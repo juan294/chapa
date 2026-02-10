@@ -5,6 +5,111 @@
   --color-card: #0F1720;
   --color-text-primary: #E6EDF3;
   --color-text-secondary: #9AA4B2;
-  --color-mint: #39FF88;
+  --color-mint: #80CCB4;
   --color-stroke: rgba(230, 237, 243, 0.12);
+
+  --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
+  --font-family-body: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Keyframes ───────────────────────────────────────────── */
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1.5deg);
+  }
+}
+
+@keyframes float-medium {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(-1deg);
+  }
+}
+
+@keyframes float-fast {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-18px) rotate(2deg);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(128, 204, 180, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 44px rgba(128, 204, 180, 0.35);
+  }
+}
+
+/* ── Animation utilities ─────────────────────────────────── */
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+.animate-float-medium {
+  animation: float-medium 7.5s ease-in-out infinite;
+}
+.animate-float-fast {
+  animation: float-fast 5s ease-in-out infinite;
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out both;
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* ── Background grid pattern ─────────────────────────────── */
+
+.bg-grid {
+  background-image: linear-gradient(
+      rgba(230, 237, 243, 0.03) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(230, 237, 243, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(230, 237, 243, 0.12);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(230, 237, 243, 0.24);
 }

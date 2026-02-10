@@ -42,6 +42,14 @@ Shared types live in: `packages/shared/types.ts`
 - SVG must be crisp and readable when scaled down
 - Animations must be subtle (heatmap fade-in, impact pulse)
 
+## Design system (MANDATORY for UI work)
+- Full spec: @docs/design-system.md
+- Accent color: `#80CCB4` (muted teal-mint) — NOT neon green. Use `text-mint`, `bg-mint`.
+- Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
+- Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
+- Dark theme only. No light mode.
+- All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
+
 ## GitHub branding
 Include GitHub logo and "Powered by GitHub" text for hackathon.
 Must be easy to swap/remove:
