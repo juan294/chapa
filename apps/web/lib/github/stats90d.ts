@@ -77,7 +77,7 @@ export async function fetchStats90d(
 
   // maxCommitsIn10Min: we don't have fine-grained timestamp data from GraphQL,
   // so we approximate using daily spikes. If a single day has >20 commits,
-  // flag it proportionally. This is a reasonable hackathon approximation.
+  // flag it proportionally. This is a reasonable approximation.
   const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
   const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
 

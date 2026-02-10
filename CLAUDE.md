@@ -1,9 +1,9 @@
-# Chapa — Dev Impact Badge (Hackathon Build)
+# Chapa — Dev Impact Badge
 
 ## One-liner
 Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact Score v3** (Impact + Confidence) from GitHub activity, with a share page and one-click sharing.
 
-## Goals (Hackathon)
+## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
 2. Compute **Impact Score v3** from last 90 days:
    - base score (0–100), confidence (50–100) + reasons, adjusted score, tier.
@@ -12,7 +12,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 5. Caching + rate limit friendliness (daily cache is fine).
 6. Minimal analytics (PostHog) for key events.
 
-## Non-goals (for hackathon)
+## Non-goals (current scope)
 - No long-term history charts
 - No leaderboard
 - No paid tiers
@@ -51,7 +51,7 @@ Shared types live in: `packages/shared/types.ts`
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## GitHub branding
-Include GitHub logo and "Powered by GitHub" text for hackathon.
+Include GitHub logo and "Powered by GitHub" text.
 Must be easy to swap/remove:
 - Branding is behind a flag: `includeGithubBranding`
 - Branding is isolated in one component/file.
@@ -100,7 +100,7 @@ Everything below defines **how** agents work on this project — git workflow, t
 
 ## Git Workflow
 
-**IMPORTANT: Always work on `develop` branch. Only merge to `main` for production releases / hackathon submission.**
+**IMPORTANT: Always work on `develop` branch. Only merge to `main` for production releases.**
 
 ```bash
 main      # PRODUCTION — deployed to chapa.thecreativetoken.com. Agents MUST NOT touch without explicit user authorization.
@@ -531,7 +531,7 @@ When triggered, create a team of parallel investigators to diagnose the issue:
 
 ## Pre-Launch Audit (Agent Team)
 
-**Trigger:** User says "run pre-launch audit", "audit before submission", or "pre-hackathon review"
+**Trigger:** User says "run pre-launch audit", "audit before submission", or "pre-release review"
 
 The pre-launch audit spawns a team of **6 parallel specialists** that perform a comprehensive audit before any production release. This is the final gate before "create the release PR."
 

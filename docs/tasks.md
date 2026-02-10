@@ -1,4 +1,4 @@
-# Chapa Task Board (Hackathon)
+# Chapa Task Board
 
 > Rule: avoid file overlap. Each teammate owns their section’s files.
 
@@ -160,7 +160,7 @@ Acceptance
 
 ---
 
-## Milestone 2 — Hackathon extras (nice-to-have)
+## Milestone 2 — Extras (nice-to-have)
 - [ ] 2 additional themes (same layout)
 - [ ] Verified stamp (OAuth required)
 - [ ] “Chapa Studio” (agent team) generates:

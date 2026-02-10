@@ -1,4 +1,4 @@
-# Chapa Hackathon Demo Script (2–3 minutes)
+# Chapa Demo Script (2–3 minutes)
 
 ## Demo goal
 Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact Score v3** (Impact + Confidence) that updates automatically and is easy to share.
@@ -6,7 +6,7 @@ Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, anim
 ## 10-second opener (hook)
 “Developers already have GitHub graphs—but they’re not embeddable, not beautiful, and they don’t tell an impact story. Chapa generates a live badge you can embed anywhere, with an Impact Score + Confidence that discourages gaming.”
 
-## What makes it hackathon-worthy
+## Key highlights
 - Live endpoint: `/u/:handle/badge.svg`
 - Animated SVG (web-native)
 - Impact v3 = score + confidence + neutral reasons
@@ -54,10 +54,10 @@ Say:
 Say:
 “Chapa is viral by design: one beautiful badge leads to another.”
 
-## If judges ask about GitHub branding
-“We’re including GitHub branding for the hackathon. It’s isolated behind a feature flag so it can be swapped or removed for compliance.”
+## GitHub branding
+GitHub branding is included but isolated behind a feature flag (`includeGithubBranding`), so it can be swapped or removed for compliance.
 
-## If judges ask about scaling
+## Scaling
 - Daily cache per handle, plus SVG cache
 - Rate limits handled by cache fallback
 - Upstash Redis + Vercel edge caching

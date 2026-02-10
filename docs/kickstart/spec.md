@@ -1,4 +1,4 @@
-# Chapa Product Spec (Hackathon)
+# Chapa Product Spec
 
 ## User story
 As a developer, I want a **beautiful, embeddable badge** that shows my real contribution impact and updates automatically, so I can share it on my portfolio, README, or social media.
