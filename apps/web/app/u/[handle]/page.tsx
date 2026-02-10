@@ -27,24 +27,20 @@ export async function generateMetadata({
     return { title: "Not Found" };
   }
 
-  // Fetch stats to get display name for the page title
-  const stats = await getStats90d(handle);
-  const displayLabel = stats?.displayName ?? `@${handle}`;
-
   const pageUrl = `${BASE_URL}/u/${handle}`;
   return {
-    title: `${displayLabel} — Developer Impact`,
+    title: `@${handle} — Developer Impact`,
     description: `View ${handle}'s developer impact score and badge on Chapa. See commits, PRs, reviews, and impact tier.`,
     openGraph: {
       type: "profile",
-      title: `${displayLabel} — Chapa Developer Impact`,
+      title: `@${handle} — Chapa Developer Impact`,
       description: `View ${handle}'s developer impact score and badge on Chapa.`,
       url: pageUrl,
       images: [`/u/${handle}/badge.svg`],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${displayLabel} — Chapa Developer Impact`,
+      title: `@${handle} — Chapa Developer Impact`,
       description: `View ${handle}'s developer impact score and badge on Chapa.`,
       images: [`/u/${handle}/badge.svg`],
     },
