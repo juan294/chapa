@@ -3,6 +3,10 @@ import { computeImpactV3 } from "@/lib/impact/v3";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
+import { readSessionCookie } from "@/lib/auth/github";
+import { isValidHandle } from "@/lib/validation";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -14,6 +18,9 @@ export async function generateMetadata({
   params,
 }: SharePageProps): Promise<Metadata> {
   const { handle } = await params;
+  if (!isValidHandle(handle)) {
+    return { title: "Not Found — Chapa" };
+  }
   return {
     title: `@${handle} — Chapa Developer Impact`,
     description: `View ${handle}'s developer impact score and badge on Chapa.`,
@@ -27,7 +34,25 @@ export async function generateMetadata({
 
 export default async function SharePage({ params }: SharePageProps) {
   const { handle } = await params;
-  const stats = await getStats90d(handle);
+
+  // Validate handle — return 404 for invalid handles (#13)
+  if (!isValidHandle(handle)) {
+    notFound();
+  }
+
+  // Read auth token from session cookie for better rate limits (#14)
+  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  let token: string | undefined;
+  if (sessionSecret) {
+    const headerStore = await headers();
+    const session = readSessionCookie(
+      headerStore.get("cookie"),
+      sessionSecret,
+    );
+    if (session) token = session.token;
+  }
+
+  const stats = await getStats90d(handle, token);
   const impact = stats ? computeImpactV3(stats) : null;
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
