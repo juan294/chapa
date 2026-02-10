@@ -1,5 +1,3 @@
-"use client";
-
 import type { ImpactV3Result } from "@chapa/shared";
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -47,6 +45,11 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
         <div className="h-2 rounded-full bg-warm-card">
           <div
             className="h-2 rounded-full bg-amber"
+            role="progressbar"
+            aria-valuenow={impact.confidence}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Confidence score"
             style={{ width: `${impact.confidence}%` }}
           />
         </div>
@@ -73,6 +76,11 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
             <div className="h-1.5 rounded-full bg-warm-card">
               <div
                 className="h-1.5 rounded-full bg-amber/60"
+                role="progressbar"
+                aria-valuenow={Math.round(value * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${SIGNAL_LABELS[key] ?? key} score`}
                 style={{ width: `${Math.round(value * 100)}%` }}
               />
             </div>
