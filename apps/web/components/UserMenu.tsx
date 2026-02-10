@@ -158,7 +158,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 16v-4M12 8h.01" />
               </svg>
-              About <span className="font-heading font-bold text-text-primary">Chapa<span className="text-amber">.</span></span>
+              About Chapa
             </Link>
             <Link
               href="/terms"

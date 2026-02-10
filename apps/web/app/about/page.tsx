@@ -19,7 +19,7 @@ export default function AboutPage() {
 
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">
-            About <span className="text-amber">Chapa</span>
+            About Chapa<span className="text-amber">.</span>
           </h1>
 
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
