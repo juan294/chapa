@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pingRedis } from "@/lib/cache/redis";
+import packageJson from "../../../package.json";
 
 export async function GET() {
   const redisStatus = await pingRedis();
@@ -9,7 +10,7 @@ export async function GET() {
   return NextResponse.json({
     status,
     timestamp: new Date().toISOString(),
-    version: "0.0.0",
+    version: packageJson.version,
     dependencies: {
       redis: redisStatus,
     },
