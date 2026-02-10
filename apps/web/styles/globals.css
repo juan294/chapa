@@ -89,6 +89,15 @@ html {
   }
 }
 
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 @keyframes drift {
   0%,
   100% {
