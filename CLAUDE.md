@@ -38,16 +38,16 @@ Shared types live in: `packages/shared/types.ts`
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
-- Default theme: Midnight Mint (dark + mint accent)
+- Default theme: Warm Amber (dark + amber/gold accent)
 - SVG must be crisp and readable when scaled down
 - Animations must be subtle (heatmap fade-in, impact pulse)
 
 ## Design system (MANDATORY for UI work)
 - Full spec: @docs/design-system.md
-- Accent color: `#80CCB4` (muted teal-mint) — NOT neon green. Use `text-mint`, `bg-mint`.
+- Accent color: `#E2A84B` (warm amber/gold). Use `text-amber`, `bg-amber`.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
-- Dark theme only. No light mode.
+- Dark theme only. No light mode. Warm-tinted backgrounds (`#12100D`).
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## GitHub branding
