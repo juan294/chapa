@@ -24,30 +24,30 @@ export function renderBadgeSvg(
   const PAD = 60;
 
   // ── Header row ──────────────────────────────────────────────
-  const headerY = 70;
-  const avatarCX = PAD + 24;
+  const headerY = 80;
+  const avatarCX = PAD + 30;
   const avatarCY = headerY;
-  const avatarR = 24;
+  const avatarR = 30;
 
   // ── Two-column body ─────────────────────────────────────────
-  // Left column: heatmap
-  const heatmapLabelY = 175;
+  // Left column: heatmap (26px cells + 4px gap = 30px per cell)
+  const heatmapLabelY = 180;
   const heatmapX = PAD;
-  const heatmapY = heatmapLabelY + 22;
+  const heatmapY = heatmapLabelY + 25;
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
-  // Right column: impact score
-  const scoreColX = 580;
-  const scoreLabelY = 175;
-  const scoreValueY = scoreLabelY + 75;
+  // Right column: impact score (starts after heatmap area)
+  const scoreColX = 530;
+  const scoreLabelY = 180;
+  const scoreValueY = scoreLabelY + 95;
 
   // ── Stats row ───────────────────────────────────────────────
-  const statsY = 480;
+  const statsY = 460;
 
   // ── Footer ──────────────────────────────────────────────────
-  const footerDividerY = 540;
-  const footerY = 570;
+  const footerDividerY = 520;
+  const footerY = 555;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
@@ -56,7 +56,7 @@ export function renderBadgeSvg(
 
   // Tier pill dimensions
   const tierText = `\u2605 ${impact.tier}`;
-  const tierPillWidth = tierText.length * 8 + 24;
+  const tierPillWidth = tierText.length * 10 + 30;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -74,41 +74,41 @@ export function renderBadgeSvg(
 
   <!-- ─── Header row ─────────────────────────────────────── -->
   <!-- Avatar placeholder (circle with amber ring) -->
-  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.20)" stroke-width="2"/>
-  <g transform="translate(${avatarCX - 10}, ${avatarCY - 10})">
-    <path d="M10 0C4.48 0 0 4.48 0 10c0 4.42 2.86 8.16 6.84 9.49.5.09.66-.21.66-.47 0-.24-.01-1.03-.01-1.86-2.51.46-3.16-.61-3.36-1.18-.11-.29-.6-1.18-1.03-1.41-.35-.19-.85-.65-.01-.66.79-.01 1.35.72 1.54 1.03.9 1.51 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.26 2.75 1.03.8-.22 1.65-.34 2.5-.34s1.7.11 2.5.34c1.91-1.3 2.75-1.03 2.75-1.03.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85 0 1.34-.01 2.41-.01 2.75 0 .26.18.58.68.48A10.02 10.02 0 0020 10c0-5.52-4.48-10-10-10z" fill="${t.textSecondary}" opacity="0.5" transform="scale(1)"/>
+  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.25)" stroke-width="2"/>
+  <g transform="translate(${avatarCX - 14}, ${avatarCY - 14})">
+    <path d="M14 0C6.27 0 0 6.27 0 14c0 6.19 4.01 11.43 9.57 13.28.7.13.96-.3.96-.67 0-.34-.01-1.45-.02-2.61-3.52.64-4.42-.86-4.7-1.65-.16-.4-.84-1.65-1.44-1.98-.49-.26-1.19-.91-.02-.92 1.1-.02 1.89 1.01 2.16 1.43 1.26 2.12 3.27 1.52 4.07 1.16.13-.91.49-1.52.89-1.87-3.11-.35-6.37-1.55-6.37-6.92 0-1.52.55-2.78 1.44-3.76-.14-.35-.63-1.78.14-3.71 0 0 1.17-.37 3.85 1.44 1.12-.31 2.31-.47 3.5-.47s2.38.16 3.5.47c2.68-1.82 3.85-1.44 3.85-1.44.77 1.93.28 3.36.14 3.71.9.98 1.44 2.23 1.44 3.76 0 5.39-3.27 6.57-6.39 6.91.5.43.95 1.28.95 2.58 0 1.87-.02 3.37-.02 3.83 0 .37.26.81.96.67A14.03 14.03 0 0028 14c0-7.73-6.27-14-14-14z" fill="${t.textSecondary}" opacity="0.6"/>
   </g>
 
   <!-- Handle + subtitle -->
-  <text x="${PAD + 60}" y="${headerY - 4}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" font-weight="600" fill="${t.textPrimary}">@${safeHandle}</text>
-  <text x="${PAD + 60}" y="${headerY + 16}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}">Last 90 days</text>
+  <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="22" font-weight="600" fill="${t.textPrimary}">@${safeHandle}</text>
+  <text x="${PAD + 72}" y="${headerY + 18}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">Last 90 days</text>
 
   <!-- Chapa. logo (top-right) -->
-  <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="16" fill="${t.textSecondary}" opacity="0.5" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">.</tspan></text>
+  <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="20" fill="${t.textSecondary}" opacity="0.5" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">.</tspan></text>
 
   <!-- ─── Two-column body ────────────────────────────────── -->
 
   <!-- Left: ACTIVITY + heatmap -->
-  <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="11" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2">ACTIVITY</text>
+  <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2.5">ACTIVITY</text>
   ${heatmapSvg}
 
   <!-- Right: IMPACT SCORE + score + tier pill + confidence -->
-  <text x="${scoreColX}" y="${scoreLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="11" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2">IMPACT SCORE</text>
+  <text x="${scoreColX}" y="${scoreLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2.5">IMPACT SCORE</text>
 
   <!-- Large score number -->
-  <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="72" font-weight="700" fill="${t.textPrimary}" letter-spacing="-3" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
+  <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="96" font-weight="700" fill="${t.textPrimary}" letter-spacing="-4" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
 
   <!-- Tier pill badge -->
-  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 100 : 58)}, ${scoreValueY - 48})">
-    <rect width="${tierPillWidth}" height="28" rx="14" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.20)" stroke-width="1"/>
-    <text x="${tierPillWidth / 2}" y="18" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
+  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}, ${scoreValueY - 55})">
+    <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.25)" stroke-width="1"/>
+    <text x="${tierPillWidth / 2}" y="22" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
   </g>
 
   <!-- Confidence -->
-  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 100 : 58)}" y="${scoreValueY + 4}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
+  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}" y="${scoreValueY + 8}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
 
   <!-- ─── Stats row ──────────────────────────────────────── -->
-  <text x="${W / 2}" y="${statsY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}" text-anchor="middle">
+  <text x="${W / 2}" y="${statsY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" text-anchor="middle">
     <tspan>${stats.commitsTotal} commits</tspan>
     <tspan fill="${t.stroke}" dx="12">|</tspan>
     <tspan dx="12">${stats.prsMergedCount} PRs merged</tspan>
