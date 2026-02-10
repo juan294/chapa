@@ -4,10 +4,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockFetchGitHubUser, mockCacheSet, mockCacheDel } = vi.hoisted(() => ({
+const { mockFetchGitHubUser, mockCacheSet, mockCacheDel, mockRateLimit } = vi.hoisted(() => ({
   mockFetchGitHubUser: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheDel: vi.fn(),
+  mockRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/github", () => ({
@@ -17,6 +18,7 @@ vi.mock("@/lib/auth/github", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheSet: mockCacheSet,
   cacheDel: mockCacheDel,
+  rateLimit: mockRateLimit,
 }));
 
 // Re-export real validation functions through the mock to avoid alias resolution issues
@@ -74,6 +76,7 @@ describe("POST /api/supplemental", () => {
     vi.clearAllMocks();
     mockCacheSet.mockResolvedValue(undefined);
     mockCacheDel.mockResolvedValue(undefined);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   });
 
   it("returns 401 when Authorization header is missing", async () => {
@@ -219,5 +222,55 @@ describe("POST /api/supplemental", () => {
     );
     const res = await POST(req);
     expect(res.status).toBe(200);
+  });
+
+  // -------------------------------------------------------------------------
+  // Rate limiting
+  // -------------------------------------------------------------------------
+
+  it("returns 429 when rate limited by targetHandle", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toMatch(/too many/i);
+  });
+
+  it("rate limits by targetHandle with correct key and window (10 req / 24h)", async () => {
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "juan294",
+      name: "Juan",
+      avatar_url: "https://example.com/juan.png",
+    });
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    await POST(req);
+
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      "ratelimit:supplemental:juan294",
+      10,
+      86400,
+    );
+  });
+
+  it("includes Retry-After header when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    const res = await POST(req);
+
+    expect(res.headers.get("Retry-After")).toBe("86400");
   });
 });

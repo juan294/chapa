@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchGitHubUser } from "@/lib/auth/github";
-import { cacheSet, cacheDel } from "@/lib/cache/redis";
+import { cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { isValidHandle, isValidEmuHandle, isValidStats90dShape } from "@/lib/validation";
 import type { SupplementalStats } from "@chapa/shared";
 
@@ -39,6 +39,15 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!isValidStats90dShape(stats)) {
     return NextResponse.json({ error: "Invalid stats shape" }, { status: 400 });
+  }
+
+  // 3b. Rate limit: 10 requests per targetHandle per 24 hours
+  const rl = await rateLimit(`ratelimit:supplemental:${targetHandle}`, 10, 86400);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests for this handle. Please try again later." },
+      { status: 429, headers: { "Retry-After": "86400" } },
+    );
   }
 
   // 4. Verify token ownership

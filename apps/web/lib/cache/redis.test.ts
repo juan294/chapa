@@ -8,17 +8,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockGet = vi.fn();
 const mockSet = vi.fn();
 const mockDel = vi.fn();
+const mockIncr = vi.fn();
+const mockExpire = vi.fn();
 
 vi.mock("@upstash/redis", () => ({
   Redis: class MockRedis {
     get = mockGet;
     set = mockSet;
     del = mockDel;
+    incr = mockIncr;
+    expire = mockExpire;
   },
 }));
 
 // Import after mock is set up
-import { cacheGet, cacheSet, cacheDel, _resetClient } from "./redis";
+import { cacheGet, cacheSet, cacheDel, rateLimit, _resetClient } from "./redis";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -163,5 +167,72 @@ describe("missing env vars (no-op fallback)", () => {
     await cacheDel("anything");
 
     expect(mockDel).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rateLimit
+// ---------------------------------------------------------------------------
+
+describe("rateLimit", () => {
+  it("allows request when under the limit", async () => {
+    mockIncr.mockResolvedValueOnce(1);
+    mockExpire.mockResolvedValueOnce(1);
+
+    const result = await rateLimit("ratelimit:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(1);
+    expect(result.limit).toBe(10);
+    expect(mockIncr).toHaveBeenCalledWith("ratelimit:test");
+    expect(mockExpire).toHaveBeenCalledWith("ratelimit:test", 900);
+  });
+
+  it("sets expire only on first increment (current === 1)", async () => {
+    mockIncr.mockResolvedValueOnce(5);
+
+    const result = await rateLimit("ratelimit:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(5);
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("denies request when at the limit", async () => {
+    mockIncr.mockResolvedValueOnce(11);
+
+    const result = await rateLimit("ratelimit:test", 10, 900);
+
+    expect(result.allowed).toBe(false);
+    expect(result.current).toBe(11);
+  });
+
+  it("allows exactly at the limit boundary", async () => {
+    mockIncr.mockResolvedValueOnce(10);
+
+    const result = await rateLimit("ratelimit:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(10);
+  });
+
+  it("fails open when Redis throws", async () => {
+    mockIncr.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const result = await rateLimit("ratelimit:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(0);
+  });
+
+  it("fails open when Redis is unavailable (no env vars)", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await rateLimit("ratelimit:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(mockIncr).not.toHaveBeenCalled();
   });
 });
