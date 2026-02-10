@@ -1,6 +1,7 @@
 export type {
   HeatmapDay,
   Stats90d,
+  RawContributionData,
   ConfidenceFlag,
   ConfidencePenalty,
   ScoreBreakdown,
@@ -8,3 +9,6 @@ export type {
   ImpactV3Result,
   SupplementalStats,
 } from "./types";
+
+export { CONTRIBUTION_QUERY } from "./github-query";
+export { computePrWeight } from "./scoring";

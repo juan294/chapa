@@ -68,6 +68,42 @@ export interface ImpactV3Result {
   computedAt: string; // ISO timestamp
 }
 
+/** Raw data shape returned by the GitHub GraphQL contribution query */
+export interface RawContributionData {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  contributionCalendar: {
+    totalContributions: number;
+    weeks: {
+      contributionDays: {
+        date: string;
+        contributionCount: number;
+      }[];
+    }[];
+  };
+  pullRequests: {
+    totalCount: number;
+    nodes: {
+      additions: number;
+      deletions: number;
+      changedFiles: number;
+      merged: boolean;
+    }[];
+  };
+  reviews: { totalCount: number };
+  issues: { totalCount: number };
+  repositories: {
+    totalCount: number;
+    nodes: {
+      nameWithOwner: string;
+      defaultBranchRef: {
+        target: { history: { totalCount: number } };
+      } | null;
+    }[];
+  };
+}
+
 /** Supplemental stats uploaded from a linked account (e.g. GitHub EMU) */
 export interface SupplementalStats {
   targetHandle: string; // personal GitHub handle
