@@ -1,6 +1,7 @@
 import { fetchStats90d } from "./stats90d";
+import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
-import type { Stats90d } from "@chapa/shared";
+import type { Stats90d, SupplementalStats } from "@chapa/shared";
 
 const CACHE_TTL = 86400; // 24 hours
 
@@ -8,6 +9,7 @@ const CACHE_TTL = 86400; // 24 hours
  * Get Stats90d for a user — cache-first, then GitHub API.
  * Returns cached data if available (within 24h).
  * Falls back to live fetch on cache miss.
+ * If supplemental data exists (e.g. from an EMU upload), merges it into the result.
  */
 export async function getStats90d(
   handle: string,
@@ -20,10 +22,14 @@ export async function getStats90d(
   if (cached) return cached;
 
   // Fetch from GitHub
-  const stats = await fetchStats90d(handle, token);
-  if (!stats) return null;
+  const primary = await fetchStats90d(handle, token);
+  if (!primary) return null;
 
-  // Cache the result
+  // Check for supplemental data (e.g. EMU account)
+  const supplemental = await cacheGet<SupplementalStats>(`supplemental:${handle}`);
+  const stats = supplemental ? mergeStats(primary, supplemental.stats) : primary;
+
+  // Cache the (possibly merged) result
   await cacheSet(cacheKey, stats, CACHE_TTL);
   return stats;
 }

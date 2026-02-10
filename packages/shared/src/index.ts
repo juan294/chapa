@@ -6,4 +6,5 @@ export type {
   ScoreBreakdown,
   ImpactTier,
   ImpactV3Result,
+  SupplementalStats,
 } from "./types";

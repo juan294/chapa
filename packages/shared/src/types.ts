@@ -24,6 +24,7 @@ export interface Stats90d {
   docsOnlyPrRatio?: number; // optional, 0..1
   heatmapData: HeatmapDay[];
   fetchedAt: string; // ISO timestamp
+  hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
 }
 
 /** Confidence flag identifiers */
@@ -32,7 +33,8 @@ export type ConfidenceFlag =
   | "micro_commit_pattern"
   | "generated_change_pattern"
   | "low_collaboration_signal"
-  | "single_repo_concentration";
+  | "single_repo_concentration"
+  | "supplemental_unverified";
 
 /** A single confidence penalty with reason */
 export interface ConfidencePenalty {
@@ -64,4 +66,12 @@ export interface ImpactV3Result {
   tier: ImpactTier;
   breakdown: ScoreBreakdown;
   computedAt: string; // ISO timestamp
+}
+
+/** Supplemental stats uploaded from a linked account (e.g. GitHub EMU) */
+export interface SupplementalStats {
+  targetHandle: string; // personal GitHub handle
+  sourceHandle: string; // EMU handle
+  stats: Stats90d;
+  uploadedAt: string; // ISO timestamp
 }

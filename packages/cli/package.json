@@ -1,0 +1,19 @@
+{
+  "name": "@chapa/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "chapa": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chapa/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
