@@ -55,10 +55,10 @@ export default function AboutPage() {
             <p>
               Questions or feedback? Reach us at{" "}
               <a
-                href="mailto:support@chapa.dev"
+                href="mailto:support@chapa.thecreativetoken.com"
                 className="text-amber hover:text-amber-light transition-colors"
               >
-                support@chapa.dev
+                support@chapa.thecreativetoken.com
               </a>
               .
             </p>

@@ -78,10 +78,10 @@ export default function PrivacyPage() {
             <p>
               For privacy-related inquiries, contact us at{" "}
               <a
-                href="mailto:support@chapa.dev"
+                href="mailto:support@chapa.thecreativetoken.com"
                 className="text-amber hover:text-amber-light transition-colors"
               >
-                support@chapa.dev
+                support@chapa.thecreativetoken.com
               </a>
               .
             </p>
