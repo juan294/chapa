@@ -1,6 +1,165 @@
-/**
- * GitHub GraphQL queries stub (Teammate B).
- * Will contain all GitHub data-fetching queries.
- */
+// ---------------------------------------------------------------------------
+// Types for raw GitHub GraphQL response data
+// ---------------------------------------------------------------------------
 
-export {};
+export interface RawContributionData {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  contributionCalendar: {
+    totalContributions: number;
+    weeks: {
+      contributionDays: {
+        date: string;
+        contributionCount: number;
+      }[];
+    }[];
+  };
+  pullRequests: {
+    totalCount: number;
+    nodes: {
+      additions: number;
+      deletions: number;
+      changedFiles: number;
+      merged: boolean;
+    }[];
+  };
+  reviews: { totalCount: number };
+  issues: { totalCount: number };
+  repositories: {
+    totalCount: number;
+    nodes: {
+      nameWithOwner: string;
+      defaultBranchRef: {
+        target: { history: { totalCount: number } };
+      } | null;
+    }[];
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GraphQL query
+// ---------------------------------------------------------------------------
+
+const CONTRIBUTION_QUERY = `
+query($login: String!, $since: DateTime!, $until: DateTime!) {
+  user(login: $login) {
+    login
+    name
+    avatarUrl
+    contributionsCollection(from: $since, to: $until) {
+      contributionCalendar {
+        totalContributions
+        weeks {
+          contributionDays {
+            date
+            contributionCount
+          }
+        }
+      }
+      pullRequestContributions(first: 100) {
+        totalCount
+        nodes {
+          pullRequest {
+            additions
+            deletions
+            changedFiles
+            merged
+          }
+        }
+      }
+      pullRequestReviewContributions(first: 1) {
+        totalCount
+      }
+      issueContributions(first: 1) {
+        totalCount
+      }
+    }
+    repositories(first: 20, ownerAffiliations: [OWNER, COLLABORATOR], orderBy: {field: PUSHED_AT, direction: DESC}) {
+      totalCount
+      nodes {
+        nameWithOwner
+        defaultBranchRef {
+          target {
+            ... on Commit {
+              history(since: $since, until: $until) {
+                totalCount
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Fetch function
+// ---------------------------------------------------------------------------
+
+export async function fetchContributionData(
+  login: string,
+  token?: string,
+): Promise<RawContributionData | null> {
+  const now = new Date();
+  const since = new Date(now);
+  since.setDate(since.getDate() - 90);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        query: CONTRIBUTION_QUERY,
+        variables: {
+          login,
+          since: since.toISOString(),
+          until: now.toISOString(),
+        },
+      }),
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    if (!json.data?.user) return null;
+
+    const user = json.data.user;
+    const cc = user.contributionsCollection;
+
+    return {
+      login: user.login,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      contributionCalendar: cc.contributionCalendar,
+      pullRequests: {
+        totalCount: cc.pullRequestContributions.totalCount,
+        nodes: cc.pullRequestContributions.nodes.map(
+          (n: { pullRequest: { additions: number; deletions: number; changedFiles: number; merged: boolean } }) => ({
+            additions: n.pullRequest.additions,
+            deletions: n.pullRequest.deletions,
+            changedFiles: n.pullRequest.changedFiles,
+            merged: n.pullRequest.merged,
+          }),
+        ),
+      },
+      reviews: { totalCount: cc.pullRequestReviewContributions.totalCount },
+      issues: { totalCount: cc.issueContributions.totalCount },
+      repositories: {
+        totalCount: user.repositories.totalCount,
+        nodes: user.repositories.nodes,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
