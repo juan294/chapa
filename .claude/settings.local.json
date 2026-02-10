@@ -32,7 +32,20 @@
       "Bash(vercel link:*)",
       "Bash(vercel git connect:*)",
       "Bash(# Check DNS propagation dig chapa.thecreativetoken.com CNAME +short || nslookup chapa.thecreativetoken.com)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(git config:*)",
+      "WebSearch",
+      "Bash(xargs cat:*)",
+      "Bash(42 PRs merged)",
+      "WebFetch(domain:resend.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.svix.com)",
+      "Bash(cat:*)",
+      "Bash(dig:*)",
+      "Bash(printf:*)",
+      "Bash(wc:*)",
+      "Bash(git stash:*)",
+      "Bash(aws sts get-caller-identity:*)"
     ]
   }
 }
