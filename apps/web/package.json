@@ -12,6 +12,7 @@
   "dependencies": {
     "@chapa/shared": "workspace:*",
     "@upstash/redis": "^1.36.2",
+    "canvas-confetti": "^1.9.4",
     "next": "^16.1.6",
     "posthog-js": "^1.345.2",
     "react": "^19.1.0",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.8",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.5",
