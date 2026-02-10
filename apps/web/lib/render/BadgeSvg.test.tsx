@@ -92,7 +92,7 @@ describe("escapeXml", () => {
 });
 
 // ---------------------------------------------------------------------------
-// renderBadgeSvg
+// renderBadgeSvg — structural
 // ---------------------------------------------------------------------------
 
 describe("renderBadgeSvg", () => {
@@ -101,59 +101,172 @@ describe("renderBadgeSvg", () => {
     expect(svg.trimStart().startsWith("<svg")).toBe(true);
   });
 
-  it("contains the escaped handle", () => {
-    const svg = renderBadgeSvg(
-      makeStats({ handle: "user<xss>" }),
-      makeImpact(),
-    );
-    expect(svg).toContain("@user&lt;xss&gt;");
-    expect(svg).not.toContain("user<xss>");
-  });
-
-  it("contains the score value", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact({ adjustedScore: 61 }));
-    expect(svg).toContain("61");
-  });
-
-  it("contains the tier label", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "Elite" }));
-    expect(svg).toContain("ELITE");
-  });
-
-  it("contains the confidence percentage", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact({ confidence: 85 }));
-    expect(svg).toContain("85%");
-  });
-
-  it("contains commit/PR/review counts", () => {
-    const stats = makeStats({
-      commitsTotal: 142,
-      prsMergedCount: 18,
-      reviewsSubmittedCount: 31,
-    });
-    const svg = renderBadgeSvg(stats, makeImpact());
-    expect(svg).toContain("142");
-    expect(svg).toContain("18");
-    expect(svg).toContain("31");
-  });
-
   it("returns valid SVG (no unclosed tags)", () => {
     const svg = renderBadgeSvg(makeStats(), makeImpact());
-    // Every opening tag that is not self-closing should have a matching close.
-    // A simple structural check: starts with <svg and ends with </svg>.
     expect(svg.trimStart().startsWith("<svg")).toBe(true);
     expect(svg.trimEnd().endsWith("</svg>")).toBe(true);
   });
 
-  it("includes GitHub branding by default", () => {
+  it("sets viewBox to 1200x630", () => {
     const svg = renderBadgeSvg(makeStats(), makeImpact());
-    expect(svg).toContain("Powered by GitHub");
+    expect(svg).toContain('viewBox="0 0 1200 630"');
   });
 
-  it("omits GitHub branding when includeGithubBranding is false", () => {
-    const svg = renderBadgeSvg(makeStats(), makeImpact(), {
-      includeGithubBranding: false,
+  // ---------------------------------------------------------------------------
+  // Header row
+  // ---------------------------------------------------------------------------
+
+  describe("header row", () => {
+    it("contains the escaped handle with @ prefix", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ handle: "user<xss>" }),
+        makeImpact(),
+      );
+      expect(svg).toContain("@user&lt;xss&gt;");
+      expect(svg).not.toContain("user<xss>");
     });
-    expect(svg).not.toContain("Powered by GitHub");
+
+    it("contains 'Last 90 days' subtitle", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Last 90 days");
+    });
+
+    it("contains 'Chapa.' logo text", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Chapa");
+    });
+
+    it("contains a circular avatar placeholder with amber ring", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Avatar is a circle with amber-tinted stroke
+      expect(svg).toContain("<circle");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Two-column body: heatmap + impact score
+  // ---------------------------------------------------------------------------
+
+  describe("body layout", () => {
+    it("contains 'ACTIVITY' section label", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("ACTIVITY");
+    });
+
+    it("contains 'IMPACT SCORE' section label", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("IMPACT SCORE");
+    });
+
+    it("contains the score value", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ adjustedScore: 61 }),
+      );
+      expect(svg).toContain("61");
+    });
+
+    it("contains the tier label in a pill badge", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "Elite" }));
+      expect(svg).toContain("Elite");
+    });
+
+    it("contains a star icon in the tier pill", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "Elite" }));
+      // The tier pill should have a star character or SVG star
+      expect(svg).toMatch(/[\u2605\u2606]|star/i);
+    });
+
+    it("contains the confidence percentage", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ confidence: 85 }));
+      expect(svg).toContain("85% Confidence");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stats row (commits | PRs merged | reviews)
+  // ---------------------------------------------------------------------------
+
+  describe("stats row", () => {
+    it("contains commit/PR/review counts", () => {
+      const stats = makeStats({
+        commitsTotal: 142,
+        prsMergedCount: 18,
+        reviewsSubmittedCount: 31,
+      });
+      const svg = renderBadgeSvg(stats, makeImpact());
+      expect(svg).toContain("142");
+      expect(svg).toContain("18");
+      expect(svg).toContain("31");
+    });
+
+    it("contains pipe separators between stats", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("commits");
+      expect(svg).toContain("PRs merged");
+      expect(svg).toContain("reviews");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Footer (branding)
+  // ---------------------------------------------------------------------------
+
+  describe("footer", () => {
+    it("includes GitHub branding by default", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Powered by GitHub");
+    });
+
+    it("omits GitHub branding when includeGithubBranding is false", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        includeGithubBranding: false,
+      });
+      expect(svg).not.toContain("Powered by GitHub");
+    });
+
+    it("contains the domain name in footer", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("chapa.thecreativetoken.com");
+    });
+
+    it("contains a divider line above footer", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Footer has a horizontal line divider
+      expect(svg).toContain("<line");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Animations
+  // ---------------------------------------------------------------------------
+
+  describe("animations", () => {
+    it("includes heatmap fade-in animations", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("<animate");
+      expect(svg).toContain('attributeName="opacity"');
+    });
+
+    it("includes pulse animation on impact score area", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("pulse-glow");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Typography
+  // ---------------------------------------------------------------------------
+
+  describe("typography", () => {
+    it("uses JetBrains Mono for headings/score", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("JetBrains Mono");
+    });
+
+    it("uses Plus Jakarta Sans for body text", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Plus Jakarta Sans");
+    });
   });
 });
