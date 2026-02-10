@@ -1,5 +1,5 @@
-import type { Stats90d, HeatmapDay } from "@chapa/shared";
-import { computePrWeight } from "@chapa/shared";
+import type { Stats90d } from "@chapa/shared";
+import { buildStats90dFromRaw } from "@chapa/shared";
 import { fetchContributionData } from "./queries";
 
 // ---------------------------------------------------------------------------
@@ -13,74 +13,5 @@ export async function fetchStats90d(
   const raw = await fetchContributionData(handle, token);
   if (!raw) return null;
 
-  // Heatmap: flatten weeks into 91 days (13 weeks × 7 days)
-  const heatmapData: HeatmapDay[] = [];
-  for (const week of raw.contributionCalendar.weeks) {
-    for (const day of week.contributionDays) {
-      heatmapData.push({ date: day.date, count: day.contributionCount });
-    }
-  }
-
-  // Active days: days with at least 1 contribution
-  const activeDays = heatmapData.filter((d) => d.count > 0).length;
-
-  // Total commits from contribution calendar
-  const commitsTotal = raw.contributionCalendar.totalContributions;
-
-  // PRs: only count merged, compute weight
-  const mergedPRs = raw.pullRequests.nodes.filter((pr) => pr.merged);
-  const prsMergedCount = mergedPRs.length;
-  const prsMergedWeight = Math.min(
-    mergedPRs.reduce((sum, pr) => sum + computePrWeight(pr), 0),
-    40,
-  );
-
-  // Lines added/deleted from merged PRs
-  const linesAdded = mergedPRs.reduce((sum, pr) => sum + pr.additions, 0);
-  const linesDeleted = mergedPRs.reduce((sum, pr) => sum + pr.deletions, 0);
-
-  // Reviews and issues
-  const reviewsSubmittedCount = raw.reviews.totalCount;
-  const issuesClosedCount = raw.issues.totalCount;
-
-  // Repos contributed to (with commits in the period)
-  const repoCommits = raw.repositories.nodes
-    .map((r) => ({
-      name: r.nameWithOwner,
-      commits: r.defaultBranchRef?.target?.history?.totalCount ?? 0,
-    }))
-    .filter((r) => r.commits > 0);
-  const reposContributed = repoCommits.length;
-
-  // Top repo share
-  const totalRepoCommits = repoCommits.reduce((s, r) => s + r.commits, 0);
-  const topRepoShare =
-    totalRepoCommits > 0
-      ? Math.max(...repoCommits.map((r) => r.commits)) / totalRepoCommits
-      : 0;
-
-  // maxCommitsIn10Min: we don't have fine-grained timestamp data from GraphQL,
-  // so we approximate using daily spikes. If a single day has >20 commits,
-  // flag it proportionally. This is a reasonable approximation.
-  const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
-  const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
-
-  return {
-    handle: raw.login,
-    displayName: raw.name ?? undefined,
-    avatarUrl: raw.avatarUrl,
-    commitsTotal,
-    activeDays,
-    prsMergedCount,
-    prsMergedWeight,
-    reviewsSubmittedCount,
-    issuesClosedCount,
-    linesAdded,
-    linesDeleted,
-    reposContributed,
-    topRepoShare,
-    maxCommitsIn10Min,
-    heatmapData,
-    fetchedAt: new Date().toISOString(),
-  };
+  return buildStats90dFromRaw(raw);
 }
