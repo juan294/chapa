@@ -286,4 +286,42 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("Plus Jakarta Sans");
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // R4: Numeric defense-in-depth — coerce numeric stats to prevent XSS
+  // ---------------------------------------------------------------------------
+
+  describe("numeric defense-in-depth", () => {
+    it("coerces commitsTotal to a number string even if somehow a string", () => {
+      const stats = makeStats({ commitsTotal: "42<script>" as unknown as number });
+      const svg = renderBadgeSvg(stats, makeImpact());
+      // Should contain NaN (since "42<script>" coerced via Number() is NaN)
+      // but must NOT contain the raw script tag
+      expect(svg).not.toContain("<script>");
+    });
+
+    it("coerces prsMergedCount to a number string even if somehow a string", () => {
+      const stats = makeStats({ prsMergedCount: '10"onload="alert(1)' as unknown as number });
+      const svg = renderBadgeSvg(stats, makeImpact());
+      expect(svg).not.toContain("onload");
+    });
+
+    it("coerces reviewsSubmittedCount to a number string even if somehow a string", () => {
+      const stats = makeStats({ reviewsSubmittedCount: "<img src=x>" as unknown as number });
+      const svg = renderBadgeSvg(stats, makeImpact());
+      expect(svg).not.toContain("<img");
+    });
+
+    it("renders valid numbers correctly after coercion", () => {
+      const stats = makeStats({
+        commitsTotal: 142,
+        prsMergedCount: 18,
+        reviewsSubmittedCount: 31,
+      });
+      const svg = renderBadgeSvg(stats, makeImpact());
+      expect(svg).toContain("142 commits");
+      expect(svg).toContain("18 PRs merged");
+      expect(svg).toContain("31 reviews");
+    });
+  });
 });

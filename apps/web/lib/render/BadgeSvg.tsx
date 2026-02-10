@@ -46,6 +46,11 @@ export function renderBadgeSvg(
   const scoreValueY = scoreLabelY + 95;
 
   // ── Stats row ───────────────────────────────────────────────
+  // Defense-in-depth: coerce numeric stats to prevent XSS from malformed data
+  const safeCommits = String(Number(stats.commitsTotal));
+  const safePRs = String(Number(stats.prsMergedCount));
+  const safeReviews = String(Number(stats.reviewsSubmittedCount));
+
   const statsY = 460;
 
   // ── Footer ──────────────────────────────────────────────────
@@ -112,11 +117,11 @@ export function renderBadgeSvg(
 
   <!-- ─── Stats row ──────────────────────────────────────── -->
   <text x="${W / 2}" y="${statsY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" text-anchor="middle">
-    <tspan>${stats.commitsTotal} commits</tspan>
+    <tspan>${safeCommits} commits</tspan>
     <tspan fill="${t.stroke}" dx="12">|</tspan>
-    <tspan dx="12">${stats.prsMergedCount} PRs merged</tspan>
+    <tspan dx="12">${safePRs} PRs merged</tspan>
     <tspan fill="${t.stroke}" dx="12">|</tspan>
-    <tspan dx="12">${stats.reviewsSubmittedCount} reviews</tspan>
+    <tspan dx="12">${safeReviews} reviews</tspan>
   </text>
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
