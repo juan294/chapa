@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { escapeXml, renderBadgeSvg } from "./BadgeSvg";
+import { renderBadgeSvg } from "./BadgeSvg";
+import { escapeXml } from "./escape";
 import type { Stats90d, ImpactV3Result } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
