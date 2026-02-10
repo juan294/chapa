@@ -5,6 +5,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
+import { Navbar } from "@/components/Navbar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -66,17 +67,9 @@ export default async function SharePage({ params }: SharePageProps) {
         <div className="absolute bottom-1/4 right-1/4 h-80 w-80 rounded-full bg-amber/[0.04] blur-[120px]" />
       </div>
 
-      <div className="relative mx-auto max-w-4xl px-6 py-16">
-        {/* Header */}
-        <div className="mb-12 animate-fade-in-up">
-          <Link
-            href="/"
-            className="font-heading text-lg font-bold text-amber hover:text-amber-light transition-colors"
-          >
-            CHAPA
-          </Link>
-        </div>
+      <Navbar />
 
+      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
         {/* Handle */}
         <h1 className="font-heading text-3xl font-bold text-text-primary mb-8 animate-fade-in-up [animation-delay:100ms]">
           <span className="text-amber">@{handle}</span>
