@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version:*)",
+      "Bash(pnpm:*)",
+      "Bash(gh:*)",
+      "Bash(npx:*)",
+      "Bash(npm:*)",
+      "Bash(corepack --version:*)",
+      "Bash(corepack enable:*)",
+      "Bash(git init:*)",
+      "Bash(GITHUB_CLIENT_ID=dummy GITHUB_CLIENT_SECRET=dummy NEXTAUTH_SECRET=dummy-secret UPSTASH_REDIS_REST_URL=https://dummy.upstash.io UPSTASH_REDIS_REST_TOKEN=dummy pnpm run build:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

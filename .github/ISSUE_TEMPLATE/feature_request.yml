@@ -1,0 +1,58 @@
+name: Feature Request
+description: Propose new functionality
+title: "[Feature]: "
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the feature you'd like to add to Chapa.
+
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: "As a [type of user], I want [goal] so that [reason]."
+      placeholder: "As a developer, I want to see my badge in dark mode so that it matches my GitHub README theme."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: How should this work?
+      placeholder: "Add a `theme` query parameter to the badge endpoint..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - OAuth
+        - Scoring
+        - Badge
+        - Share Page
+        - Cache
+        - Infrastructure
+        - UX
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Other approaches you thought about
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Mockups, examples, references
+    validations:
+      required: false

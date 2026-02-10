@@ -1,0 +1,65 @@
+/** Daily activity count for heatmap (13 weeks × 7 days = 91 entries) */
+export interface HeatmapDay {
+  date: string; // ISO date string (YYYY-MM-DD)
+  count: number;
+}
+
+/** Aggregated GitHub stats over the last 90 days */
+export interface Stats90d {
+  handle: string;
+  commitsTotal: number; // cap 200
+  activeDays: number; // 0..90
+  prsMergedCount: number;
+  prsMergedWeight: number; // cap 40
+  reviewsSubmittedCount: number; // cap 60
+  issuesClosedCount: number; // cap 30
+  linesAdded: number;
+  linesDeleted: number;
+  reposContributed: number; // cap 10
+  topRepoShare: number; // 0..1
+  maxCommitsIn10Min: number; // derived from commit timestamps
+  microCommitRatio?: number; // optional, 0..1
+  docsOnlyPrRatio?: number; // optional, 0..1
+  heatmapData: HeatmapDay[];
+  fetchedAt: string; // ISO timestamp
+}
+
+/** Confidence flag identifiers */
+export type ConfidenceFlag =
+  | "burst_activity"
+  | "micro_commit_pattern"
+  | "generated_change_pattern"
+  | "low_collaboration_signal"
+  | "single_repo_concentration";
+
+/** A single confidence penalty with reason */
+export interface ConfidencePenalty {
+  flag: ConfidenceFlag;
+  penalty: number;
+  reason: string;
+}
+
+/** Normalized score breakdown (each 0..1 before weighting) */
+export interface ScoreBreakdown {
+  commits: number;
+  prWeight: number;
+  reviews: number;
+  issues: number;
+  streak: number;
+  collaboration: number;
+}
+
+/** Impact tier based on adjusted score */
+export type ImpactTier = "Emerging" | "Solid" | "High" | "Elite";
+
+/** Full Impact v3 result */
+export interface ImpactV3Result {
+  handle: string;
+  baseScore: number; // 0..100
+  confidence: number; // 50..100
+  confidencePenalties: ConfidencePenalty[];
+  adjustedScore: number; // 0..100
+  tier: ImpactTier;
+  breakdown: ScoreBreakdown;
+  computedAt: string; // ISO timestamp
+}

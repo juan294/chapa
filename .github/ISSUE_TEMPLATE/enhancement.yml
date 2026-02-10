@@ -1,0 +1,50 @@
+name: Enhancement
+description: Improve an existing feature
+title: "[Enhancement]: "
+labels: ["type: enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe what you'd like to improve.
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Behavior
+      description: How does it work now?
+      placeholder: "The confidence reasons are shown as plain text..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-behavior
+    attributes:
+      label: Desired Behavior
+      description: How should it work instead?
+      placeholder: "Confidence reasons should have icons and be color-coded..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - OAuth
+        - Scoring
+        - Badge
+        - Share Page
+        - Cache
+        - Infrastructure
+        - UX
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Screenshots, mockups, references
+    validations:
+      required: false

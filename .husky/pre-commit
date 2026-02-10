@@ -1,0 +1,27 @@
+#!/bin/sh
+
+echo "Running pre-commit checks..."
+
+# On Apple Silicon Macs, force arm64 architecture to avoid Rosetta issues
+# (x86_64 git binary can cause native module architecture mismatches)
+ARCH_PREFIX=""
+if [ "$(uname -s)" = "Darwin" ]; then
+  CPU_BRAND=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "")
+  if echo "$CPU_BRAND" | grep -q "Apple"; then
+    ARCH_PREFIX="arch -arm64"
+  fi
+fi
+
+# Run typecheck
+echo "→ TypeScript check..."
+$ARCH_PREFIX pnpm run typecheck || exit 1
+
+# Run lint
+echo "→ ESLint check..."
+$ARCH_PREFIX pnpm run lint || exit 1
+
+# Run tests
+echo "→ Running tests..."
+$ARCH_PREFIX pnpm run test || exit 1
+
+echo "✓ All checks passed!"

@@ -1,0 +1,65 @@
+name: Bug Report
+description: Report something that's broken
+title: "[Bug]: "
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill out the details below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect to happen?
+      placeholder: "The badge endpoint returns a 500 when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Go to `/u/test-handle/badge.svg`
+        2. See error...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - OAuth
+        - Scoring
+        - Badge
+        - Share Page
+        - Cache
+        - Infrastructure
+        - UX
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical (blocks demo)
+        - High (major functionality broken)
+        - Medium (important but workaround exists)
+        - Low (cosmetic / minor)
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Screenshots, logs, browser info, etc.
+      placeholder: "Browser: Chrome 120, OS: macOS..."
+    validations:
+      required: false
