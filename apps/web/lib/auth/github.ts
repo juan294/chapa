@@ -14,8 +14,7 @@ export interface GitHubUser {
 // OAuth URL
 // ---------------------------------------------------------------------------
 
-export function buildAuthUrl(clientId: string, redirectUri: string): string {
-  const state = randomBytes(16).toString("hex");
+export function buildAuthUrl(clientId: string, redirectUri: string, state: string): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
@@ -23,6 +22,36 @@ export function buildAuthUrl(clientId: string, redirectUri: string): string {
     state,
   });
   return `https://github.com/login/oauth/authorize?${params.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
+// CSRF state cookie
+// ---------------------------------------------------------------------------
+
+const STATE_COOKIE_NAME = "chapa_oauth_state";
+
+export function createStateCookie(): { state: string; cookie: string } {
+  const state = randomBytes(16).toString("hex");
+  const cookie = `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`;
+  return { state, cookie };
+}
+
+export function validateState(
+  cookieHeader: string | null,
+  queryState: string | null,
+): boolean {
+  if (!cookieHeader || !queryState) return false;
+  const match = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${STATE_COOKIE_NAME}=`));
+  if (!match) return false;
+  const cookieState = match.slice(STATE_COOKIE_NAME.length + 1);
+  return cookieState === queryState;
+}
+
+export function clearStateCookie(): string {
+  return `${STATE_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,12 +3,20 @@ import {
   exchangeCodeForToken,
   fetchGitHubUser,
   createSessionCookie,
+  validateState,
+  clearStateCookie,
 } from "@/lib/auth/github";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
     return NextResponse.redirect(new URL("/?error=no_code", request.url));
+  }
+
+  const queryState = request.nextUrl.searchParams.get("state");
+  const cookieHeader = request.headers.get("cookie");
+  if (!validateState(cookieHeader, queryState)) {
+    return NextResponse.redirect(new URL("/?error=invalid_state", request.url));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();
@@ -43,5 +51,6 @@ export async function GET(request: NextRequest) {
     new URL(`/u/${user.login}`, request.url),
   );
   response.headers.append("Set-Cookie", cookie);
+  response.headers.append("Set-Cookie", clearStateCookie());
   return response;
 }

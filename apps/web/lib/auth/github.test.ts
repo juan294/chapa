@@ -5,6 +5,8 @@ import {
   fetchGitHubUser,
   encryptToken,
   decryptToken,
+  createStateCookie,
+  validateState,
 } from "./github";
 
 // ---------------------------------------------------------------------------
@@ -13,7 +15,7 @@ import {
 
 describe("buildAuthUrl", () => {
   it("returns a GitHub OAuth URL with correct client_id", () => {
-    const url = buildAuthUrl("test-client-id", "http://localhost:3000/api/auth/callback");
+    const url = buildAuthUrl("test-client-id", "http://localhost:3000/api/auth/callback", "test-state");
     const parsed = new URL(url);
     expect(parsed.origin).toBe("https://github.com");
     expect(parsed.pathname).toBe("/login/oauth/authorize");
@@ -21,7 +23,7 @@ describe("buildAuthUrl", () => {
   });
 
   it("includes the redirect_uri", () => {
-    const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback");
+    const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback", "test-state");
     const parsed = new URL(url);
     expect(parsed.searchParams.get("redirect_uri")).toBe(
       "http://localhost:3000/api/auth/callback"
@@ -29,17 +31,15 @@ describe("buildAuthUrl", () => {
   });
 
   it("requests read:user scope", () => {
-    const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback");
+    const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback", "test-state");
     const parsed = new URL(url);
     expect(parsed.searchParams.get("scope")).toContain("read:user");
   });
 
-  it("includes a state parameter for CSRF protection", () => {
-    const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback");
+  it("includes the provided state parameter for CSRF protection", () => {
+    const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback", "my-csrf-state-123");
     const parsed = new URL(url);
-    const state = parsed.searchParams.get("state");
-    expect(state).toBeTruthy();
-    expect(state!.length).toBeGreaterThanOrEqual(16);
+    expect(parsed.searchParams.get("state")).toBe("my-csrf-state-123");
   });
 });
 
@@ -136,6 +136,58 @@ describe("fetchGitHubUser", () => {
 
 // ---------------------------------------------------------------------------
 // encryptToken / decryptToken
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// CSRF state cookie
+// ---------------------------------------------------------------------------
+
+describe("createStateCookie", () => {
+  it("returns a state value and a Set-Cookie header string", () => {
+    const { state, cookie } = createStateCookie();
+    expect(state).toBeTruthy();
+    expect(state.length).toBe(32); // 16 bytes hex
+    expect(cookie).toContain("chapa_oauth_state=");
+    expect(cookie).toContain(state);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain("Max-Age=600");
+  });
+
+  it("generates unique state values each call", () => {
+    const a = createStateCookie();
+    const b = createStateCookie();
+    expect(a.state).not.toBe(b.state);
+  });
+});
+
+describe("validateState", () => {
+  it("returns true when cookie state matches query state", () => {
+    const { state, cookie } = createStateCookie();
+    // Extract just the cookie key=value part (before the flags)
+    const cookieHeader = cookie.split(";")[0];
+    expect(validateState(cookieHeader, state)).toBe(true);
+  });
+
+  it("returns false when state values do not match", () => {
+    const { cookie } = createStateCookie();
+    const cookieHeader = cookie.split(";")[0];
+    expect(validateState(cookieHeader, "wrong-state-value")).toBe(false);
+  });
+
+  it("returns false when cookie header is null", () => {
+    expect(validateState(null, "some-state")).toBe(false);
+  });
+
+  it("returns false when state param is null", () => {
+    const { cookie } = createStateCookie();
+    const cookieHeader = cookie.split(";")[0];
+    expect(validateState(cookieHeader, null)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token encryption
 // ---------------------------------------------------------------------------
 
 describe("token encryption", () => {

@@ -224,7 +224,7 @@ export default function Home() {
           </div>
 
           <a
-            href="/api/auth/github"
+            href="/api/auth/login"
             className="flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
           >
             <GitHubIcon className="w-4 h-4" />
@@ -293,7 +293,7 @@ export default function Home() {
                 {/* CTAs */}
                 <div className="animate-fade-in-up [animation-delay:450ms] mt-8 flex flex-col sm:flex-row items-start gap-4">
                   <a
-                    href="/api/auth/github"
+                    href="/api/auth/login"
                     className="group flex items-center gap-2.5 rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 animate-pulse-glow-amber"
                   >
                     <GitHubIcon className="w-4 h-4" />
@@ -638,7 +638,7 @@ export default function Home() {
             </p>
             <div className="mt-10">
               <a
-                href="/api/auth/github"
+                href="/api/auth/login"
                 className="group inline-flex items-center gap-2.5 rounded-full bg-amber px-10 py-4 text-lg font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 animate-pulse-glow-amber"
               >
                 <GitHubIcon className="w-5 h-5" />
