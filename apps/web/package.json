@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@chapa/shared": "workspace:*",
+    "@upstash/redis": "^1.36.2",
     "next": "^15.3.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
