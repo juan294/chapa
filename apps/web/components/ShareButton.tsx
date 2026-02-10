@@ -1,5 +1,3 @@
-"use client";
-
 export function ShareButton({ handle }: { handle: string }) {
   const shareUrl = `https://chapa.thecreativetoken.com/u/${handle}`;
   const text = encodeURIComponent(
