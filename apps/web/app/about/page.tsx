@@ -2,8 +2,20 @@ import { Navbar } from "@/components/Navbar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About — Chapa",
-  description: "Learn about Chapa, the developer impact badge platform.",
+  title: "About",
+  description:
+    "Learn about Chapa, the developer impact badge platform. Discover how Impact Score v3 works and what data we analyze.",
+  openGraph: {
+    title: "About Chapa",
+    description:
+      "Learn about Chapa, the developer impact badge platform. Discover how Impact Score v3 works.",
+  },
+  twitter: {
+    card: "summary",
+    title: "About Chapa",
+    description:
+      "Learn about Chapa, the developer impact badge platform.",
+  },
 };
 
 export default function AboutPage() {

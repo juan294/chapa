@@ -2,8 +2,14 @@ import { Navbar } from "@/components/Navbar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Chapa",
-  description: "Terms of Service for Chapa, the developer impact badge platform.",
+  title: "Terms of Service",
+  description:
+    "Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.",
+  openGraph: {
+    title: "Terms of Service — Chapa",
+    description:
+      "Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.",
+  },
 };
 
 export default function TermsPage() {

@@ -2,8 +2,14 @@ import { Navbar } from "@/components/Navbar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Chapa",
-  description: "Privacy Policy for Chapa, the developer impact badge platform.",
+  title: "Privacy Policy",
+  description:
+    "Privacy Policy for Chapa. Learn how we handle your GitHub data, session storage, and analytics.",
+  openGraph: {
+    title: "Privacy Policy — Chapa",
+    description:
+      "Privacy Policy for Chapa. Learn how we handle your GitHub data, session storage, and analytics.",
+  },
 };
 
 export default function PrivacyPage() {
