@@ -16,6 +16,9 @@ export function renderBadgeSvg(
   const { includeGithubBranding = true } = options;
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
+  const headerName = stats.displayName
+    ? escapeXml(stats.displayName)
+    : `@${safeHandle}`;
   const tierColor = getTierColor(impact.tier);
 
   // Layout constants
@@ -23,81 +26,109 @@ export function renderBadgeSvg(
   const H = 630;
   const PAD = 60;
 
-  // Heatmap position
+  // ── Header row ──────────────────────────────────────────────
+  const headerY = 80;
+  const avatarCX = PAD + 30;
+  const avatarCY = headerY;
+  const avatarR = 30;
+
+  // ── Two-column body ─────────────────────────────────────────
+  // Left column: heatmap (26px cells + 4px gap = 30px per cell)
+  const heatmapLabelY = 180;
   const heatmapX = PAD;
-  const heatmapY = 180;
+  const heatmapY = heatmapLabelY + 25;
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
-  // Stats block (right side)
-  const statsX = 380;
-  const statsY = 180;
+  // Right column: impact score (starts after heatmap area)
+  const scoreColX = 530;
+  const scoreLabelY = 180;
+  const scoreValueY = scoreLabelY + 95;
 
-  // Impact block (right side, prominent)
-  const impactX = 700;
-  const impactY = 160;
+  // ── Stats row ───────────────────────────────────────────────
+  // Defense-in-depth: coerce numeric stats to prevent XSS from malformed data
+  const safeCommits = String(Number(stats.commitsTotal));
+  const safePRs = String(Number(stats.prsMergedCount));
+  const safeReviews = String(Number(stats.reviewsSubmittedCount));
+
+  const statsY = 460;
+
+  // ── Footer ──────────────────────────────────────────────────
+  const footerDividerY = 520;
+  const footerY = 555;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
-    ? renderGithubBranding(PAD, H - 40)
+    ? renderGithubBranding(PAD, footerY, W - PAD)
     : "";
+
+  // Tier pill dimensions
+  const tierText = `\u2605 ${impact.tier}`;
+  const tierPillWidth = tierText.length * 10 + 30;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <style>
       @keyframes pulse-glow {
-        0%, 100% { opacity: 0.6; }
+        0%, 100% { opacity: 0.7; }
         50% { opacity: 1; }
       }
     </style>
   </defs>
 
   <!-- Background -->
-  <rect width="${W}" height="${H}" rx="16" fill="${t.bg}"/>
-  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="15" fill="none" stroke="${t.stroke}" stroke-width="2"/>
+  <rect width="${W}" height="${H}" rx="20" fill="${t.bg}"/>
+  <rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="19" fill="none" stroke="${t.stroke}" stroke-width="2"/>
 
-  <!-- Title block -->
-  <text x="${PAD}" y="75" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="42" font-weight="700" fill="${t.accent}">CHAPA</text>
-  <text x="${PAD}" y="105" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}">Developer Impact Badge</text>
-  <text x="${PAD}" y="145" font-family="'JetBrains Mono', 'Courier New', monospace" font-size="24" font-weight="500" fill="${t.textPrimary}">@${safeHandle}</text>
+  <!-- ─── Header row ─────────────────────────────────────── -->
+  <!-- Avatar placeholder (circle with amber ring) -->
+  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.25)" stroke-width="2"/>
+  <g transform="translate(${avatarCX - 14}, ${avatarCY - 14})">
+    <path d="M14 0C6.27 0 0 6.27 0 14c0 6.19 4.01 11.43 9.57 13.28.7.13.96-.3.96-.67 0-.34-.01-1.45-.02-2.61-3.52.64-4.42-.86-4.7-1.65-.16-.4-.84-1.65-1.44-1.98-.49-.26-1.19-.91-.02-.92 1.1-.02 1.89 1.01 2.16 1.43 1.26 2.12 3.27 1.52 4.07 1.16.13-.91.49-1.52.89-1.87-3.11-.35-6.37-1.55-6.37-6.92 0-1.52.55-2.78 1.44-3.76-.14-.35-.63-1.78.14-3.71 0 0 1.17-.37 3.85 1.44 1.12-.31 2.31-.47 3.5-.47s2.38.16 3.5.47c2.68-1.82 3.85-1.44 3.85-1.44.77 1.93.28 3.36.14 3.71.9.98 1.44 2.23 1.44 3.76 0 5.39-3.27 6.57-6.39 6.91.5.43.95 1.28.95 2.58 0 1.87-.02 3.37-.02 3.83 0 .37.26.81.96.67A14.03 14.03 0 0028 14c0-7.73-6.27-14-14-14z" fill="${t.textSecondary}" opacity="0.6"/>
+  </g>
 
-  <!-- Heatmap (13w × 7d) -->
-  <text x="${heatmapX}" y="${heatmapY - 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="12" fill="${t.textSecondary}">LAST 90 DAYS</text>
+  <!-- Handle + subtitle -->
+  <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="22" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
+  <text x="${PAD + 72}" y="${headerY + 18}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">Last 90 days</text>
+
+  <!-- Chapa. logo (top-right) -->
+  <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="20" fill="${t.textSecondary}" opacity="0.5" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">.</tspan></text>
+
+  <!-- ─── Two-column body ────────────────────────────────── -->
+
+  <!-- Left: ACTIVITY + heatmap -->
+  <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2.5">ACTIVITY</text>
   ${heatmapSvg}
 
-  <!-- Stats block -->
-  <g font-family="'Plus Jakarta Sans', system-ui, sans-serif">
-    <text x="${statsX}" y="${statsY}" font-size="12" fill="${t.textSecondary}" letter-spacing="1">COMMITS</text>
-    <text x="${statsX}" y="${statsY + 36}" font-family="'JetBrains Mono', monospace" font-size="40" font-weight="700" fill="${t.textPrimary}">${stats.commitsTotal}</text>
+  <!-- Right: IMPACT SCORE + score + tier pill + confidence -->
+  <text x="${scoreColX}" y="${scoreLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2.5">IMPACT SCORE</text>
 
-    <text x="${statsX}" y="${statsY + 90}" font-size="12" fill="${t.textSecondary}" letter-spacing="1">PRS MERGED</text>
-    <text x="${statsX}" y="${statsY + 126}" font-family="'JetBrains Mono', monospace" font-size="40" font-weight="700" fill="${t.textPrimary}">${stats.prsMergedCount}</text>
+  <!-- Large score number -->
+  <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="96" font-weight="700" fill="${t.textPrimary}" letter-spacing="-4" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
 
-    <text x="${statsX}" y="${statsY + 180}" font-size="12" fill="${t.textSecondary}" letter-spacing="1">REVIEWS</text>
-    <text x="${statsX}" y="${statsY + 216}" font-family="'JetBrains Mono', monospace" font-size="40" font-weight="700" fill="${t.textPrimary}">${stats.reviewsSubmittedCount}</text>
+  <!-- Tier pill badge -->
+  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}, ${scoreValueY - 55})">
+    <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.25)" stroke-width="1"/>
+    <text x="${tierPillWidth / 2}" y="22" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
   </g>
 
-  <!-- Impact block -->
-  <g font-family="'JetBrains Mono', 'Courier New', monospace">
-    <rect x="${impactX}" y="${impactY}" width="440" height="280" rx="12" fill="${t.card}" stroke="${t.stroke}" stroke-width="1"/>
+  <!-- Confidence -->
+  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}" y="${scoreValueY + 8}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
 
-    <text x="${impactX + 30}" y="${impactY + 45}" font-size="12" fill="${t.textSecondary}" letter-spacing="2" font-family="'Plus Jakarta Sans', system-ui, sans-serif">IMPACT</text>
-    <text x="${impactX + 30}" y="${impactY + 100}" font-size="56" font-weight="800" fill="${tierColor}" style="animation: pulse-glow 3s ease-in-out infinite">${impact.tier.toUpperCase()}</text>
-
-    <text x="${impactX + 30}" y="${impactY + 150}" font-size="12" fill="${t.textSecondary}" letter-spacing="1" font-family="'Plus Jakarta Sans', system-ui, sans-serif">SCORE</text>
-    <text x="${impactX + 30}" y="${impactY + 190}" font-size="48" font-weight="700" fill="${t.accent}">${impact.adjustedScore}</text>
-    <text x="${impactX + 120}" y="${impactY + 190}" font-size="20" fill="${t.textSecondary}">/ 100</text>
-
-    <text x="${impactX + 30}" y="${impactY + 230}" font-size="12" fill="${t.textSecondary}" letter-spacing="1" font-family="'Plus Jakarta Sans', system-ui, sans-serif">CONFIDENCE</text>
-    <text x="${impactX + 30}" y="${impactY + 260}" font-size="28" font-weight="500" fill="${t.textPrimary}">${impact.confidence}%</text>
-  </g>
-
-  <!-- Active days -->
-  <text x="${PAD}" y="${H - 70}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">
-    <tspan fill="${t.accent}" font-weight="600">${stats.activeDays}</tspan> active days · <tspan fill="${t.accent}" font-weight="600">${stats.reposContributed}</tspan> repos
+  <!-- ─── Stats row ──────────────────────────────────────── -->
+  <text x="${W / 2}" y="${statsY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" text-anchor="middle">
+    <tspan>${safeCommits} commits</tspan>
+    <tspan fill="${t.stroke}" dx="12">|</tspan>
+    <tspan dx="12">${safePRs} PRs merged</tspan>
+    <tspan fill="${t.stroke}" dx="12">|</tspan>
+    <tspan dx="12">${safeReviews} reviews</tspan>
   </text>
 
-  <!-- Footer branding -->
+  <!-- ─── Footer ─────────────────────────────────────────── -->
+  <!-- Divider line -->
+  <line x1="${PAD}" y1="${footerDividerY}" x2="${W - PAD}" y2="${footerDividerY}" stroke="${t.stroke}" stroke-width="1"/>
+
+  <!-- Branding: left = GitHub, right = domain -->
   ${brandingSvg}
 </svg>`;
 }

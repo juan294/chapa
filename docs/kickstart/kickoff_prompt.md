@@ -1,4 +1,4 @@
-We are starting a hackathon build for “Chapa” (Dev Impact Badge).
+We are building "Chapa" (Dev Impact Badge).
 
 First: read and internalize these repo docs as the source of truth:
 - CLAUDE.md
@@ -22,7 +22,7 @@ Then do this in planning mode:
    - Impact Score v3 only (no v1/v2).
    - Confidence is non-accusatory; never claims cheating; only signal strength with up to 2 reasons.
    - Badge is 1200×630, Midnight Mint theme, subtle animations.
-   - GitHub logo/“Powered by GitHub” included for hackathon but isolated behind a feature flag includeGithubBranding.
+   - GitHub logo/"Powered by GitHub" included but isolated behind a feature flag includeGithubBranding.
    - Cache stats/impact/svg daily per handle (TTL 24h) and set Cache-Control headers on /badge.svg.
    - Handle GitHub API failures by serving cached data if available.
 5) Start with Milestone 0 (repo skeleton) and coordinate the teammates to implement Milestone 0–1 end-to-end first (a working badge for one handle), then iterate.

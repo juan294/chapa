@@ -49,7 +49,7 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
 
       {/* Breakdown bars */}
       <div className="space-y-4">
-        <h3 className="text-sm tracking-widest uppercase text-amber">
+        <h3 className="font-heading text-sm tracking-widest uppercase text-amber">
           Score Breakdown
         </h3>
         {Object.entries(breakdown).map(([key, value]) => (
@@ -83,7 +83,7 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
       {/* Confidence reasons */}
       {impact.confidencePenalties.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm tracking-widest uppercase text-amber">
+          <h3 className="font-heading text-sm tracking-widest uppercase text-amber">
             Confidence Notes
           </h3>
           {impact.confidencePenalties.map((p) => (

@@ -1,14 +1,19 @@
-/**
- * PostHog analytics stub.
- * No-op until PostHog is configured.
- */
+import posthog from "posthog-js";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function trackEvent(event: string, properties?: Record<string, unknown>): void {
-  // No-op stub
+export function trackEvent(
+  event: string,
+  properties?: Record<string, unknown>,
+): void {
+  if (typeof window === "undefined") return;
+  if (!posthog.__loaded) return;
+  posthog.capture(event, properties);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function identifyUser(distinctId: string, traits?: Record<string, unknown>): void {
-  // No-op stub
+export function identifyUser(
+  distinctId: string,
+  traits?: Record<string, unknown>,
+): void {
+  if (typeof window === "undefined") return;
+  if (!posthog.__loaded) return;
+  posthog.identify(distinctId, traits);
 }

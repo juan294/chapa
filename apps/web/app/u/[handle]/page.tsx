@@ -5,10 +5,15 @@ import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
+import { Navbar } from "@/components/Navbar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+
+const BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
+  "https://chapa.thecreativetoken.com";
 
 interface SharePageProps {
   params: Promise<{ handle: string }>;
@@ -19,15 +24,28 @@ export async function generateMetadata({
 }: SharePageProps): Promise<Metadata> {
   const { handle } = await params;
   if (!isValidHandle(handle)) {
-    return { title: "Not Found — Chapa" };
+    return { title: "Not Found" };
   }
+
+  const pageUrl = `${BASE_URL}/u/${handle}`;
   return {
-    title: `@${handle} — Chapa Developer Impact`,
-    description: `View ${handle}'s developer impact score and badge on Chapa.`,
+    title: `@${handle} — Developer Impact`,
+    description: `View ${handle}'s developer impact score and badge on Chapa. See commits, PRs, reviews, and impact tier.`,
     openGraph: {
+      type: "profile",
+      title: `@${handle} — Chapa Developer Impact`,
+      description: `View ${handle}'s developer impact score and badge on Chapa.`,
+      url: pageUrl,
+      images: [`/u/${handle}/badge.svg`],
+    },
+    twitter: {
+      card: "summary_large_image",
       title: `@${handle} — Chapa Developer Impact`,
       description: `View ${handle}'s developer impact score and badge on Chapa.`,
       images: [`/u/${handle}/badge.svg`],
+    },
+    alternates: {
+      canonical: pageUrl,
     },
   };
 }
@@ -58,28 +76,39 @@ export default async function SharePage({ params }: SharePageProps) {
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
   const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
 
+  const displayLabel = stats?.displayName ?? handle;
+
+  const personJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: displayLabel,
+    url: `https://github.com/${handle}`,
+    sameAs: [`https://github.com/${handle}`],
+    ...(impact
+      ? {
+          description: `Developer with a Chapa Impact Score of ${impact.adjustedScore} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
+        }
+      : {}),
+  };
+
   return (
     <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+      />
       {/* Ambient glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/3 h-96 w-96 rounded-full bg-amber/[0.03] blur-[150px]" />
         <div className="absolute bottom-1/4 right-1/4 h-80 w-80 rounded-full bg-amber/[0.04] blur-[120px]" />
       </div>
 
-      <div className="relative mx-auto max-w-4xl px-6 py-16">
-        {/* Header */}
-        <div className="mb-12 animate-fade-in-up">
-          <Link
-            href="/"
-            className="font-heading text-lg font-bold text-amber hover:text-amber-light transition-colors"
-          >
-            CHAPA
-          </Link>
-        </div>
+      <Navbar />
 
-        {/* Handle */}
-        <h1 className="font-heading text-3xl font-bold text-text-primary mb-8 animate-fade-in-up [animation-delay:100ms]">
-          <span className="text-amber">@{handle}</span>
+      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
+        {/* Page heading */}
+        <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-text-primary mb-8 animate-fade-in-up">
+          @{handle}
         </h1>
 
         {/* Badge preview */}
@@ -100,7 +129,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {impact ? (
           <section className="mb-12 animate-fade-in-up [animation-delay:300ms]">
             <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8">
-              <h2 className="text-sm tracking-widest uppercase text-amber mb-6">
+              <h2 className="font-heading text-sm tracking-widest uppercase text-amber mb-6">
                 Impact Breakdown
               </h2>
               <ImpactBreakdown impact={impact} />
@@ -119,7 +148,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {/* Embed snippets */}
         <section className="mb-12 animate-fade-in-up [animation-delay:400ms]">
           <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8 space-y-6">
-            <h2 className="text-sm tracking-widest uppercase text-amber">
+            <h2 className="font-heading text-sm tracking-widest uppercase text-amber">
               Embed This Badge
             </h2>
 

@@ -278,6 +278,31 @@ describe("computeConfidence(stats)", () => {
     expect(typeof penalties[0].reason).toBe("string");
     expect(penalties[0].reason.length).toBeGreaterThan(10);
   });
+
+  it("does NOT apply supplemental_unverified when hasSupplementalData is absent", () => {
+    const stats = makeStats();
+    const { penalties } = computeConfidence(stats);
+    expect(penalties.find((p) => p.flag === "supplemental_unverified")).toBeUndefined();
+  });
+
+  it("applies supplemental_unverified penalty (-5) when hasSupplementalData is true", () => {
+    const stats = makeStats({ hasSupplementalData: true });
+    const { confidence, penalties } = computeConfidence(stats);
+    const penalty = penalties.find((p) => p.flag === "supplemental_unverified");
+    expect(penalty).toBeTruthy();
+    expect(penalty!.penalty).toBe(5);
+    expect(confidence).toBe(95);
+  });
+
+  it("stacks supplemental_unverified with other penalties", () => {
+    const stats = makeStats({
+      hasSupplementalData: true,
+      maxCommitsIn10Min: 25, // burst: -15
+    });
+    const { confidence, penalties } = computeConfidence(stats);
+    expect(penalties).toHaveLength(2);
+    expect(confidence).toBe(80); // 100 - 15 - 5
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -1,23 +1,15 @@
-# Pre-Launch Audit Report (v2)
-> Generated on 2026-02-10 | Branch: `develop` | 6 parallel specialists
+# Pre-Launch Audit Report (v3)
+> Generated on 2026-02-10 | Branch: `develop` | Commit: `0fe42d5` | 6 parallel specialists
 
-## Verdict: CONDITIONAL — 1 blocker, 15 warnings
+## Verdict: READY — 0 blockers, 5 warnings
 
-Previous blockers B1 (OAuth URL mismatch), B2 (CSRF state validation), and B3 (focus indicators) are **all resolved**.
-
-One new blocker found. 15 warnings catalogued as accepted risks or recommended improvements.
+All previous blockers (v1: OAuth URL mismatch, CSRF state, focus indicators; v2: OAuth error display) are resolved. No new blockers found.
 
 ---
 
-## Blockers (must fix before submission)
+## Blockers
 
-### B1. HIGH — OAuth error flow is silent
-**Found by:** ux-reviewer
-**Severity:** User-facing — demo failure risk
-
-The callback route redirects to `/?error=no_code`, `/?error=invalid_state`, `/?error=config`, `/?error=token_exchange`, or `/?error=user_fetch` on failure. **The landing page never reads or displays these error parameters.** Users who fail OAuth land back on the homepage with zero feedback.
-
-**Fix:** Read `searchParams.error` in the landing page and display a user-friendly toast/banner (e.g., "Sign-in failed. Please try again.").
+None.
 
 ---
 
@@ -25,34 +17,25 @@ The callback route redirects to `/?error=no_code`, `/?error=invalid_state`, `/?e
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | In-memory cache stub — won't persist across Vercel cold starts | HIGH | devops, architect, perf-eng, qa-lead, security | Effectively no caching in production; CDN `Cache-Control` headers compensate partially |
-| W2 | No custom error pages (404, error, global-error) | HIGH | devops, ux-reviewer | Users see unstyled Next.js defaults on errors |
-| W3 | No loading states (`loading.tsx`, Suspense) for share page | HIGH | ux-reviewer | Blank screen during data fetch on slow connections |
-| W4 | No skip-to-content link | HIGH | ux-reviewer | WCAG 2.4.1 Level A violation for keyboard/screen reader users |
-| W5 | `NEXT_PUBLIC_BASE_URL` undocumented but used in OAuth login | MEDIUM | devops | OAuth redirect breaks in production if not set |
-| W6 | No tests for SVG rendering (`BadgeSvg.tsx`, `heatmap.ts`, `escapeXml`) | MEDIUM | qa-lead | Most visible output has zero test coverage |
-| W7 | No input validation on `handle` parameter | MEDIUM | security | Cache key injection risk when migrating to Redis |
-| W8 | Share page doesn't pass auth token to `getStats90d()` | MEDIUM | architect | Always uses unauthenticated rate limit (60/hr) |
-| W9 | Duplicate `escapeXml` in `BadgeSvg.tsx` and `badge.svg/route.ts` | MEDIUM | architect, perf-eng, security | DRY violation, divergence risk for XSS protection |
-| W10 | Duplicate scoring weights in `v3.ts` and `ImpactBreakdown.tsx` | MEDIUM | architect | Silent inconsistency if formula changes |
-| W11 | Dead code: `BadgePreview.tsx`, `posthog.ts` stubs, `cacheDel`, `HEATMAP_WIDTH/HEIGHT` | LOW | architect, perf-eng | Violates "no dead code" rule |
-| W12 | Unnecessary `"use client"` on `ImpactBreakdown.tsx` and `ShareButton.tsx` | LOW | perf-eng | ~1-2 kB avoidable client JS |
-| W13 | CopyButton lacks `aria-label` and `aria-live` for state change | LOW | ux-reviewer | Screen readers can't announce "Copied!" feedback |
-| W14 | Progress bars in ImpactBreakdown lack `role="progressbar"` and ARIA attrs | LOW | ux-reviewer | Screen readers can't interpret score breakdown bars |
-| W15 | Low-opacity text elements (`/20`, `/30`, `/40`) fail WCAG contrast | LOW | ux-reviewer | Decorative but some contain meaningful info |
+| W1 | No CSP / HSTS / X-Frame-Options headers configured | MEDIUM | security | Acceptable for now; recommended before production hardening |
+| W2 | No rate limiting on auth endpoints | MEDIUM | security | OAuth endpoints could be hammered; GitHub rate limits provide partial protection |
+| W3 | Smooth scrolling without `prefers-reduced-motion` guard on scroll behavior | LOW | ux | CSS `scroll-behavior: smooth` triggers for motion-sensitive users |
+| W4 | Nav links hidden on mobile without hamburger menu | LOW | ux | Mobile users must scroll to find navigation |
+| W5 | Undocumented env vars: `RESEND_WEBHOOK_SECRET`, `SUPPORT_FORWARD_EMAIL` | LOW | devops | New email forwarding vars not in `.env.example`; only needed in production |
 
 ---
 
 ## Detailed Findings
 
-### 1. Quality Assurance (qa-lead) — YELLOW
+### 1. Quality Assurance (qa-lead) — GREEN
 
 | Metric | Value |
 |--------|-------|
-| Tests | **68 passed, 0 failed** |
-| Test files | 4 (impact, auth, theme, stats) |
+| Tests | **260 passed, 0 failed** |
+| Test files | 21 |
 | Typecheck | Clean (0 errors) |
-| Lint | Clean (4 warnings in PostHog stubs only) |
+| Lint | Clean |
+| Pre-commit hooks | Passing (typecheck + lint + tests) |
 
 **Acceptance criteria:**
 
@@ -62,137 +45,165 @@ The callback route redirects to `/?error=no_code`, `/?error=invalid_state`, `/?e
 | 2 | `/u/:handle/badge.svg` loads publicly without auth | **MET** |
 | 3 | Badge shows heatmap, commits, PRs, reviews, tier, score, confidence | **MET** |
 | 4 | `/u/:handle` shows badge + breakdown + embed snippet | **MET** |
-| 5 | Caching prevents repeated API calls within 24h | **PARTIAL** (in-memory stub + CDN headers) |
+| 5 | Caching prevents repeated API calls within 24h | **MET** (Upstash Redis + CDN headers) |
 | 6 | Confidence messaging is non-accusatory | **MET** |
 | 7 | Docs: `impact-v3.md` and `svg-design.md` exist | **MET** |
 
-**Coverage gaps:**
-- HIGH: `BadgeSvg.tsx`, `heatmap.ts` (core rendering) — zero tests
-- MEDIUM: Badge route handler, cache layer, GitHub client wrapper — untested
-- LOW: `escapeXml()` function — critical for XSS prevention but untested
-
-**Graceful degradation:** GREEN — badge returns fallback SVG on failure, share page shows error message, GitHub rate limits handled.
+**Test coverage by module:**
+- Impact v3 scoring: 35 tests
+- SVG badge rendering: 31 tests
+- OAuth + auth: 33 tests (github.test.ts + error-messages.test.ts)
+- Email forwarding: 28 tests (resend.test.ts + route.test.ts)
+- Validation: 27 tests
+- GitHub data pipeline: 14 tests
+- Cache (Redis): 11 tests
+- Heatmap rendering: 10 tests
+- SEO (sitemap, robots, llms.txt): 23 tests
+- Components (UserMenu, CopyButton, ImpactBreakdown, ShareButton): 27 tests
+- Analytics: 6 tests
 
 ---
 
-### 2. Security (security-reviewer) — YELLOW
+### 2. Security (security-reviewer) — GREEN
 
 | Area | Status |
 |------|--------|
 | `pnpm audit` | GREEN — 0 vulnerabilities |
 | Hardcoded secrets | GREEN — only test mocks |
 | Token encryption | GREEN — AES-256-GCM with random IV |
-| Cookie flags | GREEN — HttpOnly, Secure, SameSite=Lax |
-| CSRF state validation | **GREEN** — state cookie created, validated, cleared |
-| SVG XSS | GREEN — `escapeXml()` on all user input |
+| Cookie flags | GREEN — HttpOnly, Secure (conditional on HTTPS), SameSite=Lax |
+| CSRF state validation | GREEN — state cookie created, validated, cleared |
+| SVG XSS | GREEN — `escapeXml()` on all user input, deduplicated to single source |
 | Env var leakage | GREEN — no secrets in `NEXT_PUBLIC_*` |
-| Licenses | GREEN — all MIT/Apache-2.0 |
-| GraphQL injection | GREEN — typed variable, not interpolated |
-| Handle validation | YELLOW — no regex validation before cache/API (W7) |
-| Cache size limit | YELLOW — unbounded in-memory Map (DoS vector) |
-| Security headers | YELLOW — no CSP, HSTS, X-Frame-Options configured |
-| State comparison | INFO — uses `===` not `timingSafeEqual` (theoretical only) |
+| Licenses | GREEN — all MIT/Apache-2.0/ISC/BSD |
+| GraphQL injection | GREEN — typed variables, not interpolated |
+| Handle validation | GREEN — regex validation before cache/API |
+| Webhook verification | GREEN — Svix HMAC-SHA256 signature verification |
+| Path injection | GREEN — UUID validation on email ID before API call |
+| Email security | GREEN — DKIM (Resend + AWS SES), SPF, DMARC configured |
+| Security headers | YELLOW — no CSP, HSTS, X-Frame-Options (W1) |
+| Rate limiting | YELLOW — no rate limiting on auth endpoints (W2) |
 
 ---
 
-### 3. Infrastructure (devops) — YELLOW
+### 3. Infrastructure (devops) — GREEN
 
 | Area | Status |
 |------|--------|
 | Build | GREEN — succeeds cleanly |
 | CI | GREEN — all 3 workflows passing (CI, Security Scan, Secret Scanning) |
-| Bundle sizes | GREEN — max 107 kB First Load JS |
 | Cache headers | GREEN — match CLAUDE.md spec exactly |
 | Health endpoint | GREEN — returns valid JSON |
-| Error pages | YELLOW — no custom 404/error/global-error (W2) |
-| Env var docs | YELLOW — `NEXT_PUBLIC_BASE_URL` missing from docs (W5) |
-| Git hygiene | YELLOW — stale local branch `feature/variant-1-landing` |
+| Error pages | GREEN — custom 404, error, global-error pages |
+| Loading states | GREEN — loading.tsx with skeleton UI |
+| DNS | GREEN — A record, MX, DKIM (Resend + SES), SPF, DMARC all configured |
+| Email webhook | GREEN — Resend webhook configured and verified |
+| Vercel env vars | GREEN — all required vars present in production |
+| Skip-to-content | GREEN — WCAG 2.4.1 compliant |
+| Env var docs | YELLOW — new email vars undocumented (W5) |
 
-**Bundle sizes:**
+**Routes:**
 
-| Route | Size | First Load JS |
-|-------|------|---------------|
-| `/` (landing) | 161 B | 106 kB |
-| `/u/[handle]` (share page) | 1.32 kB | 107 kB |
-| `/u/[handle]/badge.svg` | 139 B | 102 kB |
-| `/api/auth/*` (4 routes) | 139 B each | 102 kB |
-| `/api/health` | 139 B | 102 kB |
-
-10 commits on `develop` not in `main`, ready for release when blocker is fixed.
+| Route | Type |
+|-------|------|
+| `/` (landing) | Dynamic |
+| `/u/[handle]` (share page) | Dynamic |
+| `/u/[handle]/badge.svg` | Dynamic |
+| `/api/auth/*` (4 routes) | Dynamic |
+| `/api/health` | Dynamic |
+| `/api/webhooks/resend` | Dynamic |
+| `/about`, `/privacy`, `/terms` | Dynamic |
+| `/llms.txt` | Dynamic |
+| `/robots.txt`, `/sitemap.xml` | Static |
 
 ---
 
-### 4. Architecture (architect) — YELLOW
+### 4. Architecture (architect) — GREEN
 
 | Area | Status |
 |------|--------|
-| Circular deps | GREEN — zero (verified by madge) |
+| Circular deps | GREEN — zero |
 | TypeScript strict | GREEN — `strict: true` everywhere |
 | Module boundaries | GREEN — agent team file ownership respected |
 | Pure functions | GREEN — scoring and rendering are side-effect-free |
-| Shared types | GREEN — `@chapa/shared` properly used across codebase |
-| Dependencies | GREEN — minimal production deps (next, react, react-dom) |
-| `noUncheckedIndexedAccess` | YELLOW — not enabled |
-| Dead code | YELLOW — unused exports and files (W11) |
-| Duplicate code | YELLOW — `escapeXml` and weights duplicated (W9, W10) |
-| Data flow consistency | YELLOW — share page doesn't pass auth token (W8) |
-
-**Data flow:** Landing → `/api/auth/login` (state cookie) → GitHub → `/api/auth/callback` (validate state, exchange token, create session) → `/u/[handle]` (share page) → badge SVG. Flow is complete and correct.
+| Shared types | GREEN — `@chapa/shared` properly used |
+| Dependencies | GREEN — minimal production deps |
+| Code deduplication | GREEN — `escapeXml` and scoring weights are single-source |
+| Data flow | GREEN — auth token passed through share page flow |
+| Dead code | GREEN — cleaned up (knip passes) |
+| Unused exports | INFO — `ReceivedEmail` interface exported but unused (may be used by future callers) |
 
 ---
 
-### 5. Performance (performance-eng) — YELLOW
+### 5. Performance (performance-eng) — GREEN
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| Largest First Load JS | 107 kB | GREEN (4.7x under 500 kB) |
-| Shared JS | 102 kB | GREEN |
-| Production deps | 3 | GREEN (lean) |
-| `useEffect` calls | 0 | GREEN (no hydration risk) |
-| Font loading | `display: swap` + subset | GREEN |
-| N+1 queries | None (single GraphQL) | GREEN |
-| Client components | 2 unnecessary (W12) | YELLOW |
-| In-memory cache | Useless on serverless (W1) | YELLOW |
-
-**OG image note:** Share page OG image points to the badge SVG endpoint. Some social platforms (Twitter/X, LinkedIn) may not render SVGs in card previews.
+| Build | Succeeds in ~1.5s (Turbopack) | GREEN |
+| Largest chunk | ~225 kB First Load JS | GREEN (well under 500 kB) |
+| Font loading | `display: swap` + subset + fallback metrics | GREEN |
+| `use client` directives | At leaf component level | GREEN |
+| N+1 queries | None (single GraphQL call) | GREEN |
+| Cache | Upstash Redis with 24h TTL | GREEN |
+| CDN caching | `s-maxage=86400, stale-while-revalidate=604800` | GREEN |
 
 ---
 
-### 6. UX/Accessibility (ux-reviewer) — YELLOW
+### 6. UX/Accessibility (ux-reviewer) — GREEN
 
 | Area | Status |
 |------|--------|
-| Focus indicators | **GREEN** — `*:focus-visible` with amber outline (fixed in latest commit) |
-| Reduced motion | **GREEN** — `prefers-reduced-motion` media query (fixed in latest commit) |
-| Heading hierarchy | GREEN — correct h1→h2→h3, no skipped levels |
+| Focus indicators | GREEN — `*:focus-visible` with amber outline |
+| Reduced motion | GREEN — `prefers-reduced-motion` media query |
+| Heading hierarchy | GREEN — correct h1 -> h2 -> h3 |
 | Alt text | GREEN — all images have meaningful alt |
-| ARIA labels | GREEN — decorative icons hidden, footer links labeled |
-| Color contrast | GREEN — amber on dark ≈ 7.0:1, text-primary ≈ 15:1 |
-| Responsive (landing) | GREEN — thorough breakpoints |
-| Language attr | GREEN — `<html lang="en">` set |
-| OAuth error display | **RED** — silent failures (B1) |
-| Skip-to-content | YELLOW — missing (W4) |
-| Error/404 pages | YELLOW — no custom pages (W2) |
-| Loading states | YELLOW — no loading.tsx (W3) |
-| Responsive (share page) | YELLOW — no breakpoint classes |
-| CopyButton a11y | YELLOW — no aria-label/aria-live (W13) |
-| Progress bars a11y | YELLOW — no role="progressbar" (W14) |
-| Low-opacity contrast | YELLOW — decorative text below WCAG AA (W15) |
+| ARIA labels | GREEN — decorative icons hidden, interactive elements labeled |
+| Color contrast | GREEN — amber on dark >= 7:1, text-primary >= 15:1 |
+| Skip-to-content | GREEN — present and functional |
+| Error pages | GREEN — custom styled 404/500 |
+| Loading states | GREEN — skeleton UI on share page |
+| OAuth error display | GREEN — error banner on landing page |
+| CopyButton a11y | GREEN — aria-label and aria-live region |
+| Progress bars a11y | GREEN — role="progressbar" with ARIA attrs |
+| Mobile nav | YELLOW — no hamburger menu (W4) |
+| Smooth scroll | YELLOW — no motion guard on scroll-behavior (W3) |
 
 ---
 
-## Changes Since Last Audit (v1)
+## Resolution of Previous Findings
 
-| Previous Blocker | Status | Resolution |
-|-----------------|--------|------------|
-| B1: OAuth CTA URL mismatch (`/api/auth/github` → `/api/auth/login`) | **FIXED** | All 3 CTA hrefs corrected in `page.tsx` |
-| B2: CSRF state parameter never validated | **FIXED** | `createStateCookie`, `validateState`, `clearStateCookie` added; login sets state, callback validates + clears |
-| B3: No visible focus indicators | **FIXED** | `*:focus-visible` + `prefers-reduced-motion` added to `globals.css` |
+### From v1 (all fixed)
+| Blocker | Resolution |
+|---------|------------|
+| B1: OAuth CTA URL mismatch | Fixed — all CTA hrefs corrected |
+| B2: CSRF state never validated | Fixed — full state cookie flow implemented |
+| B3: No visible focus indicators | Fixed — `*:focus-visible` + reduced motion support |
 
-**New finding:** B1 (OAuth error display) was not caught in v1 because the previous audit focused on whether the OAuth *success* flow worked, not the *failure* path.
+### From v2 (all fixed)
+| Blocker | Resolution |
+|---------|------------|
+| B1: OAuth error display silent | Fixed — error banner reads query params |
+
+| Warning | Resolution |
+|---------|------------|
+| W1: In-memory cache stub | Fixed — Upstash Redis integrated |
+| W2: No custom error pages | Fixed — 404/error/global-error pages added |
+| W3: No loading states | Fixed — loading.tsx with skeleton UI |
+| W4: No skip-to-content | Fixed — skip-to-content link added |
+| W5: Undocumented BASE_URL | Fixed — documented in .env.example |
+| W6: No SVG rendering tests | Fixed — 31 badge tests + 10 heatmap tests |
+| W7: No handle validation | Fixed — regex validation added |
+| W8: Share page no auth token | Fixed — auth token passed through |
+| W9: Duplicate escapeXml | Fixed — deduplicated to single source |
+| W10: Duplicate scoring weights | Fixed — single source of truth |
+| W11: Dead code | Fixed — cleaned up |
+| W12: Unnecessary use client | Fixed — directives at leaf level |
+| W13: CopyButton a11y | Fixed — aria-label and aria-live |
+| W14: Progress bars a11y | Fixed — role="progressbar" |
+| W15: Low-opacity contrast | Fixed — improved contrast ratios |
 
 ---
 
 ## Recommendation
 
-Fix B1 (OAuth error display) before submission. The remaining 15 warnings are acceptable risks for a hackathon build, with W1 (in-memory cache) being the most impactful limitation to document.
+**Ship it.** All 7 acceptance criteria are met. 260 tests pass. Zero blockers. The 5 remaining warnings are all low-severity and acceptable (CSP headers, rate limiting, smooth scroll motion guard, mobile hamburger menu, env var docs).

@@ -6,8 +6,20 @@ import {
   validateState,
   clearStateCookie,
 } from "@/lib/auth/github";
+import { rateLimit } from "@/lib/cache/redis";
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 10 requests per IP per 15 minutes
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = await rateLimit(`ratelimit:callback:${ip}`, 10, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
     return NextResponse.redirect(new URL("/?error=no_code", request.url));

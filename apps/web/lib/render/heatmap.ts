@@ -1,8 +1,8 @@
 import type { HeatmapDay } from "@chapa/shared";
 import { getHeatmapColor } from "./theme";
 
-const CELL_SIZE = 14;
-const CELL_GAP = 3;
+const CELL_SIZE = 26;
+const CELL_GAP = 4;
 const WEEKS = 13;
 const DAYS = 7;
 
@@ -38,7 +38,7 @@ export function renderHeatmapSvg(cells: HeatmapCell[]): string {
   return cells
     .map(
       (c) =>
-        `<rect x="${c.x}" y="${c.y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="3" fill="${c.fill}" opacity="0">` +
+        `<rect x="${c.x}" y="${c.y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="4" fill="${c.fill}" opacity="0">` +
         `<animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="${c.delay}ms" fill="freeze"/>` +
         `</rect>`,
     )

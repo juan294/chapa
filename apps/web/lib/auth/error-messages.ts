@@ -15,7 +15,7 @@ export const OAUTH_ERROR_CODES = [
   "user_fetch",
 ] as const;
 
-export type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
+type OAuthErrorCode = (typeof OAUTH_ERROR_CODES)[number];
 
 const ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
   no_code:

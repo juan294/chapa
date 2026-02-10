@@ -7,6 +7,8 @@ export interface HeatmapDay {
 /** Aggregated GitHub stats over the last 90 days */
 export interface Stats90d {
   handle: string;
+  displayName?: string; // GitHub profile name (e.g. "Juan García"), undefined if unset
+  avatarUrl?: string; // GitHub avatar URL
   commitsTotal: number; // cap 200
   activeDays: number; // 0..90
   prsMergedCount: number;
@@ -22,6 +24,7 @@ export interface Stats90d {
   docsOnlyPrRatio?: number; // optional, 0..1
   heatmapData: HeatmapDay[];
   fetchedAt: string; // ISO timestamp
+  hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
 }
 
 /** Confidence flag identifiers */
@@ -30,7 +33,8 @@ export type ConfidenceFlag =
   | "micro_commit_pattern"
   | "generated_change_pattern"
   | "low_collaboration_signal"
-  | "single_repo_concentration";
+  | "single_repo_concentration"
+  | "supplemental_unverified";
 
 /** A single confidence penalty with reason */
 export interface ConfidencePenalty {
@@ -62,4 +66,48 @@ export interface ImpactV3Result {
   tier: ImpactTier;
   breakdown: ScoreBreakdown;
   computedAt: string; // ISO timestamp
+}
+
+/** Raw data shape returned by the GitHub GraphQL contribution query */
+export interface RawContributionData {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  contributionCalendar: {
+    totalContributions: number;
+    weeks: {
+      contributionDays: {
+        date: string;
+        contributionCount: number;
+      }[];
+    }[];
+  };
+  pullRequests: {
+    totalCount: number;
+    nodes: {
+      additions: number;
+      deletions: number;
+      changedFiles: number;
+      merged: boolean;
+    }[];
+  };
+  reviews: { totalCount: number };
+  issues: { totalCount: number };
+  repositories: {
+    totalCount: number;
+    nodes: {
+      nameWithOwner: string;
+      defaultBranchRef: {
+        target: { history: { totalCount: number } };
+      } | null;
+    }[];
+  };
+}
+
+/** Supplemental stats uploaded from a linked account (e.g. GitHub EMU) */
+export interface SupplementalStats {
+  targetHandle: string; // personal GitHub handle
+  sourceHandle: string; // EMU handle
+  stats: Stats90d;
+  uploadedAt: string; // ISO timestamp
 }

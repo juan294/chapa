@@ -5,6 +5,7 @@ import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
+import { rateLimit } from "@/lib/cache/redis";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -27,6 +28,20 @@ export async function GET(
   { params }: { params: Promise<{ handle: string }> },
 ) {
   const { handle } = await params;
+
+  // Rate limit: 100 requests per IP per 60 seconds
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = await rateLimit(`ratelimit:badge:${ip}`, 100, 60);
+  if (!rl.allowed) {
+    return new NextResponse("Too many requests. Please try again later.", {
+      status: 429,
+      headers: {
+        "Content-Type": "text/plain",
+        "Retry-After": "60",
+      },
+    });
+  }
 
   // Validate handle before any work
   if (!isValidHandle(handle)) {

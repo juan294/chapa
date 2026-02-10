@@ -8,10 +8,11 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("ShareButton", () => {
-  // Issue #18 — "use client" should be removed (purely presentational <a> tag)
-  describe("server component (#18)", () => {
-    it("does not have a 'use client' directive", () => {
-      expect(SOURCE).not.toMatch(/^["']use client["']/m);
-    });
+  it("has 'use client' directive (uses onClick with trackEvent)", () => {
+    expect(SOURCE).toMatch(/^["']use client["']/m);
+  });
+
+  it("tracks share_clicked event on click", () => {
+    expect(SOURCE).toContain('trackEvent("share_clicked"');
   });
 });

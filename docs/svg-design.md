@@ -1,6 +1,6 @@
 # Chapa Badge SVG Design (React-to-SVG)
 
-## Output formats (hackathon)
+## Output formats
 - Default: 1200×630 (wide)
 - Theme: Midnight Mint
 - Rendering method: JSX <svg> template rendered server-side to string.
@@ -40,7 +40,7 @@
 - Small confidence icon (optional)
 
 6) Footer
-- "Powered by GitHub" + GitHub mark (hackathon only)
+- "Powered by GitHub" + GitHub mark (optional, behind flag)
 - Must be swappable/removable via flag.
 
 ## GitHub branding swap

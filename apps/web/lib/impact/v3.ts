@@ -78,6 +78,8 @@ const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
     "Limited review and collaboration signals detected in this period.",
   single_repo_concentration:
     "Most activity is concentrated in one repo (not bad\u2014just less cross-repo signal).",
+  supplemental_unverified:
+    "Includes activity from a linked account that cannot be independently verified.",
 };
 
 export function computeConfidence(stats: Stats90d): {
@@ -137,6 +139,16 @@ export function computeConfidence(stats: Stats90d): {
       flag: "single_repo_concentration",
       penalty: 5,
       reason: CONFIDENCE_REASONS.single_repo_concentration,
+    });
+    score -= 5;
+  }
+
+  // supplemental_unverified: -5 if stats include merged supplemental data
+  if (stats.hasSupplementalData) {
+    penalties.push({
+      flag: "supplemental_unverified",
+      penalty: 5,
+      reason: CONFIDENCE_REASONS.supplemental_unverified,
     });
     score -= 5;
   }

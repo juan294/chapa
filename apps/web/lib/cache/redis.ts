@@ -91,6 +91,68 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Rate limiting (sliding window counter via INCR + EXPIRE)
+// ---------------------------------------------------------------------------
+
+export interface RateLimitResult {
+  allowed: boolean;
+  current: number;
+  limit: number;
+}
+
+/**
+ * Check and increment a rate limit counter.
+ * Uses Redis INCR + EXPIRE for a fixed-window counter.
+ *
+ * @param key - Rate limit key (e.g. "ratelimit:login:1.2.3.4")
+ * @param limit - Maximum allowed requests in the window
+ * @param windowSeconds - Window duration in seconds
+ * @returns Whether the request is allowed, or allowed if Redis is unavailable (fail-open)
+ */
+export async function rateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<RateLimitResult> {
+  const redis = getRedis();
+  if (!redis) return { allowed: true, current: 0, limit };
+
+  try {
+    const current = await redis.incr(key);
+    // Set expiry only on first increment (when counter is 1)
+    if (current === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+    return { allowed: current <= limit, current, limit };
+  } catch {
+    // Fail open — don't block requests if Redis is down
+    return { allowed: true, current: 0, limit };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
+
+/**
+ * Ping Redis and return a health status string.
+ * - "ok" — Redis responded to PING.
+ * - "error" — Redis client exists but PING failed.
+ * - "unavailable" — Redis client is null (missing env vars).
+ */
+export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
+  const redis = getRedis();
+  if (!redis) return "unavailable";
+
+  try {
+    await redis.ping();
+    return "ok";
+  } catch {
+    return "error";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Test helper — reset the cached client (only used by tests)
 // ---------------------------------------------------------------------------
 
