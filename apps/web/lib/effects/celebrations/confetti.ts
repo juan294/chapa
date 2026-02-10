@@ -1,0 +1,90 @@
+import confetti from "canvas-confetti";
+
+const AMBER_COLORS = ["#E2A84B", "#F0C97D", "#C28A2E", "#E6EDF3"];
+const GOLD_COLORS = ["#E2A84B", "#F0C97D", "#C28A2E", "#D4A849", "#FFDD85"];
+const RAINBOW_COLORS = ["#E2A84B", "#F0C97D", "#E86B6B", "#6BE8C4", "#8B9CF0", "#F0A06B"];
+
+export type ConfettiPalette = "amber" | "gold" | "rainbow";
+
+function getColors(palette: ConfettiPalette): string[] {
+  switch (palette) {
+    case "gold":
+      return GOLD_COLORS;
+    case "rainbow":
+      return RAINBOW_COLORS;
+    default:
+      return AMBER_COLORS;
+  }
+}
+
+export function fireSingleBurst(
+  particleCount: number,
+  palette: ConfettiPalette,
+  origin?: { x: number; y: number },
+) {
+  confetti({
+    particleCount,
+    spread: 70,
+    origin: origin ?? { x: 0.5, y: 0.5 },
+    colors: getColors(palette),
+    disableForReducedMotion: true,
+  });
+}
+
+export function fireMultiBurst(particleCount: number, palette: ConfettiPalette) {
+  const colors = getColors(palette);
+  const base = Math.round(particleCount * 0.4);
+  const side = Math.round(particleCount * 0.3);
+
+  const fire = (opts: confetti.Options) => {
+    confetti({ ...opts, colors, disableForReducedMotion: true });
+  };
+
+  fire({ particleCount: base, spread: 55, origin: { x: 0.5, y: 0.5 } });
+  setTimeout(() => fire({ particleCount: side, spread: 70, origin: { x: 0.3, y: 0.6 } }), 200);
+  setTimeout(() => fire({ particleCount: side, spread: 70, origin: { x: 0.7, y: 0.6 } }), 400);
+}
+
+export function fireFireworks(particleCount: number, palette: ConfettiPalette, speed: number) {
+  const colors = getColors(palette);
+  const duration = Math.round(2000 / speed);
+  const end = Date.now() + duration;
+  const perFrame = Math.max(1, Math.round(particleCount / 60));
+
+  const frame = () => {
+    confetti({
+      particleCount: perFrame,
+      angle: 60 + Math.random() * 60,
+      spread: 55,
+      origin: { x: Math.random(), y: Math.random() * 0.6 },
+      colors,
+      disableForReducedMotion: true,
+    });
+    if (Date.now() < end) requestAnimationFrame(frame);
+  };
+  frame();
+}
+
+export function fireSubtleSparkle(palette: ConfettiPalette, speed: number): () => void {
+  const colors = getColors(palette);
+  let cancelled = false;
+  const interval = Math.round(400 / speed);
+
+  const tick = () => {
+    if (cancelled) return;
+    confetti({
+      particleCount: 2,
+      spread: 360,
+      startVelocity: 8,
+      gravity: 0.4,
+      ticks: 200,
+      origin: { x: 0.3 + Math.random() * 0.4, y: 0.3 + Math.random() * 0.3 },
+      colors,
+      disableForReducedMotion: true,
+    });
+    setTimeout(tick, interval);
+  };
+  tick();
+
+  return () => { cancelled = true; };
+}
