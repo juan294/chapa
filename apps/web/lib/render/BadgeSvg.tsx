@@ -2,19 +2,7 @@ import type { Stats90d, ImpactV3Result } from "@chapa/shared";
 import { WARM_AMBER, getTierColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
-
-export function escapeXml(unsafe: string): string {
-  return unsafe.replace(/[<>&'"]/g, (c) => {
-    switch (c) {
-      case "<": return "&lt;";
-      case ">": return "&gt;";
-      case "&": return "&amp;";
-      case "'": return "&apos;";
-      case '"': return "&quot;";
-      default: return c;
-    }
-  });
-}
+import { escapeXml } from "./escape";
 
 interface BadgeOptions {
   includeGithubBranding?: boolean;

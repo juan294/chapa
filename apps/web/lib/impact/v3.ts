@@ -21,7 +21,7 @@ export function normalize(x: number, cap: number): number {
 // Base score (0–100)
 // ---------------------------------------------------------------------------
 
-const WEIGHTS = {
+export const WEIGHTS = {
   commits: 0.12,
   prWeight: 0.33,
   reviews: 0.22,

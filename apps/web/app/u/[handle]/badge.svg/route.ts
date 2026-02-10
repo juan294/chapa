@@ -4,19 +4,7 @@ import { computeImpactV3 } from "@/lib/impact/v3";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
-
-function escapeXml(unsafe: string): string {
-  return unsafe.replace(/[<>&'"]/g, (c) => {
-    switch (c) {
-      case "<": return "&lt;";
-      case ">": return "&gt;";
-      case "&": return "&amp;";
-      case "'": return "&apos;";
-      case '"': return "&quot;";
-      default: return c;
-    }
-  });
-}
+import { escapeXml } from "@/lib/render/escape";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
