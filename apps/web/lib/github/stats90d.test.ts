@@ -133,6 +133,25 @@ describe("fetchStats90d", () => {
     expect(stats!.topRepoShare).toBe(0);
   });
 
+  it("passes displayName and avatarUrl from raw data", async () => {
+    mockedQueries.fetchContributionData.mockResolvedValue(
+      makeContribData({ name: "Juan García", avatarUrl: "https://avatars.githubusercontent.com/u/42" }),
+    );
+
+    const stats = await fetchStats90d("test-user", "gho_token");
+    expect(stats!.displayName).toBe("Juan García");
+    expect(stats!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/42");
+  });
+
+  it("sets displayName to undefined when GitHub name is null", async () => {
+    mockedQueries.fetchContributionData.mockResolvedValue(
+      makeContribData({ name: null }),
+    );
+
+    const stats = await fetchStats90d("test-user", "gho_token");
+    expect(stats!.displayName).toBeUndefined();
+  });
+
   it("returns null when the query fails", async () => {
     mockedQueries.fetchContributionData.mockResolvedValue(null);
 

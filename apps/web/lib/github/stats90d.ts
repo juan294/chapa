@@ -83,6 +83,8 @@ export async function fetchStats90d(
 
   return {
     handle: raw.login,
+    displayName: raw.name ?? undefined,
+    avatarUrl: raw.avatarUrl,
     commitsTotal,
     activeDays,
     prsMergedCount,

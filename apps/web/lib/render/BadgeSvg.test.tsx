@@ -126,6 +126,23 @@ describe("renderBadgeSvg", () => {
       expect(svg).not.toContain("user<xss>");
     });
 
+    it("shows displayName instead of handle when available", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ displayName: "Juan García" }),
+        makeImpact(),
+      );
+      expect(svg).toContain("Juan Garc");
+      expect(svg).not.toContain("@testuser");
+    });
+
+    it("falls back to @handle when displayName is not set", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ displayName: undefined }),
+        makeImpact(),
+      );
+      expect(svg).toContain("@testuser");
+    });
+
     it("contains 'Last 90 days' subtitle", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("Last 90 days");

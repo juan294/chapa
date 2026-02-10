@@ -7,6 +7,8 @@ export interface HeatmapDay {
 /** Aggregated GitHub stats over the last 90 days */
 export interface Stats90d {
   handle: string;
+  displayName?: string; // GitHub profile name (e.g. "Juan García"), undefined if unset
+  avatarUrl?: string; // GitHub avatar URL
   commitsTotal: number; // cap 200
   activeDays: number; // 0..90
   prsMergedCount: number;

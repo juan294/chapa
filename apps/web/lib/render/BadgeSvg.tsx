@@ -16,6 +16,9 @@ export function renderBadgeSvg(
   const { includeGithubBranding = true } = options;
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
+  const headerName = stats.displayName
+    ? escapeXml(stats.displayName)
+    : `@${safeHandle}`;
   const tierColor = getTierColor(impact.tier);
 
   // Layout constants
@@ -80,7 +83,7 @@ export function renderBadgeSvg(
   </g>
 
   <!-- Handle + subtitle -->
-  <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="22" font-weight="600" fill="${t.textPrimary}">@${safeHandle}</text>
+  <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="22" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
   <text x="${PAD + 72}" y="${headerY + 18}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">Last 90 days</text>
 
   <!-- Chapa. logo (top-right) -->

@@ -26,20 +26,25 @@ export async function generateMetadata({
   if (!isValidHandle(handle)) {
     return { title: "Not Found" };
   }
+
+  // Fetch stats to get display name for the page title
+  const stats = await getStats90d(handle);
+  const displayLabel = stats?.displayName ?? `@${handle}`;
+
   const pageUrl = `${BASE_URL}/u/${handle}`;
   return {
-    title: `@${handle} — Developer Impact`,
+    title: `${displayLabel} — Developer Impact`,
     description: `View ${handle}'s developer impact score and badge on Chapa. See commits, PRs, reviews, and impact tier.`,
     openGraph: {
       type: "profile",
-      title: `@${handle} — Chapa Developer Impact`,
+      title: `${displayLabel} — Chapa Developer Impact`,
       description: `View ${handle}'s developer impact score and badge on Chapa.`,
       url: pageUrl,
       images: [`/u/${handle}/badge.svg`],
     },
     twitter: {
       card: "summary_large_image",
-      title: `@${handle} — Chapa Developer Impact`,
+      title: `${displayLabel} — Chapa Developer Impact`,
       description: `View ${handle}'s developer impact score and badge on Chapa.`,
       images: [`/u/${handle}/badge.svg`],
     },
@@ -75,10 +80,12 @@ export default async function SharePage({ params }: SharePageProps) {
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
   const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
 
+  const displayLabel = stats?.displayName ?? handle;
+
   const personJsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
-    name: handle,
+    name: displayLabel,
     url: `https://github.com/${handle}`,
     sameAs: [`https://github.com/${handle}`],
     ...(impact
@@ -103,11 +110,6 @@ export default async function SharePage({ params }: SharePageProps) {
       <Navbar />
 
       <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
-        {/* Handle */}
-        <h1 className="font-heading text-3xl font-bold text-text-primary mb-8 animate-fade-in-up [animation-delay:100ms]">
-          <span className="text-amber">@{handle}</span>
-        </h1>
-
         {/* Badge preview */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">
           <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-4 animate-pulse-glow-amber">
