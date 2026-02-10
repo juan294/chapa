@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "Chapa — Developer Impact Badge",
   description:
     "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score.",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({

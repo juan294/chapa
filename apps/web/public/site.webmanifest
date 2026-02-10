@@ -1,0 +1,21 @@
+{
+  "name": "Chapa — Developer Impact Badge",
+  "short_name": "Chapa",
+  "description": "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12100D",
+  "theme_color": "#E2A84B",
+  "icons": [
+    {
+      "src": "/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
