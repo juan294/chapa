@@ -1,6 +1,7 @@
 "use client";
 
 import type { ImpactV3Result } from "@chapa/shared";
+import { WEIGHTS } from "@/lib/impact/v3";
 
 const SIGNAL_LABELS: Record<string, string> = {
   commits: "Commits",
@@ -9,15 +10,6 @@ const SIGNAL_LABELS: Record<string, string> = {
   issues: "Issues Closed",
   streak: "Active Days",
   collaboration: "Cross-Repo",
-};
-
-const SIGNAL_WEIGHTS: Record<string, number> = {
-  commits: 0.12,
-  prWeight: 0.33,
-  reviews: 0.22,
-  issues: 0.10,
-  streak: 0.13,
-  collaboration: 0.10,
 };
 
 export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
@@ -66,7 +58,7 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
               <span className="text-text-primary font-heading">
                 {Math.round(value * 100)}%
                 <span className="text-text-secondary text-xs ml-1">
-                  (×{SIGNAL_WEIGHTS[key]?.toFixed(2)})
+                  (×{WEIGHTS[key as keyof typeof WEIGHTS]?.toFixed(2)})
                 </span>
               </span>
             </div>

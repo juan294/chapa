@@ -44,6 +44,3 @@ export function renderHeatmapSvg(cells: HeatmapCell[]): string {
     )
     .join("\n    ");
 }
-
-export const HEATMAP_WIDTH = WEEKS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
-export const HEATMAP_HEIGHT = DAYS * (CELL_SIZE + CELL_GAP) - CELL_GAP;

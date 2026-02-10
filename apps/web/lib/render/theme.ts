@@ -6,7 +6,6 @@ export interface BadgeTheme {
   textPrimary: string;
   textSecondary: string;
   accent: string;
-  accentLight: string;
   stroke: string;
   heatmap: [string, string, string, string, string];
 }
@@ -17,7 +16,6 @@ export const WARM_AMBER: BadgeTheme = {
   textPrimary: "#E6EDF3",
   textSecondary: "#9AA4B2",
   accent: "#E2A84B",
-  accentLight: "#F0C97D",
   stroke: "rgba(226,168,75,0.12)",
   heatmap: [
     "rgba(226,168,75,0.06)", // 0: none
