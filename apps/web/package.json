@@ -15,7 +15,9 @@
     "next": "^16.1.6",
     "posthog-js": "^1.345.2",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "resend": "^6.9.1",
+    "svix": "^1.84.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
