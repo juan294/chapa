@@ -1,17 +1,23 @@
-/**
- * Copy-to-clipboard button stub (Teammate E).
- * Will copy embed snippets and track via PostHog.
- */
-
 "use client";
 
+import { useState } from "react";
+
 export function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <button
-      onClick={() => navigator.clipboard.writeText(text)}
-      className="rounded bg-card px-3 py-1.5 text-sm text-text-secondary border border-stroke hover:text-text-primary transition-colors"
+      onClick={handleCopy}
+      aria-label="Copy embed snippet"
+      className="rounded-full border border-warm-stroke bg-warm-card px-4 py-1.5 text-sm text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors"
     >
-      Copy
+      <span aria-live="polite">{copied ? "Copied!" : "Copy"}</span>
     </button>
   );
 }

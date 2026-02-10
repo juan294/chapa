@@ -38,9 +38,17 @@ Shared types live in: `packages/shared/types.ts`
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
-- Default theme: Midnight Mint (dark + mint accent)
+- Default theme: Warm Amber (dark + amber/gold accent)
 - SVG must be crisp and readable when scaled down
 - Animations must be subtle (heatmap fade-in, impact pulse)
+
+## Design system (MANDATORY for UI work)
+- Full spec: @docs/design-system.md
+- Accent color: `#E2A84B` (warm amber/gold). Use `text-amber`, `bg-amber`.
+- Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
+- Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
+- Dark theme only. No light mode. Warm-tinted backgrounds (`#12100D`).
+- All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## GitHub branding
 Include GitHub logo and "Powered by GitHub" text for hackathon.
@@ -297,6 +305,7 @@ Required in `.env.local`:
 GITHUB_CLIENT_ID=          # GitHub OAuth App
 GITHUB_CLIENT_SECRET=      # GitHub OAuth App
 NEXTAUTH_SECRET=           # Session signing (if NextAuth)
+NEXT_PUBLIC_BASE_URL=      # Base URL for OAuth redirect (e.g., https://chapa.thecreativetoken.com)
 
 UPSTASH_REDIS_REST_URL=    # Upstash Redis
 UPSTASH_REDIS_REST_TOKEN=  # Upstash Redis
@@ -430,12 +439,34 @@ If unsure about priority, default to `priority: medium`.
 | `area: infra` | CI/CD, Vercel, deployment, monitoring |
 | `area: ux` | UI/UX, design, accessibility |
 
+### Issue-Driven Development (MANDATORY)
+
+**Every code change starts with a GitHub issue. No exceptions.**
+
+This is the permanent workflow for all work — features, bugs, improvements, cleanup:
+
+1. **Open an issue first.** Before writing any code, create a GitHub issue describing the work. Use the label taxonomy above. Include acceptance criteria in the body.
+2. **Ask the user for details if needed.** If the issue needs more context, ask before starting implementation.
+3. **Assign the issue.** If an agent is working on it, note the assignment. Use worktree branch names that reference the issue (e.g., `fix/42-oauth-error-display`).
+4. **Reference the issue in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
+5. **The agent that fixes the issue closes it.** After the fix is merged to `develop` with green CI, the agent runs `gh issue close N --comment "Fixed in <commit-sha>"`. No need to wait for production.
+
+```bash
+# Full lifecycle
+gh issue create --title "..." --label "..." --body "..."    # Step 1
+# ... work in worktree, write tests, implement ...
+git commit -m "fix(area): description. Fixes #N"            # Step 4
+# ... merge to develop, verify CI ...
+gh issue close N --comment "Fixed in $(git rev-parse --short HEAD)"  # Step 5
+```
+
 ### Agent Rules for Issues
 
-1. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
-2. **Close issues when merged to `develop` with green CI.** No need to wait for production.
-3. **When starting work on an issue**, mention the issue number in your first commit.
-4. **Use the CLI:**
+1. **One issue per concern.** Don't bundle unrelated work into one issue.
+2. **Reference issues in commits.** Use `Fixes #N` or `Refs #N` in commit messages.
+3. **Close issues when merged to `develop` with green CI.** The agent that did the work is responsible for closing. Don't leave issues hanging.
+4. **When starting work on an issue**, mention the issue number in your first commit.
+5. **Use the CLI:**
    ```bash
    # Create an issue
    gh issue create --title "Badge: heatmap colors too dark on light themes" --label "type: bug,priority: high,area: badge" --body "..."
@@ -443,6 +474,9 @@ If unsure about priority, default to `priority: medium`.
    # List open issues by priority
    gh issue list --label "priority: critical"
    gh issue list --label "priority: high"
+
+   # Close with comment
+   gh issue close 42 --comment "Fixed in abc1234"
    ```
 
 ## Agent Autonomy
@@ -499,64 +533,114 @@ When triggered, create a team of parallel investigators to diagnose the issue:
 
 **Trigger:** User says "run pre-launch audit", "audit before submission", or "pre-hackathon review"
 
-Create a team called "pre-launch" with 3 parallel specialists to review the codebase before hackathon submission:
+The pre-launch audit spawns a team of **6 parallel specialists** that perform a comprehensive audit before any production release. This is the final gate before "create the release PR."
 
-### Specialists
+### The Team
 
-1. **qa-lead** — Quality Assurance
-   - Run the full test suite: `pnpm run test && pnpm run typecheck && pnpm run lint`
+| Specialist | Focus |
+|------------|-------|
+| **architect** | Dependency health, TypeScript config, circular deps, typecheck + knip |
+| **qa-lead** | Full test suite + E2E, coverage gaps, critical paths without tests |
+| **security-reviewer** | pnpm audit, hardcoded secrets, auth flows, RLS, CORS, CSP headers |
+| **performance-eng** | Bundle analysis (500KB threshold), unused exports, dynamic imports, Core Web Vitals |
+| **ux-reviewer** | ARIA/a11y, alt text, keyboard nav, error states, design consistency |
+| **devops** | Vercel config, env var audit, `/api/health`, GitHub Actions, DNS/domains |
+
+### How They Work
+
+1. **All 6 run in parallel** — each specialist independently investigates their domain using read-only tools (Glob, Grep, Read, Bash for analysis commands)
+2. **Each produces findings** categorized as blockers, warnings, or recommendations
+3. **Results are synthesized** into a single report at `docs/agents/pre-launch-report.md`
+4. **Final verdict** is one of:
+   - **READY** — no blockers, safe to release
+   - **CONDITIONAL** — minor issues, can release with caveats
+   - **NOT READY** — blockers found, must fix before release
+
+### Key Design Choices
+
+- **Read-only** — no specialist makes changes, they only audit and report
+- **Parallel** — all 6 run simultaneously for speed
+- **Aligned with production safety** — the audit informs the user's decision, but doesn't touch `main` or trigger a deploy
+
+### Specialist Details
+
+1. **architect**
+   - Run `pnpm outdated` and check for duplicate/conflicting dependencies
+   - Review all `tsconfig.json` files for strict mode settings
+   - Run `npx madge --circular` or trace import chains for circular deps
+   - Run `pnpm run typecheck` and report any errors
+   - Run `npx knip` for dead code detection (unused files, exports, dependencies)
+   - Check for duplicate code patterns across modules
+
+2. **qa-lead**
+   - Run `pnpm run test && pnpm run typecheck && pnpm run lint`
    - Report total test count, pass rate, and any failures
    - Check test coverage for critical paths (scoring pipeline, SVG rendering, OAuth callback)
    - Verify all acceptance criteria from CLAUDE.md are met
-   - Test the badge endpoint manually: `curl -s /u/test-handle/badge.svg`
-   - Check for console errors, unhandled promise rejections
-   - Verify graceful degradation: what happens when Redis is down? When GitHub rate-limits?
+   - Verify graceful degradation: what happens when data fetches fail? When GitHub rate-limits?
+   - Identify untested files and assess risk level
 
-2. **security-reviewer** — Security Audit
+3. **security-reviewer**
    - Run `pnpm audit` and report vulnerabilities by severity
    - Check for hardcoded secrets (grep for API keys, tokens, passwords in source)
    - Verify OAuth implementation: token storage, callback validation, CSRF protection
-   - Check SVG XSS vectors: is all user input (handle, display name) properly escaped?
+   - Check SVG XSS vectors: is all user input properly escaped?
    - Verify environment variables are not leaked to the client (no secrets in `NEXT_PUBLIC_*`)
    - Check CORS configuration on API routes
-   - Verify cache keys cannot be manipulated (no injection in Redis key construction)
+   - Verify cache keys cannot be manipulated (no injection in key construction)
    - Check dependency licenses: no copyleft violations
 
-3. **devops-reviewer** — Infrastructure & Deployment
+4. **performance-eng**
+   - Run `pnpm run build` and parse output for route sizes
+   - Flag any route or chunk exceeding 500KB First Load JS
+   - Check for unused exports that bloat the bundle
+   - Verify `"use client"` directives are at the right level (not too high)
+   - Assess Core Web Vitals: CLS risks (image dimensions, font loading), render-blocking resources
+   - Check for unnecessary `useEffect` calls causing hydration mismatches
+
+5. **ux-reviewer**
+   - Check heading hierarchy (h1 → h2 → h3, no skipped levels)
+   - Verify ARIA labels on interactive elements and decorative images
+   - Check for visible focus indicators (`:focus-visible` styles)
+   - Verify `prefers-reduced-motion` support for animations
+   - Audit alt text on all images
+   - Check keyboard navigation: all interactive elements natively focusable, no onClick on divs
+   - Review error states, empty states, and loading states
+   - Verify design system consistency (tokens, fonts, spacing)
+
+6. **devops**
    - Verify the production build succeeds: `pnpm run build`
    - Check all CI workflows are passing on `develop`
    - Verify environment variable documentation matches what's actually required
    - Check response headers on the badge endpoint (Cache-Control, Content-Type)
-   - Verify domain configuration and redirects work
    - Check error boundaries and 404/500 pages exist
    - Verify health endpoint returns valid JSON
    - Check bundle sizes for any oversized chunks
+   - Verify git state: clean working tree, no stale worktrees or branches
 
 ### Output
 
-Each specialist writes findings to `docs/agents/shared-context.md` using the standard entry format. The team lead synthesizes a final report:
+Results are synthesized into a single report at **`docs/agents/pre-launch-report.md`** with this structure:
 
 ```markdown
 # Pre-Launch Audit Report
-> Generated on [date]
+> Generated on [date] | Branch: `develop` | 6 parallel specialists
 
-## Verdict: READY / NOT READY
+## Verdict: READY / CONDITIONAL / NOT READY
 
-## Blockers (must fix before submission)
-[Any critical issues]
+## Blockers (must fix before release)
+[B1, B2, ...] — with severity, found-by, and fix description
 
-## Warnings (accepted risks)
-[Non-critical issues with justification]
+## Warnings
+[Table: #, Issue, Severity, Found by, Risk]
 
 ## Detailed Findings
-### Quality Assurance
-[qa-lead findings]
-
-### Security
-[security-reviewer findings]
-
-### Infrastructure
-[devops-reviewer findings]
+### 1. Quality Assurance (qa-lead) — GREEN/YELLOW/RED
+### 2. Security (security-reviewer) — GREEN/YELLOW/RED
+### 3. Infrastructure (devops) — GREEN/YELLOW/RED
+### 4. Architecture (architect) — GREEN/YELLOW/RED
+### 5. Performance (performance-eng) — GREEN/YELLOW/RED
+### 6. UX/Accessibility (ux-reviewer) — GREEN/YELLOW/RED
 ```
 
 **Do NOT auto-fix issues.** Present the full audit to the user. The user decides what to fix and what to accept as risk before submission.

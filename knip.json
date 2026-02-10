@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "workspaces": {
+    "apps/web": {
+      "ignoreDependencies": [
+        "eslint",
+        "eslint-config-next",
+        "eslint-plugin-import",
+        "eslint-plugin-jsx-a11y",
+        "eslint-plugin-react-hooks",
+        "postcss",
+        "postcss-load-config"
+      ],
+      "ignore": [
+        "lib/analytics/posthog.ts",
+        "components/BadgePreview.tsx"
+      ]
+    }
+  }
+}

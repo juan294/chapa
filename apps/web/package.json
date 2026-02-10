@@ -3,15 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@chapa/shared": "workspace:*",
-    "next": "^15.3.3",
+    "@upstash/redis": "^1.36.2",
+    "next": "^16.1.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

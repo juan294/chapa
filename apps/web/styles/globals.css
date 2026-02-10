@@ -1,10 +1,191 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0B0F14;
-  --color-card: #0F1720;
+  /* Base palette (warm dark) */
+  --color-bg: #12100D;
+  --color-card: #1A1610;
   --color-text-primary: #E6EDF3;
   --color-text-secondary: #9AA4B2;
-  --color-mint: #39FF88;
-  --color-stroke: rgba(230, 237, 243, 0.12);
+  --color-stroke: rgba(226, 168, 75, 0.12);
+
+  /* Accent: warm amber/gold */
+  --color-amber: #E2A84B;
+  --color-amber-light: #F0C97D;
+  --color-amber-dark: #C28A2E;
+
+  /* Warm aliases (used throughout the page) */
+  --color-warm-bg: #12100D;
+  --color-warm-card: #1A1610;
+  --color-warm-stroke: rgba(226, 168, 75, 0.12);
+
+  /* Typography */
+  --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
+  --font-family-body: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Keyframes ───────────────────────────────────────────── */
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1.5deg);
+  }
+}
+
+@keyframes float-medium {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(-1deg);
+  }
+}
+
+@keyframes float-fast {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-18px) rotate(2deg);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow-amber {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(226, 168, 75, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 44px rgba(226, 168, 75, 0.3);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -8px) rotate(1deg);
+  }
+  50% {
+    transform: translate(-5px, -16px) rotate(-0.5deg);
+  }
+  75% {
+    transform: translate(-10px, -6px) rotate(0.5deg);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ── Animation utilities ─────────────────────────────────── */
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+.animate-float-medium {
+  animation: float-medium 7.5s ease-in-out infinite;
+}
+.animate-float-fast {
+  animation: float-fast 5s ease-in-out infinite;
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out both;
+}
+.animate-pulse-glow-amber {
+  animation: pulse-glow-amber 3s ease-in-out infinite;
+}
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+.animate-drift {
+  animation: drift 8s ease-in-out infinite;
+}
+.animate-scale-in {
+  animation: scale-in 0.6s ease-out both;
+}
+
+/* ── Background grid pattern ─────────────────────────────── */
+
+.bg-grid-warm {
+  background-image: linear-gradient(
+      rgba(226, 168, 75, 0.03) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(226, 168, 75, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+/* ── Focus indicators (accessibility) ────────────────────── */
+
+*:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+/* ── Reduced motion ─────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(226, 168, 75, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(226, 168, 75, 0.3);
 }
