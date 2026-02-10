@@ -106,6 +106,11 @@ export default async function SharePage({ params }: SharePageProps) {
       <Navbar />
 
       <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
+        {/* Page heading */}
+        <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-text-primary mb-8 animate-fade-in-up">
+          @{handle}
+        </h1>
+
         {/* Badge preview */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">
           <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-4 animate-pulse-glow-amber">
@@ -124,7 +129,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {impact ? (
           <section className="mb-12 animate-fade-in-up [animation-delay:300ms]">
             <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8">
-              <h2 className="text-sm tracking-widest uppercase text-amber mb-6">
+              <h2 className="font-heading text-sm tracking-widest uppercase text-amber mb-6">
                 Impact Breakdown
               </h2>
               <ImpactBreakdown impact={impact} />
@@ -143,7 +148,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {/* Embed snippets */}
         <section className="mb-12 animate-fade-in-up [animation-delay:400ms]">
           <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8 space-y-6">
-            <h2 className="text-sm tracking-widest uppercase text-amber">
+            <h2 className="font-heading text-sm tracking-widest uppercase text-amber">
               Embed This Badge
             </h2>
 

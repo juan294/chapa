@@ -173,4 +173,20 @@ describe("isValidStats90dShape", () => {
   it("accepts optional fields when present", () => {
     expect(isValidStats90dShape({ ...validStats, microCommitRatio: 0.3, docsOnlyPrRatio: 0.1 })).toBe(true);
   });
+
+  it("rejects heatmapData with more than 91 entries", () => {
+    const bigHeatmap = Array.from({ length: 92 }, (_, i) => ({
+      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+      count: 1,
+    }));
+    expect(isValidStats90dShape({ ...validStats, heatmapData: bigHeatmap })).toBe(false);
+  });
+
+  it("accepts heatmapData with exactly 91 entries", () => {
+    const maxHeatmap = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+      count: 1,
+    }));
+    expect(isValidStats90dShape({ ...validStats, heatmapData: maxHeatmap })).toBe(true);
+  });
 });

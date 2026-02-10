@@ -312,6 +312,10 @@ UPSTASH_REDIS_REST_TOKEN=  # Upstash Redis
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
+
+RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
+RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)
+SUPPORT_FORWARD_EMAIL=     # Gmail address for email forwarding (optional)
 ```
 
 ### Environment Variable Safety

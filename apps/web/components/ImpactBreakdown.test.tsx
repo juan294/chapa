@@ -15,6 +15,17 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // W4 — headings must use font-heading per design system
+  describe("design system typography", () => {
+    it("h3 elements include font-heading class", () => {
+      const h3Matches = SOURCE.match(/<h3[^>]*>/g) ?? [];
+      expect(h3Matches.length).toBeGreaterThan(0);
+      for (const h3 of h3Matches) {
+        expect(h3).toContain("font-heading");
+      }
+    });
+  });
+
   // Issue #20 — progress bars need ARIA attributes
   describe("accessibility (#20)", () => {
     it("confidence bar has role=progressbar", () => {
