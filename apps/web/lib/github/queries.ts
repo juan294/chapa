@@ -155,7 +155,7 @@ export async function fetchContributionData(
       pullRequests: {
         totalCount: cc.pullRequestContributions.totalCount,
         nodes: cc.pullRequestContributions.nodes
-          .filter((n: { pullRequest: unknown }) => n.pullRequest != null)
+          .filter((n: { pullRequest: unknown } | null) => n != null && n.pullRequest != null)
           .map(
             (n: { pullRequest: { additions: number; deletions: number; changedFiles: number; merged: boolean } }) => ({
               additions: n.pullRequest.additions,

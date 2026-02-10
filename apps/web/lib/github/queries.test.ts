@@ -164,6 +164,7 @@ describe("fetchContributionData", () => {
                     nodes: [
                       { pullRequest: { additions: 10, deletions: 2, changedFiles: 3, merged: true } },
                       { pullRequest: null },
+                      null,
                       { pullRequest: { additions: 5, deletions: 1, changedFiles: 1, merged: false } },
                     ],
                   },
