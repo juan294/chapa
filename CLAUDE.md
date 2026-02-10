@@ -305,6 +305,7 @@ Required in `.env.local`:
 GITHUB_CLIENT_ID=          # GitHub OAuth App
 GITHUB_CLIENT_SECRET=      # GitHub OAuth App
 NEXTAUTH_SECRET=           # Session signing (if NextAuth)
+NEXT_PUBLIC_BASE_URL=      # Base URL for OAuth redirect (e.g., https://chapa.thecreativetoken.com)
 
 UPSTASH_REDIS_REST_URL=    # Upstash Redis
 UPSTASH_REDIS_REST_TOKEN=  # Upstash Redis
