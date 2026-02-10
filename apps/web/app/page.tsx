@@ -1,6 +1,12 @@
-import Link from "next/link";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { Navbar } from "@/components/Navbar";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+
+const NAV_LINKS = [
+  { label: "Features", href: "#features" },
+  { label: "How it Works", href: "#how-it-works" },
+  { label: "Stats", href: "#stats" },
+];
 
 /* ── Heatmap data (13 weeks x 7 days) ──────────────────────────
    0 = none, 1 = low, 2 = medium, 3 = high, 4 = intense */
@@ -215,36 +221,7 @@ export default async function Home({
       {errorMessage && <ErrorBanner message={errorMessage} />}
 
       {/* ── Navigation ─────────────────────────────────────── */}
-      <nav className="fixed top-0 z-50 w-full border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold font-heading tracking-tight">
-              Chapa<span className="text-amber">.</span>
-            </span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-1 rounded-full border border-warm-stroke bg-warm-card/60 px-1.5 py-1">
-            {["Features", "How it Works", "Stats"].map((item) => (
-              <a
-                key={item}
-                href={`#${item.toLowerCase().replace(/\s+/g, "-")}`}
-                className="rounded-full px-4 py-1.5 text-sm text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
-              >
-                {item}
-              </a>
-            ))}
-          </div>
-
-          <a
-            href="/api/auth/login"
-            className="flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
-          >
-            <GitHubIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Get Your Badge</span>
-            <span className="sm:hidden">Sign in</span>
-          </a>
-        </div>
-      </nav>
+      <Navbar navLinks={NAV_LINKS} />
 
       <main id="main-content">
         {/* ── Hero ─────────────────────────────────────────── */}
