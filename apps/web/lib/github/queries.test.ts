@@ -145,6 +145,47 @@ describe("fetchContributionData", () => {
     expect(body.variables.historyUntil).toBe(body.variables.until);
   });
 
+  it("skips PR contribution nodes where pullRequest is null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                login: "testuser",
+                name: "Test",
+                avatarUrl: "https://example.com/avatar.png",
+                contributionsCollection: {
+                  contributionCalendar: { totalContributions: 5, weeks: [] },
+                  pullRequestContributions: {
+                    totalCount: 3,
+                    nodes: [
+                      { pullRequest: { additions: 10, deletions: 2, changedFiles: 3, merged: true } },
+                      { pullRequest: null },
+                      { pullRequest: { additions: 5, deletions: 1, changedFiles: 1, merged: false } },
+                    ],
+                  },
+                  pullRequestReviewContributions: { totalCount: 0 },
+                  issueContributions: { totalCount: 0 },
+                },
+                repositories: { totalCount: 0, nodes: [] },
+              },
+            },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+
+    expect(result).not.toBeNull();
+    // Should have 2 nodes (the null one filtered out)
+    expect(result!.pullRequests.nodes).toHaveLength(2);
+    expect(result!.pullRequests.nodes[0].additions).toBe(10);
+    expect(result!.pullRequests.nodes[1].additions).toBe(5);
+  });
+
   it("logs network/fetch errors", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(

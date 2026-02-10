@@ -154,14 +154,16 @@ export async function fetchContributionData(
       contributionCalendar: cc.contributionCalendar,
       pullRequests: {
         totalCount: cc.pullRequestContributions.totalCount,
-        nodes: cc.pullRequestContributions.nodes.map(
-          (n: { pullRequest: { additions: number; deletions: number; changedFiles: number; merged: boolean } }) => ({
-            additions: n.pullRequest.additions,
-            deletions: n.pullRequest.deletions,
-            changedFiles: n.pullRequest.changedFiles,
-            merged: n.pullRequest.merged,
-          }),
-        ),
+        nodes: cc.pullRequestContributions.nodes
+          .filter((n: { pullRequest: unknown }) => n.pullRequest != null)
+          .map(
+            (n: { pullRequest: { additions: number; deletions: number; changedFiles: number; merged: boolean } }) => ({
+              additions: n.pullRequest.additions,
+              deletions: n.pullRequest.deletions,
+              changedFiles: n.pullRequest.changedFiles,
+              merged: n.pullRequest.merged,
+            }),
+          ),
       },
       reviews: { totalCount: cc.pullRequestReviewContributions.totalCount },
       issues: { totalCount: cc.issueContributions.totalCount },
