@@ -8,12 +8,10 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("CopyButton", () => {
-  // Issue #19 — should have "use client" (uses useState)
   it("has 'use client' directive (uses hooks)", () => {
     expect(SOURCE).toMatch(/^["']use client["']/m);
   });
 
-  // Issue #19 — aria-label on the button
   describe("accessibility (#19)", () => {
     it("has aria-label on the button element", () => {
       expect(SOURCE).toContain("aria-label=");
@@ -22,5 +20,9 @@ describe("CopyButton", () => {
     it("has aria-live=polite for state change announcement", () => {
       expect(SOURCE).toContain('aria-live="polite"');
     });
+  });
+
+  it("tracks embed_copied event on copy", () => {
+    expect(SOURCE).toContain('trackEvent("embed_copied"');
   });
 });

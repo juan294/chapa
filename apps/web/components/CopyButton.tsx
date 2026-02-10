@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { trackEvent } from "@/lib/analytics/posthog";
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
+    trackEvent("embed_copied");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
