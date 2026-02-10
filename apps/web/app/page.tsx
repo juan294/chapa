@@ -246,7 +246,7 @@ export default async function Home({
         </div>
       </nav>
 
-      <main>
+      <main id="main-content">
         {/* ── Hero ─────────────────────────────────────────── */}
         <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
           {/* Background layers */}

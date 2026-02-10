@@ -59,7 +59,7 @@ export default async function SharePage({ params }: SharePageProps) {
   const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
 
   return (
-    <main className="min-h-screen bg-bg bg-grid-warm">
+    <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
       {/* Ambient glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/3 h-96 w-96 rounded-full bg-amber/[0.03] blur-[150px]" />
