@@ -111,3 +111,56 @@ export interface SupplementalStats {
   stats: Stats90d;
   uploadedAt: string; // ISO timestamp
 }
+
+// ---------------------------------------------------------------------------
+// Creator Studio — Badge customization config
+// ---------------------------------------------------------------------------
+
+export type BadgeBackground = "solid" | "aurora" | "particles";
+export type BadgeCardStyle = "flat" | "frost" | "smoke" | "crystal" | "aurora-glass";
+export type BadgeBorder = "solid-amber" | "gradient-rotating" | "none";
+export type BadgeScoreEffect = "standard" | "gold-shimmer" | "gold-leaf" | "chrome" | "embossed" | "neon-amber" | "holographic";
+export type BadgeHeatmapAnimation = "fade-in" | "diagonal" | "ripple" | "scatter" | "cascade" | "waterfall";
+export type BadgeInteraction = "static" | "tilt-3d" | "holographic";
+export type BadgeStatsDisplay = "static" | "animated-ease" | "animated-spring";
+export type BadgeTierTreatment = "standard" | "enhanced";
+export type BadgeCelebration = "none" | "confetti";
+
+/** User-authored badge visual configuration (stored in Redis, no TTL) */
+export interface BadgeConfig {
+  background: BadgeBackground;
+  cardStyle: BadgeCardStyle;
+  border: BadgeBorder;
+  scoreEffect: BadgeScoreEffect;
+  heatmapAnimation: BadgeHeatmapAnimation;
+  interaction: BadgeInteraction;
+  statsDisplay: BadgeStatsDisplay;
+  tierTreatment: BadgeTierTreatment;
+  celebration: BadgeCelebration;
+}
+
+/** All valid values for each BadgeConfig field (used by validation + UI) */
+export const BADGE_CONFIG_OPTIONS = {
+  background: ["solid", "aurora", "particles"] as const,
+  cardStyle: ["flat", "frost", "smoke", "crystal", "aurora-glass"] as const,
+  border: ["solid-amber", "gradient-rotating", "none"] as const,
+  scoreEffect: ["standard", "gold-shimmer", "gold-leaf", "chrome", "embossed", "neon-amber", "holographic"] as const,
+  heatmapAnimation: ["fade-in", "diagonal", "ripple", "scatter", "cascade", "waterfall"] as const,
+  interaction: ["static", "tilt-3d", "holographic"] as const,
+  statsDisplay: ["static", "animated-ease", "animated-spring"] as const,
+  tierTreatment: ["standard", "enhanced"] as const,
+  celebration: ["none", "confetti"] as const,
+} as const;
+
+/** Default config — all fields set to their first (most basic) option */
+export const DEFAULT_BADGE_CONFIG: BadgeConfig = {
+  background: "solid",
+  cardStyle: "flat",
+  border: "solid-amber",
+  scoreEffect: "standard",
+  heatmapAnimation: "fade-in",
+  interaction: "static",
+  statsDisplay: "static",
+  tierTreatment: "standard",
+  celebration: "none",
+};

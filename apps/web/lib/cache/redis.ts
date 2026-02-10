@@ -57,8 +57,9 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Set a cached value with TTL.
- * Defaults to 24 hours (86 400 seconds). Silently no-ops if Redis is unavailable.
+ * Set a cached value with optional TTL.
+ * Defaults to 24 hours (86 400 seconds). Pass 0 for no expiry (persistent).
+ * Silently no-ops if Redis is unavailable.
  */
 export async function cacheSet<T>(
   key: string,
@@ -69,7 +70,11 @@ export async function cacheSet<T>(
   if (!redis) return;
 
   try {
-    await redis.set(key, value, { ex: ttlSeconds });
+    if (ttlSeconds > 0) {
+      await redis.set(key, value, { ex: ttlSeconds });
+    } else {
+      await redis.set(key, value);
+    }
   } catch (error) {
     console.error("[cache] cacheSet failed:", (error as Error).message);
   }
