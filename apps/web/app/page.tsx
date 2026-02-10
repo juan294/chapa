@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ErrorBanner } from "@/components/ErrorBanner";
+import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 
 /* ── Heatmap data (13 weeks x 7 days) ──────────────────────────
    0 = none, 1 = low, 2 = medium, 3 = high, 4 = intense */
@@ -199,9 +201,19 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 /* ── Page ──────────────────────────────────────────────────────── */
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const errorMessage = getOAuthErrorMessage(error);
+
   return (
     <div className="bg-warm-bg min-h-screen text-text-primary">
+      {/* ── OAuth error banner ──────────────────────────────── */}
+      {errorMessage && <ErrorBanner message={errorMessage} />}
+
       {/* ── Navigation ─────────────────────────────────────── */}
       <nav className="fixed top-0 z-50 w-full border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -243,25 +255,25 @@ export default function Home() {
           <div className="absolute bottom-1/4 left-1/6 w-[500px] h-[500px] rounded-full bg-amber/[0.03] blur-[120px]" />
 
           {/* Floating decorative pills */}
-          <div className="absolute top-32 left-[8%] animate-drift [animation-delay:0ms]">
+          <div className="absolute top-32 left-[8%] animate-drift [animation-delay:0ms]" aria-hidden="true">
             <div className="rounded-full border border-warm-stroke bg-warm-card/40 px-4 py-2 text-xs text-text-secondary/60 backdrop-blur-sm">
               847 commits
             </div>
           </div>
-          <div className="absolute top-48 right-[12%] animate-drift [animation-delay:2000ms]">
+          <div className="absolute top-48 right-[12%] animate-drift [animation-delay:2000ms]" aria-hidden="true">
             <div className="rounded-full border border-amber/20 bg-amber/[0.06] px-4 py-2 text-xs text-amber/70 backdrop-blur-sm">
               Elite Tier
             </div>
           </div>
-          <div className="absolute bottom-40 left-[15%] animate-drift [animation-delay:4000ms]">
+          <div className="absolute bottom-40 left-[15%] animate-drift [animation-delay:4000ms]" aria-hidden="true">
             <div className="rounded-full border border-warm-stroke bg-warm-card/40 px-4 py-2 text-xs text-text-secondary/60 backdrop-blur-sm">
               42 PRs merged
             </div>
           </div>
-          <div className="absolute bottom-56 right-[8%] animate-drift [animation-delay:1000ms]">
+          <div className="absolute bottom-56 right-[8%] animate-drift [animation-delay:1000ms]" aria-hidden="true">
             <DiamondIcon className="w-5 h-5 text-amber/20" />
           </div>
-          <div className="absolute top-64 left-[45%] animate-float-slow">
+          <div className="absolute top-64 left-[45%] animate-float-slow" aria-hidden="true">
             <DiamondIcon className="w-4 h-4 text-amber/10" />
           </div>
 
@@ -373,7 +385,7 @@ export default function Home() {
                     <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
                       {/* Heatmap */}
                       <div className="flex-shrink-0">
-                        <p className="text-[10px] tracking-widest uppercase text-text-secondary/40 mb-2">
+                        <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-2">
                           Activity
                         </p>
                         <div className="flex gap-[3px]">
@@ -393,7 +405,7 @@ export default function Home() {
                       {/* Score */}
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
-                          <p className="text-[10px] tracking-widest uppercase text-text-secondary/40 mb-1">
+                          <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-1">
                             Impact Score
                           </p>
                           <div className="flex items-baseline gap-3">
@@ -424,11 +436,11 @@ export default function Home() {
 
                     {/* Footer */}
                     <div className="mt-6 pt-4 border-t border-warm-stroke flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-[10px] text-text-secondary/30">
+                      <div className="flex items-center gap-2 text-[10px] text-text-secondary/60">
                         <GitHubIcon className="w-3 h-3" />
                         <span>Powered by GitHub</span>
                       </div>
-                      <span className="text-[10px] text-text-secondary/20 font-mono">
+                      <span className="text-[10px] text-text-secondary/60 font-mono">
                         chapa.thecreativetoken.com
                       </span>
                     </div>
@@ -439,7 +451,7 @@ export default function Home() {
           </div>
 
           {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-fade-in-up [animation-delay:900ms]">
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-fade-in-up [animation-delay:900ms]" aria-hidden="true">
             <div className="flex flex-col items-center gap-2 text-text-secondary/30">
               <span className="text-[10px] tracking-[0.2em] uppercase">
                 Scroll
@@ -473,7 +485,7 @@ export default function Home() {
                   <div className="w-3 h-3 rounded-full bg-amber/20" />
                   <div className="w-3 h-3 rounded-full bg-amber/10" />
                   <div className="w-3 h-3 rounded-full bg-amber/[0.06]" />
-                  <span className="ml-2 text-xs text-text-secondary/40 font-mono">
+                  <span className="ml-2 text-xs text-text-secondary/60 font-mono">
                     embed snippet
                   </span>
                 </div>
@@ -521,7 +533,7 @@ export default function Home() {
                   className="group relative rounded-2xl border border-warm-stroke bg-warm-card/50 p-8 transition-all hover:border-amber/20 hover:bg-warm-card"
                 >
                   {/* Decorative number */}
-                  <span className="absolute top-6 right-6 text-5xl font-heading text-amber/[0.06] select-none">
+                  <span className="absolute top-6 right-6 text-5xl font-heading text-amber/[0.06] select-none" aria-hidden="true">
                     {String(i + 1).padStart(2, "0")}
                   </span>
 
@@ -607,10 +619,10 @@ export default function Home() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-amber/[0.05] blur-[140px]" />
 
           {/* Floating decorative elements */}
-          <div className="absolute top-20 left-[10%] animate-float-slow">
+          <div className="absolute top-20 left-[10%] animate-float-slow" aria-hidden="true">
             <DiamondIcon className="w-6 h-6 text-amber/10" />
           </div>
-          <div className="absolute bottom-20 right-[10%] animate-float-medium">
+          <div className="absolute bottom-20 right-[10%] animate-float-medium" aria-hidden="true">
             <StarIcon className="w-5 h-5 text-amber/10" />
           </div>
 
@@ -658,12 +670,12 @@ export default function Home() {
               <span className="font-heading text-lg tracking-tight">
                 Chapa<span className="text-amber">.</span>
               </span>
-              <span className="text-sm text-text-secondary/50">
+              <span className="text-sm text-text-secondary/60">
                 Built for developers, by developers.
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-text-secondary/40">
+            <div className="flex items-center gap-2 text-xs text-text-secondary/60">
               <GitHubIcon className="w-3.5 h-3.5" />
               <span>Powered by GitHub</span>
             </div>
@@ -671,14 +683,14 @@ export default function Home() {
             <div className="flex items-center gap-4">
               <a
                 href="https://github.com"
-                className="text-text-secondary/40 hover:text-amber/60 transition-colors"
+                className="text-text-secondary/60 hover:text-amber/60 transition-colors"
                 aria-label="GitHub"
               >
                 <GitHubIcon className="w-5 h-5" />
               </a>
               <a
                 href="https://x.com"
-                className="text-text-secondary/40 hover:text-amber/60 transition-colors"
+                className="text-text-secondary/60 hover:text-amber/60 transition-colors"
                 aria-label="X (Twitter)"
               >
                 <svg
@@ -693,7 +705,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-8 text-center text-xs text-text-secondary/30">
+          <div className="mt-8 text-center text-xs text-text-secondary/60">
             &copy; {new Date().getFullYear()} Chapa. All rights reserved.
           </div>
         </div>
