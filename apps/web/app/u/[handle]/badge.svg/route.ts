@@ -3,6 +3,7 @@ import { getStats90d } from "@/lib/github/client";
 import { computeImpactV3 } from "@/lib/impact/v3";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { readSessionCookie } from "@/lib/auth/github";
+import { isValidHandle } from "@/lib/validation";
 
 function escapeXml(unsafe: string): string {
   return unsafe.replace(/[<>&'"]/g, (c) => {
@@ -38,6 +39,15 @@ export async function GET(
   { params }: { params: Promise<{ handle: string }> },
 ) {
   const { handle } = await params;
+
+  // Validate handle before any work
+  if (!isValidHandle(handle)) {
+    const svg = fallbackSvg(handle, "Invalid GitHub handle.");
+    return new NextResponse(svg, {
+      status: 400,
+      headers: { "Content-Type": "image/svg+xml" },
+    });
+  }
 
   // Try to get an auth token from session (better rate limits)
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
