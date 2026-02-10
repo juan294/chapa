@@ -36,6 +36,38 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
+  // Arrow key navigation for menu items (W9)
+  useEffect(() => {
+    if (!open || !menuRef.current) return;
+    function handleMenuKeyDown(e: KeyboardEvent) {
+      const items = Array.from(
+        menuRef.current?.querySelectorAll('[role="menuitem"]') ?? [],
+      ) as HTMLElement[];
+      if (items.length === 0) return;
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+
+      let nextIndex = -1;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        nextIndex = (currentIndex + 1) % items.length;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        nextIndex = (currentIndex - 1 + items.length) % items.length;
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        nextIndex = 0;
+      } else if (e.key === "End") {
+        e.preventDefault();
+        nextIndex = items.length - 1;
+      }
+      if (nextIndex >= 0) {
+        items[nextIndex].focus();
+      }
+    }
+    document.addEventListener("keydown", handleMenuKeyDown);
+    return () => document.removeEventListener("keydown", handleMenuKeyDown);
+  }, [open]);
+
   const fallbackLetter = login.charAt(0).toUpperCase();
 
   return (
