@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { readSessionCookie } from "@/lib/auth/github";
 import { UserMenu } from "./UserMenu";
+import { MobileNav } from "./MobileNav";
 
 interface NavLink {
   label: string;
@@ -63,6 +64,10 @@ export async function Navbar({ navLinks }: NavbarProps) {
               </a>
             ))}
           </div>
+        )}
+
+        {navLinks && navLinks.length > 0 && (
+          <MobileNav links={navLinks} />
         )}
 
         {session ? (

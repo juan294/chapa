@@ -13,7 +13,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  if (!args.handle || !args.emuHandle) {
+  const handle = args.handle;
+  const emuHandle = args.emuHandle;
+
+  if (!handle || !emuHandle) {
     console.error("Error: --handle and --emu-handle are required.");
     process.exit(1);
   }
@@ -32,8 +35,8 @@ async function main(): Promise<void> {
   }
 
   // Fetch EMU stats
-  console.log(`Fetching stats for EMU account: ${args.emuHandle}...`);
-  const emuStats = await fetchEmuStats(args.emuHandle, emuToken);
+  console.log(`Fetching stats for EMU account: ${emuHandle}...`);
+  const emuStats = await fetchEmuStats(emuHandle, emuToken);
   if (!emuStats) {
     console.error("Error: Failed to fetch EMU stats. Check your EMU token and handle.");
     process.exit(1);
@@ -44,8 +47,8 @@ async function main(): Promise<void> {
   // Upload to Chapa
   console.log(`Uploading supplemental stats to ${args.server}...`);
   const result = await uploadSupplementalStats({
-    targetHandle: args.handle,
-    sourceHandle: args.emuHandle,
+    targetHandle: handle,
+    sourceHandle: emuHandle,
     stats: emuStats,
     token: personalToken,
     serverUrl: args.server,

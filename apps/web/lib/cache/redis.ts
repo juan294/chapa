@@ -91,6 +91,28 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
+
+/**
+ * Ping Redis and return a health status string.
+ * - "ok" — Redis responded to PING.
+ * - "error" — Redis client exists but PING failed.
+ * - "unavailable" — Redis client is null (missing env vars).
+ */
+export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
+  const redis = getRedis();
+  if (!redis) return "unavailable";
+
+  try {
+    await redis.ping();
+    return "ok";
+  } catch {
+    return "error";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Test helper — reset the cached client (only used by tests)
 // ---------------------------------------------------------------------------
 
