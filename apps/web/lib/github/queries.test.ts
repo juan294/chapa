@@ -102,6 +102,49 @@ describe("fetchContributionData", () => {
     consoleSpy.mockRestore();
   });
 
+  it("sends separate DateTime and GitTimestamp variables in the query body", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: { totalContributions: 0, weeks: [] },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser", "token");
+
+    const [, opts] = mockFetch.mock.calls[0];
+    const body = JSON.parse(opts.body);
+
+    // Query must declare GitTimestamp variables for Commit.history
+    expect(body.query).toContain("$historySince: GitTimestamp!");
+    expect(body.query).toContain("$historyUntil: GitTimestamp!");
+    // And pass them to the history field
+    expect(body.query).toContain("history(since: $historySince, until: $historyUntil)");
+    // Variables must include both sets
+    expect(body.variables).toHaveProperty("since");
+    expect(body.variables).toHaveProperty("until");
+    expect(body.variables).toHaveProperty("historySince");
+    expect(body.variables).toHaveProperty("historyUntil");
+    // Both pairs should have the same ISO string values
+    expect(body.variables.historySince).toBe(body.variables.since);
+    expect(body.variables.historyUntil).toBe(body.variables.until);
+  });
+
   it("logs network/fetch errors", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(

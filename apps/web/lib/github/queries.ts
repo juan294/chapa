@@ -42,7 +42,7 @@ export interface RawContributionData {
 // ---------------------------------------------------------------------------
 
 const CONTRIBUTION_QUERY = `
-query($login: String!, $since: DateTime!, $until: DateTime!) {
+query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitTimestamp!, $historyUntil: GitTimestamp!) {
   user(login: $login) {
     login
     name
@@ -82,7 +82,7 @@ query($login: String!, $since: DateTime!, $until: DateTime!) {
         defaultBranchRef {
           target {
             ... on Commit {
-              history(since: $since, until: $until) {
+              history(since: $historySince, until: $historyUntil) {
                 totalCount
               }
             }
@@ -124,6 +124,8 @@ export async function fetchContributionData(
           login,
           since: since.toISOString(),
           until: now.toISOString(),
+          historySince: since.toISOString(),
+          historyUntil: now.toISOString(),
         },
       }),
     });
