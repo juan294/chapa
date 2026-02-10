@@ -4,7 +4,7 @@ import { createHash, createCipheriv, createDecipheriv, randomBytes } from "crypt
 // Types
 // ---------------------------------------------------------------------------
 
-export interface GitHubUser {
+interface GitHubUser {
   login: string;
   name: string | null;
   avatar_url: string;
@@ -162,7 +162,7 @@ export function decryptToken(
 
 const COOKIE_NAME = "chapa_session";
 
-export interface SessionPayload {
+interface SessionPayload {
   token: string;
   login: string;
   name: string | null;

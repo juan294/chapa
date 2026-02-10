@@ -16,7 +16,7 @@ function escapeXml(unsafe: string): string {
   });
 }
 
-export interface BadgeOptions {
+interface BadgeOptions {
   includeGithubBranding?: boolean;
 }
 

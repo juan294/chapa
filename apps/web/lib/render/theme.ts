@@ -1,6 +1,6 @@
 import type { ImpactTier } from "@chapa/shared";
 
-export interface BadgeTheme {
+interface BadgeTheme {
   bg: string;
   card: string;
   textPrimary: string;

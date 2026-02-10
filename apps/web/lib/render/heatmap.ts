@@ -6,7 +6,7 @@ const CELL_GAP = 3;
 const WEEKS = 13;
 const DAYS = 7;
 
-export interface HeatmapCell {
+interface HeatmapCell {
   x: number;
   y: number;
   fill: string;
@@ -45,5 +45,5 @@ export function renderHeatmapSvg(cells: HeatmapCell[]): string {
     .join("\n    ");
 }
 
-export const HEATMAP_WIDTH = WEEKS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
-export const HEATMAP_HEIGHT = DAYS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
+const HEATMAP_WIDTH = WEEKS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
+const HEATMAP_HEIGHT = DAYS * (CELL_SIZE + CELL_GAP) - CELL_GAP;

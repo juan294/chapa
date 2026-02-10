@@ -26,6 +26,6 @@ export async function cacheSet<T>(
   });
 }
 
-export async function cacheDel(key: string): Promise<void> {
+async function cacheDel(key: string): Promise<void> {
   store.delete(key);
 }
