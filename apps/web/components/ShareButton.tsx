@@ -1,8 +1,3 @@
-/**
- * Share-on-X button stub (Teammate E).
- * Will open X compose with prefilled message.
- */
-
 "use client";
 
 export function ShareButton({ handle }: { handle: string }) {
@@ -16,7 +11,7 @@ export function ShareButton({ handle }: { handle: string }) {
       href={`https://x.com/intent/tweet?text=${text}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="rounded-lg bg-mint/10 px-4 py-2 text-mint font-medium hover:bg-mint/20 transition-colors"
+      className="rounded-full bg-amber/10 px-6 py-2.5 text-amber font-semibold hover:bg-amber/20 transition-colors"
     >
       Share on X
     </a>
