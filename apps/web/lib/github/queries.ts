@@ -128,9 +128,18 @@ export async function fetchContributionData(
       }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error(`[github] GraphQL HTTP ${res.status} for ${login}: ${body}`);
+      return null;
+    }
 
     const json = await res.json();
+
+    if (json.errors) {
+      console.error(`[github] GraphQL errors for ${login}:`, json.errors);
+    }
+
     if (!json.data?.user) return null;
 
     const user = json.data.user;
@@ -159,7 +168,8 @@ export async function fetchContributionData(
         nodes: user.repositories.nodes,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error(`[github] fetch error for ${login}:`, err);
     return null;
   }
 }

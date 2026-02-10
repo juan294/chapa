@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildAuthUrl,
   exchangeCodeForToken,
@@ -7,6 +7,10 @@ import {
   decryptToken,
   createStateCookie,
   validateState,
+  createSessionCookie,
+  clearSessionCookie,
+  clearStateCookie,
+  readSessionCookie,
 } from "./github";
 
 // ---------------------------------------------------------------------------
@@ -189,6 +193,62 @@ describe("validateState", () => {
 // ---------------------------------------------------------------------------
 // Token encryption
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Cookie Secure flag (conditional on HTTPS)
+// ---------------------------------------------------------------------------
+
+describe("cookie Secure flag", () => {
+  const originalEnv = process.env.NEXT_PUBLIC_BASE_URL;
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.NEXT_PUBLIC_BASE_URL = originalEnv;
+    } else {
+      delete process.env.NEXT_PUBLIC_BASE_URL;
+    }
+  });
+
+  it("session cookie includes Secure when base URL is HTTPS", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    const cookie = createSessionCookie(
+      { token: "t", login: "u", name: null, avatar_url: "" },
+      "secret-key-for-test-32-chars!!!!",
+    );
+    expect(cookie).toContain("Secure");
+  });
+
+  it("session cookie omits Secure when base URL is HTTP", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    const cookie = createSessionCookie(
+      { token: "t", login: "u", name: null, avatar_url: "" },
+      "secret-key-for-test-32-chars!!!!",
+    );
+    expect(cookie).not.toContain("Secure");
+  });
+
+  it("state cookie omits Secure when base URL is HTTP", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    const { cookie } = createStateCookie();
+    expect(cookie).not.toContain("Secure");
+  });
+
+  it("clear cookies omit Secure when base URL is HTTP", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    expect(clearSessionCookie()).not.toContain("Secure");
+    expect(clearStateCookie()).not.toContain("Secure");
+  });
+
+  it("session cookie roundtrips correctly (encrypt+decrypt)", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    const secret = "secret-key-for-test-32-chars!!!!";
+    const payload = { token: "gho_abc", login: "juan294", name: "Juan", avatar_url: "https://img" };
+    const cookie = createSessionCookie(payload, secret);
+    const cookieHeader = cookie.split(";")[0]; // just the name=value part
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toEqual(payload);
+  });
+});
 
 describe("token encryption", () => {
   const secret = "test-secret-key-at-least-32-chars!!";

@@ -30,9 +30,19 @@ export function buildAuthUrl(clientId: string, redirectUri: string, state: strin
 
 const STATE_COOKIE_NAME = "chapa_oauth_state";
 
+function isSecureOrigin(): boolean {
+  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
+  return base.startsWith("https://");
+}
+
+function cookieFlags(): string {
+  const secure = isSecureOrigin() ? " Secure;" : "";
+  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+}
+
 export function createStateCookie(): { state: string; cookie: string } {
   const state = randomBytes(16).toString("hex");
-  const cookie = `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`;
+  const cookie = `${STATE_COOKIE_NAME}=${state}; ${cookieFlags()}; Max-Age=600`;
   return { state, cookie };
 }
 
@@ -51,7 +61,7 @@ export function validateState(
 }
 
 export function clearStateCookie(): string {
-  return `${STATE_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+  return `${STATE_COOKIE_NAME}=; ${cookieFlags()}; Max-Age=0`;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +185,7 @@ export function createSessionCookie(
 ): string {
   const json = JSON.stringify(payload);
   const encrypted = encryptToken(json, secret);
-  return `${COOKIE_NAME}=${encrypted}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400`;
+  return `${COOKIE_NAME}=${encrypted}; ${cookieFlags()}; Max-Age=86400`;
 }
 
 export function readSessionCookie(
@@ -199,5 +209,5 @@ export function readSessionCookie(
 }
 
 export function clearSessionCookie(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+  return `${COOKIE_NAME}=; ${cookieFlags()}; Max-Age=0`;
 }

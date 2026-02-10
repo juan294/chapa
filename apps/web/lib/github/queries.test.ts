@@ -1,0 +1,121 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { fetchContributionData } from "./queries";
+
+describe("fetchContributionData", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends Authorization header when token is provided", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: {
+                  totalContributions: 10,
+                  weeks: [],
+                },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser", "gho_token123");
+
+    const [, opts] = mockFetch.mock.calls[0];
+    expect(opts.headers["Authorization"]).toBe("Bearer gho_token123");
+  });
+
+  it("omits Authorization header when token is undefined", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve("Unauthorized"),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser");
+
+    const [, opts] = mockFetch.mock.calls[0];
+    expect(opts.headers["Authorization"]).toBeUndefined();
+  });
+
+  it("logs HTTP errors with status code", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve("Bad credentials"),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "bad-token");
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[github] GraphQL HTTP 401"),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("logs GraphQL errors from the response body", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            errors: [{ message: "Could not resolve to a User" }],
+            data: { user: null },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("nonexistent");
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[github] GraphQL errors for nonexistent:"),
+      expect.arrayContaining([
+        expect.objectContaining({ message: "Could not resolve to a User" }),
+      ]),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("logs network/fetch errors", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[github] fetch error for testuser:"),
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+});
