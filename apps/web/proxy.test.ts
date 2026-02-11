@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldRedirect } from "./middleware";
+import { shouldRedirect } from "./proxy";
 
 describe("shouldRedirect", () => {
   describe("when COMING_SOON is false", () => {
