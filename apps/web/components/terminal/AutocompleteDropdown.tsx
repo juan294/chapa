@@ -39,13 +39,16 @@ export function AutocompleteDropdown({
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i + 1) % matching.length);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i - 1 + matching.length) % matching.length);
       } else if (e.key === "Tab" || e.key === "Enter") {
         if (matching[activeIndex]) {
           e.preventDefault();
+          e.stopPropagation();
           onSelect(matching[activeIndex].name);
         }
       }
@@ -55,8 +58,8 @@ export function AutocompleteDropdown({
 
   useEffect(() => {
     if (visible && matching.length > 0) {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown, true);
+      return () => document.removeEventListener("keydown", handleKeyDown, true);
     }
   }, [visible, matching.length, handleKeyDown]);
 
@@ -76,7 +79,7 @@ export function AutocompleteDropdown({
           aria-selected={i === activeIndex}
           onClick={() => onSelect(cmd.name)}
           onMouseEnter={() => setActiveIndex(i)}
-          className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+          className={`flex w-full items-center gap-3 px-4 py-1.5 text-left text-sm transition-colors ${
             i === activeIndex
               ? "bg-amber/10 text-text-primary"
               : "text-text-secondary hover:bg-amber/5"
