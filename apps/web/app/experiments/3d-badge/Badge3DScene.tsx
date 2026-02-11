@@ -8,7 +8,7 @@ import {
   Environment,
   Float,
 } from "@react-three/drei";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
+
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import * as THREE from "three";
 
@@ -425,14 +425,6 @@ export default function Badge3DScene() {
           />
 
           <Environment preset="city" />
-
-          <EffectComposer>
-            <Bloom
-              luminanceThreshold={0.8}
-              luminanceSmoothing={0.9}
-              intensity={0.5}
-            />
-          </EffectComposer>
 
           <CameraResetter trigger={resetTrigger} />
           <FPSCounter onFPS={handleFPS} />
