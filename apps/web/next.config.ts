@@ -19,15 +19,17 @@ function buildCsp(frameAncestors: string): string {
     // 'unsafe-eval' is only needed in development for Next.js Fast Refresh / HMR.
     // In production, Next.js does not require eval.
     ...(isDev ? ["'unsafe-eval'"] : []),
+    "blob:",
   ].join(" ");
 
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
+    "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://avatars.githubusercontent.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://eu.i.posthog.com https://api.github.com",
+    "connect-src 'self' https://eu.i.posthog.com https://api.github.com https://cdn.jsdelivr.net",
     `frame-ancestors ${frameAncestors}`,
   ].join("; ");
 }

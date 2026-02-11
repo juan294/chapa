@@ -1,49 +1,9 @@
 "use client";
 
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import {
-  OrbitControls,
-  RoundedBox,
-  Text,
-  Environment,
-  Float,
-} from "@react-three/drei";
-
-import { useRef, useState, useMemo, useCallback, useEffect } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, RoundedBox, Text, Float } from "@react-three/drei";
+import { useRef, useState, useMemo, useEffect } from "react";
 import * as THREE from "three";
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-/** Generate deterministic heatmap intensity grid (13 weeks x 7 days). */
-function generateHeatmapData(): number[][] {
-  const weeks = 13;
-  const days = 7;
-  const data: number[][] = [];
-  for (let w = 0; w < weeks; w++) {
-    const week: number[] = [];
-    for (let d = 0; d < days; d++) {
-      const seed = (w * 7 + d * 13 + 42) % 100;
-      week.push(
-        seed < 25 ? 0 : seed < 50 ? 1 : seed < 75 ? 2 : seed < 90 ? 3 : 4
-      );
-    }
-    data.push(week);
-  }
-  return data;
-}
-
-/** Check WebGL support synchronously (safe on client). */
-function checkWebGLSupport(): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-    return gl != null;
-  } catch {
-    return false;
-  }
-}
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -51,43 +11,25 @@ function checkWebGLSupport(): boolean {
 
 type MaterialPreset = "matte" | "metallic" | "glossy" | "holographic";
 
-interface MaterialConfig {
-  metalness: number;
-  roughness: number;
-  color: string;
-  emissiveIntensity: number;
-  iridescence?: number;
-  clearcoat?: number;
-  clearcoatRoughness?: number;
-}
-
-const MATERIAL_PRESETS: Record<MaterialPreset, MaterialConfig> = {
-  matte: {
-    metalness: 0.1,
-    roughness: 0.9,
-    color: "#1A1610",
-    emissiveIntensity: 0,
-  },
-  metallic: {
-    metalness: 0.7,
-    roughness: 0.3,
-    color: "#1A1610",
-    emissiveIntensity: 0.05,
-  },
-  glossy: {
-    metalness: 0.9,
-    roughness: 0.1,
-    color: "#1A1610",
-    emissiveIntensity: 0.08,
-  },
+const MATERIAL_PRESETS: Record<
+  MaterialPreset,
+  {
+    metalness: number;
+    roughness: number;
+    emissiveIntensity: number;
+    iridescence?: number;
+    clearcoat?: number;
+  }
+> = {
+  matte: { metalness: 0.1, roughness: 0.9, emissiveIntensity: 0 },
+  metallic: { metalness: 0.7, roughness: 0.3, emissiveIntensity: 0.05 },
+  glossy: { metalness: 0.9, roughness: 0.1, emissiveIntensity: 0.08 },
   holographic: {
     metalness: 0.5,
     roughness: 0.15,
-    color: "#1A1610",
     emissiveIntensity: 0.12,
     iridescence: 1,
     clearcoat: 1,
-    clearcoatRoughness: 0.05,
   },
 };
 
@@ -99,195 +41,68 @@ const PRESET_LABELS: Record<MaterialPreset, string> = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Heatmap Grid                                                       */
+/*  Heatmap — single InstancedMesh (1 draw call instead of 91)        */
 /* ------------------------------------------------------------------ */
 
-function HeatmapGrid() {
+function HeatmapInstanced() {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
   const cellSize = 0.065;
   const gap = 0.015;
-  const startX = -1.65;
-  const startY = -0.55;
+  const stride = cellSize + gap;
+  const weeks = 13;
+  const days = 7;
+  const count = weeks * days;
 
-  const intensities = useMemo(() => generateHeatmapData(), []);
-
-  const colors = ["#1A1610", "#3D2A0E", "#7A5518", "#C28A2E", "#E2A84B"];
-
-  return (
-    <group position={[startX, startY, 0.05]}>
-      {intensities.map((week, w) =>
-        week.map((intensity, d) => (
-          <mesh
-            key={`${w}-${d}`}
-            position={[w * (cellSize + gap), (6 - d) * (cellSize + gap), 0]}
-          >
-            <boxGeometry args={[cellSize, cellSize, 0.01]} />
-            <meshStandardMaterial
-              color={colors[intensity]}
-              emissive={colors[intensity]}
-              emissiveIntensity={intensity > 2 ? 0.3 : 0}
-            />
-          </mesh>
-        ))
-      )}
-    </group>
+  const colors = useMemo(
+    () => [
+      new THREE.Color("#1A1610"),
+      new THREE.Color("#3D2A0E"),
+      new THREE.Color("#7A5518"),
+      new THREE.Color("#C28A2E"),
+      new THREE.Color("#E2A84B"),
+    ],
+    []
   );
-}
 
-/* ------------------------------------------------------------------ */
-/*  Stat Pill                                                          */
-/* ------------------------------------------------------------------ */
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
 
-function StatPill({
-  position,
-  label,
-  value,
-}: {
-  position: [number, number, number];
-  label: string;
-  value: string;
-}) {
+    const dummy = new THREE.Object3D();
+    const colorArr = new Float32Array(count * 3);
+
+    let i = 0;
+    for (let w = 0; w < weeks; w++) {
+      for (let d = 0; d < days; d++) {
+        dummy.position.set(w * stride, (6 - d) * stride, 0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+
+        const seed = (w * 7 + d * 13 + 42) % 100;
+        const level =
+          seed < 25 ? 0 : seed < 50 ? 1 : seed < 75 ? 2 : seed < 90 ? 3 : 4;
+        const c = colors[level];
+        colorArr[i * 3] = c.r;
+        colorArr[i * 3 + 1] = c.g;
+        colorArr[i * 3 + 2] = c.b;
+        i++;
+      }
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.geometry.setAttribute(
+      "color",
+      new THREE.InstancedBufferAttribute(colorArr, 3)
+    );
+  }, [colors, stride]);
+
   return (
-    <group position={position}>
-      <Text fontSize={0.08} color="#9AA4B2" anchorX="left" anchorY="middle">
-        {label}
-      </Text>
-      <Text
-        position={[0, -0.12, 0]}
-        fontSize={0.11}
-        color="#E6EDF3"
-        anchorX="left"
-        anchorY="middle"
-      >
-        {value}
-      </Text>
+    <group position={[-1.65, -0.55, 0.05]}>
+      <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
+        <boxGeometry args={[cellSize, cellSize, 0.01]} />
+        <meshStandardMaterial vertexColors toneMapped={false} />
+      </instancedMesh>
     </group>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Badge Card (3D object)                                             */
-/* ------------------------------------------------------------------ */
-
-function BadgeCard({ preset }: { preset: MaterialPreset }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const config = MATERIAL_PRESETS[preset];
-
-  const isPhysical = preset === "holographic";
-
-  return (
-    <Float speed={2} rotationIntensity={0.3} floatIntensity={0.5}>
-      <group>
-        {/* Card body */}
-        <RoundedBox
-          args={[4, 2.1, 0.08]}
-          radius={0.1}
-          smoothness={4}
-          ref={meshRef}
-        >
-          {isPhysical ? (
-            <meshPhysicalMaterial
-              color={config.color}
-              metalness={config.metalness}
-              roughness={config.roughness}
-              emissive="#E2A84B"
-              emissiveIntensity={config.emissiveIntensity}
-              iridescence={config.iridescence ?? 0}
-              clearcoat={config.clearcoat ?? 0}
-              clearcoatRoughness={config.clearcoatRoughness ?? 0}
-            />
-          ) : (
-            <meshStandardMaterial
-              color={config.color}
-              metalness={config.metalness}
-              roughness={config.roughness}
-              emissive="#E2A84B"
-              emissiveIntensity={config.emissiveIntensity}
-            />
-          )}
-        </RoundedBox>
-
-        {/* Card border frame */}
-        <RoundedBox
-          args={[4.06, 2.16, 0.06]}
-          radius={0.11}
-          smoothness={4}
-          position={[0, 0, -0.02]}
-        >
-          <meshStandardMaterial
-            color="#E2A84B"
-            metalness={0.8}
-            roughness={0.2}
-            emissive="#E2A84B"
-            emissiveIntensity={0.15}
-          />
-        </RoundedBox>
-
-        {/* ---- Text content ---- */}
-
-        {/* Handle */}
-        <Text
-          position={[-1.7, 0.8, 0.06]}
-          fontSize={0.15}
-          color="#E6EDF3"
-          anchorX="left"
-          anchorY="middle"
-        >
-          @juan294
-        </Text>
-
-        {/* "Impact Score" label */}
-        <Text
-          position={[-1.7, 0.55, 0.06]}
-          fontSize={0.09}
-          color="#9AA4B2"
-          anchorX="left"
-          anchorY="middle"
-        >
-          IMPACT SCORE
-        </Text>
-
-        {/* Score */}
-        <ScoreText />
-
-        {/* Tier label */}
-        <Text
-          position={[0.8, 0.55, 0.06]}
-          fontSize={0.12}
-          color="#E2A84B"
-          anchorX="center"
-          anchorY="middle"
-        >
-          Elite
-        </Text>
-
-        {/* Confidence */}
-        <Text
-          position={[0.8, -0.55, 0.06]}
-          fontSize={0.09}
-          color="#9AA4B2"
-          anchorX="center"
-          anchorY="middle"
-        >
-          95% confidence
-        </Text>
-
-        {/* Stats */}
-        <StatPill position={[-1.7, -0.15, 0.06]} label="Commits" value="487" />
-        <StatPill
-          position={[-1.0, -0.15, 0.06]}
-          label="PRs Merged"
-          value="38"
-        />
-        <StatPill
-          position={[-0.3, -0.15, 0.06]}
-          label="Reviews"
-          value="124"
-        />
-
-        {/* Heatmap */}
-        <HeatmapGrid />
-      </group>
-    </Float>
   );
 }
 
@@ -320,125 +135,174 @@ function ScoreText() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Reset Camera Helper                                                */
+/*  Badge Card                                                         */
 /* ------------------------------------------------------------------ */
 
-function CameraResetter({ trigger }: { trigger: number }) {
-  const { camera } = useThree();
-  const initialPos = useRef(new THREE.Vector3(0, 0, 5));
+function BadgeCard({ preset }: { preset: MaterialPreset }) {
+  const config = MATERIAL_PRESETS[preset];
+  const isPhysical = preset === "holographic";
 
-  useEffect(() => {
-    if (trigger > 0) {
-      camera.position.copy(initialPos.current);
-      camera.lookAt(0, 0, 0);
-    }
-  }, [trigger, camera]);
+  return (
+    <Float speed={2} rotationIntensity={0.3} floatIntensity={0.5}>
+      <group>
+        {/* Card body */}
+        <RoundedBox args={[4, 2.1, 0.08]} radius={0.1} smoothness={4}>
+          {isPhysical ? (
+            <meshPhysicalMaterial
+              color="#1A1610"
+              metalness={config.metalness}
+              roughness={config.roughness}
+              emissive="#E2A84B"
+              emissiveIntensity={config.emissiveIntensity}
+              iridescence={config.iridescence ?? 0}
+              clearcoat={config.clearcoat ?? 0}
+            />
+          ) : (
+            <meshStandardMaterial
+              color="#1A1610"
+              metalness={config.metalness}
+              roughness={config.roughness}
+              emissive="#E2A84B"
+              emissiveIntensity={config.emissiveIntensity}
+            />
+          )}
+        </RoundedBox>
 
-  return null;
+        {/* Card border frame */}
+        <RoundedBox
+          args={[4.06, 2.16, 0.06]}
+          radius={0.11}
+          smoothness={4}
+          position={[0, 0, -0.02]}
+        >
+          <meshStandardMaterial
+            color="#E2A84B"
+            metalness={0.8}
+            roughness={0.2}
+            emissive="#E2A84B"
+            emissiveIntensity={0.15}
+          />
+        </RoundedBox>
+
+        {/* Key text only — handle, score, tier (3 Text instead of 8) */}
+        <Text
+          position={[-1.7, 0.75, 0.06]}
+          fontSize={0.15}
+          color="#E6EDF3"
+          anchorX="left"
+          anchorY="middle"
+        >
+          @juan294
+        </Text>
+
+        <ScoreText />
+
+        <Text
+          position={[0.8, 0.5, 0.06]}
+          fontSize={0.13}
+          color="#E2A84B"
+          anchorX="center"
+          anchorY="middle"
+        >
+          Elite
+        </Text>
+
+        {/* Stats as a single Text line */}
+        <Text
+          position={[0, -0.85, 0.06]}
+          fontSize={0.09}
+          color="#9AA4B2"
+          anchorX="center"
+          anchorY="middle"
+        >
+          487 commits · 38 PRs · 124 reviews
+        </Text>
+
+        {/* Heatmap — single instanced mesh */}
+        <HeatmapInstanced />
+      </group>
+    </Float>
+  );
 }
 
 /* ------------------------------------------------------------------ */
-/*  FPS Counter                                                        */
-/* ------------------------------------------------------------------ */
-
-function FPSCounter({ onFPS }: { onFPS: (fps: number) => void }) {
-  const frameCount = useRef(0);
-  const lastTime = useRef(0);
-
-  useEffect(() => {
-    lastTime.current = performance.now();
-  }, []);
-
-  useFrame(() => {
-    frameCount.current++;
-    const now = performance.now();
-    if (lastTime.current > 0 && now - lastTime.current >= 1000) {
-      onFPS(frameCount.current);
-      frameCount.current = 0;
-      lastTime.current = now;
-    }
-  });
-
-  return null;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Exported Scene Component                                           */
+/*  Exported Scene                                                     */
 /* ------------------------------------------------------------------ */
 
 export default function Badge3DScene() {
   const [preset, setPreset] = useState<MaterialPreset>("metallic");
   const [autoRotate, setAutoRotate] = useState(true);
-  const [resetTrigger, setResetTrigger] = useState(0);
-  const [fps, setFPS] = useState(0);
+  const [canvasKey, setCanvasKey] = useState(0);
 
-  // This component is only loaded client-side (ssr: false), so synchronous
-  // check is safe and avoids the eslint set-state-in-effect warning.
-  const webGLSupported = useMemo(() => checkWebGLSupport(), []);
-
-  const handleFPS = useCallback((value: number) => {
-    setFPS(value);
+  const webGLSupported = useMemo(() => {
+    try {
+      const c = document.createElement("canvas");
+      return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    } catch {
+      return false;
+    }
   }, []);
 
   if (!webGLSupported) {
     return (
       <div className="flex h-[600px] w-full items-center justify-center rounded-2xl border border-warm-stroke bg-warm-card/50">
-        <div className="text-center">
-          <p className="font-heading text-xl font-bold text-text-primary">
-            WebGL Not Available
-          </p>
-          <p className="mt-2 text-text-secondary">
-            Your browser does not support WebGL, which is required for the 3D
-            badge viewer.
-          </p>
-        </div>
+        <p className="font-heading text-xl font-bold text-text-primary">
+          WebGL Not Available
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* 3D Canvas */}
       <div className="relative h-[600px] w-full overflow-hidden rounded-2xl border border-warm-stroke bg-warm-card/50">
         <Canvas
+          key={canvasKey}
           camera={{ position: [0, 0, 5], fov: 45 }}
-          gl={{ antialias: true, alpha: true }}
+          gl={{
+            antialias: true,
+            alpha: true,
+            powerPreference: "default",
+            failIfMajorPerformanceCaveat: false,
+          }}
+          onCreated={({ gl }) => {
+            gl.domElement.addEventListener("webglcontextlost", (e) => {
+              e.preventDefault();
+            });
+            gl.domElement.addEventListener("webglcontextrestored", () => {
+              setCanvasKey((k) => k + 1);
+            });
+          }}
           style={{ background: "transparent" }}
         >
-          <ambientLight intensity={0.4} />
+          <ambientLight intensity={0.5} />
           <directionalLight
             position={[5, 5, 5]}
             intensity={0.8}
             color="#F0C97D"
           />
           <pointLight position={[-3, 2, 4]} intensity={0.5} color="#E2A84B" />
+          <hemisphereLight
+            intensity={0.3}
+            color="#F0C97D"
+            groundColor="#1A1610"
+          />
 
           <BadgeCard preset={preset} />
 
           <OrbitControls
-            enableZoom={true}
+            enableZoom
             enablePan={false}
             minDistance={3}
             maxDistance={8}
             autoRotate={autoRotate}
             autoRotateSpeed={1}
           />
-
-          <Environment preset="city" />
-
-          <CameraResetter trigger={resetTrigger} />
-          <FPSCounter onFPS={handleFPS} />
         </Canvas>
-
-        {/* FPS overlay */}
-        <div className="absolute right-3 top-3 rounded-lg border border-warm-stroke bg-warm-card/80 px-3 py-1.5 text-xs font-medium text-text-secondary backdrop-blur-sm">
-          {fps} FPS
-        </div>
       </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4">
-        {/* Material presets */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text-secondary">
             Material:
@@ -458,10 +322,8 @@ export default function Badge3DScene() {
           ))}
         </div>
 
-        {/* Divider */}
         <div className="h-6 w-px bg-warm-stroke" aria-hidden="true" />
 
-        {/* Auto-rotate toggle */}
         <button
           onClick={() => setAutoRotate((v) => !v)}
           className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
@@ -473,9 +335,8 @@ export default function Badge3DScene() {
           {autoRotate ? "Auto-Rotate: On" : "Auto-Rotate: Off"}
         </button>
 
-        {/* Reset view */}
         <button
-          onClick={() => setResetTrigger((v) => v + 1)}
+          onClick={() => setCanvasKey((k) => k + 1)}
           className="rounded-full border border-warm-stroke px-4 py-2 text-sm font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]"
         >
           Reset View
