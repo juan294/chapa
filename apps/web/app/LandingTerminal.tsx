@@ -1,40 +1,68 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
-import { parseCommand } from "@/components/terminal/command-registry";
+import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
+import {
+  executeCommand,
+  createLandingCommands,
+} from "@/components/terminal/command-registry";
 
 export function LandingTerminal() {
   const router = useRouter();
+  const [partial, setPartial] = useState("");
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+
+  const commands = useMemo(() => createLandingCommands(), []);
 
   const handleSubmit = useCallback(
     (input: string) => {
-      const parsed = parseCommand(input);
-      if (!parsed) return;
+      setShowAutocomplete(false);
+      setPartial("");
 
-      switch (parsed.name) {
-        case "/studio":
-          router.push("/studio");
-          break;
-        case "/login":
-          window.location.href = "/api/auth/login";
-          break;
-        case "/badge":
-        case "/b": {
-          const handle = parsed.args[0]?.replace(/^@/, "");
-          if (handle) router.push(`/u/${handle}`);
-          break;
-        }
-        case "/about":
-          router.push("/about");
-          break;
-        default:
-          break;
+      const result = executeCommand(input, commands);
+      const action = result.action;
+      if (!action || action.type !== "navigate") return;
+
+      if (action.path === "/api/auth/login") {
+        window.location.href = action.path;
+      } else {
+        router.push(action.path);
       }
     },
-    [router],
+    [commands, router],
+  );
+
+  const handlePartialChange = useCallback((val: string) => {
+    setPartial(val);
+    setShowAutocomplete(val.startsWith("/") && val.length > 0);
+  }, []);
+
+  const handleAutocompleteSelect = useCallback(
+    (command: string) => {
+      setShowAutocomplete(false);
+      setPartial("");
+
+      if (command === "/badge") {
+        const input = document.querySelector<HTMLInputElement>(
+          'input[aria-label="Terminal command input"]',
+        );
+        if (input) {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            "value",
+          )?.set;
+          nativeInputValueSetter?.call(input, command + " ");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.focus();
+        }
+      } else {
+        handleSubmit(command);
+      }
+    },
+    [handleSubmit],
   );
 
   return (
@@ -42,9 +70,16 @@ export function LandingTerminal() {
       <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
         <AuthorTypewriter />
       </div>
-      <div className="mx-auto max-w-4xl">
+      <div className="relative mx-auto max-w-4xl">
+        <AutocompleteDropdown
+          commands={commands}
+          partial={partial}
+          onSelect={handleAutocompleteSelect}
+          visible={showAutocomplete}
+        />
         <TerminalInput
           onSubmit={handleSubmit}
+          onPartialChange={handlePartialChange}
           prompt="chapa"
           autoFocus={false}
         />

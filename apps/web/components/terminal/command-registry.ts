@@ -244,6 +244,67 @@ export function createCoreCommands(): CommandDef[] {
   ];
 }
 
+export function createLandingCommands(): CommandDef[] {
+  return [
+    {
+      name: "/help",
+      description: "List available commands",
+      execute: () => ({
+        lines: [
+          makeLine("system", "Available commands:"),
+          makeLine("info", "  /help              List available commands"),
+          makeLine("info", "  /studio            Open Creator Studio"),
+          makeLine("info", "  /login             Sign in with GitHub"),
+          makeLine("info", "  /badge <handle>    View a developer badge"),
+          makeLine("info", "  /about             About Chapa"),
+        ],
+      }),
+    },
+    {
+      name: "/studio",
+      description: "Open Creator Studio",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Creator Studio...")],
+        action: { type: "navigate", path: "/studio" },
+      }),
+    },
+    {
+      name: "/login",
+      description: "Sign in with GitHub",
+      execute: () => ({
+        lines: [makeLine("system", "Redirecting to GitHub login...")],
+        action: { type: "navigate", path: "/api/auth/login" },
+      }),
+    },
+    {
+      name: "/badge",
+      aliases: ["/b"],
+      description: "View a developer badge",
+      usage: "/badge <handle>",
+      execute: (args) => {
+        if (args.length === 0) {
+          return {
+            lines: [makeLine("error", "Usage: /badge <handle>")],
+          };
+        }
+        const handle = args[0].replace(/^@/, "");
+        return {
+          lines: [makeLine("system", `Opening badge for @${handle}...`)],
+          action: { type: "navigate", path: `/u/${handle}` },
+        };
+      },
+    },
+    {
+      name: "/about",
+      description: "About Chapa",
+      execute: () => ({
+        lines: [makeLine("system", "Opening about page...")],
+        action: { type: "navigate", path: "/about" },
+      }),
+    },
+  ];
+}
+
 export function parseCommand(input: string): { name: string; args: string[] } | null {
   const trimmed = input.trim();
   if (!trimmed.startsWith("/")) return null;
