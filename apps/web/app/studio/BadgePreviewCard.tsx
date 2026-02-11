@@ -95,7 +95,7 @@ function AnimatedStat({
 function ParticleCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useParticles(canvasRef, PARTICLE_PRESETS.sparkle);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />;
+  return <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 w-full h-full" />;
 }
 
 // ---------------------------------------------------------------------------

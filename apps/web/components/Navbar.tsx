@@ -44,7 +44,7 @@ export async function Navbar({ navLinks }: NavbarProps) {
   }
 
   return (
-    <nav className="fixed top-0 z-50 w-full border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl">
+    <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl font-bold font-heading tracking-tight">
