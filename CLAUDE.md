@@ -47,7 +47,7 @@ Shared types live in: `packages/shared/types.ts`
 - Accent color: `#7C6AEF` (cool indigo/violet). Use `text-amber`, `bg-amber`.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
-- Dark theme only. No light mode. Cool-tinted backgrounds (`#0C0D14`).
+- Dark theme only. No light mode. Terminal dark backgrounds (`#0A0A0F`).
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## GitHub branding
