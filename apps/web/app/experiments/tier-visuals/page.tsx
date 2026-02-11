@@ -100,11 +100,11 @@ function heatmapColor(level: number, tier: TierName): string {
   }
   // High and Elite use amber
   const colors = [
-    "rgba(226,168,75,0.04)",
-    "rgba(226,168,75,0.18)",
-    "rgba(226,168,75,0.35)",
-    "rgba(226,168,75,0.60)",
-    "rgba(226,168,75,0.90)",
+    "rgba(124,106,239,0.04)",
+    "rgba(124,106,239,0.18)",
+    "rgba(124,106,239,0.35)",
+    "rgba(124,106,239,0.60)",
+    "rgba(124,106,239,0.90)",
   ];
   return colors[level] ?? colors[0];
 }
@@ -120,7 +120,7 @@ function tierPillClasses(tier: TierName): string {
     case "High":
       return "bg-amber/10 border-amber/25 text-amber";
     case "Elite":
-      return "tier-elite-pill border-amber/30 text-[#12100D] font-bold";
+      return "tier-elite-pill border-amber/30 text-[#0C0D14] font-bold";
   }
 }
 
@@ -143,17 +143,17 @@ function SparkleDots() {
   return (
     <>
       <div
-        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#F0C97D]"
+        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#9D8FFF]"
         style={{ top: "12%", right: "8%", animationDelay: "0s" }}
         aria-hidden="true"
       />
       <div
-        className="sparkle-dot absolute w-[3px] h-[3px] rounded-full bg-[#E2A84B]"
+        className="sparkle-dot absolute w-[3px] h-[3px] rounded-full bg-[#7C6AEF]"
         style={{ bottom: "18%", left: "6%", animationDelay: "0.7s" }}
         aria-hidden="true"
       />
       <div
-        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#F0C97D]"
+        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#9D8FFF]"
         style={{ top: "45%", right: "3%", animationDelay: "1.4s" }}
         aria-hidden="true"
       />
@@ -217,7 +217,7 @@ function BadgeCard({ data, scoreOverride, tierOverride }: BadgeCardProps) {
         )}
 
         {/* Card body */}
-        <div className="relative z-10 rounded-2xl bg-[#1A1610] p-4 sm:p-5 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
+        <div className="relative z-10 rounded-2xl bg-[#13141E] p-4 sm:p-5 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between">
             <span className="font-heading text-[10px] sm:text-xs text-text-secondary truncate">
@@ -370,7 +370,7 @@ function TierTransitionDemo() {
             }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
               currentIndex === i
-                ? "bg-amber text-[#12100D]"
+                ? "bg-amber text-[#0C0D14]"
                 : "border border-warm-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
             }`}
           >
@@ -541,11 +541,11 @@ function EscalationSummary() {
           <defs>
             <linearGradient id="arrow-grad" x1="0" y1="6" x2="120" y2="6" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#9AA4B2" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#E2A84B" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#7C6AEF" stopOpacity="0.8" />
             </linearGradient>
           </defs>
           <line x1="0" y1="6" x2="112" y2="6" stroke="url(#arrow-grad)" strokeWidth="1.5" />
-          <polygon points="112,2 120,6 112,10" fill="#E2A84B" fillOpacity="0.8" />
+          <polygon points="112,2 120,6 112,10" fill="#7C6AEF" fillOpacity="0.8" />
         </svg>
         <span className="text-amber text-xs font-semibold">Aspirational</span>
       </div>
@@ -577,7 +577,7 @@ export default function TierVisualsExperimentPage() {
 
 /* High: static gold gradient text */
 .tier-score-high {
-  background: linear-gradient(135deg, #C28A2E, #E2A84B, #F0C97D, #E2A84B, #C28A2E);
+  background: linear-gradient(135deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -587,13 +587,13 @@ export default function TierVisualsExperimentPage() {
 .tier-score-elite {
   background: linear-gradient(
     90deg,
-    #C28A2E,
-    #E2A84B,
-    #F6E27A,
-    #F6F2C0,
-    #F6E27A,
-    #E2A84B,
-    #C28A2E
+    #5E4FCC,
+    #7C6AEF,
+    #A99BFF,
+    #D0C9FF,
+    #A99BFF,
+    #7C6AEF,
+    #5E4FCC
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -621,15 +621,15 @@ export default function TierVisualsExperimentPage() {
 
 /* High: amber glow border */
 .tier-card-high {
-  border: 1px solid rgba(226,168,75,0.18);
-  box-shadow: 0 0 20px rgba(226,168,75,0.10), 0 0 40px rgba(226,168,75,0.04);
+  border: 1px solid rgba(124,106,239,0.18);
+  box-shadow: 0 0 20px rgba(124,106,239,0.10), 0 0 40px rgba(124,106,239,0.04);
 }
 
 /* Elite: outer glow only (border handled by pseudo-element) */
 .tier-card-elite {
   box-shadow:
-    0 0 40px rgba(226,168,75,0.15),
-    0 0 80px rgba(226,168,75,0.05);
+    0 0 40px rgba(124,106,239,0.15),
+    0 0 80px rgba(124,106,239,0.05);
 }
 
 /* ── Elite animated gradient border ───────────── */
@@ -643,15 +643,15 @@ export default function TierVisualsExperimentPage() {
 .elite-border-glow {
   background: conic-gradient(
     from var(--elite-angle),
-    #C28A2E,
-    #E2A84B,
-    #F0C97D,
-    #E2A84B,
-    #C28A2E,
-    #E2A84B,
-    #F0C97D,
-    #E2A84B,
-    #C28A2E
+    #5E4FCC,
+    #7C6AEF,
+    #9D8FFF,
+    #7C6AEF,
+    #5E4FCC,
+    #7C6AEF,
+    #9D8FFF,
+    #7C6AEF,
+    #5E4FCC
   );
   animation: elite-border-rotate 4s linear infinite;
   filter: blur(3px);
@@ -666,7 +666,7 @@ export default function TierVisualsExperimentPage() {
 /* Fallback for browsers without @property */
 @supports not (background: conic-gradient(from var(--elite-angle), red, blue)) {
   .elite-border-glow {
-    background: linear-gradient(90deg, #C28A2E, #E2A84B, #F0C97D, #E2A84B, #C28A2E);
+    background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
     background-size: 300% 300%;
     animation: elite-border-fallback 3s ease infinite;
     filter: blur(3px);
@@ -683,7 +683,7 @@ export default function TierVisualsExperimentPage() {
 /* ── Elite tier pill gradient ─────────────────── */
 
 .tier-elite-pill {
-  background: linear-gradient(135deg, #C28A2E, #E2A84B, #F0C97D);
+  background: linear-gradient(135deg, #5E4FCC, #7C6AEF, #9D8FFF);
 }
 
 /* ── Sparkle dots ─────────────────────────────── */
@@ -715,11 +715,11 @@ export default function TierVisualsExperimentPage() {
     animation: none !important;
     background: conic-gradient(
       from 45deg,
-      #C28A2E,
-      #E2A84B,
-      #F0C97D,
-      #E2A84B,
-      #C28A2E
+      #5E4FCC,
+      #7C6AEF,
+      #9D8FFF,
+      #7C6AEF,
+      #5E4FCC
     );
   }
 

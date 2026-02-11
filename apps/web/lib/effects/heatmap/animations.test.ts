@@ -200,7 +200,7 @@ describe("INTENSITY_COLORS", () => {
   it("has entries for levels 0 through 4", () => {
     for (let i = 0; i <= 4; i++) {
       expect(INTENSITY_COLORS[i]).toBeDefined();
-      expect(INTENSITY_COLORS[i]).toMatch(/^rgba\(226,168,75,/);
+      expect(INTENSITY_COLORS[i]).toMatch(/^rgba\(124,106,239,/);
     }
   });
 

@@ -82,7 +82,7 @@ export function renderBadgeSvg(
 
   <!-- ─── Header row ─────────────────────────────────────── -->
   <!-- Avatar placeholder (circle with amber ring) -->
-  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.25)" stroke-width="2"/>
+  <circle cx="${avatarCX}" cy="${avatarCY}" r="${avatarR}" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="2"/>
   <g transform="translate(${avatarCX - 14}, ${avatarCY - 14})">
     <path d="M14 0C6.27 0 0 6.27 0 14c0 6.19 4.01 11.43 9.57 13.28.7.13.96-.3.96-.67 0-.34-.01-1.45-.02-2.61-3.52.64-4.42-.86-4.7-1.65-.16-.4-.84-1.65-1.44-1.98-.49-.26-1.19-.91-.02-.92 1.1-.02 1.89 1.01 2.16 1.43 1.26 2.12 3.27 1.52 4.07 1.16.13-.91.49-1.52.89-1.87-3.11-.35-6.37-1.55-6.37-6.92 0-1.52.55-2.78 1.44-3.76-.14-.35-.63-1.78.14-3.71 0 0 1.17-.37 3.85 1.44 1.12-.31 2.31-.47 3.5-.47s2.38.16 3.5.47c2.68-1.82 3.85-1.44 3.85-1.44.77 1.93.28 3.36.14 3.71.9.98 1.44 2.23 1.44 3.76 0 5.39-3.27 6.57-6.39 6.91.5.43.95 1.28.95 2.58 0 1.87-.02 3.37-.02 3.83 0 .37.26.81.96.67A14.03 14.03 0 0028 14c0-7.73-6.27-14-14-14z" fill="${t.textSecondary}" opacity="0.6"/>
   </g>
@@ -108,7 +108,7 @@ export function renderBadgeSvg(
 
   <!-- Tier pill badge -->
   <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}, ${scoreValueY - 55})">
-    <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(226,168,75,0.10)" stroke="rgba(226,168,75,0.25)" stroke-width="1"/>
+    <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
     <text x="${tierPillWidth / 2}" y="22" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
   </g>
 

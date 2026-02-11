@@ -102,7 +102,7 @@ function EffectText({
 
 function EffectCard({ info }: { info: EffectInfo }) {
   return (
-    <div className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610] p-8 flex flex-col items-center text-center gap-5 transition-colors hover:border-[rgba(226,168,75,0.2)] hover:bg-[#1A1610]">
+    <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E] p-8 flex flex-col items-center text-center gap-5 transition-colors hover:border-[rgba(124,106,239,0.2)] hover:bg-[#13141E]">
       {/* Effect name label */}
       <p className="text-[#9AA4B2] text-xs tracking-widest uppercase font-semibold">
         {info.label}
@@ -157,7 +157,7 @@ function ComparisonSection() {
       {compared.map(({ label, effect }) => (
         <div
           key={label}
-          className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610] p-6 flex flex-col items-center text-center gap-3"
+          className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E] p-6 flex flex-col items-center text-center gap-3"
         >
           <p className="text-[#9AA4B2] text-xs tracking-widest uppercase font-semibold">
             {label}
@@ -198,12 +198,12 @@ function ComparisonSection() {
 
 function ApplicationPreview() {
   return (
-    <div className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610] p-8 sm:p-10 max-w-xl mx-auto">
+    <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E] p-8 sm:p-10 max-w-xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[rgba(226,168,75,0.15)] flex items-center justify-center">
-            <span className="font-heading text-sm font-bold text-[#E2A84B]">
+          <div className="w-10 h-10 rounded-full bg-[rgba(124,106,239,0.15)] flex items-center justify-center">
+            <span className="font-heading text-sm font-bold text-[#7C6AEF]">
               C
             </span>
           </div>
@@ -247,12 +247,12 @@ function ApplicationPreview() {
           const intensity = pseudoRandom(i + 87);
           const bg =
             intensity > 0.7
-              ? "bg-[#E2A84B]"
+              ? "bg-[#7C6AEF]"
               : intensity > 0.4
-                ? "bg-[rgba(226,168,75,0.4)]"
+                ? "bg-[rgba(124,106,239,0.4)]"
                 : intensity > 0.15
-                  ? "bg-[rgba(226,168,75,0.15)]"
-                  : "bg-[rgba(226,168,75,0.04)]";
+                  ? "bg-[rgba(124,106,239,0.15)]"
+                  : "bg-[rgba(124,106,239,0.04)]";
           return (
             <div
               key={i}
@@ -305,8 +305,8 @@ function EffectSelector({
         onClick={() => onChange(null)}
         className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
           active === null
-            ? "bg-[#E2A84B] text-[#12100D]"
-            : "border border-[rgba(226,168,75,0.12)] text-[#9AA4B2] hover:border-[rgba(226,168,75,0.2)] hover:text-[#E6EDF3]"
+            ? "bg-[#7C6AEF] text-[#0C0D14]"
+            : "border border-[rgba(124,106,239,0.12)] text-[#9AA4B2] hover:border-[rgba(124,106,239,0.2)] hover:text-[#E6EDF3]"
         }`}
       >
         All
@@ -317,8 +317,8 @@ function EffectSelector({
           onClick={() => onChange(e.key)}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
             active === e.key
-              ? "bg-[#E2A84B] text-[#12100D]"
-              : "border border-[rgba(226,168,75,0.12)] text-[#9AA4B2] hover:border-[rgba(226,168,75,0.2)] hover:text-[#E6EDF3]"
+              ? "bg-[#7C6AEF] text-[#0C0D14]"
+              : "border border-[rgba(124,106,239,0.12)] text-[#9AA4B2] hover:border-[rgba(124,106,239,0.2)] hover:text-[#E6EDF3]"
           }`}
         >
           {e.label}
@@ -350,13 +350,13 @@ export default function TextEffectsExperimentPage() {
           display: inline-block;
           background: linear-gradient(
             to bottom,
-            #462523 0%,
-            #CB9B51 22%,
-            #F6E27A 45%,
-            #F6F2C0 50%,
-            #F6E27A 55%,
-            #CB9B51 78%,
-            #462523 100%
+            #1E1645 0%,
+            #6355C0 22%,
+            #A99BFF 45%,
+            #D0C9FF 50%,
+            #A99BFF 55%,
+            #6355C0 78%,
+            #1E1645 100%
           );
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
@@ -387,7 +387,7 @@ export default function TextEffectsExperimentPage() {
         /*  3. Embossed (Raised)                             */
         /* ================================================ */
         .te-embossed {
-          color: rgba(226, 168, 75, 0.8);
+          color: rgba(124, 106, 239, 0.8);
           text-shadow:
             -1px -1px 1px rgba(255, 255, 255, 0.2),
             1px 1px 2px rgba(0, 0, 0, 0.8);
@@ -397,7 +397,7 @@ export default function TextEffectsExperimentPage() {
         /*  4. Debossed (Pressed In)                         */
         /* ================================================ */
         .te-debossed {
-          color: rgba(226, 168, 75, 0.5);
+          color: rgba(124, 106, 239, 0.5);
           text-shadow:
             1px 1px 1px rgba(255, 255, 255, 0.1),
             -1px -1px 2px rgba(0, 0, 0, 0.9);
@@ -410,13 +410,13 @@ export default function TextEffectsExperimentPage() {
           display: inline-block;
           background: linear-gradient(
             90deg,
-            #C28A2E 0%,
-            #E2A84B 20%,
-            #F6E27A 40%,
-            #F6F2C0 50%,
-            #F6E27A 60%,
-            #E2A84B 80%,
-            #C28A2E 100%
+            #5E4FCC 0%,
+            #7C6AEF 20%,
+            #A99BFF 40%,
+            #D0C9FF 50%,
+            #A99BFF 60%,
+            #7C6AEF 80%,
+            #5E4FCC 100%
           );
           background-size: 200% 100%;
           -webkit-background-clip: text;
@@ -434,12 +434,12 @@ export default function TextEffectsExperimentPage() {
         /*  6. Neon Glow (Amber)                             */
         /* ================================================ */
         .te-neon-amber {
-          color: #E2A84B;
+          color: #7C6AEF;
           text-shadow:
-            0 0 7px rgba(226, 168, 75, 0.5),
-            0 0 10px rgba(226, 168, 75, 0.4),
-            0 0 21px rgba(226, 168, 75, 0.3),
-            0 0 42px rgba(226, 168, 75, 0.2);
+            0 0 7px rgba(124, 106, 239, 0.5),
+            0 0 10px rgba(124, 106, 239, 0.4),
+            0 0 21px rgba(124, 106, 239, 0.3),
+            0 0 42px rgba(124, 106, 239, 0.2);
         }
 
         /* ================================================ */
@@ -448,7 +448,7 @@ export default function TextEffectsExperimentPage() {
         .te-sparkle {
           position: relative;
           display: inline-block;
-          color: #E2A84B;
+          color: #7C6AEF;
         }
 
         .te-sparkle::before,
@@ -456,7 +456,7 @@ export default function TextEffectsExperimentPage() {
           content: "\\2726";
           position: absolute;
           font-size: 0.4em;
-          color: #F0C97D;
+          color: #9D8FFF;
           animation: te-sparkle-pulse 2s ease-in-out infinite;
           pointer-events: none;
         }
@@ -496,21 +496,21 @@ export default function TextEffectsExperimentPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#12100D] bg-grid-warm">
+      <div className="min-h-screen bg-[#0C0D14] bg-grid-warm">
         {/* Ambient glow */}
         <div
-          className="pointer-events-none fixed top-1/4 left-1/3 h-[500px] w-[500px] rounded-full bg-[rgba(226,168,75,0.03)] blur-[150px]"
+          className="pointer-events-none fixed top-1/4 left-1/3 h-[500px] w-[500px] rounded-full bg-[rgba(124,106,239,0.03)] blur-[150px]"
           aria-hidden="true"
         />
         <div
-          className="pointer-events-none fixed bottom-1/3 right-1/4 h-[400px] w-[400px] rounded-full bg-[rgba(226,168,75,0.04)] blur-[120px]"
+          className="pointer-events-none fixed bottom-1/3 right-1/4 h-[400px] w-[400px] rounded-full bg-[rgba(124,106,239,0.04)] blur-[120px]"
           aria-hidden="true"
         />
 
         <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
           {/* ── Hero ─────────────────────────────────────────── */}
           <header className="mb-20 text-center animate-fade-in-up">
-            <p className="text-[#E2A84B] text-sm tracking-widest uppercase mb-4 font-semibold">
+            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
               Experiment #53
             </p>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-[#E6EDF3] tracking-tight mb-6">
@@ -561,7 +561,7 @@ export default function TextEffectsExperimentPage() {
 
           {/* ── Comparison ───────────────────────────────────── */}
           <section className="mb-20 animate-fade-in-up [animation-delay:400ms]">
-            <p className="text-[#E2A84B] text-sm tracking-widest uppercase mb-4 font-semibold">
+            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
               Comparison
             </p>
             <h2 className="text-xl sm:text-2xl font-bold font-heading text-[#E6EDF3] tracking-tight mb-2">
@@ -576,7 +576,7 @@ export default function TextEffectsExperimentPage() {
 
           {/* ── Application Preview ──────────────────────────── */}
           <section className="mb-20 animate-fade-in-up [animation-delay:500ms]">
-            <p className="text-[#E2A84B] text-sm tracking-widest uppercase mb-4 font-semibold">
+            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
               Application
             </p>
             <h2 className="text-xl sm:text-2xl font-bold font-heading text-[#E6EDF3] tracking-tight mb-2">
@@ -591,8 +591,8 @@ export default function TextEffectsExperimentPage() {
           </section>
 
           {/* ── Implementation Notes ─────────────────────────── */}
-          <footer className="rounded-xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/40 p-6 animate-fade-in-up [animation-delay:600ms]">
-            <h3 className="font-heading text-sm font-semibold text-[#E2A84B]">
+          <footer className="rounded-xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/40 p-6 animate-fade-in-up [animation-delay:600ms]">
+            <h3 className="font-heading text-sm font-semibold text-[#7C6AEF]">
               Implementation Notes
             </h3>
             <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-[#9AA4B2]">
@@ -613,7 +613,7 @@ export default function TextEffectsExperimentPage() {
                 Embossed/debossed effects use directional{" "}
                 <code className="text-[#E6EDF3]/70">text-shadow</code> to
                 simulate depth on the{" "}
-                <code className="text-[#E6EDF3]/70">#1A1610</code> surface.
+                <code className="text-[#E6EDF3]/70">#13141E</code> surface.
               </li>
               <li>
                 Sparkle uses{" "}
@@ -630,7 +630,7 @@ export default function TextEffectsExperimentPage() {
               </li>
               <li>
                 All text remains readable on the{" "}
-                <code className="text-[#E6EDF3]/70">#12100D</code> background.
+                <code className="text-[#E6EDF3]/70">#0C0D14</code> background.
                 Effects enhance without sacrificing legibility.
               </li>
             </ul>
@@ -639,7 +639,7 @@ export default function TextEffectsExperimentPage() {
           {/* Footer marker */}
           <p className="text-center text-[#9AA4B2] text-sm mt-12">
             Experiment #53 &middot;{" "}
-            <span className="text-[#E2A84B] font-medium">
+            <span className="text-[#7C6AEF] font-medium">
               Pure CSS text effects
             </span>{" "}
             &middot; prefers-reduced-motion supported

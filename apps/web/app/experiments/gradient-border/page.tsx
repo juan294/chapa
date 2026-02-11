@@ -33,18 +33,18 @@ function generateHeatmap(): number[][] {
 const HEATMAP = generateHeatmap();
 
 const HEAT_COLORS = [
-  "rgba(226,168,75,0.06)", // 0 — empty
-  "rgba(226,168,75,0.18)", // 1 — low
-  "rgba(226,168,75,0.35)", // 2 — medium
-  "rgba(226,168,75,0.60)", // 3 — high
-  "rgba(226,168,75,0.90)", // 4 — max
+  "rgba(124,106,239,0.06)", // 0 — empty
+  "rgba(124,106,239,0.18)", // 1 — low
+  "rgba(124,106,239,0.35)", // 2 — medium
+  "rgba(124,106,239,0.60)", // 3 — high
+  "rgba(124,106,239,0.90)", // 4 — max
 ];
 
 // ── Mock badge card ──────────────────────────────────────────
 
 function MockBadgeCard() {
   return (
-    <div className="relative z-10 rounded-2xl bg-[#1A1610] p-6 sm:p-8 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
+    <div className="relative z-10 rounded-2xl bg-[#13141E] p-6 sm:p-8 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="font-heading text-sm sm:text-base text-text-secondary">
@@ -208,11 +208,11 @@ export default function GradientBorderExperiment() {
 .animated-gradient-border {
   background: conic-gradient(
     from var(--gradient-angle),
-    #C28A2E,
-    #E2A84B,
-    #F0C97D,
-    #E2A84B,
-    #C28A2E
+    #5E4FCC,
+    #7C6AEF,
+    #9D8FFF,
+    #7C6AEF,
+    #5E4FCC
   );
   animation: rotate-gradient-border 4s linear infinite;
 }
@@ -220,7 +220,7 @@ export default function GradientBorderExperiment() {
 /* ── Technique 2: Fallback for browsers without @property ── */
 @supports not (background: conic-gradient(from var(--gradient-angle), red, blue)) {
   .animated-gradient-border {
-    background: linear-gradient(90deg, #C28A2E, #E2A84B, #F0C97D, #E2A84B, #C28A2E);
+    background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
     background-size: 300% 300%;
     animation: gradient-shift-fallback 3s ease infinite;
   }
@@ -238,11 +238,11 @@ export default function GradientBorderExperiment() {
     animation: none !important;
     background: conic-gradient(
       from 45deg,
-      #C28A2E,
-      #E2A84B,
-      #F0C97D,
-      #E2A84B,
-      #C28A2E
+      #5E4FCC,
+      #7C6AEF,
+      #9D8FFF,
+      #7C6AEF,
+      #5E4FCC
     );
   }
 }

@@ -25,14 +25,14 @@ export const GRADIENT_BORDER_CSS = `
 .animated-gradient-border {
   background: conic-gradient(
     from var(--gradient-angle),
-    #C28A2E, #E2A84B, #F0C97D, #E2A84B, #C28A2E
+    #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC
   );
   animation: rotate-gradient-border 4s linear infinite;
 }
 
 @supports not (background: conic-gradient(from var(--gradient-angle), red, blue)) {
   .animated-gradient-border {
-    background: linear-gradient(90deg, #C28A2E, #E2A84B, #F0C97D, #E2A84B, #C28A2E);
+    background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
     background-size: 300% 300%;
     animation: gradient-shift-fallback 3s ease infinite;
   }
@@ -46,7 +46,7 @@ export const GRADIENT_BORDER_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .animated-gradient-border {
     animation: none !important;
-    background: conic-gradient(from 45deg, #C28A2E, #E2A84B, #F0C97D, #E2A84B, #C28A2E);
+    background: conic-gradient(from 45deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
   }
 }
 `;

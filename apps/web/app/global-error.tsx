@@ -10,7 +10,7 @@ export default function GlobalError({
     <html lang="en">
       <body
         style={{
-          backgroundColor: "#12100D",
+          backgroundColor: "#0C0D14",
           color: "#E6EDF3",
           fontFamily: "system-ui, sans-serif",
           margin: 0,
@@ -32,7 +32,7 @@ export default function GlobalError({
             style={{
               fontSize: "2.25rem",
               fontWeight: 700,
-              color: "#E2A84B",
+              color: "#7C6AEF",
               fontFamily: '"JetBrains Mono", "Courier New", monospace',
               margin: 0,
             }}
@@ -60,12 +60,12 @@ export default function GlobalError({
               onClick={reset}
               style={{
                 borderRadius: "9999px",
-                border: "1px solid rgba(226, 168, 75, 0.2)",
-                backgroundColor: "rgba(226, 168, 75, 0.1)",
+                border: "1px solid rgba(124, 106, 239, 0.2)",
+                backgroundColor: "rgba(124, 106, 239, 0.1)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#E2A84B",
+                color: "#7C6AEF",
                 cursor: "pointer",
               }}
             >
@@ -76,7 +76,7 @@ export default function GlobalError({
               href="/"
               style={{
                 borderRadius: "9999px",
-                border: "1px solid rgba(226, 168, 75, 0.12)",
+                border: "1px solid rgba(124, 106, 239, 0.12)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,

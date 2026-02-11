@@ -15,8 +15,8 @@ const CACHE_HEADERS = {
 function fallbackSvg(handle: string, message: string): string {
   const safe = escapeXml(handle);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" rx="16" fill="#12100D" stroke="rgba(226,168,75,0.12)" stroke-width="2"/>
-  <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="#E2A84B">CHAPA</text>
+  <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="rgba(124,106,239,0.12)" stroke-width="2"/>
+  <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="#7C6AEF">CHAPA</text>
   <text x="60" y="120" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" fill="#9AA4B2">Developer Impact Badge</text>
   <text x="60" y="340" font-family="'JetBrains Mono', monospace" font-size="28" fill="#E6EDF3">@${safe}</text>
   <text x="60" y="400" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2">${escapeXml(message)}</text>

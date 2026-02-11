@@ -215,13 +215,13 @@ export default function MetallicShimmerPage() {
 .metallic-gold {
   background: linear-gradient(
     90deg,
-    #C28A2E 0%,
-    #E2A84B 20%,
-    #F6E27A 40%,
-    #F6F2C0 50%,   /* bright highlight */
-    #F6E27A 60%,
-    #E2A84B 80%,
-    #C28A2E 100%
+    #5E4FCC 0%,
+    #7C6AEF 20%,
+    #A99BFF 40%,
+    #D0C9FF 50%,   /* bright highlight */
+    #A99BFF 60%,
+    #7C6AEF 80%,
+    #5E4FCC 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -289,13 +289,13 @@ function MetallicText({
       style={{
         background: `linear-gradient(
           90deg,
-          #C28A2E 0%,
-          #E2A84B 20%,
-          #F6E27A 40%,
+          #5E4FCC 0%,
+          #7C6AEF 20%,
+          #A99BFF 40%,
           ${highlightColor} 50%,
-          #F6E27A 60%,
-          #E2A84B 80%,
-          #C28A2E 100%
+          #A99BFF 60%,
+          #7C6AEF 80%,
+          #5E4FCC 100%
         )`,
         backgroundSize: "200% 100%",
         WebkitBackgroundClip: "text",
@@ -343,7 +343,7 @@ function SvgMetallicScore({
             y2="0%"
             gradientUnits="userSpaceOnUse"
           >
-            <stop offset="0%" stopColor="#C28A2E">
+            <stop offset="0%" stopColor="#5E4FCC">
               <animate
                 attributeName="offset"
                 values="-1;0;1"
@@ -351,7 +351,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="20%" stopColor="#E2A84B">
+            <stop offset="20%" stopColor="#7C6AEF">
               <animate
                 attributeName="offset"
                 values="-0.8;0.2;1.2"
@@ -359,7 +359,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="40%" stopColor="#F6E27A">
+            <stop offset="40%" stopColor="#A99BFF">
               <animate
                 attributeName="offset"
                 values="-0.6;0.4;1.4"
@@ -369,7 +369,7 @@ function SvgMetallicScore({
             </stop>
             <stop
               offset="50%"
-              stopColor="#F6F2C0"
+              stopColor="#D0C9FF"
               stopOpacity={highlightOpacity}
             >
               <animate
@@ -379,7 +379,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="60%" stopColor="#F6E27A">
+            <stop offset="60%" stopColor="#A99BFF">
               <animate
                 attributeName="offset"
                 values="-0.4;0.6;1.6"
@@ -387,7 +387,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="80%" stopColor="#E2A84B">
+            <stop offset="80%" stopColor="#7C6AEF">
               <animate
                 attributeName="offset"
                 values="-0.2;0.8;1.8"
@@ -395,7 +395,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="100%" stopColor="#C28A2E">
+            <stop offset="100%" stopColor="#5E4FCC">
               <animate
                 attributeName="offset"
                 values="0;1;2"
@@ -414,7 +414,7 @@ function SvgMetallicScore({
             y2="0%"
             gradientUnits="userSpaceOnUse"
           >
-            <stop offset="0%" stopColor="#C28A2E">
+            <stop offset="0%" stopColor="#5E4FCC">
               <animate
                 attributeName="offset"
                 values="-1;0;1"
@@ -422,7 +422,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="30%" stopColor="#E2A84B">
+            <stop offset="30%" stopColor="#7C6AEF">
               <animate
                 attributeName="offset"
                 values="-0.7;0.3;1.3"
@@ -432,7 +432,7 @@ function SvgMetallicScore({
             </stop>
             <stop
               offset="50%"
-              stopColor="#F6F2C0"
+              stopColor="#D0C9FF"
               stopOpacity={highlightOpacity}
             >
               <animate
@@ -442,7 +442,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="70%" stopColor="#E2A84B">
+            <stop offset="70%" stopColor="#7C6AEF">
               <animate
                 attributeName="offset"
                 values="-0.3;0.7;1.7"
@@ -450,7 +450,7 @@ function SvgMetallicScore({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="100%" stopColor="#C28A2E">
+            <stop offset="100%" stopColor="#5E4FCC">
               <animate
                 attributeName="offset"
                 values="0;1;2"
@@ -468,8 +468,8 @@ function SvgMetallicScore({
           width="400"
           height="200"
           rx="16"
-          fill="#1A1610"
-          stroke="rgba(226,168,75,0.12)"
+          fill="#13141E"
+          stroke="rgba(124,106,239,0.12)"
           strokeWidth="1"
         />
 

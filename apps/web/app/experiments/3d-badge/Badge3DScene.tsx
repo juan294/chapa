@@ -55,11 +55,11 @@ function HeatmapInstanced() {
 
   const colors = useMemo(
     () => [
-      new THREE.Color("#1A1610"),
+      new THREE.Color("#13141E"),
       new THREE.Color("#3D2A0E"),
       new THREE.Color("#7A5518"),
-      new THREE.Color("#C28A2E"),
-      new THREE.Color("#E2A84B"),
+      new THREE.Color("#5E4FCC"),
+      new THREE.Color("#7C6AEF"),
     ],
     []
   );
@@ -125,7 +125,7 @@ function ScoreText() {
       ref={meshRef}
       position={[0.8, 0.05, 0.06]}
       fontSize={0.6}
-      color="#E2A84B"
+      color="#7C6AEF"
       anchorX="center"
       anchorY="middle"
     >
@@ -149,20 +149,20 @@ function BadgeCard({ preset }: { preset: MaterialPreset }) {
         <RoundedBox args={[4, 2.1, 0.08]} radius={0.1} smoothness={4}>
           {isPhysical ? (
             <meshPhysicalMaterial
-              color="#1A1610"
+              color="#13141E"
               metalness={config.metalness}
               roughness={config.roughness}
-              emissive="#E2A84B"
+              emissive="#7C6AEF"
               emissiveIntensity={config.emissiveIntensity}
               iridescence={config.iridescence ?? 0}
               clearcoat={config.clearcoat ?? 0}
             />
           ) : (
             <meshStandardMaterial
-              color="#1A1610"
+              color="#13141E"
               metalness={config.metalness}
               roughness={config.roughness}
-              emissive="#E2A84B"
+              emissive="#7C6AEF"
               emissiveIntensity={config.emissiveIntensity}
             />
           )}
@@ -176,10 +176,10 @@ function BadgeCard({ preset }: { preset: MaterialPreset }) {
           position={[0, 0, -0.02]}
         >
           <meshStandardMaterial
-            color="#E2A84B"
+            color="#7C6AEF"
             metalness={0.8}
             roughness={0.2}
-            emissive="#E2A84B"
+            emissive="#7C6AEF"
             emissiveIntensity={0.15}
           />
         </RoundedBox>
@@ -200,7 +200,7 @@ function BadgeCard({ preset }: { preset: MaterialPreset }) {
         <Text
           position={[0.8, 0.5, 0.06]}
           fontSize={0.13}
-          color="#E2A84B"
+          color="#7C6AEF"
           anchorX="center"
           anchorY="middle"
         >
@@ -279,13 +279,13 @@ export default function Badge3DScene() {
           <directionalLight
             position={[5, 5, 5]}
             intensity={0.8}
-            color="#F0C97D"
+            color="#9D8FFF"
           />
-          <pointLight position={[-3, 2, 4]} intensity={0.5} color="#E2A84B" />
+          <pointLight position={[-3, 2, 4]} intensity={0.5} color="#7C6AEF" />
           <hemisphereLight
             intensity={0.3}
-            color="#F0C97D"
-            groundColor="#1A1610"
+            color="#9D8FFF"
+            groundColor="#13141E"
           />
 
           <BadgeCard preset={preset} />

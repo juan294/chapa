@@ -2,9 +2,9 @@
 
 This is the single source of truth for visual design decisions. All agents working on UI must follow these guidelines.
 
-## Theme: Warm Amber
+## Theme: Cool Indigo
 
-Dark developer-tool aesthetic with warm, premium undertones. Think luxury dev tools — sophisticated, warm, technical.
+Dark developer-tool aesthetic with cool, premium undertones. Think modern dev tools — sophisticated, technical, distinctive.
 
 ## Colors
 
@@ -12,23 +12,23 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`:
 
 | Token | Hex | Tailwind class | Usage |
 |-------|-----|----------------|-------|
-| `--color-bg` | `#12100D` | `bg-bg` | Page background (warm dark) |
-| `--color-card` | `#1A1610` | `bg-card` | Card/panel backgrounds |
+| `--color-bg` | `#0C0D14` | `bg-bg` | Page background (cool dark) |
+| `--color-card` | `#13141E` | `bg-card` | Card/panel backgrounds |
 | `--color-text-primary` | `#E6EDF3` | `text-text-primary` | Headings, body text |
 | `--color-text-secondary` | `#9AA4B2` | `text-text-secondary` | Muted text, labels |
-| `--color-amber` | `#E2A84B` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
-| `--color-amber-light` | `#F0C97D` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
-| `--color-amber-dark` | `#C28A2E` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
-| `--color-stroke` | `rgba(226,168,75,0.12)` | `border-stroke` | Borders, dividers (amber-tinted) |
-| `--color-warm-bg` | `#12100D` | `bg-warm-bg` | Alias for page background |
-| `--color-warm-card` | `#1A1610` | `bg-warm-card` | Alias for card background |
-| `--color-warm-stroke` | `rgba(226,168,75,0.12)` | `border-warm-stroke` | Alias for warm-tinted borders |
+| `--color-amber` | `#7C6AEF` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
+| `--color-amber-light` | `#9D8FFF` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
+| `--color-amber-dark` | `#5E4FCC` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
+| `--color-stroke` | `rgba(124,106,239,0.12)` | `border-stroke` | Borders, dividers (indigo-tinted) |
+| `--color-warm-bg` | `#0C0D14` | `bg-warm-bg` | Alias for page background |
+| `--color-warm-card` | `#13141E` | `bg-warm-card` | Alias for card background |
+| `--color-warm-stroke` | `rgba(124,106,239,0.12)` | `border-warm-stroke` | Alias for indigo-tinted borders |
 
 ### Color rules
 
-- Amber (`#E2A84B`) is the signature accent. Use sparingly — CTAs, active states, key data points, section highlights.
-- Never use neon/bright greens or blues. The palette is warm and sophisticated.
-- Use Tailwind opacity modifiers for amber variants: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
+- Indigo (`#7C6AEF`) is the signature accent. Use sparingly — CTAs, active states, key data points, section highlights.
+- Never use neon/bright greens or warm browns/golds. The palette is cool and sophisticated.
+- Use Tailwind opacity modifiers for accent variants: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
 - Ambient glow effects use `bg-amber/[0.03]` to `bg-amber/[0.06]` with `blur-[120px]`+.
 - Cards use semi-transparent backgrounds where needed: `bg-warm-card/50`, `bg-warm-card/60`.
 
@@ -55,8 +55,8 @@ Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
 - Max content width: `max-w-7xl` (nav, features grid), `max-w-5xl` (mid sections), `max-w-4xl` (hero text, badge preview).
 - Section padding: `py-32` for full sections. Generous vertical space between sections.
 - Horizontal padding: `px-6` on all containers.
-- Section dividers: `border-t border-warm-stroke` — subtle amber-tinted, not heavy.
-- Section eyebrows: Uppercase amber text above section headings (`text-amber text-sm tracking-widest uppercase mb-4`).
+- Section dividers: `border-t border-warm-stroke` — subtle indigo-tinted, not heavy.
+- Section eyebrows: Uppercase accent text above section headings (`text-amber text-sm tracking-widest uppercase mb-4`).
 
 ## Components
 
@@ -75,7 +75,7 @@ rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg
 hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25
 ```
 
-Dark text on amber background. Always `rounded-full`.
+Light text on indigo background. Always `rounded-full`.
 
 ### Buttons (Ghost/Outline)
 
@@ -88,19 +88,19 @@ hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]
 
 - Fixed top, backdrop-blur: `fixed top-0 z-50 border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl`
 - Nav links in a pill container: `rounded-full border border-warm-stroke bg-warm-card/60`
-- CTA button: amber `rounded-full` with GitHub icon
+- CTA button: indigo `rounded-full` with GitHub icon
 
 ### Terminal/Code blocks
 
 ```
-rounded-xl border border-warm-stroke bg-[#0d0b08] overflow-hidden
+rounded-xl border border-warm-stroke bg-[#08090f] overflow-hidden
 ```
 
-Header with three dots: `w-3 h-3 rounded-full` using `bg-amber/20`, `bg-amber/10`, `bg-amber/[0.06]` (warm gradient tones).
+Header with three dots: `w-3 h-3 rounded-full` using `bg-amber/20`, `bg-amber/10`, `bg-amber/[0.06]` (cool gradient tones).
 
 ## Background Effects
 
-- **Grid pattern**: `.bg-grid-warm` class — faint 72px grid lines at 3% opacity, amber-tinted.
+- **Grid pattern**: `.bg-grid-warm` class — faint 72px grid lines at 3% opacity, indigo-tinted.
 - **Ambient glow**: Large `rounded-full` divs with `bg-amber/[0.03-0.06]` and `blur-[120px-150px]`, positioned absolute behind content.
 - Dark theme ONLY. No light mode.
 
@@ -111,7 +111,7 @@ Defined in `globals.css`:
 | Class | Effect | Duration |
 |-------|--------|----------|
 | `animate-fade-in-up` | Fade in + slide up 30px | 0.8s ease-out |
-| `animate-pulse-glow-amber` | Pulsing amber box-shadow | 3s infinite |
+| `animate-pulse-glow-amber` | Pulsing indigo box-shadow | 3s infinite |
 | `animate-float-slow` | Gentle vertical float | 6s infinite |
 | `animate-float-medium` | Gentle vertical float | 7.5s infinite |
 | `animate-float-fast` | Gentle vertical float | 5s infinite |
@@ -135,7 +135,7 @@ Use `[animation-delay:Xms]` for staggered reveals.
 - Floating decorative pills with stats (commits, tier, PRs) around the hero area.
 - Diamond icons scattered as decorative elements.
 - Social proof row below CTAs: avatar circles + 5 star icons + developer count.
-- Badge card as hero centerpiece with shimmer top edge and outer amber glow.
+- Badge card as hero centerpiece with shimmer top edge and outer indigo glow.
 
 ## Do NOT
 
@@ -145,4 +145,4 @@ Use `[animation-delay:Xms]` for staggered reveals.
 - Use icon libraries (lucide, heroicons, etc.) — keep inline SVGs.
 - Use `Inter`, `Roboto`, `Arial`, or other generic fonts anywhere.
 - Add heavy shadows or gradients — keep effects subtle and muted.
-- Use cool-toned blues for backgrounds — keep everything warm-tinted.
+- Use warm browns/golds for accents — the palette is cool indigo/violet.
