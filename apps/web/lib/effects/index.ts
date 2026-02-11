@@ -21,6 +21,7 @@ export type { ScoreEffect, ScoreEffectTextProps } from "./text/ScoreEffectText";
 // Heatmap animations
 export {
   getDelayFn,
+  fadeInDelay,
   diagonalDelay,
   rippleDelay,
   scatterDelay,
@@ -33,6 +34,10 @@ export {
   DAYS,
 } from "./heatmap/animations";
 export type { AnimationVariant } from "./heatmap/animations";
+
+// Heatmap grid component
+export { HeatmapGrid, getIntensityLevel, HEATMAP_GRID_CSS } from "./heatmap/HeatmapGrid";
+export type { HeatmapGridProps } from "./heatmap/HeatmapGrid";
 
 // Interactions
 export { computeTilt, useTilt } from "./interactions/use-tilt";
