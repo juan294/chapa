@@ -12,6 +12,7 @@
   "dependencies": {
     "@chapa/shared": "workspace:*",
     "@upstash/redis": "^1.36.2",
+    "@vercel/analytics": "^1.6.1",
     "canvas-confetti": "^1.9.4",
     "next": "^16.1.6",
     "posthog-js": "^1.345.2",
