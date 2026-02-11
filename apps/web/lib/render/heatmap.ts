@@ -1,8 +1,8 @@
 import type { HeatmapDay } from "@chapa/shared";
 import { getHeatmapColor } from "./theme";
 
-const CELL_SIZE = 26;
-const CELL_GAP = 4;
+const CELL_SIZE = 32;
+const CELL_GAP = 5;
 const WEEKS = 13;
 const DAYS = 7;
 

@@ -176,12 +176,18 @@ export default async function Home({
                         <GitHubIcon className="w-5 h-5 text-amber" />
                       </div>
                       <div>
-                        <p className="font-semibold text-text-primary">@developer</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-text-primary">@developer</p>
+                          {/* Verified placeholder — visual only, logic not implemented yet */}
+                          <svg className="w-3.5 h-3.5 text-amber opacity-40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
+                          </svg>
+                        </div>
                         <p className="text-sm text-text-secondary">Last 90 days</p>
                       </div>
                     </div>
                     <span className="text-sm font-heading text-text-secondary/50 tracking-tight">
-                      Chapa<span className="text-amber">.</span>
+                      Chapa<span className="text-amber">_</span>
                     </span>
                   </div>
 
@@ -192,13 +198,13 @@ export default async function Home({
                       <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-2">
                         Activity
                       </p>
-                      <div className="flex gap-[3px]">
+                      <div className="flex gap-1">
                         {HEATMAP.map((week, wi) => (
-                          <div key={wi} className="flex flex-col gap-[3px]">
+                          <div key={wi} className="flex flex-col gap-1">
                             {week.map((level, di) => (
                               <div
                                 key={`${wi}-${di}`}
-                                className={`w-[10px] h-[10px] rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
+                                className={`w-3.5 h-3.5 rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
                               />
                             ))}
                           </div>
@@ -240,11 +246,11 @@ export default async function Home({
 
                   {/* Footer */}
                   <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] text-text-secondary/60">
-                      <GitHubIcon className="w-3 h-3" />
+                    <div className="flex items-center gap-2 text-xs text-text-secondary/60">
+                      <GitHubIcon className="w-3.5 h-3.5" />
                       <span>Powered by GitHub</span>
                     </div>
-                    <span className="text-[10px] text-text-secondary/60 font-heading">
+                    <span className="text-xs text-text-secondary/60 font-heading">
                       chapa.thecreativetoken.com
                     </span>
                   </div>
@@ -473,7 +479,7 @@ export default async function Home({
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <span className="font-heading text-sm tracking-tight text-text-primary">
-                Chapa<span className="text-amber">.</span>
+                Chapa<span className="text-amber">_</span>
               </span>
               <span className="text-xs text-text-secondary">
                 Built for developers, by developers.

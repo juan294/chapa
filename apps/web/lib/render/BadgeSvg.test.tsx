@@ -148,15 +148,36 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("Last 90 days");
     });
 
-    it("contains 'Chapa.' logo text", () => {
+    it("contains 'Chapa_' logo text with underscore cursor", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("Chapa");
+      // Must use underscore (_) not dot (.)
+      expect(svg).toMatch(/Chapa.*_/);
+      expect(svg).not.toMatch(/Chapa<tspan[^>]*>\.<\/tspan>/);
     });
 
     it("contains a circular avatar placeholder with amber ring", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       // Avatar is a circle with amber-tinted stroke
       expect(svg).toContain("<circle");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Verification placeholder
+  // ---------------------------------------------------------------------------
+
+  describe("verification placeholder", () => {
+    it("contains a verification placeholder icon", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Should have a shield/verified icon placeholder
+      expect(svg).toContain("Verified");
+    });
+
+    it("verification placeholder has low opacity (placeholder state)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // The verified indicator should be dimmed to show it's a placeholder
+      expect(svg).toMatch(/opacity="0\.4"/);
     });
   });
 
@@ -245,6 +266,17 @@ describe("renderBadgeSvg", () => {
     it("contains the domain name in footer", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("chapa.thecreativetoken.com");
+    });
+
+    it("footer text is at least 15px for readability", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // "Powered by GitHub" and domain text should be at least font-size 15
+      const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g);
+      expect(brandingFontSizes).not.toBeNull();
+      for (const match of brandingFontSizes!) {
+        const size = parseInt(match.match(/font-size="(\d+)"/)![1], 10);
+        expect(size).toBeGreaterThanOrEqual(15);
+      }
     });
 
     it("contains a divider line above footer", () => {
