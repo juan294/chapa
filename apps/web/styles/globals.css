@@ -1,45 +1,66 @@
 @import "tailwindcss";
 
 @theme {
-  /* Base palette — LIGHT defaults */
-  --color-bg: #FFFFFF;
-  --color-card: #F9FAFB;
-  --color-text-primary: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-stroke: rgba(0, 0, 0, 0.08);
+  /* Register tokens so Tailwind generates utility classes (bg-bg, text-text-primary, etc.)
+     Actual values are set below in :root / [data-theme] to avoid @layer cascade issues. */
+  --color-bg: initial;
+  --color-card: initial;
+  --color-text-primary: initial;
+  --color-text-secondary: initial;
+  --color-stroke: initial;
 
-  /* Accent: cool indigo/violet (shared) */
   --color-amber: #7C6AEF;
   --color-amber-light: #9D8FFF;
   --color-amber-dark: #5E4FCC;
 
-  /* Aliases */
-  --color-warm-bg: #FFFFFF;
-  --color-warm-card: #F9FAFB;
-  --color-warm-stroke: rgba(0, 0, 0, 0.08);
+  --color-warm-bg: initial;
+  --color-warm-card: initial;
+  --color-warm-stroke: initial;
 
-  /* Dark sections (for forced-dark areas like badge preview) */
-  --color-dark-section: #1A1A2E;
-  --color-dark-card: #252542;
-  --color-purple-tint: #F5F3FF;
+  --color-dark-section: initial;
+  --color-dark-card: initial;
+  --color-purple-tint: initial;
   --color-complement: #10B981;
-  --color-complement-light: #D1FAE5;
+  --color-complement-light: initial;
 
-  /* Terminal-specific */
-  --color-terminal-green: #16A34A;
-  --color-terminal-red: #DC2626;
-  --color-terminal-yellow: #D97706;
-  --color-terminal-dim: #9CA3AF;
+  --color-terminal-green: initial;
+  --color-terminal-red: initial;
+  --color-terminal-yellow: initial;
+  --color-terminal-dim: initial;
 
-  /* Progress bar track */
-  --color-track: rgba(0, 0, 0, 0.06);
+  --color-track: initial;
 
   /* Typography */
   --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
   --font-family-body: var(--font-plus-jakarta), system-ui, sans-serif;
 }
 
-/* ── Dark theme overrides ──────────────────────────────── */
+/* ── Theme values (unlayered — same cascade level) ─────── */
+
+:root {
+  /* Light palette (default) */
+  --color-bg: #FFFFFF;
+  --color-card: #F9FAFB;
+  --color-text-primary: #1A1A2E;
+  --color-text-secondary: #6B7280;
+  --color-stroke: rgba(0, 0, 0, 0.08);
+
+  --color-warm-bg: #FFFFFF;
+  --color-warm-card: #F9FAFB;
+  --color-warm-stroke: rgba(0, 0, 0, 0.08);
+
+  --color-dark-section: #1A1A2E;
+  --color-dark-card: #252542;
+  --color-purple-tint: #F5F3FF;
+  --color-complement-light: #D1FAE5;
+
+  --color-terminal-green: #16A34A;
+  --color-terminal-red: #DC2626;
+  --color-terminal-yellow: #D97706;
+  --color-terminal-dim: #9CA3AF;
+
+  --color-track: rgba(0, 0, 0, 0.06);
+}
 
 [data-theme="dark"] {
   --color-bg: #0A0A0F;
