@@ -9,25 +9,17 @@ import type {
 } from "@chapa/shared";
 import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
 import type { ScoreEffect } from "@/lib/effects/text/ScoreEffectText";
-import {
-  AuroraBackground,
-  useParticles,
-  PARTICLE_PRESETS,
-  glassStyle,
-  GradientBorder,
-  GRADIENT_BORDER_CSS,
-  ScoreEffectText,
-  SCORE_EFFECT_CSS,
-  useTilt,
-  HolographicOverlay,
-  HOLOGRAPHIC_CSS,
-  useAnimatedCounter,
-  useInView,
-  tierPillClasses,
-  SparkleDots,
-  TIER_VISUALS_CSS,
-  fireSingleBurst,
-} from "@/lib/effects";
+import { AuroraBackground } from "@/lib/effects/backgrounds/AuroraBackground";
+import { useParticles, PARTICLE_PRESETS } from "@/lib/effects/backgrounds/ParticleBackground";
+import { glassStyle } from "@/lib/effects/cards/glass-presets";
+import { GradientBorder, GRADIENT_BORDER_CSS } from "@/lib/effects/borders/GradientBorder";
+import { ScoreEffectText, SCORE_EFFECT_CSS } from "@/lib/effects/text/ScoreEffectText";
+import { useTilt } from "@/lib/effects/interactions/use-tilt";
+import { HolographicOverlay, HOLOGRAPHIC_CSS } from "@/lib/effects/interactions/HolographicOverlay";
+import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter";
+import { useInView } from "@/lib/effects/counters/use-in-view";
+import { tierPillClasses, SparkleDots, TIER_VISUALS_CSS } from "@/lib/effects/tier/TierVisuals";
+import { fireSingleBurst } from "@/lib/effects/celebrations/confetti";
 import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid";
 
 // ---------------------------------------------------------------------------
