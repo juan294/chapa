@@ -73,7 +73,13 @@
       "WebFetch(domain:mobbin.com)",
       "Bash(git status:*)",
       "Bash(node:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(chapa-cli:*)",
+      "Bash(chapa:*)",
+      "Bash(xxd:*)",
+      "Bash(git -C /Users/juan/Documents/GenAI_Projects/chapa status --short)",
+      "Bash(for i in 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54)",
+      "Bash(do gh issue close $i --comment \"Experiment implemented and integrated into Creator Studio. Code lives in \\\\`apps/web/lib/effects/\\\\` and \\\\`/experiments/\\\\`. Closing — no further work needed.\")"
     ]
   }
 }
