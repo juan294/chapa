@@ -144,20 +144,14 @@ export default async function Home({
                 <p><span className="text-terminal-dim select-none">&gt;</span> Generates a live, embeddable SVG badge.</p>
                 <p><span className="text-terminal-dim select-none">&gt;</span> Impact Score + Confidence + Tier.</p>
               </div>
-              <div className="pt-4 flex flex-col sm:flex-row items-start gap-3">
+              <div className="pt-4">
                 <a
                   href="/api/auth/login"
-                  className="group flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                 >
                   <GitHubIcon className="w-4 h-4" />
                   Get Your Badge
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </a>
-                <a
-                  href="#badge-preview"
-                  className="flex items-center gap-2 rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary"
-                >
-                  See Example
                 </a>
               </div>
             </div>
