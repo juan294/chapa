@@ -1,8 +1,7 @@
 "use client";
 
-import posthog from "posthog-js";
-import { PostHogProvider as PHProvider } from "posthog-js/react";
 import { useEffect } from "react";
+import { setPosthogInstance } from "@/lib/analytics/posthog";
 
 function PostHogInit() {
   useEffect(() => {
@@ -10,22 +9,29 @@ function PostHogInit() {
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
     if (!key || !host) return;
 
-    posthog.init(key, {
-      api_host: host,
-      capture_pageview: true,
-      capture_pageleave: true,
-      persistence: "localStorage",
+    import("posthog-js").then(({ default: posthog }) => {
+      posthog.init(key, {
+        api_host: host,
+        capture_pageview: false,
+        capture_pageleave: true,
+        persistence: "localStorage",
+      });
+      setPosthogInstance(posthog);
     });
   }, []);
 
   return null;
 }
 
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
+export default function PostHogProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <PHProvider client={posthog}>
+    <>
       <PostHogInit />
       {children}
-    </PHProvider>
+    </>
   );
 }

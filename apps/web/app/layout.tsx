@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
 import { Analytics } from "@vercel/analytics/react";
-import { PostHogProvider } from "@/components/PostHogProvider";
+import PostHogProvider from "@/components/PostHogProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
