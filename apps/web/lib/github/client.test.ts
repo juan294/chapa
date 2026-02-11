@@ -148,4 +148,13 @@ describe("getStats90d", () => {
       86400,
     );
   });
+
+  it("passes token argument through to fetchStats90d", async () => {
+    mockCacheGet.mockResolvedValue(null);
+    mockFetchStats90d.mockResolvedValue(makeStats());
+
+    await getStats90d("test-user", "abc");
+
+    expect(mockFetchStats90d).toHaveBeenCalledWith("test-user", "abc");
+  });
 });

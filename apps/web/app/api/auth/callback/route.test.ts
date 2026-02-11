@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -60,10 +60,34 @@ function makeRequest(params?: {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Shared setup: allow rate limit by default, set env vars for happy path
+// ---------------------------------------------------------------------------
+
+function allowRateLimit() {
+  mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+}
+
+function setEnvVars() {
+  process.env.GITHUB_CLIENT_ID = "test-client-id";
+  process.env.GITHUB_CLIENT_SECRET = "test-client-secret";
+  process.env.NEXTAUTH_SECRET = "test-session-secret";
+}
+
+function clearEnvVars() {
+  delete process.env.GITHUB_CLIENT_ID;
+  delete process.env.GITHUB_CLIENT_SECRET;
+  delete process.env.NEXTAUTH_SECRET;
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting tests (existing)
+// ---------------------------------------------------------------------------
+
 describe("GET /api/auth/callback — rate limiting", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    allowRateLimit();
   });
 
   it("returns 429 when rate limited", async () => {
@@ -114,6 +138,182 @@ describe("GET /api/auth/callback — rate limiting", () => {
     expect(res.status).toBe(307);
     expect(new URL(res.headers.get("Location")!).searchParams.get("error")).toBe(
       "no_code",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OAuth callback integration tests
+// ---------------------------------------------------------------------------
+
+describe("GET /api/auth/callback — OAuth flow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    allowRateLimit();
+    setEnvVars();
+  });
+
+  afterEach(() => {
+    clearEnvVars();
+  });
+
+  it("redirects to /?error=no_code when code param is missing", async () => {
+    const res = await GET(makeRequest({ state: "abc123" }));
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("no_code");
+  });
+
+  it("redirects to /?error=invalid_state when state validation fails", async () => {
+    mockValidateState.mockReturnValue(false);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "bad-state", cookie: "chapa_oauth_state=other" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("invalid_state");
+  });
+
+  it("redirects to /?error=config when GITHUB_CLIENT_ID is missing", async () => {
+    delete process.env.GITHUB_CLIENT_ID;
+    mockValidateState.mockReturnValue(true);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("config");
+  });
+
+  it("redirects to /?error=config when GITHUB_CLIENT_SECRET is missing", async () => {
+    delete process.env.GITHUB_CLIENT_SECRET;
+    mockValidateState.mockReturnValue(true);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("config");
+  });
+
+  it("redirects to /?error=config when NEXTAUTH_SECRET is missing", async () => {
+    delete process.env.NEXTAUTH_SECRET;
+    mockValidateState.mockReturnValue(true);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("config");
+  });
+
+  it("redirects to /?error=token_exchange when token exchange fails", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue(null);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("token_exchange");
+  });
+
+  it("redirects to /?error=user_fetch when user fetch fails", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue(null);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.searchParams.get("error")).toBe("user_fetch");
+  });
+
+  it("redirects to /u/:login with Set-Cookie on successful flow", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/u/octocat");
+
+    // Verify Set-Cookie headers are present
+    const setCookies = res.headers.getSetCookie();
+    expect(setCookies).toHaveLength(2);
+    expect(setCookies[0]).toContain("chapa_session=");
+    expect(setCookies[1]).toContain("chapa_oauth_state=");
+  });
+
+  it("passes correct arguments to exchangeCodeForToken", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "my-oauth-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockExchangeCodeForToken).toHaveBeenCalledWith(
+      "my-oauth-code",
+      "test-client-id",
+      "test-client-secret",
+    );
+  });
+
+  it("passes correct arguments to createSessionCookie", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockCreateSessionCookie).toHaveBeenCalledWith(
+      {
+        token: "gho_valid_token",
+        login: "octocat",
+        name: "The Octocat",
+        avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+      },
+      "test-session-secret",
     );
   });
 });
