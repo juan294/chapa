@@ -417,7 +417,7 @@ export default async function Home({
                         <GitHubIcon className="w-3 h-3" />
                         <span>Powered by GitHub</span>
                       </div>
-                      <span className="text-[10px] text-text-secondary/60 font-mono">
+                      <span className="text-[10px] text-text-secondary/60 font-heading">
                         chapa.thecreativetoken.com
                       </span>
                     </div>
@@ -462,11 +462,11 @@ export default async function Home({
                   <div className="w-3 h-3 rounded-full bg-amber/20" />
                   <div className="w-3 h-3 rounded-full bg-amber/10" />
                   <div className="w-3 h-3 rounded-full bg-amber/[0.06]" />
-                  <span className="ml-2 text-xs text-text-secondary/60 font-mono">
+                  <span className="ml-2 text-xs text-text-secondary/60 font-heading">
                     embed snippet
                   </span>
                 </div>
-                <div className="p-4 font-mono text-sm leading-relaxed">
+                <div className="p-4 font-heading text-sm leading-relaxed">
                   <p className="text-text-secondary/50">
                     <span className="text-amber/50">{"<!-- "}</span>
                     Add to your README
