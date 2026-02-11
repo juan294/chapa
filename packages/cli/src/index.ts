@@ -1,15 +1,45 @@
-#!/usr/bin/env node
-
 import { parseArgs } from "./cli.js";
 import { resolveToken } from "./auth.js";
 import { fetchEmuStats } from "./fetch-emu.js";
 import { uploadSupplementalStats } from "./upload.js";
 
+// Injected by tsup at build time; falls back for dev/test
+declare const __CLI_VERSION__: string;
+const VERSION = typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "0.0.0-dev";
+
+const HELP_TEXT = `chapa-cli v${VERSION}
+
+Merge GitHub EMU (Enterprise Managed User) contributions into your Chapa badge.
+
+Usage:
+  chapa merge --handle <personal> --emu-handle <emu> [options]
+
+Options:
+  --handle <handle>       Your personal GitHub handle (required)
+  --emu-handle <handle>   Your EMU GitHub handle (required)
+  --emu-token <token>     EMU GitHub token (or set GITHUB_EMU_TOKEN)
+  --token <token>         Personal GitHub token (or set GITHUB_TOKEN)
+  --server <url>          Chapa server URL (default: https://chapa.thecreativetoken.com)
+  --version, -v           Show version number
+  --help, -h              Show this help message
+`;
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
+  if (args.version) {
+    console.log(VERSION);
+    process.exit(0);
+  }
+
+  if (args.help) {
+    console.log(HELP_TEXT);
+    process.exit(0);
+  }
+
   if (args.command !== "merge") {
     console.error("Usage: chapa merge --handle <personal> --emu-handle <emu> [--emu-token <token>] [--token <token>] [--server <url>]");
+    console.error("\nRun 'chapa --help' for more information.");
     process.exit(1);
   }
 

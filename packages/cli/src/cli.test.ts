@@ -45,4 +45,20 @@ describe("parseArgs", () => {
     const args = parseArgs(["unknown", "--handle", "juan294"]);
     expect(args.command).toBeNull();
   });
+
+  it("sets version flag when --version is passed", () => {
+    const args = parseArgs(["--version"]);
+    expect(args.version).toBe(true);
+  });
+
+  it("sets help flag when --help is passed", () => {
+    const args = parseArgs(["--help"]);
+    expect(args.help).toBe(true);
+  });
+
+  it("version and help default to false", () => {
+    const args = parseArgs(["merge", "--handle", "juan294", "--emu-handle", "x"]);
+    expect(args.version).toBe(false);
+    expect(args.help).toBe(false);
+  });
 });
