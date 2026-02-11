@@ -158,13 +158,13 @@ export default function ConfettiExperimentPage() {
     fireFireworks(particleCount, palette, speed);
   }, [particleCount, palette, speed]);
 
-  const toggleSparkle = useCallback(() => {
+  const toggleSparkle = useCallback(async () => {
     if (sparkleRef.current) {
       sparkleRef.current();
       sparkleRef.current = null;
       setSparkleActive(false);
     } else {
-      sparkleRef.current = fireSubtleSparkle(palette, speed);
+      sparkleRef.current = await fireSubtleSparkle(palette, speed);
       setSparkleActive(true);
     }
   }, [palette, speed]);
