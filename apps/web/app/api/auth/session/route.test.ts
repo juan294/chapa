@@ -143,4 +143,27 @@ describe("GET /api/auth/session", () => {
       avatar_url: "https://avatars.githubusercontent.com/u/1",
     });
   });
+
+  it("sets Cache-Control: no-store, private header", async () => {
+    mockReadSessionCookie.mockReturnValue({
+      token: "gho_token",
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/583231",
+    });
+
+    const res = await GET(
+      makeRequest("chapa_session=encrypted-cookie-value"),
+    );
+
+    expect(res.headers.get("Cache-Control")).toBe("no-store, private");
+  });
+
+  it("sets Cache-Control: no-store, private even when no session", async () => {
+    mockReadSessionCookie.mockReturnValue(null);
+
+    const res = await GET(makeRequest());
+
+    expect(res.headers.get("Cache-Control")).toBe("no-store, private");
+  });
 });

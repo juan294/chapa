@@ -183,6 +183,31 @@ describe("next.config.ts security headers", () => {
     });
   });
 
+  describe("W4: Permissions-Policy header", () => {
+    it("includes Permissions-Policy header on non-badge routes", async () => {
+      const config = await loadConfig();
+      const headersArray = await config.headers!();
+      const matched = findMatchingHeaders(headersArray, "/some/page");
+      expect(matched).toBeDefined();
+      const pp = getHeaderValue(matched!, "Permissions-Policy");
+      expect(pp).toBeDefined();
+      expect(pp).toContain("camera=()");
+      expect(pp).toContain("microphone=()");
+      expect(pp).toContain("geolocation=()");
+      expect(pp).toContain("interest-cohort=()");
+    });
+
+    it("includes Permissions-Policy header on badge route", async () => {
+      const config = await loadConfig();
+      const headersArray = await config.headers!();
+      const matched = findMatchingHeaders(headersArray, "/u/juan294/badge.svg");
+      expect(matched).toBeDefined();
+      const pp = getHeaderValue(matched!, "Permissions-Policy");
+      expect(pp).toBeDefined();
+      expect(pp).toContain("camera=()");
+    });
+  });
+
   describe("source code contains explanatory comment for unsafe-inline", () => {
     it("has a comment explaining why unsafe-inline is needed", async () => {
       const { readFileSync } = await import("fs");
