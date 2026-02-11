@@ -61,7 +61,19 @@
       "Bash(git -C /Users/juan/Documents/GenAI_Projects/chapa rev-parse --short HEAD)",
       "Bash(lsof:*)",
       "Bash(done)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "WebFetch(domain:clig.dev)",
+      "WebFetch(domain:lucasfcosta.com)",
+      "WebFetch(domain:kotrotsos.medium.com)",
+      "WebFetch(domain:blog.superhuman.com)",
+      "Bash(grep:*)",
+      "WebFetch(domain:evilmartians.com)",
+      "WebFetch(domain:blog.sshh.io)",
+      "WebFetch(domain:solomon.io)",
+      "WebFetch(domain:mobbin.com)",
+      "Bash(git status:*)",
+      "Bash(node:*)",
+      "Bash(echo:*)"
     ]
   }
 }

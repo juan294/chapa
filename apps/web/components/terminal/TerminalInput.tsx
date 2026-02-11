@@ -115,9 +115,3 @@ export function TerminalInput({
   );
 }
 
-export function focusTerminalInput() {
-  const input = document.querySelector<HTMLInputElement>(
-    'input[aria-label="Terminal command input"]',
-  );
-  input?.focus();
-}

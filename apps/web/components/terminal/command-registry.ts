@@ -43,13 +43,6 @@ export function makeLine(
   return { id: `line-${++lineCounter}`, type, text };
 }
 
-export function makeLines(
-  type: OutputLineType,
-  texts: string[],
-): OutputLine[] {
-  return texts.map((t) => makeLine(type, t));
-}
-
 /** Category short aliases for /set */
 const CATEGORY_ALIASES: Record<string, string> = {
   bg: "background",
