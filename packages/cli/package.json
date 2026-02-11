@@ -1,9 +1,10 @@
 {
   "name": "chapa-cli",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Merge GitHub EMU contributions into your Chapa developer impact badge",
   "type": "module",
   "bin": {
+    "chapa-cli": "dist/index.js",
     "chapa": "dist/index.js"
   },
   "files": [
@@ -11,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "tsup",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
