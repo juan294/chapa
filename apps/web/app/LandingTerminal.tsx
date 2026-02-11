@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
 import { parseCommand } from "@/components/terminal/command-registry";
 
@@ -38,7 +39,8 @@ export function LandingTerminal() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
-      <div className="mx-auto max-w-4xl">
+      <div className="relative mx-auto max-w-4xl">
+        <AuthorTypewriter className="hidden md:flex absolute right-full mr-4 top-1/2 -translate-y-1/2" />
         <TerminalInput
           onSubmit={handleSubmit}
           prompt="chapa"

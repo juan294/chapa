@@ -1,4 +1,3 @@
-import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Navbar } from "@/components/Navbar";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
@@ -392,9 +391,6 @@ export default async function Home({
         {/* ── Persistent terminal input ───────────────────── */}
         <LandingTerminal />
       </main>
-
-      {/* ── Author pill (desktop only) ────────────────────── */}
-      <AuthorTypewriter className="fixed bottom-4 right-4 hidden md:block" />
 
       {/* ── Footer ─────────────────────────────────────────── */}
       <footer className="border-t border-stroke py-8">
