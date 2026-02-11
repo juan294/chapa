@@ -1,4 +1,4 @@
-import confetti from "canvas-confetti";
+import type confetti from "canvas-confetti";
 
 const AMBER_COLORS = ["#E2A84B", "#F0C97D", "#C28A2E", "#E6EDF3"];
 const GOLD_COLORS = ["#E2A84B", "#F0C97D", "#C28A2E", "#D4A849", "#FFDD85"];
@@ -17,11 +17,12 @@ function getColors(palette: ConfettiPalette): string[] {
   }
 }
 
-export function fireSingleBurst(
+export async function fireSingleBurst(
   particleCount: number,
   palette: ConfettiPalette,
   origin?: { x: number; y: number },
 ) {
+  const confetti = (await import("canvas-confetti")).default;
   confetti({
     particleCount,
     spread: 70,
@@ -31,7 +32,8 @@ export function fireSingleBurst(
   });
 }
 
-export function fireMultiBurst(particleCount: number, palette: ConfettiPalette) {
+export async function fireMultiBurst(particleCount: number, palette: ConfettiPalette) {
+  const confetti = (await import("canvas-confetti")).default;
   const colors = getColors(palette);
   const base = Math.round(particleCount * 0.4);
   const side = Math.round(particleCount * 0.3);
@@ -45,7 +47,8 @@ export function fireMultiBurst(particleCount: number, palette: ConfettiPalette) 
   setTimeout(() => fire({ particleCount: side, spread: 70, origin: { x: 0.7, y: 0.6 } }), 400);
 }
 
-export function fireFireworks(particleCount: number, palette: ConfettiPalette, speed: number) {
+export async function fireFireworks(particleCount: number, palette: ConfettiPalette, speed: number) {
+  const confetti = (await import("canvas-confetti")).default;
   const colors = getColors(palette);
   const duration = Math.round(2000 / speed);
   const end = Date.now() + duration;
@@ -65,7 +68,8 @@ export function fireFireworks(particleCount: number, palette: ConfettiPalette, s
   frame();
 }
 
-export function fireSubtleSparkle(palette: ConfettiPalette, speed: number): () => void {
+export async function fireSubtleSparkle(palette: ConfettiPalette, speed: number): Promise<() => void> {
+  const confetti = (await import("canvas-confetti")).default;
   const colors = getColors(palette);
   let cancelled = false;
   const interval = Math.round(400 / speed);
