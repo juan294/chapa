@@ -208,6 +208,17 @@ describe("next.config.ts security headers", () => {
     });
   });
 
+  describe("CSP connect-src includes Vercel Analytics", () => {
+    it("includes va.vercel-scripts.com in connect-src", async () => {
+      const config = await loadConfig();
+      const headersArray = await config.headers!();
+      const matched = findMatchingHeaders(headersArray, "/");
+      expect(matched).toBeDefined();
+      const csp = getHeaderValue(matched!, "Content-Security-Policy");
+      expect(csp).toContain("https://va.vercel-scripts.com");
+    });
+  });
+
   describe("source code contains explanatory comment for unsafe-inline", () => {
     it("has a comment explaining why unsafe-inline is needed", async () => {
       const { readFileSync } = await import("fs");

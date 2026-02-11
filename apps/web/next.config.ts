@@ -29,7 +29,7 @@ function buildCsp(frameAncestors: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://avatars.githubusercontent.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://eu.i.posthog.com https://api.github.com https://cdn.jsdelivr.net",
+    "connect-src 'self' https://eu.i.posthog.com https://api.github.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
     `frame-ancestors ${frameAncestors}`,
   ].join("; ");
 }
