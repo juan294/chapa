@@ -11,6 +11,8 @@ export interface EffectSectionProps {
   onChange: (key: keyof BadgeConfig, value: string) => void;
   isExpanded: boolean;
   onToggle: () => void;
+  triggerId: string;
+  panelId: string;
 }
 
 export function EffectSection({
@@ -19,6 +21,8 @@ export function EffectSection({
   onChange,
   isExpanded,
   onToggle,
+  triggerId,
+  panelId,
 }: EffectSectionProps) {
   const currentValue = config[category.key];
   const currentLabel = getOptionLabel(category.key, currentValue);
@@ -28,8 +32,11 @@ export function EffectSection({
     <div className="border-b border-warm-stroke last:border-b-0">
       <button
         type="button"
+        id={triggerId}
         onClick={onToggle}
         aria-expanded={isExpanded}
+        aria-controls={panelId}
+        data-accordion-trigger=""
         className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-amber/[0.03]"
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -57,7 +64,7 @@ export function EffectSection({
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-4">
+        <div id={panelId} role="region" aria-labelledby={triggerId} className="px-4 pb-4">
           <OptionPicker
             options={category.options}
             value={currentValue}

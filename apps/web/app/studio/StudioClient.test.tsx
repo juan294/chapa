@@ -79,4 +79,64 @@ describe("StudioClient", () => {
       expect(SOURCE).toContain("DEFAULT_BADGE_CONFIG");
     });
   });
+
+  describe("PostHog analytics", () => {
+    it("imports trackEvent from posthog analytics", () => {
+      expect(SOURCE).toContain("trackEvent");
+    });
+
+    it("tracks studio_opened on mount", () => {
+      expect(SOURCE).toContain('"studio_opened"');
+    });
+
+    it("tracks effect_changed when config changes", () => {
+      expect(SOURCE).toContain('"effect_changed"');
+    });
+
+    it("tracks preset_selected when a preset is chosen", () => {
+      expect(SOURCE).toContain('"preset_selected"');
+    });
+
+    it("tracks config_saved on successful save", () => {
+      expect(SOURCE).toContain('"config_saved"');
+    });
+  });
+
+  describe("reduced motion", () => {
+    it("has useReducedMotion hook", () => {
+      expect(SOURCE).toContain("useReducedMotion");
+    });
+
+    it("detects prefers-reduced-motion media query", () => {
+      expect(SOURCE).toContain("prefers-reduced-motion");
+    });
+
+    it("passes interactive flag based on reduced motion", () => {
+      expect(SOURCE).toContain("interactive={!reducedMotion}");
+    });
+
+    it("shows reduced motion notice when detected", () => {
+      expect(SOURCE).toContain("Reduced motion detected");
+    });
+  });
+
+  describe("preview animation replay", () => {
+    it("uses previewKey state for animation replay", () => {
+      expect(SOURCE).toContain("previewKey");
+    });
+
+    it("passes previewKey as key to BadgePreviewCard", () => {
+      expect(SOURCE).toContain("key={previewKey}");
+    });
+  });
+
+  describe("preset analytics separation", () => {
+    it("has separate handlePresetSelect handler", () => {
+      expect(SOURCE).toContain("handlePresetSelect");
+    });
+
+    it("passes onPresetSelect to StudioControls", () => {
+      expect(SOURCE).toContain("onPresetSelect={handlePresetSelect}");
+    });
+  });
 });
