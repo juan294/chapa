@@ -14,10 +14,24 @@ describe("AutocompleteDropdown", () => {
     });
   });
 
-  describe("spacing", () => {
+  describe("terminal layout", () => {
     it("uses compact padding on items (py-1.5, not py-2.5)", () => {
       expect(SOURCE).toContain("py-1.5");
       expect(SOURCE).not.toContain("py-2.5");
+    });
+
+    it("uses monospace font (font-heading) on the entire dropdown", () => {
+      expect(SOURCE).toContain("font-heading");
+    });
+
+    it("uses same font size for command name and description (text-sm)", () => {
+      // Both should be text-sm, no text-xs on description
+      expect(SOURCE).not.toContain("text-xs");
+    });
+
+    it("uses fixed-width column for command name to align descriptions", () => {
+      // A min-width or w- class on the command name ensures alignment
+      expect(SOURCE).toMatch(/min-w-|w-\[/);
     });
   });
 

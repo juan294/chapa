@@ -69,7 +69,7 @@ export function AutocompleteDropdown({
     <div
       role="listbox"
       aria-label="Command suggestions"
-      className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl"
+      className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-heading text-sm shadow-xl"
     >
       {matching.map((cmd, i) => (
         <button
@@ -79,14 +79,14 @@ export function AutocompleteDropdown({
           aria-selected={i === activeIndex}
           onClick={() => onSelect(cmd.name)}
           onMouseEnter={() => setActiveIndex(i)}
-          className={`flex w-full items-center gap-3 px-4 py-1.5 text-left text-sm transition-colors ${
+          className={`flex w-full items-center px-4 py-1.5 text-left transition-colors ${
             i === activeIndex
               ? "bg-amber/10 text-text-primary"
               : "text-text-secondary hover:bg-amber/5"
           }`}
         >
-          <span className="font-heading text-amber shrink-0">{cmd.name}</span>
-          <span className="text-text-secondary truncate text-xs">
+          <span className="min-w-[10ch] text-amber shrink-0">{cmd.name}</span>
+          <span className="text-text-secondary truncate">
             {cmd.description}
           </span>
         </button>
