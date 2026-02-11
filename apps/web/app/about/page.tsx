@@ -26,7 +26,7 @@ export default function AboutPage() {
       <main id="main-content" className="relative mx-auto max-w-3xl px-6 pt-32 pb-24">
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">
-            About Chapa<span className="text-amber">.</span>
+            About Chapa<span className="text-amber animate-cursor-blink">_</span>
           </h1>
 
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
