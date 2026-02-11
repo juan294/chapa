@@ -33,16 +33,17 @@ export function renderBadgeSvg(
   const avatarR = 30;
 
   // ── Two-column body ─────────────────────────────────────────
-  // Left column: heatmap (26px cells + 4px gap = 30px per cell)
-  const heatmapLabelY = 180;
+  // Left column: heatmap (32px cells + 5px gap = 37px per cell)
+  // 13 weeks = 476px wide, 7 days = 254px tall
+  const heatmapLabelY = 160;
   const heatmapX = PAD;
   const heatmapY = heatmapLabelY + 25;
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
-  // Right column: impact score (starts after heatmap area)
-  const scoreColX = 530;
-  const scoreLabelY = 180;
+  // Right column: impact score (pushed right for balance with wider heatmap)
+  const scoreColX = 620;
+  const scoreLabelY = 160;
   const scoreValueY = scoreLabelY + 95;
 
   // ── Stats row ───────────────────────────────────────────────
@@ -51,11 +52,11 @@ export function renderBadgeSvg(
   const safePRs = String(Number(stats.prsMergedCount));
   const safeReviews = String(Number(stats.reviewsSubmittedCount));
 
-  const statsY = 460;
+  const statsY = 480;
 
   // ── Footer ──────────────────────────────────────────────────
-  const footerDividerY = 520;
-  const footerY = 555;
+  const footerDividerY = 540;
+  const footerY = 575;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
@@ -91,8 +92,14 @@ export function renderBadgeSvg(
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="22" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
   <text x="${PAD + 72}" y="${headerY + 18}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">Last 90 days</text>
 
-  <!-- Chapa. logo (top-right) -->
-  <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="20" fill="${t.textSecondary}" opacity="0.5" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">.</tspan></text>
+  <!-- Verified placeholder (shield + checkmark icon, dimmed) -->
+  <g transform="translate(${PAD + 72 + headerName.length * 11 + 8}, ${headerY - 20})" opacity="0.4">
+    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${t.accent}" transform="scale(0.75)"/>
+    <text x="20" y="12" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="11" fill="${t.textSecondary}">Verified</text>
+  </g>
+
+  <!-- Chapa_ logo (top-right) -->
+  <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="20" fill="${t.textSecondary}" opacity="0.5" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">_</tspan></text>
 
   <!-- ─── Two-column body ────────────────────────────────── -->
 
