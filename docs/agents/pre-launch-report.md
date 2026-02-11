@@ -37,6 +37,18 @@ None.
 
 ---
 
+## Accepted Risks
+
+| # | Risk | Rationale |
+|---|------|-----------|
+| AR1 | 983KB Three.js chunk (W1) | Code-split to `/experiments/3d-badge` only via `next/dynamic` with `ssr: false`. Does not load on production routes. |
+| AR2 | `'unsafe-inline'` in CSP script-src (W2) | Required by Next.js App Router — no nonce-based CSP support yet. Mitigated by other CSP directives. |
+| AR3 | Rate limiting fails open on Redis outage (W4) | By design for availability. Users can still access the app during Redis downtime. Low exploitation risk. |
+| AR4 | sharp/libvips LGPL-3.0 license (W5) | Dynamically linked native binary — compliant with LGPL terms. Sharp itself is Apache-2.0. |
+| AR5 | useReducedMotion hydration mismatch (W13) | Server returns `false`, client may return `true` for reduced-motion users. One-frame flash only. Acceptable tradeoff for responsive a11y. |
+
+---
+
 ## Recommendations (not blocking, nice-to-have)
 
 | # | Recommendation | From |
