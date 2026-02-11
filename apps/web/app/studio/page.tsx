@@ -83,11 +83,12 @@ export default async function StudioPage() {
         ]}
       />
 
-      <div className="pt-[73px]">
+      <div className="pt-[57px]">
         <StudioClient
           initialConfig={initialConfig}
           stats={effectiveStats}
           impact={impact}
+          handle={session.login}
         />
       </div>
     </main>

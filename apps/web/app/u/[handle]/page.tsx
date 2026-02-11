@@ -131,10 +131,7 @@ export default async function SharePage({ params }: SharePageProps) {
       <Navbar />
 
       <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
-        {/* Page heading */}
-        <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-text-primary mb-8 animate-fade-in-up">
-          @{handle}
-        </h1>
+        <h1 className="sr-only">@{handle} — Developer Impact</h1>
 
         {/* Badge preview — interactive if user has custom config, static SVG otherwise */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">

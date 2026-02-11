@@ -75,8 +75,8 @@ describe("MobileNav", () => {
   });
 
   describe("design system compliance", () => {
-    it("uses white background for the mobile menu", () => {
-      expect(SOURCE).toMatch(/bg-white/);
+    it("uses card background for the mobile menu", () => {
+      expect(SOURCE).toMatch(/bg-card/);
     });
 
     it("uses stroke for borders", () => {
