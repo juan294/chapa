@@ -1,34 +1,34 @@
 @import "tailwindcss";
 
 @theme {
-  /* Register tokens so Tailwind generates utility classes (bg-bg, text-text-primary, etc.)
-     Actual values are set below in :root / [data-theme] to avoid @layer cascade issues. */
-  --color-bg: initial;
-  --color-card: initial;
-  --color-text-primary: initial;
-  --color-text-secondary: initial;
-  --color-stroke: initial;
+  /* Light defaults — Tailwind reads these to generate utility classes (bg-bg, text-text-primary, etc.).
+     Runtime values are overridden below in unlayered :root / [data-theme="dark"] blocks. */
+  --color-bg: #FFFFFF;
+  --color-card: #F9FAFB;
+  --color-text-primary: #1A1A2E;
+  --color-text-secondary: #6B7280;
+  --color-stroke: #00000014;
 
   --color-amber: #7C6AEF;
   --color-amber-light: #9D8FFF;
   --color-amber-dark: #5E4FCC;
 
-  --color-warm-bg: initial;
-  --color-warm-card: initial;
-  --color-warm-stroke: initial;
+  --color-warm-bg: #FFFFFF;
+  --color-warm-card: #F9FAFB;
+  --color-warm-stroke: #00000014;
 
-  --color-dark-section: initial;
-  --color-dark-card: initial;
-  --color-purple-tint: initial;
+  --color-dark-section: #1A1A2E;
+  --color-dark-card: #252542;
+  --color-purple-tint: #F5F3FF;
   --color-complement: #10B981;
-  --color-complement-light: initial;
+  --color-complement-light: #D1FAE5;
 
-  --color-terminal-green: initial;
-  --color-terminal-red: initial;
-  --color-terminal-yellow: initial;
-  --color-terminal-dim: initial;
+  --color-terminal-green: #16A34A;
+  --color-terminal-red: #DC2626;
+  --color-terminal-yellow: #D97706;
+  --color-terminal-dim: #9CA3AF;
 
-  --color-track: initial;
+  --color-track: #0000000F;
 
   /* Typography */
   --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
