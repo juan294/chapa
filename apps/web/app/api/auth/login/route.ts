@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() || "http://localhost:3001";
   const redirectUri = `${baseUrl}/api/auth/callback`;
 
   const { state, cookie: stateCookie } = createStateCookie();
