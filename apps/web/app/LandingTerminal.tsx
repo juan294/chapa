@@ -38,9 +38,11 @@ export function LandingTerminal() {
   );
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
-      <div className="relative mx-auto max-w-4xl">
-        <AuthorTypewriter className="hidden md:flex absolute right-full mr-4 top-1/2 -translate-y-1/2" />
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl relative">
+      <div className="hidden md:block absolute left-4 top-1/2 -translate-y-1/2 z-50">
+        <AuthorTypewriter />
+      </div>
+      <div className="mx-auto max-w-4xl">
         <TerminalInput
           onSubmit={handleSubmit}
           prompt="chapa"
