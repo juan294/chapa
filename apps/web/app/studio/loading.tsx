@@ -1,6 +1,6 @@
 export default function StudioLoading() {
   return (
-    <main className="min-h-screen bg-bg">
+    <main id="main-content" className="min-h-screen bg-bg">
       {/* Nav placeholder */}
       <div className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">

@@ -51,6 +51,13 @@ describe("StudioClient", () => {
     });
   });
 
+  describe("accessibility", () => {
+    it("has sr-only h1 heading for accessibility", () => {
+      expect(SOURCE).toContain('className="sr-only"');
+      expect(SOURCE).toContain("Creator Studio");
+    });
+  });
+
   describe("props interface", () => {
     it("accepts Stats90d prop", () => {
       expect(SOURCE).toContain("stats: Stats90d");

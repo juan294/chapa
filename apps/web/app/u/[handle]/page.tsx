@@ -160,7 +160,7 @@ export default async function SharePage({ params }: SharePageProps) {
           <div className="mb-8 animate-fade-in-up [animation-delay:250ms]">
             <Link
               href="/studio"
-              className="inline-flex items-center gap-2 rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
+              className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
             >
               <svg
                 className="h-4 w-4"
@@ -235,7 +235,7 @@ export default async function SharePage({ params }: SharePageProps) {
           <ShareButton handle={handle} />
           <Link
             href="/"
-            className="rounded-full border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04] transition-colors"
+            className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04] transition-colors"
           >
             Generate yours
           </Link>

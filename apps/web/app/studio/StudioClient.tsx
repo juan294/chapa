@@ -222,6 +222,7 @@ export function StudioClient({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
+      <h1 className="sr-only">Creator Studio</h1>
       {/* Preview pane (left, sticky) */}
       <div className="flex items-start justify-center lg:items-center px-4 py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke">
         <div className="w-full max-w-xl sticky top-20">
