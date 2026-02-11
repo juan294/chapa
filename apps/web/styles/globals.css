@@ -1,22 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-  /* Base palette (warm dark) */
-  --color-bg: #12100D;
-  --color-card: #1A1610;
-  --color-text-primary: #E6EDF3;
-  --color-text-secondary: #9AA4B2;
-  --color-stroke: rgba(226, 168, 75, 0.12);
+  /* Base palette (terminal dark) */
+  --color-bg: #0A0A0F;
+  --color-card: #111118;
+  --color-text-primary: #E2E4E9;
+  --color-text-secondary: #6B6F7B;
+  --color-stroke: rgba(124, 106, 239, 0.10);
 
-  /* Accent: warm amber/gold */
-  --color-amber: #E2A84B;
-  --color-amber-light: #F0C97D;
-  --color-amber-dark: #C28A2E;
+  /* Accent: cool indigo/violet */
+  --color-amber: #7C6AEF;
+  --color-amber-light: #9D8FFF;
+  --color-amber-dark: #5E4FCC;
 
-  /* Warm aliases (used throughout the page) */
-  --color-warm-bg: #12100D;
-  --color-warm-card: #1A1610;
-  --color-warm-stroke: rgba(226, 168, 75, 0.12);
+  /* Aliases (dark) */
+  --color-warm-bg: #0A0A0F;
+  --color-warm-card: #111118;
+  --color-warm-stroke: rgba(124, 106, 239, 0.10);
+
+  /* Dark sections (deeper emphasis) */
+  --color-dark-section: #06060A;
+  --color-dark-card: #0E0E16;
+  --color-purple-tint: rgba(124, 106, 239, 0.06);
+  --color-complement: #10B981;
+  --color-complement-light: rgba(16, 185, 129, 0.15);
+
+  /* Terminal-specific */
+  --color-terminal-green: #4ADE80;
+  --color-terminal-red: #F87171;
+  --color-terminal-yellow: #FBBF24;
+  --color-terminal-dim: #3A3A4A;
 
   /* Typography */
   --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
@@ -73,10 +86,10 @@ html {
 @keyframes pulse-glow-amber {
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(226, 168, 75, 0.2);
+    box-shadow: 0 0 20px rgba(124, 106, 239, 0.1);
   }
   50% {
-    box-shadow: 0 0 44px rgba(226, 168, 75, 0.3);
+    box-shadow: 0 0 40px rgba(124, 106, 239, 0.18);
   }
 }
 
@@ -125,6 +138,27 @@ html {
   }
 }
 
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes terminal-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes terminal-type {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
 /* ── Animation utilities ─────────────────────────────────── */
 
 .animate-float-slow {
@@ -152,15 +186,21 @@ html {
 .animate-scale-in {
   animation: scale-in 0.6s ease-out both;
 }
+.animate-cursor-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+.animate-terminal-fade-in {
+  animation: terminal-fade-in 0.3s ease-out both;
+}
 
 /* ── Background grid pattern ─────────────────────────────── */
 
 .bg-grid-warm {
   background-image: linear-gradient(
-      rgba(226, 168, 75, 0.03) 1px,
+      rgba(124, 106, 239, 0.04) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, rgba(226, 168, 75, 0.03) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(124, 106, 239, 0.04) 1px, transparent 1px);
   background-size: 72px 72px;
 }
 
@@ -193,9 +233,9 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(226, 168, 75, 0.15);
+  background: rgba(124, 106, 239, 0.15);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(226, 168, 75, 0.3);
+  background: rgba(124, 106, 239, 0.25);
 }

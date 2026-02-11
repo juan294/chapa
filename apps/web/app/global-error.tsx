@@ -10,8 +10,8 @@ export default function GlobalError({
     <html lang="en">
       <body
         style={{
-          backgroundColor: "#12100D",
-          color: "#E6EDF3",
+          backgroundColor: "#FFFFFF",
+          color: "#1A1A2E",
           fontFamily: "system-ui, sans-serif",
           margin: 0,
         }}
@@ -32,7 +32,7 @@ export default function GlobalError({
             style={{
               fontSize: "2.25rem",
               fontWeight: 700,
-              color: "#E2A84B",
+              color: "#7C6AEF",
               fontFamily: '"JetBrains Mono", "Courier New", monospace',
               margin: 0,
             }}
@@ -43,7 +43,7 @@ export default function GlobalError({
             style={{
               marginTop: "1rem",
               fontSize: "0.875rem",
-              color: "#9AA4B2",
+              color: "#6B7280",
             }}
           >
             A critical error occurred. Please try again.
@@ -60,12 +60,12 @@ export default function GlobalError({
               onClick={reset}
               style={{
                 borderRadius: "9999px",
-                border: "1px solid rgba(226, 168, 75, 0.2)",
-                backgroundColor: "rgba(226, 168, 75, 0.1)",
+                border: "1px solid rgba(124, 106, 239, 0.3)",
+                backgroundColor: "rgba(124, 106, 239, 0.08)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#E2A84B",
+                color: "#7C6AEF",
                 cursor: "pointer",
               }}
             >
@@ -76,11 +76,11 @@ export default function GlobalError({
               href="/"
               style={{
                 borderRadius: "9999px",
-                border: "1px solid rgba(226, 168, 75, 0.12)",
+                border: "1px solid rgba(0, 0, 0, 0.08)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#9AA4B2",
+                color: "#6B7280",
                 textDecoration: "none",
                 cursor: "pointer",
               }}

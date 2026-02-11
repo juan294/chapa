@@ -105,7 +105,7 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
       <div className="relative z-[5] flex h-full flex-col justify-between p-6 sm:p-8">
         {/* Header row */}
         <div className="flex items-center justify-between">
-          <span className="font-heading text-base font-bold text-[#E2A84B] sm:text-lg">
+          <span className="font-heading text-base font-bold text-[#7C6AEF] sm:text-lg">
             @juan294
           </span>
           <span className="font-heading text-sm font-medium tracking-widest text-[#9AA4B2]">
@@ -126,8 +126,8 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
                     style={{
                       backgroundColor:
                         val === 0
-                          ? "rgba(226,168,75,0.06)"
-                          : `rgba(226,168,75,${val})`,
+                          ? "rgba(124,106,239,0.06)"
+                          : `rgba(124,106,239,${val})`,
                     }}
                   />
                 ))}
@@ -140,7 +140,7 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
             <span className="font-heading text-5xl font-extrabold leading-none text-[#E6EDF3] sm:text-6xl">
               87
             </span>
-            <span className="mt-2 inline-block rounded-full bg-[#E2A84B]/15 px-3 py-0.5 text-xs font-semibold tracking-wide text-[#E2A84B]">
+            <span className="mt-2 inline-block rounded-full bg-[#7C6AEF]/15 px-3 py-0.5 text-xs font-semibold tracking-wide text-[#7C6AEF]">
               Elite
             </span>
           </div>
@@ -149,9 +149,9 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
         {/* Stats row */}
         <div className="flex items-center gap-4 text-xs text-[#9AA4B2] sm:text-sm">
           <span>523 commits</span>
-          <span className="text-[rgba(226,168,75,0.25)]">|</span>
+          <span className="text-[rgba(124,106,239,0.25)]">|</span>
           <span>47 PRs</span>
-          <span className="text-[rgba(226,168,75,0.25)]">|</span>
+          <span className="text-[rgba(124,106,239,0.25)]">|</span>
           <span>89 reviews</span>
         </div>
       </div>
@@ -181,7 +181,7 @@ function Controls({
   setAutoAnimate,
 }: ControlsProps) {
   return (
-    <div className="flex flex-wrap items-center gap-6 rounded-xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/60 px-6 py-4">
+    <div className="flex flex-wrap items-center gap-6 rounded-xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/60 px-6 py-4">
       {/* Intensity */}
       <label className="flex items-center gap-3 text-sm text-[#9AA4B2]">
         <span className="min-w-[70px]">Intensity</span>
@@ -194,7 +194,7 @@ function Controls({
           onChange={(e) => setIntensity(parseFloat(e.target.value))}
           className="holo-slider w-28"
         />
-        <span className="w-8 font-heading text-xs text-[#E2A84B]">
+        <span className="w-8 font-heading text-xs text-[#7C6AEF]">
           {Math.round(intensity * 100)}%
         </span>
       </label>
@@ -211,7 +211,7 @@ function Controls({
           onChange={(e) => setSpeed(parseFloat(e.target.value))}
           className="holo-slider w-28"
         />
-        <span className="w-8 font-heading text-xs text-[#E2A84B]">
+        <span className="w-8 font-heading text-xs text-[#7C6AEF]">
           {speed}s
         </span>
       </label>
@@ -226,12 +226,12 @@ function Controls({
           onClick={() => setAutoAnimate(!autoAnimate)}
           className={`relative h-6 w-11 rounded-full border transition-colors ${
             autoAnimate
-              ? "border-[#E2A84B]/40 bg-[#E2A84B]/25"
-              : "border-[rgba(226,168,75,0.12)] bg-[#1A1610]"
+              ? "border-[#7C6AEF]/40 bg-[#7C6AEF]/25"
+              : "border-[rgba(124,106,239,0.12)] bg-[#13141E]"
           }`}
         >
           <span
-            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#E2A84B] transition-transform ${
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#7C6AEF] transition-transform ${
               autoAnimate ? "translate-x-5" : "translate-x-0"
             }`}
           />
@@ -289,14 +289,14 @@ export default function HolographicExperimentPage() {
           width: 100%;
           max-width: 560px;
           border-radius: 1rem;
-          border: 1px solid rgba(226, 168, 75, 0.12);
-          background: #1A1610;
+          border: 1px solid rgba(124, 106, 239, 0.12);
+          background: #13141E;
           transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
 
         .holo-card:hover {
-          border-color: rgba(226, 168, 75, 0.25);
-          box-shadow: 0 0 40px rgba(226, 168, 75, 0.06);
+          border-color: rgba(124, 106, 239, 0.25);
+          box-shadow: 0 0 40px rgba(124, 106, 239, 0.06);
         }
 
         /* ---- Holographic overlay ---- */
@@ -317,11 +317,11 @@ export default function HolographicExperimentPage() {
           background: linear-gradient(
             var(--holo-angle, 115deg),
             transparent 20%,
-            rgba(226, 168, 75, 0.3) 36%,
-            rgba(240, 201, 125, 0.3) 42%,
+            rgba(124, 106, 239, 0.3) 36%,
+            rgba(157, 143, 255, 0.3) 42%,
             rgba(255, 255, 255, 0.2) 48%,
-            rgba(240, 201, 125, 0.3) 54%,
-            rgba(194, 138, 46, 0.3) 60%,
+            rgba(157, 143, 255, 0.3) 54%,
+            rgba(94, 79, 204, 0.3) 60%,
             transparent 80%
           );
           background-size: 200% 200%;
@@ -372,7 +372,7 @@ export default function HolographicExperimentPage() {
           appearance: none;
           height: 4px;
           border-radius: 2px;
-          background: rgba(226, 168, 75, 0.15);
+          background: rgba(124, 106, 239, 0.15);
           outline: none;
         }
 
@@ -382,31 +382,31 @@ export default function HolographicExperimentPage() {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: #E2A84B;
+          background: #7C6AEF;
           cursor: pointer;
-          border: 2px solid #12100D;
+          border: 2px solid #0C0D14;
         }
 
         .holo-slider::-moz-range-thumb {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: #E2A84B;
+          background: #7C6AEF;
           cursor: pointer;
-          border: 2px solid #12100D;
+          border: 2px solid #0C0D14;
         }
 
         .holo-slider:focus-visible::-webkit-slider-thumb {
-          outline: 2px solid #E2A84B;
+          outline: 2px solid #7C6AEF;
           outline-offset: 2px;
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#12100D] px-6 py-16">
+      <div className="min-h-screen bg-[#0C0D14] px-6 py-16">
         <div className="mx-auto max-w-5xl">
           {/* Page header */}
           <header className="mb-4">
-            <p className="mb-3 text-sm tracking-widest text-[#E2A84B] uppercase">
+            <p className="mb-3 text-sm tracking-widest text-[#7C6AEF] uppercase">
               Experiment #43
             </p>
             <h1 className="font-heading text-3xl font-bold tracking-tight text-[#E6EDF3] sm:text-4xl">
@@ -452,8 +452,8 @@ export default function HolographicExperimentPage() {
           </div>
 
           {/* Notes */}
-          <footer className="mt-16 rounded-xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/40 p-6">
-            <h3 className="font-heading text-sm font-semibold text-[#E2A84B]">
+          <footer className="mt-16 rounded-xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/40 p-6">
+            <h3 className="font-heading text-sm font-semibold text-[#7C6AEF]">
               Implementation Notes
             </h3>
             <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-[#9AA4B2]">

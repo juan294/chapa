@@ -30,10 +30,6 @@ describe("StudioClient", () => {
     it("tracks saving state", () => {
       expect(SOURCE).toContain("saving");
     });
-
-    it("tracks saved toast state", () => {
-      expect(SOURCE).toContain("saved");
-    });
   });
 
   describe("layout", () => {
@@ -41,12 +37,24 @@ describe("StudioClient", () => {
       expect(SOURCE).toContain("BadgePreviewCard");
     });
 
-    it("renders StudioControls in controls pane", () => {
-      expect(SOURCE).toContain("StudioControls");
+    it("renders terminal components", () => {
+      expect(SOURCE).toContain("TerminalOutput");
+      expect(SOURCE).toContain("TerminalInput");
+    });
+
+    it("renders QuickControls for mouse fallback", () => {
+      expect(SOURCE).toContain("QuickControls");
     });
 
     it("has responsive split layout classes", () => {
       expect(SOURCE).toContain("lg:grid-cols");
+    });
+  });
+
+  describe("accessibility", () => {
+    it("has sr-only h1 heading for accessibility", () => {
+      expect(SOURCE).toContain('className="sr-only"');
+      expect(SOURCE).toContain("Creator Studio");
     });
   });
 
@@ -61,6 +69,10 @@ describe("StudioClient", () => {
 
     it("accepts BadgeConfig initial config", () => {
       expect(SOURCE).toContain("initialConfig: BadgeConfig");
+    });
+
+    it("accepts handle prop", () => {
+      expect(SOURCE).toContain("handle");
     });
   });
 
@@ -130,13 +142,26 @@ describe("StudioClient", () => {
     });
   });
 
-  describe("preset analytics separation", () => {
-    it("has separate handlePresetSelect handler", () => {
-      expect(SOURCE).toContain("handlePresetSelect");
+  describe("terminal integration", () => {
+    it("uses useStudioCommands hook", () => {
+      expect(SOURCE).toContain("useStudioCommands");
     });
 
-    it("passes onPresetSelect to StudioControls", () => {
-      expect(SOURCE).toContain("onPresetSelect={handlePresetSelect}");
+    it("uses executeCommand from command registry", () => {
+      expect(SOURCE).toContain("executeCommand");
+    });
+
+    it("handles command actions", () => {
+      expect(SOURCE).toContain("handleAction");
+    });
+
+    it("supports autocomplete", () => {
+      expect(SOURCE).toContain("AutocompleteDropdown");
+    });
+
+    it("supports Cmd+K / Ctrl+K keyboard shortcut", () => {
+      expect(SOURCE).toContain("metaKey");
+      expect(SOURCE).toContain('"k"');
     });
   });
 });

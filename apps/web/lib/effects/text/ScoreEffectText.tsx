@@ -13,7 +13,7 @@ export type ScoreEffect =
 export const SCORE_EFFECT_CSS = `
 .te-gold-leaf {
   display: inline-block;
-  background: linear-gradient(to bottom, #462523 0%, #CB9B51 22%, #F6E27A 45%, #F6F2C0 50%, #F6E27A 55%, #CB9B51 78%, #462523 100%);
+  background: linear-gradient(to bottom, #1E1645 0%, #6355C0 22%, #A99BFF 45%, #D0C9FF 50%, #A99BFF 55%, #6355C0 78%, #1E1645 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -30,13 +30,13 @@ export const SCORE_EFFECT_CSS = `
 }
 
 .te-embossed {
-  color: rgba(226, 168, 75, 0.8);
+  color: rgba(124, 106, 239, 0.8);
   text-shadow: -1px -1px 1px rgba(255, 255, 255, 0.2), 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .te-gold-shimmer {
   display: inline-block;
-  background: linear-gradient(90deg, #C28A2E 0%, #E2A84B 20%, #F6E27A 40%, #F6F2C0 50%, #F6E27A 60%, #E2A84B 80%, #C28A2E 100%);
+  background: linear-gradient(90deg, #5E4FCC 0%, #7C6AEF 20%, #A99BFF 40%, #D0C9FF 50%, #A99BFF 60%, #7C6AEF 80%, #5E4FCC 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -50,13 +50,13 @@ export const SCORE_EFFECT_CSS = `
 }
 
 .te-neon-amber {
-  color: #E2A84B;
-  text-shadow: 0 0 7px rgba(226, 168, 75, 0.5), 0 0 10px rgba(226, 168, 75, 0.4), 0 0 21px rgba(226, 168, 75, 0.3), 0 0 42px rgba(226, 168, 75, 0.2);
+  color: #7C6AEF;
+  text-shadow: 0 0 7px rgba(124, 106, 239, 0.5), 0 0 10px rgba(124, 106, 239, 0.4), 0 0 21px rgba(124, 106, 239, 0.3), 0 0 42px rgba(124, 106, 239, 0.2);
 }
 
 .te-holographic {
   display: inline-block;
-  background: linear-gradient(90deg, #C28A2E, #E2A84B, #F6E27A, #F0C97D, #E2A84B, #F6E27A, #C28A2E);
+  background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #A99BFF, #9D8FFF, #7C6AEF, #A99BFF, #5E4FCC);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

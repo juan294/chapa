@@ -14,13 +14,13 @@ const HEATMAP = Array.from({ length: 13 * 7 }, (_, i) => {
 function heatmapColor(level: number): string {
   switch (level) {
     case 0:
-      return "rgba(226,168,75,0.06)";
+      return "rgba(124,106,239,0.06)";
     case 1:
-      return "rgba(226,168,75,0.25)";
+      return "rgba(124,106,239,0.25)";
     case 2:
-      return "rgba(226,168,75,0.5)";
+      return "rgba(124,106,239,0.5)";
     default:
-      return "rgba(226,168,75,0.85)";
+      return "rgba(124,106,239,0.85)";
   }
 }
 
@@ -37,11 +37,11 @@ interface GlassConfig {
 
 function glassStyle(config: GlassConfig): React.CSSProperties {
   return {
-    background: `rgba(26, 22, 16, ${config.bgOpacity})`,
+    background: `rgba(19, 20, 30, ${config.bgOpacity})`,
     backdropFilter: `blur(${config.blur}px) saturate(${config.saturation}%)`,
     WebkitBackdropFilter: `blur(${config.blur}px) saturate(${config.saturation}%)`,
     border: config.showBorder
-      ? `1px solid rgba(226, 168, 75, ${config.borderOpacity})`
+      ? `1px solid rgba(124, 106, 239, ${config.borderOpacity})`
       : "1px solid transparent",
   };
 }
@@ -98,15 +98,15 @@ function presetToStyle(variant: GlassVariant, showBorder: boolean): React.CSSPro
     backdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     WebkitBackdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     border: showBorder
-      ? `1px solid rgba(226, 168, 75, ${p.borderOpacity})`
+      ? `1px solid rgba(124, 106, 239, ${p.borderOpacity})`
       : "1px solid transparent",
   };
 
   // Amber variant uses amber-tinted background
   if (variant === "amber") {
-    base.background = `rgba(226, 168, 75, ${p.bgOpacity})`;
+    base.background = `rgba(124, 106, 239, ${p.bgOpacity})`;
   } else {
-    base.background = `rgba(26, 22, 16, ${p.bgOpacity})`;
+    base.background = `rgba(19, 20, 30, ${p.bgOpacity})`;
   }
 
   if (p.shadow) {
@@ -243,7 +243,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           left: "20%",
           width: "24rem",
           height: "24rem",
-          background: "#E2A84B",
+          background: "#7C6AEF",
           opacity: 0.08,
           filter: "blur(100px)",
         }}
@@ -256,7 +256,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           right: "20%",
           width: "20rem",
           height: "20rem",
-          background: "#F0C97D",
+          background: "#9D8FFF",
           opacity: 0.06,
           filter: "blur(120px)",
         }}
@@ -270,7 +270,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           transform: "translate(-50%, -50%)",
           width: "500px",
           height: "300px",
-          background: "#C28A2E",
+          background: "#5E4FCC",
           opacity: 0.05,
           filter: "blur(150px)",
         }}
@@ -283,7 +283,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           left: "10%",
           width: "18rem",
           height: "18rem",
-          background: "#E2A84B",
+          background: "#7C6AEF",
           opacity: 0.04,
           filter: "blur(130px)",
         }}
@@ -755,11 +755,11 @@ export default function GlassmorphismExperimentPage() {
                 </div>
                 <pre className="overflow-x-auto p-4 font-heading text-xs leading-relaxed text-text-secondary">
                   <code>{`.glass-custom {
-  background: rgba(26, 22, 16, ${opacity});
+  background: rgba(19, 20, 30, ${opacity});
   backdrop-filter: blur(${blur}px) saturate(${saturation}%);
   -webkit-backdrop-filter: blur(${blur}px) saturate(${saturation}%);${
     showBorder
-      ? `\n  border: 1px solid rgba(226, 168, 75, 0.15);`
+      ? `\n  border: 1px solid rgba(124, 106, 239, 0.15);`
       : ""
   }
 }`}</code>

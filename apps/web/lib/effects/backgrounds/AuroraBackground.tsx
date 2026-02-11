@@ -17,9 +17,9 @@ const SPEED_DURATIONS: Record<Speed, { a1: string; a2: string; a3: string }> = {
 };
 
 const COLOR_BLOBS: Record<ColorVariant, [string, string, string]> = {
-  amber: ["#E2A84B", "#F0C97D", "#C28A2E"],
-  "amber-white": ["#E2A84B", "#F0C97D", "#F5E6D0"],
-  "amber-deep": ["#E2A84B", "#F0C97D", "#8B5E2B"],
+  amber: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+  "amber-white": ["#7C6AEF", "#9D8FFF", "#E0DBFF"],
+  "amber-deep": ["#7C6AEF", "#9D8FFF", "#3D2F8C"],
 };
 
 export interface AuroraBackgroundProps {

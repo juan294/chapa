@@ -34,7 +34,7 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
             {impact.confidence}%
           </span>
         </div>
-        <div className="h-2 rounded-full bg-warm-card">
+        <div className="h-2 rounded-full bg-white/[0.06]">
           <div
             className="h-2 rounded-full bg-amber"
             role="progressbar"
@@ -65,7 +65,7 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
                 </span>
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-warm-card">
+            <div className="h-1.5 rounded-full bg-white/[0.06]">
               <div
                 className="h-1.5 rounded-full bg-amber/60"
                 role="progressbar"
@@ -89,7 +89,7 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
           {impact.confidencePenalties.map((p) => (
             <p
               key={p.flag}
-              className="text-sm text-text-secondary leading-relaxed border-l-2 border-warm-stroke pl-3"
+              className="text-sm text-text-secondary leading-relaxed border-l-2 border-amber/20 pl-3"
             >
               {p.reason}
             </p>

@@ -87,11 +87,11 @@ function useRegisterChapaBadge() {
         });
 
         const heatmapColors = [
-          "rgba(226,168,75,0.06)",
-          "rgba(226,168,75,0.20)",
-          "rgba(226,168,75,0.38)",
-          "rgba(226,168,75,0.58)",
-          "rgba(226,168,75,0.85)",
+          "rgba(124,106,239,0.06)",
+          "rgba(124,106,239,0.20)",
+          "rgba(124,106,239,0.38)",
+          "rgba(124,106,239,0.58)",
+          "rgba(124,106,239,0.85)",
         ];
 
         let heatmapSvg = "";
@@ -118,9 +118,9 @@ function useRegisterChapaBadge() {
             .badge-card {
               width: ${s.width}px;
               height: ${s.height}px;
-              background: #1A1610;
+              background: #13141E;
               border-radius: 16px;
-              border: 1px solid rgba(226,168,75,0.12);
+              border: 1px solid rgba(124,106,239,0.12);
               padding: ${Math.round(s.width * 0.04)}px;
               box-sizing: border-box;
               position: relative;
@@ -130,7 +130,7 @@ function useRegisterChapaBadge() {
             }
             .badge-card:hover {
               transform: translateY(-2px);
-              box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(226,168,75,0.08);
+              box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(124,106,239,0.08);
             }
             .header {
               display: flex;
@@ -149,7 +149,7 @@ function useRegisterChapaBadge() {
               font-weight: 700;
               font-family: 'JetBrains Mono', monospace;
             }
-            .logo-dot { color: #E2A84B; }
+            .logo-dot { color: #7C6AEF; }
             .body {
               display: flex;
               gap: ${Math.round(s.width * 0.04)}px;
@@ -174,7 +174,7 @@ function useRegisterChapaBadge() {
               font-family: 'JetBrains Mono', monospace;
               font-size: ${s.scoreSize}px;
               font-weight: 800;
-              background: linear-gradient(90deg, #C28A2E, #E2A84B, #F6E27A, #F6F2C0, #F6E27A, #E2A84B, #C28A2E);
+              background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #A99BFF, #D0C9FF, #A99BFF, #7C6AEF, #5E4FCC);
               background-size: 200% 100%;
               -webkit-background-clip: text;
               -webkit-text-fill-color: transparent;
@@ -187,9 +187,9 @@ function useRegisterChapaBadge() {
               gap: 4px;
               padding: 4px 12px;
               border-radius: 999px;
-              background: rgba(226,168,75,0.1);
-              border: 1px solid rgba(226,168,75,0.2);
-              color: #E2A84B;
+              background: rgba(124,106,239,0.1);
+              border: 1px solid rgba(124,106,239,0.2);
+              color: #7C6AEF;
               font-size: ${Math.round(s.scoreSize * 0.2)}px;
               font-weight: 600;
               margin-bottom: 8px;
@@ -322,7 +322,7 @@ function BackgroundGrid() {
       className="pointer-events-none fixed inset-0"
       aria-hidden="true"
       style={{
-        backgroundImage: `linear-gradient(rgba(226,168,75,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(226,168,75,0.03) 1px, transparent 1px)`,
+        backgroundImage: `linear-gradient(rgba(124,106,239,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(124,106,239,0.03) 1px, transparent 1px)`,
         backgroundSize: "72px 72px",
       }}
     />
@@ -359,7 +359,7 @@ export default function WebComponentExperimentPage() {
             transform: "translateX(-50%)",
             width: "36rem",
             height: "36rem",
-            background: "#E2A84B",
+            background: "#7C6AEF",
             opacity: 0.03,
             filter: "blur(150px)",
           }}
@@ -371,7 +371,7 @@ export default function WebComponentExperimentPage() {
             right: "15%",
             width: "24rem",
             height: "24rem",
-            background: "#C28A2E",
+            background: "#5E4FCC",
             opacity: 0.04,
             filter: "blur(120px)",
           }}
@@ -719,7 +719,7 @@ export default function WebComponentExperimentPage() {
             {[
               { label: "White", bg: "#ffffff" },
               { label: "Light Gray", bg: "#f0f0f0" },
-              { label: "Dark (Chapa)", bg: "#12100D" },
+              { label: "Dark (Chapa)", bg: "#0C0D14" },
               { label: "Navy Blue", bg: "#1a1a3e" },
               { label: "Forest Green", bg: "#1a2e1a" },
               { label: "Warm Red", bg: "#2e1a1a" },

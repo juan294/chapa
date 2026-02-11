@@ -20,13 +20,13 @@ const HEATMAP = Array.from({ length: 13 * 7 }, (_, i) => {
 function heatmapColor(level: number): string {
   switch (level) {
     case 0:
-      return "rgba(226,168,75,0.06)";
+      return "rgba(124,106,239,0.06)";
     case 1:
-      return "rgba(226,168,75,0.25)";
+      return "rgba(124,106,239,0.25)";
     case 2:
-      return "rgba(226,168,75,0.5)";
+      return "rgba(124,106,239,0.5)";
     default:
-      return "rgba(226,168,75,0.85)";
+      return "rgba(124,106,239,0.85)";
   }
 }
 

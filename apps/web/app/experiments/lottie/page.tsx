@@ -540,7 +540,7 @@ function StarScatterCSS({ playing }: { playing: boolean }) {
         >
           <path
             d="M6 0l1.76 3.57L12 4.16 8.82 7.03l.94 4.01L6 9.12l-3.76 1.92.94-4.01L0 4.16l4.24-.59z"
-            fill="#E2A84B"
+            fill="#7C6AEF"
           />
         </svg>
       ))}
@@ -585,7 +585,7 @@ function BadgeRevealCSS({ playing }: { playing: boolean }) {
             >
               <path
                 d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"
-                fill="#E2A84B"
+                fill="#7C6AEF"
               />
             </svg>
           </div>
@@ -640,7 +640,7 @@ function TierUpgradeInner() {
         style={{
           animation:
             "tier-upgrade 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
-          color: "#E2A84B",
+          color: "#7C6AEF",
           transition: "color 0.3s",
         }}
       >
@@ -651,12 +651,12 @@ function TierUpgradeInner() {
         style={{
           borderColor:
             displayTier === "Elite"
-              ? "rgba(226,168,75,0.4)"
-              : "rgba(226,168,75,0.12)",
-          color: displayTier === "Elite" ? "#E2A84B" : "#9AA4B2",
+              ? "rgba(124,106,239,0.4)"
+              : "rgba(124,106,239,0.12)",
+          color: displayTier === "Elite" ? "#7C6AEF" : "#9AA4B2",
           backgroundColor:
             displayTier === "Elite"
-              ? "rgba(226,168,75,0.08)"
+              ? "rgba(124,106,239,0.08)"
               : "transparent",
         }}
       >
@@ -717,13 +717,13 @@ function CombinedSequenceInner() {
               key={label}
               className="rounded-full px-3 py-1 text-xs font-medium transition-all duration-300"
               style={{
-                color: phase > i ? "#E2A84B" : "#9AA4B2",
+                color: phase > i ? "#7C6AEF" : "#9AA4B2",
                 borderColor:
                   phase > i
-                    ? "rgba(226,168,75,0.3)"
-                    : "rgba(226,168,75,0.12)",
+                    ? "rgba(124,106,239,0.3)"
+                    : "rgba(124,106,239,0.12)",
                 backgroundColor:
-                  phase > i ? "rgba(226,168,75,0.08)" : "transparent",
+                  phase > i ? "rgba(124,106,239,0.08)" : "transparent",
                 border: "1px solid",
               }}
             >
@@ -775,7 +775,7 @@ function CombinedSequenceInner() {
             >
               <path
                 d="M6 0l1.76 3.57L12 4.16 8.82 7.03l.94 4.01L6 9.12l-3.76 1.92.94-4.01L0 4.16l4.24-.59z"
-                fill="#F0C97D"
+                fill="#9D8FFF"
               />
             </svg>
           ))}
@@ -805,7 +805,7 @@ function CombinedSequenceInner() {
                   phase >= 4
                     ? "tier-upgrade 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards"
                     : "none",
-                color: phase >= 4 ? "#E2A84B" : "#9AA4B2",
+                color: phase >= 4 ? "#7C6AEF" : "#9AA4B2",
               }}
             >
               {phase >= 4 ? "92" : "--"}
@@ -1006,7 +1006,7 @@ export default function LottieExperimentPage() {
           25% {
             transform: scale(1.3);
             filter: brightness(2);
-            text-shadow: 0 0 40px rgba(226, 168, 75, 0.8);
+            text-shadow: 0 0 40px rgba(124, 106, 239, 0.8);
           }
           50% {
             transform: scale(0.9) rotate(2deg);
@@ -1018,7 +1018,7 @@ export default function LottieExperimentPage() {
           100% {
             transform: scale(1) rotate(0);
             filter: brightness(1);
-            text-shadow: 0 0 20px rgba(226, 168, 75, 0.3);
+            text-shadow: 0 0 20px rgba(124, 106, 239, 0.3);
           }
         }
 

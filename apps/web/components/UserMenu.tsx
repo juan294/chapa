@@ -78,7 +78,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
         aria-expanded={open}
         aria-haspopup="true"
         aria-label="User menu"
-        className="flex items-center gap-2 rounded-full border border-warm-stroke bg-warm-card/60 px-1.5 py-1 transition-colors hover:border-amber/20 hover:bg-warm-card"
+        className="flex items-center gap-2 rounded-full border border-stroke bg-card/60 px-1.5 py-1 transition-colors hover:border-amber/20 hover:bg-card"
       >
         {imgError ? (
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber/10 text-sm font-semibold text-amber">
@@ -116,10 +116,10 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-warm-stroke bg-warm-card shadow-2xl shadow-black/50 animate-scale-in"
+          className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-stroke bg-card shadow-xl shadow-black/30 animate-scale-in"
         >
           {/* Header */}
-          <div className="border-b border-warm-stroke px-4 py-3">
+          <div className="border-b border-stroke px-4 py-3">
             <div className="flex items-center gap-3">
               {imgError ? (
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber/10 text-base font-semibold text-amber">
@@ -187,7 +187,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
             </Link>
           </div>
 
-          <div className="mx-3 border-t border-warm-stroke" />
+          <div className="mx-3 border-t border-stroke" />
 
           {/* Links */}
           <div className="px-2 py-1.5">
@@ -255,7 +255,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
             </Link>
           </div>
 
-          <div className="mx-3 border-t border-warm-stroke" />
+          <div className="mx-3 border-t border-stroke" />
 
           {/* Sign out */}
           <div className="px-2 py-1.5">

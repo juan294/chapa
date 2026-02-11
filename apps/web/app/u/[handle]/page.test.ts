@@ -14,10 +14,10 @@ describe("SharePage", () => {
       expect(SOURCE).toMatch(/<h1[\s>]/);
     });
 
-    it("h1 uses font-heading class", () => {
+    it("h1 is screen-reader only", () => {
       const h1Match = SOURCE.match(/<h1[^>]*>/);
       expect(h1Match).not.toBeNull();
-      expect(h1Match![0]).toContain("font-heading");
+      expect(h1Match![0]).toContain("sr-only");
     });
   });
 

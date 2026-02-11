@@ -445,7 +445,7 @@ function ConfidenceSection({
             style={{
               width: `${(counter.value / 82) * 100}%`,
               background:
-                "linear-gradient(90deg, #C28A2E 0%, #E2A84B 60%, #F0C97D 100%)",
+                "linear-gradient(90deg, #5E4FCC 0%, #7C6AEF 60%, #9D8FFF 100%)",
             }}
           />
         </div>

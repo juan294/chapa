@@ -163,7 +163,7 @@ export function BadgePreviewCard({
         !isGlass ? "bg-card" : ""
       } ${
         config.border === "solid-amber" && !isGlass
-          ? "border border-warm-stroke"
+          ? "border border-stroke"
           : ""
       }`}
       style={{ ...cardInlineStyle, ...tiltStyle }}
@@ -233,20 +233,20 @@ export function BadgePreviewCard({
       {/* --- Stats row --- */}
       <div
         ref={statsRef}
-        className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-warm-stroke"
+        className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-stroke"
       >
         <AnimatedStat
           value={stats.commitsTotal}
           label="commits"
           statsDisplay={config.statsDisplay}
         />
-        <span className="text-warm-stroke">·</span>
+        <span className="text-stroke">·</span>
         <AnimatedStat
           value={stats.prsMergedCount}
           label="PRs"
           statsDisplay={config.statsDisplay}
         />
-        <span className="text-warm-stroke">·</span>
+        <span className="text-stroke">·</span>
         <AnimatedStat
           value={stats.reviewsSubmittedCount}
           label="reviews"

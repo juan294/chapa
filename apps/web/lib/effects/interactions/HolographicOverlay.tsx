@@ -21,8 +21,8 @@ export const HOLOGRAPHIC_CSS = `
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .holo-card:hover {
-  border-color: rgba(226, 168, 75, 0.25);
-  box-shadow: 0 0 40px rgba(226, 168, 75, 0.06);
+  border-color: rgba(124, 106, 239, 0.25);
+  box-shadow: 0 0 40px rgba(124, 106, 239, 0.06);
 }
 .holo-overlay {
   position: absolute;
@@ -36,7 +36,7 @@ export const HOLOGRAPHIC_CSS = `
   z-index: 8;
 }
 .holo-amber {
-  background: linear-gradient(var(--holo-angle, 115deg), transparent 20%, rgba(226,168,75,0.3) 36%, rgba(240,201,125,0.3) 42%, rgba(255,255,255,0.2) 48%, rgba(240,201,125,0.3) 54%, rgba(194,138,46,0.3) 60%, transparent 80%);
+  background: linear-gradient(var(--holo-angle, 115deg), transparent 20%, rgba(124,106,239,0.3) 36%, rgba(157,143,255,0.3) 42%, rgba(255,255,255,0.2) 48%, rgba(157,143,255,0.3) 54%, rgba(94,79,204,0.3) 60%, transparent 80%);
   background-size: 200% 200%;
 }
 .holo-rainbow {

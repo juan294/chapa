@@ -2,9 +2,9 @@
 
 This is the single source of truth for visual design decisions. All agents working on UI must follow these guidelines.
 
-## Theme: Warm Amber
+## Theme: Terminal Dark + Purple Accent
 
-Dark developer-tool aesthetic with warm, premium undertones. Think luxury dev tools — sophisticated, warm, technical.
+Bold, developer-tool aesthetic inspired by terminal UIs. Dark backgrounds dominate, with purple (`#7C6AEF`) used sparingly for CTAs, highlights, and active states. Terminal-specific colors (green, red, yellow) for output types. Badge SVG is dark-themed as an independent embeddable asset.
 
 ## Colors
 
@@ -12,25 +12,37 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`:
 
 | Token | Hex | Tailwind class | Usage |
 |-------|-----|----------------|-------|
-| `--color-bg` | `#12100D` | `bg-bg` | Page background (warm dark) |
-| `--color-card` | `#1A1610` | `bg-card` | Card/panel backgrounds |
-| `--color-text-primary` | `#E6EDF3` | `text-text-primary` | Headings, body text |
-| `--color-text-secondary` | `#9AA4B2` | `text-text-secondary` | Muted text, labels |
-| `--color-amber` | `#E2A84B` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
-| `--color-amber-light` | `#F0C97D` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
-| `--color-amber-dark` | `#C28A2E` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
-| `--color-stroke` | `rgba(226,168,75,0.12)` | `border-stroke` | Borders, dividers (amber-tinted) |
-| `--color-warm-bg` | `#12100D` | `bg-warm-bg` | Alias for page background |
-| `--color-warm-card` | `#1A1610` | `bg-warm-card` | Alias for card background |
-| `--color-warm-stroke` | `rgba(226,168,75,0.12)` | `border-warm-stroke` | Alias for warm-tinted borders |
+| `--color-bg` | `#0A0A0F` | `bg-bg` | Page background (true dark) |
+| `--color-card` | `#111118` | `bg-card` | Card/panel surfaces |
+| `--color-text-primary` | `#E2E4E9` | `text-text-primary` | Headings, body text (light) |
+| `--color-text-secondary` | `#6B6F7B` | `text-text-secondary` | Muted text, labels |
+| `--color-amber` | `#7C6AEF` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
+| `--color-amber-light` | `#9D8FFF` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
+| `--color-amber-dark` | `#5E4FCC` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
+| `--color-stroke` | `rgba(124,106,239,0.10)` | `border-stroke` | Borders, dividers (purple-tinted) |
+| `--color-warm-bg` | `#0A0A0F` | `bg-warm-bg` | Alias for page background |
+| `--color-warm-card` | `#111118` | `bg-warm-card` | Alias for card background |
+| `--color-warm-stroke` | `rgba(124,106,239,0.10)` | `border-warm-stroke` | Alias for borders |
+| `--color-dark-section` | `#06060A` | `bg-dark-section` | Deeper emphasis band backgrounds |
+| `--color-dark-card` | `#0E0E16` | `bg-dark-card` | Cards inside dark sections |
+| `--color-purple-tint` | `rgba(124,106,239,0.06)` | `bg-purple-tint` | Subtle purple section tint |
+| `--color-terminal-green` | `#4ADE80` | `text-terminal-green` | Success messages, checkmarks |
+| `--color-terminal-red` | `#F87171` | `text-terminal-red` | Error messages |
+| `--color-terminal-yellow` | `#FBBF24` | `text-terminal-yellow` | Warning messages |
+| `--color-terminal-dim` | `#3A3A4A` | `text-terminal-dim` | Dim text, prefixes, decorative |
+| `--color-complement` | `#10B981` | `text-complement` | Soft teal accent (sparingly) |
+| `--color-complement-light` | `rgba(16,185,129,0.15)` | `bg-complement-light` | Teal tint |
 
 ### Color rules
 
-- Amber (`#E2A84B`) is the signature accent. Use sparingly — CTAs, active states, key data points, section highlights.
-- Never use neon/bright greens or blues. The palette is warm and sophisticated.
-- Use Tailwind opacity modifiers for amber variants: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
-- Ambient glow effects use `bg-amber/[0.03]` to `bg-amber/[0.06]` with `blur-[120px]`+.
-- Cards use semi-transparent backgrounds where needed: `bg-warm-card/50`, `bg-warm-card/60`.
+- Purple (`#7C6AEF`) is the signature accent. Use sparingly — CTAs, active states, key data points.
+- Dark backgrounds dominate. `bg-bg` for page, `bg-card` for surfaces.
+- Purple-tinted borders (`border-stroke`) are the default for all dividers.
+- Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings.
+- Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
+- Cards use `bg-card` with `border-stroke`.
+- Button text on purple background: always `text-white`.
+- No ambient glow blurs — they are invisible on dark backgrounds.
 
 ## Typography
 
@@ -43,66 +55,84 @@ Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
 
 ### Typography rules
 
-- All `<h1>`–`<h3>` elements use `font-heading` (JetBrains Mono).
-- Body text, labels, buttons, and UI chrome use `font-body` (Plus Jakarta Sans) — this is the default on `<body>`.
-- JetBrains Mono is monospace — do NOT use `italic` with it. Use `font-bold` or `font-extrabold` for emphasis.
-- Accent text in headings uses `text-amber` (not italic).
-- Heading sizes follow responsive scale: `text-3xl sm:text-4xl md:text-5xl` for section heads, larger for hero.
+- All `<h1>`-`<h3>` elements use `font-heading` (JetBrains Mono).
+- Body text, labels, buttons, and UI chrome use `font-body` (Plus Jakarta Sans) — default on `<body>`.
+- JetBrains Mono is monospace — do NOT use `italic` with it.
+- Terminal output uses `font-heading` throughout for monospace consistency.
+- Accent text in headings uses `text-amber`.
 - Use `tracking-tight` on headings. Use `leading-relaxed` on body paragraphs.
 
 ## Spacing & Layout
 
-- Max content width: `max-w-7xl` (nav, features grid), `max-w-5xl` (mid sections), `max-w-4xl` (hero text, badge preview).
-- Section padding: `py-32` for full sections. Generous vertical space between sections.
+- Max content width: `max-w-7xl` (nav), `max-w-4xl` (terminal session, landing page).
+- Section spacing: `space-y-24` between terminal sections on landing page.
 - Horizontal padding: `px-6` on all containers.
-- Section dividers: `border-t border-warm-stroke` — subtle amber-tinted, not heavy.
-- Section eyebrows: Uppercase amber text above section headings (`text-amber text-sm tracking-widest uppercase mb-4`).
+- Section dividers: `border-l border-stroke` — vertical left border for terminal output blocks.
+
+## Terminal Section Pattern
+
+The landing page is structured as a "terminal session" — each section is a command + output pair:
+
+```
+$ command-name
+  [output content with left border]
+```
+
+- Command line: `font-heading text-sm`, `$` prefix in `text-terminal-dim`, command in `text-text-secondary`
+- Output block: `pl-4 border-l border-stroke`
+- Sections animate in with `animate-fade-in-up` and staggered `animation-delay`
 
 ## Components
 
 ### Cards
 
 ```
-rounded-2xl border border-warm-stroke bg-warm-card/50 p-8
+rounded-xl border border-stroke bg-card overflow-hidden
 ```
-
-Hover state: `hover:border-amber/20 hover:bg-warm-card`
 
 ### Buttons (Primary)
 
 ```
-rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg
+rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white
 hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25
 ```
 
-Dark text on amber background. Always `rounded-full`.
+White text on purple. `rounded-lg` (not `rounded-full`).
 
 ### Buttons (Ghost/Outline)
 
 ```
-rounded-full border border-warm-stroke px-8 py-3.5 text-base font-medium text-text-secondary
-hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]
+rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary
+hover:border-amber/20 hover:text-text-primary
 ```
 
 ### Navigation
 
-- Fixed top, backdrop-blur: `fixed top-0 z-50 border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl`
-- Nav links in a pill container: `rounded-full border border-warm-stroke bg-warm-card/60`
-- CTA button: amber `rounded-full` with GitHub icon
+- Fixed top, dark glass: `fixed top-0 z-50 border-b border-stroke bg-bg/80 backdrop-blur-xl`
+- Logo: `Chapa_` with blinking cursor (`animate-cursor-blink`)
+- Nav links: `/` prefix in `text-amber/50`, label in `text-terminal-dim`
+- CTA: `/ login` text link (no button), hover to `text-amber`
 
-### Terminal/Code blocks
+### Terminal components
+
+- **TerminalOutput**: `role="log" aria-live="polite"`, monospace, color-coded by line type
+- **TerminalInput**: `chapa >` or `studio >` prompt in amber, blinking cursor, input with placeholder
+- **AutocompleteDropdown**: `role="listbox"`, shows on `/` keystroke, purple accent on active item
+- **QuickControls**: Collapsible panel with clickable chips that insert terminal commands
+
+### Code blocks
 
 ```
-rounded-xl border border-warm-stroke bg-[#0d0b08] overflow-hidden
+rounded-xl border border-stroke bg-card overflow-hidden
 ```
 
-Header with three dots: `w-3 h-3 rounded-full` using `bg-amber/20`, `bg-amber/10`, `bg-amber/[0.06]` (warm gradient tones).
+Terminal dots: `bg-terminal-red/60`, `bg-terminal-yellow/60`, `bg-terminal-green/60`.
 
 ## Background Effects
 
-- **Grid pattern**: `.bg-grid-warm` class — faint 72px grid lines at 3% opacity, amber-tinted.
-- **Ambient glow**: Large `rounded-full` divs with `bg-amber/[0.03-0.06]` and `blur-[120px-150px]`, positioned absolute behind content.
-- Dark theme ONLY. No light mode.
+- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity, purple-tinted.
+- No ambient glow on dark backgrounds.
+- Dark theme ONLY. No light mode toggle.
 
 ## Animations
 
@@ -111,15 +141,12 @@ Defined in `globals.css`:
 | Class | Effect | Duration |
 |-------|--------|----------|
 | `animate-fade-in-up` | Fade in + slide up 30px | 0.8s ease-out |
-| `animate-pulse-glow-amber` | Pulsing amber box-shadow | 3s infinite |
+| `animate-cursor-blink` | Step cursor blink | 1s infinite |
+| `animate-terminal-fade-in` | Fade in + slide up 8px | 0.3s ease-out |
+| `animate-pulse-glow-amber` | Soft pulsing indigo shadow | 3s infinite |
 | `animate-float-slow` | Gentle vertical float | 6s infinite |
-| `animate-float-medium` | Gentle vertical float | 7.5s infinite |
-| `animate-float-fast` | Gentle vertical float | 5s infinite |
-| `animate-drift` | Multi-directional drift | 8s infinite |
 | `animate-shimmer` | Horizontal shimmer gradient | 3s linear infinite |
 | `animate-scale-in` | Scale from 0.92 + fade in | 0.6s ease-out |
-
-Use `[animation-delay:Xms]` for staggered reveals.
 
 ## Icons
 
@@ -127,22 +154,15 @@ Use `[animation-delay:Xms]` for staggered reveals.
 - Stroke icons: `strokeWidth="1.5"`, `strokeLinecap="round"`, `strokeLinejoin="round"`.
 - Always include `aria-hidden="true"` on decorative icons.
 - GitHub icon uses the official octocat SVG path (fill, not stroke).
-- Decorative icons: `DiamondIcon` and `StarIcon` for floating elements and social proof.
-
-## Hero Layout
-
-- **Two-column layout**: Text content on the left, badge preview card on the right.
-- Floating decorative pills with stats (commits, tier, PRs) around the hero area.
-- Diamond icons scattered as decorative elements.
-- Social proof row below CTAs: avatar circles + 5 star icons + developer count.
-- Badge card as hero centerpiece with shimmer top edge and outer amber glow.
 
 ## Do NOT
 
-- Use bright/neon colors (`#39FF88`, `#80CCB4` and similar are not in this palette).
+- Use light colors (`#FFFFFF`, `#F9FAFB`) for page or card backgrounds.
 - Use italic on monospace headings.
 - Add a light mode or theme toggle.
 - Use icon libraries (lucide, heroicons, etc.) — keep inline SVGs.
-- Use `Inter`, `Roboto`, `Arial`, or other generic fonts anywhere.
-- Add heavy shadows or gradients — keep effects subtle and muted.
-- Use cool-toned blues for backgrounds — keep everything warm-tinted.
+- Use `Inter`, `Roboto`, `Arial`, or other generic fonts.
+- Add ambient glow blurs on dark backgrounds (invisible, wastes DOM).
+- Use `text-warm-bg` for button text — use `text-white` instead.
+- Touch badge SVG theme — it stays dark as an independent embeddable asset.
+- Use `rounded-full` for primary buttons — use `rounded-lg` instead.

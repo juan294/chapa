@@ -41,7 +41,7 @@ interface ParticleConfig {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { r: 226, g: 168, b: 75 }; // fallback to amber
+  if (!result) return { r: 124, g: 106, b: 239 }; // fallback to amber
   return {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
@@ -176,7 +176,7 @@ function useParticles(
         }
 
         // Draw particle
-        const rgb = colorRgbMap.get(p.color) ?? { r: 226, g: 168, b: 75 };
+        const rgb = colorRgbMap.get(p.color) ?? { r: 124, g: 106, b: 239 };
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${p.opacity})`;
@@ -196,7 +196,7 @@ function useParticles(
               ctx.beginPath();
               ctx.moveTo(particles[i].x, particles[i].y);
               ctx.lineTo(particles[j].x, particles[j].y);
-              ctx.strokeStyle = `rgba(226, 168, 75, ${opacity})`;
+              ctx.strokeStyle = `rgba(124, 106, 239, ${opacity})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
             }
@@ -218,7 +218,7 @@ function useParticles(
       // Draw particles once, static
       const particles = particlesRef.current;
       for (const p of particles) {
-        const rgb = colorRgbMap.get(p.color) ?? { r: 226, g: 168, b: 75 };
+        const rgb = colorRgbMap.get(p.color) ?? { r: 124, g: 106, b: 239 };
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${p.opacity})`;
@@ -251,15 +251,15 @@ function pseudoRandom(seed: number): number {
 
 function MockBadgeCard() {
   return (
-    <div className="relative rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/90 backdrop-blur-sm p-6 w-full max-w-sm">
+    <div className="relative rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/90 backdrop-blur-sm p-6 w-full max-w-sm">
       {/* Top shimmer edge */}
-      <div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[#E2A84B]/40 to-transparent" />
+      <div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[#7C6AEF]/40 to-transparent" />
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#E2A84B]/20 flex items-center justify-center">
-            <span className="text-[#E2A84B] text-xs font-bold font-heading">
+          <div className="w-8 h-8 rounded-full bg-[#7C6AEF]/20 flex items-center justify-center">
+            <span className="text-[#7C6AEF] text-xs font-bold font-heading">
               C
             </span>
           </div>
@@ -270,14 +270,14 @@ function MockBadgeCard() {
             <p className="text-[#9AA4B2] text-xs">Dev Impact Badge</p>
           </div>
         </div>
-        <span className="rounded-full border border-[#E2A84B]/30 bg-[#E2A84B]/10 px-3 py-0.5 text-xs font-semibold text-[#E2A84B]">
+        <span className="rounded-full border border-[#7C6AEF]/30 bg-[#7C6AEF]/10 px-3 py-0.5 text-xs font-semibold text-[#7C6AEF]">
           Elite
         </span>
       </div>
 
       {/* Score */}
       <div className="text-center mb-4">
-        <p className="text-4xl font-extrabold font-heading text-[#E2A84B] tracking-tight">
+        <p className="text-4xl font-extrabold font-heading text-[#7C6AEF] tracking-tight">
           87
         </p>
         <p className="text-[#9AA4B2] text-xs mt-1">Impact Score</p>
@@ -289,12 +289,12 @@ function MockBadgeCard() {
           const intensity = pseudoRandom(i + 87);
           const bg =
             intensity > 0.7
-              ? "bg-[#E2A84B]"
+              ? "bg-[#7C6AEF]"
               : intensity > 0.4
-                ? "bg-[#E2A84B]/40"
+                ? "bg-[#7C6AEF]/40"
                 : intensity > 0.15
-                  ? "bg-[#E2A84B]/15"
-                  : "bg-[#E2A84B]/[0.04]";
+                  ? "bg-[#7C6AEF]/15"
+                  : "bg-[#7C6AEF]/[0.04]";
           return (
             <div
               key={i}
@@ -340,14 +340,14 @@ function ParticleSection({
   useParticles(canvasRef, config);
 
   return (
-    <section className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/50 overflow-hidden">
-      <div className="p-6 border-b border-[rgba(226,168,75,0.12)]">
+    <section className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/50 overflow-hidden">
+      <div className="p-6 border-b border-[rgba(124,106,239,0.12)]">
         <h2 className="text-lg font-bold font-heading text-[#E6EDF3] tracking-tight mb-1">
           {title}
         </h2>
         <p className="text-[#9AA4B2] text-sm leading-relaxed">{description}</p>
       </div>
-      <div className={`relative ${height} bg-[#12100D]`}>
+      <div className={`relative ${height} bg-[#0C0D14]`}>
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-auto"
@@ -368,9 +368,9 @@ function ParticleSection({
 type ColorPreset = "amber" | "gold" | "mixed";
 
 const COLOR_PRESETS: Record<ColorPreset, string[]> = {
-  amber: ["#E2A84B"],
-  gold: ["#F0C97D", "#E2A84B"],
-  mixed: ["#E2A84B", "#F0C97D", "#C28A2E"],
+  amber: ["#7C6AEF"],
+  gold: ["#9D8FFF", "#7C6AEF"],
+  mixed: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
 };
 
 function PlaygroundSection() {
@@ -403,8 +403,8 @@ function PlaygroundSection() {
   const configKey = `${count}-${speed}-${minRadius}-${maxRadius}-${connections}-${mouseRepulsion}-${colorPreset}`;
 
   return (
-    <section className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/50 overflow-hidden">
-      <div className="p-6 border-b border-[rgba(226,168,75,0.12)]">
+    <section className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/50 overflow-hidden">
+      <div className="p-6 border-b border-[rgba(124,106,239,0.12)]">
         <h2 className="text-lg font-bold font-heading text-[#E6EDF3] tracking-tight mb-1">
           Interactive Playground
         </h2>
@@ -415,7 +415,7 @@ function PlaygroundSection() {
       </div>
 
       {/* Controls */}
-      <div className="p-6 border-b border-[rgba(226,168,75,0.12)] bg-[#1A1610]/30">
+      <div className="p-6 border-b border-[rgba(124,106,239,0.12)] bg-[#13141E]/30">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Particle count */}
           <div>
@@ -424,7 +424,7 @@ function PlaygroundSection() {
               className="block text-[#9AA4B2] text-sm mb-2"
             >
               Particles:{" "}
-              <span className="text-[#E2A84B] font-semibold">{count}</span>
+              <span className="text-[#7C6AEF] font-semibold">{count}</span>
             </label>
             <input
               id="pg-count"
@@ -433,7 +433,7 @@ function PlaygroundSection() {
               max={150}
               value={count}
               onChange={(e) => setCount(Number(e.target.value))}
-              className="w-full accent-[#E2A84B]"
+              className="w-full accent-[#7C6AEF]"
             />
             <div className="flex justify-between text-xs text-[#9AA4B2] mt-1">
               <span>10</span>
@@ -448,7 +448,7 @@ function PlaygroundSection() {
               className="block text-[#9AA4B2] text-sm mb-2"
             >
               Speed:{" "}
-              <span className="text-[#E2A84B] font-semibold">
+              <span className="text-[#7C6AEF] font-semibold">
                 {speed.toFixed(1)}
               </span>
             </label>
@@ -460,7 +460,7 @@ function PlaygroundSection() {
               step={0.1}
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
-              className="w-full accent-[#E2A84B]"
+              className="w-full accent-[#7C6AEF]"
             />
             <div className="flex justify-between text-xs text-[#9AA4B2] mt-1">
               <span>0.1</span>
@@ -475,7 +475,7 @@ function PlaygroundSection() {
               className="block text-[#9AA4B2] text-sm mb-2"
             >
               Size:{" "}
-              <span className="text-[#E2A84B] font-semibold">
+              <span className="text-[#7C6AEF] font-semibold">
                 {minRadius}-{maxRadius}px
               </span>
             </label>
@@ -492,7 +492,7 @@ function PlaygroundSection() {
                   setMinRadius(v);
                   if (v > maxRadius) setMaxRadius(v);
                 }}
-                className="w-full accent-[#E2A84B]"
+                className="w-full accent-[#7C6AEF]"
               />
               <input
                 type="range"
@@ -505,7 +505,7 @@ function PlaygroundSection() {
                   setMaxRadius(v);
                   if (v < minRadius) setMinRadius(v);
                 }}
-                className="w-full accent-[#E2A84B]"
+                className="w-full accent-[#7C6AEF]"
                 aria-label="Max radius"
               />
             </div>
@@ -522,8 +522,8 @@ function PlaygroundSection() {
                   onClick={() => setColorPreset(p)}
                   className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                     colorPreset === p
-                      ? "bg-[#E2A84B] text-[#12100D]"
-                      : "border border-[rgba(226,168,75,0.12)] text-[#9AA4B2] hover:border-[#E2A84B]/20 hover:text-[#E6EDF3]"
+                      ? "bg-[#7C6AEF] text-[#0C0D14]"
+                      : "border border-[rgba(124,106,239,0.12)] text-[#9AA4B2] hover:border-[#7C6AEF]/20 hover:text-[#E6EDF3]"
                   }`}
                 >
                   {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -561,7 +561,7 @@ function PlaygroundCanvas({ config }: { config: ParticleConfig }) {
   useParticles(canvasRef, config);
 
   return (
-    <div className="relative h-[460px] bg-[#12100D]">
+    <div className="relative h-[460px] bg-[#0C0D14]">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full pointer-events-auto"
@@ -601,7 +601,7 @@ function ToggleSwitch({
         />
         <div
           className={`w-10 h-5 rounded-full transition-colors ${
-            checked ? "bg-[#E2A84B]" : "bg-[rgba(226,168,75,0.12)]"
+            checked ? "bg-[#7C6AEF]" : "bg-[rgba(124,106,239,0.12)]"
           }`}
         />
         <div
@@ -622,7 +622,7 @@ function ToggleSwitch({
 function DetailRow({ title, text }: { title: string; text: string }) {
   return (
     <div>
-      <h3 className="font-heading text-sm font-bold text-[#E2A84B] mb-1">
+      <h3 className="font-heading text-sm font-bold text-[#7C6AEF] mb-1">
         {title}
       </h3>
       <p className="text-sm text-[#9AA4B2] leading-relaxed font-body">
@@ -638,7 +638,7 @@ function DetailRow({ title, text }: { title: string; text: string }) {
 
 const DOTS_CONFIG: ParticleConfig = {
   count: 60,
-  colors: ["#E2A84B", "#F0C97D", "#C28A2E"],
+  colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
   minRadius: 1,
   maxRadius: 3,
   speed: 0.3,
@@ -653,7 +653,7 @@ const DOTS_CONFIG: ParticleConfig = {
 
 const CONSTELLATION_CONFIG: ParticleConfig = {
   count: 40,
-  colors: ["#E2A84B", "#F0C97D"],
+  colors: ["#7C6AEF", "#9D8FFF"],
   minRadius: 1,
   maxRadius: 2.5,
   speed: 0.25,
@@ -668,7 +668,7 @@ const CONSTELLATION_CONFIG: ParticleConfig = {
 
 const DUST_CONFIG: ParticleConfig = {
   count: 25,
-  colors: ["#E2A84B", "#F0C97D", "#C28A2E"],
+  colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
   minRadius: 2,
   maxRadius: 5,
   speed: 0.1,
@@ -683,7 +683,7 @@ const DUST_CONFIG: ParticleConfig = {
 
 const SPARKLE_CONFIG: ParticleConfig = {
   count: 80,
-  colors: ["#E2A84B", "#F0C97D", "#E6EDF3"],
+  colors: ["#7C6AEF", "#9D8FFF", "#E6EDF3"],
   minRadius: 0.5,
   maxRadius: 1.5,
   speed: 0.2,
@@ -698,7 +698,7 @@ const SPARKLE_CONFIG: ParticleConfig = {
 
 const INTERACTIVE_CONFIG: ParticleConfig = {
   count: 50,
-  colors: ["#E2A84B", "#F0C97D", "#C28A2E"],
+  colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
   minRadius: 1,
   maxRadius: 3,
   speed: 0.3,
@@ -717,25 +717,25 @@ const INTERACTIVE_CONFIG: ParticleConfig = {
 
 export default function ParticlesExperimentPage() {
   return (
-    <div className="min-h-screen bg-[#12100D]">
+    <div className="min-h-screen bg-[#0C0D14]">
       {/* Ambient glow */}
       <div
-        className="pointer-events-none fixed top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-[#E2A84B]/[0.03] blur-[150px]"
+        className="pointer-events-none fixed top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-[#7C6AEF]/[0.03] blur-[150px]"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none fixed bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-[#E2A84B]/[0.04] blur-[120px]"
+        className="pointer-events-none fixed bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-[#7C6AEF]/[0.04] blur-[120px]"
         aria-hidden="true"
       />
 
       <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
         {/* Header */}
         <header className="mb-12 animate-fade-in-up">
-          <p className="text-[#E2A84B] text-sm tracking-widest uppercase mb-4 font-semibold">
+          <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
             Experiment #49
           </p>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-[#E6EDF3] tracking-tight mb-4">
-            Canvas <span className="text-[#E2A84B]">Particle System</span>
+            Canvas <span className="text-[#7C6AEF]">Particle System</span>
           </h1>
           <p className="text-[#9AA4B2] text-lg leading-relaxed max-w-2xl">
             Lightweight, custom-built canvas particle system for ambient
@@ -775,8 +775,8 @@ export default function ParticlesExperimentPage() {
           />
 
           {/* Section 5: Mouse Interactive */}
-          <section className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/50 overflow-hidden">
-            <div className="p-6 border-b border-[rgba(226,168,75,0.12)]">
+          <section className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/50 overflow-hidden">
+            <div className="p-6 border-b border-[rgba(124,106,239,0.12)]">
               <h2 className="text-lg font-bold font-heading text-[#E6EDF3] tracking-tight mb-1">
                 5. Mouse Interactive
               </h2>
@@ -792,7 +792,7 @@ export default function ParticlesExperimentPage() {
 
         {/* Playground */}
         <div className="mb-12">
-          <p className="text-[#E2A84B] text-sm tracking-widest uppercase mb-4 font-semibold">
+          <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
             Playground
           </p>
           <PlaygroundSection />
@@ -800,13 +800,13 @@ export default function ParticlesExperimentPage() {
 
         {/* Implementation notes */}
         <section className="mb-12">
-          <p className="text-[#E2A84B] text-sm tracking-widest uppercase mb-4 font-semibold">
+          <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
             Notes
           </p>
           <h2 className="font-heading text-2xl sm:text-3xl font-bold text-[#E6EDF3] tracking-tight mb-6">
             Implementation Details
           </h2>
-          <div className="rounded-2xl border border-[rgba(226,168,75,0.12)] bg-[#1A1610]/60 p-6 space-y-4">
+          <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/60 p-6 space-y-4">
             <DetailRow
               title="Zero Dependencies"
               text="Entirely custom canvas implementation. No tsParticles, no external libraries. Just requestAnimationFrame and the Canvas 2D API."
@@ -838,7 +838,7 @@ export default function ParticlesExperimentPage() {
         <footer className="text-center text-[#9AA4B2] text-sm">
           <p>
             Experiment #49 &middot;{" "}
-            <span className="text-[#E2A84B] font-medium">
+            <span className="text-[#7C6AEF] font-medium">
               Custom Canvas 2D
             </span>{" "}
             &middot; Zero external dependencies
@@ -858,7 +858,7 @@ function InteractiveCanvasSection({ config }: { config: ParticleConfig }) {
   useParticles(canvasRef, config);
 
   return (
-    <div className="relative h-[420px] bg-[#12100D]">
+    <div className="relative h-[420px] bg-[#0C0D14]">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full pointer-events-auto"

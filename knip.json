@@ -4,7 +4,6 @@
   "workspaces": {
     "apps/web": {
       "ignoreDependencies": [
-        "eslint-config-next",
         "eslint-plugin-import",
         "eslint-plugin-jsx-a11y",
         "eslint-plugin-react-hooks",

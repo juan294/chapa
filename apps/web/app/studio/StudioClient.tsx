@@ -4,13 +4,25 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { BadgeConfig, Stats90d, ImpactV3Result } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
+import { STUDIO_PRESETS } from "@/lib/effects/defaults";
 import { BadgePreviewCard } from "./BadgePreviewCard";
-import { StudioControls } from "./StudioControls";
+import { QuickControls } from "./QuickControls";
+import { useStudioCommands } from "./useStudioCommands";
+import { TerminalOutput } from "@/components/terminal/TerminalOutput";
+import { TerminalInput } from "@/components/terminal/TerminalInput";
+import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
+import {
+  executeCommand,
+  makeLine,
+  type OutputLine,
+  type CommandAction,
+} from "@/components/terminal/command-registry";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: Stats90d;
   impact: ImpactV3Result;
+  handle?: string;
 }
 
 function useReducedMotion(): boolean {
@@ -31,13 +43,25 @@ export function StudioClient({
   initialConfig,
   stats,
   impact,
+  handle = "",
 }: StudioClientProps) {
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
+  const [showQuickControls, setShowQuickControls] = useState(false);
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
+
+  // Terminal state
+  const [lines, setLines] = useState<OutputLine[]>([
+    makeLine("system", "Creator Studio — customize your badge"),
+    makeLine("dim", "Type /help for commands or use Quick Controls."),
+  ]);
+  const [history, setHistory] = useState<string[]>([]);
+  const [partial, setPartial] = useState("");
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+
+  const studioCommands = useStudioCommands({ config, handle });
 
   // Track studio_opened on mount (once)
   useEffect(() => {
@@ -47,9 +71,23 @@ export function StudioClient({
     }
   }, []);
 
+  // Cmd+K / Ctrl+K to focus terminal input
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        const input = document.querySelector<HTMLInputElement>(
+          'input[aria-label="Terminal command input"]',
+        );
+        input?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const handleConfigChange = useCallback(
     (newConfig: BadgeConfig) => {
-      // Track which field changed
       for (const key of Object.keys(newConfig) as (keyof BadgeConfig)[]) {
         if (newConfig[key] !== config[key]) {
           trackEvent("effect_changed", {
@@ -60,23 +98,13 @@ export function StudioClient({
         }
       }
       setConfig(newConfig);
-      // Reset preview key to replay heatmap animation
       setPreviewKey((k) => k + 1);
     },
     [config],
   );
 
-  const handlePresetSelect = useCallback(
-    (presetConfig: BadgeConfig) => {
-      trackEvent("preset_selected", { preset: presetConfig });
-      handleConfigChange(presetConfig);
-    },
-    [handleConfigChange],
-  );
-
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setSaved(false);
     try {
       const res = await fetch("/api/studio/config", {
         method: "PUT",
@@ -84,9 +112,10 @@ export function StudioClient({
         body: JSON.stringify(config),
       });
       if (res.ok) {
-        setSaved(true);
         trackEvent("config_saved", { config });
-        setTimeout(() => setSaved(false), 2000);
+        setLines((prev) => [...prev, makeLine("success", "Configuration saved!")]);
+      } else {
+        setLines((prev) => [...prev, makeLine("error", "Failed to save. Try again.")]);
       }
     } finally {
       setSaving(false);
@@ -99,11 +128,104 @@ export function StudioClient({
     trackEvent("effect_changed", { category: "reset", to: "default" });
   }, []);
 
+  const handleAction = useCallback(
+    (action: CommandAction) => {
+      switch (action.type) {
+        case "set": {
+          const key = action.category as keyof BadgeConfig;
+          handleConfigChange({ ...config, [key]: action.value });
+          break;
+        }
+        case "preset": {
+          const preset = STUDIO_PRESETS.find((p) => p.id === action.name);
+          if (preset) {
+            trackEvent("preset_selected", { preset: preset.id });
+            handleConfigChange(preset.config);
+          }
+          break;
+        }
+        case "save":
+          handleSave();
+          break;
+        case "reset":
+          handleReset();
+          break;
+        case "clear":
+          setLines([]);
+          break;
+        default:
+          break;
+      }
+    },
+    [config, handleConfigChange, handleSave, handleReset],
+  );
+
+  const handleSubmit = useCallback(
+    (input: string) => {
+      const inputLine = makeLine("input", input);
+      setHistory((h) => [...h, input]);
+      setShowAutocomplete(false);
+      setPartial("");
+
+      const result = executeCommand(input, studioCommands);
+
+      if (result.action?.type === "clear") {
+        setLines([]);
+        return;
+      }
+
+      setLines((prev) => [...prev, inputLine, ...result.lines]);
+
+      if (result.action) {
+        handleAction(result.action);
+      }
+    },
+    [studioCommands, handleAction],
+  );
+
+  const handleQuickCommand = useCallback(
+    (cmd: string) => {
+      handleSubmit(cmd);
+    },
+    [handleSubmit],
+  );
+
+  const handlePartialChange = useCallback((val: string) => {
+    setPartial(val);
+    setShowAutocomplete(val.startsWith("/") && val.length > 0);
+  }, []);
+
+  const handleAutocompleteSelect = useCallback(
+    (command: string) => {
+      setShowAutocomplete(false);
+      setPartial("");
+      const needsArgs = ["/set", "/preset"];
+      if (needsArgs.includes(command)) {
+        const input = document.querySelector<HTMLInputElement>(
+          'input[aria-label="Terminal command input"]',
+        );
+        if (input) {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            "value",
+          )?.set;
+          nativeInputValueSetter?.call(input, command + " ");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.focus();
+        }
+      } else {
+        handleSubmit(command);
+      }
+    },
+    [handleSubmit],
+  );
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 lg:gap-0 min-h-[calc(100vh-5rem)]">
-      {/* Preview pane */}
-      <div className="flex items-start justify-center lg:items-center px-4 py-6 lg:px-8 lg:py-0">
-        <div className="w-full max-w-xl sticky top-24">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
+      <h1 className="sr-only">Creator Studio</h1>
+      {/* Preview pane (left, sticky) */}
+      <div className="flex items-start justify-center lg:items-center px-4 py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke">
+        <div className="w-full max-w-xl sticky top-20">
           <BadgePreviewCard
             key={previewKey}
             config={config}
@@ -112,14 +234,12 @@ export function StudioClient({
             interactive={!reducedMotion}
           />
 
-          {/* Saved toast */}
-          {saved && (
-            <div className="mt-4 text-center text-sm text-amber animate-fade-in-up">
-              Configuration saved!
+          {saving && (
+            <div className="mt-4 text-center text-sm text-amber animate-terminal-fade-in font-heading">
+              Saving...
             </div>
           )}
 
-          {/* Reduced motion notice */}
           {reducedMotion && (
             <div className="mt-4 text-center text-xs text-text-secondary">
               Reduced motion detected — animations are disabled
@@ -128,17 +248,34 @@ export function StudioClient({
         </div>
       </div>
 
-      {/* Controls pane */}
-      <div className="border-t lg:border-t-0 lg:border-l border-warm-stroke bg-warm-card/30 lg:h-[calc(100vh-5rem)] lg:overflow-y-auto">
-        <StudioControls
+      {/* Terminal pane (right) */}
+      <div className="flex flex-col lg:h-[calc(100vh-3.5rem)] bg-bg">
+        {/* Quick Controls toggle */}
+        <QuickControls
           config={config}
-          onChange={handleConfigChange}
-          onPresetSelect={handlePresetSelect}
-          onSave={handleSave}
-          onReset={handleReset}
-          saving={saving}
-          saved={saved}
+          onCommand={handleQuickCommand}
+          visible={showQuickControls}
+          onToggle={() => setShowQuickControls((v) => !v)}
         />
+
+        {/* Terminal output */}
+        <TerminalOutput lines={lines} />
+
+        {/* Terminal input + autocomplete */}
+        <div className="relative mt-auto">
+          <AutocompleteDropdown
+            commands={studioCommands}
+            partial={partial}
+            onSelect={handleAutocompleteSelect}
+            visible={showAutocomplete}
+          />
+          <TerminalInput
+            onSubmit={handleSubmit}
+            onPartialChange={handlePartialChange}
+            history={history}
+            prompt="studio"
+          />
+        </div>
       </div>
     </div>
   );
