@@ -171,7 +171,7 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke">
               {/* Badge card — always dark */}
-              <div className="relative rounded-xl border border-stroke bg-[#111118] shadow-2xl shadow-black/30 overflow-hidden">
+              <div data-theme="dark" className="relative rounded-xl border border-stroke bg-[#111118] shadow-2xl shadow-black/30 overflow-hidden">
                 <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-amber/30 to-transparent animate-shimmer" />
 
                 <div className="p-6 md:p-8">

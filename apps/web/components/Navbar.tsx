@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { readSessionCookie } from "@/lib/auth/github";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface NavLink {
   label: string;
@@ -60,21 +61,24 @@ export async function Navbar({ navLinks }: NavbarProps) {
           <MobileNav links={navLinks} />
         )}
 
-        {/* Right: User or login */}
-        {session ? (
-          <UserMenu
-            login={session.login}
-            name={session.name}
-            avatarUrl={session.avatar_url}
-          />
-        ) : (
-          <a
-            href="/api/auth/login"
-            className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"
-          >
-            <span className="text-amber/50">/</span> login
-          </a>
-        )}
+        {/* Right: Theme toggle + User or login */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          {session ? (
+            <UserMenu
+              login={session.login}
+              name={session.name}
+              avatarUrl={session.avatar_url}
+            />
+          ) : (
+            <a
+              href="/api/auth/login"
+              className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"
+            >
+              <span className="text-amber/50">/</span> login
+            </a>
+          )}
+        </div>
       </div>
     </nav>
   );
