@@ -90,6 +90,7 @@ export function scatterDelay(col: number, row: number): number {
  * Column cascade: all rows in a column appear together.
  * delay = col * 80
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function columnCascadeDelay(col: number, _row: number): number {
   return col * 80;
 }
