@@ -335,9 +335,90 @@ export default async function Home({
             </div>
           </section>
 
+          {/* ── Enterprise: $ chapa enterprise ────────────── */}
+          <h2 className="sr-only">Enterprise</h2>
+          <section className="animate-fade-in-up [animation-delay:900ms]">
+            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
+              <span className="text-terminal-dim select-none">$</span>
+              <span className="text-text-secondary">chapa enterprise</span>
+            </div>
+            <div className="pl-4 border-l border-stroke space-y-5">
+              <div>
+                <h3 className="font-heading text-lg tracking-tight text-text-primary">
+                  GitHub <span className="text-amber">Enterprise Managed Users</span>
+                </h3>
+                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl">
+                  Work at a company that uses GitHub Enterprise? Your corporate contributions
+                  (commits, PRs, reviews) live in a separate EMU namespace and don&apos;t show up
+                  on your personal profile. Chapa can merge them into your badge.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
+                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
+                  <span className="ml-2 text-xs text-terminal-dim font-heading">
+                    terminal
+                  </span>
+                </div>
+                <div className="p-4 font-heading text-sm leading-relaxed space-y-1">
+                  <p>
+                    <span className="text-terminal-dim select-none">$ </span>
+                    <span className="text-text-primary/80">npx @chapa/cli</span>
+                  </p>
+                  <p className="text-terminal-green">
+                    <span className="text-terminal-dim select-none">&gt; </span>
+                    Authenticated as @developer
+                  </p>
+                  <p className="text-terminal-green">
+                    <span className="text-terminal-dim select-none">&gt; </span>
+                    Found EMU account: @developer_company
+                  </p>
+                  <p className="text-terminal-green">
+                    <span className="text-terminal-dim select-none">&gt; </span>
+                    Merged 312 enterprise contributions into badge
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                    WHAT IT DOES
+                  </span>
+                  <span className="text-text-secondary text-sm">
+                    Links your EMU stats with your personal GitHub — one unified badge.
+                  </span>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                    HOW TO USE
+                  </span>
+                  <span className="text-text-secondary text-sm">
+                    Run{" "}
+                    <code className="font-heading text-text-primary/80 bg-amber/10 px-1.5 py-0.5 rounded text-xs">
+                      npx @chapa/cli
+                    </code>{" "}
+                    and follow the prompts. Takes under a minute.
+                  </span>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                    NO EMU?
+                  </span>
+                  <span className="text-text-secondary text-sm">
+                    No problem — the CLI also works for supplemental stats and manual overrides.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* ── Stats: $ chapa stats ──────────────────────── */}
           <h2 className="sr-only">Stats</h2>
-          <section id="stats" className="animate-fade-in-up [animation-delay:1000ms]">
+          <section id="stats" className="animate-fade-in-up [animation-delay:1100ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa stats</span>
@@ -361,7 +442,7 @@ export default async function Home({
 
           {/* ── CTA: $ chapa login ────────────────────────── */}
           <h2 className="sr-only">Get Started</h2>
-          <section className="animate-fade-in-up [animation-delay:1200ms]">
+          <section className="animate-fade-in-up [animation-delay:1300ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa login</span>
