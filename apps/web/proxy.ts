@@ -22,7 +22,7 @@ export function shouldRedirect(pathname: string, comingSoon: boolean): boolean {
   return !ALLOW_PATTERNS.some((re) => re.test(pathname));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const comingSoon = process.env.COMING_SOON?.trim() === "true";
   if (shouldRedirect(request.nextUrl.pathname, comingSoon)) {
     const url = request.nextUrl.clone();
@@ -36,7 +36,7 @@ export const config = {
   matcher: [
     /*
      * Match all routes except Next.js internals and static assets.
-     * Middleware still checks the allowlist above for belt-and-suspenders safety.
+     * Proxy still checks the allowlist above for belt-and-suspenders safety.
      */
     "/((?!_next/static|_next/image).*)",
   ],
