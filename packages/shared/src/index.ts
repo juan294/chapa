@@ -23,5 +23,4 @@ export type {
 export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";
 
 export { CONTRIBUTION_QUERY } from "./github-query";
-export { computePrWeight } from "./scoring";
 export { buildStats90dFromRaw } from "./stats-aggregation";

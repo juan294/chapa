@@ -6,7 +6,7 @@ import Link from "next/link";
 /* ------------------------------------------------------------------ */
 /*  Pure tilt computation (hook is in use-tilt.ts, tested separately)  */
 /* ------------------------------------------------------------------ */
-import { computeTilt, type TiltState } from "./use-tilt";
+import { computeTilt, type TiltState } from "@/lib/effects/interactions/use-tilt";
 
 /* ------------------------------------------------------------------ */
 /*  Mock heatmap data (13 weeks x 7 days)                              */

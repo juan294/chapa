@@ -52,8 +52,6 @@ export { useInView } from "./counters/use-in-view";
 // Tier
 export {
   tierPillClasses,
-  tierScoreClass,
-  tierCardClass,
   SparkleDots,
   TIER_VISUALS_CSS,
 } from "./tier/TierVisuals";
@@ -68,5 +66,5 @@ export {
 export type { ConfettiPalette } from "./celebrations/confetti";
 
 // Defaults & Presets
-export { DEFAULT_BADGE_CONFIG, STUDIO_PRESETS } from "./defaults";
+export { STUDIO_PRESETS } from "./defaults";
 export type { StudioPreset } from "./defaults";

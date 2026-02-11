@@ -9,7 +9,7 @@ import {
   getDelayFn,
   generateMockHeatmap,
   INTENSITY_COLORS,
-} from "./animations";
+} from "@/lib/effects/heatmap/animations";
 
 /* ------------------------------------------------------------------ */
 /*  Heatmap Wave Animation — Experiment #41                           */

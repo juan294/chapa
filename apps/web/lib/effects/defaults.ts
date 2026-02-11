@@ -1,8 +1,6 @@
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 
-export { DEFAULT_BADGE_CONFIG };
-
 export interface StudioPreset {
   id: string;
   label: string;

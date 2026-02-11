@@ -15,14 +15,6 @@ export function tierPillClasses(tier: ImpactTier): string {
   }
 }
 
-export function tierScoreClass(tier: ImpactTier): string {
-  return `tier-score tier-score-${tier.toLowerCase()}`;
-}
-
-export function tierCardClass(tier: ImpactTier): string {
-  return `tier-card tier-card-${tier.toLowerCase()}`;
-}
-
 /** CSS for tier-specific visual treatments. Inject once in the page. */
 export const TIER_VISUALS_CSS = `
 .tier-score-emerging { color: #9AA4B2; }
