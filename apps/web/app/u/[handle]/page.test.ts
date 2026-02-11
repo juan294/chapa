@@ -31,4 +31,30 @@ describe("SharePage", () => {
       }
     });
   });
+
+  // Phase 5 — Share page integration with Creator Studio
+  describe("config-aware badge rendering", () => {
+    it("fetches saved config from Redis", () => {
+      expect(SOURCE).toContain("cacheGet");
+      expect(SOURCE).toContain("config:");
+    });
+
+    it("renders ShareBadgePreview for interactive badge", () => {
+      expect(SOURCE).toContain("ShareBadgePreview");
+    });
+
+    it("falls back to static SVG img when no config", () => {
+      expect(SOURCE).toContain("badge.svg");
+    });
+  });
+
+  describe("customize badge CTA", () => {
+    it("has Customize Badge link", () => {
+      expect(SOURCE).toContain("/studio");
+    });
+
+    it("only shows CTA for badge owner", () => {
+      expect(SOURCE).toContain("isOwner");
+    });
+  });
 });

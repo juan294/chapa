@@ -3,13 +3,17 @@ import { computeImpactV3 } from "@/lib/impact/v3";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
+import { ShareBadgePreview } from "@/components/ShareBadgePreview";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
+import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import type { BadgeConfig } from "@chapa/shared";
+import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
@@ -50,6 +54,21 @@ export async function generateMetadata({
   };
 }
 
+function hasCustomConfig(config: BadgeConfig | null): config is BadgeConfig {
+  if (!config) return false;
+  return (
+    config.background !== DEFAULT_BADGE_CONFIG.background ||
+    config.cardStyle !== DEFAULT_BADGE_CONFIG.cardStyle ||
+    config.border !== DEFAULT_BADGE_CONFIG.border ||
+    config.scoreEffect !== DEFAULT_BADGE_CONFIG.scoreEffect ||
+    config.heatmapAnimation !== DEFAULT_BADGE_CONFIG.heatmapAnimation ||
+    config.interaction !== DEFAULT_BADGE_CONFIG.interaction ||
+    config.statsDisplay !== DEFAULT_BADGE_CONFIG.statsDisplay ||
+    config.tierTreatment !== DEFAULT_BADGE_CONFIG.tierTreatment ||
+    config.celebration !== DEFAULT_BADGE_CONFIG.celebration
+  );
+}
+
 export default async function SharePage({ params }: SharePageProps) {
   const { handle } = await params;
 
@@ -60,6 +79,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
   // Read auth token from session cookie for better rate limits (#14)
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  let sessionLogin: string | null = null;
   let token: string | undefined;
   if (sessionSecret) {
     const headerStore = await headers();
@@ -67,11 +87,21 @@ export default async function SharePage({ params }: SharePageProps) {
       headerStore.get("cookie"),
       sessionSecret,
     );
-    if (session) token = session.token;
+    if (session) {
+      token = session.token;
+      sessionLogin = session.login;
+    }
   }
 
-  const stats = await getStats90d(handle, token);
+  // Fetch stats + saved config in parallel
+  const [stats, savedConfig] = await Promise.all([
+    getStats90d(handle, token),
+    cacheGet<BadgeConfig>(`config:${handle}`),
+  ]);
   const impact = stats ? computeImpactV3(stats) : null;
+
+  const isOwner = sessionLogin !== null && sessionLogin === handle;
+  const useInteractivePreview = hasCustomConfig(savedConfig) && stats && impact;
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
   const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
@@ -111,19 +141,51 @@ export default async function SharePage({ params }: SharePageProps) {
           @{handle}
         </h1>
 
-        {/* Badge preview */}
+        {/* Badge preview — interactive if user has custom config, static SVG otherwise */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">
-          <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-4 animate-pulse-glow-amber">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/u/${encodeURIComponent(handle)}/badge.svg`}
-              alt={`Chapa badge for ${handle}`}
-              width={1200}
-              height={630}
-              className="w-full rounded-xl"
+          {useInteractivePreview ? (
+            <ShareBadgePreview
+              config={savedConfig}
+              stats={stats}
+              impact={impact}
             />
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-4 animate-pulse-glow-amber">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/u/${encodeURIComponent(handle)}/badge.svg`}
+                alt={`Chapa badge for ${handle}`}
+                width={1200}
+                height={630}
+                className="w-full rounded-xl"
+              />
+            </div>
+          )}
         </div>
+
+        {/* Customize Badge CTA — only for badge owner */}
+        {isOwner && (
+          <div className="mb-8 animate-fade-in-up [animation-delay:250ms]">
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-2 rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
+            >
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
+              </svg>
+              Customize Badge
+            </Link>
+          </div>
+        )}
 
         {/* Impact breakdown */}
         {impact ? (

@@ -45,6 +45,9 @@ test-results/
 # worktrees (background agent sandboxed workspaces)
 .worktrees/
 
+# claude code
+.claude/settings.local.json
+
 # misc
 *.tsbuildinfo
 next-env.d.ts

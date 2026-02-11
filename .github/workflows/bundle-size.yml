@@ -1,6 +1,8 @@
 name: Bundle Size Analysis
 
 on:
+  push:
+    branches: [develop]
   pull_request:
     branches: [develop, main]
 
@@ -72,6 +74,7 @@ jobs:
           echo "total_size=${TOTAL_SIZE}" >> "$GITHUB_OUTPUT"
 
       - name: Comment on PR
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
           script: |

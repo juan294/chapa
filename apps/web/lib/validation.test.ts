@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { isValidHandle, isValidEmuHandle, isValidStats90dShape } from "./validation";
+import { isValidHandle, isValidEmuHandle, isValidStats90dShape, isValidBadgeConfig } from "./validation";
+import { DEFAULT_BADGE_CONFIG, BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 
 describe("isValidHandle", () => {
   describe("valid handles", () => {
@@ -188,5 +189,90 @@ describe("isValidStats90dShape", () => {
       count: 1,
     }));
     expect(isValidStats90dShape({ ...validStats, heatmapData: maxHeatmap })).toBe(true);
+  });
+});
+
+describe("isValidBadgeConfig", () => {
+  it("accepts the default config", () => {
+    expect(isValidBadgeConfig(DEFAULT_BADGE_CONFIG)).toBe(true);
+  });
+
+  it("accepts a fully customized valid config", () => {
+    expect(
+      isValidBadgeConfig({
+        background: "aurora",
+        cardStyle: "frost",
+        border: "gradient-rotating",
+        scoreEffect: "gold-shimmer",
+        heatmapAnimation: "diagonal",
+        interaction: "tilt-3d",
+        statsDisplay: "animated-ease",
+        tierTreatment: "enhanced",
+        celebration: "confetti",
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects null", () => {
+    expect(isValidBadgeConfig(null)).toBe(false);
+  });
+
+  it("rejects non-object", () => {
+    expect(isValidBadgeConfig("string")).toBe(false);
+    expect(isValidBadgeConfig(42)).toBe(false);
+    expect(isValidBadgeConfig(undefined)).toBe(false);
+  });
+
+  it("rejects missing fields", () => {
+    const partial = { background: "solid", cardStyle: "flat" };
+    expect(isValidBadgeConfig(partial)).toBe(false);
+  });
+
+  it("rejects unknown values for a field", () => {
+    expect(
+      isValidBadgeConfig({ ...DEFAULT_BADGE_CONFIG, background: "neon" }),
+    ).toBe(false);
+  });
+
+  it("rejects extra fields", () => {
+    expect(
+      isValidBadgeConfig({ ...DEFAULT_BADGE_CONFIG, unknownField: "evil" }),
+    ).toBe(false);
+  });
+
+  it("rejects non-string field values", () => {
+    expect(
+      isValidBadgeConfig({ ...DEFAULT_BADGE_CONFIG, background: 42 }),
+    ).toBe(false);
+  });
+
+  it("rejects each field with an invalid value", () => {
+    const fields = [
+      ["background", "neon"],
+      ["cardStyle", "neon"],
+      ["border", "neon"],
+      ["scoreEffect", "neon"],
+      ["heatmapAnimation", "neon"],
+      ["interaction", "neon"],
+      ["statsDisplay", "neon"],
+      ["tierTreatment", "neon"],
+      ["celebration", "neon"],
+    ] as const;
+
+    for (const [field, badValue] of fields) {
+      expect(
+        isValidBadgeConfig({ ...DEFAULT_BADGE_CONFIG, [field]: badValue }),
+      ).toBe(false);
+    }
+  });
+
+  it("accepts every valid option for each field", () => {
+    for (const [field, options] of Object.entries(BADGE_CONFIG_OPTIONS)) {
+      for (const option of options) {
+        expect(
+          isValidBadgeConfig({ ...DEFAULT_BADGE_CONFIG, [field]: option }),
+        ).toBe(true);
+      }
+    }
   });
 });

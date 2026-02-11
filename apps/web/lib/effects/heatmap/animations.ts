@@ -5,10 +5,13 @@
 /* ------------------------------------------------------------------ */
 
 export type AnimationVariant =
+  | "fade-in"
   | "diagonal"
   | "ripple"
   | "scatter"
+  | "cascade"
   | "column-cascade"
+  | "waterfall"
   | "row-waterfall";
 
 export interface VariantMeta {
@@ -49,6 +52,13 @@ export const VARIANTS: VariantMeta[] = [
 export const WEEKS = 13;
 /** Days per week (rows) */
 export const DAYS = 7;
+
+/**
+ * Simple fade-in: uniform small stagger so all cells appear near-simultaneously.
+ */
+export function fadeInDelay(col: number, row: number): number {
+  return (col * DAYS + row) * 8; // 8ms stagger per cell
+}
 
 /**
  * Diagonal wave: delay = col * 40 + row * 60
@@ -99,14 +109,18 @@ export function getDelayFn(
   variant: AnimationVariant
 ): (col: number, row: number) => number {
   switch (variant) {
+    case "fade-in":
+      return fadeInDelay;
     case "diagonal":
       return diagonalDelay;
     case "ripple":
       return rippleDelay;
     case "scatter":
       return scatterDelay;
+    case "cascade":
     case "column-cascade":
       return columnCascadeDelay;
+    case "waterfall":
     case "row-waterfall":
       return rowWaterfallDelay;
   }

@@ -26,6 +26,32 @@ export function isValidEmuHandle(handle: string): boolean {
 }
 
 /**
+ * Validate a BadgeConfig object.
+ * Ensures every field is present with a recognized value, and no extra fields exist.
+ */
+import { BADGE_CONFIG_OPTIONS } from "@chapa/shared";
+
+const BADGE_CONFIG_KEYS = Object.keys(BADGE_CONFIG_OPTIONS) as (keyof typeof BADGE_CONFIG_OPTIONS)[];
+
+export function isValidBadgeConfig(value: unknown): boolean {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return false;
+  const obj = value as Record<string, unknown>;
+
+  // Reject extra fields
+  const keys = Object.keys(obj);
+  if (keys.length !== BADGE_CONFIG_KEYS.length) return false;
+
+  for (const key of BADGE_CONFIG_KEYS) {
+    const val = obj[key];
+    if (typeof val !== "string") return false;
+    const allowed = BADGE_CONFIG_OPTIONS[key] as readonly string[];
+    if (!allowed.includes(val)) return false;
+  }
+
+  return true;
+}
+
+/**
  * Structural validation for uploaded Stats90d.
  * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
  */

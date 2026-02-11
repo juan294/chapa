@@ -45,7 +45,23 @@
       "Bash(printf:*)",
       "Bash(wc:*)",
       "Bash(git stash:*)",
-      "Bash(aws sts get-caller-identity:*)"
+      "Bash(aws sts get-caller-identity:*)",
+      "Bash(aws sesv2 create-email-identity:*)",
+      "Bash(aws sesv2:*)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:den.dev)",
+      "WebFetch(domain:dxrf.com)",
+      "Bash(source:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:blog.eamonncottrell.com)",
+      "Bash(git -C /Users/juan/Documents/GenAI_Projects/chapa/.worktrees/remaining-fixes diff --name-only)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(git -C /Users/juan/Documents/GenAI_Projects/chapa rev-parse --short HEAD)",
+      "Bash(lsof:*)",
+      "Bash(done)",
+      "Bash(xargs:*)"
     ]
   }
 }

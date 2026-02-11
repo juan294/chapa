@@ -101,3 +101,30 @@ describe("GET /api/auth/login — rate limiting", () => {
     expect(res.headers.get("Retry-After")).toBe("900");
   });
 });
+
+describe("GET /api/auth/login — fallback URL", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+    mockCreateStateCookie.mockReturnValue({
+      state: "abc",
+      cookie: "gh_oauth_state=abc; Path=/",
+    });
+    mockBuildAuthUrl.mockReturnValue(
+      "https://github.com/login/oauth/authorize?state=abc",
+    );
+  });
+
+  it("uses localhost:3001 as fallback when NEXT_PUBLIC_BASE_URL is not set", async () => {
+    vi.stubEnv("GITHUB_CLIENT_ID", "test-client-id");
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "");
+
+    await GET(makeRequest("1.2.3.4"));
+
+    expect(mockBuildAuthUrl).toHaveBeenCalledWith(
+      "test-client-id",
+      "http://localhost:3001/api/auth/callback",
+      "abc",
+    );
+  });
+});

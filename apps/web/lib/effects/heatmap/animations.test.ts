@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  fadeInDelay,
   diagonalDelay,
   rippleDelay,
   scatterDelay,
@@ -122,13 +123,39 @@ describe("rowWaterfallDelay", () => {
   });
 });
 
+describe("fadeInDelay", () => {
+  it("returns 0 for top-left corner (0,0)", () => {
+    expect(fadeInDelay(0, 0)).toBe(0);
+  });
+
+  it("produces small uniform stagger", () => {
+    const d = fadeInDelay(1, 0);
+    // 1 * DAYS + 0 = 7, * 8 = 56
+    expect(d).toBe(7 * 8);
+  });
+
+  it("is always non-negative", () => {
+    for (let c = 0; c < WEEKS; c++) {
+      for (let r = 0; r < DAYS; r++) {
+        expect(fadeInDelay(c, r)).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});
+
 describe("getDelayFn", () => {
   it("returns correct function for each variant", () => {
+    expect(getDelayFn("fade-in")).toBe(fadeInDelay);
     expect(getDelayFn("diagonal")).toBe(diagonalDelay);
     expect(getDelayFn("ripple")).toBe(rippleDelay);
     expect(getDelayFn("scatter")).toBe(scatterDelay);
     expect(getDelayFn("column-cascade")).toBe(columnCascadeDelay);
     expect(getDelayFn("row-waterfall")).toBe(rowWaterfallDelay);
+  });
+
+  it("supports BadgeConfig aliases (cascade, waterfall)", () => {
+    expect(getDelayFn("cascade")).toBe(columnCascadeDelay);
+    expect(getDelayFn("waterfall")).toBe(rowWaterfallDelay);
   });
 });
 
