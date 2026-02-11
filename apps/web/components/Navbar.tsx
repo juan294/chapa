@@ -44,16 +44,16 @@ export async function Navbar({ navLinks }: NavbarProps) {
   }
 
   return (
-    <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-warm-stroke bg-warm-bg/80 backdrop-blur-xl">
+    <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-stroke bg-white/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold font-heading tracking-tight">
+          <span className="text-xl font-bold font-heading tracking-tight text-text-primary">
             Chapa<span className="text-amber">.</span>
           </span>
         </Link>
 
         {navLinks && navLinks.length > 0 && (
-          <div className="hidden md:flex items-center gap-1 rounded-full border border-warm-stroke bg-warm-card/60 px-1.5 py-1">
+          <div className="hidden md:flex items-center gap-1 rounded-full border border-stroke bg-card/60 px-1.5 py-1">
             {navLinks.map((link) => (
               <a
                 key={link.label}
@@ -79,7 +79,7 @@ export async function Navbar({ navLinks }: NavbarProps) {
         ) : (
           <a
             href="/api/auth/login"
-            className="flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
+            className="flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
           >
             <GitHubIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Get Your Badge</span>

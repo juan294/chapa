@@ -75,12 +75,12 @@ describe("MobileNav", () => {
   });
 
   describe("design system compliance", () => {
-    it("uses warm-card background for the mobile menu", () => {
-      expect(SOURCE).toMatch(/bg-warm-card/);
+    it("uses white background for the mobile menu", () => {
+      expect(SOURCE).toMatch(/bg-white/);
     });
 
-    it("uses warm-stroke for borders", () => {
-      expect(SOURCE).toMatch(/border-warm-stroke/);
+    it("uses stroke for borders", () => {
+      expect(SOURCE).toMatch(/border-stroke/);
     });
   });
 });

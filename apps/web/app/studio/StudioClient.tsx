@@ -129,7 +129,7 @@ export function StudioClient({
       </div>
 
       {/* Controls pane */}
-      <div className="border-t lg:border-t-0 lg:border-l border-warm-stroke bg-warm-card/30 lg:h-[calc(100vh-5rem)] lg:overflow-y-auto">
+      <div className="border-t lg:border-t-0 lg:border-l border-stroke bg-card/50 lg:h-[calc(100vh-5rem)] lg:overflow-y-auto">
         <StudioControls
           config={config}
           onChange={handleConfigChange}

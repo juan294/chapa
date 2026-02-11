@@ -143,9 +143,9 @@ export function generateMockHeatmap(): number[][] {
  * Heatmap cell color based on intensity level (0-4).
  */
 export const INTENSITY_COLORS: Record<number, string> = {
-  0: "rgba(124,106,239,0.06)",
-  1: "rgba(124,106,239,0.20)",
-  2: "rgba(124,106,239,0.38)",
-  3: "rgba(124,106,239,0.58)",
-  4: "rgba(124,106,239,0.85)",
+  0: "rgba(124,106,239,0.08)",
+  1: "rgba(124,106,239,0.25)",
+  2: "rgba(124,106,239,0.42)",
+  3: "rgba(124,106,239,0.62)",
+  4: "rgba(124,106,239,0.88)",
 };

@@ -29,7 +29,7 @@ export function EffectSection({
   const columns = category.options.length <= 3 ? 2 : 2;
 
   return (
-    <div className="border-b border-warm-stroke last:border-b-0">
+    <div className="border-b border-stroke last:border-b-0">
       <button
         type="button"
         id={triggerId}

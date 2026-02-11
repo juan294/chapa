@@ -122,16 +122,11 @@ export default async function SharePage({ params }: SharePageProps) {
   };
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
+    <main id="main-content" className="min-h-screen bg-bg">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
       />
-      {/* Ambient glow */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/3 h-96 w-96 rounded-full bg-amber/[0.03] blur-[150px]" />
-        <div className="absolute bottom-1/4 right-1/4 h-80 w-80 rounded-full bg-amber/[0.04] blur-[120px]" />
-      </div>
 
       <Navbar />
 
@@ -150,7 +145,7 @@ export default async function SharePage({ params }: SharePageProps) {
               impact={impact}
             />
           ) : (
-            <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-4 animate-pulse-glow-amber">
+            <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/u/${encodeURIComponent(handle)}/badge.svg`}
@@ -168,7 +163,7 @@ export default async function SharePage({ params }: SharePageProps) {
           <div className="mb-8 animate-fade-in-up [animation-delay:250ms]">
             <Link
               href="/studio"
-              className="inline-flex items-center gap-2 rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
+              className="inline-flex items-center gap-2 rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
             >
               <svg
                 className="h-4 w-4"
@@ -190,7 +185,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {/* Impact breakdown */}
         {impact ? (
           <section className="mb-12 animate-fade-in-up [animation-delay:300ms]">
-            <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8">
+            <div className="rounded-2xl border border-stroke bg-card p-8">
               <h2 className="font-heading text-sm tracking-widest uppercase text-amber mb-6">
                 Impact Breakdown
               </h2>
@@ -199,7 +194,7 @@ export default async function SharePage({ params }: SharePageProps) {
           </section>
         ) : (
           <section className="mb-12 animate-fade-in-up [animation-delay:300ms]">
-            <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8">
+            <div className="rounded-2xl border border-stroke bg-card p-8">
               <p className="text-text-secondary">
                 Could not load impact data for this user. Try again later.
               </p>
@@ -209,7 +204,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
         {/* Embed snippets */}
         <section className="mb-12 animate-fade-in-up [animation-delay:400ms]">
-          <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-8 space-y-6">
+          <div className="rounded-2xl border border-stroke bg-card p-8 space-y-6">
             <h2 className="font-heading text-sm tracking-widest uppercase text-amber">
               Embed This Badge
             </h2>
@@ -220,7 +215,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-sm text-text-secondary">Markdown</span>
                 <CopyButton text={embedMarkdown} />
               </div>
-              <pre className="overflow-x-auto rounded-xl border border-warm-stroke bg-[#0d0b08] p-4 text-sm text-text-secondary font-heading">
+              <pre className="overflow-x-auto rounded-xl border border-black/10 bg-[#1A1A2E] p-4 text-sm text-[#9AA4B2] font-heading">
                 {embedMarkdown}
               </pre>
             </div>
@@ -231,7 +226,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-sm text-text-secondary">HTML</span>
                 <CopyButton text={embedHtml} />
               </div>
-              <pre className="overflow-x-auto rounded-xl border border-warm-stroke bg-[#0d0b08] p-4 text-sm text-text-secondary font-heading">
+              <pre className="overflow-x-auto rounded-xl border border-black/10 bg-[#1A1A2E] p-4 text-sm text-[#9AA4B2] font-heading">
                 {embedHtml}
               </pre>
             </div>
@@ -243,7 +238,7 @@ export default async function SharePage({ params }: SharePageProps) {
           <ShareButton handle={handle} />
           <Link
             href="/"
-            className="rounded-full border border-warm-stroke px-6 py-2.5 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04] transition-colors"
+            className="rounded-full border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04] transition-colors"
           >
             Generate yours
           </Link>

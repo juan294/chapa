@@ -71,7 +71,7 @@ export function OptionPicker({
             className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
               isActive
                 ? "border-amber bg-amber/[0.06] text-text-primary"
-                : "border-warm-stroke text-text-secondary hover:border-amber/20 hover:bg-amber/[0.03]"
+                : "border-stroke text-text-secondary hover:border-amber/20 hover:bg-amber/[0.03]"
             }`}
           >
             <div className="text-sm font-medium">{opt.label}</div>

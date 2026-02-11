@@ -17,7 +17,7 @@ export function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       aria-label="Copy embed snippet"
-      className="rounded-full border border-warm-stroke bg-warm-card px-4 py-1.5 text-sm text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors"
+      className="rounded-full border border-stroke bg-card px-4 py-1.5 text-sm text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors"
     >
       <span aria-live="polite">{copied ? "Copied!" : "Copy"}</span>
     </button>

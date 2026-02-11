@@ -5,20 +5,20 @@ import type { ImpactTier } from "@chapa/shared";
 export function tierPillClasses(tier: ImpactTier): string {
   switch (tier) {
     case "Emerging":
-      return "bg-[rgba(154,164,178,0.08)] border-[rgba(154,164,178,0.20)] text-text-secondary";
+      return "bg-[rgba(107,114,128,0.08)] border-[rgba(107,114,128,0.20)] text-text-secondary";
     case "Solid":
-      return "bg-[rgba(230,237,243,0.06)] border-[rgba(230,237,243,0.20)] text-text-primary";
+      return "bg-[rgba(26,26,46,0.06)] border-[rgba(26,26,46,0.15)] text-text-primary";
     case "High":
       return "bg-amber/10 border-amber/25 text-amber";
     case "Elite":
-      return "tier-elite-pill border-amber/30 text-[#0C0D14] font-bold";
+      return "tier-elite-pill border-amber/30 text-white font-bold";
   }
 }
 
 /** CSS for tier-specific visual treatments. Inject once in the page. */
 export const TIER_VISUALS_CSS = `
-.tier-score-emerging { color: #9AA4B2; }
-.tier-score-solid { color: #E6EDF3; text-shadow: 0 1px 8px rgba(230,237,243,0.15); }
+.tier-score-emerging { color: #6B7280; }
+.tier-score-solid { color: #1A1A2E; text-shadow: none; }
 .tier-score-high {
   background: linear-gradient(135deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
@@ -31,10 +31,10 @@ export const TIER_VISUALS_CSS = `
 }
 @keyframes tier-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-.tier-card-emerging { border: 1px solid rgba(154,164,178,0.15); }
-.tier-card-solid { border: 1px solid rgba(230,237,243,0.12); }
-.tier-card-high { border: 1px solid rgba(124,106,239,0.18); box-shadow: 0 0 20px rgba(124,106,239,0.10), 0 0 40px rgba(124,106,239,0.04); }
-.tier-card-elite { box-shadow: 0 0 40px rgba(124,106,239,0.15), 0 0 80px rgba(124,106,239,0.05); }
+.tier-card-emerging { border: 1px solid rgba(0,0,0,0.08); }
+.tier-card-solid { border: 1px solid rgba(0,0,0,0.10); }
+.tier-card-high { border: 1px solid rgba(124,106,239,0.25); box-shadow: 0 0 20px rgba(124,106,239,0.08), 0 0 40px rgba(124,106,239,0.03); }
+.tier-card-elite { box-shadow: 0 0 40px rgba(124,106,239,0.12), 0 0 80px rgba(124,106,239,0.04); }
 
 @property --elite-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 .elite-border-glow {

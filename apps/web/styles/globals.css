@@ -1,22 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  /* Base palette (cool dark) */
-  --color-bg: #0C0D14;
-  --color-card: #13141E;
-  --color-text-primary: #E6EDF3;
-  --color-text-secondary: #9AA4B2;
-  --color-stroke: rgba(124, 106, 239, 0.12);
+  /* Base palette (light) */
+  --color-bg: #FFFFFF;
+  --color-card: #F9FAFB;
+  --color-text-primary: #1A1A2E;
+  --color-text-secondary: #6B7280;
+  --color-stroke: rgba(0, 0, 0, 0.08);
 
   /* Accent: cool indigo/violet */
   --color-amber: #7C6AEF;
   --color-amber-light: #9D8FFF;
   --color-amber-dark: #5E4FCC;
 
-  /* Aliases (used throughout the page) */
-  --color-warm-bg: #0C0D14;
-  --color-warm-card: #13141E;
-  --color-warm-stroke: rgba(124, 106, 239, 0.12);
+  /* Aliases */
+  --color-warm-bg: #FFFFFF;
+  --color-warm-card: #F9FAFB;
+  --color-warm-stroke: rgba(0, 0, 0, 0.08);
+
+  /* Dark emphasis sections */
+  --color-dark-section: #1A1A2E;
+  --color-dark-card: #252542;
+  --color-purple-tint: #F5F3FF;
+  --color-complement: #10B981;
+  --color-complement-light: #D1FAE5;
 
   /* Typography */
   --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
@@ -73,10 +80,10 @@ html {
 @keyframes pulse-glow-amber {
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(124, 106, 239, 0.2);
+    box-shadow: 0 0 20px rgba(124, 106, 239, 0.1);
   }
   50% {
-    box-shadow: 0 0 44px rgba(124, 106, 239, 0.3);
+    box-shadow: 0 0 40px rgba(124, 106, 239, 0.18);
   }
 }
 
@@ -157,10 +164,10 @@ html {
 
 .bg-grid-warm {
   background-image: linear-gradient(
-      rgba(124, 106, 239, 0.03) 1px,
+      rgba(0, 0, 0, 0.03) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, rgba(124, 106, 239, 0.03) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
   background-size: 72px 72px;
 }
 
@@ -193,9 +200,9 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(124, 106, 239, 0.15);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 106, 239, 0.3);
+  background: rgba(0, 0, 0, 0.2);
 }

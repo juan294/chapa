@@ -15,7 +15,7 @@ export function ShareBadgePreview({
   impact,
 }: ShareBadgePreviewProps) {
   return (
-    <div className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-4 animate-pulse-glow-amber">
+    <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
       <BadgePreviewCard
         config={config}
         stats={stats}

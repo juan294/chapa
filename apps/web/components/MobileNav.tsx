@@ -70,7 +70,7 @@ export function MobileNav({ links }: MobileNavProps) {
     <>
       <button
         type="button"
-        className="md:hidden flex items-center justify-center w-10 h-10 rounded-full border border-warm-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
+        className="md:hidden flex items-center justify-center w-10 h-10 rounded-full border border-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
         aria-label="Toggle navigation"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
@@ -101,7 +101,7 @@ export function MobileNav({ links }: MobileNavProps) {
       </button>
 
       {open && (
-        <div ref={panelRef} className="absolute top-full left-0 w-full border-b border-warm-stroke bg-warm-card md:hidden">
+        <div ref={panelRef} className="absolute top-full left-0 w-full border-b border-stroke bg-white md:hidden shadow-lg">
           <div className="flex flex-col px-6 py-4 gap-2">
             {links.map((link) => (
               <a

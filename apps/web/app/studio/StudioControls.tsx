@@ -90,7 +90,7 @@ export function StudioControls({
         <PresetBar config={config} onSelect={onPresetSelect} />
       </div>
 
-      <div className="mx-4 border-t border-warm-stroke" />
+      <div className="mx-4 border-t border-stroke" />
 
       {/* Effect sections */}
       <div
@@ -115,19 +115,19 @@ export function StudioControls({
       </div>
 
       {/* Save / Reset */}
-      <div className="border-t border-warm-stroke px-4 py-4 flex items-center gap-3">
+      <div className="border-t border-stroke px-4 py-4 flex items-center gap-3">
         <button
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="flex-1 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? "Saving..." : saved ? "Saved!" : "Save & Apply"}
         </button>
         <button
           type="button"
           onClick={handleReset}
-          className="rounded-full border border-warm-stroke px-5 py-3 text-sm font-medium text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]"
+          className="rounded-full border border-stroke px-5 py-3 text-sm font-medium text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]"
         >
           {confirmReset ? "Confirm?" : "Reset"}
         </button>

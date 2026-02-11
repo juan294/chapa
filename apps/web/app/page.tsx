@@ -226,32 +226,27 @@ export default async function Home({
       <main id="main-content">
         {/* ── Hero ─────────────────────────────────────────── */}
         <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
-          {/* Background layers */}
-          <div className="absolute inset-0 bg-grid-warm" />
-          <div className="absolute top-1/4 right-1/4 w-[800px] h-[600px] rounded-full bg-amber/[0.04] blur-[150px]" />
-          <div className="absolute bottom-1/4 left-1/6 w-[500px] h-[500px] rounded-full bg-amber/[0.03] blur-[120px]" />
-
           {/* Floating decorative pills */}
           <div className="absolute top-32 left-[8%] animate-drift [animation-delay:0ms]" aria-hidden="true">
-            <div className="rounded-full border border-warm-stroke bg-warm-card/40 px-4 py-2 text-xs text-text-secondary/60 backdrop-blur-sm">
+            <div className="rounded-full border border-stroke bg-purple-tint px-4 py-2 text-xs text-text-secondary shadow-sm">
               847 commits
             </div>
           </div>
           <div className="absolute top-48 right-[12%] animate-drift [animation-delay:2000ms]" aria-hidden="true">
-            <div className="rounded-full border border-amber/20 bg-amber/[0.06] px-4 py-2 text-xs text-amber/70 backdrop-blur-sm">
+            <div className="rounded-full border border-amber/20 bg-purple-tint px-4 py-2 text-xs text-amber shadow-sm">
               Elite Tier
             </div>
           </div>
           <div className="absolute bottom-40 left-[15%] animate-drift [animation-delay:4000ms]" aria-hidden="true">
-            <div className="rounded-full border border-warm-stroke bg-warm-card/40 px-4 py-2 text-xs text-text-secondary/60 backdrop-blur-sm">
+            <div className="rounded-full border border-stroke bg-purple-tint px-4 py-2 text-xs text-text-secondary shadow-sm">
               42 PRs merged
             </div>
           </div>
           <div className="absolute bottom-56 right-[8%] animate-drift [animation-delay:1000ms]" aria-hidden="true">
-            <DiamondIcon className="w-5 h-5 text-amber/20" />
+            <DiamondIcon className="w-5 h-5 text-amber/30" />
           </div>
           <div className="absolute top-64 left-[45%] animate-float-slow" aria-hidden="true">
-            <DiamondIcon className="w-4 h-4 text-amber/10" />
+            <DiamondIcon className="w-4 h-4 text-amber/20" />
           </div>
 
           {/* Two-column hero */}
@@ -260,7 +255,7 @@ export default async function Home({
               {/* Left: Text content */}
               <div>
                 {/* Eyebrow */}
-                <div className="animate-fade-in-up mb-6 inline-flex items-center gap-2 rounded-full border border-amber/20 bg-amber/[0.06] px-4 py-1.5 text-sm text-amber">
+                <div className="animate-fade-in-up mb-6 inline-flex items-center gap-2 rounded-full border border-amber/20 bg-purple-tint px-4 py-1.5 text-sm text-amber">
                   <DiamondIcon className="w-3.5 h-3.5" />
                   <span>Your developer impact, quantified</span>
                 </div>
@@ -283,7 +278,7 @@ export default async function Home({
                 <div className="animate-fade-in-up [animation-delay:450ms] mt-8 flex flex-col sm:flex-row items-start gap-4">
                   <a
                     href="/api/auth/login"
-                    className="group flex items-center gap-2.5 rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 animate-pulse-glow-amber"
+                    className="group flex items-center gap-2.5 rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                   >
                     <GitHubIcon className="w-4 h-4" />
                     Get Your Badge
@@ -291,7 +286,7 @@ export default async function Home({
                   </a>
                   <a
                     href="#badge-preview"
-                    className="flex items-center gap-2 rounded-full border border-warm-stroke px-8 py-3.5 text-base font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]"
+                    className="flex items-center gap-2 rounded-full border border-stroke px-8 py-3.5 text-base font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]"
                   >
                     See Example
                   </a>
@@ -303,9 +298,9 @@ export default async function Home({
                     {[1, 2, 3, 4, 5].map((i) => (
                       <div
                         key={i}
-                        className="w-8 h-8 rounded-full border-2 border-warm-bg bg-warm-card flex items-center justify-center"
+                        className="w-8 h-8 rounded-full border-2 border-white bg-purple-tint flex items-center justify-center shadow-sm"
                       >
-                        <span className="text-[10px] text-text-secondary/60 font-heading">
+                        <span className="text-[10px] text-text-secondary font-heading">
                           {String.fromCharCode(64 + i)}
                         </span>
                       </div>
@@ -327,13 +322,10 @@ export default async function Home({
                 </div>
               </div>
 
-              {/* Right: Badge preview card (hero centerpiece) */}
+              {/* Right: Badge preview card (hero centerpiece) — stays dark */}
               <div className="animate-scale-in [animation-delay:300ms] relative">
-                {/* Outer glow */}
-                <div className="absolute -inset-6 rounded-3xl bg-amber/[0.06] blur-3xl" />
-
                 {/* Card */}
-                <div className="relative rounded-2xl border border-warm-stroke bg-warm-card shadow-2xl shadow-black/50 overflow-hidden">
+                <div className="relative rounded-2xl border border-black/10 bg-[#13141E] shadow-2xl shadow-black/15 overflow-hidden">
                   {/* Shimmer top edge */}
                   <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-amber/30 to-transparent animate-shimmer" />
 
@@ -345,15 +337,15 @@ export default async function Home({
                           <GitHubIcon className="w-5 h-5 text-amber" />
                         </div>
                         <div>
-                          <p className="font-semibold text-text-primary">
+                          <p className="font-semibold text-[#E6EDF3]">
                             @developer
                           </p>
-                          <p className="text-sm text-text-secondary">
+                          <p className="text-sm text-[#9AA4B2]">
                             Last 90 days
                           </p>
                         </div>
                       </div>
-                      <span className="text-sm font-heading text-text-secondary/50 tracking-tight">
+                      <span className="text-sm font-heading text-[#9AA4B2]/50 tracking-tight">
                         Chapa<span className="text-amber">.</span>
                       </span>
                     </div>
@@ -362,7 +354,7 @@ export default async function Home({
                     <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
                       {/* Heatmap */}
                       <div className="flex-shrink-0">
-                        <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-2">
+                        <p className="text-[10px] tracking-widest uppercase text-[#9AA4B2]/60 mb-2">
                           Activity
                         </p>
                         <div className="flex gap-[3px]">
@@ -382,11 +374,11 @@ export default async function Home({
                       {/* Score */}
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
-                          <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-1">
+                          <p className="text-[10px] tracking-widest uppercase text-[#9AA4B2]/60 mb-1">
                             Impact Score
                           </p>
                           <div className="flex items-baseline gap-3">
-                            <span className="text-6xl font-heading tracking-tighter text-text-primary">
+                            <span className="text-6xl font-heading tracking-tighter text-[#E6EDF3]">
                               94
                             </span>
                             <div className="flex flex-col gap-1">
@@ -394,30 +386,30 @@ export default async function Home({
                                 <StarIcon className="w-3 h-3" />
                                 Elite
                               </span>
-                              <span className="text-xs text-text-secondary">
+                              <span className="text-xs text-[#9AA4B2]">
                                 87% Confidence
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary/70">
+                        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#9AA4B2]/70">
                           <span>847 commits</span>
-                          <span className="text-warm-stroke">|</span>
+                          <span className="text-[#9AA4B2]/30">|</span>
                           <span>42 PRs merged</span>
-                          <span className="text-warm-stroke">|</span>
+                          <span className="text-[#9AA4B2]/30">|</span>
                           <span>28 reviews</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="mt-6 pt-4 border-t border-warm-stroke flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-[10px] text-text-secondary/60">
+                    <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[10px] text-[#9AA4B2]/60">
                         <GitHubIcon className="w-3 h-3" />
                         <span>Powered by GitHub</span>
                       </div>
-                      <span className="text-[10px] text-text-secondary/60 font-heading">
+                      <span className="text-[10px] text-[#9AA4B2]/60 font-heading">
                         chapa.thecreativetoken.com
                       </span>
                     </div>
@@ -429,11 +421,11 @@ export default async function Home({
 
           {/* Scroll indicator */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-fade-in-up [animation-delay:900ms]" aria-hidden="true">
-            <div className="flex flex-col items-center gap-2 text-text-secondary/30">
+            <div className="flex flex-col items-center gap-2 text-text-secondary/40">
               <span className="text-[10px] tracking-[0.2em] uppercase">
                 Scroll
               </span>
-              <div className="h-8 w-[1px] bg-gradient-to-b from-amber/20 to-transparent" />
+              <div className="h-8 w-[1px] bg-gradient-to-b from-amber/30 to-transparent" />
             </div>
           </div>
         </section>
@@ -441,10 +433,8 @@ export default async function Home({
         {/* ── Badge Preview (standalone) ──────────────────── */}
         <section
           id="badge-preview"
-          className="relative py-32 overflow-hidden border-t border-warm-stroke"
+          className="relative py-32 overflow-hidden border-t border-stroke"
         >
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-amber/[0.03] blur-[120px]" />
-
           <div className="relative z-10 mx-auto max-w-4xl px-6">
             <div className="text-center mb-12">
               <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl tracking-tight">
@@ -457,24 +447,24 @@ export default async function Home({
 
             {/* Terminal / embed snippet */}
             <div className="mx-auto max-w-lg">
-              <div className="rounded-xl border border-warm-stroke bg-[#0d0b08] overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-warm-stroke">
-                  <div className="w-3 h-3 rounded-full bg-amber/20" />
-                  <div className="w-3 h-3 rounded-full bg-amber/10" />
-                  <div className="w-3 h-3 rounded-full bg-amber/[0.06]" />
-                  <span className="ml-2 text-xs text-text-secondary/60 font-heading">
+              <div className="rounded-xl border border-black/10 bg-[#1A1A2E] overflow-hidden shadow-lg">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
+                  <div className="w-3 h-3 rounded-full bg-red-400/60" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400/60" />
+                  <div className="w-3 h-3 rounded-full bg-green-400/60" />
+                  <span className="ml-2 text-xs text-[#9AA4B2]/60 font-heading">
                     embed snippet
                   </span>
                 </div>
                 <div className="p-4 font-heading text-sm leading-relaxed">
-                  <p className="text-text-secondary/50">
+                  <p className="text-[#9AA4B2]/50">
                     <span className="text-amber/50">{"<!-- "}</span>
                     Add to your README
                     <span className="text-amber/50">{" -->"}</span>
                   </p>
-                  <p className="text-text-primary/80 mt-1">
+                  <p className="text-[#E6EDF3]/80 mt-1">
                     <span className="text-amber">{"![Impact Badge]("}</span>
-                    <span className="text-text-secondary">
+                    <span className="text-[#9AA4B2]">
                       {"chapa.thecreativetoken.com/u/"}
                     </span>
                     <span className="text-amber/70">{"developer"}</span>
@@ -489,7 +479,7 @@ export default async function Home({
         {/* ── Features ──────────────────────────────────────── */}
         <section
           id="features"
-          className="py-32 border-t border-warm-stroke"
+          className="py-32 bg-purple-tint border-t border-stroke"
         >
           <div className="mx-auto max-w-7xl px-6">
             <div className="text-center mb-16">
@@ -507,14 +497,14 @@ export default async function Home({
               {FEATURES.map((feature, i) => (
                 <div
                   key={feature.title}
-                  className="group relative rounded-2xl border border-warm-stroke bg-warm-card/50 p-8 transition-all hover:border-amber/20 hover:bg-warm-card"
+                  className="group relative rounded-2xl border border-stroke bg-white p-8 shadow-sm transition-all hover:border-amber/30 hover:shadow-md"
                 >
                   {/* Decorative number */}
-                  <span className="absolute top-6 right-6 text-5xl font-heading text-amber/[0.06] select-none" aria-hidden="true">
+                  <span className="absolute top-6 right-6 text-5xl font-heading text-amber/10 select-none" aria-hidden="true">
                     {String(i + 1).padStart(2, "0")}
                   </span>
 
-                  <div className="mb-6 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber/[0.08] border border-amber/10 text-amber transition-colors group-hover:bg-amber/15">
+                  <div className="mb-6 inline-flex items-center justify-center w-12 h-12 rounded-xl bg-purple-tint border border-amber/15 text-amber transition-colors group-hover:bg-amber/10">
                     {ICON_MAP[feature.icon]}
                   </div>
                   <h3 className="font-heading text-lg font-semibold text-text-primary mb-3 tracking-tight">
@@ -532,7 +522,7 @@ export default async function Home({
         {/* ── How It Works ──────────────────────────────────── */}
         <section
           id="how-it-works"
-          className="py-32 border-t border-warm-stroke"
+          className="py-32 border-t border-stroke"
         >
           <div className="mx-auto max-w-5xl px-6">
             <div className="text-center mb-16">
@@ -547,12 +537,12 @@ export default async function Home({
 
             <div className="relative">
               {/* Connecting line (desktop) */}
-              <div className="hidden md:block absolute top-16 left-[16.67%] right-[16.67%] h-[1px] bg-gradient-to-r from-warm-stroke via-amber/20 to-warm-stroke" />
+              <div className="hidden md:block absolute top-16 left-[16.67%] right-[16.67%] h-[1px] bg-gradient-to-r from-stroke via-amber/20 to-stroke" />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
                 {STEPS.map((step) => (
                   <div key={step.number} className="relative text-center">
-                    <div className="relative z-10 mx-auto inline-flex items-center justify-center w-32 h-32 rounded-full border border-warm-stroke bg-warm-card mb-8">
+                    <div className="relative z-10 mx-auto inline-flex items-center justify-center w-32 h-32 rounded-full border border-amber/20 bg-white shadow-sm mb-8">
                       {/* Inner ring */}
                       <div className="absolute inset-2 rounded-full border border-amber/10" />
                       <span className="text-3xl font-heading text-amber">
@@ -572,40 +562,38 @@ export default async function Home({
           </div>
         </section>
 
-        {/* ── Stats ─────────────────────────────────────────── */}
-        <section id="stats" className="py-32 border-t border-warm-stroke">
+        {/* ── Stats (dark emphasis band) ────────────────────── */}
+        <section id="stats" className="py-32 bg-dark-section">
           <div className="mx-auto max-w-5xl px-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {STATS.map((stat) => (
                 <div
                   key={stat.label}
-                  className="rounded-2xl border border-warm-stroke bg-warm-card/50 p-10 text-center transition-all hover:border-amber/20"
+                  className="rounded-2xl border border-amber/15 bg-dark-card p-10 text-center transition-all hover:border-amber/30"
                 >
                   <p className="text-5xl md:text-6xl font-heading tracking-tight text-amber">
                     {stat.value}
                   </p>
-                  <p className="mt-3 text-text-secondary">{stat.label}</p>
+                  <p className="mt-3 text-[#9AA4B2]">{stat.label}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── Final CTA ─────────────────────────────────────── */}
-        <section className="relative py-32 overflow-hidden border-t border-warm-stroke">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-amber/[0.05] blur-[140px]" />
-
+        {/* ── Final CTA (dark section) ─────────────────────── */}
+        <section className="relative py-32 overflow-hidden bg-dark-section">
           {/* Floating decorative elements */}
           <div className="absolute top-20 left-[10%] animate-float-slow" aria-hidden="true">
-            <DiamondIcon className="w-6 h-6 text-amber/10" />
+            <DiamondIcon className="w-6 h-6 text-amber/20" />
           </div>
           <div className="absolute bottom-20 right-[10%] animate-float-medium" aria-hidden="true">
-            <StarIcon className="w-5 h-5 text-amber/10" />
+            <StarIcon className="w-5 h-5 text-amber/20" />
           </div>
 
           <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
             {/* Rating badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber/20 bg-amber/[0.06] px-4 py-2 mb-8">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber/20 bg-amber/10 px-4 py-2 mb-8">
               <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <StarIcon key={i} className="w-3.5 h-3.5 text-amber" />
@@ -616,19 +604,19 @@ export default async function Home({
               </span>
             </div>
 
-            <h2 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight">
+            <h2 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight text-white">
               Ready to prove
               <br />
               <span className="text-amber">your impact?</span>
             </h2>
-            <p className="mt-6 text-text-secondary text-lg max-w-xl mx-auto leading-relaxed">
+            <p className="mt-6 text-[#9AA4B2] text-lg max-w-xl mx-auto leading-relaxed">
               Join thousands of developers showcasing their real contributions.
               It takes 30 seconds.
             </p>
             <div className="mt-10">
               <a
                 href="/api/auth/login"
-                className="group inline-flex items-center gap-2.5 rounded-full bg-amber px-10 py-4 text-lg font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 animate-pulse-glow-amber"
+                className="group inline-flex items-center gap-2.5 rounded-full bg-amber px-10 py-4 text-lg font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 <GitHubIcon className="w-5 h-5" />
                 Get Your Badge
@@ -640,19 +628,19 @@ export default async function Home({
       </main>
 
       {/* ── Footer ──────────────────────────────────────────── */}
-      <footer className="border-t border-warm-stroke py-12">
+      <footer className="border-t border-stroke py-12 bg-white">
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <span className="font-heading text-lg tracking-tight">
+              <span className="font-heading text-lg tracking-tight text-text-primary">
                 Chapa<span className="text-amber">.</span>
               </span>
-              <span className="text-sm text-text-secondary/60">
+              <span className="text-sm text-text-secondary">
                 Built for developers, by developers.
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-text-secondary/60">
+            <div className="flex items-center gap-2 text-xs text-text-secondary">
               <GitHubIcon className="w-3.5 h-3.5" />
               <span>Powered by GitHub</span>
             </div>
@@ -660,14 +648,14 @@ export default async function Home({
             <div className="flex items-center gap-4">
               <a
                 href="https://github.com"
-                className="text-text-secondary/60 hover:text-amber/60 transition-colors"
+                className="text-text-secondary hover:text-amber transition-colors"
                 aria-label="GitHub"
               >
                 <GitHubIcon className="w-5 h-5" />
               </a>
               <a
                 href="https://x.com"
-                className="text-text-secondary/60 hover:text-amber/60 transition-colors"
+                className="text-text-secondary hover:text-amber transition-colors"
                 aria-label="X (Twitter)"
               >
                 <svg
@@ -682,7 +670,7 @@ export default async function Home({
             </div>
           </div>
 
-          <div className="mt-8 text-center text-xs text-text-secondary/60">
+          <div className="mt-8 text-center text-xs text-text-secondary">
             &copy; {new Date().getFullYear()} Chapa. All rights reserved.
           </div>
         </div>
