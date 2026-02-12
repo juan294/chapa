@@ -33,7 +33,7 @@
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
   --font-body: var(--font-plus-jakarta), system-ui, sans-serif;
-  --font-terminal: var(--font-geist-mono), "SF Mono", "Menlo", "Courier New", monospace;
+  --font-terminal: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
 /* ── Theme values (unlayered — same cascade level) ─────── */
