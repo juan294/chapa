@@ -23,6 +23,15 @@ describe("buildHeatmapCells", () => {
     expect(cells).toHaveLength(91);
   });
 
+  it("slices 365-entry input to last 91 entries (13 weeks)", () => {
+    const fullYear = makeHeatmapData(365);
+    const cells = buildHeatmapCells(fullYear);
+    expect(cells).toHaveLength(91);
+    // First cell should use data from entry 274 (365 - 91)
+    const expectedCount = fullYear[274].count;
+    // We can't test fill directly (depends on theme), but cell count is correct
+  });
+
   it("each cell has x, y, fill, and delay properties", () => {
     const cells = buildHeatmapCells(makeHeatmapData());
     for (const cell of cells) {

@@ -18,11 +18,18 @@ export function buildHeatmapCells(
   offsetX: number = 0,
   offsetY: number = 0,
 ): HeatmapCell[] {
+  // Slice to last 13 weeks (91 days) — scoring window may be 365 days
+  const displaySize = WEEKS * DAYS;
+  const sliced =
+    heatmapData.length > displaySize
+      ? heatmapData.slice(-displaySize)
+      : heatmapData;
+
   const cells: HeatmapCell[] = [];
   for (let week = 0; week < WEEKS; week++) {
     for (let day = 0; day < DAYS; day++) {
       const idx = week * DAYS + day;
-      const count = idx < heatmapData.length ? heatmapData[idx].count : 0;
+      const count = idx < sliced.length ? sliced[idx].count : 0;
       cells.push({
         x: offsetX + week * (CELL_SIZE + CELL_GAP),
         y: offsetY + day * (CELL_SIZE + CELL_GAP),
