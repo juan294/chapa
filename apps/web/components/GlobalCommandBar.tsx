@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
+import { TerminalOutput } from "@/components/terminal/TerminalOutput";
 import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
 import {
   executeCommand,
   createNavigationCommands,
 } from "@/components/terminal/command-registry";
+import type { OutputLine } from "@/components/terminal/command-registry";
+
+const OUTPUT_TIMEOUT_MS = 5000;
 
 /**
  * Fixed bottom command bar with navigation commands + AuthorTypewriter pill.
@@ -18,8 +22,21 @@ export function GlobalCommandBar() {
   const router = useRouter();
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
+  const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const commands = useMemo(() => createNavigationCommands(), []);
+
+  // Auto-clear output after timeout
+  useEffect(() => {
+    if (outputLines.length === 0) return;
+    outputTimerRef.current = setTimeout(() => {
+      setOutputLines([]);
+    }, OUTPUT_TIMEOUT_MS);
+    return () => {
+      if (outputTimerRef.current) clearTimeout(outputTimerRef.current);
+    };
+  }, [outputLines]);
 
   const handleSubmit = useCallback(
     (input: string) => {
@@ -28,12 +45,18 @@ export function GlobalCommandBar() {
 
       const result = executeCommand(input, commands);
       const action = result.action;
-      if (!action || action.type !== "navigate") return;
 
-      if (action.path === "/api/auth/login") {
-        window.location.href = action.path;
-      } else {
-        router.push(action.path);
+      // Show output lines for any command that produces them
+      if (result.lines.length > 0) {
+        setOutputLines(result.lines);
+      }
+
+      if (action?.type === "navigate") {
+        if (action.path === "/api/auth/login") {
+          window.location.href = action.path;
+        } else {
+          router.push(action.path);
+        }
       }
     },
     [commands, router],
@@ -42,6 +65,8 @@ export function GlobalCommandBar() {
   const handlePartialChange = useCallback((val: string) => {
     setPartial(val);
     setShowAutocomplete(val.startsWith("/") && val.length > 0);
+    // Clear transient output on next keystroke
+    setOutputLines([]);
   }, []);
 
   const handleAutocompleteDismiss = useCallback(() => {
@@ -79,6 +104,11 @@ export function GlobalCommandBar() {
         <AuthorTypewriter />
       </div>
       <div className="relative mx-auto max-w-4xl">
+        {outputLines.length > 0 && (
+          <div className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl">
+            <TerminalOutput lines={outputLines} />
+          </div>
+        )}
         <AutocompleteDropdown
           commands={commands}
           partial={partial}

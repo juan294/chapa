@@ -80,6 +80,50 @@ describe("GlobalCommandBar", () => {
     });
   });
 
+  describe("transient output panel (issue #116)", () => {
+    it("imports TerminalOutput component", () => {
+      expect(GLOBAL_SOURCE).toContain("TerminalOutput");
+    });
+
+    it("imports OutputLine type", () => {
+      expect(GLOBAL_SOURCE).toContain("OutputLine");
+    });
+
+    it("has outputLines state", () => {
+      expect(GLOBAL_SOURCE).toContain("outputLines");
+      expect(GLOBAL_SOURCE).toContain("setOutputLines");
+    });
+
+    it("stores result.lines for non-navigate commands", () => {
+      // handleSubmit should set outputLines from result.lines
+      // instead of silently returning
+      expect(GLOBAL_SOURCE).toContain("setOutputLines");
+      // Must not early-return when action is missing or non-navigate
+      expect(GLOBAL_SOURCE).not.toMatch(
+        /if\s*\(\s*!action\s*\|\|\s*action\.type\s*!==\s*["']navigate["']\s*\)\s*return/,
+      );
+    });
+
+    it("auto-clears output after timeout", () => {
+      // Should have a useEffect that clears outputLines
+      expect(GLOBAL_SOURCE).toMatch(/setTimeout/);
+      expect(GLOBAL_SOURCE).toMatch(/setOutputLines\s*\(\s*\[\s*\]\s*\)/);
+    });
+
+    it("clears output on next keystroke", () => {
+      // handlePartialChange should clear outputLines
+      const partialChangeMatch = GLOBAL_SOURCE.match(
+        /handlePartialChange[\s\S]*?setOutputLines/,
+      );
+      expect(partialChangeMatch).not.toBeNull();
+    });
+
+    it("renders TerminalOutput conditionally when outputLines is non-empty", () => {
+      expect(GLOBAL_SOURCE).toContain("<TerminalOutput");
+      expect(GLOBAL_SOURCE).toMatch(/outputLines\.length\s*>\s*0/);
+    });
+  });
+
   describe("layout", () => {
     it("has relative container for dropdown positioning", () => {
       expect(GLOBAL_SOURCE).toContain("relative");
