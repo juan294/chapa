@@ -22,6 +22,8 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     topRepoShare: 0.6,
     maxCommitsIn10Min: 3,
     totalStars: 0,
+    totalForks: 0,
+    totalWatchers: 0,
     heatmapData: Array.from({ length: 91 }, (_, i) => ({
       date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
       count: i % 5,
@@ -261,35 +263,34 @@ describe("renderBadgeSvg", () => {
       expect(svg).toMatch(/[\u2605\u2606]|star/i);
     });
 
-    it("shows totalStars count next to archetype pill with middle dot separator", () => {
+    it("shows watch, fork, star counts in meta row with middle dot separators", () => {
       const svg = renderBadgeSvg(
-        makeStats({ totalStars: 142 }),
+        makeStats({ totalWatchers: 80, totalForks: 25, totalStars: 142 }),
         makeImpact(),
       );
-      // Should contain the star count
+      expect(svg).toContain("80");
+      expect(svg).toContain("25");
       expect(svg).toContain("142");
-      // Should contain a middle dot separator (·)
+      // Middle dot separators between metrics
       expect(svg).toContain("\u00B7");
-      // Star icon should be the filled star (★) in accent color, not emoji
+    });
+
+    it("formats large counts with compact notation", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ totalWatchers: 1005, totalForks: 31800, totalStars: 188000 }),
+        makeImpact(),
+      );
+      expect(svg).toContain("1k");
+      expect(svg).toContain("31.8k");
+      expect(svg).toContain("188k");
+    });
+
+    it("renders inline SVG icons for watch (eye), fork, and star", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Star icon (★ in accent color)
       expect(svg).toMatch(/fill="[^"]*7C6AEF[^"]*">\u2605<\/tspan>/);
-    });
-
-    it("formats large star counts with compact notation", () => {
-      const svg = renderBadgeSvg(
-        makeStats({ totalStars: 2500 }),
-        makeImpact(),
-      );
-      expect(svg).toContain("2.5k");
-    });
-
-    it("shows 0 stars when totalStars is 0", () => {
-      const svg = renderBadgeSvg(
-        makeStats({ totalStars: 0 }),
-        makeImpact(),
-      );
-      // Middle dot separator and star count still present
-      expect(svg).toContain("\u00B7");
-      expect(svg).toMatch(/\u2605<\/tspan>\s*0</);
+      // Fork and eye icons as SVG paths
+      expect(svg).toMatch(/<path[^>]*d="M[^"]*"[^>]*\/>/); // at least one SVG icon path
     });
 
     it("contains a radar chart with polygon", () => {

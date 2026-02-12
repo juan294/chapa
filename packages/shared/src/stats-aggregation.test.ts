@@ -41,9 +41,9 @@ function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionD
     },
     ownedRepoStars: {
       nodes: [
-        { stargazerCount: 100 },
-        { stargazerCount: 50 },
-        { stargazerCount: 10 },
+        { stargazerCount: 100, forkCount: 20, watchers: { totalCount: 30 } },
+        { stargazerCount: 50, forkCount: 10, watchers: { totalCount: 15 } },
+        { stargazerCount: 10, forkCount: 2, watchers: { totalCount: 5 } },
       ],
     },
     ...overrides,
@@ -367,9 +367,41 @@ describe("buildStatsFromRaw", () => {
 
   it("handles single repo with many stars", () => {
     const raw = makeRaw({
-      ownedRepoStars: { nodes: [{ stargazerCount: 5000 }] },
+      ownedRepoStars: { nodes: [{ stargazerCount: 5000, forkCount: 200, watchers: { totalCount: 50 } }] },
     });
     const result = buildStatsFromRaw(raw);
     expect(result.totalStars).toBe(5000);
+  });
+
+  // --- Total forks ---
+
+  it("sums forkCount across owned repos", () => {
+    const result = buildStatsFromRaw(makeRaw());
+    // Default test data: 20 + 10 + 2 = 32
+    expect(result.totalForks).toBe(32);
+  });
+
+  it("returns 0 totalForks when no owned repos", () => {
+    const raw = makeRaw({
+      ownedRepoStars: { nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.totalForks).toBe(0);
+  });
+
+  // --- Total watchers ---
+
+  it("sums watchers totalCount across owned repos", () => {
+    const result = buildStatsFromRaw(makeRaw());
+    // Default test data: 30 + 15 + 5 = 50
+    expect(result.totalWatchers).toBe(50);
+  });
+
+  it("returns 0 totalWatchers when no owned repos", () => {
+    const raw = makeRaw({
+      ownedRepoStars: { nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.totalWatchers).toBe(0);
   });
 });

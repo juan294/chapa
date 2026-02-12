@@ -31,6 +31,8 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     topRepoShare: 0,
     maxCommitsIn10Min: 0,
     totalStars: 0,
+    totalForks: 0,
+    totalWatchers: 0,
     heatmapData: [],
     fetchedAt: new Date().toISOString(),
     ...overrides,

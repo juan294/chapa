@@ -31,4 +31,11 @@ describe("CONTRIBUTION_QUERY", () => {
     expect(CONTRIBUTION_QUERY).toContain("deletions");
     expect(CONTRIBUTION_QUERY).toContain("changedFiles");
   });
+
+  it("queries owned repos for watchers, forkCount, and stargazerCount", () => {
+    expect(CONTRIBUTION_QUERY).toContain("stargazerCount");
+    expect(CONTRIBUTION_QUERY).toContain("forkCount");
+    expect(CONTRIBUTION_QUERY).toContain("watchers");
+    expect(CONTRIBUTION_QUERY).toContain("totalCount");
+  });
 });

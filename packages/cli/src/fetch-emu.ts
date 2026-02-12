@@ -82,7 +82,7 @@ export async function fetchEmuStats(
       ownedRepoStars: {
         nodes: (user.ownedRepos?.nodes ?? [])
           .filter((n: any) => n != null)
-          .map((n: any) => ({ stargazerCount: n.stargazerCount })),
+          .map((n: any) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
       },
     };
 

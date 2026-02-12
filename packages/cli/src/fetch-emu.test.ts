@@ -75,7 +75,7 @@ describe("fetchEmuStats", () => {
                 },
               ],
             },
-            ownedRepos: { nodes: [{ stargazerCount: 25 }] },
+            ownedRepos: { nodes: [{ stargazerCount: 25, forkCount: 5, watchers: { totalCount: 10 } }] },
           },
         },
       }),

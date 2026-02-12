@@ -45,7 +45,7 @@ function makeContribData(
         { nameWithOwner: "user/repo4", defaultBranchRef: { target: { history: { totalCount: 5 } } } },
       ],
     },
-    ownedRepoStars: { nodes: [] },
+    ownedRepoStars: { nodes: [] as { stargazerCount: number; forkCount: number; watchers: { totalCount: number } }[] },
     ...overrides,
   };
 }

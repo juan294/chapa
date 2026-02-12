@@ -32,6 +32,8 @@ function buildEmptyStats(session: {
     topRepoShare: 0,
     maxCommitsIn10Min: 0,
     totalStars: 0,
+    totalForks: 0,
+    totalWatchers: 0,
     heatmapData: Array.from({ length: 366 }, (_, i) => ({
       date: new Date(now - (365 - i) * 86400000).toISOString().slice(0, 10),
       count: 0,

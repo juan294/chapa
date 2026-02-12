@@ -62,9 +62,17 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
   const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
 
-  // 10. Total stars across owned repos
+  // 10. Total stars, forks, and watchers across owned repos
   const totalStars = raw.ownedRepoStars.nodes.reduce(
     (sum, r) => sum + r.stargazerCount,
+    0,
+  );
+  const totalForks = raw.ownedRepoStars.nodes.reduce(
+    (sum, r) => sum + r.forkCount,
+    0,
+  );
+  const totalWatchers = raw.ownedRepoStars.nodes.reduce(
+    (sum, r) => sum + r.watchers.totalCount,
     0,
   );
 
@@ -84,6 +92,8 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     topRepoShare,
     maxCommitsIn10Min,
     totalStars,
+    totalForks,
+    totalWatchers,
     heatmapData,
     fetchedAt: new Date().toISOString(),
   };

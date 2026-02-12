@@ -47,6 +47,8 @@ export function mergeStats(
     reposContributed: primary.reposContributed + supplemental.reposContributed,
     topRepoShare,
     totalStars: Math.max(primary.totalStars, supplemental.totalStars),
+    totalForks: Math.max(primary.totalForks, supplemental.totalForks),
+    totalWatchers: Math.max(primary.totalWatchers, supplemental.totalWatchers),
     maxCommitsIn10Min: Math.max(primary.maxCommitsIn10Min, supplemental.maxCommitsIn10Min),
     microCommitRatio: mergeOptionalMax(primary.microCommitRatio, supplemental.microCommitRatio),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),

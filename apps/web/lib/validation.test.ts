@@ -129,6 +129,8 @@ describe("isValidStatsShape", () => {
     topRepoShare: 0.5,
     maxCommitsIn10Min: 3,
     totalStars: 0,
+    totalForks: 0,
+    totalWatchers: 0,
     heatmapData: [{ date: "2025-01-01", count: 5 }],
     fetchedAt: new Date().toISOString(),
   };

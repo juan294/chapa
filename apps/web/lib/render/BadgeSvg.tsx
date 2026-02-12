@@ -41,10 +41,12 @@ export function renderBadgeSvg(
   const avatarCY = headerY;
   const avatarR = 30;
 
-  // ── Archetype + stars row (above heatmap, left-aligned) ─────
+  // ── Archetype + repo metrics row (above heatmap, left-aligned) ─
   const metaRowY = 160;
   const archetypeText = `\u2605 ${impact.archetype}`;
   const archetypePillWidth = archetypeText.length * 11 + 30;
+  const watchStr = formatCompact(stats.totalWatchers);
+  const forkStr = formatCompact(stats.totalForks);
   const starsStr = formatCompact(stats.totalStars);
 
   // ── Two-column body ─────────────────────────────────────────
@@ -119,13 +121,29 @@ export function renderBadgeSvg(
   <!-- Chapa_ logo (top-right) -->
   <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="22" fill="${t.textSecondary}" opacity="0.7" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">_</tspan></text>
 
-  <!-- ─── Archetype + stars row (above heatmap) ──────────── -->
+  <!-- ─── Archetype + repo metrics row (above heatmap) ────── -->
   <g transform="translate(${heatmapX}, ${metaRowY - 17})">
     <rect width="${archetypePillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
     <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
-  <text x="${heatmapX + archetypePillWidth + 16}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
-  <text x="${heatmapX + archetypePillWidth + 28}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}"><tspan fill="${t.accent}">\u2605</tspan> ${starsStr}</text>
+  <!-- Watch · Fork · Star (same order as GitHub) -->
+  <g transform="translate(${heatmapX + archetypePillWidth + 16}, ${metaRowY - 7})" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">
+    <!-- Eye icon (watch) -->
+    <path d="M1 7.5C1 7.5 3.5 2.5 8 2.5S15 7.5 15 7.5S12.5 12.5 8 12.5S1 7.5 1 7.5Z" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="translate(0,1)" opacity="0.7"/>
+    <circle cx="8" cy="8.5" r="2.5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" opacity="0.7"/>
+    <text x="19" y="12">${watchStr}</text>
+    <!-- Separator -->
+    <text x="${19 + watchStr.length * 8 + 8}" y="12" opacity="0.4">\u00B7</text>
+    <!-- Fork icon -->
+    <g transform="translate(${19 + watchStr.length * 8 + 20}, 1)" opacity="0.7">
+      <path d="M6 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM6 11a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM14 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM4 5v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="scale(0.85)"/>
+    </g>
+    <text x="${19 + watchStr.length * 8 + 34}" y="12">${forkStr}</text>
+    <!-- Separator -->
+    <text x="${19 + watchStr.length * 8 + 34 + forkStr.length * 8 + 8}" y="12" opacity="0.4">\u00B7</text>
+    <!-- Star icon (★ in accent) -->
+    <text x="${19 + watchStr.length * 8 + 34 + forkStr.length * 8 + 20}" y="12"><tspan fill="${t.accent}">\u2605</tspan> ${starsStr}</text>
+  </g>
 
   <!-- ─── Two-column body ────────────────────────────────── -->
 

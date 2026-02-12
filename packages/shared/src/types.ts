@@ -23,6 +23,8 @@ export interface StatsData {
   microCommitRatio?: number; // optional, 0..1
   docsOnlyPrRatio?: number; // optional, 0..1
   totalStars: number; // sum of stargazerCount across owned repos
+  totalForks: number; // sum of forkCount across owned repos
+  totalWatchers: number; // sum of watchers.totalCount across owned repos
   heatmapData: HeatmapDay[];
   fetchedAt: string; // ISO timestamp
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
@@ -116,7 +118,11 @@ export interface RawContributionData {
     }[];
   };
   ownedRepoStars: {
-    nodes: { stargazerCount: number }[];
+    nodes: {
+      stargazerCount: number;
+      forkCount: number;
+      watchers: { totalCount: number };
+    }[];
   };
 }
 

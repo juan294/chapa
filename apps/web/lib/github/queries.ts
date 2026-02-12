@@ -82,9 +82,9 @@ export async function fetchContributionData(
         nodes: user.repositories.nodes,
       },
       ownedRepoStars: {
-        nodes: ((user.ownedRepos?.nodes ?? []) as { stargazerCount: number }[])
-          .filter((n): n is { stargazerCount: number } => n != null)
-          .map((n) => ({ stargazerCount: n.stargazerCount })),
+        nodes: ((user.ownedRepos?.nodes ?? []) as { stargazerCount: number; forkCount: number; watchers: { totalCount: number } }[])
+          .filter((n): n is { stargazerCount: number; forkCount: number; watchers: { totalCount: number } } => n != null)
+          .map((n) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
       },
     };
   } catch (err) {
