@@ -87,4 +87,13 @@ describe("renderBadgeSvg with demo data", () => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT);
     expect(svg).toContain("Alex Chen");
   });
+
+  it("includes verification strip when hash and date are provided", () => {
+    const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+      verificationHash: "a1b2c3d4",
+      verificationDate: "2025-01-01",
+    });
+    expect(svg).toContain("VERIFIED");
+    expect(svg).toContain("a1b2c3d4");
+  });
 });

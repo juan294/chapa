@@ -7,6 +7,8 @@ import { LandingTerminal } from "./LandingTerminal";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   includeGithubBranding: true,
+  verificationHash: "d3m0b4dg",
+  verificationDate: "2025-01-01",
 });
 
 const NAV_LINKS = [
@@ -137,7 +139,7 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke">
               <div
-                className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden"
+                className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
                 dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
               />
             </div>
