@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
-import { GeistMono } from "geist/font/mono";
 import "@/styles/globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import PostHogProvider from "@/components/PostHogProvider";
-import { ThemeProvider } from "@/components/ThemeProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -72,7 +70,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${jetbrainsMono.variable} ${plusJakarta.variable} ${GeistMono.variable}`}
+      className={`${jetbrainsMono.variable} ${plusJakarta.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-bg text-text-primary font-body antialiased">
@@ -102,9 +100,7 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <ThemeProvider>
-          <PostHogProvider>{children}</PostHogProvider>
-        </ThemeProvider>
+        <PostHogProvider>{children}</PostHogProvider>
         <Analytics />
       </body>
     </html>
