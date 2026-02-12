@@ -194,26 +194,24 @@ export default async function Home({
                   {/* Body */}
                   <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
                     {/* Heatmap */}
-                    <div className="flex-shrink-0">
+                    <div className="flex-1 min-w-0">
                       <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-2">
                         Activity
                       </p>
-                      <div className="flex gap-1">
-                        {HEATMAP.map((week, wi) => (
-                          <div key={wi} className="flex flex-col gap-1">
-                            {week.map((level, di) => (
-                              <div
-                                key={`${wi}-${di}`}
-                                className={`w-3.5 h-3.5 rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
-                              />
-                            ))}
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-13 grid-rows-7 grid-flow-col gap-1">
+                        {HEATMAP.map((week, wi) =>
+                          week.map((level, di) => (
+                            <div
+                              key={`${wi}-${di}`}
+                              className={`aspect-square rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
+                            />
+                          ))
+                        )}
                       </div>
                     </div>
 
                     {/* Score */}
-                    <div className="flex-1 flex flex-col justify-between">
+                    <div className="w-[35%] sm:w-[280px] flex-shrink-0 flex flex-col justify-between">
                       <div>
                         <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-1">
                           Impact Score
