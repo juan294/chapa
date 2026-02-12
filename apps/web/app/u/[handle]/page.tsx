@@ -3,7 +3,6 @@ import { computeImpactV4 } from "@/lib/impact/v4";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
-import { ShareBadgePreview } from "@/components/ShareBadgePreview";
 import { RefreshBadgeButton } from "@/components/RefreshBadgeButton";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
@@ -16,6 +15,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
+import dynamic from "next/dynamic";
+
+const ShareBadgePreview = dynamic(
+  () => import("@/components/ShareBadgePreview").then(m => ({ default: m.ShareBadgePreview })),
+  { ssr: false, loading: () => <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5 animate-pulse h-[400px]" /> }
+);
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
