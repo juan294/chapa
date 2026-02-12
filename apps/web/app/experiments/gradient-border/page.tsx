@@ -66,7 +66,7 @@ function MockBadgeCard() {
               gridTemplateRows: `repeat(${HEATMAP_ROWS}, 1fr)`,
             }}
             role="img"
-            aria-label="Activity heatmap showing commit frequency over 90 days"
+            aria-label="Activity heatmap showing commit frequency over 12 months"
           >
             {HEATMAP.flat().map((level, i) => (
               <div

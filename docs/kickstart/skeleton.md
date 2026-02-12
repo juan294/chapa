@@ -29,7 +29,7 @@ touch apps/web/app/api/impact/route.ts
 touch apps/web/components/{BadgePreview.tsx,CopyButton.tsx,ImpactBreakdown.tsx,ShareButton.tsx}
 
 touch apps/web/lib/auth/github.ts
-touch apps/web/lib/github/{client.ts,queries.ts,stats90d.ts}
+touch apps/web/lib/github/{client.ts,queries.ts,stats.ts}
 touch apps/web/lib/cache/redis.ts
 touch apps/web/lib/impact/{v3.ts,v3.test.ts}
 touch apps/web/lib/render/{BadgeSvg.tsx,GithubBranding.tsx,theme.ts,heatmap.ts}
