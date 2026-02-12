@@ -1,7 +1,8 @@
-import type { Stats90d, ImpactV3Result } from "@chapa/shared";
-import { WARM_AMBER, getTierColor } from "./theme";
+import type { Stats90d, ImpactV4Result } from "@chapa/shared";
+import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
+import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
 
 interface BadgeOptions {
@@ -11,7 +12,7 @@ interface BadgeOptions {
 
 export function renderBadgeSvg(
   stats: Stats90d,
-  impact: ImpactV3Result,
+  impact: ImpactV4Result,
   options: BadgeOptions = {},
 ): string {
   const { includeGithubBranding = true, avatarDataUri } = options;
@@ -21,6 +22,7 @@ export function renderBadgeSvg(
     ? escapeXml(stats.displayName)
     : `@${safeHandle}`;
   const tierColor = getTierColor(impact.tier);
+  const archetypeColor = getArchetypeColor(impact.archetype);
 
   // Layout constants
   const W = 1200;
@@ -42,41 +44,44 @@ export function renderBadgeSvg(
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
-  // Right column: impact score + achievement cards + active days
-  const scoreColX = 670;
-  const scoreColW = W - PAD - scoreColX; // 470px
-  const scoreLabelY = 160;
-  const scoreValueY = scoreLabelY + 95;
+  // Right column: radar chart + archetype + composite + confidence
+  const profileColX = 670;
+  const profileColW = W - PAD - profileColX; // 470px
+  const profileLabelY = 160;
 
-  // ── Achievement cards ─────────────────────────────────────────
-  // Defense-in-depth: coerce numeric stats to prevent XSS from malformed data
-  const safeCommits = String(Number(stats.commitsTotal));
-  const safePRs = String(Number(stats.prsMergedCount));
-  const safeReviews = String(Number(stats.reviewsSubmittedCount));
-  const safeActiveDays = String(Number(stats.activeDays));
+  // Radar chart centered in the right column
+  const radarCX = profileColX + profileColW / 2;
+  const radarCY = profileLabelY + 120;
+  const radarR = 85;
+  const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR);
 
-  const cardsY = scoreValueY + 40;
+  // Archetype label + composite score + tier (below radar chart)
+  const archetypeY = radarCY + radarR + 42;
+  const archetypeText = `\u2605 ${impact.archetype}`;
+  const archetypePillWidth = archetypeText.length * 11 + 30;
+
+  // ── Dimension cards (4 across full width) ─────────────────────
+  // Defense-in-depth: coerce numeric values
+  const dims = impact.dimensions;
+  const safeBuilding = String(Number(dims.building));
+  const safeGuarding = String(Number(dims.guarding));
+  const safeConsistency = String(Number(dims.consistency));
+  const safeBreadth = String(Number(dims.breadth));
+
+  const cardsY = 470;
   const cardGap = 12;
-  const cardW = Math.floor((scoreColW - cardGap * 2) / 3);
-  const cardH = 85;
-
-  // ── Active days bar ───────────────────────────────────────────
-  const activeDaysY = cardsY + cardH + 16;
-  const barH = 60;
-  const activeDaysRatio = Math.min(stats.activeDays / 90, 1);
+  const totalCardWidth = W - PAD * 2;
+  const cardW = Math.floor((totalCardWidth - cardGap * 3) / 4);
+  const cardH = 55;
 
   // ── Footer ──────────────────────────────────────────────────
-  const footerDividerY = 540;
-  const footerY = 575;
+  const footerDividerY = 545;
+  const footerY = 580;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
     ? renderGithubBranding(PAD, footerY, W - PAD)
     : "";
-
-  // Tier pill dimensions
-  const tierText = `\u2605 ${impact.tier}`;
-  const tierPillWidth = tierText.length * 12 + 30;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -122,53 +127,50 @@ export function renderBadgeSvg(
   <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">ACTIVITY</text>
   ${heatmapSvg}
 
-  <!-- Right: IMPACT SCORE + score + tier pill + confidence -->
-  <text x="${scoreColX}" y="${scoreLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">IMPACT SCORE</text>
+  <!-- Right: DEVELOPER PROFILE + radar chart + archetype + composite -->
+  <text x="${profileColX}" y="${profileLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">DEVELOPER PROFILE</text>
 
-  <!-- Large score number -->
-  <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="92" font-weight="700" fill="${t.textPrimary}" letter-spacing="-4" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
+  <!-- Radar chart -->
+  ${radarSvg}
 
-  <!-- Tier pill badge (beside score) -->
-  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 135 : 78)}, ${scoreValueY - 48})">
-    <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
-    <text x="${tierPillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
+  <!-- Archetype pill badge -->
+  <g transform="translate(${radarCX - archetypePillWidth / 2}, ${archetypeY - 22})">
+    <rect width="${archetypePillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
+    <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
 
-  <!-- Confidence (below tier) -->
-  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 135 : 78)}" y="${scoreValueY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${t.textPrimary}" opacity="0.7">${impact.confidence}% Confidence</text>
+  <!-- Composite score + tier + confidence -->
+  <text x="${radarCX}" y="${archetypeY + 24}" font-family="'JetBrains Mono', monospace" font-size="22" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedComposite}</text>
+  <text x="${radarCX + 20}" y="${archetypeY + 24}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="start">${impact.tier}</text>
+  <text x="${radarCX}" y="${archetypeY + 46}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textPrimary}" opacity="0.7" text-anchor="middle">${impact.confidence}% Confidence</text>
 
-  <!-- ─── Achievement cards (3 stat blocks) ────────────────── -->
-  <!-- Card 1: commits -->
-  <g transform="translate(${scoreColX}, ${cardsY})">
+  <!-- ─── Dimension cards (4 across full width) ────────────── -->
+  <!-- Card 1: Building -->
+  <g transform="translate(${PAD}, ${cardsY})">
     <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="38" font-family="'JetBrains Mono', monospace" font-size="38" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeCommits}</text>
-    <text x="${cardW / 2}" y="62" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">COMMITS</text>
+    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeBuilding}</text>
+    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">BUILDING</text>
   </g>
 
-  <!-- Card 2: PRs merged -->
-  <g transform="translate(${scoreColX + cardW + cardGap}, ${cardsY})">
+  <!-- Card 2: Guarding -->
+  <g transform="translate(${PAD + cardW + cardGap}, ${cardsY})">
     <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="38" font-family="'JetBrains Mono', monospace" font-size="38" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safePRs}</text>
-    <text x="${cardW / 2}" y="62" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">PRS MERGED</text>
+    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeGuarding}</text>
+    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">GUARDING</text>
   </g>
 
-  <!-- Card 3: reviews -->
-  <g transform="translate(${scoreColX + (cardW + cardGap) * 2}, ${cardsY})">
+  <!-- Card 3: Consistency -->
+  <g transform="translate(${PAD + (cardW + cardGap) * 2}, ${cardsY})">
     <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="38" font-family="'JetBrains Mono', monospace" font-size="38" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeReviews}</text>
-    <text x="${cardW / 2}" y="62" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">REVIEWS</text>
+    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeConsistency}</text>
+    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">CONSISTENCY</text>
   </g>
 
-  <!-- ─── Active Days bar ──────────────────────────────────── -->
-  <g transform="translate(${scoreColX}, ${activeDaysY})">
-    <rect width="${scoreColW}" height="${barH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="16" y="26" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" letter-spacing="1.5">ACTIVE DAYS</text>
-    <text x="${scoreColW - 16}" y="26" font-family="'JetBrains Mono', monospace" font-size="17" fill="${t.textPrimary}" text-anchor="end"><tspan fill="#4ADE80" font-weight="700">${safeActiveDays}</tspan><tspan fill="${t.textSecondary}">/90</tspan></text>
-    <!-- Progress bar background -->
-    <rect x="16" y="38" width="${scoreColW - 32}" height="12" rx="6" fill="rgba(255,255,255,0.06)"/>
-    <!-- Progress bar fill (gradient from accent to green) -->
-    <defs><linearGradient id="active-days-grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="${t.accent}"/><stop offset="100%" stop-color="#4ADE80"/></linearGradient></defs>
-    <rect x="16" y="38" width="${Math.round((scoreColW - 32) * activeDaysRatio)}" height="12" rx="6" fill="url(#active-days-grad)"/>
+  <!-- Card 4: Breadth -->
+  <g transform="translate(${PAD + (cardW + cardGap) * 3}, ${cardsY})">
+    <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeBreadth}</text>
+    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">BREADTH</text>
   </g>
 
   <!-- ─── Footer ─────────────────────────────────────────── -->

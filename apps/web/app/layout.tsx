@@ -27,11 +27,11 @@ const BASE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: "Chapa — Developer Impact Badge",
+    default: "Chapa — Developer Impact Profile",
     template: "%s — Chapa",
   },
   description:
-    "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score. Analyze 90 days of commits, PRs, reviews, and issues.",
+    "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions — Building, Guarding, Consistency, Breadth — from 90 days of GitHub activity.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -39,9 +39,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Chapa",
-    title: "Chapa — Developer Impact Badge",
+    title: "Chapa — Developer Impact Profile",
     description:
-      "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score. Analyze 90 days of commits, PRs, reviews, and issues.",
+      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions from 90 days of GitHub activity.",
     url: BASE_URL,
     images: [
       {
@@ -54,9 +54,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Chapa — Developer Impact Badge",
+    title: "Chapa — Developer Impact Profile",
     description:
-      "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score.",
+      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile.",
     images: ["/logo-512.png"],
   },
   alternates: {
@@ -85,7 +85,7 @@ export default function RootLayout({
               name: "Chapa",
               url: BASE_URL,
               description:
-                "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score. Analyze 90 days of commits, PRs, reviews, and issues.",
+                "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile — Building, Guarding, Consistency, and Breadth from 90 days of GitHub activity.",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               offers: {

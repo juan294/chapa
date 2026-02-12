@@ -23,15 +23,16 @@ vi.mock("@/lib/validation", () => ({
   isValidHandle: vi.fn().mockReturnValue(true),
 }));
 
-vi.mock("@/lib/impact/v3", () => ({
-  computeImpactV3: vi.fn().mockReturnValue({
+vi.mock("@/lib/impact/v4", () => ({
+  computeImpactV4: vi.fn().mockReturnValue({
     handle: "testuser",
-    adjustedScore: 72,
+    adjustedComposite: 72,
+    compositeScore: 72,
     confidence: 85,
     tier: "Solid",
-    baseScore: 72,
     confidencePenalties: [],
-    breakdown: { commits: 0.5, prWeight: 0.5, reviews: 0.5, issues: 0.5, streak: 0.5, collaboration: 0.5 },
+    dimensions: { building: 75, guarding: 65, consistency: 70, breadth: 60 },
+    archetype: "Builder",
     computedAt: new Date().toISOString(),
   }),
 }));
@@ -133,7 +134,7 @@ describe("POST /api/refresh", () => {
 
     const body = await res.json();
     expect(body.stats.commitsTotal).toBe(142);
-    expect(body.impact.adjustedScore).toBe(72);
+    expect(body.impact.adjustedComposite).toBe(72);
   });
 
   it("returns 502 when GitHub fetch fails", async () => {

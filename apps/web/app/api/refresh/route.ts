@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats90d } from "@/lib/github/client";
-import { computeImpactV3 } from "@/lib/impact/v3";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { isValidHandle } from "@/lib/validation";
 
 /**
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  const impact = computeImpactV3(stats);
+  const impact = computeImpactV4(stats);
 
   return NextResponse.json({ stats, impact });
 }

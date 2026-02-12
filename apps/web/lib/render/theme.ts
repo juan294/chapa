@@ -1,4 +1,4 @@
-import type { ImpactTier } from "@chapa/shared";
+import type { ImpactTier, DeveloperArchetype } from "@chapa/shared";
 
 interface BadgeTheme {
   bg: string;
@@ -43,4 +43,17 @@ const TIER_COLORS: Record<ImpactTier, string> = {
 
 export function getTierColor(tier: ImpactTier): string {
   return TIER_COLORS[tier];
+}
+
+const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
+  Builder: "#7C6AEF",   // signature purple
+  Guardian: "#9D8FFF",  // lighter purple
+  Marathoner: "#4ADE80", // green
+  Polymath: "#FBBF24",  // amber/gold
+  Balanced: "#E6EDF3",  // light gray
+  Emerging: "#9AA4B2",  // muted gray
+};
+
+export function getArchetypeColor(archetype: DeveloperArchetype): string {
+  return ARCHETYPE_COLORS[archetype];
 }

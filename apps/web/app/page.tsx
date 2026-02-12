@@ -37,8 +37,12 @@ const HEATMAP_COLORS: Record<number, string> = {
 
 const FEATURES = [
   {
-    title: "IMPACT SCORE V3",
-    description: "Commits, PRs, reviews — 90 days of real activity, one score.",
+    title: "FOUR DIMENSIONS",
+    description: "Building, Guarding, Consistency, Breadth — what kind of developer you are, not just how much code you write.",
+  },
+  {
+    title: "DEVELOPER ARCHETYPE",
+    description: "Builder, Guardian, Marathoner, Polymath — your profile shape tells a story.",
   },
   {
     title: "CONFIDENCE RATING",
@@ -52,13 +56,14 @@ const FEATURES = [
 
 const STEPS = [
   { number: "01", title: "Sign in with GitHub", description: "OAuth login — we only request access to public data." },
-  { number: "02", title: "We crunch the numbers", description: "90 days of activity → Impact Score + Confidence rating." },
+  { number: "02", title: "We build your profile", description: "90 days of activity → 4 dimensions, archetype, and composite score." },
   { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere." },
 ];
 
 const STATS = [
   { value: "12,400+", label: "badges generated" },
-  { value: "4", label: "impact tiers" },
+  { value: "6", label: "archetypes" },
+  { value: "4", label: "dimensions" },
   { value: "90", label: "days analyzed" },
 ];
 
@@ -137,12 +142,12 @@ export default async function Home({
               <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[0.95]">
                 Developer Impact
                 <br />
-                <span className="text-amber">Badge</span>
+                <span className="text-amber">Profile</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> Analyzes 90 days of GitHub activity.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Generates a live, embeddable SVG badge.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Impact Score + Confidence + Tier.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions showing what kind of developer you are.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Not just how much code you write.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Archetype + Dimensions + Confidence.</p>
               </div>
               <div className="pt-4">
                 <a
@@ -210,73 +215,64 @@ export default async function Home({
                       </div>
                     </div>
 
-                    {/* Score + Stats */}
+                    {/* Developer Profile — radar + archetype + composite */}
                     <div className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
                       <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
-                        Impact Score
+                        Developer Profile
                       </p>
 
-                      {/* Score row: big number + tier */}
-                      <div className="flex items-end gap-3">
-                        <span className="text-6xl font-heading tracking-tighter text-text-primary leading-none">
-                          94
+                      {/* Radar chart mock */}
+                      <div className="flex justify-center my-2">
+                        <svg viewBox="0 0 140 140" width="120" height="120" aria-hidden="true">
+                          {[0.25, 0.5, 0.75, 1].map((s) => (
+                            <polygon key={s} points={`70,${70-55*s} ${70+55*s},70 70,${70+55*s} ${70-55*s},70`} fill="none" stroke="rgba(124,106,239,0.12)" strokeWidth="1" />
+                          ))}
+                          <line x1="70" y1="15" x2="70" y2="125" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
+                          <line x1="15" y1="70" x2="125" y2="70" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
+                          <polygon points="70,22 115,70 70,105 35,70" fill="rgba(124,106,239,0.20)" stroke="#7C6AEF" strokeWidth="1.5" />
+                          <circle cx="70" cy="22" r="3" fill="#7C6AEF" />
+                          <circle cx="115" cy="70" r="3" fill="#7C6AEF" />
+                          <circle cx="70" cy="105" r="3" fill="#7C6AEF" />
+                          <circle cx="35" cy="70" r="3" fill="#7C6AEF" />
+                        </svg>
+                      </div>
+
+                      {/* Archetype pill + composite + tier */}
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-3 py-1 text-xs font-semibold text-amber">
+                          <StarIcon className="w-3 h-3" />
+                          Builder
                         </span>
-                        <div className="flex flex-col gap-1 pb-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-2.5 py-0.5 text-xs font-semibold text-amber w-fit">
-                            <StarIcon className="w-3 h-3" />
-                            Elite
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-heading tracking-tighter text-text-primary leading-none">
+                            82
                           </span>
-                          <span className="text-xs text-text-primary/70">
-                            87% Confidence
+                          <span className="text-xs font-semibold text-amber">
+                            High
                           </span>
                         </div>
+                        <span className="text-xs text-text-primary/70">
+                          87% Confidence
+                        </span>
                       </div>
 
-                      {/* Stats — three achievement blocks */}
-                      <div className="mt-5 grid grid-cols-3 gap-3">
-                        <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
-                          <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
-                            847
-                          </span>
-                          <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
-                            commits
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
-                          <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
-                            42
-                          </span>
-                          <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
-                            PRs merged
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
-                          <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
-                            28
-                          </span>
-                          <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
-                            reviews
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Active days — consistency bar */}
-                      <div className="mt-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-4 py-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] uppercase tracking-wider text-text-secondary">
-                            Active Days
-                          </span>
-                          <span className="text-xs font-heading text-text-primary">
-                            <span className="text-terminal-green font-bold">45</span>
-                            <span className="text-text-secondary"> / 90</span>
-                          </span>
-                        </div>
-                        <div className="h-3 rounded-full bg-white/[0.06] overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-amber to-terminal-green"
-                            style={{ width: "50%" }}
-                          />
-                        </div>
+                      {/* Dimension cards */}
+                      <div className="mt-4 grid grid-cols-4 gap-2">
+                        {[
+                          { score: 88, label: "Build" },
+                          { score: 72, label: "Guard" },
+                          { score: 80, label: "Consist" },
+                          { score: 65, label: "Breadth" },
+                        ].map((d) => (
+                          <div key={d.label} className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-2 py-2 text-center">
+                            <span className="block text-lg font-heading font-bold tracking-tight text-text-primary leading-none">
+                              {d.score}
+                            </span>
+                            <span className="block text-[8px] uppercase tracking-wider text-text-secondary mt-1">
+                              {d.label}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>

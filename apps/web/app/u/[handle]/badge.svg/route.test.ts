@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
   mockGetStats90d,
-  mockComputeImpactV3,
+  mockComputeImpactV4,
   mockRenderBadgeSvg,
   mockReadSessionCookie,
   mockIsValidHandle,
@@ -14,7 +14,7 @@ const {
   mockFetchAvatarBase64,
 } = vi.hoisted(() => ({
   mockGetStats90d: vi.fn(),
-  mockComputeImpactV3: vi.fn(),
+  mockComputeImpactV4: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
@@ -26,8 +26,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats90d: mockGetStats90d,
 }));
 
-vi.mock("@/lib/impact/v3", () => ({
-  computeImpactV3: mockComputeImpactV3,
+vi.mock("@/lib/impact/v4", () => ({
+  computeImpactV4: mockComputeImpactV4,
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -90,9 +90,11 @@ const FAKE_STATS = {
 
 const FAKE_IMPACT = {
   handle: "testuser",
-  adjustedScore: 65,
+  adjustedComposite: 65,
   tier: "Solid",
   confidence: 85,
+  dimensions: { building: 70, guarding: 60, consistency: 65, breadth: 55 },
+  archetype: "Builder",
 };
 
 // ---------------------------------------------------------------------------
@@ -107,7 +109,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockReadSessionCookie.mockReturnValue(null);
     mockGetStats90d.mockResolvedValue(FAKE_STATS);
-    mockComputeImpactV3.mockReturnValue(FAKE_IMPACT);
+    mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   });
@@ -151,10 +153,10 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockGetStats90d).toHaveBeenCalledWith("testuser", undefined);
     });
 
-    it("passes stats to computeImpactV3", async () => {
+    it("passes stats to computeImpactV4", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockComputeImpactV3).toHaveBeenCalledWith(FAKE_STATS);
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
     });
 
     it("passes stats, impact, and avatarDataUri to renderBadgeSvg", async () => {
