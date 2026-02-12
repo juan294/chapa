@@ -408,6 +408,20 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain('stroke-linecap="round"');
     });
+
+    it("score ring arc has a draw-in animation from 0 to score", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Should contain a ring-draw keyframe animation
+      expect(svg).toContain("@keyframes ring-draw");
+      // The arc circle should reference the animation
+      expect(svg).toContain("animation: ring-draw");
+    });
+
+    it("ring-draw animation starts from full circumference (empty ring)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // circumference ≈ 289.03 — animation should start from this value
+      expect(svg).toMatch(/ring-draw[\s\S]*stroke-dashoffset:\s*289/);
+    });
   });
 
   // ---------------------------------------------------------------------------

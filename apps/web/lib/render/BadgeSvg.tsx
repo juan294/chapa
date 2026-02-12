@@ -105,6 +105,10 @@ export function renderBadgeSvg(
         0%, 100% { opacity: 0.7; }
         50% { opacity: 1; }
       }
+      @keyframes ring-draw {
+        from { stroke-dashoffset: ${ringCircumference.toFixed(2)}; }
+        to   { stroke-dashoffset: ${ringOffset.toFixed(2)}; }
+      }
     </style>
   </defs>
 
@@ -185,8 +189,8 @@ export function renderBadgeSvg(
   <!-- ─── Hero composite score ring (right column) ────────── -->
   <!-- Ring track (background) -->
   <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="rgba(124,106,239,0.10)" stroke-width="4"/>
-  <!-- Ring arc (foreground, tier-colored) -->
-  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})"/>
+  <!-- Ring arc (foreground, tier-colored, animates from 0 to score) -->
+  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})" style="animation: ring-draw 1.2s ease-out 0.5s both"/>
   <!-- Score number (centered inside ring) -->
   <text x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
   <!-- Tier label (always visible below ring) -->
