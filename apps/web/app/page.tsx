@@ -1,39 +1,19 @@
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Navbar } from "@/components/Navbar";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+
+const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
+  includeGithubBranding: true,
+});
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
   { label: "How it Works", href: "#how-it-works" },
   { label: "Stats", href: "#stats" },
 ];
-
-/* ── Heatmap data (13 weeks x 7 days) ──────────────────────────
-   0 = none, 1 = low, 2 = medium, 3 = high, 4 = intense */
-const HEATMAP: number[][] = [
-  [0, 2, 3, 2, 1, 0, 0],
-  [1, 3, 4, 3, 2, 1, 0],
-  [2, 4, 3, 4, 3, 0, 0],
-  [1, 2, 4, 3, 2, 1, 0],
-  [0, 1, 2, 3, 2, 0, 0],
-  [3, 4, 4, 3, 4, 1, 0],
-  [2, 3, 2, 4, 3, 0, 1],
-  [1, 2, 3, 2, 1, 0, 0],
-  [0, 3, 4, 4, 3, 1, 0],
-  [2, 4, 3, 2, 4, 0, 0],
-  [1, 3, 4, 3, 2, 1, 0],
-  [3, 4, 2, 4, 3, 0, 1],
-  [2, 3, 4, 3, 2, 1, 0],
-];
-
-const HEATMAP_COLORS: Record<number, string> = {
-  0: "bg-amber/[0.04]",
-  1: "bg-amber/15",
-  2: "bg-amber/30",
-  3: "bg-amber/55",
-  4: "bg-amber/85",
-};
 
 const FEATURES = [
   {
@@ -78,19 +58,6 @@ function GitHubIcon({ className }: { className?: string }) {
       aria-hidden="true"
     >
       <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-    </svg>
-  );
-}
-
-function StarIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
     </svg>
   );
 }
@@ -169,126 +136,10 @@ export default async function Home({
               <span className="text-text-secondary">chapa preview @developer</span>
             </div>
             <div className="pl-4 border-l border-stroke">
-              {/* Badge card — always dark */}
-              <div data-theme="dark" className="relative rounded-xl border border-stroke bg-card shadow-2xl shadow-black/30 overflow-hidden">
-                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-amber/30 to-transparent animate-shimmer" />
-
-                <div className="p-6 md:p-8">
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-amber/10 border border-amber/20 flex items-center justify-center">
-                        <GitHubIcon className="w-5 h-5 text-amber" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-semibold text-text-primary">@developer</p>
-                          {/* Verified placeholder — visual only, logic not implemented yet */}
-                          <svg className="w-3.5 h-3.5 text-amber opacity-40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
-                          </svg>
-                        </div>
-                        <p className="text-sm text-text-secondary">Last 12 months</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-heading text-text-primary/60 tracking-tight">
-                      Chapa<span className="text-amber">_</span>
-                    </span>
-                  </div>
-
-                  {/* Body */}
-                  <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
-                    {/* Heatmap */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-2">
-                        Activity
-                      </p>
-                      <div className="grid grid-cols-13 grid-rows-7 grid-flow-col gap-1">
-                        {HEATMAP.map((week, wi) =>
-                          week.map((level, di) => (
-                            <div
-                              key={`${wi}-${di}`}
-                              className={`aspect-square rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
-                            />
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Developer Profile — radar + archetype + composite */}
-                    <div className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
-                      <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
-                        Developer Profile
-                      </p>
-
-                      {/* Radar chart mock */}
-                      <div className="flex justify-center my-2">
-                        <svg viewBox="0 0 140 140" width="120" height="120" aria-hidden="true">
-                          {[0.25, 0.5, 0.75, 1].map((s) => (
-                            <polygon key={s} points={`70,${70-55*s} ${70+55*s},70 70,${70+55*s} ${70-55*s},70`} fill="none" stroke="rgba(124,106,239,0.12)" strokeWidth="1" />
-                          ))}
-                          <line x1="70" y1="15" x2="70" y2="125" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
-                          <line x1="15" y1="70" x2="125" y2="70" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
-                          <polygon points="70,22 115,70 70,105 35,70" fill="rgba(124,106,239,0.20)" stroke="#7C6AEF" strokeWidth="1.5" />
-                          <circle cx="70" cy="22" r="3" fill="#7C6AEF" />
-                          <circle cx="115" cy="70" r="3" fill="#7C6AEF" />
-                          <circle cx="70" cy="105" r="3" fill="#7C6AEF" />
-                          <circle cx="35" cy="70" r="3" fill="#7C6AEF" />
-                        </svg>
-                      </div>
-
-                      {/* Archetype pill + composite + tier */}
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-3 py-1 text-xs font-semibold text-amber">
-                          <StarIcon className="w-3 h-3" />
-                          Builder
-                        </span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-heading tracking-tighter text-text-primary leading-none">
-                            82
-                          </span>
-                          <span className="text-xs font-semibold text-amber">
-                            High
-                          </span>
-                        </div>
-                        <span className="text-xs text-text-primary/70">
-                          87% Confidence
-                        </span>
-                      </div>
-
-                      {/* Dimension cards */}
-                      <div className="mt-4 grid grid-cols-4 gap-2">
-                        {[
-                          { score: 88, label: "Build" },
-                          { score: 72, label: "Guard" },
-                          { score: 80, label: "Consist" },
-                          { score: 65, label: "Breadth" },
-                        ].map((d) => (
-                          <div key={d.label} className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-2 py-2 text-center">
-                            <span className="block text-lg font-heading font-bold tracking-tight text-text-primary leading-none">
-                              {d.score}
-                            </span>
-                            <span className="block text-[8px] uppercase tracking-wider text-text-secondary mt-1">
-                              {d.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-text-primary/50">
-                      <GitHubIcon className="w-3.5 h-3.5" />
-                      <span>Powered by GitHub</span>
-                    </div>
-                    <span className="text-xs text-text-primary/50 font-heading">
-                      chapa.thecreativetoken.com
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <div
+                className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden"
+                dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
+              />
             </div>
           </section>
 
