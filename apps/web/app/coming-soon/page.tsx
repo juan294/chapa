@@ -1,3 +1,4 @@
+import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -28,6 +29,8 @@ export default function ComingSoonPage() {
           Developer impact badges, powered by GitHub.
         </p>
       </div>
+
+      <GlobalCommandBar />
     </main>
   );
 }

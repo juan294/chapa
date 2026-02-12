@@ -244,7 +244,8 @@ export function createCoreCommands(): CommandDef[] {
   ];
 }
 
-export function createLandingCommands(): CommandDef[] {
+/** Navigation commands available on all pages (global command bar). */
+export function createNavigationCommands(): CommandDef[] {
   return [
     {
       name: "/help",
@@ -253,11 +254,22 @@ export function createLandingCommands(): CommandDef[] {
         lines: [
           makeLine("system", "Available commands:"),
           makeLine("info", "  /help              List available commands"),
+          makeLine("info", "  /home              Go to home page"),
           makeLine("info", "  /studio            Open Creator Studio"),
           makeLine("info", "  /login             Sign in with GitHub"),
           makeLine("info", "  /badge <handle>    View a developer badge"),
           makeLine("info", "  /about             About Chapa"),
+          makeLine("info", "  /terms             Terms of Service"),
+          makeLine("info", "  /privacy           Privacy Policy"),
         ],
+      }),
+    },
+    {
+      name: "/home",
+      description: "Go to home page",
+      execute: () => ({
+        lines: [makeLine("system", "Going home...")],
+        action: { type: "navigate", path: "/" },
       }),
     },
     {
@@ -302,7 +314,28 @@ export function createLandingCommands(): CommandDef[] {
         action: { type: "navigate", path: "/about" },
       }),
     },
+    {
+      name: "/terms",
+      description: "Terms of Service",
+      execute: () => ({
+        lines: [makeLine("system", "Opening terms...")],
+        action: { type: "navigate", path: "/terms" },
+      }),
+    },
+    {
+      name: "/privacy",
+      description: "Privacy Policy",
+      execute: () => ({
+        lines: [makeLine("system", "Opening privacy policy...")],
+        action: { type: "navigate", path: "/privacy" },
+      }),
+    },
   ];
+}
+
+/** @deprecated Use createNavigationCommands() instead */
+export function createLandingCommands(): CommandDef[] {
+  return createNavigationCommands();
 }
 
 export function parseCommand(input: string): { name: string; args: string[] } | null {

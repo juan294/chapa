@@ -4,6 +4,7 @@ import {
   executeCommand,
   createCoreCommands,
   createLandingCommands,
+  createNavigationCommands,
   getMatchingCommands,
   resolveCategory,
   makeLine,
@@ -190,20 +191,23 @@ describe("getMatchingCommands", () => {
   });
 });
 
-describe("createLandingCommands", () => {
-  const commands = createLandingCommands();
+describe("createNavigationCommands", () => {
+  const commands = createNavigationCommands();
 
-  it("returns exactly 5 commands", () => {
-    expect(commands).toHaveLength(5);
+  it("returns 8 navigation commands", () => {
+    expect(commands).toHaveLength(8);
   });
 
-  it("includes /help, /studio, /login, /badge, /about", () => {
+  it("includes all navigation commands", () => {
     const names = commands.map((c) => c.name);
     expect(names).toContain("/help");
+    expect(names).toContain("/home");
     expect(names).toContain("/studio");
     expect(names).toContain("/login");
     expect(names).toContain("/badge");
     expect(names).toContain("/about");
+    expect(names).toContain("/terms");
+    expect(names).toContain("/privacy");
   });
 
   it("/help output does NOT mention studio-only commands", () => {
@@ -217,13 +221,21 @@ describe("createLandingCommands", () => {
     expect(allText).not.toContain("/status");
   });
 
-  it("/help lists landing commands", () => {
+  it("/help lists all navigation commands", () => {
     const result = executeCommand("/help", commands);
     const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("/home");
     expect(allText).toContain("/studio");
     expect(allText).toContain("/login");
     expect(allText).toContain("/badge");
     expect(allText).toContain("/about");
+    expect(allText).toContain("/terms");
+    expect(allText).toContain("/privacy");
+  });
+
+  it("/home navigates to /", () => {
+    const result = executeCommand("/home", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/" });
   });
 
   it("/studio navigates to /studio", () => {
@@ -260,9 +272,19 @@ describe("createLandingCommands", () => {
     expect(result.action).toEqual({ type: "navigate", path: "/about" });
   });
 
-  it("getMatchingCommands returns all 5 for /", () => {
+  it("/terms navigates to /terms", () => {
+    const result = executeCommand("/terms", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/terms" });
+  });
+
+  it("/privacy navigates to /privacy", () => {
+    const result = executeCommand("/privacy", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/privacy" });
+  });
+
+  it("getMatchingCommands returns all 8 for /", () => {
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(5);
+    expect(matches).toHaveLength(8);
   });
 
   it("getMatchingCommands filters correctly", () => {
@@ -270,6 +292,14 @@ describe("createLandingCommands", () => {
     const names = matches.map((m) => m.name);
     expect(names).toContain("/badge");
     expect(names).not.toContain("/studio");
+  });
+});
+
+describe("createLandingCommands (deprecated alias)", () => {
+  it("returns the same commands as createNavigationCommands", () => {
+    const landing = createLandingCommands();
+    const nav = createNavigationCommands();
+    expect(landing.map((c) => c.name)).toEqual(nav.map((c) => c.name));
   });
 });
 

@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/Navbar";
+import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -90,6 +91,8 @@ export default function PrivacyPage() {
           </div>
         </div>
       </main>
+
+      <GlobalCommandBar />
     </div>
   );
 }

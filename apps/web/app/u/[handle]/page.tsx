@@ -9,6 +9,7 @@ import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
+import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -131,7 +132,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
       <Navbar />
 
-      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
+      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-24">
         <h1 className="sr-only">@{handle} — Developer Impact</h1>
 
         {/* Badge preview — interactive if user has custom config, static SVG otherwise */}
@@ -243,6 +244,8 @@ export default async function SharePage({ params }: SharePageProps) {
           </Link>
         </div>
       </div>
+
+      <GlobalCommandBar />
     </main>
   );
 }
