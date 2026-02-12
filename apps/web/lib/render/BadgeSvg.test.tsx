@@ -228,6 +228,17 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toMatch(/opacity="0\.4"/);
     });
+
+    it("shield icon appears just before 'Verified metrics' text in SVG", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const shieldIdx = svg.indexOf("M12 1L3 5v6");
+      const subtitleIdx = svg.indexOf("Verified metrics");
+      expect(shieldIdx).toBeGreaterThan(-1);
+      expect(subtitleIdx).toBeGreaterThan(-1);
+      // Shield should appear just before the subtitle in SVG source order
+      expect(shieldIdx).toBeLessThan(subtitleIdx);
+      expect(subtitleIdx - shieldIdx).toBeLessThan(400);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -258,12 +269,18 @@ describe("renderBadgeSvg", () => {
       expect(archetypeIdx).toBeLessThan(firstHeatmapRect);
     });
 
-    it("contains a star icon in the archetype pill", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toMatch(/[\u2605\u2606]|star/i);
+    it("contains a code-brackets icon in the archetype pill (not a star)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      // Code brackets icon rendered as SVG <path> near the archetype text
+      const builderIdx = svg.indexOf(">Builder<");
+      expect(builderIdx).toBeGreaterThan(-1);
+      const pillArea = svg.slice(Math.max(0, builderIdx - 400), builderIdx);
+      expect(pillArea).toContain("<path");
+      // ★ should NOT appear before the archetype name in the pill
+      expect(pillArea).not.toContain("\u2605");
     });
 
-    it("shows watch, fork, star counts in meta row with middle dot separators", () => {
+    it("shows watch, fork, star as labeled pills with counts", () => {
       const svg = renderBadgeSvg(
         makeStats({ totalWatchers: 80, totalForks: 25, totalStars: 142 }),
         makeImpact(),
@@ -271,8 +288,10 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("80");
       expect(svg).toContain("25");
       expect(svg).toContain("142");
-      // Middle dot separators between metrics
-      expect(svg).toContain("\u00B7");
+      // Each metric should have its label word
+      expect(svg).toContain("Watch");
+      expect(svg).toContain("Fork");
+      expect(svg).toContain("Star");
     });
 
     it("formats large counts with compact notation", () => {
@@ -295,22 +314,12 @@ describe("renderBadgeSvg", () => {
       expect(svg).not.toContain("undefined");
     });
 
-    it("has separator dot between archetype pill and watch metrics", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
-      // There should be a · separator between the pill group and the watch group
-      const pillEnd = svg.indexOf("Builder");
-      const watchGroup = svg.indexOf("Eye icon");
-      // A middle dot should appear between them
-      const dotsBetween = svg.slice(pillEnd, watchGroup);
-      expect(dotsBetween).toContain("\u00B7");
-    });
-
-    it("renders inline SVG icons for watch (eye), fork, and star", () => {
+    it("metric pills have individual rect backgrounds", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Star icon (★ in accent color)
-      expect(svg).toMatch(/fill="[^"]*7C6AEF[^"]*">\u2605<\/tspan>/);
-      // Fork and eye icons as SVG paths
-      expect(svg).toMatch(/<path[^>]*d="M[^"]*"[^>]*\/>/); // at least one SVG icon path
+      // At least 4 pill rects: 1 archetype + 3 metrics (Watch, Fork, Star)
+      const pillRects = svg.match(/rx="17"/g);
+      expect(pillRects).not.toBeNull();
+      expect(pillRects!.length).toBeGreaterThanOrEqual(4);
     });
 
     it("contains a radar chart with polygon", () => {
@@ -457,8 +466,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("archetype pill text font-size is at least 17", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*text-anchor="middle"[^>]*>★/);
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*>Builder</);
       expect(match).not.toBeNull();
       expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(17);
     });

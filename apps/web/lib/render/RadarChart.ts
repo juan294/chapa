@@ -21,9 +21,9 @@ export function renderRadarChart(
 ): string {
   const t = WARM_AMBER;
 
-  // Axes rotated 45° clockwise so labels don't overlap with score below
-  // Building = top-right, Guarding = bottom-right, Consistency = bottom-left, Breadth = top-left
-  const ROTATION = Math.PI / 4;
+  // Axes rotated ~30° clockwise so labels don't overlap with score below
+  // Building = upper-right, Guarding = lower-right, Consistency = lower-left, Breadth = upper-left
+  const ROTATION = Math.PI / 6;
   const axes: { key: keyof DimensionScores; label: string; angle: number }[] = [
     { key: "building", label: "Building", angle: -Math.PI / 2 + ROTATION },
     { key: "guarding", label: "Guarding", angle: 0 + ROTATION },
