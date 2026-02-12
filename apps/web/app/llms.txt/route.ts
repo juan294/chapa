@@ -4,11 +4,11 @@ const LLMS_TXT = `# Chapa — Developer Impact Badge
 
 ## What is Chapa?
 
-Chapa is a developer tool that generates a live, embeddable SVG badge showcasing a developer's Impact Score from their GitHub activity. It analyzes the last 90 days of commits, pull requests, code reviews, and issues to produce a transparent, data-driven impact rating.
+Chapa is a developer tool that generates a live, embeddable SVG badge showcasing a developer's Impact Score from their GitHub activity. It analyzes the last 12 months of commits, pull requests, code reviews, and issues to produce a transparent, data-driven impact rating.
 
 ## Key Concepts
 
-- **Impact Score v3**: A composite score (0-100) based on commits, PRs merged, code reviews, and issues from the last 90 days of GitHub activity.
+- **Impact Score v3**: A composite score (0-100) based on commits, PRs merged, code reviews, and issues from the last 12 months of GitHub activity.
 - **Confidence Rating**: A quality signal (50-100) that surfaces data patterns without making accusations. Higher confidence means more consistent, diverse activity.
 - **Tier System**: Four tiers based on adjusted score — Newcomer, Rising, Established, and Elite.
 

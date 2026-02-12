@@ -1,9 +1,9 @@
-import type { Stats90d } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 
 interface UploadOptions {
   targetHandle: string;
   sourceHandle: string;
-  stats: Stats90d;
+  stats: StatsData;
   token: string;
   serverUrl: string;
 }

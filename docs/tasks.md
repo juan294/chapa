@@ -37,7 +37,7 @@ Acceptance
 
 ## Teammate B — GitHub stats + caching (apps/web/lib/github/*, apps/web/lib/cache/*)
 ### Stats queries
-- [ ] Implement GraphQL queries for last 90 days:
+- [ ] Implement GraphQL queries for last 365 days:
   - [ ] `commitsTotal` (proxy ok)
   - [ ] `activeDays`
   - [ ] `prsMergedCount`
@@ -60,14 +60,14 @@ Acceptance
 - [ ] Add fallback: if GitHub fails, serve last cached
 
 Acceptance
-- [ ] `getStats90d(handle, token?)` returns `Stats90d`
+- [ ] `getStats(handle, token?)` returns `StatsData`
 - [ ] Rate limit failures do not break badge if cached exists
 
 ---
 
 ## Teammate C — Impact v3 scoring + tests (apps/web/lib/impact/*)
 ### Scoring
-- [ ] Implement `computeImpactV3(stats: Stats90d): ImpactV3Result`
+- [ ] Implement `computeImpactV3(stats: StatsData): ImpactV3Result`
 - [ ] Ensure v3 includes:
   - [ ] base score
   - [ ] confidence [50..100]

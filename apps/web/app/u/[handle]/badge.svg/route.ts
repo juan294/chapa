@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getStats90d } from "@/lib/github/client";
+import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { fetchAvatarBase64 } from "@/lib/render/avatar";
@@ -65,7 +65,7 @@ export async function GET(
   }
 
   // Fetch stats (cache-first)
-  const stats = await getStats90d(handle, token);
+  const stats = await getStats(handle, token);
   if (!stats) {
     const svg = fallbackSvg(
       handle,

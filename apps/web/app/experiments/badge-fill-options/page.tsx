@@ -52,7 +52,7 @@ function BadgeShell({ children, label }: { children: React.ReactNode; label: str
                     <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
                   </svg>
                 </div>
-                <p className="text-sm text-text-secondary">Last 90 days</p>
+                <p className="text-sm text-text-secondary">Last 12 months</p>
               </div>
             </div>
             <span className="text-sm font-heading text-text-primary/60 tracking-tight">

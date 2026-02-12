@@ -3,7 +3,7 @@
 import { useRef, useEffect, memo } from "react";
 import type {
   BadgeConfig,
-  Stats90d,
+  StatsData,
   ImpactV4Result,
   ImpactTier,
 } from "@chapa/shared";
@@ -28,7 +28,7 @@ import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid
 
 export interface BadgePreviewCardProps {
   config: BadgeConfig;
-  stats: Stats90d;
+  stats: StatsData;
   impact: ImpactV4Result;
   interactive?: boolean;
 }
@@ -196,7 +196,7 @@ function BadgePreviewCardInner({
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
               </svg>
             </div>
-            <div className="text-text-secondary text-xs">Last 90 days</div>
+            <div className="text-text-secondary text-xs">Last 12 months</div>
           </div>
         </div>
         <span className="text-sm font-heading text-text-secondary/50 tracking-tight">

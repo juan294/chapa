@@ -10,6 +10,10 @@ const SOURCE = fs.readFileSync(
 
 describe("HeatmapGrid", () => {
   describe("component structure", () => {
+    it("slices data to last 91 entries when input exceeds 91", () => {
+      expect(SOURCE).toContain("slice(-displaySize)");
+    });
+
     it("has 'use client' directive", () => {
       expect(SOURCE).toMatch(/^["']use client["']/m);
     });

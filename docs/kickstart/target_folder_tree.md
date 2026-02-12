@@ -45,7 +45,7 @@ chapa/
       │  ├─ github/
       │  │  ├─ client.ts
       │  │  ├─ queries.ts
-      │  │  └─ stats90d.ts
+      │  │  └─ stats.ts
       │  ├─ cache/
       │  │  └─ redis.ts
       │  ├─ impact/

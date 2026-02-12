@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 
 const {
-  mockGetStats90d,
+  mockGetStatsData,
   mockComputeImpactV4,
   mockRenderBadgeSvg,
   mockReadSessionCookie,
@@ -13,7 +13,7 @@ const {
   mockRateLimit,
   mockFetchAvatarBase64,
 } = vi.hoisted(() => ({
-  mockGetStats90d: vi.fn(),
+  mockGetStatsData: vi.fn(),
   mockComputeImpactV4: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockReadSessionCookie: vi.fn(),
@@ -23,7 +23,7 @@ const {
 }));
 
 vi.mock("@/lib/github/client", () => ({
-  getStats90d: mockGetStats90d,
+  getStats: mockGetStatsData,
 }));
 
 vi.mock("@/lib/impact/v4", () => ({
@@ -108,7 +108,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockReadSessionCookie.mockReturnValue(null);
-    mockGetStats90d.mockResolvedValue(FAKE_STATS);
+    mockGetStatsData.mockResolvedValue(FAKE_STATS);
     mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
@@ -147,10 +147,10 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(res.status).toBe(200);
     });
 
-    it("calls getStats90d with the handle", async () => {
+    it("calls getStats with the handle", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockGetStats90d).toHaveBeenCalledWith("testuser", undefined);
+      expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
     });
 
     it("passes stats to computeImpactV4", async () => {
@@ -185,7 +185,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
 
     it("passes undefined avatarDataUri when stats has no avatarUrl", async () => {
-      mockGetStats90d.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
+      mockGetStatsData.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockFetchAvatarBase64).not.toHaveBeenCalled();
@@ -219,11 +219,11 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
     });
 
-    it("validates handle before processing (does not call getStats90d)", async () => {
+    it("validates handle before processing (does not call getStats)", async () => {
       mockIsValidHandle.mockReturnValue(false);
       const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockGetStats90d).not.toHaveBeenCalled();
+      expect(mockGetStatsData).not.toHaveBeenCalled();
     });
   });
 
@@ -233,7 +233,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
   describe("stats fetch failure", () => {
     it("returns fallback SVG when stats fetch returns null", async () => {
-      mockGetStats90d.mockResolvedValue(null);
+      mockGetStatsData.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       const body = await res.text();
@@ -242,7 +242,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
 
     it("returns shorter cache TTL on error fallback (s-maxage=300)", async () => {
-      mockGetStats90d.mockResolvedValue(null);
+      mockGetStatsData.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Cache-Control")).toBe(
@@ -251,7 +251,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
 
     it("returns Content-Type: image/svg+xml on error fallback", async () => {
-      mockGetStats90d.mockResolvedValue(null);
+      mockGetStatsData.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
@@ -306,11 +306,11 @@ describe("GET /u/[handle]/badge.svg", () => {
       );
     });
 
-    it("does not call getStats90d when rate limited", async () => {
+    it("does not call getStats when rate limited", async () => {
       mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockGetStats90d).not.toHaveBeenCalled();
+      expect(mockGetStatsData).not.toHaveBeenCalled();
     });
   });
 });

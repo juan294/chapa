@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mergeStats } from "./merge";
-import type { Stats90d } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "primary-user",
     displayName: "Primary User",
@@ -56,11 +56,11 @@ describe("mergeStats", () => {
   });
 
   describe("prsMergedWeight cap", () => {
-    it("sums prsMergedWeight and caps at 40", () => {
-      const primary = makeStats({ prsMergedWeight: 25 });
-      const supplemental = makeStats({ prsMergedWeight: 20 });
+    it("sums prsMergedWeight and caps at 120", () => {
+      const primary = makeStats({ prsMergedWeight: 70 });
+      const supplemental = makeStats({ prsMergedWeight: 60 });
       const merged = mergeStats(primary, supplemental);
-      expect(merged.prsMergedWeight).toBe(40);
+      expect(merged.prsMergedWeight).toBe(120);
     });
 
     it("sums prsMergedWeight when below cap", () => {

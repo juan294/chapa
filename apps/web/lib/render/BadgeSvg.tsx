@@ -1,4 +1,4 @@
-import type { Stats90d, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV4Result } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
@@ -12,7 +12,7 @@ interface BadgeOptions {
 }
 
 export function renderBadgeSvg(
-  stats: Stats90d,
+  stats: StatsData,
   impact: ImpactV4Result,
   options: BadgeOptions = {},
 ): string {
@@ -112,7 +112,7 @@ export function renderBadgeSvg(
 
   <!-- Handle + subtitle -->
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
-  <text x="${PAD + 72}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">Last 90 days</text>
+  <text x="${PAD + 72}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">Last 12 months</text>
 
   <!-- Verified icon (shield + checkmark, dimmed — no text label) -->
   <g transform="translate(${PAD + 72 + headerName.length * 13 + 8}, ${headerY - 20})" opacity="0.4">

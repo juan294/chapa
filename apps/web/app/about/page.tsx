@@ -40,7 +40,7 @@ export default function AboutPage() {
             <p>
               Chapa generates a live, embeddable SVG badge that showcases your
               Developer Impact Profile from GitHub activity. It analyzes your
-              last 90 days across four independent dimensions to show what kind
+              last 12 months across four independent dimensions to show what kind
               of developer you are.
             </p>
 

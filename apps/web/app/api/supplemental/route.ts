@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchGitHubUser } from "@/lib/auth/github";
 import { cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
-import { isValidHandle, isValidEmuHandle, isValidStats90dShape } from "@/lib/validation";
+import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
 import type { SupplementalStats } from "@chapa/shared";
 
 const CACHE_TTL = 86400; // 24 hours
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Invalid sourceHandle" }, { status: 400 });
   }
 
-  if (!isValidStats90dShape(stats)) {
+  if (!isValidStatsShape(stats)) {
     return NextResponse.json({ error: "Invalid stats shape" }, { status: 400 });
   }
 

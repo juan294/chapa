@@ -1,23 +1,23 @@
-/** Daily activity count for heatmap (13 weeks × 7 days = 91 entries) */
+/** Daily activity count for heatmap (up to 53 weeks × 7 days = 371 entries) */
 export interface HeatmapDay {
   date: string; // ISO date string (YYYY-MM-DD)
   count: number;
 }
 
-/** Aggregated GitHub stats over the last 90 days */
-export interface Stats90d {
+/** Aggregated GitHub stats over the last 365 days */
+export interface StatsData {
   handle: string;
   displayName?: string; // GitHub profile name (e.g. "Juan García"), undefined if unset
   avatarUrl?: string; // GitHub avatar URL
-  commitsTotal: number; // cap 200
-  activeDays: number; // 0..90
+  commitsTotal: number; // cap 600
+  activeDays: number; // 0..365
   prsMergedCount: number;
-  prsMergedWeight: number; // cap 40
-  reviewsSubmittedCount: number; // cap 60
-  issuesClosedCount: number; // cap 30
+  prsMergedWeight: number; // cap 120
+  reviewsSubmittedCount: number; // cap 180
+  issuesClosedCount: number; // cap 80
   linesAdded: number;
   linesDeleted: number;
-  reposContributed: number; // cap 10
+  reposContributed: number; // cap 15
   topRepoShare: number; // 0..1
   maxCommitsIn10Min: number; // derived from commit timestamps
   microCommitRatio?: number; // optional, 0..1
@@ -120,7 +120,7 @@ export interface RawContributionData {
 export interface SupplementalStats {
   targetHandle: string; // personal GitHub handle
   sourceHandle: string; // EMU handle
-  stats: Stats90d;
+  stats: StatsData;
   uploadedAt: string; // ISO timestamp
 }
 

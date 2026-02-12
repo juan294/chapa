@@ -8,14 +8,14 @@ import {
   deriveArchetype,
   computeImpactV4,
 } from "./v4";
-import type { Stats90d, DimensionScores } from "@chapa/shared";
+import type { StatsData, DimensionScores } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a Stats90d with sensible defaults — override only what you need. */
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+/** Build a StatsData with sensible defaults — override only what you need. */
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "test-user",
     commitsTotal: 0,
@@ -78,28 +78,28 @@ describe("computeBuilding(stats)", () => {
 
   it("returns 100 for maxed-out shipping signals", () => {
     const stats = makeStats({
-      prsMergedWeight: 40,
-      issuesClosedCount: 30,
-      commitsTotal: 200,
+      prsMergedWeight: 120,
+      issuesClosedCount: 80,
+      commitsTotal: 600,
     });
     expect(computeBuilding(stats)).toBe(100);
   });
 
   it("weights PRs at 70%", () => {
     // Only PRs, no issues/commits
-    const prOnly = makeStats({ prsMergedWeight: 40 });
+    const prOnly = makeStats({ prsMergedWeight: 120 });
     const score = computeBuilding(prOnly);
     expect(score).toBe(70);
   });
 
   it("weights issues at 20%", () => {
-    const issueOnly = makeStats({ issuesClosedCount: 30 });
+    const issueOnly = makeStats({ issuesClosedCount: 80 });
     const score = computeBuilding(issueOnly);
     expect(score).toBe(20);
   });
 
   it("weights commits at 10%", () => {
-    const commitOnly = makeStats({ commitsTotal: 200 });
+    const commitOnly = makeStats({ commitsTotal: 600 });
     const score = computeBuilding(commitOnly);
     expect(score).toBe(10);
   });
@@ -122,9 +122,9 @@ describe("computeBuilding(stats)", () => {
 
   it("caps values above their limits", () => {
     const stats = makeStats({
-      prsMergedWeight: 100,
-      issuesClosedCount: 100,
-      commitsTotal: 500,
+      prsMergedWeight: 300,
+      issuesClosedCount: 200,
+      commitsTotal: 1500,
     });
     expect(computeBuilding(stats)).toBe(100);
   });
@@ -141,15 +141,15 @@ describe("computeGuarding(stats)", () => {
 
   it("returns high score for prolific reviewer", () => {
     const stats = makeStats({
-      reviewsSubmittedCount: 60,
-      prsMergedCount: 20, // review-to-PR ratio = 3:1 is excellent
+      reviewsSubmittedCount: 180,
+      prsMergedCount: 60, // review-to-PR ratio = 3:1 is excellent
     });
     const score = computeGuarding(stats);
     expect(score).toBeGreaterThan(70);
   });
 
   it("weights reviews at 60%", () => {
-    const reviewOnly = makeStats({ reviewsSubmittedCount: 60 });
+    const reviewOnly = makeStats({ reviewsSubmittedCount: 180 });
     const score = computeGuarding(reviewOnly);
     // 60% from reviews, 0% from ratio (no PRs → ratio undefined → 0), 15% from inverse micro
     // With no microCommitRatio data, inverse micro should give full points (no penalty)
@@ -183,8 +183,8 @@ describe("computeGuarding(stats)", () => {
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ reviewsSubmittedCount: 60, prsMergedCount: 5, microCommitRatio: 0 }),
-      makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 1 }),
+      makeStats({ reviewsSubmittedCount: 180, prsMergedCount: 5, microCommitRatio: 0 }),
+      makeStats({ reviewsSubmittedCount: 300, prsMergedCount: 1 }),
     ];
     for (const s of scenarios) {
       const score = computeGuarding(s);
@@ -205,7 +205,7 @@ describe("computeConsistency(stats)", () => {
 
   it("returns high score for daily, uniform activity", () => {
     const stats = makeStats({
-      activeDays: 85,
+      activeDays: 340,
       heatmapData: makeUniformHeatmap(14), // 2/day for 13 weeks
       maxCommitsIn10Min: 3,
     });
@@ -213,9 +213,9 @@ describe("computeConsistency(stats)", () => {
     expect(score).toBeGreaterThan(80);
   });
 
-  it("weights activeDays/90 at 50%", () => {
+  it("weights activeDays/365 at 50%", () => {
     const stats = makeStats({
-      activeDays: 90,
+      activeDays: 365,
       heatmapData: [], // no heatmap data → evenness = 0
       maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
     });
@@ -257,7 +257,7 @@ describe("computeConsistency(stats)", () => {
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ activeDays: 90, heatmapData: makeUniformHeatmap(20), maxCommitsIn10Min: 0 }),
+      makeStats({ activeDays: 365, heatmapData: makeUniformHeatmap(20), maxCommitsIn10Min: 0 }),
       makeStats({ activeDays: 1, heatmapData: makeBurstHeatmap(100), maxCommitsIn10Min: 50 }),
     ];
     for (const s of scenarios) {
@@ -279,7 +279,7 @@ describe("computeBreadth(stats)", () => {
 
   it("returns high score for many repos with low concentration and stars", () => {
     const stats = makeStats({
-      reposContributed: 10,
+      reposContributed: 15,
       topRepoShare: 0.2,
       docsOnlyPrRatio: 0.3,
       totalStars: 200,
@@ -289,7 +289,7 @@ describe("computeBreadth(stats)", () => {
   });
 
   it("weights repos at 40%", () => {
-    const repoOnly = makeStats({ reposContributed: 10, topRepoShare: 1.0 });
+    const repoOnly = makeStats({ reposContributed: 15, topRepoShare: 1.0 });
     // 40% from repos (maxed), 0% from inverse topRepoShare (1.0 = no diversity), 0% from docs, 0% from stars
     const score = computeBreadth(repoOnly);
     expect(score).toBeGreaterThanOrEqual(30);
@@ -334,7 +334,7 @@ describe("computeBreadth(stats)", () => {
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ reposContributed: 10, topRepoShare: 0.1, docsOnlyPrRatio: 1.0 }),
+      makeStats({ reposContributed: 15, topRepoShare: 0.1, docsOnlyPrRatio: 1.0 }),
       makeStats({ reposContributed: 1, topRepoShare: 1.0, docsOnlyPrRatio: 0 }),
     ];
     for (const s of scenarios) {
@@ -579,12 +579,12 @@ describe("computeImpactV4(stats)", () => {
 
   it("identifies a Builder archetype", () => {
     const stats = makeStats({
-      prsMergedWeight: 35,
-      issuesClosedCount: 20,
-      commitsTotal: 150,
+      prsMergedWeight: 100,
+      issuesClosedCount: 50,
+      commitsTotal: 400,
       reviewsSubmittedCount: 5,
-      prsMergedCount: 20,
-      activeDays: 30,
+      prsMergedCount: 50,
+      activeDays: 60,
       heatmapData: makeUniformHeatmap(5),
       reposContributed: 2,
       topRepoShare: 0.7,
@@ -595,11 +595,11 @@ describe("computeImpactV4(stats)", () => {
 
   it("identifies a Guardian archetype", () => {
     const stats = makeStats({
-      reviewsSubmittedCount: 55,
-      prsMergedCount: 8,
-      prsMergedWeight: 5,
-      commitsTotal: 20,
-      activeDays: 30,
+      reviewsSubmittedCount: 170,
+      prsMergedCount: 20,
+      prsMergedWeight: 15,
+      commitsTotal: 50,
+      activeDays: 60,
       heatmapData: makeUniformHeatmap(4),
       reposContributed: 2,
       topRepoShare: 0.6,
@@ -624,14 +624,14 @@ describe("computeImpactV4(stats)", () => {
   it("tier is derived from adjustedComposite", () => {
     // Force a high composite by maxing all dimensions
     const stats = makeStats({
-      prsMergedWeight: 40,
-      issuesClosedCount: 30,
-      commitsTotal: 200,
-      reviewsSubmittedCount: 60,
-      prsMergedCount: 10,
-      activeDays: 90,
+      prsMergedWeight: 120,
+      issuesClosedCount: 80,
+      commitsTotal: 600,
+      reviewsSubmittedCount: 180,
+      prsMergedCount: 40,
+      activeDays: 365,
       heatmapData: makeUniformHeatmap(20),
-      reposContributed: 10,
+      reposContributed: 15,
       topRepoShare: 0.15,
       docsOnlyPrRatio: 0.3,
       maxCommitsIn10Min: 3,

@@ -162,7 +162,7 @@ function MockBadgeCard() {
             <p className="font-heading text-sm font-medium text-[#E6EDF3]">
               @juandeveloper
             </p>
-            <p className="text-xs text-[#9AA4B2]">Last 90 days</p>
+            <p className="text-xs text-[#9AA4B2]">Last 12 months</p>
           </div>
         </div>
         <div className="text-right">

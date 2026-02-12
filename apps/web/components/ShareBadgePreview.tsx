@@ -1,11 +1,11 @@
 "use client";
 
-import type { BadgeConfig, Stats90d, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
 import { BadgePreviewCard } from "@/app/studio/BadgePreviewCard";
 
 export interface ShareBadgePreviewProps {
   config: BadgeConfig;
-  stats: Stats90d;
+  stats: StatsData;
   impact: ImpactV4Result;
 }
 

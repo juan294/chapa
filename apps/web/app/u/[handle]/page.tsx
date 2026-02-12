@@ -1,4 +1,4 @@
-import { getStats90d } from "@/lib/github/client";
+import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
@@ -97,7 +97,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
   // Fetch stats + saved config in parallel
   const [stats, savedConfig] = await Promise.all([
-    getStats90d(handle, token),
+    getStats(handle, token),
     cacheGet<BadgeConfig>(`config:${handle}`),
   ]);
   const impact = stats ? computeImpactV4(stats) : null;

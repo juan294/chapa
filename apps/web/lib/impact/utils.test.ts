@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Stats90d } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 import {
   normalize,
   computeConfidence,
@@ -8,10 +8,10 @@ import {
 } from "./utils";
 
 // ---------------------------------------------------------------------------
-// Helper: build a minimal Stats90d with sane defaults (no penalties triggered)
+// Helper: build a minimal StatsData with sane defaults (no penalties triggered)
 // ---------------------------------------------------------------------------
 
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "test-user",
     commitsTotal: 50,
