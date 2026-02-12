@@ -49,10 +49,10 @@ function hasEnhancedTier(tier: ImpactTier): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Animated stat sub-component (hook is always called — static just skips anim)
+// Animated stat card sub-component (achievement card block)
 // ---------------------------------------------------------------------------
 
-function AnimatedStat({
+function AnimatedStatCard({
   value,
   label,
   statsDisplay,
@@ -67,16 +67,18 @@ function AnimatedStat({
     value,
     2000,
     easing,
-    isAnimated, // startOnMount — animates from 0 when true
+    isAnimated,
   );
 
   return (
-    <span className="text-text-secondary text-sm">
-      <span className="text-text-primary font-semibold tabular-nums">
+    <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
+      <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
         {isAnimated ? counter : value}
-      </span>{" "}
-      {label}
-    </span>
+      </span>
+      <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
+        {label}
+      </span>
+    </div>
   );
 }
 
@@ -188,7 +190,7 @@ export function BadgePreviewCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <div className="text-text-primary font-heading font-bold text-sm truncate">
-                @{stats.handle}
+                {stats.displayName ?? `@${stats.handle}`}
               </div>
               <svg className="w-3.5 h-3.5 text-amber opacity-40 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
@@ -206,7 +208,7 @@ export function BadgePreviewCard({
       <div className="flex gap-6">
         {/* Left: Heatmap */}
         <div className="flex-1 min-w-0">
-          <div className="text-text-secondary text-xs uppercase tracking-wider mb-2">
+          <div className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-2">
             Activity
           </div>
           <HeatmapGrid
@@ -215,53 +217,73 @@ export function BadgePreviewCard({
           />
         </div>
 
-        {/* Right: Score + Tier */}
-        <div className="flex flex-col items-center justify-center gap-2 w-[35%] sm:w-[200px] flex-shrink-0">
-          <div className="text-text-secondary text-xs uppercase tracking-wider">
+        {/* Right: Score + Stats + Active Days */}
+        <div ref={statsRef} className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
+          <div className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
             Impact Score
           </div>
-          <div data-score-effect={config.scoreEffect}>
-            <ScoreEffectText
-              effect={config.scoreEffect as ScoreEffect}
-              className="text-5xl font-heading font-extrabold"
-            >
-              {impact.adjustedScore}
-            </ScoreEffectText>
+
+          {/* Score row: big number + tier */}
+          <div className="flex items-end gap-3">
+            <div data-score-effect={config.scoreEffect}>
+              <ScoreEffectText
+                effect={config.scoreEffect as ScoreEffect}
+                className="text-6xl font-heading tracking-tighter leading-none"
+              >
+                {impact.adjustedScore}
+              </ScoreEffectText>
+            </div>
+            <div className="flex flex-col gap-1 pb-1">
+              <div
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border w-fit ${tierPillClasses(impact.tier)}`}
+              >
+                <span>{TIER_SYMBOLS[impact.tier]}</span>
+                <span>{impact.tier}</span>
+              </div>
+              <div className="text-xs text-text-secondary">
+                {impact.confidence}% Confidence
+              </div>
+            </div>
           </div>
-          <div
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold border ${tierPillClasses(impact.tier)}`}
-          >
-            <span>{TIER_SYMBOLS[impact.tier]}</span>
-            <span>{impact.tier}</span>
+
+          {/* Stats — three achievement blocks */}
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <AnimatedStatCard
+              value={stats.commitsTotal}
+              label="commits"
+              statsDisplay={config.statsDisplay}
+            />
+            <AnimatedStatCard
+              value={stats.prsMergedCount}
+              label="PRs merged"
+              statsDisplay={config.statsDisplay}
+            />
+            <AnimatedStatCard
+              value={stats.reviewsSubmittedCount}
+              label="reviews"
+              statsDisplay={config.statsDisplay}
+            />
           </div>
-          <div className="text-text-secondary text-xs">
-            {impact.confidence}% Confidence
+
+          {/* Active days — consistency bar */}
+          <div className="mt-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-text-secondary">
+                Active Days
+              </span>
+              <span className="text-xs font-heading text-text-primary">
+                <span className="text-terminal-green font-bold">{stats.activeDays}</span>
+                <span className="text-text-secondary"> / 90</span>
+              </span>
+            </div>
+            <div className="h-3 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber to-terminal-green"
+                style={{ width: `${Math.round((stats.activeDays / 90) * 100)}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* --- Stats row --- */}
-      <div
-        ref={statsRef}
-        className="flex items-center justify-center gap-4 mt-5 pt-4 border-t border-stroke"
-      >
-        <AnimatedStat
-          value={stats.commitsTotal}
-          label="commits"
-          statsDisplay={config.statsDisplay}
-        />
-        <span className="text-text-secondary/30">|</span>
-        <AnimatedStat
-          value={stats.prsMergedCount}
-          label="PRs merged"
-          statsDisplay={config.statsDisplay}
-        />
-        <span className="text-text-secondary/30">|</span>
-        <AnimatedStat
-          value={stats.reviewsSubmittedCount}
-          label="reviews"
-          statsDisplay={config.statsDisplay}
-        />
       </div>
 
       {/* --- Footer: GitHub branding --- */}

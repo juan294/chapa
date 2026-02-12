@@ -224,14 +224,54 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("Activity");
     });
 
-    it("has @ prefix on handle", () => {
-      expect(SOURCE).toContain("@{stats.handle}");
+    it("shows displayName as primary header when available", () => {
+      expect(SOURCE).toContain("stats.displayName");
     });
 
-    it("uses pipe separators instead of dots", () => {
-      expect(SOURCE).toContain("|");
-      // Should not use dot separator
-      expect(SOURCE).not.toContain('"text-stroke">·<');
+    it("falls back to @handle when no displayName", () => {
+      // Should show @handle as fallback
+      expect(SOURCE).toMatch(/@.*stats\.handle/);
+    });
+  });
+
+  describe("achievement card stats", () => {
+    it("has three stat achievement card blocks", () => {
+      // Achievement cards use bg-white/[0.04] pattern
+      expect(SOURCE).toContain("bg-white/[0.04]");
+    });
+
+    it("renders commits in achievement card", () => {
+      expect(SOURCE).toContain("stats.commitsTotal");
+      expect(SOURCE).toContain("commits");
+    });
+
+    it("renders PRs merged in achievement card", () => {
+      expect(SOURCE).toContain("stats.prsMergedCount");
+      expect(SOURCE).toContain("PRs merged");
+    });
+
+    it("renders reviews in achievement card", () => {
+      expect(SOURCE).toContain("stats.reviewsSubmittedCount");
+      expect(SOURCE).toContain("reviews");
+    });
+  });
+
+  describe("active days bar", () => {
+    it("renders active days from stats", () => {
+      expect(SOURCE).toContain("stats.activeDays");
+    });
+
+    it("shows Active Days label", () => {
+      expect(SOURCE).toContain("Active Days");
+    });
+
+    it("shows /90 denominator", () => {
+      expect(SOURCE).toContain("/ 90");
+    });
+
+    it("has gradient progress bar", () => {
+      expect(SOURCE).toContain("from-amber");
+      expect(SOURCE).toContain("to-terminal-green");
     });
   });
 });

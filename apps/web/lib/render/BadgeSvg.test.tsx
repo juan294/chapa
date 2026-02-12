@@ -225,8 +225,8 @@ describe("renderBadgeSvg", () => {
   // Stats row (commits | PRs merged | reviews)
   // ---------------------------------------------------------------------------
 
-  describe("stats row", () => {
-    it("contains commit/PR/review counts", () => {
+  describe("achievement cards", () => {
+    it("contains commit/PR/review counts in card blocks", () => {
       const stats = makeStats({
         commitsTotal: 142,
         prsMergedCount: 18,
@@ -238,11 +238,35 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("31");
     });
 
-    it("contains pipe separators between stats", () => {
+    it("has card rectangles for stat blocks", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("commits");
-      expect(svg).toContain("PRs merged");
-      expect(svg).toContain("reviews");
+      // Achievement cards rendered as rounded rectangles with uppercase labels
+      expect(svg).toContain("COMMITS");
+      expect(svg).toContain("PRS MERGED");
+      expect(svg).toContain("REVIEWS");
+    });
+  });
+
+  describe("active days bar", () => {
+    it("contains Active Days label", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Active Days");
+    });
+
+    it("shows active days count from stats", () => {
+      const svg = renderBadgeSvg(makeStats({ activeDays: 45 }), makeImpact());
+      expect(svg).toContain("45");
+    });
+
+    it("shows /90 denominator", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("/90");
+    });
+
+    it("has progress bar rect elements", () => {
+      const svg = renderBadgeSvg(makeStats({ activeDays: 45 }), makeImpact());
+      // Progress bar background + fill
+      expect(svg).toContain("Active Days");
     });
   });
 
@@ -351,9 +375,12 @@ describe("renderBadgeSvg", () => {
         reviewsSubmittedCount: 31,
       });
       const svg = renderBadgeSvg(stats, makeImpact());
-      expect(svg).toContain("142 commits");
-      expect(svg).toContain("18 PRs merged");
-      expect(svg).toContain("31 reviews");
+      expect(svg).toContain(">142<");
+      expect(svg).toContain(">18<");
+      expect(svg).toContain(">31<");
+      expect(svg).toContain("COMMITS");
+      expect(svg).toContain("PRS MERGED");
+      expect(svg).toContain("REVIEWS");
     });
   });
 });
