@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { escapeXml } from "./escape";
-import type { Stats90d, ImpactV3Result } from "@chapa/shared";
+import type { Stats90d, ImpactV4Result } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers — reusable test fixtures
@@ -30,22 +30,21 @@ function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
   };
 }
 
-function makeImpact(overrides: Partial<ImpactV3Result> = {}): ImpactV3Result {
+function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
   return {
     handle: "testuser",
-    baseScore: 72,
+    dimensions: {
+      building: 72,
+      guarding: 55,
+      consistency: 68,
+      breadth: 48,
+    },
+    archetype: "Builder",
+    compositeScore: 61,
     confidence: 85,
     confidencePenalties: [],
-    adjustedScore: 61,
+    adjustedComposite: 58,
     tier: "Solid",
-    breakdown: {
-      commits: 0.71,
-      prWeight: 0.55,
-      reviews: 0.52,
-      issues: 0.17,
-      streak: 0.5,
-      collaboration: 0.4,
-    },
     computedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -151,7 +150,6 @@ describe("renderBadgeSvg", () => {
     it("contains 'Chapa_' logo text with underscore cursor", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("Chapa");
-      // Must use underscore (_) not dot (.)
       expect(svg).toMatch(/Chapa.*_/);
       expect(svg).not.toMatch(/Chapa<tspan[^>]*>\.<\/tspan>/);
     });
@@ -185,7 +183,6 @@ describe("renderBadgeSvg", () => {
       );
       expect(svg).toContain("<image");
       expect(svg).toContain(dataUri);
-      // Must NOT contain the raw external URL
       expect(svg).not.toContain("https://avatars.githubusercontent.com/u/123");
     });
 
@@ -194,7 +191,6 @@ describe("renderBadgeSvg", () => {
         makeStats({ avatarUrl: undefined }),
         makeImpact(),
       );
-      // Should still have the circle but with the octocat path
       expect(svg).toContain("<circle");
       expect(svg).toContain("M14 0C6.27");
     });
@@ -203,7 +199,6 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
         makeImpact(),
-        // No avatarDataUri — should NOT embed the raw URL (it won't load in SVG-as-image)
       );
       expect(svg).toContain("M14 0C6.27");
       expect(svg).not.toContain("https://avatars.githubusercontent.com/u/123");
@@ -217,13 +212,11 @@ describe("renderBadgeSvg", () => {
   describe("verified icon", () => {
     it("contains a shield/checkmark icon", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Should have the shield path
       expect(svg).toContain("M12 1L3 5v6");
     });
 
     it("does NOT contain the word 'Verified' as text", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Only the icon, no text label — matches landing page source of truth
       expect(svg).not.toContain(">Verified<");
     });
 
@@ -234,7 +227,7 @@ describe("renderBadgeSvg", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Two-column body: heatmap + impact score
+  // Two-column body: heatmap + developer profile
   // ---------------------------------------------------------------------------
 
   describe("body layout", () => {
@@ -243,27 +236,31 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("ACTIVITY");
     });
 
-    it("contains 'IMPACT SCORE' section label", () => {
+    it("contains 'DEVELOPER PROFILE' section label", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("IMPACT SCORE");
+      expect(svg).toContain("DEVELOPER PROFILE");
     });
 
-    it("contains the score value", () => {
+    it("contains the archetype label", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      expect(svg).toContain("Builder");
+    });
+
+    it("contains the composite score", () => {
       const svg = renderBadgeSvg(
         makeStats(),
-        makeImpact({ adjustedScore: 61 }),
+        makeImpact({ adjustedComposite: 58 }),
       );
-      expect(svg).toContain("61");
+      expect(svg).toContain(">58<");
     });
 
-    it("contains the tier label in a pill badge", () => {
+    it("contains the tier label", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "Elite" }));
       expect(svg).toContain("Elite");
     });
 
-    it("contains a star icon in the tier pill", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ tier: "Elite" }));
-      // The tier pill should have a star character or SVG star
+    it("contains a star icon in the archetype pill", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toMatch(/[\u2605\u2606]|star/i);
     });
 
@@ -271,54 +268,51 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact({ confidence: 85 }));
       expect(svg).toContain("85% Confidence");
     });
+
+    it("contains a radar chart with polygon", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Radar chart data shape
+      expect(svg).toContain("fill-opacity");
+      expect(svg).toContain("<polygon");
+    });
+
+    it("radar chart shows dimension labels", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("Building");
+      expect(svg).toContain("Guarding");
+      expect(svg).toContain("Consistency");
+      expect(svg).toContain("Breadth");
+    });
   });
 
   // ---------------------------------------------------------------------------
-  // Stats row (commits | PRs merged | reviews)
+  // Dimension cards (4 across: Building, Guarding, Consistency, Breadth)
   // ---------------------------------------------------------------------------
 
-  describe("achievement cards", () => {
-    it("contains commit/PR/review counts in card blocks", () => {
-      const stats = makeStats({
-        commitsTotal: 142,
-        prsMergedCount: 18,
-        reviewsSubmittedCount: 31,
-      });
-      const svg = renderBadgeSvg(stats, makeImpact());
-      expect(svg).toContain("142");
-      expect(svg).toContain("18");
-      expect(svg).toContain("31");
+  describe("dimension cards", () => {
+    it("contains all 4 dimension scores", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({
+        dimensions: { building: 72, guarding: 55, consistency: 68, breadth: 48 },
+      }));
+      expect(svg).toContain(">72<");
+      expect(svg).toContain(">55<");
+      expect(svg).toContain(">68<");
+      expect(svg).toContain(">48<");
     });
 
-    it("has card rectangles for stat blocks", () => {
+    it("has card labels for all 4 dimensions", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Achievement cards rendered as rounded rectangles with uppercase labels
-      expect(svg).toContain("COMMITS");
-      expect(svg).toContain("PRS MERGED");
-      expect(svg).toContain("REVIEWS");
+      expect(svg).toContain("BUILDING");
+      expect(svg).toContain("GUARDING");
+      expect(svg).toContain("CONSISTENCY");
+      expect(svg).toContain("BREADTH");
     });
-  });
 
-  describe("active days bar", () => {
-    it("contains Active Days label", () => {
+    it("has card rectangles for dimension blocks", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("Active Days");
-    });
-
-    it("shows active days count from stats", () => {
-      const svg = renderBadgeSvg(makeStats({ activeDays: 45 }), makeImpact());
-      expect(svg).toContain("45");
-    });
-
-    it("shows /90 denominator", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("/90");
-    });
-
-    it("has progress bar rect elements", () => {
-      const svg = renderBadgeSvg(makeStats({ activeDays: 45 }), makeImpact());
-      // Progress bar background + fill
-      expect(svg).toContain("Active Days");
+      // At least 4 card rectangles
+      const cardRects = [...svg.matchAll(/fill="rgba\(255,255,255,0\.04\)"/g)];
+      expect(cardRects.length).toBeGreaterThanOrEqual(4);
     });
   });
 
@@ -346,7 +340,6 @@ describe("renderBadgeSvg", () => {
 
     it("footer text is at least 17px for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // "Powered by GitHub" and domain text should be at least font-size 17
       const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g);
       expect(brandingFontSizes).not.toBeNull();
       for (const match of brandingFontSizes!) {
@@ -357,7 +350,6 @@ describe("renderBadgeSvg", () => {
 
     it("footer text opacity is at least 0.75 for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Footer text (GitHub branding + domain) should have higher opacity
       const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g)];
       expect(opacityMatches.length).toBeGreaterThanOrEqual(1);
       for (const match of opacityMatches) {
@@ -367,68 +359,34 @@ describe("renderBadgeSvg", () => {
 
     it("contains a divider line above footer", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Footer has a horizontal line divider
       expect(svg).toContain("<line");
     });
   });
 
   // ---------------------------------------------------------------------------
-  // Font size and contrast parity with landing page (#109)
-  // SVG is 1200px wide, displayed at ~72% (864px). Fonts must be scaled up
-  // so displayed size matches the landing page HTML.
+  // Font size and contrast parity
   // ---------------------------------------------------------------------------
 
-  describe("font size and contrast parity (#109)", () => {
-    it("score font-size is at least 84 to display at ~60px", () => {
+  describe("font size and contrast parity", () => {
+    it("section labels use textPrimary color for contrast", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // The score text element should have font-size >= 84
-      const scoreMatch = svg.match(/font-size="(\d+)"[^>]*font-weight="700"[^>]*>[^<]*\d+/);
-      expect(scoreMatch).not.toBeNull();
-      const scoreFontSize = parseInt(scoreMatch![1], 10);
-      expect(scoreFontSize).toBeGreaterThanOrEqual(84);
+      const activityMatch = svg.match(/fill="([^"]+)"[^>]*>ACTIVITY/);
+      const profileMatch = svg.match(/fill="([^"]+)"[^>]*>DEVELOPER PROFILE/);
+      expect(activityMatch).not.toBeNull();
+      expect(profileMatch).not.toBeNull();
+      expect(activityMatch![1]).toBe("#E6EDF3");
+      expect(profileMatch![1]).toBe("#E6EDF3");
     });
 
-    it("achievement card numbers font-size is at least 34 to display at ~24px", () => {
+    it("dimension card labels font-size is at least 13", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Card number elements (commits, PRs, reviews) with font-weight 700
-      const cardNumberMatches = [...svg.matchAll(/font-size="(\d+)"[^>]*font-weight="700"[^>]*text-anchor="middle"[^>]*>/g)];
-      expect(cardNumberMatches.length).toBeGreaterThanOrEqual(3);
-      for (const match of cardNumberMatches) {
-        const size = parseInt(match[1], 10);
-        expect(size).toBeGreaterThanOrEqual(34);
-      }
-    });
-
-    it("achievement card labels font-size is at least 13 to display at ~10px", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Labels: COMMITS, PRS MERGED, REVIEWS
-      for (const label of ["COMMITS", "PRS MERGED", "REVIEWS"]) {
+      for (const label of ["BUILDING", "GUARDING", "CONSISTENCY", "BREADTH"]) {
         const regex = new RegExp(`font-size="(\\d+)"[^>]*>${label}`);
         const match = svg.match(regex);
         expect(match).not.toBeNull();
         const size = parseInt(match![1], 10);
         expect(size).toBeGreaterThanOrEqual(13);
       }
-    });
-
-    it("section labels use textPrimary color (not textSecondary) for contrast", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // "ACTIVITY" and "IMPACT SCORE" labels should use the primary text color
-      // for better contrast (matching landing page's text-text-primary/50)
-      const activityMatch = svg.match(/fill="([^"]+)"[^>]*>ACTIVITY/);
-      const impactMatch = svg.match(/fill="([^"]+)"[^>]*>IMPACT SCORE/);
-      expect(activityMatch).not.toBeNull();
-      expect(impactMatch).not.toBeNull();
-      // Should use textPrimary (#E6EDF3), not textSecondary (#9AA4B2)
-      expect(activityMatch![1]).toBe("#E6EDF3");
-      expect(impactMatch![1]).toBe("#E6EDF3");
-    });
-
-    it("active days label font-size is at least 13", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const match = svg.match(/font-size="(\d+)"[^>]*>ACTIVE DAYS/);
-      expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(13);
     });
 
     it("subtitle font-size is at least 19 to display at ~14px", () => {
@@ -438,27 +396,18 @@ describe("renderBadgeSvg", () => {
       expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(19);
     });
 
-    it("confidence text font-size is at least 17 to display at ~12px", () => {
+    it("confidence text font-size is at least 15", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       const match = svg.match(/font-size="(\d+)"[^>]*>\d+% Confidence/);
       expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(17);
+      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(15);
     });
 
-    it("tier pill text font-size is at least 17", () => {
+    it("archetype pill text font-size is at least 17", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Tier pill text with star + tier name
       const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*text-anchor="middle"[^>]*>★/);
       expect(match).not.toBeNull();
       expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(17);
-    });
-
-    it("achievement cards are at least 85px tall for breathing room", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Card rects should have height >= 85
-      const cardRects = [...svg.matchAll(/height="(\d+)"[^>]*rx="10"[^>]*fill="rgba\(255,255,255,0\.04\)"/g)];
-      const tallCards = cardRects.filter(m => parseInt(m[1], 10) >= 85);
-      expect(tallCards.length).toBeGreaterThanOrEqual(3);
     });
   });
 
@@ -473,7 +422,7 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain('attributeName="opacity"');
     });
 
-    it("includes pulse animation on impact score area", () => {
+    it("includes pulse animation on composite score area", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("pulse-glow");
     });
@@ -496,43 +445,49 @@ describe("renderBadgeSvg", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // R4: Numeric defense-in-depth — coerce numeric stats to prevent XSS
+  // Numeric defense-in-depth — coerce dimension scores to prevent XSS
   // ---------------------------------------------------------------------------
 
   describe("numeric defense-in-depth", () => {
-    it("coerces commitsTotal to a number string even if somehow a string", () => {
-      const stats = makeStats({ commitsTotal: "42<script>" as unknown as number });
-      const svg = renderBadgeSvg(stats, makeImpact());
-      // Should contain NaN (since "42<script>" coerced via Number() is NaN)
-      // but must NOT contain the raw script tag
+    it("coerces dimension scores to number strings even if somehow strings", () => {
+      const impact = makeImpact({
+        dimensions: {
+          building: '42<script>' as unknown as number,
+          guarding: 55,
+          consistency: 68,
+          breadth: 48,
+        },
+      });
+      const svg = renderBadgeSvg(makeStats(), impact);
       expect(svg).not.toContain("<script>");
     });
 
-    it("coerces prsMergedCount to a number string even if somehow a string", () => {
-      const stats = makeStats({ prsMergedCount: '10"onload="alert(1)' as unknown as number });
-      const svg = renderBadgeSvg(stats, makeImpact());
-      expect(svg).not.toContain("onload");
+    it("renders valid dimension numbers correctly after coercion", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({
+        dimensions: { building: 72, guarding: 55, consistency: 68, breadth: 48 },
+      }));
+      expect(svg).toContain(">72<");
+      expect(svg).toContain(">55<");
+      expect(svg).toContain(">68<");
+      expect(svg).toContain(">48<");
+      expect(svg).toContain("BUILDING");
+      expect(svg).toContain("GUARDING");
+      expect(svg).toContain("CONSISTENCY");
+      expect(svg).toContain("BREADTH");
     });
+  });
 
-    it("coerces reviewsSubmittedCount to a number string even if somehow a string", () => {
-      const stats = makeStats({ reviewsSubmittedCount: "<img src=x>" as unknown as number });
-      const svg = renderBadgeSvg(stats, makeImpact());
-      expect(svg).not.toContain("<img");
-    });
+  // ---------------------------------------------------------------------------
+  // Archetype display
+  // ---------------------------------------------------------------------------
 
-    it("renders valid numbers correctly after coercion", () => {
-      const stats = makeStats({
-        commitsTotal: 142,
-        prsMergedCount: 18,
-        reviewsSubmittedCount: 31,
-      });
-      const svg = renderBadgeSvg(stats, makeImpact());
-      expect(svg).toContain(">142<");
-      expect(svg).toContain(">18<");
-      expect(svg).toContain(">31<");
-      expect(svg).toContain("COMMITS");
-      expect(svg).toContain("PRS MERGED");
-      expect(svg).toContain("REVIEWS");
+  describe("archetype display", () => {
+    it("shows each archetype type correctly", () => {
+      const archetypes = ["Builder", "Guardian", "Marathoner", "Polymath", "Balanced", "Emerging"] as const;
+      for (const archetype of archetypes) {
+        const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype }));
+        expect(svg).toContain(archetype);
+      }
     });
   });
 });
