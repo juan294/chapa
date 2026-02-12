@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { BadgeConfig, Stats90d, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
@@ -20,7 +20,7 @@ import {
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
-  stats: Stats90d;
+  stats: StatsData;
   impact: ImpactV4Result;
   handle?: string;
 }

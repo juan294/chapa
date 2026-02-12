@@ -1,4 +1,4 @@
-import type { Stats90d, HeatmapDay } from "@chapa/shared";
+import type { StatsData, HeatmapDay } from "@chapa/shared";
 
 /**
  * Merge primary GitHub stats with supplemental stats (e.g. from an EMU account).
@@ -15,9 +15,9 @@ import type { Stats90d, HeatmapDay } from "@chapa/shared";
  * - Sets hasSupplementalData: true
  */
 export function mergeStats(
-  primary: Stats90d,
-  supplemental: Stats90d,
-): Stats90d {
+  primary: StatsData,
+  supplemental: StatsData,
+): StatsData {
   const mergedHeatmap = mergeHeatmap(primary.heatmapData, supplemental.heatmapData);
   const activeDays = mergedHeatmap.filter((d) => d.count > 0).length;
 

@@ -1,5 +1,5 @@
 import type {
-  Stats90d,
+  StatsData,
   ImpactTier,
   ConfidencePenalty,
   ConfidenceFlag,
@@ -34,7 +34,7 @@ const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
     "Includes activity from a linked account that cannot be independently verified.",
 };
 
-export function computeConfidence(stats: Stats90d): {
+export function computeConfidence(stats: StatsData): {
   confidence: number;
   penalties: ConfidencePenalty[];
 } {

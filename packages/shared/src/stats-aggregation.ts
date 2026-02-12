@@ -1,8 +1,8 @@
-import type { RawContributionData, Stats90d, HeatmapDay } from "./types";
+import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
 
 /**
- * Transform raw GitHub GraphQL contribution data into a Stats90d object.
+ * Transform raw GitHub GraphQL contribution data into a StatsData object.
  *
  * This is a pure function — deterministic output for a given input
  * (except for `fetchedAt` which uses the current time).
@@ -10,7 +10,7 @@ import { computePrWeight } from "./scoring";
  * Input shape: `RawContributionData` where PR nodes are already unwrapped
  * (i.e. null nodes filtered out by the caller — see `queries.ts` and `fetch-emu.ts`).
  */
-export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
+export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // 1. Flatten heatmap from weeks -> HeatmapDay[]
   const heatmapData: HeatmapDay[] = [];
   for (const week of raw.contributionCalendar.weeks) {

@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
 import { escapeXml } from "./escape";
-import type { Stats90d, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV4Result } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers — reusable test fixtures
 // ---------------------------------------------------------------------------
 
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "testuser",
     commitsTotal: 142,

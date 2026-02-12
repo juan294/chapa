@@ -52,10 +52,10 @@ export function isValidBadgeConfig(value: unknown): boolean {
 }
 
 /**
- * Structural validation for uploaded Stats90d.
+ * Structural validation for uploaded StatsData.
  * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
  */
-export function isValidStats90dShape(value: unknown): boolean {
+export function isValidStatsShape(value: unknown): boolean {
   if (value == null || typeof value !== "object") return false;
   const obj = value as Record<string, unknown>;
 

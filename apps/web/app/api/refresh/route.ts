@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
-import { getStats90d } from "@/lib/github/client";
+import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { isValidHandle } from "@/lib/validation";
 
@@ -58,11 +58,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Clear cached stats so getStats90d fetches fresh from GitHub
+  // Clear cached stats so getStats fetches fresh from GitHub
   await cacheDel(`stats:${handle}`);
 
   // Fetch fresh stats with the user's OAuth token for better rate limits
-  const stats = await getStats90d(handle, session.token);
+  const stats = await getStats(handle, session.token);
   if (!stats) {
     return NextResponse.json(
       { error: "Failed to fetch stats from GitHub. Try again later." },

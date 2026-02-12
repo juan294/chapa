@@ -1,5 +1,5 @@
-import type { Stats90d, RawContributionData } from "@chapa/shared";
-import { CONTRIBUTION_QUERY, buildStats90dFromRaw } from "@chapa/shared";
+import type { StatsData, RawContributionData } from "@chapa/shared";
+import { CONTRIBUTION_QUERY, buildStatsFromRaw } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Fetch EMU stats via GraphQL (requires EMU token with auth)
@@ -8,7 +8,7 @@ import { CONTRIBUTION_QUERY, buildStats90dFromRaw } from "@chapa/shared";
 export async function fetchEmuStats(
   login: string,
   emuToken: string,
-): Promise<Stats90d | null> {
+): Promise<StatsData | null> {
   const now = new Date();
   const since = new Date(now);
   since.setDate(since.getDate() - 90);
@@ -86,7 +86,7 @@ export async function fetchEmuStats(
       },
     };
 
-    return buildStats90dFromRaw(raw);
+    return buildStatsFromRaw(raw);
   } catch (err) {
     console.error(`[cli] fetch error:`, err);
     return null;

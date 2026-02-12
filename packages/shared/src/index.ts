@@ -1,6 +1,6 @@
 export type {
   HeatmapDay,
-  Stats90d,
+  StatsData,
   RawContributionData,
   ConfidenceFlag,
   ConfidencePenalty,
@@ -24,5 +24,5 @@ export type {
 export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";
 
 export { CONTRIBUTION_QUERY } from "./github-query";
-export { buildStats90dFromRaw } from "./stats-aggregation";
+export { buildStatsFromRaw } from "./stats-aggregation";
 export { formatCompact } from "./format";

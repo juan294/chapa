@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Stats90d, SupplementalStats } from "@chapa/shared";
+import type { StatsData, SupplementalStats } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockFetchStats90d, mockCacheGet, mockCacheSet } = vi.hoisted(() => ({
-  mockFetchStats90d: vi.fn(),
+const { mockFetchStatsData, mockCacheGet, mockCacheSet } = vi.hoisted(() => ({
+  mockFetchStatsData: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
 }));
 
-vi.mock("./stats90d", () => ({
-  fetchStats90d: mockFetchStats90d,
+vi.mock("./stats", () => ({
+  fetchStats: mockFetchStatsData,
 }));
 
 vi.mock("../cache/redis", () => ({
@@ -20,13 +20,13 @@ vi.mock("../cache/redis", () => ({
   cacheSet: mockCacheSet,
 }));
 
-import { getStats90d } from "./client";
+import { getStats } from "./client";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "test-user",
     commitsTotal: 50,
@@ -51,7 +51,7 @@ function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("getStats90d", () => {
+describe("getStats", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCacheSet.mockResolvedValue(undefined);
@@ -61,26 +61,26 @@ describe("getStats90d", () => {
     const cached = makeStats();
     mockCacheGet.mockResolvedValue(cached);
 
-    const result = await getStats90d("test-user");
+    const result = await getStats("test-user");
     expect(result).toEqual(cached);
-    expect(mockFetchStats90d).not.toHaveBeenCalled();
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
   });
 
   it("fetches from GitHub on cache miss and caches result", async () => {
     const fresh = makeStats();
     mockCacheGet.mockResolvedValue(null);
-    mockFetchStats90d.mockResolvedValue(fresh);
+    mockFetchStatsData.mockResolvedValue(fresh);
 
-    const result = await getStats90d("test-user");
+    const result = await getStats("test-user");
     expect(result).toEqual(fresh);
     expect(mockCacheSet).toHaveBeenCalledWith("stats:test-user", fresh, 21600);
   });
 
   it("returns null when GitHub returns null", async () => {
     mockCacheGet.mockResolvedValue(null);
-    mockFetchStats90d.mockResolvedValue(null);
+    mockFetchStatsData.mockResolvedValue(null);
 
-    const result = await getStats90d("test-user");
+    const result = await getStats("test-user");
     expect(result).toBeNull();
   });
 
@@ -102,9 +102,9 @@ describe("getStats90d", () => {
     mockCacheGet
       .mockResolvedValueOnce(null) // stats:test-user
       .mockResolvedValueOnce(supplemental); // supplemental:test-user
-    mockFetchStats90d.mockResolvedValue(primary);
+    mockFetchStatsData.mockResolvedValue(primary);
 
-    const result = await getStats90d("test-user");
+    const result = await getStats("test-user");
     expect(result).not.toBeNull();
     expect(result!.commitsTotal).toBe(80); // 50 + 30
     expect(result!.prsMergedCount).toBe(8); // 5 + 3
@@ -118,9 +118,9 @@ describe("getStats90d", () => {
     mockCacheGet
       .mockResolvedValueOnce(null) // stats cache miss
       .mockResolvedValueOnce(null); // no supplemental
-    mockFetchStats90d.mockResolvedValue(primary);
+    mockFetchStatsData.mockResolvedValue(primary);
 
-    const result = await getStats90d("test-user");
+    const result = await getStats("test-user");
     expect(result).not.toBeNull();
     expect(result!.commitsTotal).toBe(50);
     expect(result!.hasSupplementalData).toBeUndefined();
@@ -138,9 +138,9 @@ describe("getStats90d", () => {
     mockCacheGet
       .mockResolvedValueOnce(null) // stats cache miss
       .mockResolvedValueOnce(supplemental);
-    mockFetchStats90d.mockResolvedValue(primary);
+    mockFetchStatsData.mockResolvedValue(primary);
 
-    await getStats90d("test-user");
+    await getStats("test-user");
 
     // The cached value should be the merged stats
     expect(mockCacheSet).toHaveBeenCalledWith(
@@ -150,12 +150,12 @@ describe("getStats90d", () => {
     );
   });
 
-  it("passes token argument through to fetchStats90d", async () => {
+  it("passes token argument through to fetchStats", async () => {
     mockCacheGet.mockResolvedValue(null);
-    mockFetchStats90d.mockResolvedValue(makeStats());
+    mockFetchStatsData.mockResolvedValue(makeStats());
 
-    await getStats90d("test-user", "abc");
+    await getStats("test-user", "abc");
 
-    expect(mockFetchStats90d).toHaveBeenCalledWith("test-user", "abc");
+    expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", "abc");
   });
 });

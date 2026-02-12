@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mergeStats } from "./merge";
-import type { Stats90d } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "primary-user",
     displayName: "Primary User",

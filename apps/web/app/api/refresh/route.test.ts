@@ -16,7 +16,7 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 vi.mock("@/lib/github/client", () => ({
-  getStats90d: vi.fn(),
+  getStats: vi.fn(),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -39,7 +39,7 @@ vi.mock("@/lib/impact/v4", () => ({
 
 import { readSessionCookie } from "@/lib/auth/github";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
-import { getStats90d } from "@/lib/github/client";
+import { getStats } from "@/lib/github/client";
 
 function makeRequest(handle?: string): NextRequest {
   const url = handle
@@ -106,7 +106,7 @@ describe("POST /api/refresh", () => {
       avatar_url: "https://example.com/avatar.png",
     });
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
-    vi.mocked(getStats90d).mockResolvedValue({
+    vi.mocked(getStats).mockResolvedValue({
       handle: "testuser",
       commitsTotal: 142,
       activeDays: 45,
@@ -131,7 +131,7 @@ describe("POST /api/refresh", () => {
     expect(cacheDel).toHaveBeenCalledWith("stats:testuser");
 
     // Should have fetched fresh stats with token
-    expect(getStats90d).toHaveBeenCalledWith("testuser", "tok");
+    expect(getStats).toHaveBeenCalledWith("testuser", "tok");
 
     const body = await res.json();
     expect(body.stats.commitsTotal).toBe(142);
@@ -146,7 +146,7 @@ describe("POST /api/refresh", () => {
       avatar_url: "https://example.com/avatar.png",
     });
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
-    vi.mocked(getStats90d).mockResolvedValue(null);
+    vi.mocked(getStats).mockResolvedValue(null);
 
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(502);

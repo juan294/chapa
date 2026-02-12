@@ -5,7 +5,7 @@ export interface HeatmapDay {
 }
 
 /** Aggregated GitHub stats over the last 90 days */
-export interface Stats90d {
+export interface StatsData {
   handle: string;
   displayName?: string; // GitHub profile name (e.g. "Juan García"), undefined if unset
   avatarUrl?: string; // GitHub avatar URL
@@ -120,7 +120,7 @@ export interface RawContributionData {
 export interface SupplementalStats {
   targetHandle: string; // personal GitHub handle
   sourceHandle: string; // EMU handle
-  stats: Stats90d;
+  stats: StatsData;
   uploadedAt: string; // ISO timestamp
 }
 

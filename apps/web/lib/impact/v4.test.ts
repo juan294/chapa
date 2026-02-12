@@ -8,14 +8,14 @@ import {
   deriveArchetype,
   computeImpactV4,
 } from "./v4";
-import type { Stats90d, DimensionScores } from "@chapa/shared";
+import type { StatsData, DimensionScores } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a Stats90d with sensible defaults — override only what you need. */
-function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
+/** Build a StatsData with sensible defaults — override only what you need. */
+function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   return {
     handle: "test-user",
     commitsTotal: 0,

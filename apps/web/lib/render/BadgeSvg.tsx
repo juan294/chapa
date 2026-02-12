@@ -1,4 +1,4 @@
-import type { Stats90d, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV4Result } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
@@ -12,7 +12,7 @@ interface BadgeOptions {
 }
 
 export function renderBadgeSvg(
-  stats: Stats90d,
+  stats: StatsData,
   impact: ImpactV4Result,
   options: BadgeOptions = {},
 ): string {

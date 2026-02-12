@@ -2,19 +2,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { readSessionCookie } from "@/lib/auth/github";
-import { getStats90d } from "@/lib/github/client";
+import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
 import { StudioClient } from "./StudioClient";
-import type { BadgeConfig, Stats90d } from "@chapa/shared";
+import type { BadgeConfig, StatsData } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 
 function buildEmptyStats(session: {
   login: string;
   name: string | null;
   avatar_url: string;
-}): Stats90d {
+}): StatsData {
   const now = Date.now();
   return {
     handle: session.login,
@@ -65,12 +65,12 @@ export default async function StudioPage() {
 
   // Fetch data in parallel: stats + saved config
   const [stats, savedConfig] = await Promise.all([
-    getStats90d(session.login, session.token),
+    getStats(session.login, session.token),
     cacheGet<BadgeConfig>(`config:${session.login}`),
   ]);
 
   // Compute impact (fallback to empty stats if fetch failed)
-  const effectiveStats: Stats90d = stats ?? buildEmptyStats(session);
+  const effectiveStats: StatsData = stats ?? buildEmptyStats(session);
 
   const impact = computeImpactV4(effectiveStats);
   const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;

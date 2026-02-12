@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidHandle, isValidEmuHandle, isValidStats90dShape, isValidBadgeConfig } from "./validation";
+import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig } from "./validation";
 import { DEFAULT_BADGE_CONFIG, BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 
 describe("isValidHandle", () => {
@@ -114,7 +114,7 @@ describe("isValidEmuHandle", () => {
   });
 });
 
-describe("isValidStats90dShape", () => {
+describe("isValidStatsShape", () => {
   const validStats = {
     handle: "test",
     commitsTotal: 10,
@@ -133,47 +133,47 @@ describe("isValidStats90dShape", () => {
     fetchedAt: new Date().toISOString(),
   };
 
-  it("accepts a valid Stats90d object", () => {
-    expect(isValidStats90dShape(validStats)).toBe(true);
+  it("accepts a valid StatsData object", () => {
+    expect(isValidStatsShape(validStats)).toBe(true);
   });
 
   it("rejects null", () => {
-    expect(isValidStats90dShape(null)).toBe(false);
+    expect(isValidStatsShape(null)).toBe(false);
   });
 
   it("rejects non-object", () => {
-    expect(isValidStats90dShape("string")).toBe(false);
-    expect(isValidStats90dShape(42)).toBe(false);
+    expect(isValidStatsShape("string")).toBe(false);
+    expect(isValidStatsShape(42)).toBe(false);
   });
 
   it("rejects missing required fields", () => {
     const missing = { ...validStats };
     delete (missing as Record<string, unknown>).commitsTotal;
-    expect(isValidStats90dShape(missing)).toBe(false);
+    expect(isValidStatsShape(missing)).toBe(false);
   });
 
   it("rejects non-number for numeric fields", () => {
-    expect(isValidStats90dShape({ ...validStats, commitsTotal: "ten" })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, commitsTotal: "ten" })).toBe(false);
   });
 
   it("rejects negative numbers", () => {
-    expect(isValidStats90dShape({ ...validStats, commitsTotal: -1 })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, commitsTotal: -1 })).toBe(false);
   });
 
   it("rejects non-array heatmapData", () => {
-    expect(isValidStats90dShape({ ...validStats, heatmapData: "not-array" })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, heatmapData: "not-array" })).toBe(false);
   });
 
   it("rejects heatmapData with invalid entries", () => {
-    expect(isValidStats90dShape({ ...validStats, heatmapData: [{ wrong: true }] })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, heatmapData: [{ wrong: true }] })).toBe(false);
   });
 
   it("accepts empty heatmapData array", () => {
-    expect(isValidStats90dShape({ ...validStats, heatmapData: [] })).toBe(true);
+    expect(isValidStatsShape({ ...validStats, heatmapData: [] })).toBe(true);
   });
 
   it("accepts optional fields when present", () => {
-    expect(isValidStats90dShape({ ...validStats, microCommitRatio: 0.3, docsOnlyPrRatio: 0.1 })).toBe(true);
+    expect(isValidStatsShape({ ...validStats, microCommitRatio: 0.3, docsOnlyPrRatio: 0.1 })).toBe(true);
   });
 
   it("rejects heatmapData with more than 91 entries", () => {
@@ -181,7 +181,7 @@ describe("isValidStats90dShape", () => {
       date: `2025-01-${String(i + 1).padStart(2, "0")}`,
       count: 1,
     }));
-    expect(isValidStats90dShape({ ...validStats, heatmapData: bigHeatmap })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, heatmapData: bigHeatmap })).toBe(false);
   });
 
   it("accepts heatmapData with exactly 91 entries", () => {
@@ -189,7 +189,7 @@ describe("isValidStats90dShape", () => {
       date: `2025-01-${String(i + 1).padStart(2, "0")}`,
       count: 1,
     }));
-    expect(isValidStats90dShape({ ...validStats, heatmapData: maxHeatmap })).toBe(true);
+    expect(isValidStatsShape({ ...validStats, heatmapData: maxHeatmap })).toBe(true);
   });
 });
 

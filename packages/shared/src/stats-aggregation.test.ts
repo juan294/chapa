@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { RawContributionData, Stats90d } from "./types";
-import { buildStats90dFromRaw } from "./stats-aggregation";
+import type { RawContributionData, StatsData } from "./types";
+import { buildStatsFromRaw } from "./stats-aggregation";
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -54,37 +54,37 @@ function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionD
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("buildStats90dFromRaw", () => {
+describe("buildStatsFromRaw", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   // --- Basic shape ---
 
-  it("returns a Stats90d object with correct handle", () => {
-    const result = buildStats90dFromRaw(makeRaw());
+  it("returns a StatsData object with correct handle", () => {
+    const result = buildStatsFromRaw(makeRaw());
     expect(result.handle).toBe("test-user");
   });
 
   it("passes displayName from raw data", () => {
-    const result = buildStats90dFromRaw(makeRaw({ name: "Juan Garcia" }));
+    const result = buildStatsFromRaw(makeRaw({ name: "Juan Garcia" }));
     expect(result.displayName).toBe("Juan Garcia");
   });
 
   it("sets displayName to undefined when name is null", () => {
-    const result = buildStats90dFromRaw(makeRaw({ name: null }));
+    const result = buildStatsFromRaw(makeRaw({ name: null }));
     expect(result.displayName).toBeUndefined();
   });
 
   it("passes avatarUrl from raw data", () => {
-    const result = buildStats90dFromRaw(makeRaw({ avatarUrl: "https://example.com/avatar.png" }));
+    const result = buildStatsFromRaw(makeRaw({ avatarUrl: "https://example.com/avatar.png" }));
     expect(result.avatarUrl).toBe("https://example.com/avatar.png");
   });
 
   it("includes a fetchedAt ISO timestamp", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-15T12:00:00Z"));
-    const result = buildStats90dFromRaw(makeRaw());
+    const result = buildStatsFromRaw(makeRaw());
     expect(result.fetchedAt).toBe("2026-01-15T12:00:00.000Z");
     vi.useRealTimers();
   });
@@ -92,7 +92,7 @@ describe("buildStats90dFromRaw", () => {
   // --- Heatmap ---
 
   it("flattens weeks into heatmapData (13 weeks * 7 days = 91 entries)", () => {
-    const result = buildStats90dFromRaw(makeRaw());
+    const result = buildStatsFromRaw(makeRaw());
     expect(result.heatmapData).toHaveLength(91);
     expect(result.heatmapData[0]).toHaveProperty("date");
     expect(result.heatmapData[0]).toHaveProperty("count");
@@ -112,7 +112,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.heatmapData).toHaveLength(2);
   });
 
@@ -132,7 +132,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 30, weeks },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.activeDays).toBe(10);
   });
 
@@ -146,7 +146,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 0, weeks },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.activeDays).toBe(0);
   });
 
@@ -155,14 +155,14 @@ describe("buildStats90dFromRaw", () => {
   it("uses totalContributions from calendar as commitsTotal", () => {
     const raw = makeRaw();
     raw.contributionCalendar.totalContributions = 42;
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.commitsTotal).toBe(42);
   });
 
   // --- PRs ---
 
   it("counts only merged PRs", () => {
-    const result = buildStats90dFromRaw(makeRaw());
+    const result = buildStatsFromRaw(makeRaw());
     // 2 merged, 1 unmerged in default test data
     expect(result.prsMergedCount).toBe(2);
   });
@@ -176,7 +176,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     // w = 0.5 + 0.25*ln(1+20) + 0.25*ln(1+1500) = capped at 3.0
     expect(result.prsMergedWeight).toBeCloseTo(3.0, 1);
   });
@@ -192,7 +192,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       pullRequests: { totalCount: 20, nodes },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.prsMergedWeight).toBe(40);
   });
 
@@ -206,7 +206,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.prsMergedCount).toBe(1);
     expect(result.linesAdded).toBe(100);
     expect(result.linesDeleted).toBe(20);
@@ -224,7 +224,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.linesAdded).toBe(150);
     expect(result.linesDeleted).toBe(30);
   });
@@ -236,7 +236,7 @@ describe("buildStats90dFromRaw", () => {
       reviews: { totalCount: 25 },
       issues: { totalCount: 12 },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.reviewsSubmittedCount).toBe(25);
     expect(result.issuesClosedCount).toBe(12);
   });
@@ -254,7 +254,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.reposContributed).toBe(1);
   });
 
@@ -268,7 +268,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.topRepoShare).toBeCloseTo(0.9, 2);
   });
 
@@ -276,7 +276,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       repositories: { totalCount: 0, nodes: [] },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.topRepoShare).toBe(0);
   });
 
@@ -290,7 +290,7 @@ describe("buildStats90dFromRaw", () => {
         ],
       },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.reposContributed).toBe(1);
     expect(result.topRepoShare).toBe(1); // only 1 repo, so it has 100%
   });
@@ -308,7 +308,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 100, weeks },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.maxCommitsIn10Min).toBe(35);
   });
 
@@ -322,7 +322,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 100, weeks },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.maxCommitsIn10Min).toBe(0);
   });
 
@@ -332,7 +332,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       pullRequests: { totalCount: 0, nodes: [] },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.prsMergedCount).toBe(0);
     expect(result.prsMergedWeight).toBe(0);
     expect(result.linesAdded).toBe(0);
@@ -343,7 +343,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 0, weeks: [] },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.heatmapData).toHaveLength(0);
     expect(result.activeDays).toBe(0);
     expect(result.maxCommitsIn10Min).toBe(0);
@@ -352,7 +352,7 @@ describe("buildStats90dFromRaw", () => {
   // --- Total stars ---
 
   it("sums stargazerCount across owned repos", () => {
-    const result = buildStats90dFromRaw(makeRaw());
+    const result = buildStatsFromRaw(makeRaw());
     // Default test data: 100 + 50 + 10 = 160
     expect(result.totalStars).toBe(160);
   });
@@ -361,7 +361,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       ownedRepoStars: { nodes: [] },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.totalStars).toBe(0);
   });
 
@@ -369,7 +369,7 @@ describe("buildStats90dFromRaw", () => {
     const raw = makeRaw({
       ownedRepoStars: { nodes: [{ stargazerCount: 5000 }] },
     });
-    const result = buildStats90dFromRaw(raw);
+    const result = buildStatsFromRaw(raw);
     expect(result.totalStars).toBe(5000);
   });
 });

@@ -1,5 +1,5 @@
 import type {
-  Stats90d,
+  StatsData,
   DimensionScores,
   DeveloperArchetype,
   ImpactV4Result,
@@ -25,7 +25,7 @@ const CAPS = {
 // prsMergedWeight (70%), issuesClosedCount (20%), commitsTotal (10%)
 // ---------------------------------------------------------------------------
 
-export function computeBuilding(stats: Stats90d): number {
+export function computeBuilding(stats: StatsData): number {
   const pr = normalize(stats.prsMergedWeight, CAPS.prWeight);
   const issues = normalize(stats.issuesClosedCount, CAPS.issues);
   const commits = normalize(stats.commitsTotal, CAPS.commits);
@@ -39,7 +39,7 @@ export function computeBuilding(stats: Stats90d): number {
 // reviewsSubmittedCount (60%), review-to-PR ratio (25%), inverse microCommitRatio (15%)
 // ---------------------------------------------------------------------------
 
-export function computeGuarding(stats: Stats90d): number {
+export function computeGuarding(stats: StatsData): number {
   if (stats.reviewsSubmittedCount === 0) return 0;
 
   const reviews = normalize(stats.reviewsSubmittedCount, CAPS.reviews);
@@ -68,7 +68,7 @@ export function computeGuarding(stats: Stats90d): number {
 // activeDays/90 (50%), heatmap evenness (35%), inverse burst activity (15%)
 // ---------------------------------------------------------------------------
 
-export function computeConsistency(stats: Stats90d): number {
+export function computeConsistency(stats: StatsData): number {
   if (stats.activeDays === 0) return 0;
 
   const streak = Math.min(stats.activeDays, 90) / 90;
@@ -88,7 +88,7 @@ export function computeConsistency(stats: Stats90d): number {
 // reposContributed (40%), inverse topRepoShare (30%), stars (20%), docsOnlyPrRatio (10%)
 // ---------------------------------------------------------------------------
 
-export function computeBreadth(stats: Stats90d): number {
+export function computeBreadth(stats: StatsData): number {
   if (stats.reposContributed === 0) return 0;
 
   const repos = Math.min(stats.reposContributed, CAPS.repos) / CAPS.repos;
@@ -104,7 +104,7 @@ export function computeBreadth(stats: Stats90d): number {
 // Compute all dimensions
 // ---------------------------------------------------------------------------
 
-export function computeDimensions(stats: Stats90d): DimensionScores {
+export function computeDimensions(stats: StatsData): DimensionScores {
   return {
     building: computeBuilding(stats),
     guarding: computeGuarding(stats),
@@ -166,7 +166,7 @@ export function deriveArchetype(dimensions: DimensionScores): DeveloperArchetype
 // Public entry point
 // ---------------------------------------------------------------------------
 
-export function computeImpactV4(stats: Stats90d): ImpactV4Result {
+export function computeImpactV4(stats: StatsData): ImpactV4Result {
   const dimensions = computeDimensions(stats);
   const archetype = deriveArchetype(dimensions);
 

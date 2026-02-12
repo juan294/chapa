@@ -13,7 +13,7 @@ describe("fetchEmuStats", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns Stats90d on successful GraphQL response", async () => {
+  it("returns StatsData on successful GraphQL response", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({

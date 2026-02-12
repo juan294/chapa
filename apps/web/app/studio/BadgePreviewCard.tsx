@@ -3,7 +3,7 @@
 import { useRef, useEffect, memo } from "react";
 import type {
   BadgeConfig,
-  Stats90d,
+  StatsData,
   ImpactV4Result,
   ImpactTier,
 } from "@chapa/shared";
@@ -28,7 +28,7 @@ import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid
 
 export interface BadgePreviewCardProps {
   config: BadgeConfig;
-  stats: Stats90d;
+  stats: StatsData;
   impact: ImpactV4Result;
   interactive?: boolean;
 }
