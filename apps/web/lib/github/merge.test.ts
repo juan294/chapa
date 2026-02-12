@@ -18,6 +18,7 @@ function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
     reposContributed: 0,
     topRepoShare: 0,
     maxCommitsIn10Min: 0,
+    totalStars: 0,
     heatmapData: [],
     fetchedAt: new Date().toISOString(),
     ...overrides,
@@ -161,6 +162,22 @@ describe("mergeStats", () => {
       const supplemental = makeStats({ commitsTotal: 0, topRepoShare: 0 });
       const merged = mergeStats(primary, supplemental);
       expect(merged.topRepoShare).toBe(0);
+    });
+  });
+
+  describe("totalStars", () => {
+    it("takes the max of both (avoids double-counting overlapping repos)", () => {
+      const primary = makeStats({ totalStars: 200 });
+      const supplemental = makeStats({ totalStars: 150 });
+      const merged = mergeStats(primary, supplemental);
+      expect(merged.totalStars).toBe(200);
+    });
+
+    it("takes supplemental if higher", () => {
+      const primary = makeStats({ totalStars: 50 });
+      const supplemental = makeStats({ totalStars: 300 });
+      const merged = mergeStats(primary, supplemental);
+      expect(merged.totalStars).toBe(300);
     });
   });
 

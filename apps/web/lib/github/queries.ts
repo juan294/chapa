@@ -81,6 +81,11 @@ export async function fetchContributionData(
         totalCount: user.repositories.totalCount,
         nodes: user.repositories.nodes,
       },
+      ownedRepoStars: {
+        nodes: ((user.ownedRepos?.nodes ?? []) as { stargazerCount: number }[])
+          .filter((n): n is { stargazerCount: number } => n != null)
+          .map((n) => ({ stargazerCount: n.stargazerCount })),
+      },
     };
   } catch (err) {
     console.error(`[github] fetch error for ${login}:`, err);

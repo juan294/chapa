@@ -18,6 +18,7 @@ function makeStats(): Stats90d {
     reposContributed: 2,
     topRepoShare: 0.6,
     maxCommitsIn10Min: 3,
+    totalStars: 0,
     heatmapData: [],
     fetchedAt: new Date().toISOString(),
   };

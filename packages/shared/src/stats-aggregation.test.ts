@@ -39,6 +39,13 @@ function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionD
         { nameWithOwner: "user/repo4", defaultBranchRef: { target: { history: { totalCount: 5 } } } },
       ],
     },
+    ownedRepoStars: {
+      nodes: [
+        { stargazerCount: 100 },
+        { stargazerCount: 50 },
+        { stargazerCount: 10 },
+      ],
+    },
     ...overrides,
   };
 }
@@ -340,5 +347,29 @@ describe("buildStats90dFromRaw", () => {
     expect(result.heatmapData).toHaveLength(0);
     expect(result.activeDays).toBe(0);
     expect(result.maxCommitsIn10Min).toBe(0);
+  });
+
+  // --- Total stars ---
+
+  it("sums stargazerCount across owned repos", () => {
+    const result = buildStats90dFromRaw(makeRaw());
+    // Default test data: 100 + 50 + 10 = 160
+    expect(result.totalStars).toBe(160);
+  });
+
+  it("returns 0 totalStars when no owned repos", () => {
+    const raw = makeRaw({
+      ownedRepoStars: { nodes: [] },
+    });
+    const result = buildStats90dFromRaw(raw);
+    expect(result.totalStars).toBe(0);
+  });
+
+  it("handles single repo with many stars", () => {
+    const raw = makeRaw({
+      ownedRepoStars: { nodes: [{ stargazerCount: 5000 }] },
+    });
+    const result = buildStats90dFromRaw(raw);
+    expect(result.totalStars).toBe(5000);
   });
 });

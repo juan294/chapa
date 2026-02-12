@@ -22,6 +22,7 @@ export interface Stats90d {
   maxCommitsIn10Min: number; // derived from commit timestamps
   microCommitRatio?: number; // optional, 0..1
   docsOnlyPrRatio?: number; // optional, 0..1
+  totalStars: number; // sum of stargazerCount across owned repos
   heatmapData: HeatmapDay[];
   fetchedAt: string; // ISO timestamp
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
@@ -109,6 +110,9 @@ export interface RawContributionData {
         target: { history: { totalCount: number } };
       } | null;
     }[];
+  };
+  ownedRepoStars: {
+    nodes: { stargazerCount: number }[];
   };
 }
 

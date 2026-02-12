@@ -1,4 +1,5 @@
 import type { Stats90d, ImpactV4Result } from "@chapa/shared";
+import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
@@ -125,6 +126,7 @@ export function renderBadgeSvg(
 
   <!-- Left: ACTIVITY + heatmap -->
   <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">ACTIVITY</text>
+  <text x="${profileColX - 30}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${t.textSecondary}" text-anchor="end"><tspan fill="${t.accent}">\u2605</tspan> ${formatCompact(stats.totalStars)} stars</text>
   ${heatmapSvg}
 
   <!-- Right: DEVELOPER PROFILE + radar chart + archetype + composite -->

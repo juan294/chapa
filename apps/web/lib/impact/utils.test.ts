@@ -25,6 +25,7 @@ function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
     reposContributed: 4,
     topRepoShare: 0.4,
     maxCommitsIn10Min: 3,
+    totalStars: 0,
     heatmapData: [],
     fetchedAt: new Date().toISOString(),
     ...overrides,

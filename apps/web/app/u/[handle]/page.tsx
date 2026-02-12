@@ -189,7 +189,7 @@ export default async function SharePage({ params }: SharePageProps) {
               <h2 className="font-heading text-sm tracking-widest uppercase text-amber mb-6">
                 Profile Breakdown
               </h2>
-              <ImpactBreakdown impact={impact} />
+              <ImpactBreakdown impact={impact} totalStars={stats?.totalStars} />
             </div>
           </section>
         ) : (

@@ -45,6 +45,7 @@ function makeContribData(
         { nameWithOwner: "user/repo4", defaultBranchRef: { target: { history: { totalCount: 5 } } } },
       ],
     },
+    ownedRepoStars: { nodes: [] },
     ...overrides,
   };
 }

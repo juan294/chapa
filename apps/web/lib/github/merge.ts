@@ -45,6 +45,7 @@ export function mergeStats(
     linesDeleted: primary.linesDeleted + supplemental.linesDeleted,
     reposContributed: primary.reposContributed + supplemental.reposContributed,
     topRepoShare,
+    totalStars: Math.max(primary.totalStars, supplemental.totalStars),
     maxCommitsIn10Min: Math.max(primary.maxCommitsIn10Min, supplemental.maxCommitsIn10Min),
     microCommitRatio: mergeOptionalMax(primary.microCommitRatio, supplemental.microCommitRatio),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),

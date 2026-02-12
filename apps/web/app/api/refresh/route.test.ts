@@ -119,6 +119,7 @@ describe("POST /api/refresh", () => {
       reposContributed: 4,
       topRepoShare: 0.6,
       maxCommitsIn10Min: 3,
+      totalStars: 0,
       heatmapData: [],
       fetchedAt: new Date().toISOString(),
     });

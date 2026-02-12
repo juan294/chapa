@@ -29,6 +29,7 @@ function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
     reposContributed: 0,
     topRepoShare: 0,
     maxCommitsIn10Min: 0,
+    totalStars: 0,
     heatmapData: [],
     fetchedAt: new Date().toISOString(),
     ...overrides,
@@ -276,22 +277,23 @@ describe("computeBreadth(stats)", () => {
     expect(computeBreadth(makeStats())).toBe(0);
   });
 
-  it("returns high score for many repos with low concentration", () => {
+  it("returns high score for many repos with low concentration and stars", () => {
     const stats = makeStats({
       reposContributed: 10,
       topRepoShare: 0.2,
       docsOnlyPrRatio: 0.3,
+      totalStars: 200,
     });
     const score = computeBreadth(stats);
     expect(score).toBeGreaterThan(70);
   });
 
-  it("weights repos at 50%", () => {
+  it("weights repos at 40%", () => {
     const repoOnly = makeStats({ reposContributed: 10, topRepoShare: 1.0 });
-    // 50% from repos (maxed), 0% from inverse topRepoShare (1.0 = no diversity), 0% from docs
+    // 40% from repos (maxed), 0% from inverse topRepoShare (1.0 = no diversity), 0% from docs, 0% from stars
     const score = computeBreadth(repoOnly);
-    expect(score).toBeGreaterThanOrEqual(40); // might get some from docsOnlyPrRatio default
-    expect(score).toBeLessThanOrEqual(60);
+    expect(score).toBeGreaterThanOrEqual(30);
+    expect(score).toBeLessThanOrEqual(50);
   });
 
   it("rewards low topRepoShare (diverse)", () => {
@@ -304,6 +306,18 @@ describe("computeBreadth(stats)", () => {
     const withDocs = makeStats({ reposContributed: 5, topRepoShare: 0.5, docsOnlyPrRatio: 0.5 });
     const noDocs = makeStats({ reposContributed: 5, topRepoShare: 0.5, docsOnlyPrRatio: 0 });
     expect(computeBreadth(withDocs)).toBeGreaterThan(computeBreadth(noDocs));
+  });
+
+  it("rewards totalStars (20% weight)", () => {
+    const noStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 0 });
+    const withStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 300 });
+    expect(computeBreadth(withStars)).toBeGreaterThan(computeBreadth(noStars));
+  });
+
+  it("caps stars contribution at 500", () => {
+    const at500 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 500 });
+    const at1000 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 1000 });
+    expect(computeBreadth(at1000)).toBe(computeBreadth(at500));
   });
 
   it("handles missing docsOnlyPrRatio gracefully", () => {

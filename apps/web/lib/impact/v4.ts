@@ -17,6 +17,7 @@ const CAPS = {
   commits: 200,
   reviews: 60,
   repos: 10,
+  stars: 500,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,7 @@ export function computeConsistency(stats: Stats90d): number {
 
 // ---------------------------------------------------------------------------
 // Breadth: cross-project influence
-// reposContributed (50%), inverse topRepoShare (40%), docsOnlyPrRatio (10%)
+// reposContributed (40%), inverse topRepoShare (30%), stars (20%), docsOnlyPrRatio (10%)
 // ---------------------------------------------------------------------------
 
 export function computeBreadth(stats: Stats90d): number {
@@ -92,9 +93,10 @@ export function computeBreadth(stats: Stats90d): number {
 
   const repos = Math.min(stats.reposContributed, CAPS.repos) / CAPS.repos;
   const inverseConcentration = 1 - stats.topRepoShare;
+  const stars = normalize(stats.totalStars, CAPS.stars);
   const docsRatio = stats.docsOnlyPrRatio ?? 0;
 
-  const raw = 100 * (0.5 * repos + 0.4 * inverseConcentration + 0.1 * docsRatio);
+  const raw = 100 * (0.4 * repos + 0.3 * inverseConcentration + 0.2 * stars + 0.1 * docsRatio);
   return Math.round(Math.max(0, Math.min(100, raw)));
 }
 

@@ -61,6 +61,12 @@ export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
   const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
   const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
 
+  // 10. Total stars across owned repos
+  const totalStars = raw.ownedRepoStars.nodes.reduce(
+    (sum, r) => sum + r.stargazerCount,
+    0,
+  );
+
   return {
     handle: raw.login,
     displayName: raw.name ?? undefined,
@@ -76,6 +82,7 @@ export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
     reposContributed,
     topRepoShare,
     maxCommitsIn10Min,
+    totalStars,
     heatmapData,
     fetchedAt: new Date().toISOString(),
   };

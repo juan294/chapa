@@ -1,4 +1,5 @@
 import type { ImpactV4Result, DeveloperArchetype } from "@chapa/shared";
+import { formatCompact } from "@chapa/shared";
 
 const DIMENSION_LABELS: Record<string, string> = {
   building: "Building",
@@ -11,7 +12,7 @@ const DIMENSION_DESCRIPTIONS: Record<string, string> = {
   building: "Shipping meaningful changes — PRs merged, issues closed, commits",
   guarding: "Reviewing & quality gatekeeping — code reviews, review ratio",
   consistency: "Reliable, sustained contributions — active days, even distribution",
-  breadth: "Cross-project influence — repos contributed, diversity of work",
+  breadth: "Cross-project influence — repos contributed, diversity of work, community stars",
 };
 
 const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
@@ -23,7 +24,7 @@ const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
   Emerging: "You're getting started. Keep contributing and your profile will take shape.",
 };
 
-export function ImpactBreakdown({ impact }: { impact: ImpactV4Result }) {
+export function ImpactBreakdown({ impact, totalStars }: { impact: ImpactV4Result; totalStars?: number }) {
   const dims = impact.dimensions;
 
   return (
@@ -46,6 +47,15 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV4Result }) {
       <p className="text-sm text-text-secondary leading-relaxed border-l-2 border-amber/30 pl-3">
         {ARCHETYPE_DESCRIPTIONS[impact.archetype]}
       </p>
+
+      {/* Total stars */}
+      {totalStars != null && (
+        <div className="flex items-center gap-1.5 text-sm">
+          <span className="text-amber">{"\u2605"}</span>
+          <span className="text-text-primary font-heading font-bold">{formatCompact(totalStars)}</span>
+          <span className="text-text-secondary">stars across owned repos</span>
+        </div>
+      )}
 
       {/* Confidence */}
       <div className="space-y-2">

@@ -21,6 +21,7 @@ function makeStats(overrides: Partial<Stats90d> = {}): Stats90d {
     reposContributed: 4,
     topRepoShare: 0.6,
     maxCommitsIn10Min: 3,
+    totalStars: 0,
     heatmapData: Array.from({ length: 91 }, (_, i) => ({
       date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
       count: i % 5,
@@ -282,6 +283,33 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("Guarding");
       expect(svg).toContain("Consistency");
       expect(svg).toContain("Breadth");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stars display
+  // ---------------------------------------------------------------------------
+
+  describe("stars display", () => {
+    it("contains a star symbol (★)", () => {
+      const svg = renderBadgeSvg(makeStats({ totalStars: 42 }), makeImpact());
+      expect(svg).toContain("\u2605");
+    });
+
+    it("shows formatted star count", () => {
+      const svg = renderBadgeSvg(makeStats({ totalStars: 1234 }), makeImpact());
+      expect(svg).toContain("1.2k");
+    });
+
+    it("shows 'stars' label text", () => {
+      const svg = renderBadgeSvg(makeStats({ totalStars: 50 }), makeImpact());
+      expect(svg).toContain("stars");
+    });
+
+    it("shows 0 stars when totalStars is 0", () => {
+      const svg = renderBadgeSvg(makeStats({ totalStars: 0 }), makeImpact());
+      expect(svg).toContain("\u2605");
+      expect(svg).toMatch(/★.*0/);
     });
   });
 

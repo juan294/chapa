@@ -79,6 +79,11 @@ export async function fetchEmuStats(
         totalCount: user.repositories.totalCount,
         nodes: user.repositories.nodes,
       },
+      ownedRepoStars: {
+        nodes: (user.ownedRepos?.nodes ?? [])
+          .filter((n: any) => n != null)
+          .map((n: any) => ({ stargazerCount: n.stargazerCount })),
+      },
     };
 
     return buildStats90dFromRaw(raw);

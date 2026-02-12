@@ -60,6 +60,9 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
         }
       }
     }
+    ownedRepos: repositories(ownerAffiliations: OWNER, first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
+      nodes { stargazerCount }
+    }
   }
 }
 `;
