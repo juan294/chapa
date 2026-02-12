@@ -69,7 +69,7 @@ export function AutocompleteDropdown({
     <div
       role="listbox"
       aria-label="Command suggestions"
-      className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-heading text-sm shadow-xl"
+      className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl"
     >
       {matching.map((cmd, i) => (
         <button

@@ -20,8 +20,8 @@ describe("AutocompleteDropdown", () => {
       expect(SOURCE).not.toContain("py-2.5");
     });
 
-    it("uses monospace font (font-heading) on the entire dropdown", () => {
-      expect(SOURCE).toContain("font-heading");
+    it("uses terminal font (font-terminal) on the entire dropdown", () => {
+      expect(SOURCE).toContain("font-terminal");
     });
 
     it("uses same font size for command name and description (text-sm)", () => {

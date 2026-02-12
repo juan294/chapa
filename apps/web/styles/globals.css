@@ -33,6 +33,7 @@
   /* Typography */
   --font-family-heading: var(--font-jetbrains-mono), "Courier New", monospace;
   --font-family-body: var(--font-plus-jakarta), system-ui, sans-serif;
+  --font-family-terminal: var(--font-geist-mono), "SF Mono", "Menlo", "Courier New", monospace;
 }
 
 /* ── Theme values (unlayered — same cascade level) ─────── */

@@ -91,7 +91,7 @@ export function TerminalInput({
 
   return (
     <div
-      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-heading text-sm"
+      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-sm"
       onClick={() => inputRef.current?.focus()}
     >
       <span className="text-amber select-none shrink-0">
