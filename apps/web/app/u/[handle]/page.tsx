@@ -215,7 +215,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-sm text-text-secondary">Markdown</span>
                 <CopyButton text={embedMarkdown} />
               </div>
-              <pre className="overflow-x-auto rounded-xl border border-black/10 bg-[#1A1A2E] p-4 text-sm text-[#9AA4B2] font-heading">
+              <pre className="overflow-x-auto rounded-xl border border-stroke bg-dark-card p-4 text-sm text-text-secondary font-heading">
                 {embedMarkdown}
               </pre>
             </div>
@@ -226,7 +226,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-sm text-text-secondary">HTML</span>
                 <CopyButton text={embedHtml} />
               </div>
-              <pre className="overflow-x-auto rounded-xl border border-black/10 bg-[#1A1A2E] p-4 text-sm text-[#9AA4B2] font-heading">
+              <pre className="overflow-x-auto rounded-xl border border-stroke bg-dark-card p-4 text-sm text-text-secondary font-heading">
                 {embedHtml}
               </pre>
             </div>
