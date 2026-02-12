@@ -53,4 +53,14 @@ describe("useKeyboardShortcuts hook (source-reading)", () => {
   it("cleans up the sequence timeout on unmount", () => {
     expect(SRC).toMatch(/clearTimeout/);
   });
+
+  it("skips plain-key shortcuts when input is focused by checking before preventDefault", () => {
+    // The hook must gate plain-key events (no metaKey/ctrlKey) when inInput is true
+    // BEFORE calling preventDefault(). This prevents "/" and "?" from being eaten.
+    // The guard must appear between the match check and the preventDefault call.
+    // Pattern: if inInput and no modifier keys held, skip (return early)
+    expect(SRC).toMatch(
+      /inInput\s*&&\s*!event\.(metaKey|ctrlKey)/,
+    );
+  });
 });

@@ -64,6 +64,12 @@ export function useKeyboardShortcuts({
       );
 
       if (matched) {
+        // Skip plain-key shortcuts (no modifier) when typing in an input.
+        // This lets "/" and "?" pass through to text fields.
+        if (inInput && !event.metaKey && !event.ctrlKey) {
+          clearPending();
+          return;
+        }
         event.preventDefault();
         clearPending();
         onShortcutRef.current(matched);

@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
-import { isInputFocused, type ShortcutScope } from "@/lib/keyboard/shortcuts";
+import { type ShortcutScope } from "@/lib/keyboard/shortcuts";
 import { ShortcutCheatSheet } from "./ShortcutCheatSheet";
 
 type PageShortcutHandler = (id: string) => void;
@@ -98,11 +98,9 @@ export function KeyboardShortcutsProvider({ children }: Props) {
           router.push("/studio");
           return;
         case "open-cheatsheet":
-          if (isInputFocused()) return;
           setCheatSheetOpen((v) => !v);
           return;
         case "focus-command-bar": {
-          if (isInputFocused()) return;
           const input = document.querySelector<HTMLInputElement>(
             'input[aria-label="Terminal command input"]',
           );
