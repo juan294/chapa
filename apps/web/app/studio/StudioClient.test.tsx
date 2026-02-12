@@ -159,9 +159,10 @@ describe("StudioClient", () => {
       expect(SOURCE).toContain("AutocompleteDropdown");
     });
 
-    it("supports Cmd+K / Ctrl+K keyboard shortcut", () => {
-      expect(SOURCE).toContain("metaKey");
-      expect(SOURCE).toContain('"k"');
+    it("registers keyboard shortcuts via global provider", () => {
+      expect(SOURCE).toContain("registerPageShortcuts");
+      expect(SOURCE).toContain('"studio"');
+      expect(SOURCE).toContain('"focus-terminal"');
     });
   });
 });

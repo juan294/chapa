@@ -16,6 +16,7 @@ import type { Metadata } from "next";
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
+import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
@@ -125,6 +126,11 @@ export default async function SharePage({ params }: SharePageProps) {
 
   return (
     <main id="main-content" className="min-h-screen bg-bg">
+      <SharePageShortcuts
+        embedMarkdown={embedMarkdown}
+        handle={handle}
+        isOwner={isOwner}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, '\\u003c') }}

@@ -17,6 +17,7 @@ import {
   type OutputLine,
   type CommandAction,
 } from "@/components/terminal/command-registry";
+import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsProvider";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
@@ -69,21 +70,6 @@ export function StudioClient({
       trackEvent("studio_opened");
       hasTrackedOpen.current = true;
     }
-  }, []);
-
-  // Cmd+K / Ctrl+K to focus terminal input
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        const input = document.querySelector<HTMLInputElement>(
-          'input[aria-label="Terminal command input"]',
-        );
-        input?.focus();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const handleConfigChange = useCallback(
@@ -223,6 +209,38 @@ export function StudioClient({
       input.focus();
     }
   }, []);
+
+  // Register studio keyboard shortcuts via global provider
+  const { registerPageShortcuts } = useKeyboardShortcutsContext();
+  useEffect(() => {
+    return registerPageShortcuts("studio", (id: string) => {
+      switch (id) {
+        case "focus-terminal": {
+          const input = document.querySelector<HTMLInputElement>(
+            'input[aria-label="Terminal command input"]',
+          );
+          input?.focus();
+          break;
+        }
+        case "cycle-preset": {
+          const currentIdx = STUDIO_PRESETS.findIndex(
+            (p) => p.config.background === config.background,
+          );
+          const nextIdx = (currentIdx + 1) % STUDIO_PRESETS.length;
+          const preset = STUDIO_PRESETS[nextIdx];
+          trackEvent("preset_selected", { preset: preset.id });
+          handleConfigChange(preset.config);
+          break;
+        }
+        case "toggle-quick-controls":
+          setShowQuickControls((v) => !v);
+          break;
+        case "refresh-preview":
+          setPreviewKey((k) => k + 1);
+          break;
+      }
+    });
+  }, [registerPageShortcuts, config.background, handleConfigChange]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">

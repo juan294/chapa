@@ -4,6 +4,7 @@ import "@/styles/globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import PostHogProvider from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -102,7 +103,9 @@ export default function RootLayout({
           Skip to content
         </a>
         <ThemeProvider>
-          <PostHogProvider>{children}</PostHogProvider>
+          <PostHogProvider>
+            <KeyboardShortcutsProvider>{children}</KeyboardShortcutsProvider>
+          </PostHogProvider>
         </ThemeProvider>
         <Analytics />
       </body>
