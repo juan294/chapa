@@ -57,11 +57,11 @@ export function renderBadgeSvg(
   const cardsY = scoreValueY + 40;
   const cardGap = 12;
   const cardW = Math.floor((scoreColW - cardGap * 2) / 3);
-  const cardH = 70;
+  const cardH = 85;
 
   // ── Active days bar ───────────────────────────────────────────
   const activeDaysY = cardsY + cardH + 16;
-  const barH = 55;
+  const barH = 60;
   const activeDaysRatio = Math.min(stats.activeDays / 90, 1);
 
   // ── Footer ──────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export function renderBadgeSvg(
 
   // Tier pill dimensions
   const tierText = `\u2605 ${impact.tier}`;
-  const tierPillWidth = tierText.length * 10 + 30;
+  const tierPillWidth = tierText.length * 12 + 30;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -100,7 +100,7 @@ export function renderBadgeSvg(
 
   <!-- Handle + subtitle -->
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="22" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
-  <text x="${PAD + 72}" y="${headerY + 18}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">Last 90 days</text>
+  <text x="${PAD + 72}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">Last 90 days</text>
 
   <!-- Verified placeholder (shield + checkmark icon, dimmed) -->
   <g transform="translate(${PAD + 72 + headerName.length * 11 + 8}, ${headerY - 20})" opacity="0.4">
@@ -114,56 +114,56 @@ export function renderBadgeSvg(
   <!-- ─── Two-column body ────────────────────────────────── -->
 
   <!-- Left: ACTIVITY + heatmap -->
-  <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2.5">ACTIVITY</text>
+  <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">ACTIVITY</text>
   ${heatmapSvg}
 
   <!-- Right: IMPACT SCORE + score + tier pill + confidence -->
-  <text x="${scoreColX}" y="${scoreLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" opacity="0.6" letter-spacing="2.5">IMPACT SCORE</text>
+  <text x="${scoreColX}" y="${scoreLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">IMPACT SCORE</text>
 
   <!-- Large score number -->
-  <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="80" font-weight="700" fill="${t.textPrimary}" letter-spacing="-4" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
+  <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="84" font-weight="700" fill="${t.textPrimary}" letter-spacing="-4" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
 
   <!-- Tier pill badge (beside score) -->
-  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 115 : 65)}, ${scoreValueY - 45})">
-    <rect width="${tierPillWidth}" height="30" rx="15" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
-    <text x="${tierPillWidth / 2}" y="20" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
+  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 120 : 68)}, ${scoreValueY - 48})">
+    <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
+    <text x="${tierPillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
   </g>
 
   <!-- Confidence (below tier) -->
-  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 115 : 65)}" y="${scoreValueY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
+  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 120 : 68)}" y="${scoreValueY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
 
   <!-- ─── Achievement cards (3 stat blocks) ────────────────── -->
   <!-- Card 1: commits -->
   <g transform="translate(${scoreColX}, ${cardsY})">
     <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="32" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeCommits}</text>
-    <text x="${cardW / 2}" y="52" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="10" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">COMMITS</text>
+    <text x="${cardW / 2}" y="38" font-family="'JetBrains Mono', monospace" font-size="34" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeCommits}</text>
+    <text x="${cardW / 2}" y="62" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">COMMITS</text>
   </g>
 
   <!-- Card 2: PRs merged -->
   <g transform="translate(${scoreColX + cardW + cardGap}, ${cardsY})">
     <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="32" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safePRs}</text>
-    <text x="${cardW / 2}" y="52" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="10" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">PRS MERGED</text>
+    <text x="${cardW / 2}" y="38" font-family="'JetBrains Mono', monospace" font-size="34" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safePRs}</text>
+    <text x="${cardW / 2}" y="62" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">PRS MERGED</text>
   </g>
 
   <!-- Card 3: reviews -->
   <g transform="translate(${scoreColX + (cardW + cardGap) * 2}, ${cardsY})">
     <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="32" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeReviews}</text>
-    <text x="${cardW / 2}" y="52" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="10" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">REVIEWS</text>
+    <text x="${cardW / 2}" y="38" font-family="'JetBrains Mono', monospace" font-size="34" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeReviews}</text>
+    <text x="${cardW / 2}" y="62" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">REVIEWS</text>
   </g>
 
   <!-- ─── Active Days bar ──────────────────────────────────── -->
   <g transform="translate(${scoreColX}, ${activeDaysY})">
     <rect width="${scoreColW}" height="${barH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="16" y="24" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="10" fill="${t.textSecondary}" letter-spacing="1.5">ACTIVE DAYS</text>
-    <text x="${scoreColW - 16}" y="24" font-family="'JetBrains Mono', monospace" font-size="14" fill="${t.textPrimary}" text-anchor="end"><tspan fill="#4ADE80" font-weight="700">${safeActiveDays}</tspan><tspan fill="${t.textSecondary}">/90</tspan></text>
+    <text x="16" y="26" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" letter-spacing="1.5">ACTIVE DAYS</text>
+    <text x="${scoreColW - 16}" y="26" font-family="'JetBrains Mono', monospace" font-size="17" fill="${t.textPrimary}" text-anchor="end"><tspan fill="#4ADE80" font-weight="700">${safeActiveDays}</tspan><tspan fill="${t.textSecondary}">/90</tspan></text>
     <!-- Progress bar background -->
-    <rect x="16" y="34" width="${scoreColW - 32}" height="10" rx="5" fill="rgba(255,255,255,0.06)"/>
+    <rect x="16" y="38" width="${scoreColW - 32}" height="12" rx="6" fill="rgba(255,255,255,0.06)"/>
     <!-- Progress bar fill (gradient from accent to green) -->
     <defs><linearGradient id="active-days-grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="${t.accent}"/><stop offset="100%" stop-color="#4ADE80"/></linearGradient></defs>
-    <rect x="16" y="34" width="${Math.round((scoreColW - 32) * activeDaysRatio)}" height="10" rx="5" fill="url(#active-days-grad)"/>
+    <rect x="16" y="38" width="${Math.round((scoreColW - 32) * activeDaysRatio)}" height="12" rx="6" fill="url(#active-days-grad)"/>
   </g>
 
   <!-- ─── Footer ─────────────────────────────────────────── -->

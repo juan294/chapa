@@ -311,6 +311,96 @@ describe("renderBadgeSvg", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Font size and contrast parity with landing page (#109)
+  // SVG is 1200px wide, displayed at ~72% (864px). Fonts must be scaled up
+  // so displayed size matches the landing page HTML.
+  // ---------------------------------------------------------------------------
+
+  describe("font size and contrast parity (#109)", () => {
+    it("score font-size is at least 84 to display at ~60px", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // The score text element should have font-size >= 84
+      const scoreMatch = svg.match(/font-size="(\d+)"[^>]*font-weight="700"[^>]*>[^<]*\d+/);
+      expect(scoreMatch).not.toBeNull();
+      const scoreFontSize = parseInt(scoreMatch![1], 10);
+      expect(scoreFontSize).toBeGreaterThanOrEqual(84);
+    });
+
+    it("achievement card numbers font-size is at least 34 to display at ~24px", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Card number elements (commits, PRs, reviews) with font-weight 700
+      const cardNumberMatches = [...svg.matchAll(/font-size="(\d+)"[^>]*font-weight="700"[^>]*text-anchor="middle"[^>]*>/g)];
+      expect(cardNumberMatches.length).toBeGreaterThanOrEqual(3);
+      for (const match of cardNumberMatches) {
+        const size = parseInt(match[1], 10);
+        expect(size).toBeGreaterThanOrEqual(34);
+      }
+    });
+
+    it("achievement card labels font-size is at least 13 to display at ~10px", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Labels: COMMITS, PRS MERGED, REVIEWS
+      for (const label of ["COMMITS", "PRS MERGED", "REVIEWS"]) {
+        const regex = new RegExp(`font-size="(\\d+)"[^>]*>${label}`);
+        const match = svg.match(regex);
+        expect(match).not.toBeNull();
+        const size = parseInt(match![1], 10);
+        expect(size).toBeGreaterThanOrEqual(13);
+      }
+    });
+
+    it("section labels use textPrimary color (not textSecondary) for contrast", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // "ACTIVITY" and "IMPACT SCORE" labels should use the primary text color
+      // for better contrast (matching landing page's text-text-primary/50)
+      const activityMatch = svg.match(/fill="([^"]+)"[^>]*>ACTIVITY/);
+      const impactMatch = svg.match(/fill="([^"]+)"[^>]*>IMPACT SCORE/);
+      expect(activityMatch).not.toBeNull();
+      expect(impactMatch).not.toBeNull();
+      // Should use textPrimary (#E6EDF3), not textSecondary (#9AA4B2)
+      expect(activityMatch![1]).toBe("#E6EDF3");
+      expect(impactMatch![1]).toBe("#E6EDF3");
+    });
+
+    it("active days label font-size is at least 13", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const match = svg.match(/font-size="(\d+)"[^>]*>ACTIVE DAYS/);
+      expect(match).not.toBeNull();
+      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(13);
+    });
+
+    it("subtitle font-size is at least 19 to display at ~14px", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const match = svg.match(/font-size="(\d+)"[^>]*>Last 90 days/);
+      expect(match).not.toBeNull();
+      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(19);
+    });
+
+    it("confidence text font-size is at least 17 to display at ~12px", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      const match = svg.match(/font-size="(\d+)"[^>]*>\d+% Confidence/);
+      expect(match).not.toBeNull();
+      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(17);
+    });
+
+    it("tier pill text font-size is at least 17", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Tier pill text with star + tier name
+      const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*text-anchor="middle"[^>]*>★/);
+      expect(match).not.toBeNull();
+      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(17);
+    });
+
+    it("achievement cards are at least 85px tall for breathing room", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Card rects should have height >= 85
+      const cardRects = [...svg.matchAll(/height="(\d+)"[^>]*rx="10"[^>]*fill="rgba\(255,255,255,0\.04\)"/g)];
+      const tallCards = cardRects.filter(m => parseInt(m[1], 10) >= 85);
+      expect(tallCards.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Animations
   // ---------------------------------------------------------------------------
 
