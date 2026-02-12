@@ -48,26 +48,26 @@ export function LandingTerminal() {
     (command: string) => {
       setShowAutocomplete(false);
       setPartial("");
-
-      if (command === "/badge") {
-        const input = document.querySelector<HTMLInputElement>(
-          'input[aria-label="Terminal command input"]',
-        );
-        if (input) {
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype,
-            "value",
-          )?.set;
-          nativeInputValueSetter?.call(input, command + " ");
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.focus();
-        }
-      } else {
-        handleSubmit(command);
-      }
+      handleSubmit(command);
     },
     [handleSubmit],
   );
+
+  const handleAutocompleteFill = useCallback((command: string) => {
+    setShowAutocomplete(false);
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Terminal command input"]',
+    );
+    if (input) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      nativeInputValueSetter?.call(input, command + " ");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    }
+  }, []);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
@@ -79,6 +79,7 @@ export function LandingTerminal() {
           commands={commands}
           partial={partial}
           onSelect={handleAutocompleteSelect}
+          onFill={handleAutocompleteFill}
           onDismiss={handleAutocompleteDismiss}
           visible={showAutocomplete}
         />

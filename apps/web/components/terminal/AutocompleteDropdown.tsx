@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { CommandDef } from "./command-registry";
 
 interface AutocompleteDropdownProps {
   commands: CommandDef[];
   partial: string;
   onSelect: (command: string) => void;
+  onFill?: (command: string) => void;
   onDismiss?: () => void;
   visible: boolean;
 }
@@ -15,10 +16,12 @@ export function AutocompleteDropdown({
   commands,
   partial,
   onSelect,
+  onFill,
   onDismiss,
   visible,
 }: AutocompleteDropdownProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const matching = useMemo(
     () =>
@@ -47,7 +50,13 @@ export function AutocompleteDropdown({
         e.preventDefault();
         e.stopPropagation();
         setActiveIndex((i) => (i - 1 + matching.length) % matching.length);
-      } else if (e.key === "Tab" || e.key === "Enter") {
+      } else if (e.key === "Tab") {
+        if (matching[activeIndex]) {
+          e.preventDefault();
+          e.stopPropagation();
+          (onFill ?? onSelect)(matching[activeIndex].name);
+        }
+      } else if (e.key === "Enter") {
         if (matching[activeIndex]) {
           e.preventDefault();
           e.stopPropagation();
@@ -59,7 +68,7 @@ export function AutocompleteDropdown({
         onDismiss?.();
       }
     },
-    [visible, matching, activeIndex, onSelect, onDismiss],
+    [visible, matching, activeIndex, onSelect, onFill, onDismiss],
   );
 
   useEffect(() => {
@@ -69,10 +78,22 @@ export function AutocompleteDropdown({
     }
   }, [visible, matching.length, handleKeyDown]);
 
+  useEffect(() => {
+    if (!visible || matching.length === 0) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        onDismiss?.();
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [visible, matching.length, onDismiss]);
+
   if (!visible || matching.length === 0) return null;
 
   return (
     <div
+      ref={containerRef}
       role="listbox"
       aria-label="Command suggestions"
       className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl"
@@ -95,6 +116,11 @@ export function AutocompleteDropdown({
           <span className="text-text-secondary truncate">
             {cmd.description}
           </span>
+          {cmd.usage && (
+            <span className="ml-auto pl-3 text-terminal-dim shrink-0">
+              {cmd.usage.replace(cmd.name + " ", "")}
+            </span>
+          )}
         </button>
       ))}
     </div>

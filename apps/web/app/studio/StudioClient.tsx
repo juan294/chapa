@@ -203,26 +203,26 @@ export function StudioClient({
     (command: string) => {
       setShowAutocomplete(false);
       setPartial("");
-      const needsArgs = ["/set", "/preset"];
-      if (needsArgs.includes(command)) {
-        const input = document.querySelector<HTMLInputElement>(
-          'input[aria-label="Terminal command input"]',
-        );
-        if (input) {
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype,
-            "value",
-          )?.set;
-          nativeInputValueSetter?.call(input, command + " ");
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.focus();
-        }
-      } else {
-        handleSubmit(command);
-      }
+      handleSubmit(command);
     },
     [handleSubmit],
   );
+
+  const handleAutocompleteFill = useCallback((command: string) => {
+    setShowAutocomplete(false);
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Terminal command input"]',
+    );
+    if (input) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      nativeInputValueSetter?.call(input, command + " ");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    }
+  }, []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
@@ -271,6 +271,7 @@ export function StudioClient({
             commands={studioCommands}
             partial={partial}
             onSelect={handleAutocompleteSelect}
+            onFill={handleAutocompleteFill}
             onDismiss={handleAutocompleteDismiss}
             visible={showAutocomplete}
           />

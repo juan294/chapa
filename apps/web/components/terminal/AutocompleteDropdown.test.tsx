@@ -60,6 +60,59 @@ describe("AutocompleteDropdown", () => {
     it("accepts an onDismiss prop", () => {
       expect(SOURCE).toContain("onDismiss");
     });
+
+    it("listens for mousedown on document to dismiss on click-outside", () => {
+      // Should add a mousedown listener to detect clicks outside the dropdown
+      expect(SOURCE).toContain('"mousedown"');
+    });
+
+    it("uses a ref to detect clicks outside the dropdown container", () => {
+      // Needs a ref on the container to check if click target is inside
+      expect(SOURCE).toContain("useRef");
+      expect(SOURCE).toContain("containerRef");
+      expect(SOURCE).toContain(".contains(");
+    });
+
+    it("calls onDismiss when clicking outside", () => {
+      // The mousedown handler should call onDismiss for outside clicks
+      expect(SOURCE).toMatch(/onDismiss/);
+    });
+  });
+
+  describe("Tab vs Enter distinction", () => {
+    it("accepts an onFill prop for Tab completion", () => {
+      expect(SOURCE).toContain("onFill");
+    });
+
+    it("calls onFill (not onSelect) on Tab key", () => {
+      // Tab should fill the command into input, not execute it
+      // The Tab branch should reference onFill
+      expect(SOURCE).toMatch(/Tab[\s\S]*onFill|onFill[\s\S]*Tab/);
+    });
+
+    it("calls onSelect on Enter key (execute)", () => {
+      // Enter should execute (select) the command
+      expect(SOURCE).toMatch(/Enter[\s\S]*onSelect|onSelect[\s\S]*Enter/);
+    });
+
+    it("Tab and Enter are handled in separate branches", () => {
+      // They should NOT be combined in the same condition anymore
+      expect(SOURCE).not.toMatch(
+        /e\.key === "Tab" \|\| e\.key === "Enter"/,
+      );
+    });
+  });
+
+  describe("argument hints", () => {
+    it("renders usage hint from command definition", () => {
+      // Should display cmd.usage when available
+      expect(SOURCE).toContain("cmd.usage");
+    });
+
+    it("uses dim styling for usage hints", () => {
+      // Hints should be visually distinct (dimmer) from the description
+      expect(SOURCE).toMatch(/text-text-secondary|text-terminal-dim/);
+    });
   });
 
   describe("accessibility", () => {
