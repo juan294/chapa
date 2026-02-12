@@ -156,27 +156,51 @@ describe("renderBadgeSvg", () => {
       expect(svg).not.toMatch(/Chapa<tspan[^>]*>\.<\/tspan>/);
     });
 
-    it("contains a circular avatar placeholder with amber ring", () => {
+    it("contains a circular avatar with clip-path", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Avatar is a circle with amber-tinted stroke
       expect(svg).toContain("<circle");
+      expect(svg).toContain("clipPath");
+    });
+
+    it("embeds GitHub avatar image when avatarUrl is present", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
+        makeImpact(),
+      );
+      expect(svg).toContain("<image");
+      expect(svg).toContain("https://avatars.githubusercontent.com/u/123");
+    });
+
+    it("falls back to octocat icon when avatarUrl is missing", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ avatarUrl: undefined }),
+        makeImpact(),
+      );
+      // Should still have the circle but with the octocat path
+      expect(svg).toContain("<circle");
+      expect(svg).toContain("M14 0C6.27");
     });
   });
 
   // ---------------------------------------------------------------------------
-  // Verification placeholder
+  // Verified icon (icon only, no text)
   // ---------------------------------------------------------------------------
 
-  describe("verification placeholder", () => {
-    it("contains a verification placeholder icon", () => {
+  describe("verified icon", () => {
+    it("contains a shield/checkmark icon", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // Should have a shield/verified icon placeholder
-      expect(svg).toContain("Verified");
+      // Should have the shield path
+      expect(svg).toContain("M12 1L3 5v6");
     });
 
-    it("verification placeholder has low opacity (placeholder state)", () => {
+    it("does NOT contain the word 'Verified' as text", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // The verified indicator should be dimmed to show it's a placeholder
+      // Only the icon, no text label — matches landing page source of truth
+      expect(svg).not.toContain(">Verified<");
+    });
+
+    it("verified icon has low opacity", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toMatch(/opacity="0\.4"/);
     });
   });
