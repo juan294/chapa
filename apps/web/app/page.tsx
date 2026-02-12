@@ -31,6 +31,10 @@ const FEATURES = [
     description: "Transparent quality signals. No false positives.",
   },
   {
+    title: "VERIFIED METRICS",
+    description: "Every badge carries an HMAC hash seal. Click it to cryptographically verify the scores haven\u2019t been tampered with.",
+  },
+  {
     title: "ONE-CLICK EMBED",
     description: "Markdown or HTML, paste anywhere that renders images.",
   },
