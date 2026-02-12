@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { readSessionCookie } from "@/lib/auth/github";
 import { getStats90d } from "@/lib/github/client";
-import { computeImpactV3 } from "@/lib/impact/v3";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
 import { StudioClient } from "./StudioClient";
@@ -71,7 +71,7 @@ export default async function StudioPage() {
   // Compute impact (fallback to empty stats if fetch failed)
   const effectiveStats: Stats90d = stats ?? buildEmptyStats(session);
 
-  const impact = computeImpactV3(effectiveStats);
+  const impact = computeImpactV4(effectiveStats);
   const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;
 
   return (

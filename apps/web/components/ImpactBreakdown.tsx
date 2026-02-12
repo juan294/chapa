@@ -1,30 +1,51 @@
-import type { ImpactV3Result } from "@chapa/shared";
-import { WEIGHTS } from "@/lib/impact/v3";
+import type { ImpactV4Result, DeveloperArchetype } from "@chapa/shared";
 
-const SIGNAL_LABELS: Record<string, string> = {
-  commits: "Commits",
-  prWeight: "PRs Merged",
-  reviews: "Code Reviews",
-  issues: "Issues Closed",
-  streak: "Active Days",
-  collaboration: "Cross-Repo",
+const DIMENSION_LABELS: Record<string, string> = {
+  building: "Building",
+  guarding: "Guarding",
+  consistency: "Consistency",
+  breadth: "Breadth",
 };
 
-export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
-  const breakdown = impact.breakdown;
+const DIMENSION_DESCRIPTIONS: Record<string, string> = {
+  building: "Shipping meaningful changes — PRs merged, issues closed, commits",
+  guarding: "Reviewing & quality gatekeeping — code reviews, review ratio",
+  consistency: "Reliable, sustained contributions — active days, even distribution",
+  breadth: "Cross-project influence — repos contributed, diversity of work",
+};
+
+const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
+  Builder: "You ship. PRs merged, issues closed, meaningful code changes — building is your strongest dimension.",
+  Guardian: "You protect quality. Code reviews and gatekeeping are where you make the biggest impact.",
+  Marathoner: "You show up. Consistent, sustained activity over time — reliability is your hallmark.",
+  Polymath: "You reach across projects. Contributing to multiple repos and diverse work areas sets you apart.",
+  Balanced: "You do it all. Your dimensions are well-rounded with no single weakness.",
+  Emerging: "You're getting started. Keep contributing and your profile will take shape.",
+};
+
+export function ImpactBreakdown({ impact }: { impact: ImpactV4Result }) {
+  const dims = impact.dimensions;
 
   return (
     <div className="space-y-8">
-      {/* Tier + Score */}
+      {/* Archetype + Composite */}
       <div className="flex items-baseline gap-4">
-        <span className="font-heading text-4xl font-extrabold text-amber">
-          {impact.tier}
+        <span className="font-heading text-3xl font-extrabold text-amber">
+          {impact.archetype}
         </span>
         <span className="font-heading text-2xl text-text-primary">
-          {impact.adjustedScore}
+          {impact.adjustedComposite}
           <span className="text-text-secondary text-lg"> / 100</span>
         </span>
+        <span className="text-sm text-text-secondary font-heading">
+          {impact.tier}
+        </span>
       </div>
+
+      {/* Archetype description */}
+      <p className="text-sm text-text-secondary leading-relaxed border-l-2 border-amber/30 pl-3">
+        {ARCHETYPE_DESCRIPTIONS[impact.archetype]}
+      </p>
 
       {/* Confidence */}
       <div className="space-y-2">
@@ -47,37 +68,39 @@ export function ImpactBreakdown({ impact }: { impact: ImpactV3Result }) {
         </div>
       </div>
 
-      {/* Breakdown bars */}
+      {/* Dimension bars */}
       <div className="space-y-4">
         <h3 className="font-heading text-sm tracking-widest uppercase text-amber">
-          Score Breakdown
+          Dimension Scores
         </h3>
-        {Object.entries(breakdown).map(([key, value]) => (
-          <div key={key} className="space-y-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-text-secondary">
-                {SIGNAL_LABELS[key] ?? key}
-              </span>
-              <span className="text-text-primary font-heading">
-                {Math.round(value * 100)}%
-                <span className="text-text-secondary text-xs ml-1">
-                  (×{WEIGHTS[key as keyof typeof WEIGHTS]?.toFixed(2)})
+        {(["building", "guarding", "consistency", "breadth"] as const).map(
+          (key) => (
+            <div key={key} className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-text-secondary">
+                  {DIMENSION_LABELS[key]}
                 </span>
-              </span>
+                <span className="text-text-primary font-heading font-bold">
+                  {dims[key]}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-track">
+                <div
+                  className="h-1.5 rounded-full bg-amber/60"
+                  role="progressbar"
+                  aria-valuenow={dims[key]}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${DIMENSION_LABELS[key]} score`}
+                  style={{ width: `${dims[key]}%` }}
+                />
+              </div>
+              <div className="text-xs text-text-secondary/60">
+                {DIMENSION_DESCRIPTIONS[key]}
+              </div>
             </div>
-            <div className="h-1.5 rounded-full bg-track">
-              <div
-                className="h-1.5 rounded-full bg-amber/60"
-                role="progressbar"
-                aria-valuenow={Math.round(value * 100)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label={`${SIGNAL_LABELS[key] ?? key} score`}
-                style={{ width: `${Math.round(value * 100)}%` }}
-              />
-            </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       {/* Confidence reasons */}

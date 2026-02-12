@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react";
 import type {
   BadgeConfig,
   Stats90d,
-  ImpactV3Result,
+  ImpactV4Result,
   ImpactTier,
 } from "@chapa/shared";
 import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
@@ -29,7 +29,7 @@ import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid
 export interface BadgePreviewCardProps {
   config: BadgeConfig;
   stats: Stats90d;
-  impact: ImpactV3Result;
+  impact: ImpactV4Result;
   interactive?: boolean;
 }
 
@@ -217,73 +217,106 @@ export function BadgePreviewCard({
           />
         </div>
 
-        {/* Right: Score + Stats + Active Days */}
+        {/* Right: Developer Profile — archetype + radar + composite + tier */}
         <div ref={statsRef} className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
           <div className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
-            Impact Score
+            Developer Profile
           </div>
 
-          {/* Score row: big number + tier */}
-          <div className="flex items-end gap-3">
-            <div data-score-effect={config.scoreEffect}>
-              <ScoreEffectText
-                effect={config.scoreEffect as ScoreEffect}
-                className="text-6xl font-heading tracking-tighter leading-none"
-              >
-                {impact.adjustedScore}
-              </ScoreEffectText>
+          {/* Radar chart placeholder (CSS diamond) */}
+          <div className="flex justify-center my-3">
+            <div className="relative w-[140px] h-[140px]">
+              {/* Diamond background grid */}
+              <svg viewBox="0 0 140 140" className="absolute inset-0 w-full h-full" aria-hidden="true">
+                {/* Guide rings */}
+                {[0.25, 0.5, 0.75, 1].map((scale) => (
+                  <polygon
+                    key={scale}
+                    points={`70,${70 - 55 * scale} ${70 + 55 * scale},70 70,${70 + 55 * scale} ${70 - 55 * scale},70`}
+                    fill="none"
+                    stroke="rgba(124,106,239,0.12)"
+                    strokeWidth="1"
+                  />
+                ))}
+                {/* Axes */}
+                <line x1="70" y1="15" x2="70" y2="125" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
+                <line x1="15" y1="70" x2="125" y2="70" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
+                {/* Data polygon */}
+                <polygon
+                  points={`70,${70 - (impact.dimensions.building / 100) * 55} ${70 + (impact.dimensions.guarding / 100) * 55},70 70,${70 + (impact.dimensions.consistency / 100) * 55} ${70 - (impact.dimensions.breadth / 100) * 55},70`}
+                  fill="rgba(124,106,239,0.20)"
+                  stroke="#7C6AEF"
+                  strokeWidth="1.5"
+                />
+                {/* Vertex dots */}
+                <circle cx="70" cy={70 - (impact.dimensions.building / 100) * 55} r="3" fill="#7C6AEF" />
+                <circle cx={70 + (impact.dimensions.guarding / 100) * 55} cy="70" r="3" fill="#7C6AEF" />
+                <circle cx="70" cy={70 + (impact.dimensions.consistency / 100) * 55} r="3" fill="#7C6AEF" />
+                <circle cx={70 - (impact.dimensions.breadth / 100) * 55} cy="70" r="3" fill="#7C6AEF" />
+              </svg>
+              {/* Axis labels */}
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Build</span>
+              <span className="absolute top-1/2 -right-2 -translate-y-1/2 text-[9px] text-text-secondary">Guard</span>
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Consist</span>
+              <span className="absolute top-1/2 -left-3 -translate-y-1/2 text-[9px] text-text-secondary">Breadth</span>
             </div>
-            <div className="flex flex-col gap-1 pb-1">
+          </div>
+
+          {/* Archetype pill */}
+          <div className="flex justify-center mb-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber/10 border border-amber/25 px-3 py-1">
+              <span className="text-xs font-semibold text-amber">
+                {TIER_SYMBOLS[impact.tier]} {impact.archetype}
+              </span>
+            </div>
+          </div>
+
+          {/* Composite score + tier + confidence */}
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-baseline gap-2">
+              <div data-score-effect={config.scoreEffect}>
+                <ScoreEffectText
+                  effect={config.scoreEffect as ScoreEffect}
+                  className="text-3xl font-heading font-bold tracking-tighter leading-none"
+                >
+                  {impact.adjustedComposite}
+                </ScoreEffectText>
+              </div>
               <div
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border w-fit ${tierPillClasses(impact.tier)}`}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border w-fit ${tierPillClasses(impact.tier)}`}
               >
-                <span>{TIER_SYMBOLS[impact.tier]}</span>
                 <span>{impact.tier}</span>
               </div>
-              <div className="text-xs text-text-secondary">
-                {impact.confidence}% Confidence
-              </div>
             </div>
-          </div>
-
-          {/* Stats — three achievement blocks */}
-          <div className="mt-5 grid grid-cols-3 gap-3">
-            <AnimatedStatCard
-              value={stats.commitsTotal}
-              label="commits"
-              statsDisplay={config.statsDisplay}
-            />
-            <AnimatedStatCard
-              value={stats.prsMergedCount}
-              label="PRs merged"
-              statsDisplay={config.statsDisplay}
-            />
-            <AnimatedStatCard
-              value={stats.reviewsSubmittedCount}
-              label="reviews"
-              statsDisplay={config.statsDisplay}
-            />
-          </div>
-
-          {/* Active days — consistency bar */}
-          <div className="mt-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-wider text-text-secondary">
-                Active Days
-              </span>
-              <span className="text-xs font-heading text-text-primary">
-                <span className="text-terminal-green font-bold">{stats.activeDays}</span>
-                <span className="text-text-secondary"> / 90</span>
-              </span>
-            </div>
-            <div className="h-3 rounded-full bg-white/[0.06] overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-amber to-terminal-green"
-                style={{ width: `${Math.round((stats.activeDays / 90) * 100)}%` }}
-              />
+            <div className="text-xs text-text-secondary">
+              {impact.confidence}% Confidence
             </div>
           </div>
         </div>
+      </div>
+
+      {/* --- Dimension cards (4 across) --- */}
+      <div className="mt-5 grid grid-cols-4 gap-3">
+        <AnimatedStatCard
+          value={impact.dimensions.building}
+          label="Building"
+          statsDisplay={config.statsDisplay}
+        />
+        <AnimatedStatCard
+          value={impact.dimensions.guarding}
+          label="Guarding"
+          statsDisplay={config.statsDisplay}
+        />
+        <AnimatedStatCard
+          value={impact.dimensions.consistency}
+          label="Consistency"
+          statsDisplay={config.statsDisplay}
+        />
+        <AnimatedStatCard
+          value={impact.dimensions.breadth}
+          label="Breadth"
+          statsDisplay={config.statsDisplay}
+        />
       </div>
 
       {/* --- Footer: GitHub branding --- */}

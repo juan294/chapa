@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getStats90d } from "@/lib/github/client";
-import { computeImpactV3 } from "@/lib/impact/v3";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { fetchAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -80,7 +80,7 @@ export async function GET(
   }
 
   // Compute impact
-  const impact = computeImpactV3(stats);
+  const impact = computeImpactV4(stats);
 
   // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image)
   const avatarDataUri = stats.avatarUrl

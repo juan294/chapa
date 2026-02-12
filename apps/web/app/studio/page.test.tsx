@@ -38,7 +38,7 @@ describe("Studio page (server component)", () => {
     });
 
     it("computes impact score", () => {
-      expect(SOURCE).toContain("computeImpactV3");
+      expect(SOURCE).toContain("computeImpactV4");
     });
 
     it("loads saved badge config", () => {

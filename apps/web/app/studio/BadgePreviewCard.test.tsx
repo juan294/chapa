@@ -23,8 +23,8 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("stats: Stats90d");
     });
 
-    it("accepts ImpactV3Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV3Result");
+    it("accepts ImpactV4Result prop", () => {
+      expect(SOURCE).toContain("impact: ImpactV4Result");
     });
 
     it("has optional interactive flag", () => {
@@ -96,8 +96,8 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("config.scoreEffect");
     });
 
-    it("renders adjustedScore from impact", () => {
-      expect(SOURCE).toContain("impact.adjustedScore");
+    it("renders adjustedComposite from impact", () => {
+      expect(SOURCE).toContain("impact.adjustedComposite");
     });
   });
 
@@ -127,17 +127,21 @@ describe("BadgePreviewCard", () => {
     });
   });
 
-  describe("stats display", () => {
-    it("renders commit count from stats", () => {
-      expect(SOURCE).toContain("stats.commitsTotal");
+  describe("dimension display", () => {
+    it("renders building dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.building");
     });
 
-    it("renders PR count from stats", () => {
-      expect(SOURCE).toContain("stats.prsMergedCount");
+    it("renders guarding dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.guarding");
     });
 
-    it("renders review count from stats", () => {
-      expect(SOURCE).toContain("stats.reviewsSubmittedCount");
+    it("renders consistency dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.consistency");
+    });
+
+    it("renders breadth dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.breadth");
     });
 
     it("supports animated counters", () => {
@@ -234,44 +238,22 @@ describe("BadgePreviewCard", () => {
     });
   });
 
-  describe("achievement card stats", () => {
-    it("has three stat achievement card blocks", () => {
-      // Achievement cards use bg-white/[0.04] pattern
-      expect(SOURCE).toContain("bg-white/[0.04]");
-    });
-
-    it("renders commits in achievement card", () => {
-      expect(SOURCE).toContain("stats.commitsTotal");
-      expect(SOURCE).toContain("commits");
-    });
-
-    it("renders PRs merged in achievement card", () => {
-      expect(SOURCE).toContain("stats.prsMergedCount");
-      expect(SOURCE).toContain("PRs merged");
-    });
-
-    it("renders reviews in achievement card", () => {
-      expect(SOURCE).toContain("stats.reviewsSubmittedCount");
-      expect(SOURCE).toContain("reviews");
+  describe("dimension cards", () => {
+    it("has dimension labels", () => {
+      expect(SOURCE).toContain('"Building"');
+      expect(SOURCE).toContain('"Guarding"');
+      expect(SOURCE).toContain('"Consistency"');
+      expect(SOURCE).toContain('"Breadth"');
     });
   });
 
-  describe("active days bar", () => {
-    it("renders active days from stats", () => {
-      expect(SOURCE).toContain("stats.activeDays");
+  describe("archetype display", () => {
+    it("renders archetype from impact", () => {
+      expect(SOURCE).toContain("impact.archetype");
     });
 
-    it("shows Active Days label", () => {
-      expect(SOURCE).toContain("Active Days");
-    });
-
-    it("shows /90 denominator", () => {
-      expect(SOURCE).toContain("/ 90");
-    });
-
-    it("has gradient progress bar", () => {
-      expect(SOURCE).toContain("from-amber");
-      expect(SOURCE).toContain("to-terminal-green");
+    it("shows Developer Profile label", () => {
+      expect(SOURCE).toContain("Developer Profile");
     });
   });
 });

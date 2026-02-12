@@ -1,5 +1,5 @@
 import { getStats90d } from "@/lib/github/client";
-import { computeImpactV3 } from "@/lib/impact/v3";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
@@ -100,7 +100,7 @@ export default async function SharePage({ params }: SharePageProps) {
     getStats90d(handle, token),
     cacheGet<BadgeConfig>(`config:${handle}`),
   ]);
-  const impact = stats ? computeImpactV3(stats) : null;
+  const impact = stats ? computeImpactV4(stats) : null;
 
   const isOwner = sessionLogin !== null && sessionLogin === handle;
   const useInteractivePreview = hasCustomConfig(savedConfig) && stats && impact;
@@ -118,7 +118,7 @@ export default async function SharePage({ params }: SharePageProps) {
     sameAs: [`https://github.com/${handle}`],
     ...(impact
       ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedScore} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
+          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
         }
       : {}),
   };

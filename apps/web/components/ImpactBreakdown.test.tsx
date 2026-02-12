@@ -53,10 +53,10 @@ describe("ImpactBreakdown", () => {
       expect(matches!.length).toBeGreaterThanOrEqual(2);
     });
 
-    it("breakdown bars have aria-valuenow with the computed value", () => {
-      // Breakdown bars show Math.round(value * 100), so aria-valuenow should use same
+    it("dimension bars have aria-valuenow with the dimension score", () => {
+      // Dimension bars use dims[key] directly
       expect(SOURCE).toMatch(
-        /aria-valuenow=\{Math\.round\(value \* 100\)\}/,
+        /aria-valuenow=\{dims\[key\]\}/,
       );
     });
 
