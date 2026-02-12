@@ -1,8 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
-
-vi.mock("@/components/GlobalCommandBar", () => ({
-  GlobalCommandBar: () => null,
-}));
+import { describe, it, expect } from "vitest";
 
 describe("coming-soon page", () => {
   it("exports metadata with noindex robots directive", async () => {
