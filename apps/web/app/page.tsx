@@ -226,7 +226,7 @@ export default async function Home({
                             <StarIcon className="w-3 h-3" />
                             Elite
                           </span>
-                          <span className="text-xs text-text-secondary">
+                          <span className="text-xs text-text-primary/70">
                             87% Confidence
                           </span>
                         </div>
