@@ -305,8 +305,11 @@ function BadgeDemo({
 
   useEffect(() => {
     if (!ref.current) return;
-    const sizeAttr = size ? ` size="${size}"` : "";
-    ref.current.innerHTML = `<chapa-badge handle="${handle}"${sizeAttr}></chapa-badge>`;
+    const escapeAttr = (s: string) =>
+      s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] ?? c));
+    const safeHandle = escapeAttr(handle);
+    const safeSize = size ? ` size="${escapeAttr(size)}"` : "";
+    ref.current.innerHTML = `<chapa-badge handle="${safeHandle}"${safeSize}></chapa-badge>`;
   }, [handle, size]);
 
   return <div ref={ref} />;

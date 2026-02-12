@@ -127,7 +127,7 @@ export default async function SharePage({ params }: SharePageProps) {
     <main id="main-content" className="min-h-screen bg-bg">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, '\\u003c') }}
       />
 
       <Navbar />
