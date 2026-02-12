@@ -68,6 +68,40 @@ export interface ImpactV3Result {
   computedAt: string; // ISO timestamp
 }
 
+// ---------------------------------------------------------------------------
+// Impact v4: Developer Impact Profile
+// ---------------------------------------------------------------------------
+
+/** Four independent dimension scores (each 0..100) */
+export interface DimensionScores {
+  building: number;
+  guarding: number;
+  consistency: number;
+  breadth: number;
+}
+
+/** Developer archetype derived from dimension profile shape */
+export type DeveloperArchetype =
+  | "Builder"
+  | "Guardian"
+  | "Marathoner"
+  | "Polymath"
+  | "Balanced"
+  | "Emerging";
+
+/** Full Impact v4 result */
+export interface ImpactV4Result {
+  handle: string;
+  dimensions: DimensionScores;
+  archetype: DeveloperArchetype;
+  compositeScore: number; // 0..100 — avg of 4 dimensions
+  confidence: number; // 50..100
+  confidencePenalties: ConfidencePenalty[];
+  adjustedComposite: number; // 0..100
+  tier: ImpactTier;
+  computedAt: string; // ISO timestamp
+}
+
 /** Raw data shape returned by the GitHub GraphQL contribution query */
 export interface RawContributionData {
   login: string;
