@@ -186,7 +186,7 @@ export default async function Home({
                         <p className="text-sm text-text-secondary">Last 90 days</p>
                       </div>
                     </div>
-                    <span className="text-sm font-heading text-text-secondary/50 tracking-tight">
+                    <span className="text-sm font-heading text-text-primary/60 tracking-tight">
                       Chapa<span className="text-amber">_</span>
                     </span>
                   </div>
@@ -195,7 +195,7 @@ export default async function Home({
                   <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
                     {/* Heatmap */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-2">
+                      <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-2">
                         Activity
                       </p>
                       <div className="grid grid-cols-13 grid-rows-7 grid-flow-col gap-1">
@@ -211,44 +211,42 @@ export default async function Home({
                     </div>
 
                     {/* Score */}
-                    <div className="w-[35%] sm:w-[280px] flex-shrink-0 flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-1">
-                          Impact Score
-                        </p>
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-6xl font-heading tracking-tighter text-text-primary">
+                    <div className="w-[35%] sm:w-[280px] flex-shrink-0 flex flex-col">
+                      <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
+                        Impact Score
+                      </p>
+                      <div className="flex items-start gap-4">
+                        {/* Score + tier + confidence stacked */}
+                        <div className="flex flex-col">
+                          <span className="text-6xl font-heading tracking-tighter text-text-primary leading-none">
                             94
                           </span>
-                          <div className="flex flex-col gap-1">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-2.5 py-0.5 text-xs font-semibold text-amber">
-                              <StarIcon className="w-3 h-3" />
-                              Elite
-                            </span>
-                            <span className="text-xs text-text-secondary">
-                              87% Confidence
-                            </span>
-                          </div>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-2.5 py-0.5 text-xs font-semibold text-amber mt-2 w-fit">
+                            <StarIcon className="w-3 h-3" />
+                            Elite
+                          </span>
+                          <span className="text-xs text-text-secondary mt-1">
+                            87% Confidence
+                          </span>
                         </div>
-                      </div>
 
-                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary/70">
-                        <span>847 commits</span>
-                        <span className="text-text-secondary/30">|</span>
-                        <span>42 PRs merged</span>
-                        <span className="text-text-secondary/30">|</span>
-                        <span>28 reviews</span>
+                        {/* Stats column */}
+                        <div className="flex flex-col gap-1.5 text-xs text-text-secondary/80 pt-2">
+                          <span>847 commits</span>
+                          <span>42 PRs merged</span>
+                          <span>28 reviews</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Footer */}
                   <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-text-secondary/60">
+                    <div className="flex items-center gap-2 text-xs text-text-primary/50">
                       <GitHubIcon className="w-3.5 h-3.5" />
                       <span>Powered by GitHub</span>
                     </div>
-                    <span className="text-xs text-text-secondary/60 font-heading">
+                    <span className="text-xs text-text-primary/50 font-heading">
                       chapa.thecreativetoken.com
                     </span>
                   </div>
