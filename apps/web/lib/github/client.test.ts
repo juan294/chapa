@@ -72,7 +72,7 @@ describe("getStats90d", () => {
 
     const result = await getStats90d("test-user");
     expect(result).toEqual(fresh);
-    expect(mockCacheSet).toHaveBeenCalledWith("stats:test-user", fresh, 86400);
+    expect(mockCacheSet).toHaveBeenCalledWith("stats:test-user", fresh, 21600);
   });
 
   it("returns null when GitHub returns null", async () => {
@@ -145,7 +145,7 @@ describe("getStats90d", () => {
     expect(mockCacheSet).toHaveBeenCalledWith(
       "stats:test-user",
       expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
-      86400,
+      21600,
     );
   });
 

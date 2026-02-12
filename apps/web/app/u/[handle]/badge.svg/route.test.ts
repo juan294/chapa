@@ -129,7 +129,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Cache-Control")).toBe(
-        "public, s-maxage=86400, stale-while-revalidate=604800",
+        "public, s-maxage=21600, stale-while-revalidate=604800",
       );
     });
   });

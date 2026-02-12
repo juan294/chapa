@@ -10,7 +10,7 @@ import { rateLimit } from "@/lib/cache/redis";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
-  "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+  "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=604800",
 };
 
 function fallbackSvg(handle: string, message: string): string {

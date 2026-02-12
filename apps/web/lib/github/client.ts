@@ -3,11 +3,11 @@ import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
 import type { Stats90d, SupplementalStats } from "@chapa/shared";
 
-const CACHE_TTL = 86400; // 24 hours
+const CACHE_TTL = 21600; // 6 hours
 
 /**
  * Get Stats90d for a user — cache-first, then GitHub API.
- * Returns cached data if available (within 24h).
+ * Returns cached data if available (within 6h).
  * Falls back to live fetch on cache miss.
  * If supplemental data exists (e.g. from an EMU upload), merges it into the result.
  */
