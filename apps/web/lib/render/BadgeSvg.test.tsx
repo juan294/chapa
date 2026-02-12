@@ -261,15 +261,17 @@ describe("renderBadgeSvg", () => {
       expect(svg).toMatch(/[\u2605\u2606]|star/i);
     });
 
-    it("shows totalStars count next to archetype pill with pipe separator", () => {
+    it("shows totalStars count next to archetype pill with middle dot separator", () => {
       const svg = renderBadgeSvg(
         makeStats({ totalStars: 142 }),
         makeImpact(),
       );
       // Should contain the star count
       expect(svg).toContain("142");
-      // Should contain a pipe separator
-      expect(svg).toContain("|");
+      // Should contain a middle dot separator (·)
+      expect(svg).toContain("\u00B7");
+      // Star icon should be the filled star (★) in accent color, not emoji
+      expect(svg).toMatch(/fill="[^"]*7C6AEF[^"]*">\u2605<\/tspan>/);
     });
 
     it("formats large star counts with compact notation", () => {
@@ -285,9 +287,9 @@ describe("renderBadgeSvg", () => {
         makeStats({ totalStars: 0 }),
         makeImpact(),
       );
-      // Pipe separator and star count still present
-      expect(svg).toContain("|");
-      expect(svg).toMatch(/\u2B50\s*0</);
+      // Middle dot separator and star count still present
+      expect(svg).toContain("\u00B7");
+      expect(svg).toMatch(/\u2605<\/tspan>\s*0</);
     });
 
     it("contains a radar chart with polygon", () => {

@@ -124,8 +124,8 @@ export function renderBadgeSvg(
     <rect width="${archetypePillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
     <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
-  <text x="${heatmapX + archetypePillWidth + 16}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">|</text>
-  <text x="${heatmapX + archetypePillWidth + 30}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">\u2B50 ${starsStr}</text>
+  <text x="${heatmapX + archetypePillWidth + 16}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
+  <text x="${heatmapX + archetypePillWidth + 28}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}"><tspan fill="${t.accent}">\u2605</tspan> ${starsStr}</text>
 
   <!-- ─── Two-column body ────────────────────────────────── -->
 
