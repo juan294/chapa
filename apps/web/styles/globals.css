@@ -270,6 +270,11 @@ html {
   outline-offset: 2px;
 }
 
+/* Terminal input should not show focus outline — it's always focused */
+.terminal-input-bare:focus-visible {
+  outline: none;
+}
+
 /* ── Reduced motion ─────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

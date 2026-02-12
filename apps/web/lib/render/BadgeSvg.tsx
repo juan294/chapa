@@ -1,5 +1,4 @@
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
-import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
@@ -37,47 +36,34 @@ export function renderBadgeSvg(
   const avatarR = 30;
 
   // ── Two-column body ─────────────────────────────────────────
-  // Left column: heatmap (38px cells + 5px gap = 43px per cell)
-  // 13 weeks = 559px wide, 7 days = 301px tall
-  const heatmapLabelY = 160;
+  // Left column: heatmap (44px cells + 5px gap = 49px per cell)
   const heatmapX = PAD;
-  const heatmapY = heatmapLabelY + 25;
+  const heatmapY = 160;
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
-  // Right column: radar chart + archetype + composite + confidence
+  // Right column: radar chart + archetype
   const profileColX = 670;
   const profileColW = W - PAD - profileColX; // 470px
-  const profileLabelY = 160;
 
   // Radar chart centered in the right column
   const radarCX = profileColX + profileColW / 2;
-  const radarCY = profileLabelY + 120;
+  const radarCY = 270;
   const radarR = 85;
   const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR);
 
-  // Archetype label + composite score + tier (below radar chart)
+  // Archetype pill badge (below radar chart)
   const archetypeY = radarCY + radarR + 42;
   const archetypeText = `\u2605 ${impact.archetype}`;
   const archetypePillWidth = archetypeText.length * 11 + 30;
 
-  // ── Dimension cards (4 across full width) ─────────────────────
-  // Defense-in-depth: coerce numeric values
-  const dims = impact.dimensions;
-  const safeBuilding = String(Number(dims.building));
-  const safeGuarding = String(Number(dims.guarding));
-  const safeConsistency = String(Number(dims.consistency));
-  const safeBreadth = String(Number(dims.breadth));
-
-  const cardsY = 470;
-  const cardGap = 12;
-  const totalCardWidth = W - PAD * 2;
-  const cardW = Math.floor((totalCardWidth - cardGap * 3) / 4);
-  const cardH = 55;
+  // ── Hero score ──────────────────────────────────────────────
+  const scoreStr = String(impact.adjustedComposite);
+  const scoreY = 510;
 
   // ── Footer ──────────────────────────────────────────────────
-  const footerDividerY = 545;
-  const footerY = 580;
+  const footerDividerY = 555;
+  const footerY = 590;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
@@ -124,15 +110,10 @@ export function renderBadgeSvg(
 
   <!-- ─── Two-column body ────────────────────────────────── -->
 
-  <!-- Left: ACTIVITY + heatmap -->
-  <text x="${heatmapX}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">ACTIVITY</text>
-  <text x="${profileColX - 30}" y="${heatmapLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${t.textSecondary}" text-anchor="end"><tspan fill="${t.accent}">\u2605</tspan> ${formatCompact(stats.totalStars)} stars</text>
+  <!-- Left: heatmap -->
   ${heatmapSvg}
 
-  <!-- Right: DEVELOPER PROFILE + radar chart + archetype + composite -->
-  <text x="${profileColX}" y="${profileLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textPrimary}" opacity="0.5" letter-spacing="2.5">DEVELOPER PROFILE</text>
-
-  <!-- Radar chart -->
+  <!-- Right: radar chart + archetype -->
   ${radarSvg}
 
   <!-- Archetype pill badge -->
@@ -141,39 +122,9 @@ export function renderBadgeSvg(
     <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
 
-  <!-- Composite score + tier + confidence -->
-  <text x="${radarCX}" y="${archetypeY + 24}" font-family="'JetBrains Mono', monospace" font-size="22" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedComposite}</text>
-  <text x="${radarCX + 20}" y="${archetypeY + 24}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="start">${impact.tier}</text>
-  <text x="${radarCX}" y="${archetypeY + 46}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textPrimary}" opacity="0.7" text-anchor="middle">${impact.confidence}% Confidence</text>
-
-  <!-- ─── Dimension cards (4 across full width) ────────────── -->
-  <!-- Card 1: Building -->
-  <g transform="translate(${PAD}, ${cardsY})">
-    <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeBuilding}</text>
-    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">BUILDING</text>
-  </g>
-
-  <!-- Card 2: Guarding -->
-  <g transform="translate(${PAD + cardW + cardGap}, ${cardsY})">
-    <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeGuarding}</text>
-    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">GUARDING</text>
-  </g>
-
-  <!-- Card 3: Consistency -->
-  <g transform="translate(${PAD + (cardW + cardGap) * 2}, ${cardsY})">
-    <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeConsistency}</text>
-    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">CONSISTENCY</text>
-  </g>
-
-  <!-- Card 4: Breadth -->
-  <g transform="translate(${PAD + (cardW + cardGap) * 3}, ${cardsY})">
-    <rect width="${cardW}" height="${cardH}" rx="10" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <text x="${cardW / 2}" y="26" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="700" fill="${t.textPrimary}" text-anchor="middle">${safeBreadth}</text>
-    <text x="${cardW / 2}" y="45" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="middle" letter-spacing="1.5">BREADTH</text>
-  </g>
+  <!-- ─── Hero composite score ───────────────────────────── -->
+  <text x="${W / 2}" y="${scoreY}" font-family="'JetBrains Mono', monospace" font-size="72" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
+  ${impact.tier !== impact.archetype ? `<text x="${W / 2}" y="${scoreY + 30}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${tierColor}" text-anchor="middle">${impact.tier}</text>` : ""}
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
   <!-- Divider line -->

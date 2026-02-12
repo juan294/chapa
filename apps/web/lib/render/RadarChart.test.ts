@@ -104,9 +104,9 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
 
   it("has 4 axis labels (Building, Guarding, Consistency, Breadth)", () => {
     const svg = renderRadarChart(makeDimensions(), 200, 200, 100);
-    expect(svg).toContain("Building");
-    expect(svg).toContain("Guarding");
-    expect(svg).toContain("Consistency");
-    expect(svg).toContain("Breadth");
+    expect(svg).toContain(">Building<");
+    expect(svg).toContain(">Guarding<");
+    expect(svg).toContain(">Consistency<");
+    expect(svg).toContain(">Breadth<");
   });
 });

@@ -38,9 +38,11 @@ export function ImpactBreakdown({ impact, totalStars }: { impact: ImpactV4Result
           {impact.adjustedComposite}
           <span className="text-text-secondary text-lg"> / 100</span>
         </span>
-        <span className="text-sm text-text-secondary font-heading">
-          {impact.tier}
-        </span>
+        {impact.tier !== impact.archetype && (
+          <span className="text-sm text-text-secondary font-heading">
+            {impact.tier}
+          </span>
+        )}
       </div>
 
       {/* Archetype description */}

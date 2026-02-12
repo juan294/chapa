@@ -66,7 +66,7 @@ describe("buildHeatmapCells", () => {
   it("spaces cells correctly across weeks and days", () => {
     const cells = buildHeatmapCells(makeHeatmapData(), 0, 0);
     // Cell at week 1, day 0 (index 7)
-    const cellSize = 38;
+    const cellSize = 44;
     const cellGap = 5;
     expect(cells[7].x).toBe(1 * (cellSize + cellGap));
     expect(cells[7].y).toBe(0);

@@ -42,7 +42,7 @@ export function renderRadarChart(
       const r = radius * level;
       const pts = axes.map((a) => toPoint(a.angle, r));
       const pointsStr = pts.map(([x, y]) => `${x},${y}`).join(" ");
-      return `<polygon points="${pointsStr}" fill="none" stroke="${t.stroke}" stroke-width="${level === 1 ? 1.5 : 0.8}" opacity="${level === 1 ? 0.5 : 0.3}"/>`;
+      return `<polygon points="${pointsStr}" fill="none" stroke="${t.accent}" stroke-width="${level === 1 ? 2 : 1}" opacity="${level === 1 ? 0.5 : 0.2}"/>`;
     })
     .join("\n    ");
 
@@ -50,7 +50,7 @@ export function renderRadarChart(
   const axisLines = axes
     .map((a) => {
       const [x2, y2] = toPoint(a.angle, radius);
-      return `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="${t.stroke}" stroke-width="0.8" opacity="0.3"/>`;
+      return `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="${t.accent}" stroke-width="0.8" opacity="0.2"/>`;
     })
     .join("\n    ");
 
