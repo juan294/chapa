@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   parseCommand,
   executeCommand,
-  createCoreCommands,
-  createLandingCommands,
   createNavigationCommands,
   getMatchingCommands,
   resolveCategory,
@@ -59,17 +57,12 @@ describe("resolveCategory", () => {
 });
 
 describe("executeCommand", () => {
-  const commands = createCoreCommands();
+  const commands = createNavigationCommands();
 
   it("executes /help", () => {
     const result = executeCommand("/help", commands);
     expect(result.lines.length).toBeGreaterThan(0);
     expect(result.lines[0].type).toBe("system");
-  });
-
-  it("executes /clear with clear action", () => {
-    const result = executeCommand("/clear", commands);
-    expect(result.action).toEqual({ type: "clear" });
   });
 
   it("executes /login with navigate action", () => {
@@ -101,56 +94,6 @@ describe("executeCommand", () => {
     expect(result.action).toBeUndefined();
   });
 
-  it("executes /set with valid category", () => {
-    const result = executeCommand("/set bg aurora", commands);
-    expect(result.action).toEqual({
-      type: "set",
-      category: "background",
-      value: "aurora",
-    });
-    expect(result.lines[0].type).toBe("success");
-  });
-
-  it("errors on /set with unknown category", () => {
-    const result = executeCommand("/set unknown value", commands);
-    expect(result.lines[0].type).toBe("error");
-  });
-
-  it("errors on /set without enough args", () => {
-    const result = executeCommand("/set bg", commands);
-    expect(result.lines[0].type).toBe("error");
-  });
-
-  it("executes /preset with valid name", () => {
-    const result = executeCommand("/preset premium", commands);
-    expect(result.action).toEqual({ type: "preset", name: "premium" });
-  });
-
-  it("errors on /preset with invalid name", () => {
-    const result = executeCommand("/preset garbage", commands);
-    expect(result.lines[0].type).toBe("error");
-  });
-
-  it("executes /save", () => {
-    const result = executeCommand("/save", commands);
-    expect(result.action).toEqual({ type: "save" });
-  });
-
-  it("executes /reset", () => {
-    const result = executeCommand("/reset", commands);
-    expect(result.action).toEqual({ type: "reset" });
-  });
-
-  it("executes /embed", () => {
-    const result = executeCommand("/embed", commands);
-    expect(result.lines.length).toBeGreaterThan(0);
-  });
-
-  it("executes /share", () => {
-    const result = executeCommand("/share", commands);
-    expect(result.lines.length).toBeGreaterThan(0);
-  });
-
   it("returns error for unknown command", () => {
     const result = executeCommand("/foobar", commands);
     expect(result.lines[0].type).toBe("error");
@@ -163,15 +106,11 @@ describe("executeCommand", () => {
 });
 
 describe("getMatchingCommands", () => {
-  const commands = createCoreCommands();
+  const commands = createNavigationCommands();
 
   it("returns matching commands for partial input", () => {
     const matches = getMatchingCommands("/s", commands);
     const names = matches.map((m) => m.name);
-    expect(names).toContain("/set");
-    expect(names).toContain("/save");
-    expect(names).toContain("/share");
-    expect(names).toContain("/status");
     expect(names).toContain("/studio");
   });
 
@@ -188,6 +127,12 @@ describe("getMatchingCommands", () => {
     const matchesSt = getMatchingCommands("/st", commands);
     const matchesStu = getMatchingCommands("/stu", commands);
     expect(matchesStu.length).toBeLessThanOrEqual(matchesSt.length);
+  });
+
+  it("matches aliases (/b matches /badge)", () => {
+    const matches = getMatchingCommands("/b", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).toContain("/badge");
   });
 });
 
@@ -292,14 +237,6 @@ describe("createNavigationCommands", () => {
     const names = matches.map((m) => m.name);
     expect(names).toContain("/badge");
     expect(names).not.toContain("/studio");
-  });
-});
-
-describe("createLandingCommands (deprecated alias)", () => {
-  it("returns the same commands as createNavigationCommands", () => {
-    const landing = createLandingCommands();
-    const nav = createNavigationCommands();
-    expect(landing.map((c) => c.name)).toEqual(nav.map((c) => c.name));
   });
 });
 
