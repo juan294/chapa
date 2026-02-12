@@ -210,31 +210,53 @@ export default async function Home({
                       </div>
                     </div>
 
-                    {/* Score */}
-                    <div className="w-[35%] sm:w-[280px] flex-shrink-0 flex flex-col">
+                    {/* Score + Stats */}
+                    <div className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
                       <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
                         Impact Score
                       </p>
-                      <div className="flex items-start gap-4">
-                        {/* Score + tier + confidence stacked */}
-                        <div className="flex flex-col">
-                          <span className="text-6xl font-heading tracking-tighter text-text-primary leading-none">
-                            94
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-2.5 py-0.5 text-xs font-semibold text-amber mt-2 w-fit">
+
+                      {/* Score row: big number + tier */}
+                      <div className="flex items-end gap-3">
+                        <span className="text-6xl font-heading tracking-tighter text-text-primary leading-none">
+                          94
+                        </span>
+                        <div className="flex flex-col gap-1 pb-1">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-2.5 py-0.5 text-xs font-semibold text-amber w-fit">
                             <StarIcon className="w-3 h-3" />
                             Elite
                           </span>
-                          <span className="text-xs text-text-secondary mt-1">
+                          <span className="text-xs text-text-secondary">
                             87% Confidence
                           </span>
                         </div>
+                      </div>
 
-                        {/* Stats column */}
-                        <div className="flex flex-col gap-1.5 text-xs text-text-secondary/80 pt-2">
-                          <span>847 commits</span>
-                          <span>42 PRs merged</span>
-                          <span>28 reviews</span>
+                      {/* Stats — three achievement blocks */}
+                      <div className="mt-5 grid grid-cols-3 gap-3">
+                        <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
+                          <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
+                            847
+                          </span>
+                          <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
+                            commits
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
+                          <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
+                            42
+                          </span>
+                          <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
+                            PRs merged
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-3 py-3 text-center">
+                          <span className="block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none">
+                            28
+                          </span>
+                          <span className="block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5">
+                            reviews
+                          </span>
                         </div>
                       </div>
                     </div>
