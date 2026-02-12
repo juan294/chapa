@@ -21,13 +21,14 @@ export function renderRadarChart(
 ): string {
   const t = WARM_AMBER;
 
-  // Axes: top = Building, right = Guarding, bottom = Consistency, left = Breadth
-  // Angles: 0 = top (-π/2), π/2 = right, π = bottom, 3π/2 = left
+  // Axes rotated 45° clockwise so labels don't overlap with score below
+  // Building = top-right, Guarding = bottom-right, Consistency = bottom-left, Breadth = top-left
+  const ROTATION = Math.PI / 4;
   const axes: { key: keyof DimensionScores; label: string; angle: number }[] = [
-    { key: "building", label: "Building", angle: -Math.PI / 2 },
-    { key: "guarding", label: "Guarding", angle: 0 },
-    { key: "consistency", label: "Consistency", angle: Math.PI / 2 },
-    { key: "breadth", label: "Breadth", angle: Math.PI },
+    { key: "building", label: "Building", angle: -Math.PI / 2 + ROTATION },
+    { key: "guarding", label: "Guarding", angle: 0 + ROTATION },
+    { key: "consistency", label: "Consistency", angle: Math.PI / 2 + ROTATION },
+    { key: "breadth", label: "Breadth", angle: Math.PI + ROTATION },
   ];
 
   const toPoint = (angle: number, dist: number): [number, number] => [
@@ -62,21 +63,18 @@ export function renderRadarChart(
   });
   const dataPointsStr = dataPoints.map(([x, y]) => `${x},${y}`).join(" ");
 
-  // Axis labels
+  // Axis labels — position based on angle direction (works for any rotation)
   const labelOffset = 20;
   const labelSvg = axes
     .map((a) => {
       const [x, y] = toPoint(a.angle, radius + labelOffset);
+      const cosA = Math.cos(a.angle);
+      const sinA = Math.sin(a.angle);
       let anchor = "middle";
       let dx = 0;
-      if (a.angle === 0) {
-        anchor = "start";
-        dx = 4;
-      } else if (a.angle === Math.PI) {
-        anchor = "end";
-        dx = -4;
-      }
-      const dy = a.angle === -Math.PI / 2 ? -6 : a.angle === Math.PI / 2 ? 14 : 4;
+      if (cosA > 0.3) { anchor = "start"; dx = 4; }
+      else if (cosA < -0.3) { anchor = "end"; dx = -4; }
+      const dy = sinA < -0.3 ? -4 : sinA > 0.3 ? 14 : 4;
       return `<text x="${x + dx}" y="${y + dy}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="${anchor}">${a.label}</text>`;
     })
     .join("\n    ");

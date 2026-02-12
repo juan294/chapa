@@ -109,4 +109,17 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     expect(svg).toContain(">Consistency<");
     expect(svg).toContain(">Breadth<");
   });
+
+  it("axes are rotated 45 degrees (no label directly at top/bottom/left/right)", () => {
+    const cx = 200, cy = 200, r = 100;
+    const svg = renderRadarChart(makeDimensions({ building: 100 }), cx, cy, r);
+    // With 45° rotation, building (first point) should be at top-right, not straight up
+    // Extract the data polygon (the one with fill-opacity)
+    const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
+    expect(pointsMatch).not.toBeNull();
+    const [bx, by] = pointsMatch![1].split(" ")[0].split(",").map(Number);
+    // Building at -π/4: x should be > cx (right), y should be < cy (up)
+    expect(bx).toBeGreaterThan(cx);
+    expect(by).toBeLessThan(cy);
+  });
 });

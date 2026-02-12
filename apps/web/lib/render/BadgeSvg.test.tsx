@@ -146,9 +146,9 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("@testuser");
     });
 
-    it("contains 'Last 12 months' subtitle", () => {
+    it("contains 'Verified metrics' subtitle", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("Last 12 months");
+      expect(svg).toContain("Verified metrics");
     });
 
     it("contains 'Chapa_' logo text with underscore cursor", () => {
@@ -283,6 +283,26 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("1k");
       expect(svg).toContain("31.8k");
       expect(svg).toContain("188k");
+    });
+
+    it("defaults watch/fork to 0 when fields are missing from stats data", () => {
+      // Simulate old cached data that doesn't have totalWatchers/totalForks
+      const oldStats = makeStats();
+      delete (oldStats as unknown as Record<string, unknown>).totalWatchers;
+      delete (oldStats as unknown as Record<string, unknown>).totalForks;
+      const svg = renderBadgeSvg(oldStats, makeImpact());
+      // Should render "0" instead of "undefined"
+      expect(svg).not.toContain("undefined");
+    });
+
+    it("has separator dot between archetype pill and watch metrics", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      // There should be a · separator between the pill group and the watch group
+      const pillEnd = svg.indexOf("Builder");
+      const watchGroup = svg.indexOf("Eye icon");
+      // A middle dot should appear between them
+      const dotsBetween = svg.slice(pillEnd, watchGroup);
+      expect(dotsBetween).toContain("\u00B7");
     });
 
     it("renders inline SVG icons for watch (eye), fork, and star", () => {
@@ -431,7 +451,7 @@ describe("renderBadgeSvg", () => {
   describe("font size parity", () => {
     it("subtitle font-size is at least 19 to display at ~14px", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const match = svg.match(/font-size="(\d+)"[^>]*>Last 12 months/);
+      const match = svg.match(/font-size="(\d+)"[^>]*>Verified metrics/);
       expect(match).not.toBeNull();
       expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(19);
     });

@@ -45,9 +45,9 @@ export function renderBadgeSvg(
   const metaRowY = 160;
   const archetypeText = `\u2605 ${impact.archetype}`;
   const archetypePillWidth = archetypeText.length * 11 + 30;
-  const watchStr = formatCompact(stats.totalWatchers);
-  const forkStr = formatCompact(stats.totalForks);
-  const starsStr = formatCompact(stats.totalStars);
+  const watchStr = formatCompact(stats.totalWatchers ?? 0);
+  const forkStr = formatCompact(stats.totalForks ?? 0);
+  const starsStr = formatCompact(stats.totalStars ?? 0);
 
   // ── Two-column body ─────────────────────────────────────────
   // Left column: heatmap (44px cells + 5px gap = 49px per cell)
@@ -111,7 +111,7 @@ export function renderBadgeSvg(
 
   <!-- Handle + subtitle -->
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
-  <text x="${PAD + 72}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">Last 12 months</text>
+  <text x="${PAD + 72}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">Verified metrics</text>
 
   <!-- Verified icon (shield + checkmark, dimmed — no text label) -->
   <g transform="translate(${PAD + 72 + headerName.length * 13 + 8}, ${headerY - 20})" opacity="0.4">
@@ -126,8 +126,10 @@ export function renderBadgeSvg(
     <rect width="${archetypePillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
     <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
+  <!-- Separator between pill and metrics -->
+  <text x="${heatmapX + archetypePillWidth + 12}" y="${metaRowY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Watch · Fork · Star (same order as GitHub) -->
-  <g transform="translate(${heatmapX + archetypePillWidth + 16}, ${metaRowY - 7})" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">
+  <g transform="translate(${heatmapX + archetypePillWidth + 28}, ${metaRowY - 7})" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">
     <!-- Eye icon (watch) -->
     <path d="M1 7.5C1 7.5 3.5 2.5 8 2.5S15 7.5 15 7.5S12.5 12.5 8 12.5S1 7.5 1 7.5Z" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="translate(0,1)" opacity="0.7"/>
     <circle cx="8" cy="8.5" r="2.5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" opacity="0.7"/>
