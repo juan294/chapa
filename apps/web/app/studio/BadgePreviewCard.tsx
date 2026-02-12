@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, memo } from "react";
 import type {
   BadgeConfig,
   Stats90d,
@@ -96,7 +96,7 @@ function ParticleCanvas() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function BadgePreviewCard({
+function BadgePreviewCardInner({
   config,
   stats,
   impact,
@@ -397,3 +397,5 @@ export function BadgePreviewCard({
     </div>
   );
 }
+
+export const BadgePreviewCard = memo(BadgePreviewCardInner);
