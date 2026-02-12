@@ -57,13 +57,17 @@ export function renderBadgeSvg(
   const archetypeText = `\u2605 ${impact.archetype}`;
   const archetypePillWidth = archetypeText.length * 11 + 30;
 
-  // ── Hero score (right column, below archetype pill) ─────────
+  // ── Hero score ring (right column, below archetype pill) ────
   const scoreStr = String(impact.adjustedComposite);
-  const scoreY = archetypeY + 95;
+  const ringCY = archetypeY + 85;
+  const ringR = 46;
+  const ringCircumference = 2 * Math.PI * ringR; // ≈289.03
+  const ringOffset = ringCircumference * (1 - impact.adjustedComposite / 100);
+  const tierLabelY = ringCY + ringR + 24;
 
   // ── Footer ──────────────────────────────────────────────────
-  const footerDividerY = 555;
-  const footerY = 590;
+  const footerDividerY = 575;
+  const footerY = 600;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
@@ -122,9 +126,15 @@ export function renderBadgeSvg(
     <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
 
-  <!-- ─── Hero composite score (right column) ─────────────── -->
-  <text x="${radarCX}" y="${scoreY}" font-family="'JetBrains Mono', monospace" font-size="72" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
-  ${impact.tier !== impact.archetype ? `<text x="${radarCX}" y="${scoreY + 30}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${tierColor}" text-anchor="middle">${impact.tier}</text>` : ""}
+  <!-- ─── Hero composite score ring (right column) ────────── -->
+  <!-- Ring track (background) -->
+  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="rgba(124,106,239,0.10)" stroke-width="4"/>
+  <!-- Ring arc (foreground, tier-colored) -->
+  <circle cx="${radarCX}" cy="${ringCY}" r="${ringR}" fill="none" stroke="${tierColor}" stroke-width="4" stroke-dasharray="${ringCircumference.toFixed(2)}" stroke-dashoffset="${ringOffset.toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${radarCX} ${ringCY})"/>
+  <!-- Score number (centered inside ring) -->
+  <text x="${radarCX}" y="${ringCY}" font-family="'JetBrains Mono', monospace" font-size="52" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" dominant-baseline="central" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
+  <!-- Tier label (always visible below ring) -->
+  <text x="${radarCX}" y="${tierLabelY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="${tierColor}" text-anchor="middle">${impact.tier}</text>
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
   <!-- Divider line -->

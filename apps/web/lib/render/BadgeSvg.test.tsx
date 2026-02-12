@@ -285,34 +285,59 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain(">58<");
     });
 
-    it("hero score font-size is at least 60px", () => {
+    it("hero score font-size is 52px (fits inside ring)", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       const match = svg.match(/font-size="(\d+)"[^>]*>58</);
       expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(60);
+      expect(parseInt(match![1], 10)).toBe(52);
     });
 
-    it("shows tier label only when tier differs from archetype", () => {
-      const svgWithTier = renderBadgeSvg(
+    it("always shows tier label below the score ring", () => {
+      const svgWithDifferentTier = renderBadgeSvg(
         makeStats(),
         makeImpact({ archetype: "Builder", tier: "Elite" }),
       );
-      expect(svgWithTier).toContain(">Elite<");
+      expect(svgWithDifferentTier).toContain(">Elite<");
 
-      const svgWithoutTier = renderBadgeSvg(
+      // Tier label is always shown, even when tier === archetype
+      const svgSameTier = renderBadgeSvg(
         makeStats(),
         makeImpact({ archetype: "Emerging", tier: "Emerging" }),
       );
-      // Pill shows "★ Emerging" (>★ Emerging<), tier label would show bare (>Emerging<)
-      // When tier === archetype, there should be no separate tier label
-      expect(svgWithoutTier).not.toMatch(/>Emerging<\/text>/);
-      // But the archetype pill should still have it
-      expect(svgWithoutTier).toContain("Emerging");
+      expect(svgSameTier).toMatch(/>Emerging<\/text>/);
     });
 
     it("does NOT contain a separate confidence text", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact({ confidence: 85 }));
       expect(svg).not.toContain("% Confidence");
+    });
+
+    it("contains a score ring track circle", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      // Background track: circle with dim stroke, no fill
+      expect(svg).toMatch(/stroke="rgba\(124,106,239,0\.10\)"[^/]*stroke-width="4"/);
+    });
+
+    it("contains a score ring arc with stroke-dasharray", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain("stroke-dasharray");
+    });
+
+    it("score ring arc offset is proportional to score", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ adjustedComposite: 50 }),
+      );
+      // circumference = 2π × 46 ≈ 289.03, offset = 289.03 × (1 - 50/100) ≈ 144.51
+      const match = svg.match(/stroke-dashoffset="([0-9.]+)"/);
+      expect(match).not.toBeNull();
+      const offset = parseFloat(match![1]);
+      expect(offset).toBeCloseTo(289.03 * 0.5, 0);
+    });
+
+    it("score ring arc has stroke-linecap round", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).toContain('stroke-linecap="round"');
     });
   });
 
