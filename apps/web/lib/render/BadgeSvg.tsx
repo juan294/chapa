@@ -59,7 +59,7 @@ export function renderBadgeSvg(
 
   // ── Hero score (right column, below archetype pill) ─────────
   const scoreStr = String(impact.adjustedComposite);
-  const scoreY = archetypeY + 60;
+  const scoreY = archetypeY + 95;
 
   // ── Footer ──────────────────────────────────────────────────
   const footerDividerY = 555;
