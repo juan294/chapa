@@ -33,8 +33,8 @@ export function renderBadgeSvg(
   const avatarR = 30;
 
   // ── Two-column body ─────────────────────────────────────────
-  // Left column: heatmap (32px cells + 5px gap = 37px per cell)
-  // 13 weeks = 476px wide, 7 days = 254px tall
+  // Left column: heatmap (38px cells + 5px gap = 43px per cell)
+  // 13 weeks = 559px wide, 7 days = 301px tall
   const heatmapLabelY = 160;
   const heatmapX = PAD;
   const heatmapY = heatmapLabelY + 25;
@@ -42,7 +42,7 @@ export function renderBadgeSvg(
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
   // Right column: impact score (pushed right for balance with wider heatmap)
-  const scoreColX = 620;
+  const scoreColX = 670;
   const scoreLabelY = 160;
   const scoreValueY = scoreLabelY + 95;
 
@@ -114,13 +114,13 @@ export function renderBadgeSvg(
   <text x="${scoreColX}" y="${scoreValueY}" font-family="'JetBrains Mono', monospace" font-size="96" font-weight="700" fill="${t.textPrimary}" letter-spacing="-4" style="animation: pulse-glow 3s ease-in-out infinite">${impact.adjustedScore}</text>
 
   <!-- Tier pill badge -->
-  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}, ${scoreValueY - 55})">
+  <g transform="translate(${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}, ${scoreValueY - 50})">
     <rect width="${tierPillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
     <text x="${tierPillWidth / 2}" y="22" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" font-weight="600" fill="${tierColor}" text-anchor="middle">${tierText}</text>
   </g>
 
   <!-- Confidence -->
-  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}" y="${scoreValueY + 8}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
+  <text x="${scoreColX + (impact.adjustedScore >= 10 ? 130 : 75)}" y="${scoreValueY + 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">${impact.confidence}% Confidence</text>
 
   <!-- ─── Stats row ──────────────────────────────────────── -->
   <text x="${W / 2}" y="${statsY}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" text-anchor="middle">

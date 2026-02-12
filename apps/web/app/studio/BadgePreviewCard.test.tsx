@@ -199,4 +199,39 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("HeatmapGrid");
     });
   });
+
+  describe("unified badge elements", () => {
+    it("has verified badge icon", () => {
+      // Verified shield SVG path must be present
+      expect(SOURCE).toContain("M12 1L3 5v6c0 5.55");
+    });
+
+    it("has Chapa_ logo text", () => {
+      expect(SOURCE).toContain("Chapa");
+      expect(SOURCE).toMatch(/Chapa.*_/);
+    });
+
+    it("has Powered by GitHub footer", () => {
+      expect(SOURCE).toContain("Powered by GitHub");
+    });
+
+    it("has chapa.thecreativetoken.com URL", () => {
+      expect(SOURCE).toContain("chapa.thecreativetoken.com");
+    });
+
+    it("uses Activity label instead of Contributions", () => {
+      expect(SOURCE).not.toContain('"Contributions"');
+      expect(SOURCE).toContain("Activity");
+    });
+
+    it("has @ prefix on handle", () => {
+      expect(SOURCE).toContain("@{stats.handle}");
+    });
+
+    it("uses pipe separators instead of dots", () => {
+      expect(SOURCE).toContain("|");
+      // Should not use dot separator
+      expect(SOURCE).not.toContain('"text-stroke">·<');
+    });
+  });
 });
