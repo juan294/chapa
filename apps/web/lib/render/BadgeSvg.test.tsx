@@ -143,9 +143,9 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("@testuser");
     });
 
-    it("contains 'Last 90 days' subtitle", () => {
+    it("contains 'Last 12 months' subtitle", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("Last 90 days");
+      expect(svg).toContain("Last 12 months");
     });
 
     it("contains 'Chapa_' logo text with underscore cursor", () => {
@@ -419,7 +419,7 @@ describe("renderBadgeSvg", () => {
 
     it("subtitle font-size is at least 19 to display at ~14px", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const match = svg.match(/font-size="(\d+)"[^>]*>Last 90 days/);
+      const match = svg.match(/font-size="(\d+)"[^>]*>Last 12 months/);
       expect(match).not.toBeNull();
       expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(19);
     });

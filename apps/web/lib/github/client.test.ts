@@ -73,7 +73,7 @@ describe("getStats", () => {
 
     const result = await getStats("test-user");
     expect(result).toEqual(fresh);
-    expect(mockCacheSet).toHaveBeenCalledWith("stats:test-user", fresh, 21600);
+    expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:test-user", fresh, 21600);
   });
 
   it("returns null when GitHub returns null", async () => {
@@ -144,7 +144,7 @@ describe("getStats", () => {
 
     // The cached value should be the merged stats
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "stats:test-user",
+      "stats:v2:test-user",
       expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
       21600,
     );

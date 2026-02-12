@@ -15,7 +15,7 @@ export async function getStats(
   handle: string,
   token?: string,
 ): Promise<StatsData | null> {
-  const cacheKey = `stats:${handle}`;
+  const cacheKey = `stats:v2:${handle}`;
 
   // Try cache first
   const cached = await cacheGet<StatsData>(cacheKey);

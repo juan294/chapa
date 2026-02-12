@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s — Chapa",
   },
   description:
-    "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions — Building, Guarding, Consistency, Breadth — from 90 days of GitHub activity.",
+    "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions — Building, Guarding, Consistency, Breadth — from 12 months of GitHub activity.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     siteName: "Chapa",
     title: "Chapa — Developer Impact Profile",
     description:
-      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions from 90 days of GitHub activity.",
+      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions from 12 months of GitHub activity.",
     url: BASE_URL,
     images: [
       {
@@ -83,7 +83,7 @@ export default function RootLayout({
               name: "Chapa",
               url: BASE_URL,
               description:
-                "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile — Building, Guarding, Consistency, and Breadth from 90 days of GitHub activity.",
+                "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile — Building, Guarding, Consistency, and Breadth from 12 months of GitHub activity.",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               offers: {
