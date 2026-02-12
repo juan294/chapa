@@ -5,7 +5,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
-2. Compute **Impact Score v3** from last 90 days:
+2. Compute **Impact Score v3** from last 12 months (365 days):
    - base score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 3. Serve **embeddable SVG badge**: `/u/:handle/badge.svg`
 4. Serve **share page**: `/u/:handle`
@@ -33,7 +33,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Data & types
 Shared types live in: `packages/shared/types.ts`
-- `Stats90d`
+- `StatsData`
 - `ImpactV3Result`
 
 ## Rendering requirements
@@ -87,7 +87,7 @@ Must be easy to swap/remove:
 ## What to build first
 1) Shared types
 2) GitHub OAuth + token storage
-3) Stats90d gatherer + caching
+3) StatsData gatherer + caching
 4) Impact v3 compute + tests
 5) Badge SVG endpoint
 6) Share page + embed snippet + sharing

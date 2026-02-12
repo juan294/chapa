@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { uploadSupplementalStats } from "./upload";
-import type { Stats90d } from "@chapa/shared";
+import type { StatsData } from "@chapa/shared";
 
 const mockFetch = vi.fn();
 
-function makeStats(): Stats90d {
+function makeStats(): StatsData {
   return {
     handle: "corp_user",
     commitsTotal: 30,
@@ -18,6 +18,9 @@ function makeStats(): Stats90d {
     reposContributed: 2,
     topRepoShare: 0.6,
     maxCommitsIn10Min: 3,
+    totalStars: 0,
+    totalForks: 0,
+    totalWatchers: 0,
     heatmapData: [],
     fetchedAt: new Date().toISOString(),
   };

@@ -32,9 +32,9 @@ As a developer, I want a **beautiful, embeddable badge** that shows my real cont
   - If stale: triggers recompute (optional endpoint)
 
 ## Metrics displayed (badge)
-- Commits (90d)
-- PRs merged (90d)
-- Reviews (90d)
+- Commits (12 months)
+- PRs merged (12 months)
+- Reviews (12 months)
 - Impact tier (Emerging/Solid/High/Elite)
 - Adjusted score (0–100)
 - Confidence (50–100)

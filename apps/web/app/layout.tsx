@@ -3,6 +3,8 @@ import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import PostHogProvider from "@/components/PostHogProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -25,11 +27,11 @@ const BASE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: "Chapa — Developer Impact Badge",
+    default: "Chapa — Developer Impact Profile",
     template: "%s — Chapa",
   },
   description:
-    "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score. Analyze 90 days of commits, PRs, reviews, and issues.",
+    "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions — Building, Guarding, Consistency, Breadth — from 12 months of GitHub activity.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -37,9 +39,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Chapa",
-    title: "Chapa — Developer Impact Badge",
+    title: "Chapa — Developer Impact Profile",
     description:
-      "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score. Analyze 90 days of commits, PRs, reviews, and issues.",
+      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions from 12 months of GitHub activity.",
     url: BASE_URL,
     images: [
       {
@@ -52,9 +54,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Chapa — Developer Impact Badge",
+    title: "Chapa — Developer Impact Profile",
     description:
-      "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score.",
+      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile.",
     images: ["/logo-512.png"],
   },
   alternates: {
@@ -71,6 +73,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${jetbrainsMono.variable} ${plusJakarta.variable}`}
+      suppressHydrationWarning
     >
       <body className="bg-bg text-text-primary font-body antialiased">
         <script
@@ -82,7 +85,7 @@ export default function RootLayout({
               name: "Chapa",
               url: BASE_URL,
               description:
-                "Generate a live, embeddable SVG badge showcasing your GitHub Impact Score. Analyze 90 days of commits, PRs, reviews, and issues.",
+                "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile — Building, Guarding, Consistency, and Breadth from 12 months of GitHub activity.",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               offers: {
@@ -99,7 +102,11 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <PostHogProvider>{children}</PostHogProvider>
+        <ThemeProvider>
+          <PostHogProvider>
+            <KeyboardShortcutsProvider>{children}</KeyboardShortcutsProvider>
+          </PostHogProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

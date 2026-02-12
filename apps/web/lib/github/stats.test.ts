@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchStats90d } from "./stats90d";
+import { fetchStats } from "./stats";
 import * as queries from "./queries";
 
 vi.mock("./queries");
@@ -45,23 +45,24 @@ function makeContribData(
         { nameWithOwner: "user/repo4", defaultBranchRef: { target: { history: { totalCount: 5 } } } },
       ],
     },
+    ownedRepoStars: { nodes: [] as { stargazerCount: number; forkCount: number; watchers: { totalCount: number } }[] },
     ...overrides,
   };
 }
 
 // ---------------------------------------------------------------------------
-// fetchStats90d
+// fetchStats
 // ---------------------------------------------------------------------------
 
-describe("fetchStats90d", () => {
+describe("fetchStats", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("transforms raw data into Stats90d shape", async () => {
+  it("transforms raw data into StatsData shape", async () => {
     mockedQueries.fetchContributionData.mockResolvedValue(makeContribData());
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats).not.toBeNull();
     expect(stats!.handle).toBe("test-user");
     expect(stats!.commitsTotal).toBeGreaterThanOrEqual(0);
@@ -86,7 +87,7 @@ describe("fetchStats90d", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     // w = 0.5 + 0.25*ln(1+20) + 0.25*ln(1+1500) = 0.5 + 0.76 + 1.83 = 3.09 → capped at 3.0
     expect(stats!.prsMergedWeight).toBeCloseTo(3.0, 1);
   });
@@ -103,7 +104,7 @@ describe("fetchStats90d", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats!.prsMergedCount).toBe(1);
   });
 
@@ -119,7 +120,7 @@ describe("fetchStats90d", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats!.topRepoShare).toBeCloseTo(0.9, 2);
   });
 
@@ -129,7 +130,7 @@ describe("fetchStats90d", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats!.topRepoShare).toBe(0);
   });
 
@@ -138,7 +139,7 @@ describe("fetchStats90d", () => {
       makeContribData({ name: "Juan García", avatarUrl: "https://avatars.githubusercontent.com/u/42" }),
     );
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats!.displayName).toBe("Juan García");
     expect(stats!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/42");
   });
@@ -148,14 +149,14 @@ describe("fetchStats90d", () => {
       makeContribData({ name: null }),
     );
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats!.displayName).toBeUndefined();
   });
 
   it("returns null when the query fails", async () => {
     mockedQueries.fetchContributionData.mockResolvedValue(null);
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats).toBeNull();
   });
 
@@ -175,7 +176,7 @@ describe("fetchStats90d", () => {
     });
     mockedQueries.fetchContributionData.mockResolvedValue(data);
 
-    const stats = await fetchStats90d("test-user", "gho_token");
+    const stats = await fetchStats("test-user", "gho_token");
     expect(stats!.activeDays).toBe(10);
   });
 });

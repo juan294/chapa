@@ -34,11 +34,11 @@ describe("Studio page (server component)", () => {
 
   describe("data fetching", () => {
     it("fetches user stats", () => {
-      expect(SOURCE).toContain("getStats90d");
+      expect(SOURCE).toContain("getStats");
     });
 
     it("computes impact score", () => {
-      expect(SOURCE).toContain("computeImpactV3");
+      expect(SOURCE).toContain("computeImpactV4");
     });
 
     it("loads saved badge config", () => {

@@ -461,7 +461,7 @@ For both `--token` and `--emu-token`:
 
 ### What data is collected
 
-The CLI reads the following from your EMU account (last 90 days):
+The CLI reads the following from your EMU account (last 12 months):
 
 - Contribution calendar (commit counts per day)
 - Pull requests authored (count, additions, deletions, files changed)

@@ -1,8 +1,9 @@
-import type { RawContributionData, Stats90d, HeatmapDay } from "./types";
+import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
+import { PR_WEIGHT_AGG_CAP } from "./constants";
 
 /**
- * Transform raw GitHub GraphQL contribution data into a Stats90d object.
+ * Transform raw GitHub GraphQL contribution data into a StatsData object.
  *
  * This is a pure function — deterministic output for a given input
  * (except for `fetchedAt` which uses the current time).
@@ -10,7 +11,7 @@ import { computePrWeight } from "./scoring";
  * Input shape: `RawContributionData` where PR nodes are already unwrapped
  * (i.e. null nodes filtered out by the caller — see `queries.ts` and `fetch-emu.ts`).
  */
-export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
+export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // 1. Flatten heatmap from weeks -> HeatmapDay[]
   const heatmapData: HeatmapDay[] = [];
   for (const week of raw.contributionCalendar.weeks) {
@@ -30,7 +31,7 @@ export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
   const prsMergedCount = mergedPRs.length;
   const prsMergedWeight = Math.min(
     mergedPRs.reduce((sum, pr) => sum + computePrWeight(pr), 0),
-    40,
+    PR_WEIGHT_AGG_CAP,
   );
 
   // 5. Lines added/deleted from merged PRs
@@ -61,6 +62,20 @@ export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
   const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
   const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
 
+  // 10. Total stars, forks, and watchers across owned repos
+  const totalStars = raw.ownedRepoStars.nodes.reduce(
+    (sum, r) => sum + r.stargazerCount,
+    0,
+  );
+  const totalForks = raw.ownedRepoStars.nodes.reduce(
+    (sum, r) => sum + r.forkCount,
+    0,
+  );
+  const totalWatchers = raw.ownedRepoStars.nodes.reduce(
+    (sum, r) => sum + r.watchers.totalCount,
+    0,
+  );
+
   return {
     handle: raw.login,
     displayName: raw.name ?? undefined,
@@ -76,6 +91,9 @@ export function buildStats90dFromRaw(raw: RawContributionData): Stats90d {
     reposContributed,
     topRepoShare,
     maxCommitsIn10Min,
+    totalStars,
+    totalForks,
+    totalWatchers,
     heatmapData,
     fetchedAt: new Date().toISOString(),
   };

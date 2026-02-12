@@ -37,8 +37,12 @@ const HEATMAP_COLORS: Record<number, string> = {
 
 const FEATURES = [
   {
-    title: "IMPACT SCORE V3",
-    description: "Commits, PRs, reviews — 90 days of real activity, one score.",
+    title: "FOUR DIMENSIONS",
+    description: "Building, Guarding, Consistency, Breadth — what kind of developer you are, not just how much code you write.",
+  },
+  {
+    title: "DEVELOPER ARCHETYPE",
+    description: "Builder, Guardian, Marathoner, Polymath — your profile shape tells a story.",
   },
   {
     title: "CONFIDENCE RATING",
@@ -52,13 +56,14 @@ const FEATURES = [
 
 const STEPS = [
   { number: "01", title: "Sign in with GitHub", description: "OAuth login — we only request access to public data." },
-  { number: "02", title: "We crunch the numbers", description: "90 days of activity → Impact Score + Confidence rating." },
+  { number: "02", title: "We build your profile", description: "12 months of activity → 4 dimensions, archetype, and composite score." },
   { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere." },
 ];
 
 const STATS = [
   { value: "12,400+", label: "badges generated" },
-  { value: "4", label: "impact tiers" },
+  { value: "6", label: "archetypes" },
+  { value: "4", label: "dimensions" },
   { value: "90", label: "days analyzed" },
 ];
 
@@ -137,27 +142,21 @@ export default async function Home({
               <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[0.95]">
                 Developer Impact
                 <br />
-                <span className="text-amber">Badge</span>
+                <span className="text-amber">Profile</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> Analyzes 90 days of GitHub activity.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Generates a live, embeddable SVG badge.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Impact Score + Confidence + Tier.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions showing what kind of developer you are.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Not just how much code you write.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Archetype + Dimensions + Confidence.</p>
               </div>
-              <div className="pt-4 flex flex-col sm:flex-row items-start gap-3">
+              <div className="pt-4">
                 <a
                   href="/api/auth/login"
-                  className="group flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                 >
                   <GitHubIcon className="w-4 h-4" />
                   Get Your Badge
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </a>
-                <a
-                  href="#badge-preview"
-                  className="flex items-center gap-2 rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary"
-                >
-                  See Example
                 </a>
               </div>
             </div>
@@ -171,7 +170,7 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke">
               {/* Badge card — always dark */}
-              <div className="relative rounded-xl border border-stroke bg-[#111118] shadow-2xl shadow-black/30 overflow-hidden">
+              <div data-theme="dark" className="relative rounded-xl border border-stroke bg-card shadow-2xl shadow-black/30 overflow-hidden">
                 <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-amber/30 to-transparent animate-shimmer" />
 
                 <div className="p-6 md:p-8">
@@ -182,75 +181,109 @@ export default async function Home({
                         <GitHubIcon className="w-5 h-5 text-amber" />
                       </div>
                       <div>
-                        <p className="font-semibold text-text-primary">@developer</p>
-                        <p className="text-sm text-text-secondary">Last 90 days</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-text-primary">@developer</p>
+                          {/* Verified placeholder — visual only, logic not implemented yet */}
+                          <svg className="w-3.5 h-3.5 text-amber opacity-40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-text-secondary">Last 12 months</p>
                       </div>
                     </div>
-                    <span className="text-sm font-heading text-text-secondary/50 tracking-tight">
-                      Chapa<span className="text-amber">.</span>
+                    <span className="text-sm font-heading text-text-primary/60 tracking-tight">
+                      Chapa<span className="text-amber">_</span>
                     </span>
                   </div>
 
                   {/* Body */}
                   <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
                     {/* Heatmap */}
-                    <div className="flex-shrink-0">
-                      <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-2">
                         Activity
                       </p>
-                      <div className="flex gap-[3px]">
-                        {HEATMAP.map((week, wi) => (
-                          <div key={wi} className="flex flex-col gap-[3px]">
-                            {week.map((level, di) => (
-                              <div
-                                key={`${wi}-${di}`}
-                                className={`w-[10px] h-[10px] rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
-                              />
-                            ))}
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-13 grid-rows-7 grid-flow-col gap-1">
+                        {HEATMAP.map((week, wi) =>
+                          week.map((level, di) => (
+                            <div
+                              key={`${wi}-${di}`}
+                              className={`aspect-square rounded-[2px] ${HEATMAP_COLORS[level]} transition-colors`}
+                            />
+                          ))
+                        )}
                       </div>
                     </div>
 
-                    {/* Score */}
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div>
-                        <p className="text-[10px] tracking-widest uppercase text-text-secondary/60 mb-1">
-                          Impact Score
-                        </p>
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-6xl font-heading tracking-tighter text-text-primary">
-                            94
-                          </span>
-                          <div className="flex flex-col gap-1">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-2.5 py-0.5 text-xs font-semibold text-amber">
-                              <StarIcon className="w-3 h-3" />
-                              Elite
-                            </span>
-                            <span className="text-xs text-text-secondary">
-                              87% Confidence
-                            </span>
-                          </div>
-                        </div>
+                    {/* Developer Profile — radar + archetype + composite */}
+                    <div className="w-[40%] sm:w-[320px] flex-shrink-0 flex flex-col">
+                      <p className="text-[10px] tracking-widest uppercase text-text-primary/50 mb-1">
+                        Developer Profile
+                      </p>
+
+                      {/* Radar chart mock */}
+                      <div className="flex justify-center my-2">
+                        <svg viewBox="0 0 140 140" width="120" height="120" aria-hidden="true">
+                          {[0.25, 0.5, 0.75, 1].map((s) => (
+                            <polygon key={s} points={`70,${70-55*s} ${70+55*s},70 70,${70+55*s} ${70-55*s},70`} fill="none" stroke="rgba(124,106,239,0.12)" strokeWidth="1" />
+                          ))}
+                          <line x1="70" y1="15" x2="70" y2="125" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
+                          <line x1="15" y1="70" x2="125" y2="70" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
+                          <polygon points="70,22 115,70 70,105 35,70" fill="rgba(124,106,239,0.20)" stroke="#7C6AEF" strokeWidth="1.5" />
+                          <circle cx="70" cy="22" r="3" fill="#7C6AEF" />
+                          <circle cx="115" cy="70" r="3" fill="#7C6AEF" />
+                          <circle cx="70" cy="105" r="3" fill="#7C6AEF" />
+                          <circle cx="35" cy="70" r="3" fill="#7C6AEF" />
+                        </svg>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary/70">
-                        <span>847 commits</span>
-                        <span className="text-text-secondary/30">|</span>
-                        <span>42 PRs merged</span>
-                        <span className="text-text-secondary/30">|</span>
-                        <span>28 reviews</span>
+                      {/* Archetype pill + composite + tier */}
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/20 px-3 py-1 text-xs font-semibold text-amber">
+                          <StarIcon className="w-3 h-3" />
+                          Builder
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-heading tracking-tighter text-text-primary leading-none">
+                            82
+                          </span>
+                          <span className="text-xs font-semibold text-amber">
+                            High
+                          </span>
+                        </div>
+                        <span className="text-xs text-text-primary/70">
+                          87% Confidence
+                        </span>
+                      </div>
+
+                      {/* Dimension cards */}
+                      <div className="mt-4 grid grid-cols-4 gap-2">
+                        {[
+                          { score: 88, label: "Build" },
+                          { score: 72, label: "Guard" },
+                          { score: 80, label: "Consist" },
+                          { score: 65, label: "Breadth" },
+                        ].map((d) => (
+                          <div key={d.label} className="rounded-lg bg-white/[0.04] border border-white/[0.06] px-2 py-2 text-center">
+                            <span className="block text-lg font-heading font-bold tracking-tight text-text-primary leading-none">
+                              {d.score}
+                            </span>
+                            <span className="block text-[8px] uppercase tracking-wider text-text-secondary mt-1">
+                              {d.label}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
 
                   {/* Footer */}
                   <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] text-text-secondary/60">
-                      <GitHubIcon className="w-3 h-3" />
+                    <div className="flex items-center gap-2 text-xs text-text-primary/50">
+                      <GitHubIcon className="w-3.5 h-3.5" />
                       <span>Powered by GitHub</span>
                     </div>
-                    <span className="text-[10px] text-text-secondary/60 font-heading">
+                    <span className="text-xs text-text-primary/50 font-heading">
                       chapa.thecreativetoken.com
                     </span>
                   </div>
@@ -341,9 +374,90 @@ export default async function Home({
             </div>
           </section>
 
+          {/* ── Enterprise: $ chapa enterprise ────────────── */}
+          <h2 className="sr-only">Enterprise</h2>
+          <section className="animate-fade-in-up [animation-delay:900ms]">
+            <div className="flex items-center gap-2 mb-6 font-heading text-sm">
+              <span className="text-terminal-dim select-none">$</span>
+              <span className="text-text-secondary">chapa enterprise</span>
+            </div>
+            <div className="pl-4 border-l border-stroke space-y-5">
+              <div>
+                <h3 className="font-heading text-lg tracking-tight text-text-primary">
+                  GitHub <span className="text-amber">Enterprise Managed Users</span>
+                </h3>
+                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl">
+                  Work at a company that uses GitHub Enterprise? Your corporate contributions
+                  (commits, PRs, reviews) live in a separate EMU namespace and don&apos;t show up
+                  on your personal profile. Chapa can merge them into your badge.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
+                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
+                  <span className="ml-2 text-xs text-terminal-dim font-heading">
+                    terminal
+                  </span>
+                </div>
+                <div className="p-4 font-heading text-sm leading-relaxed space-y-1">
+                  <p>
+                    <span className="text-terminal-dim select-none">$ </span>
+                    <span className="text-text-primary/80">npx @chapa/cli</span>
+                  </p>
+                  <p className="text-terminal-green">
+                    <span className="text-terminal-dim select-none">&gt; </span>
+                    Authenticated as @developer
+                  </p>
+                  <p className="text-terminal-green">
+                    <span className="text-terminal-dim select-none">&gt; </span>
+                    Found EMU account: @developer_company
+                  </p>
+                  <p className="text-terminal-green">
+                    <span className="text-terminal-dim select-none">&gt; </span>
+                    Merged 312 enterprise contributions into badge
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                    WHAT IT DOES
+                  </span>
+                  <span className="text-text-secondary text-sm">
+                    Links your EMU stats with your personal GitHub — one unified badge.
+                  </span>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                    HOW TO USE
+                  </span>
+                  <span className="text-text-secondary text-sm">
+                    Run{" "}
+                    <code className="font-heading text-text-primary/80 bg-amber/10 px-1.5 py-0.5 rounded text-xs">
+                      npx @chapa/cli
+                    </code>{" "}
+                    and follow the prompts. Takes under a minute.
+                  </span>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                    NO EMU?
+                  </span>
+                  <span className="text-text-secondary text-sm">
+                    No problem — the CLI also works for supplemental stats and manual overrides.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* ── Stats: $ chapa stats ──────────────────────── */}
           <h2 className="sr-only">Stats</h2>
-          <section id="stats" className="animate-fade-in-up [animation-delay:1000ms]">
+          <section id="stats" className="animate-fade-in-up [animation-delay:1100ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa stats</span>
@@ -367,7 +481,7 @@ export default async function Home({
 
           {/* ── CTA: $ chapa login ────────────────────────── */}
           <h2 className="sr-only">Get Started</h2>
-          <section className="animate-fade-in-up [animation-delay:1200ms]">
+          <section className="animate-fade-in-up [animation-delay:1300ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa login</span>
@@ -398,7 +512,7 @@ export default async function Home({
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <span className="font-heading text-sm tracking-tight text-text-primary">
-                Chapa<span className="text-amber">.</span>
+                Chapa<span className="text-amber">_</span>
               </span>
               <span className="text-xs text-text-secondary">
                 Built for developers, by developers.

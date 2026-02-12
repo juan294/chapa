@@ -52,10 +52,10 @@ export function isValidBadgeConfig(value: unknown): boolean {
 }
 
 /**
- * Structural validation for uploaded Stats90d.
+ * Structural validation for uploaded StatsData.
  * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
  */
-export function isValidStats90dShape(value: unknown): boolean {
+export function isValidStatsShape(value: unknown): boolean {
   if (value == null || typeof value !== "object") return false;
   const obj = value as Record<string, unknown>;
 
@@ -82,7 +82,7 @@ export function isValidStats90dShape(value: unknown): boolean {
   }
 
   if (!Array.isArray(obj.heatmapData)) return false;
-  if (obj.heatmapData.length > 91) return false; // 13 weeks × 7 days
+  if (obj.heatmapData.length > 371) return false; // 53 weeks × 7 days
   for (const entry of obj.heatmapData) {
     if (
       entry == null ||

@@ -19,13 +19,13 @@ This document explains Chapa's Impact Score calculation, security model, verific
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 90 days** of GitHub activity and produces a single **Impact Score** (0-100) with a **Confidence** rating (50-100). The score reflects the quality and breadth of contributions, not just volume.
+Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a single **Impact Score** (0-100) with a **Confidence** rating (50-100). The score reflects the quality and breadth of contributions, not just volume.
 
 ### Signals we track
 
 | Signal | What it measures | Why it matters |
 |--------|-----------------|----------------|
-| **Commits** | Total contributions in 90 days | Baseline activity level |
+| **Commits** | Total contributions in 12 months | Baseline activity level |
 | **PR Weight** | Merged pull requests, weighted by size and complexity | Quality of code contributions |
 | **Code Reviews** | Reviews submitted on others' PRs | Collaboration and mentorship |
 | **Issues Closed** | Issues resolved | Problem-solving activity |
@@ -62,11 +62,11 @@ This produces a value between 0 and 1. The logarithmic curve means:
 
 | Signal | Cap | Rationale |
 |--------|-----|-----------|
-| Commits | 200 | ~2.2/day average is strong; more adds no extra credit |
-| PR Weight | 40 | Weighted by complexity, not count; cap prevents inflation |
-| Reviews | 60 | Encourages collaboration without requiring extreme volume |
-| Issues | 30 | Meaningful issue resolution, not ticket churn |
-| Repos | 10 | Cross-project work beyond 10 repos is fully credited |
+| Commits | 600 | ~1.6/day average is strong; more adds no extra credit |
+| PR Weight | 120 | Weighted by complexity, not count; cap prevents inflation |
+| Reviews | 180 | Encourages collaboration without requiring extreme volume |
+| Issues | 80 | Meaningful issue resolution, not ticket churn |
+| Repos | 15 | Cross-project work beyond 15 repos is fully credited |
 
 ### Step 2: Weighted sum
 
@@ -76,7 +76,7 @@ Each normalized signal is multiplied by a weight reflecting its importance:
 |--------|--------|-----------|
 | PR Weight | **33%** | Merged PRs with meaningful changes are the strongest signal |
 | Reviews | **22%** | Reviewing others' code demonstrates expertise and collaboration |
-| Streak (active days) | **13%** | Consistency matters; 45 active days out of 90 is solid |
+| Streak (active days) | **13%** | Consistency matters; 180 active days out of 365 is solid |
 | Commits | **12%** | Raw commit count is a weaker signal (easy to inflate) |
 | Issues | **10%** | Issue resolution shows end-to-end ownership |
 | Collaboration (repos) | **10%** | Cross-project work shows breadth |
@@ -93,7 +93,7 @@ w = 0.5 + 0.25 * ln(1 + filesChanged) + 0.25 * ln(1 + additions + deletions)
 
 - Minimum weight: 0.5 (even a tiny PR counts for something)
 - Maximum weight per PR: 3.0 (prevents a single massive PR from dominating)
-- Total PR weight is capped at 40 across all PRs
+- Total PR weight is capped at 120 across all PRs
 
 This means:
 - A 1-file PR touching 10 lines: weight ~0.9
@@ -280,7 +280,7 @@ When supplemental data exists, the merge is straightforward:
 |-------|---------------|
 | Commits, PRs, reviews, issues | **Summed** |
 | Lines added/deleted | **Summed** |
-| PR weight | **Summed**, capped at 40 |
+| PR weight | **Summed**, capped at 120 |
 | Repos contributed to | **Summed** |
 | Heatmap | **Merged by date** (overlapping days are summed) |
 | Active days | **Recomputed** from merged heatmap |
@@ -371,7 +371,7 @@ Since badges are embeddable SVGs, all user-controlled text (handles, display nam
 ## FAQ
 
 **Q: Can I inflate my score by uploading fake EMU stats?**
-A: The same caps and logarithmic normalization apply. Even if you claimed 10,000 commits, the cap of 200 means anything over 200 has zero effect. And the -5 confidence penalty is applied automatically, signaling that part of the data is unverified.
+A: The same caps and logarithmic normalization apply. Even if you claimed 10,000 commits, the cap of 600 means anything over 600 has zero effect. And the -5 confidence penalty is applied automatically, signaling that part of the data is unverified.
 
 **Q: Why does supplemental data reduce my confidence?**
 A: Because Chapa's server cannot independently verify EMU data (the enterprise API is walled off). The -5 penalty is minimal and the messaging is clear: "Includes activity from a linked account that cannot be independently verified." This is transparency, not punishment.

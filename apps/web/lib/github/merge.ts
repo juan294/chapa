@@ -1,11 +1,12 @@
-import type { Stats90d, HeatmapDay } from "@chapa/shared";
+import type { StatsData, HeatmapDay } from "@chapa/shared";
+import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
 
 /**
  * Merge primary GitHub stats with supplemental stats (e.g. from an EMU account).
  *
  * Rules:
  * - Numeric counts: summed
- * - prsMergedWeight: summed, capped at 40
+ * - prsMergedWeight: summed, capped at PR_WEIGHT_AGG_CAP (120)
  * - heatmapData: merged by date (same date → sum counts), sorted chronologically
  * - activeDays: recomputed from merged heatmap
  * - topRepoShare: approximated — max(P*shareP, S*shareS) / (P+S)
@@ -15,9 +16,9 @@ import type { Stats90d, HeatmapDay } from "@chapa/shared";
  * - Sets hasSupplementalData: true
  */
 export function mergeStats(
-  primary: Stats90d,
-  supplemental: Stats90d,
-): Stats90d {
+  primary: StatsData,
+  supplemental: StatsData,
+): StatsData {
   const mergedHeatmap = mergeHeatmap(primary.heatmapData, supplemental.heatmapData);
   const activeDays = mergedHeatmap.filter((d) => d.count > 0).length;
 
@@ -38,13 +39,16 @@ export function mergeStats(
     commitsTotal: totalCommits,
     activeDays,
     prsMergedCount: primary.prsMergedCount + supplemental.prsMergedCount,
-    prsMergedWeight: Math.min(primary.prsMergedWeight + supplemental.prsMergedWeight, 40),
+    prsMergedWeight: Math.min(primary.prsMergedWeight + supplemental.prsMergedWeight, PR_WEIGHT_AGG_CAP),
     reviewsSubmittedCount: primary.reviewsSubmittedCount + supplemental.reviewsSubmittedCount,
     issuesClosedCount: primary.issuesClosedCount + supplemental.issuesClosedCount,
     linesAdded: primary.linesAdded + supplemental.linesAdded,
     linesDeleted: primary.linesDeleted + supplemental.linesDeleted,
     reposContributed: primary.reposContributed + supplemental.reposContributed,
     topRepoShare,
+    totalStars: Math.max(primary.totalStars, supplemental.totalStars),
+    totalForks: Math.max(primary.totalForks, supplemental.totalForks),
+    totalWatchers: Math.max(primary.totalWatchers, supplemental.totalWatchers),
     maxCommitsIn10Min: Math.max(primary.maxCommitsIn10Min, supplemental.maxCommitsIn10Min),
     microCommitRatio: mergeOptionalMax(primary.microCommitRatio, supplemental.microCommitRatio),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),

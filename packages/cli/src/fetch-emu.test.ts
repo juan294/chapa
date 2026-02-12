@@ -13,7 +13,7 @@ describe("fetchEmuStats", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns Stats90d on successful GraphQL response", async () => {
+  it("returns StatsData on successful GraphQL response", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -75,6 +75,7 @@ describe("fetchEmuStats", () => {
                 },
               ],
             },
+            ownedRepos: { nodes: [{ stargazerCount: 25, forkCount: 5, watchers: { totalCount: 10 } }] },
           },
         },
       }),
@@ -171,6 +172,7 @@ describe("fetchEmuStats", () => {
               issueContributions: { totalCount: 0 },
             },
             repositories: { totalCount: 0, nodes: [] },
+            ownedRepos: { nodes: [] },
           },
         },
       }),

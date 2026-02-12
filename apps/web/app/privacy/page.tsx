@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/Navbar";
+import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -41,10 +42,10 @@ export default function PrivacyPage() {
               2. How We Use Your Information
             </h2>
             <p>
-              We use your GitHub activity data solely to compute your Impact
-              Score and generate your badge. We cache computed scores for up to
-              24 hours to reduce API calls. We do not sell, share, or transfer
-              your data to third parties.
+              We use your GitHub activity data solely to compute your Developer
+              Impact Profile and generate your badge. We cache computed profiles
+              for up to 24 hours to reduce API calls. We do not sell, share, or
+              transfer your data to third parties.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
@@ -90,6 +91,8 @@ export default function PrivacyPage() {
           </div>
         </div>
       </main>
+
+      <GlobalCommandBar />
     </div>
   );
 }

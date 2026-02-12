@@ -1,5 +1,5 @@
-import type { Stats90d, RawContributionData } from "@chapa/shared";
-import { CONTRIBUTION_QUERY, buildStats90dFromRaw } from "@chapa/shared";
+import type { StatsData, RawContributionData } from "@chapa/shared";
+import { CONTRIBUTION_QUERY, buildStatsFromRaw, SCORING_WINDOW_DAYS } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Fetch EMU stats via GraphQL (requires EMU token with auth)
@@ -8,10 +8,10 @@ import { CONTRIBUTION_QUERY, buildStats90dFromRaw } from "@chapa/shared";
 export async function fetchEmuStats(
   login: string,
   emuToken: string,
-): Promise<Stats90d | null> {
+): Promise<StatsData | null> {
   const now = new Date();
   const since = new Date(now);
-  since.setDate(since.getDate() - 90);
+  since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
   try {
     const res = await fetch("https://api.github.com/graphql", {
@@ -79,9 +79,14 @@ export async function fetchEmuStats(
         totalCount: user.repositories.totalCount,
         nodes: user.repositories.nodes,
       },
+      ownedRepoStars: {
+        nodes: (user.ownedRepos?.nodes ?? [])
+          .filter((n: any) => n != null)
+          .map((n: any) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
+      },
     };
 
-    return buildStats90dFromRaw(raw);
+    return buildStatsFromRaw(raw);
   } catch (err) {
     console.error(`[cli] fetch error:`, err);
     return null;

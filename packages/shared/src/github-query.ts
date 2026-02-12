@@ -1,5 +1,5 @@
 /**
- * GitHub GraphQL query for fetching a user's contribution data over 90 days.
+ * GitHub GraphQL query for fetching a user's contribution data over 365 days.
  *
  * Variables:
  * - $login: String! — GitHub username
@@ -59,6 +59,9 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
           }
         }
       }
+    }
+    ownedRepos: repositories(ownerAffiliations: OWNER, first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
+      nodes { stargazerCount forkCount watchers { totalCount } }
     }
   }
 }

@@ -1,0 +1,5 @@
+[allowlist]
+  description = "Known false positives"
+
+  # Fake test token "gho_abc123456789" in OAuth test file (commit 92f354ee)
+  commits = ["92f354ee9bf16c5f186330fb97dfc1b13dda5504"]

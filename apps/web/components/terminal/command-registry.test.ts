@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseCommand,
   executeCommand,
-  createCoreCommands,
+  createNavigationCommands,
   getMatchingCommands,
   resolveCategory,
   makeLine,
@@ -57,17 +57,12 @@ describe("resolveCategory", () => {
 });
 
 describe("executeCommand", () => {
-  const commands = createCoreCommands();
+  const commands = createNavigationCommands();
 
   it("executes /help", () => {
     const result = executeCommand("/help", commands);
     expect(result.lines.length).toBeGreaterThan(0);
     expect(result.lines[0].type).toBe("system");
-  });
-
-  it("executes /clear with clear action", () => {
-    const result = executeCommand("/clear", commands);
-    expect(result.action).toEqual({ type: "clear" });
   });
 
   it("executes /login with navigate action", () => {
@@ -99,56 +94,6 @@ describe("executeCommand", () => {
     expect(result.action).toBeUndefined();
   });
 
-  it("executes /set with valid category", () => {
-    const result = executeCommand("/set bg aurora", commands);
-    expect(result.action).toEqual({
-      type: "set",
-      category: "background",
-      value: "aurora",
-    });
-    expect(result.lines[0].type).toBe("success");
-  });
-
-  it("errors on /set with unknown category", () => {
-    const result = executeCommand("/set unknown value", commands);
-    expect(result.lines[0].type).toBe("error");
-  });
-
-  it("errors on /set without enough args", () => {
-    const result = executeCommand("/set bg", commands);
-    expect(result.lines[0].type).toBe("error");
-  });
-
-  it("executes /preset with valid name", () => {
-    const result = executeCommand("/preset premium", commands);
-    expect(result.action).toEqual({ type: "preset", name: "premium" });
-  });
-
-  it("errors on /preset with invalid name", () => {
-    const result = executeCommand("/preset garbage", commands);
-    expect(result.lines[0].type).toBe("error");
-  });
-
-  it("executes /save", () => {
-    const result = executeCommand("/save", commands);
-    expect(result.action).toEqual({ type: "save" });
-  });
-
-  it("executes /reset", () => {
-    const result = executeCommand("/reset", commands);
-    expect(result.action).toEqual({ type: "reset" });
-  });
-
-  it("executes /embed", () => {
-    const result = executeCommand("/embed", commands);
-    expect(result.lines.length).toBeGreaterThan(0);
-  });
-
-  it("executes /share", () => {
-    const result = executeCommand("/share", commands);
-    expect(result.lines.length).toBeGreaterThan(0);
-  });
-
   it("returns error for unknown command", () => {
     const result = executeCommand("/foobar", commands);
     expect(result.lines[0].type).toBe("error");
@@ -161,15 +106,11 @@ describe("executeCommand", () => {
 });
 
 describe("getMatchingCommands", () => {
-  const commands = createCoreCommands();
+  const commands = createNavigationCommands();
 
   it("returns matching commands for partial input", () => {
     const matches = getMatchingCommands("/s", commands);
     const names = matches.map((m) => m.name);
-    expect(names).toContain("/set");
-    expect(names).toContain("/save");
-    expect(names).toContain("/share");
-    expect(names).toContain("/status");
     expect(names).toContain("/studio");
   });
 
@@ -186,6 +127,116 @@ describe("getMatchingCommands", () => {
     const matchesSt = getMatchingCommands("/st", commands);
     const matchesStu = getMatchingCommands("/stu", commands);
     expect(matchesStu.length).toBeLessThanOrEqual(matchesSt.length);
+  });
+
+  it("matches aliases (/b matches /badge)", () => {
+    const matches = getMatchingCommands("/b", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).toContain("/badge");
+  });
+});
+
+describe("createNavigationCommands", () => {
+  const commands = createNavigationCommands();
+
+  it("returns 8 navigation commands", () => {
+    expect(commands).toHaveLength(8);
+  });
+
+  it("includes all navigation commands", () => {
+    const names = commands.map((c) => c.name);
+    expect(names).toContain("/help");
+    expect(names).toContain("/home");
+    expect(names).toContain("/studio");
+    expect(names).toContain("/login");
+    expect(names).toContain("/badge");
+    expect(names).toContain("/about");
+    expect(names).toContain("/terms");
+    expect(names).toContain("/privacy");
+  });
+
+  it("/help output does NOT mention studio-only commands", () => {
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).not.toContain("/set");
+    expect(allText).not.toContain("/preset");
+    expect(allText).not.toContain("/save");
+    expect(allText).not.toContain("/reset");
+    expect(allText).not.toContain("/embed");
+    expect(allText).not.toContain("/status");
+  });
+
+  it("/help lists all navigation commands", () => {
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("/home");
+    expect(allText).toContain("/studio");
+    expect(allText).toContain("/login");
+    expect(allText).toContain("/badge");
+    expect(allText).toContain("/about");
+    expect(allText).toContain("/terms");
+    expect(allText).toContain("/privacy");
+  });
+
+  it("/home navigates to /", () => {
+    const result = executeCommand("/home", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/" });
+  });
+
+  it("/studio navigates to /studio", () => {
+    const result = executeCommand("/studio", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/studio" });
+  });
+
+  it("/login navigates to /api/auth/login", () => {
+    const result = executeCommand("/login", commands);
+    expect(result.action).toEqual({
+      type: "navigate",
+      path: "/api/auth/login",
+    });
+  });
+
+  it("/badge navigates with handle", () => {
+    const result = executeCommand("/badge juan294", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
+  });
+
+  it("/badge errors without handle", () => {
+    const result = executeCommand("/badge", commands);
+    expect(result.lines[0].type).toBe("error");
+    expect(result.action).toBeUndefined();
+  });
+
+  it("/b alias resolves to /badge", () => {
+    const result = executeCommand("/b juan294", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
+  });
+
+  it("/about navigates to /about", () => {
+    const result = executeCommand("/about", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/about" });
+  });
+
+  it("/terms navigates to /terms", () => {
+    const result = executeCommand("/terms", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/terms" });
+  });
+
+  it("/privacy navigates to /privacy", () => {
+    const result = executeCommand("/privacy", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/privacy" });
+  });
+
+  it("getMatchingCommands returns all 8 for /", () => {
+    const matches = getMatchingCommands("/", commands);
+    expect(matches).toHaveLength(8);
+  });
+
+  it("getMatchingCommands filters correctly", () => {
+    const matches = getMatchingCommands("/b", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).toContain("/badge");
+    expect(names).not.toContain("/studio");
   });
 });
 

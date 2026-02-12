@@ -1,27 +1,30 @@
-/** Daily activity count for heatmap (13 weeks × 7 days = 91 entries) */
+/** Daily activity count for heatmap (up to 53 weeks × 7 days = 371 entries) */
 export interface HeatmapDay {
   date: string; // ISO date string (YYYY-MM-DD)
   count: number;
 }
 
-/** Aggregated GitHub stats over the last 90 days */
-export interface Stats90d {
+/** Aggregated GitHub stats over the last 365 days */
+export interface StatsData {
   handle: string;
   displayName?: string; // GitHub profile name (e.g. "Juan García"), undefined if unset
   avatarUrl?: string; // GitHub avatar URL
-  commitsTotal: number; // cap 200
-  activeDays: number; // 0..90
+  commitsTotal: number; // cap 600
+  activeDays: number; // 0..365
   prsMergedCount: number;
-  prsMergedWeight: number; // cap 40
-  reviewsSubmittedCount: number; // cap 60
-  issuesClosedCount: number; // cap 30
+  prsMergedWeight: number; // cap 120
+  reviewsSubmittedCount: number; // cap 180
+  issuesClosedCount: number; // cap 80
   linesAdded: number;
   linesDeleted: number;
-  reposContributed: number; // cap 10
+  reposContributed: number; // cap 15
   topRepoShare: number; // 0..1
   maxCommitsIn10Min: number; // derived from commit timestamps
   microCommitRatio?: number; // optional, 0..1
   docsOnlyPrRatio?: number; // optional, 0..1
+  totalStars: number; // sum of stargazerCount across owned repos
+  totalForks: number; // sum of forkCount across owned repos
+  totalWatchers: number; // sum of watchers.totalCount across owned repos
   heatmapData: HeatmapDay[];
   fetchedAt: string; // ISO timestamp
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
@@ -43,28 +46,40 @@ export interface ConfidencePenalty {
   reason: string;
 }
 
-/** Normalized score breakdown (each 0..1 before weighting) */
-export interface ScoreBreakdown {
-  commits: number;
-  prWeight: number;
-  reviews: number;
-  issues: number;
-  streak: number;
-  collaboration: number;
-}
-
 /** Impact tier based on adjusted score */
 export type ImpactTier = "Emerging" | "Solid" | "High" | "Elite";
 
-/** Full Impact v3 result */
-export interface ImpactV3Result {
+/** Developer profile type — determines scoring behavior */
+export type ProfileType = "solo" | "collaborative";
+
+/** Four independent dimension scores (each 0..100) */
+export interface DimensionScores {
+  building: number;
+  guarding: number;
+  consistency: number;
+  breadth: number;
+}
+
+/** Developer archetype derived from dimension profile shape */
+export type DeveloperArchetype =
+  | "Builder"
+  | "Guardian"
+  | "Marathoner"
+  | "Polymath"
+  | "Balanced"
+  | "Emerging";
+
+/** Full Impact v4 result */
+export interface ImpactV4Result {
   handle: string;
-  baseScore: number; // 0..100
+  profileType: ProfileType;
+  dimensions: DimensionScores;
+  archetype: DeveloperArchetype;
+  compositeScore: number; // 0..100 — avg of dimensions (3 for solo, 4 for collaborative)
   confidence: number; // 50..100
   confidencePenalties: ConfidencePenalty[];
-  adjustedScore: number; // 0..100
+  adjustedComposite: number; // 0..100
   tier: ImpactTier;
-  breakdown: ScoreBreakdown;
   computedAt: string; // ISO timestamp
 }
 
@@ -102,13 +117,20 @@ export interface RawContributionData {
       } | null;
     }[];
   };
+  ownedRepoStars: {
+    nodes: {
+      stargazerCount: number;
+      forkCount: number;
+      watchers: { totalCount: number };
+    }[];
+  };
 }
 
 /** Supplemental stats uploaded from a linked account (e.g. GitHub EMU) */
 export interface SupplementalStats {
   targetHandle: string; // personal GitHub handle
   sourceHandle: string; // EMU handle
-  stats: Stats90d;
+  stats: StatsData;
   uploadedAt: string; // ISO timestamp
 }
 

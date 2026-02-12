@@ -91,7 +91,7 @@ export function TerminalInput({
 
   return (
     <div
-      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-heading text-sm"
+      className="flex items-center gap-2 border-t border-stroke bg-bg/80 backdrop-blur-sm px-4 py-3 font-terminal text-sm"
       onClick={() => inputRef.current?.focus()}
     >
       <span className="text-amber select-none shrink-0">
@@ -104,7 +104,8 @@ export function TerminalInput({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          className="w-full bg-transparent text-text-primary caret-amber outline-none placeholder:text-terminal-dim"
+          className="terminal-input-bare w-full bg-transparent text-text-primary caret-amber placeholder:text-terminal-dim outline-none focus:ring-0 focus:outline-none border-none"
+          style={{ outline: "none" }}
           placeholder="Type / for commands..."
           aria-label="Terminal command input"
           autoComplete="off"

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function ComingSoonPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-6">
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center bg-bg px-6">
       <div className="max-w-md text-center">
         {/* Logo */}
         <h1 className="font-heading text-4xl font-bold tracking-tight text-text-primary">

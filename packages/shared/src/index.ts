@@ -1,12 +1,14 @@
 export type {
   HeatmapDay,
-  Stats90d,
+  StatsData,
   RawContributionData,
   ConfidenceFlag,
   ConfidencePenalty,
-  ScoreBreakdown,
   ImpactTier,
-  ImpactV3Result,
+  ProfileType,
+  DimensionScores,
+  DeveloperArchetype,
+  ImpactV4Result,
   SupplementalStats,
   BadgeBackground,
   BadgeCardStyle,
@@ -23,4 +25,11 @@ export type {
 export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";
 
 export { CONTRIBUTION_QUERY } from "./github-query";
-export { buildStats90dFromRaw } from "./stats-aggregation";
+export { buildStatsFromRaw } from "./stats-aggregation";
+export { formatCompact } from "./format";
+export {
+  SCORING_WINDOW_DAYS,
+  BADGE_HEATMAP_WEEKS,
+  PR_WEIGHT_AGG_CAP,
+  SCORING_CAPS,
+} from "./constants";

@@ -19,12 +19,12 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("config: BadgeConfig");
     });
 
-    it("accepts Stats90d prop", () => {
-      expect(SOURCE).toContain("stats: Stats90d");
+    it("accepts StatsData prop", () => {
+      expect(SOURCE).toContain("stats: StatsData");
     });
 
-    it("accepts ImpactV3Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV3Result");
+    it("accepts ImpactV4Result prop", () => {
+      expect(SOURCE).toContain("impact: ImpactV4Result");
     });
 
     it("has optional interactive flag", () => {
@@ -96,8 +96,8 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("config.scoreEffect");
     });
 
-    it("renders adjustedScore from impact", () => {
-      expect(SOURCE).toContain("impact.adjustedScore");
+    it("renders adjustedComposite from impact", () => {
+      expect(SOURCE).toContain("impact.adjustedComposite");
     });
   });
 
@@ -127,17 +127,21 @@ describe("BadgePreviewCard", () => {
     });
   });
 
-  describe("stats display", () => {
-    it("renders commit count from stats", () => {
-      expect(SOURCE).toContain("stats.commitsTotal");
+  describe("dimension display", () => {
+    it("renders building dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.building");
     });
 
-    it("renders PR count from stats", () => {
-      expect(SOURCE).toContain("stats.prsMergedCount");
+    it("renders guarding dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.guarding");
     });
 
-    it("renders review count from stats", () => {
-      expect(SOURCE).toContain("stats.reviewsSubmittedCount");
+    it("renders consistency dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.consistency");
+    });
+
+    it("renders breadth dimension score", () => {
+      expect(SOURCE).toContain("impact.dimensions.breadth");
     });
 
     it("supports animated counters", () => {
@@ -197,6 +201,59 @@ describe("BadgePreviewCard", () => {
     it("heatmap has role=img", () => {
       // Delegated to HeatmapGrid but imported
       expect(SOURCE).toContain("HeatmapGrid");
+    });
+  });
+
+  describe("unified badge elements", () => {
+    it("has verified badge icon", () => {
+      // Verified shield SVG path must be present
+      expect(SOURCE).toContain("M12 1L3 5v6c0 5.55");
+    });
+
+    it("has Chapa_ logo text", () => {
+      expect(SOURCE).toContain("Chapa");
+      expect(SOURCE).toMatch(/Chapa.*_/);
+    });
+
+    it("has Powered by GitHub footer", () => {
+      expect(SOURCE).toContain("Powered by GitHub");
+    });
+
+    it("has chapa.thecreativetoken.com URL", () => {
+      expect(SOURCE).toContain("chapa.thecreativetoken.com");
+    });
+
+    it("uses Activity label instead of Contributions", () => {
+      expect(SOURCE).not.toContain('"Contributions"');
+      expect(SOURCE).toContain("Activity");
+    });
+
+    it("shows displayName as primary header when available", () => {
+      expect(SOURCE).toContain("stats.displayName");
+    });
+
+    it("falls back to @handle when no displayName", () => {
+      // Should show @handle as fallback
+      expect(SOURCE).toMatch(/@.*stats\.handle/);
+    });
+  });
+
+  describe("dimension cards", () => {
+    it("has dimension labels", () => {
+      expect(SOURCE).toContain('"Building"');
+      expect(SOURCE).toContain('"Guarding"');
+      expect(SOURCE).toContain('"Consistency"');
+      expect(SOURCE).toContain('"Breadth"');
+    });
+  });
+
+  describe("archetype display", () => {
+    it("renders archetype from impact", () => {
+      expect(SOURCE).toContain("impact.archetype");
+    });
+
+    it("shows Developer Profile label", () => {
+      expect(SOURCE).toContain("Developer Profile");
     });
   });
 });

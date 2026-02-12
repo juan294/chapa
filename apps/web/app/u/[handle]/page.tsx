@@ -1,19 +1,22 @@
-import { getStats90d } from "@/lib/github/client";
-import { computeImpactV3 } from "@/lib/impact/v3";
+import { getStats } from "@/lib/github/client";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
-import { ShareBadgePreview } from "@/components/ShareBadgePreview";
+import { RefreshBadgeButton } from "@/components/RefreshBadgeButton";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
+import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
+import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
+import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
@@ -33,19 +36,19 @@ export async function generateMetadata({
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   return {
-    title: `@${handle} — Developer Impact`,
-    description: `View ${handle}'s developer impact score and badge on Chapa. See commits, PRs, reviews, and impact tier.`,
+    title: `@${handle} — Developer Impact Profile`,
+    description: `View ${handle}'s Developer Impact Profile on Chapa. See their archetype, four dimension scores, and embeddable badge.`,
     openGraph: {
       type: "profile",
-      title: `@${handle} — Chapa Developer Impact`,
-      description: `View ${handle}'s developer impact score and badge on Chapa.`,
+      title: `@${handle} — Chapa Developer Impact Profile`,
+      description: `View ${handle}'s Developer Impact Profile and badge on Chapa.`,
       url: pageUrl,
       images: [`/u/${handle}/badge.svg`],
     },
     twitter: {
       card: "summary_large_image",
-      title: `@${handle} — Chapa Developer Impact`,
-      description: `View ${handle}'s developer impact score and badge on Chapa.`,
+      title: `@${handle} — Chapa Developer Impact Profile`,
+      description: `View ${handle}'s Developer Impact Profile and badge on Chapa.`,
       images: [`/u/${handle}/badge.svg`],
     },
     alternates: {
@@ -95,10 +98,10 @@ export default async function SharePage({ params }: SharePageProps) {
 
   // Fetch stats + saved config in parallel
   const [stats, savedConfig] = await Promise.all([
-    getStats90d(handle, token),
+    getStats(handle, token),
     cacheGet<BadgeConfig>(`config:${handle}`),
   ]);
-  const impact = stats ? computeImpactV3(stats) : null;
+  const impact = stats ? computeImpactV4(stats) : null;
 
   const isOwner = sessionLogin !== null && sessionLogin === handle;
   const useInteractivePreview = hasCustomConfig(savedConfig) && stats && impact;
@@ -116,27 +119,32 @@ export default async function SharePage({ params }: SharePageProps) {
     sameAs: [`https://github.com/${handle}`],
     ...(impact
       ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedScore} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
+          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
         }
       : {}),
   };
 
   return (
     <main id="main-content" className="min-h-screen bg-bg">
+      <SharePageShortcuts
+        embedMarkdown={embedMarkdown}
+        handle={handle}
+        isOwner={isOwner}
+      />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd).replace(/</g, '\\u003c') }}
       />
 
       <Navbar />
 
-      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-16">
-        <h1 className="sr-only">@{handle} — Developer Impact</h1>
+      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-24">
+        <h1 className="sr-only">@{handle} — Developer Impact Profile</h1>
 
         {/* Badge preview — interactive if user has custom config, static SVG otherwise */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">
           {useInteractivePreview ? (
-            <ShareBadgePreview
+            <ShareBadgePreviewLazy
               config={savedConfig}
               stats={stats}
               impact={impact}
@@ -155,9 +163,9 @@ export default async function SharePage({ params }: SharePageProps) {
           )}
         </div>
 
-        {/* Customize Badge CTA — only for badge owner */}
+        {/* Owner actions — Customize + Refresh */}
         {isOwner && (
-          <div className="mb-8 animate-fade-in-up [animation-delay:250ms]">
+          <div className="mb-8 flex items-center gap-4 animate-fade-in-up [animation-delay:250ms]">
             <Link
               href="/studio"
               className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
@@ -176,6 +184,7 @@ export default async function SharePage({ params }: SharePageProps) {
               </svg>
               Customize Badge
             </Link>
+            <RefreshBadgeButton handle={handle} />
           </div>
         )}
 
@@ -184,9 +193,9 @@ export default async function SharePage({ params }: SharePageProps) {
           <section className="mb-12 animate-fade-in-up [animation-delay:300ms]">
             <div className="rounded-2xl border border-stroke bg-card p-8">
               <h2 className="font-heading text-sm tracking-widest uppercase text-amber mb-6">
-                Impact Breakdown
+                Profile Breakdown
               </h2>
-              <ImpactBreakdown impact={impact} />
+              <ImpactBreakdown impact={impact} totalStars={stats?.totalStars} />
             </div>
           </section>
         ) : (
@@ -212,7 +221,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-sm text-text-secondary">Markdown</span>
                 <CopyButton text={embedMarkdown} />
               </div>
-              <pre className="overflow-x-auto rounded-xl border border-black/10 bg-[#1A1A2E] p-4 text-sm text-[#9AA4B2] font-heading">
+              <pre className="overflow-x-auto rounded-xl border border-stroke bg-dark-card p-4 text-sm text-text-secondary font-heading">
                 {embedMarkdown}
               </pre>
             </div>
@@ -223,7 +232,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-sm text-text-secondary">HTML</span>
                 <CopyButton text={embedHtml} />
               </div>
-              <pre className="overflow-x-auto rounded-xl border border-black/10 bg-[#1A1A2E] p-4 text-sm text-[#9AA4B2] font-heading">
+              <pre className="overflow-x-auto rounded-xl border border-stroke bg-dark-card p-4 text-sm text-text-secondary font-heading">
                 {embedHtml}
               </pre>
             </div>
@@ -241,6 +250,8 @@ export default async function SharePage({ params }: SharePageProps) {
           </Link>
         </div>
       </div>
+
+      <GlobalCommandBar />
     </main>
   );
 }

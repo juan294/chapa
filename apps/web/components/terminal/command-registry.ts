@@ -63,60 +63,54 @@ export function resolveCategory(input: string): string | null {
   return null;
 }
 
-export function createCoreCommands(): CommandDef[] {
+/** Navigation commands available on all pages (global command bar). */
+export function createNavigationCommands(): CommandDef[] {
   return [
     {
       name: "/help",
-      description: "List all commands",
+      description: "List available commands",
       execute: () => ({
         lines: [
           makeLine("system", "Available commands:"),
-          makeLine("info", "  /help              List all commands"),
-          makeLine("info", "  /set <cat> <val>   Set badge config field"),
-          makeLine("info", "  /preset <name>     Apply preset (minimal/premium/holographic/maximum)"),
-          makeLine("info", "  /save              Save configuration"),
-          makeLine("info", "  /reset             Reset to defaults"),
-          makeLine("info", "  /embed             Show embed snippets"),
-          makeLine("info", "  /share             Show share links"),
-          makeLine("info", "  /status            Show current config summary"),
-          makeLine("info", "  /clear             Clear output"),
-          makeLine("info", "  /login             Go to GitHub login"),
-          makeLine("info", "  /studio            Go to Creator Studio"),
-          makeLine("info", "  /badge <handle>    Go to share page"),
-          makeLine("dim", ""),
-          makeLine("dim", "Category aliases for /set:"),
-          makeLine("dim", "  bg, card, border, score, heatmap, interact, stats, tier, celebrate"),
+          makeLine("info", "  /help              List available commands"),
+          makeLine("info", "  /home              Go to home page"),
+          makeLine("info", "  /studio            Open Creator Studio"),
+          makeLine("info", "  /login             Sign in with GitHub"),
+          makeLine("info", "  /badge <handle>    View a developer badge"),
+          makeLine("info", "  /about             About Chapa"),
+          makeLine("info", "  /terms             Terms of Service"),
+          makeLine("info", "  /privacy           Privacy Policy"),
         ],
       }),
     },
     {
-      name: "/clear",
-      description: "Clear output",
+      name: "/home",
+      description: "Go to home page",
       execute: () => ({
-        lines: [],
-        action: { type: "clear" },
-      }),
-    },
-    {
-      name: "/login",
-      description: "Navigate to GitHub login",
-      execute: () => ({
-        lines: [makeLine("system", "Redirecting to GitHub login...")],
-        action: { type: "navigate", path: "/api/auth/login" },
+        lines: [makeLine("system", "Going home...")],
+        action: { type: "navigate", path: "/" },
       }),
     },
     {
       name: "/studio",
-      description: "Navigate to Creator Studio",
+      description: "Open Creator Studio",
       execute: () => ({
         lines: [makeLine("system", "Opening Creator Studio...")],
         action: { type: "navigate", path: "/studio" },
       }),
     },
     {
+      name: "/login",
+      description: "Sign in with GitHub",
+      execute: () => ({
+        lines: [makeLine("system", "Redirecting to GitHub login...")],
+        action: { type: "navigate", path: "/api/auth/login" },
+      }),
+    },
+    {
       name: "/badge",
       aliases: ["/b"],
-      description: "Navigate to share page",
+      description: "View a developer badge",
       usage: "/badge <handle>",
       execute: (args) => {
         if (args.length === 0) {
@@ -132,113 +126,27 @@ export function createCoreCommands(): CommandDef[] {
       },
     },
     {
-      name: "/set",
-      description: "Set badge config field",
-      usage: "/set <category> <value>",
-      execute: (args) => {
-        if (args.length < 2) {
-          return {
-            lines: [
-              makeLine("error", "Usage: /set <category> <value>"),
-              makeLine("dim", "Example: /set bg aurora"),
-            ],
-          };
-        }
-        const catInput = args[0];
-        const value = args[1];
-        const resolved = resolveCategory(catInput);
-
-        if (!resolved) {
-          return {
-            lines: [
-              makeLine("error", `Unknown category: ${catInput}`),
-              makeLine("dim", "Valid: bg, card, border, score, heatmap, interact, stats, tier, celebrate"),
-            ],
-          };
-        }
-
-        return {
-          lines: [makeLine("success", `${resolved} → ${value}`)],
-          action: { type: "set", category: resolved, value },
-        };
-      },
-    },
-    {
-      name: "/preset",
-      description: "Apply a preset",
-      usage: "/preset <name>",
-      execute: (args) => {
-        if (args.length === 0) {
-          return {
-            lines: [
-              makeLine("error", "Usage: /preset <name>"),
-              makeLine("dim", "Available: minimal, premium, holographic, maximum"),
-            ],
-          };
-        }
-        const name = args[0].toLowerCase();
-        const valid = ["minimal", "premium", "holographic", "maximum"];
-        if (!valid.includes(name)) {
-          return {
-            lines: [
-              makeLine("error", `Unknown preset: ${name}`),
-              makeLine("dim", `Available: ${valid.join(", ")}`),
-            ],
-          };
-        }
-        return {
-          lines: [makeLine("success", `Applied preset: ${name}`)],
-          action: { type: "preset", name },
-        };
-      },
-    },
-    {
-      name: "/save",
-      description: "Save configuration",
+      name: "/about",
+      description: "About Chapa",
       execute: () => ({
-        lines: [makeLine("system", "Saving configuration...")],
-        action: { type: "save" },
+        lines: [makeLine("system", "Opening about page...")],
+        action: { type: "navigate", path: "/about" },
       }),
     },
     {
-      name: "/reset",
-      description: "Reset to defaults",
+      name: "/terms",
+      description: "Terms of Service",
       execute: () => ({
-        lines: [makeLine("warning", "Configuration reset to defaults.")],
-        action: { type: "reset" },
+        lines: [makeLine("system", "Opening terms...")],
+        action: { type: "navigate", path: "/terms" },
       }),
     },
     {
-      name: "/embed",
-      description: "Show embed snippets",
+      name: "/privacy",
+      description: "Privacy Policy",
       execute: () => ({
-        lines: [
-          makeLine("system", "Embed your badge:"),
-          makeLine("dim", ""),
-          makeLine("info", "Markdown:"),
-          makeLine("success", "![Chapa Badge](https://chapa.thecreativetoken.com/u/YOUR_HANDLE/badge.svg)"),
-          makeLine("dim", ""),
-          makeLine("info", "HTML:"),
-          makeLine("success", '<img src="https://chapa.thecreativetoken.com/u/YOUR_HANDLE/badge.svg" alt="Chapa Badge" width="600" />'),
-        ],
-      }),
-    },
-    {
-      name: "/share",
-      description: "Show share links",
-      execute: () => ({
-        lines: [
-          makeLine("system", "Share your badge:"),
-          makeLine("info", "Direct link: https://chapa.thecreativetoken.com/u/YOUR_HANDLE"),
-          makeLine("info", "Badge SVG:   https://chapa.thecreativetoken.com/u/YOUR_HANDLE/badge.svg"),
-        ],
-      }),
-    },
-    {
-      name: "/status",
-      description: "Show current config summary",
-      execute: () => ({
-        lines: [makeLine("dim", "Use /status in Creator Studio to see config.")],
+        lines: [makeLine("system", "Opening privacy policy...")],
+        action: { type: "navigate", path: "/privacy" },
       }),
     },
   ];

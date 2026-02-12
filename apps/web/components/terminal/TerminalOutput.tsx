@@ -39,7 +39,7 @@ export function TerminalOutput({ lines }: TerminalOutputProps) {
       role="log"
       aria-live="polite"
       aria-label="Terminal output"
-      className="flex-1 overflow-y-auto font-heading text-sm leading-relaxed p-4 space-y-0.5"
+      className="flex-1 overflow-y-auto font-terminal text-sm leading-relaxed p-4 space-y-0.5"
     >
       {lines.map((line) => (
         <div

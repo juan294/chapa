@@ -635,7 +635,7 @@ export default function GlassmorphismExperimentPage() {
               label="Consistency"
               value={10}
               maxValue={10}
-              detail="78 out of 90 days active. Strong sustained engagement over the full evaluation period."
+              detail="310 out of 365 days active. Strong sustained engagement over the full evaluation period."
               style={presetToStyle("medium", showBorder)}
             />
           </div>

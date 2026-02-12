@@ -58,13 +58,13 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 
 /**
  * Set a cached value with optional TTL.
- * Defaults to 24 hours (86 400 seconds). Pass 0 for no expiry (persistent).
+ * Defaults to 6 hours (21 600 seconds). Pass 0 for no expiry (persistent).
  * Silently no-ops if Redis is unavailable.
  */
 export async function cacheSet<T>(
   key: string,
   value: T,
-  ttlSeconds: number = 86400,
+  ttlSeconds: number = 21600,
 ): Promise<void> {
   const redis = getRedis();
   if (!redis) return;

@@ -1,5 +1,5 @@
 import type { RawContributionData } from "@chapa/shared";
-import { CONTRIBUTION_QUERY } from "@chapa/shared";
+import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
 
 // Re-export for consumers that import from this module
 export type { RawContributionData };
@@ -14,7 +14,7 @@ export async function fetchContributionData(
 ): Promise<RawContributionData | null> {
   const now = new Date();
   const since = new Date(now);
-  since.setDate(since.getDate() - 90);
+  since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -80,6 +80,11 @@ export async function fetchContributionData(
       repositories: {
         totalCount: user.repositories.totalCount,
         nodes: user.repositories.nodes,
+      },
+      ownedRepoStars: {
+        nodes: ((user.ownedRepos?.nodes ?? []) as { stargazerCount: number; forkCount: number; watchers: { totalCount: number } }[])
+          .filter((n): n is { stargazerCount: number; forkCount: number; watchers: { totalCount: number } } => n != null)
+          .map((n) => ({ stargazerCount: n.stargazerCount, forkCount: n.forkCount, watchers: { totalCount: n.watchers.totalCount } })),
       },
     };
   } catch (err) {

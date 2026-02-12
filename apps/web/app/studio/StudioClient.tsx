@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { BadgeConfig, Stats90d, ImpactV3Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
@@ -17,11 +17,12 @@ import {
   type OutputLine,
   type CommandAction,
 } from "@/components/terminal/command-registry";
+import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsProvider";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
-  stats: Stats90d;
-  impact: ImpactV3Result;
+  stats: StatsData;
+  impact: ImpactV4Result;
   handle?: string;
 }
 
@@ -69,21 +70,6 @@ export function StudioClient({
       trackEvent("studio_opened");
       hasTrackedOpen.current = true;
     }
-  }, []);
-
-  // Cmd+K / Ctrl+K to focus terminal input
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        const input = document.querySelector<HTMLInputElement>(
-          'input[aria-label="Terminal command input"]',
-        );
-        input?.focus();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const handleConfigChange = useCallback(
@@ -195,30 +181,66 @@ export function StudioClient({
     setShowAutocomplete(val.startsWith("/") && val.length > 0);
   }, []);
 
+  const handleAutocompleteDismiss = useCallback(() => {
+    setShowAutocomplete(false);
+  }, []);
+
   const handleAutocompleteSelect = useCallback(
     (command: string) => {
       setShowAutocomplete(false);
       setPartial("");
-      const needsArgs = ["/set", "/preset"];
-      if (needsArgs.includes(command)) {
-        const input = document.querySelector<HTMLInputElement>(
-          'input[aria-label="Terminal command input"]',
-        );
-        if (input) {
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLInputElement.prototype,
-            "value",
-          )?.set;
-          nativeInputValueSetter?.call(input, command + " ");
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.focus();
-        }
-      } else {
-        handleSubmit(command);
-      }
+      handleSubmit(command);
     },
     [handleSubmit],
   );
+
+  const handleAutocompleteFill = useCallback((command: string) => {
+    setShowAutocomplete(false);
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label="Terminal command input"]',
+    );
+    if (input) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      nativeInputValueSetter?.call(input, command + " ");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    }
+  }, []);
+
+  // Register studio keyboard shortcuts via global provider
+  const { registerPageShortcuts } = useKeyboardShortcutsContext();
+  useEffect(() => {
+    return registerPageShortcuts("studio", (id: string) => {
+      switch (id) {
+        case "focus-terminal": {
+          const input = document.querySelector<HTMLInputElement>(
+            'input[aria-label="Terminal command input"]',
+          );
+          input?.focus();
+          break;
+        }
+        case "cycle-preset": {
+          const currentIdx = STUDIO_PRESETS.findIndex(
+            (p) => p.config.background === config.background,
+          );
+          const nextIdx = (currentIdx + 1) % STUDIO_PRESETS.length;
+          const preset = STUDIO_PRESETS[nextIdx];
+          trackEvent("preset_selected", { preset: preset.id });
+          handleConfigChange(preset.config);
+          break;
+        }
+        case "toggle-quick-controls":
+          setShowQuickControls((v) => !v);
+          break;
+        case "refresh-preview":
+          setPreviewKey((k) => k + 1);
+          break;
+      }
+    });
+  }, [registerPageShortcuts, config.background, handleConfigChange]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
@@ -267,6 +289,8 @@ export function StudioClient({
             commands={studioCommands}
             partial={partial}
             onSelect={handleAutocompleteSelect}
+            onFill={handleAutocompleteFill}
+            onDismiss={handleAutocompleteDismiss}
             visible={showAutocomplete}
           />
           <TerminalInput

@@ -1,15 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getStats90d } from "@/lib/github/client";
-import { computeImpactV3 } from "@/lib/impact/v3";
+import { getStats } from "@/lib/github/client";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { fetchAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
 import { rateLimit } from "@/lib/cache/redis";
+import { generateVerificationCode } from "@/lib/verification/hmac";
+import { storeVerificationRecord } from "@/lib/verification/store";
+import type { VerificationRecord } from "@/lib/verification/types";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
-  "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+  "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=604800",
 };
 
 function fallbackSvg(handle: string, message: string): string {
@@ -64,7 +68,7 @@ export async function GET(
   }
 
   // Fetch stats (cache-first)
-  const stats = await getStats90d(handle, token);
+  const stats = await getStats(handle, token);
   if (!stats) {
     const svg = fallbackSvg(
       handle,
@@ -79,10 +83,41 @@ export async function GET(
   }
 
   // Compute impact
-  const impact = computeImpactV3(stats);
+  const impact = computeImpactV4(stats);
+
+  // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image)
+  const avatarDataUri = stats.avatarUrl
+    ? await fetchAvatarBase64(stats.avatarUrl)
+    : undefined;
+
+  // Generate verification code (returns null if secret is unset)
+  const verification = generateVerificationCode(stats, impact);
+
+  // Store verification record (fire-and-forget — don't block render)
+  if (verification) {
+    const record: VerificationRecord = {
+      handle: stats.handle.toLowerCase(),
+      displayName: stats.displayName,
+      adjustedComposite: impact.adjustedComposite,
+      confidence: impact.confidence,
+      tier: impact.tier,
+      archetype: impact.archetype,
+      dimensions: impact.dimensions,
+      commitsTotal: stats.commitsTotal,
+      prsMergedCount: stats.prsMergedCount,
+      reviewsSubmittedCount: stats.reviewsSubmittedCount,
+      generatedAt: verification.date,
+      profileType: impact.profileType,
+    };
+    void storeVerificationRecord(verification.hash, record);
+  }
 
   // Render full badge
-  const svg = renderBadgeSvg(stats, impact);
+  const svg = renderBadgeSvg(stats, impact, {
+    avatarDataUri,
+    verificationHash: verification?.hash,
+    verificationDate: verification?.date,
+  });
 
   return new NextResponse(svg, { headers: CACHE_HEADERS });
 }

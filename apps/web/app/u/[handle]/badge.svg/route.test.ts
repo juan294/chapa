@@ -5,27 +5,33 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ---------------------------------------------------------------------------
 
 const {
-  mockGetStats90d,
-  mockComputeImpactV3,
+  mockGetStatsData,
+  mockComputeImpactV4,
   mockRenderBadgeSvg,
   mockReadSessionCookie,
   mockIsValidHandle,
   mockRateLimit,
+  mockFetchAvatarBase64,
+  mockGenerateVerificationCode,
+  mockStoreVerificationRecord,
 } = vi.hoisted(() => ({
-  mockGetStats90d: vi.fn(),
-  mockComputeImpactV3: vi.fn(),
+  mockGetStatsData: vi.fn(),
+  mockComputeImpactV4: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockFetchAvatarBase64: vi.fn(),
+  mockGenerateVerificationCode: vi.fn(),
+  mockStoreVerificationRecord: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
-  getStats90d: mockGetStats90d,
+  getStats: mockGetStatsData,
 }));
 
-vi.mock("@/lib/impact/v3", () => ({
-  computeImpactV3: mockComputeImpactV3,
+vi.mock("@/lib/impact/v4", () => ({
+  computeImpactV4: mockComputeImpactV4,
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -42,6 +48,18 @@ vi.mock("@/lib/validation", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/render/avatar", () => ({
+  fetchAvatarBase64: mockFetchAvatarBase64,
+}));
+
+vi.mock("@/lib/verification/hmac", () => ({
+  generateVerificationCode: mockGenerateVerificationCode,
+}));
+
+vi.mock("@/lib/verification/store", () => ({
+  storeVerificationRecord: mockStoreVerificationRecord,
 }));
 
 // escapeXml is used in fallbackSvg — provide real implementation
@@ -79,13 +97,17 @@ const FAKE_STATS = {
   commitsTotal: 42,
   prsMergedCount: 10,
   reviewsSubmittedCount: 5,
+  avatarUrl: "https://avatars.githubusercontent.com/u/12345",
 };
 
 const FAKE_IMPACT = {
   handle: "testuser",
-  adjustedScore: 65,
+  profileType: "collaborative",
+  adjustedComposite: 65,
   tier: "Solid",
   confidence: 85,
+  dimensions: { building: 70, guarding: 60, consistency: 65, breadth: 55 },
+  archetype: "Builder",
 };
 
 // ---------------------------------------------------------------------------
@@ -99,9 +121,12 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockReadSessionCookie.mockReturnValue(null);
-    mockGetStats90d.mockResolvedValue(FAKE_STATS);
-    mockComputeImpactV3.mockReturnValue(FAKE_IMPACT);
+    mockGetStatsData.mockResolvedValue(FAKE_STATS);
+    mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+    mockGenerateVerificationCode.mockReturnValue(null);
+    mockStoreVerificationRecord.mockResolvedValue(undefined);
   });
 
   // -------------------------------------------------------------------------
@@ -119,7 +144,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Cache-Control")).toBe(
-        "public, s-maxage=86400, stale-while-revalidate=604800",
+        "public, s-maxage=21600, stale-while-revalidate=604800",
       );
     });
   });
@@ -137,22 +162,57 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(res.status).toBe(200);
     });
 
-    it("calls getStats90d with the handle", async () => {
+    it("calls getStats with the handle", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockGetStats90d).toHaveBeenCalledWith("testuser", undefined);
+      expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
     });
 
-    it("passes stats to computeImpactV3", async () => {
+    it("passes stats to computeImpactV4", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockComputeImpactV3).toHaveBeenCalledWith(FAKE_STATS);
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
     });
 
-    it("passes stats and impact to renderBadgeSvg", async () => {
+    it("passes stats, impact, and options to renderBadgeSvg", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: "data:image/png;base64,abc123",
+        verificationHash: undefined,
+        verificationDate: undefined,
+      });
+    });
+
+    it("fetches avatar base64 from stats.avatarUrl", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockFetchAvatarBase64).toHaveBeenCalledWith(
+        "https://avatars.githubusercontent.com/u/12345",
+      );
+    });
+
+    it("passes undefined avatarDataUri when avatar fetch fails", async () => {
+      mockFetchAvatarBase64.mockResolvedValue(undefined);
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: undefined,
+        verificationHash: undefined,
+        verificationDate: undefined,
+      });
+    });
+
+    it("passes undefined avatarDataUri when stats has no avatarUrl", async () => {
+      mockGetStatsData.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockFetchAvatarBase64).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        { ...FAKE_STATS, avatarUrl: undefined },
+        FAKE_IMPACT,
+        { avatarDataUri: undefined, verificationHash: undefined, verificationDate: undefined },
+      );
     });
   });
 
@@ -178,11 +238,11 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
     });
 
-    it("validates handle before processing (does not call getStats90d)", async () => {
+    it("validates handle before processing (does not call getStats)", async () => {
       mockIsValidHandle.mockReturnValue(false);
       const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockGetStats90d).not.toHaveBeenCalled();
+      expect(mockGetStatsData).not.toHaveBeenCalled();
     });
   });
 
@@ -192,7 +252,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
   describe("stats fetch failure", () => {
     it("returns fallback SVG when stats fetch returns null", async () => {
-      mockGetStats90d.mockResolvedValue(null);
+      mockGetStatsData.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       const body = await res.text();
@@ -201,7 +261,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
 
     it("returns shorter cache TTL on error fallback (s-maxage=300)", async () => {
-      mockGetStats90d.mockResolvedValue(null);
+      mockGetStatsData.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Cache-Control")).toBe(
@@ -210,7 +270,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
 
     it("returns Content-Type: image/svg+xml on error fallback", async () => {
-      mockGetStats90d.mockResolvedValue(null);
+      mockGetStatsData.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
@@ -265,11 +325,54 @@ describe("GET /u/[handle]/badge.svg", () => {
       );
     });
 
-    it("does not call getStats90d when rate limited", async () => {
+    it("does not call getStats when rate limited", async () => {
       mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockGetStats90d).not.toHaveBeenCalled();
+      expect(mockGetStatsData).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Verification integration
+  // -------------------------------------------------------------------------
+
+  describe("verification", () => {
+    it("calls generateVerificationCode with stats and impact", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockGenerateVerificationCode).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT);
+    });
+
+    it("passes verification hash and date to renderBadgeSvg when code is generated", async () => {
+      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2025-06-15" });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: "data:image/png;base64,abc123",
+        verificationHash: "abc12345",
+        verificationDate: "2025-06-15",
+      });
+    });
+
+    it("stores verification record when code is generated", async () => {
+      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2025-06-15" });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockStoreVerificationRecord).toHaveBeenCalledWith("abc12345", expect.objectContaining({
+        handle: "testuser",
+        adjustedComposite: 65,
+        tier: "Solid",
+        confidence: 85,
+        generatedAt: "2025-06-15",
+      }));
+    });
+
+    it("does not store verification record when code is null", async () => {
+      mockGenerateVerificationCode.mockReturnValue(null);
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
     });
   });
 });

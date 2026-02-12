@@ -59,12 +59,12 @@ describe("StudioClient", () => {
   });
 
   describe("props interface", () => {
-    it("accepts Stats90d prop", () => {
-      expect(SOURCE).toContain("stats: Stats90d");
+    it("accepts StatsData prop", () => {
+      expect(SOURCE).toContain("stats: StatsData");
     });
 
-    it("accepts ImpactV3Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV3Result");
+    it("accepts ImpactV4Result prop", () => {
+      expect(SOURCE).toContain("impact: ImpactV4Result");
     });
 
     it("accepts BadgeConfig initial config", () => {
@@ -159,9 +159,10 @@ describe("StudioClient", () => {
       expect(SOURCE).toContain("AutocompleteDropdown");
     });
 
-    it("supports Cmd+K / Ctrl+K keyboard shortcut", () => {
-      expect(SOURCE).toContain("metaKey");
-      expect(SOURCE).toContain('"k"');
+    it("registers keyboard shortcuts via global provider", () => {
+      expect(SOURCE).toContain("registerPageShortcuts");
+      expect(SOURCE).toContain('"studio"');
+      expect(SOURCE).toContain('"focus-terminal"');
     });
   });
 });

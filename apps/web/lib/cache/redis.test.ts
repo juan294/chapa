@@ -77,7 +77,7 @@ describe("cacheGet", () => {
 // ---------------------------------------------------------------------------
 
 describe("cacheSet", () => {
-  it("stores value with default TTL (86400s)", async () => {
+  it("stores value with default TTL (21600s)", async () => {
     mockSet.mockResolvedValueOnce("OK");
 
     await cacheSet("impact:test-user", { score: 42 });
@@ -85,7 +85,7 @@ describe("cacheSet", () => {
     expect(mockSet).toHaveBeenCalledWith(
       "impact:test-user",
       { score: 42 },
-      { ex: 86400 },
+      { ex: 21600 },
     );
   });
 

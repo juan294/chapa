@@ -39,7 +39,7 @@ Tokens need the `read:user` scope at minimum.
 
 ## How it works
 
-1. Fetches your last 90 days of activity from the EMU account via GitHub GraphQL API
+1. Fetches your last 12 months of activity from the EMU account via GitHub GraphQL API
 2. Uploads the stats (commits, PRs merged, reviews) to the Chapa server
 3. Your Chapa badge recalculates on next refresh, combining personal + EMU contributions
 
