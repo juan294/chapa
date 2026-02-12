@@ -57,4 +57,13 @@ describe("SharePage", () => {
       expect(SOURCE).toContain("isOwner");
     });
   });
+
+  // #120 — JSON-LD script injection prevention
+  describe("JSON-LD security", () => {
+    it("escapes < characters in JSON-LD to prevent script injection", () => {
+      // The dangerouslySetInnerHTML for JSON-LD must use .replace to escape <
+      expect(SOURCE).toContain("JSON.stringify(personJsonLd).replace(");
+      expect(SOURCE).toContain("u003c");
+    });
+  });
 });

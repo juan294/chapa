@@ -46,4 +46,44 @@ describe("fetchAvatarBase64", () => {
     const result = await fetchAvatarBase64("https://example.com/avatar.png");
     expect(result).toBeUndefined();
   });
+
+  it("sanitises content-type to an allowed image MIME type", async () => {
+    const fakeBytes = new Uint8Array([137, 80, 78, 71]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(fakeBytes, {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+
+    const result = await fetchAvatarBase64("https://example.com/avatar");
+    // Must fall back to image/png, never use arbitrary content-type
+    expect(result).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("strips charset parameters from valid image content-types", async () => {
+    const fakeBytes = new Uint8Array([255, 216, 255]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(fakeBytes, {
+        status: 200,
+        headers: { "content-type": "image/jpeg; charset=utf-8" },
+      }),
+    );
+
+    const result = await fetchAvatarBase64("https://example.com/avatar.jpg");
+    expect(result).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  it("allows image/svg+xml content-type", async () => {
+    const fakeBytes = new Uint8Array([60, 115, 118, 103]); // <svg
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(fakeBytes, {
+        status: 200,
+        headers: { "content-type": "image/svg+xml" },
+      }),
+    );
+
+    const result = await fetchAvatarBase64("https://example.com/avatar.svg");
+    expect(result).toMatch(/^data:image\/svg\+xml;base64,/);
+  });
 });
