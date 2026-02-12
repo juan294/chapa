@@ -48,7 +48,7 @@ function buildDemoHeatmap(): HeatmapDay[] {
 
 export const DEMO_STATS: StatsData = {
   handle: "developer",
-  displayName: "Alex Chen",
+  displayName: "Bertram Gilfoyle",
   commitsTotal: 420,
   activeDays: 195,
   prsMergedCount: 87,

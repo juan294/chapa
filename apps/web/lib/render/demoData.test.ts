@@ -8,7 +8,7 @@ describe("DEMO_STATS", () => {
   });
 
   it("has a display name", () => {
-    expect(DEMO_STATS.displayName).toBe("Alex Chen");
+    expect(DEMO_STATS.displayName).toBe("Bertram Gilfoyle");
   });
 
   it("has commit count within cap (0-600)", () => {
@@ -85,7 +85,7 @@ describe("renderBadgeSvg with demo data", () => {
 
   it("includes the demo handle in the output", () => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT);
-    expect(svg).toContain("Alex Chen");
+    expect(svg).toContain("Bertram Gilfoyle");
   });
 
   it("includes verification strip when hash and date are provided", () => {
