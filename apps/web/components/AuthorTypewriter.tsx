@@ -13,15 +13,15 @@ const HOME_TEXT = "</> JG";
 const MESSAGES = [
   HOME_TEXT,
   "made with \u2665 in Asturias",
-  "fueled by sidra",
-  "npm run explore",
-  "\u00a1buen Camino!",
   "probably \ud83c\udfd4\ufe0f rn",
   "probably \ud83d\udeb4 rn",
-  "scaling some rock",
   "404: sleep not found",
   "works on my machine\u2122",
   "bug-free* (*mostly)",
+  "git push --pray",
+  "// TODO: fix later",
+  "it compiled, ship it",
+  "powered by Son of Anton",
 ];
 
 /** Social links shown in the hover popover. Set to [] to hide the popover. */
