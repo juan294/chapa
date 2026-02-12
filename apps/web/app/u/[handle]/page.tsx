@@ -4,6 +4,7 @@ import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { ShareButton } from "@/components/ShareButton";
 import { ShareBadgePreview } from "@/components/ShareBadgePreview";
+import { RefreshBadgeButton } from "@/components/RefreshBadgeButton";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { cacheGet } from "@/lib/cache/redis";
@@ -155,9 +156,9 @@ export default async function SharePage({ params }: SharePageProps) {
           )}
         </div>
 
-        {/* Customize Badge CTA — only for badge owner */}
+        {/* Owner actions — Customize + Refresh */}
         {isOwner && (
-          <div className="mb-8 animate-fade-in-up [animation-delay:250ms]">
+          <div className="mb-8 flex items-center gap-4 animate-fade-in-up [animation-delay:250ms]">
             <Link
               href="/studio"
               className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
@@ -176,6 +177,7 @@ export default async function SharePage({ params }: SharePageProps) {
               </svg>
               Customize Badge
             </Link>
+            <RefreshBadgeButton handle={handle} />
           </div>
         )}
 
