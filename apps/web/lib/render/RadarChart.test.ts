@@ -110,18 +110,16 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     expect(svg).toContain(">Breadth<");
   });
 
-  it("axes are rotated ~30 degrees (building point in upper-right area)", () => {
+  it("building axis points straight up (no rotation)", () => {
     const cx = 200, cy = 200, r = 100;
     const svg = renderRadarChart(makeDimensions({ building: 100 }), cx, cy, r);
-    // With 30° rotation (π/6), building angle = -π/2 + π/6 = -π/3
-    // cos(-π/3) = 0.5 → x = cx + 50, sin(-π/3) = -0.866 → y = cy - 87
+    // With 0° rotation, building angle = -π/2 → straight up
+    // cos(-π/2) = 0 → x = cx, sin(-π/2) = -1 → y = cy - r
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
     const [bx, by] = pointsMatch![1].split(" ")[0].split(",").map(Number);
-    // Building should be in upper-right quadrant
-    expect(bx).toBeGreaterThan(cx);
-    expect(by).toBeLessThan(cy);
-    // With 30° rotation, x offset should be ~50 (not ~71 as with 45°)
-    expect(bx - cx).toBeLessThan(60); // was ~71 at 45°, should be ~50 at 30°
+    // Building should be directly above center (x ≈ cx, y = cy - r)
+    expect(Math.abs(bx - cx)).toBeLessThan(2);
+    expect(by).toBe(cy - r);
   });
 });

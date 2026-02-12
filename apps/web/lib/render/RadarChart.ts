@@ -21,14 +21,12 @@ export function renderRadarChart(
 ): string {
   const t = WARM_AMBER;
 
-  // Axes rotated ~30° clockwise so labels don't overlap with score below
-  // Building = upper-right, Guarding = lower-right, Consistency = lower-left, Breadth = upper-left
-  const ROTATION = Math.PI / 6;
+  // Original diamond: Building=top, Guarding=right, Consistency=bottom, Breadth=left
   const axes: { key: keyof DimensionScores; label: string; angle: number }[] = [
-    { key: "building", label: "Building", angle: -Math.PI / 2 + ROTATION },
-    { key: "guarding", label: "Guarding", angle: 0 + ROTATION },
-    { key: "consistency", label: "Consistency", angle: Math.PI / 2 + ROTATION },
-    { key: "breadth", label: "Breadth", angle: Math.PI + ROTATION },
+    { key: "building", label: "Building", angle: -Math.PI / 2 },
+    { key: "guarding", label: "Guarding", angle: 0 },
+    { key: "consistency", label: "Consistency", angle: Math.PI / 2 },
+    { key: "breadth", label: "Breadth", angle: Math.PI },
   ];
 
   const toPoint = (angle: number, dist: number): [number, number] => [

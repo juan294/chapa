@@ -280,7 +280,7 @@ describe("renderBadgeSvg", () => {
       expect(pillArea).not.toContain("\u2605");
     });
 
-    it("shows watch, fork, star as labeled pills with counts", () => {
+    it("shows watch, fork, star as labeled pills with counts and dot separators", () => {
       const svg = renderBadgeSvg(
         makeStats({ totalWatchers: 80, totalForks: 25, totalStars: 142 }),
         makeImpact(),
@@ -292,6 +292,10 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("Watch");
       expect(svg).toContain("Fork");
       expect(svg).toContain("Star");
+      // Dot separators between pills (at least 3: archetype·watch·fork·star)
+      const dots = svg.match(/\u00B7/g);
+      expect(dots).not.toBeNull();
+      expect(dots!.length).toBeGreaterThanOrEqual(3);
     });
 
     it("formats large counts with compact notation", () => {
