@@ -43,34 +43,8 @@ export interface ConfidencePenalty {
   reason: string;
 }
 
-/** Normalized score breakdown (each 0..1 before weighting) */
-export interface ScoreBreakdown {
-  commits: number;
-  prWeight: number;
-  reviews: number;
-  issues: number;
-  streak: number;
-  collaboration: number;
-}
-
 /** Impact tier based on adjusted score */
 export type ImpactTier = "Emerging" | "Solid" | "High" | "Elite";
-
-/** Full Impact v3 result */
-export interface ImpactV3Result {
-  handle: string;
-  baseScore: number; // 0..100
-  confidence: number; // 50..100
-  confidencePenalties: ConfidencePenalty[];
-  adjustedScore: number; // 0..100
-  tier: ImpactTier;
-  breakdown: ScoreBreakdown;
-  computedAt: string; // ISO timestamp
-}
-
-// ---------------------------------------------------------------------------
-// Impact v4: Developer Impact Profile
-// ---------------------------------------------------------------------------
 
 /** Four independent dimension scores (each 0..100) */
 export interface DimensionScores {

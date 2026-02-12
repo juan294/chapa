@@ -4,7 +4,7 @@ import type {
   DeveloperArchetype,
   ImpactV4Result,
 } from "@chapa/shared";
-import { normalize, computeConfidence, computeAdjustedScore, getTier } from "./v3";
+import { normalize, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness } from "./heatmap-evenness";
 
 // ---------------------------------------------------------------------------
