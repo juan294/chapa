@@ -5,6 +5,12 @@ import { renderGithubBranding } from "./GithubBranding";
 import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
 
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(n);
+}
+
 interface BadgeOptions {
   includeGithubBranding?: boolean;
   avatarDataUri?: string;
@@ -35,39 +41,40 @@ export function renderBadgeSvg(
   const avatarCY = headerY;
   const avatarR = 30;
 
+  // ── Archetype + stars row (above heatmap, left-aligned) ─────
+  const metaRowY = 160;
+  const archetypeText = `\u2605 ${impact.archetype}`;
+  const archetypePillWidth = archetypeText.length * 11 + 30;
+  const starsStr = formatCompact(stats.totalStars);
+
   // ── Two-column body ─────────────────────────────────────────
   // Left column: heatmap (44px cells + 5px gap = 49px per cell)
   const heatmapX = PAD;
-  const heatmapY = 160;
+  const heatmapY = 190; // shifted down 30px for meta row
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
-  // Right column: radar chart + archetype
+  // Right column: radar chart + score ring (no pill — it moved above)
   const profileColX = 670;
   const profileColW = W - PAD - profileColX; // 470px
 
   // Radar chart centered in the right column
   const radarCX = profileColX + profileColW / 2;
-  const radarCY = 245;
+  const radarCY = 275;
   const radarR = 85;
   const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR);
 
-  // Archetype pill badge (below radar chart, clear of Consistency label)
-  const archetypeY = radarCY + radarR + 80;
-  const archetypeText = `\u2605 ${impact.archetype}`;
-  const archetypePillWidth = archetypeText.length * 11 + 30;
-
-  // ── Hero score ring (right column, below archetype pill) ────
+  // ── Hero score ring (right column, below radar) ───────────
   const scoreStr = String(impact.adjustedComposite);
-  const ringCY = archetypeY + 85;
+  const ringCY = 460;
   const ringR = 46;
   const ringCircumference = 2 * Math.PI * ringR; // ≈289.03
   const ringOffset = ringCircumference * (1 - impact.adjustedComposite / 100);
   const tierLabelY = ringCY + ringR + 24;
 
   // ── Footer ──────────────────────────────────────────────────
-  const footerDividerY = 575;
-  const footerY = 600;
+  const footerDividerY = 560;
+  const footerY = 585;
 
   // GitHub branding (footer)
   const brandingSvg = includeGithubBranding
@@ -112,19 +119,21 @@ export function renderBadgeSvg(
   <!-- Chapa_ logo (top-right) -->
   <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="22" fill="${t.textSecondary}" opacity="0.7" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">_</tspan></text>
 
+  <!-- ─── Archetype + stars row (above heatmap) ──────────── -->
+  <g transform="translate(${heatmapX}, ${metaRowY - 17})">
+    <rect width="${archetypePillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
+    <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
+  </g>
+  <text x="${heatmapX + archetypePillWidth + 16}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">|</text>
+  <text x="${heatmapX + archetypePillWidth + 30}" y="${metaRowY + 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="15" fill="${t.textSecondary}">\u2B50 ${starsStr}</text>
+
   <!-- ─── Two-column body ────────────────────────────────── -->
 
   <!-- Left: heatmap -->
   ${heatmapSvg}
 
-  <!-- Right: radar chart + archetype -->
+  <!-- Right: radar chart -->
   ${radarSvg}
-
-  <!-- Archetype pill badge -->
-  <g transform="translate(${radarCX - archetypePillWidth / 2}, ${archetypeY - 22})">
-    <rect width="${archetypePillWidth}" height="34" rx="17" fill="rgba(124,106,239,0.10)" stroke="rgba(124,106,239,0.25)" stroke-width="1"/>
-    <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
-  </g>
 
   <!-- ─── Hero composite score ring (right column) ────────── -->
   <!-- Ring track (background) -->

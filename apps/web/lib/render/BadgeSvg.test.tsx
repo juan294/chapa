@@ -247,14 +247,47 @@ describe("renderBadgeSvg", () => {
       expect(svg).not.toContain(">BREADTH<");
     });
 
-    it("contains the archetype label", () => {
+    it("contains the archetype label above the heatmap", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
       expect(svg).toContain("Builder");
+      // Archetype pill should appear before the heatmap rects in SVG order
+      const archetypeIdx = svg.indexOf("Builder");
+      const firstHeatmapRect = svg.indexOf('rx="4"');
+      expect(archetypeIdx).toBeLessThan(firstHeatmapRect);
     });
 
     it("contains a star icon in the archetype pill", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toMatch(/[\u2605\u2606]|star/i);
+    });
+
+    it("shows totalStars count next to archetype pill with pipe separator", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ totalStars: 142 }),
+        makeImpact(),
+      );
+      // Should contain the star count
+      expect(svg).toContain("142");
+      // Should contain a pipe separator
+      expect(svg).toContain("|");
+    });
+
+    it("formats large star counts with compact notation", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ totalStars: 2500 }),
+        makeImpact(),
+      );
+      expect(svg).toContain("2.5k");
+    });
+
+    it("shows 0 stars when totalStars is 0", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ totalStars: 0 }),
+        makeImpact(),
+      );
+      // Pipe separator and star count still present
+      expect(svg).toContain("|");
+      expect(svg).toMatch(/\u2B50\s*0</);
     });
 
     it("contains a radar chart with polygon", () => {
