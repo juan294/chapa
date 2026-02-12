@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { KbdHint } from "./KbdHint";
 
 interface RefreshBadgeButtonProps {
   handle: string;
@@ -55,7 +54,6 @@ export function RefreshBadgeButton({ handle }: RefreshBadgeButtonProps) {
       {status === "loading" && "Refreshing..."}
       {status === "success" && "Refreshed!"}
       {status === "error" && "Failed — try again"}
-      <KbdHint keys={["⇧", "⌘", "R"]} className="ml-1.5" />
     </button>
   );
 }

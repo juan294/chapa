@@ -11,7 +11,6 @@ import {
   createNavigationCommands,
 } from "@/components/terminal/command-registry";
 import type { OutputLine } from "@/components/terminal/command-registry";
-import { KbdHint } from "./KbdHint";
 
 const OUTPUT_TIMEOUT_MS = 5000;
 
@@ -101,8 +100,7 @@ export function GlobalCommandBar() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
-      <div className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-50 items-center gap-3">
-        <KbdHint keys={["/"]} />
+      <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
         <AuthorTypewriter />
       </div>
       <div className="relative mx-auto max-w-4xl">
