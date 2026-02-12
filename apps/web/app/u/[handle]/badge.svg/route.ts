@@ -7,6 +7,9 @@ import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
 import { rateLimit } from "@/lib/cache/redis";
+import { generateVerificationCode } from "@/lib/verification/hmac";
+import { storeVerificationRecord } from "@/lib/verification/store";
+import type { VerificationRecord } from "@/lib/verification/types";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -87,8 +90,34 @@ export async function GET(
     ? await fetchAvatarBase64(stats.avatarUrl)
     : undefined;
 
+  // Generate verification code (returns null if secret is unset)
+  const verification = generateVerificationCode(stats, impact);
+
+  // Store verification record (fire-and-forget — don't block render)
+  if (verification) {
+    const record: VerificationRecord = {
+      handle: stats.handle.toLowerCase(),
+      displayName: stats.displayName,
+      adjustedComposite: impact.adjustedComposite,
+      confidence: impact.confidence,
+      tier: impact.tier,
+      archetype: impact.archetype,
+      dimensions: impact.dimensions,
+      commitsTotal: stats.commitsTotal,
+      prsMergedCount: stats.prsMergedCount,
+      reviewsSubmittedCount: stats.reviewsSubmittedCount,
+      generatedAt: verification.date,
+      profileType: impact.profileType,
+    };
+    void storeVerificationRecord(verification.hash, record);
+  }
+
   // Render full badge
-  const svg = renderBadgeSvg(stats, impact, { avatarDataUri });
+  const svg = renderBadgeSvg(stats, impact, {
+    avatarDataUri,
+    verificationHash: verification?.hash,
+    verificationDate: verification?.date,
+  });
 
   return new NextResponse(svg, { headers: CACHE_HEADERS });
 }

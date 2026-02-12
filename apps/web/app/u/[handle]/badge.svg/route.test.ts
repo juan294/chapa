@@ -12,6 +12,8 @@ const {
   mockIsValidHandle,
   mockRateLimit,
   mockFetchAvatarBase64,
+  mockGenerateVerificationCode,
+  mockStoreVerificationRecord,
 } = vi.hoisted(() => ({
   mockGetStatsData: vi.fn(),
   mockComputeImpactV4: vi.fn(),
@@ -20,6 +22,8 @@ const {
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
   mockFetchAvatarBase64: vi.fn(),
+  mockGenerateVerificationCode: vi.fn(),
+  mockStoreVerificationRecord: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -48,6 +52,14 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/render/avatar", () => ({
   fetchAvatarBase64: mockFetchAvatarBase64,
+}));
+
+vi.mock("@/lib/verification/hmac", () => ({
+  generateVerificationCode: mockGenerateVerificationCode,
+}));
+
+vi.mock("@/lib/verification/store", () => ({
+  storeVerificationRecord: mockStoreVerificationRecord,
 }));
 
 // escapeXml is used in fallbackSvg — provide real implementation
@@ -113,6 +125,8 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+    mockGenerateVerificationCode.mockReturnValue(null);
+    mockStoreVerificationRecord.mockResolvedValue(undefined);
   });
 
   // -------------------------------------------------------------------------
@@ -160,11 +174,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
     });
 
-    it("passes stats, impact, and avatarDataUri to renderBadgeSvg", async () => {
+    it("passes stats, impact, and options to renderBadgeSvg", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
         avatarDataUri: "data:image/png;base64,abc123",
+        verificationHash: undefined,
+        verificationDate: undefined,
       });
     });
 
@@ -182,6 +198,8 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
         avatarDataUri: undefined,
+        verificationHash: undefined,
+        verificationDate: undefined,
       });
     });
 
@@ -193,7 +211,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         { ...FAKE_STATS, avatarUrl: undefined },
         FAKE_IMPACT,
-        { avatarDataUri: undefined },
+        { avatarDataUri: undefined, verificationHash: undefined, verificationDate: undefined },
       );
     });
   });
@@ -312,6 +330,49 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockGetStatsData).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Verification integration
+  // -------------------------------------------------------------------------
+
+  describe("verification", () => {
+    it("calls generateVerificationCode with stats and impact", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockGenerateVerificationCode).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT);
+    });
+
+    it("passes verification hash and date to renderBadgeSvg when code is generated", async () => {
+      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2025-06-15" });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: "data:image/png;base64,abc123",
+        verificationHash: "abc12345",
+        verificationDate: "2025-06-15",
+      });
+    });
+
+    it("stores verification record when code is generated", async () => {
+      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2025-06-15" });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockStoreVerificationRecord).toHaveBeenCalledWith("abc12345", expect.objectContaining({
+        handle: "testuser",
+        adjustedComposite: 65,
+        tier: "Solid",
+        confidence: 85,
+        generatedAt: "2025-06-15",
+      }));
+    });
+
+    it("does not store verification record when code is null", async () => {
+      mockGenerateVerificationCode.mockReturnValue(null);
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
     });
   });
 });

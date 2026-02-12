@@ -4,6 +4,7 @@ import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
 import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
+import { renderVerificationStrip } from "./VerificationStrip";
 
 function formatCompact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
@@ -14,6 +15,8 @@ function formatCompact(n: number): string {
 interface BadgeOptions {
   includeGithubBranding?: boolean;
   avatarDataUri?: string;
+  verificationHash?: string;
+  verificationDate?: string;
 }
 
 export function renderBadgeSvg(
@@ -21,7 +24,7 @@ export function renderBadgeSvg(
   impact: ImpactV4Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeGithubBranding = true, avatarDataUri } = options;
+  const { includeGithubBranding = true, avatarDataUri, verificationHash, verificationDate } = options;
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
@@ -97,6 +100,12 @@ export function renderBadgeSvg(
   const brandingSvg = includeGithubBranding
     ? renderGithubBranding(PAD, footerY, W - PAD)
     : "";
+
+  // Verification strip (right edge)
+  const verificationSvg =
+    verificationHash && verificationDate
+      ? renderVerificationStrip(verificationHash, verificationDate)
+      : "";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
@@ -202,5 +211,8 @@ export function renderBadgeSvg(
 
   <!-- Branding: left = GitHub, right = domain -->
   ${brandingSvg}
+
+  <!-- Verification seal (right edge) -->
+  ${verificationSvg}
 </svg>`;
 }
