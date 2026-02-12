@@ -259,6 +259,25 @@ export default async function Home({
                           </span>
                         </div>
                       </div>
+
+                      {/* Active days — consistency bar */}
+                      <div className="mt-3 rounded-lg bg-white/[0.04] border border-white/[0.06] px-4 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] uppercase tracking-wider text-text-secondary">
+                            Active Days
+                          </span>
+                          <span className="text-xs font-heading text-text-primary">
+                            <span className="text-terminal-green font-bold">45</span>
+                            <span className="text-text-secondary"> / 90</span>
+                          </span>
+                        </div>
+                        <div className="h-3 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber to-terminal-green"
+                            style={{ width: "50%" }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
