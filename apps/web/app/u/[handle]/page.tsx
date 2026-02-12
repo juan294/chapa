@@ -15,12 +15,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
-import dynamic from "next/dynamic";
-
-const ShareBadgePreview = dynamic(
-  () => import("@/components/ShareBadgePreview").then(m => ({ default: m.ShareBadgePreview })),
-  { ssr: false, loading: () => <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5 animate-pulse h-[400px]" /> }
-);
+import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
@@ -143,7 +138,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {/* Badge preview — interactive if user has custom config, static SVG otherwise */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">
           {useInteractivePreview ? (
-            <ShareBadgePreview
+            <ShareBadgePreviewLazy
               config={savedConfig}
               stats={stats}
               impact={impact}
