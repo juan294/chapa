@@ -4,6 +4,7 @@ import { readSessionCookie } from "@/lib/auth/github";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
 import { ThemeToggle } from "./ThemeToggle";
+import { KbdHint } from "./KbdHint";
 
 interface NavLink {
   label: string;
@@ -42,7 +43,7 @@ export async function Navbar({ navLinks }: NavbarProps) {
         </Link>
 
         {/* Center: Command hints (desktop) */}
-        {navLinks && navLinks.length > 0 && (
+        {navLinks && navLinks.length > 0 ? (
           <div className="hidden md:flex items-center gap-4 font-heading text-xs text-terminal-dim">
             {navLinks.map((link) => (
               <a
@@ -54,6 +55,21 @@ export async function Navbar({ navLinks }: NavbarProps) {
               </a>
             ))}
           </div>
+        ) : (
+          <div className="hidden md:flex items-center gap-3 font-heading text-xs text-terminal-dim">
+            <Link href="/" className="inline-flex items-center gap-1.5 transition-colors hover:text-text-secondary">
+              <span className="text-amber/50">/</span> home
+              <KbdHint keys={["⌘", "1"]} />
+            </Link>
+            <Link href={session ? `/u/${session.login}` : "/"} className="inline-flex items-center gap-1.5 transition-colors hover:text-text-secondary">
+              <span className="text-amber/50">/</span> profile
+              <KbdHint keys={["⌘", "2"]} />
+            </Link>
+            <Link href="/studio" className="inline-flex items-center gap-1.5 transition-colors hover:text-text-secondary">
+              <span className="text-amber/50">/</span> studio
+              <KbdHint keys={["⌘", "3"]} />
+            </Link>
+          </div>
         )}
 
         {/* Mobile nav toggle */}
@@ -63,6 +79,7 @@ export async function Navbar({ navLinks }: NavbarProps) {
 
         {/* Right: Theme toggle + User or login */}
         <div className="flex items-center gap-2">
+          <KbdHint keys={["?"]} className="mr-1" />
           <ThemeToggle />
           {session ? (
             <UserMenu

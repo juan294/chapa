@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { BadgeConfig } from "@chapa/shared";
 import { STUDIO_CATEGORIES } from "./studio-options";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
+import { KbdHint } from "@/components/KbdHint";
 
 interface QuickControlsProps {
   config: BadgeConfig;
@@ -43,6 +44,7 @@ export function QuickControls({
           <path d="M12 5v14M5 12h14" />
         </svg>
         Quick Controls
+        <KbdHint keys={["⇧", "⌘", "Q"]} className="ml-1.5" />
       </button>
     );
   }

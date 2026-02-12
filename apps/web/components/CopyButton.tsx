@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
+import { KbdHint } from "./KbdHint";
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -20,6 +21,7 @@ export function CopyButton({ text }: { text: string }) {
       className="rounded-lg border border-stroke bg-card px-4 py-1.5 text-sm text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors"
     >
       <span aria-live="polite">{copied ? "Copied!" : "Copy"}</span>
+      <KbdHint keys={["⇧", "⌘", "C"]} className="ml-1.5" />
     </button>
   );
 }
