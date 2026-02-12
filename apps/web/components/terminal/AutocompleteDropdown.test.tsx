@@ -115,6 +115,16 @@ describe("AutocompleteDropdown", () => {
     });
   });
 
+  describe("alias support via getMatchingCommands (issue #118)", () => {
+    it("imports getMatchingCommands from command-registry", () => {
+      expect(SOURCE).toContain("getMatchingCommands");
+    });
+
+    it("does NOT have inline c.name.startsWith filter", () => {
+      expect(SOURCE).not.toContain("c.name.startsWith");
+    });
+  });
+
   describe("accessibility", () => {
     it("has listbox role", () => {
       expect(SOURCE).toContain('role="listbox"');

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { getMatchingCommands } from "./command-registry";
 import type { CommandDef } from "./command-registry";
 
 interface AutocompleteDropdownProps {
@@ -24,10 +25,7 @@ export function AutocompleteDropdown({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const matching = useMemo(
-    () =>
-      partial.startsWith("/")
-        ? commands.filter((c) => c.name.startsWith(partial.toLowerCase()))
-        : [],
+    () => getMatchingCommands(partial, commands),
     [commands, partial],
   );
 
