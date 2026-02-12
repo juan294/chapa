@@ -195,6 +195,10 @@ export function StudioClient({
     setShowAutocomplete(val.startsWith("/") && val.length > 0);
   }, []);
 
+  const handleAutocompleteDismiss = useCallback(() => {
+    setShowAutocomplete(false);
+  }, []);
+
   const handleAutocompleteSelect = useCallback(
     (command: string) => {
       setShowAutocomplete(false);
@@ -267,6 +271,7 @@ export function StudioClient({
             commands={studioCommands}
             partial={partial}
             onSelect={handleAutocompleteSelect}
+            onDismiss={handleAutocompleteDismiss}
             visible={showAutocomplete}
           />
           <TerminalInput

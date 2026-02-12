@@ -7,6 +7,7 @@ interface AutocompleteDropdownProps {
   commands: CommandDef[];
   partial: string;
   onSelect: (command: string) => void;
+  onDismiss?: () => void;
   visible: boolean;
 }
 
@@ -14,6 +15,7 @@ export function AutocompleteDropdown({
   commands,
   partial,
   onSelect,
+  onDismiss,
   visible,
 }: AutocompleteDropdownProps) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -51,9 +53,13 @@ export function AutocompleteDropdown({
           e.stopPropagation();
           onSelect(matching[activeIndex].name);
         }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onDismiss?.();
       }
     },
-    [visible, matching, activeIndex, onSelect],
+    [visible, matching, activeIndex, onSelect, onDismiss],
   );
 
   useEffect(() => {

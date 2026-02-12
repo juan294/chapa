@@ -48,6 +48,18 @@ describe("AutocompleteDropdown", () => {
     it("stops propagation on arrow keys to prevent TerminalInput history handling", () => {
       expect(SOURCE).toContain("stopPropagation");
     });
+
+    it("handles Escape key to dismiss dropdown via onDismiss callback", () => {
+      // Escape should call onDismiss and stopPropagation so TerminalInput doesn't clear input
+      expect(SOURCE).toContain("onDismiss");
+      expect(SOURCE).toMatch(/Escape/);
+    });
+  });
+
+  describe("dismiss behavior", () => {
+    it("accepts an onDismiss prop", () => {
+      expect(SOURCE).toContain("onDismiss");
+    });
   });
 
   describe("accessibility", () => {

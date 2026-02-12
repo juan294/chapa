@@ -40,6 +40,10 @@ export function LandingTerminal() {
     setShowAutocomplete(val.startsWith("/") && val.length > 0);
   }, []);
 
+  const handleAutocompleteDismiss = useCallback(() => {
+    setShowAutocomplete(false);
+  }, []);
+
   const handleAutocompleteSelect = useCallback(
     (command: string) => {
       setShowAutocomplete(false);
@@ -75,6 +79,7 @@ export function LandingTerminal() {
           commands={commands}
           partial={partial}
           onSelect={handleAutocompleteSelect}
+          onDismiss={handleAutocompleteDismiss}
           visible={showAutocomplete}
         />
         <TerminalInput
