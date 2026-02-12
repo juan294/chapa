@@ -48,18 +48,18 @@ export function renderBadgeSvg(
 
   // Radar chart centered in the right column
   const radarCX = profileColX + profileColW / 2;
-  const radarCY = 270;
+  const radarCY = 245;
   const radarR = 85;
   const radarSvg = renderRadarChart(impact.dimensions, radarCX, radarCY, radarR);
 
-  // Archetype pill badge (below radar chart)
-  const archetypeY = radarCY + radarR + 42;
+  // Archetype pill badge (below radar chart, clear of Consistency label)
+  const archetypeY = radarCY + radarR + 80;
   const archetypeText = `\u2605 ${impact.archetype}`;
   const archetypePillWidth = archetypeText.length * 11 + 30;
 
-  // ── Hero score ──────────────────────────────────────────────
+  // ── Hero score (right column, below archetype pill) ─────────
   const scoreStr = String(impact.adjustedComposite);
-  const scoreY = 510;
+  const scoreY = archetypeY + 60;
 
   // ── Footer ──────────────────────────────────────────────────
   const footerDividerY = 555;
@@ -122,9 +122,9 @@ export function renderBadgeSvg(
     <text x="${archetypePillWidth / 2}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" font-weight="600" fill="${archetypeColor}" text-anchor="middle">${archetypeText}</text>
   </g>
 
-  <!-- ─── Hero composite score ───────────────────────────── -->
-  <text x="${W / 2}" y="${scoreY}" font-family="'JetBrains Mono', monospace" font-size="72" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
-  ${impact.tier !== impact.archetype ? `<text x="${W / 2}" y="${scoreY + 30}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${tierColor}" text-anchor="middle">${impact.tier}</text>` : ""}
+  <!-- ─── Hero composite score (right column) ─────────────── -->
+  <text x="${radarCX}" y="${scoreY}" font-family="'JetBrains Mono', monospace" font-size="72" font-weight="700" fill="${t.textPrimary}" text-anchor="middle" style="animation: pulse-glow 3s ease-in-out infinite">${scoreStr}</text>
+  ${impact.tier !== impact.archetype ? `<text x="${radarCX}" y="${scoreY + 30}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${tierColor}" text-anchor="middle">${impact.tier}</text>` : ""}
 
   <!-- ─── Footer ─────────────────────────────────────────── -->
   <!-- Divider line -->

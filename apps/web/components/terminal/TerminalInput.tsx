@@ -105,6 +105,7 @@ export function TerminalInput({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           className="terminal-input-bare w-full bg-transparent text-text-primary caret-amber placeholder:text-terminal-dim outline-none focus:ring-0 focus:outline-none border-none"
+          style={{ outline: "none" }}
           placeholder="Type / for commands..."
           aria-label="Terminal command input"
           autoComplete="off"

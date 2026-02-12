@@ -270,9 +270,14 @@ html {
   outline-offset: 2px;
 }
 
-/* Terminal input should not show focus outline — it's always focused */
+/* Terminal input should not show focus outline — it's always focused.
+   Uses !important to guarantee override of *:focus-visible regardless of
+   Tailwind v4 cascade layer ordering or build-time CSS processing. */
+.terminal-input-bare,
+.terminal-input-bare:focus,
 .terminal-input-bare:focus-visible {
-  outline: none;
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
 /* ── Reduced motion ─────────────────────────────────────── */
