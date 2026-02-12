@@ -11,6 +11,7 @@ const {
   mockReadSessionCookie,
   mockIsValidHandle,
   mockRateLimit,
+  mockFetchAvatarBase64,
 } = vi.hoisted(() => ({
   mockGetStats90d: vi.fn(),
   mockComputeImpactV3: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockFetchAvatarBase64: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -42,6 +44,10 @@ vi.mock("@/lib/validation", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/render/avatar", () => ({
+  fetchAvatarBase64: mockFetchAvatarBase64,
 }));
 
 // escapeXml is used in fallbackSvg — provide real implementation
@@ -79,6 +85,7 @@ const FAKE_STATS = {
   commitsTotal: 42,
   prsMergedCount: 10,
   reviewsSubmittedCount: 5,
+  avatarUrl: "https://avatars.githubusercontent.com/u/12345",
 };
 
 const FAKE_IMPACT = {
@@ -102,6 +109,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockGetStats90d.mockResolvedValue(FAKE_STATS);
     mockComputeImpactV3.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   });
 
   // -------------------------------------------------------------------------
@@ -149,10 +157,41 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockComputeImpactV3).toHaveBeenCalledWith(FAKE_STATS);
     });
 
-    it("passes stats and impact to renderBadgeSvg", async () => {
+    it("passes stats, impact, and avatarDataUri to renderBadgeSvg", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: "data:image/png;base64,abc123",
+      });
+    });
+
+    it("fetches avatar base64 from stats.avatarUrl", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockFetchAvatarBase64).toHaveBeenCalledWith(
+        "https://avatars.githubusercontent.com/u/12345",
+      );
+    });
+
+    it("passes undefined avatarDataUri when avatar fetch fails", async () => {
+      mockFetchAvatarBase64.mockResolvedValue(undefined);
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: undefined,
+      });
+    });
+
+    it("passes undefined avatarDataUri when stats has no avatarUrl", async () => {
+      mockGetStats90d.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockFetchAvatarBase64).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+        { ...FAKE_STATS, avatarUrl: undefined },
+        FAKE_IMPACT,
+        { avatarDataUri: undefined },
+      );
     });
   });
 

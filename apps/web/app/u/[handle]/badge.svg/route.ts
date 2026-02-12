@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getStats90d } from "@/lib/github/client";
 import { computeImpactV3 } from "@/lib/impact/v3";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { fetchAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
@@ -81,8 +82,13 @@ export async function GET(
   // Compute impact
   const impact = computeImpactV3(stats);
 
+  // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image)
+  const avatarDataUri = stats.avatarUrl
+    ? await fetchAvatarBase64(stats.avatarUrl)
+    : undefined;
+
   // Render full badge
-  const svg = renderBadgeSvg(stats, impact);
+  const svg = renderBadgeSvg(stats, impact, { avatarDataUri });
 
   return new NextResponse(svg, { headers: CACHE_HEADERS });
 }

@@ -162,16 +162,20 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("clipPath");
     });
 
-    it("embeds GitHub avatar image when avatarUrl is present", () => {
+    it("embeds avatar as data URI when avatarDataUri option is provided", () => {
+      const dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
         makeImpact(),
+        { avatarDataUri: dataUri },
       );
       expect(svg).toContain("<image");
-      expect(svg).toContain("https://avatars.githubusercontent.com/u/123");
+      expect(svg).toContain(dataUri);
+      // Must NOT contain the raw external URL
+      expect(svg).not.toContain("https://avatars.githubusercontent.com/u/123");
     });
 
-    it("falls back to octocat icon when avatarUrl is missing", () => {
+    it("falls back to octocat icon when no avatarDataUri and no avatarUrl", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: undefined }),
         makeImpact(),
@@ -179,6 +183,16 @@ describe("renderBadgeSvg", () => {
       // Should still have the circle but with the octocat path
       expect(svg).toContain("<circle");
       expect(svg).toContain("M14 0C6.27");
+    });
+
+    it("falls back to octocat icon when avatarUrl exists but avatarDataUri is not provided", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
+        makeImpact(),
+        // No avatarDataUri — should NOT embed the raw URL (it won't load in SVG-as-image)
+      );
+      expect(svg).toContain("M14 0C6.27");
+      expect(svg).not.toContain("https://avatars.githubusercontent.com/u/123");
     });
   });
 
