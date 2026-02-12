@@ -1,5 +1,5 @@
 import type { StatsData, RawContributionData } from "@chapa/shared";
-import { CONTRIBUTION_QUERY, buildStatsFromRaw } from "@chapa/shared";
+import { CONTRIBUTION_QUERY, buildStatsFromRaw, SCORING_WINDOW_DAYS } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Fetch EMU stats via GraphQL (requires EMU token with auth)
@@ -11,7 +11,7 @@ export async function fetchEmuStats(
 ): Promise<StatsData | null> {
   const now = new Date();
   const since = new Date(now);
-  since.setDate(since.getDate() - 90);
+  since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
   try {
     const res = await fetch("https://api.github.com/graphql", {

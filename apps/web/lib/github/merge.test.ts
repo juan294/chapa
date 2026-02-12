@@ -56,11 +56,11 @@ describe("mergeStats", () => {
   });
 
   describe("prsMergedWeight cap", () => {
-    it("sums prsMergedWeight and caps at 40", () => {
-      const primary = makeStats({ prsMergedWeight: 25 });
-      const supplemental = makeStats({ prsMergedWeight: 20 });
+    it("sums prsMergedWeight and caps at 120", () => {
+      const primary = makeStats({ prsMergedWeight: 70 });
+      const supplemental = makeStats({ prsMergedWeight: 60 });
       const merged = mergeStats(primary, supplemental);
-      expect(merged.prsMergedWeight).toBe(40);
+      expect(merged.prsMergedWeight).toBe(120);
     });
 
     it("sums prsMergedWeight when below cap", () => {

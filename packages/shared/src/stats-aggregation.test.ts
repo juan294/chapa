@@ -181,19 +181,19 @@ describe("buildStatsFromRaw", () => {
     expect(result.prsMergedWeight).toBeCloseTo(3.0, 1);
   });
 
-  it("caps total PR weight at 40", () => {
-    // 20 large PRs: each has weight 3.0 -> raw sum = 60 -> capped at 40
-    const nodes = Array.from({ length: 20 }, () => ({
+  it("caps total PR weight at 120", () => {
+    // 60 large PRs: each has weight 3.0 -> raw sum = 180 -> capped at 120
+    const nodes = Array.from({ length: 60 }, () => ({
       additions: 5000,
       deletions: 5000,
       changedFiles: 100,
       merged: true,
     }));
     const raw = makeRaw({
-      pullRequests: { totalCount: 20, nodes },
+      pullRequests: { totalCount: 60, nodes },
     });
     const result = buildStatsFromRaw(raw);
-    expect(result.prsMergedWeight).toBe(40);
+    expect(result.prsMergedWeight).toBe(120);
   });
 
   it("excludes unmerged PRs from weight and line counts", () => {

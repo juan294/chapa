@@ -1,5 +1,5 @@
 import type { RawContributionData } from "@chapa/shared";
-import { CONTRIBUTION_QUERY } from "@chapa/shared";
+import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
 
 // Re-export for consumers that import from this module
 export type { RawContributionData };
@@ -14,7 +14,7 @@ export async function fetchContributionData(
 ): Promise<RawContributionData | null> {
   const now = new Date();
   const since = new Date(now);
-  since.setDate(since.getDate() - 90);
+  since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

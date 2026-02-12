@@ -1,5 +1,6 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
+import { PR_WEIGHT_AGG_CAP } from "./constants";
 
 /**
  * Transform raw GitHub GraphQL contribution data into a StatsData object.
@@ -30,7 +31,7 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   const prsMergedCount = mergedPRs.length;
   const prsMergedWeight = Math.min(
     mergedPRs.reduce((sum, pr) => sum + computePrWeight(pr), 0),
-    40,
+    PR_WEIGHT_AGG_CAP,
   );
 
   // 5. Lines added/deleted from merged PRs

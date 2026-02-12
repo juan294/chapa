@@ -4,21 +4,15 @@ import type {
   DeveloperArchetype,
   ImpactV4Result,
 } from "@chapa/shared";
+import { SCORING_CAPS, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { normalize, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness } from "./heatmap-evenness";
 
 // ---------------------------------------------------------------------------
-// Caps (reuse v3 where applicable)
+// Caps — calibrated for 365-day window (imported from shared constants)
 // ---------------------------------------------------------------------------
 
-const CAPS = {
-  prWeight: 40,
-  issues: 30,
-  commits: 200,
-  reviews: 60,
-  repos: 10,
-  stars: 500,
-} as const;
+const CAPS = SCORING_CAPS;
 
 // ---------------------------------------------------------------------------
 // Building: shipping meaningful changes
@@ -65,13 +59,13 @@ export function computeGuarding(stats: StatsData): number {
 
 // ---------------------------------------------------------------------------
 // Consistency: reliable, sustained contributions
-// activeDays/90 (50%), heatmap evenness (35%), inverse burst activity (15%)
+// activeDays/SCORING_WINDOW_DAYS (50%), heatmap evenness (35%), inverse burst activity (15%)
 // ---------------------------------------------------------------------------
 
 export function computeConsistency(stats: StatsData): number {
   if (stats.activeDays === 0) return 0;
 
-  const streak = Math.min(stats.activeDays, 90) / 90;
+  const streak = Math.min(stats.activeDays, SCORING_WINDOW_DAYS) / SCORING_WINDOW_DAYS;
   const evenness = computeHeatmapEvenness(stats.heatmapData);
 
   // Inverse burst: low maxCommitsIn10Min → steady work

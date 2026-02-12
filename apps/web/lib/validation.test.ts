@@ -176,20 +176,28 @@ describe("isValidStatsShape", () => {
     expect(isValidStatsShape({ ...validStats, microCommitRatio: 0.3, docsOnlyPrRatio: 0.1 })).toBe(true);
   });
 
-  it("rejects heatmapData with more than 91 entries", () => {
-    const bigHeatmap = Array.from({ length: 92 }, (_, i) => ({
-      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+  it("rejects heatmapData with more than 371 entries", () => {
+    const bigHeatmap = Array.from({ length: 372 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
       count: 1,
     }));
     expect(isValidStatsShape({ ...validStats, heatmapData: bigHeatmap })).toBe(false);
   });
 
-  it("accepts heatmapData with exactly 91 entries", () => {
-    const maxHeatmap = Array.from({ length: 91 }, (_, i) => ({
-      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+  it("accepts heatmapData with exactly 371 entries", () => {
+    const maxHeatmap = Array.from({ length: 371 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
       count: 1,
     }));
     expect(isValidStatsShape({ ...validStats, heatmapData: maxHeatmap })).toBe(true);
+  });
+
+  it("accepts heatmapData with 91 entries (legacy 13-week data)", () => {
+    const heatmap = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: 1,
+    }));
+    expect(isValidStatsShape({ ...validStats, heatmapData: heatmap })).toBe(true);
   });
 });
 

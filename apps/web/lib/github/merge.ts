@@ -1,11 +1,12 @@
 import type { StatsData, HeatmapDay } from "@chapa/shared";
+import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
 
 /**
  * Merge primary GitHub stats with supplemental stats (e.g. from an EMU account).
  *
  * Rules:
  * - Numeric counts: summed
- * - prsMergedWeight: summed, capped at 40
+ * - prsMergedWeight: summed, capped at PR_WEIGHT_AGG_CAP (120)
  * - heatmapData: merged by date (same date → sum counts), sorted chronologically
  * - activeDays: recomputed from merged heatmap
  * - topRepoShare: approximated — max(P*shareP, S*shareS) / (P+S)
@@ -38,7 +39,7 @@ export function mergeStats(
     commitsTotal: totalCommits,
     activeDays,
     prsMergedCount: primary.prsMergedCount + supplemental.prsMergedCount,
-    prsMergedWeight: Math.min(primary.prsMergedWeight + supplemental.prsMergedWeight, 40),
+    prsMergedWeight: Math.min(primary.prsMergedWeight + supplemental.prsMergedWeight, PR_WEIGHT_AGG_CAP),
     reviewsSubmittedCount: primary.reviewsSubmittedCount + supplemental.reviewsSubmittedCount,
     issuesClosedCount: primary.issuesClosedCount + supplemental.issuesClosedCount,
     linesAdded: primary.linesAdded + supplemental.linesAdded,

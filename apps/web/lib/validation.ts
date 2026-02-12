@@ -82,7 +82,7 @@ export function isValidStatsShape(value: unknown): boolean {
   }
 
   if (!Array.isArray(obj.heatmapData)) return false;
-  if (obj.heatmapData.length > 91) return false; // 13 weeks × 7 days
+  if (obj.heatmapData.length > 371) return false; // 53 weeks × 7 days
   for (const entry of obj.heatmapData) {
     if (
       entry == null ||
