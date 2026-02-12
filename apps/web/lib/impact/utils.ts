@@ -3,6 +3,7 @@ import type {
   ImpactTier,
   ConfidencePenalty,
   ConfidenceFlag,
+  ProfileType,
 } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
@@ -34,10 +35,14 @@ const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
     "Includes activity from a linked account that cannot be independently verified.",
 };
 
-export function computeConfidence(stats: StatsData): {
+export function computeConfidence(
+  stats: StatsData,
+  profileType: ProfileType = "collaborative",
+): {
   confidence: number;
   penalties: ConfidencePenalty[];
 } {
+  const isSolo = profileType === "solo";
   const penalties: ConfidencePenalty[] = [];
   let score = 100;
 
@@ -63,7 +68,7 @@ export function computeConfidence(stats: StatsData): {
   }
 
   const totalLines = stats.linesAdded + stats.linesDeleted;
-  if (totalLines >= 20000 && stats.reviewsSubmittedCount <= 2) {
+  if (!isSolo && totalLines >= 20000 && stats.reviewsSubmittedCount <= 2) {
     penalties.push({
       flag: "generated_change_pattern",
       penalty: 15,
@@ -72,7 +77,7 @@ export function computeConfidence(stats: StatsData): {
     score -= 15;
   }
 
-  if (stats.prsMergedCount >= 10 && stats.reviewsSubmittedCount <= 1) {
+  if (!isSolo && stats.prsMergedCount >= 10 && stats.reviewsSubmittedCount <= 1) {
     penalties.push({
       flag: "low_collaboration_signal",
       penalty: 10,

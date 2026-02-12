@@ -316,6 +316,83 @@ describe("computeConfidence", () => {
       expect(p.reason.length).toBeGreaterThan(10);
     }
   });
+
+  // --- solo profile type ---
+  describe("solo profile type", () => {
+    it("skips low_collaboration_signal for solo profiles", () => {
+      const { confidence, penalties } = computeConfidence(
+        makeStats({ prsMergedCount: 15, reviewsSubmittedCount: 0 }),
+        "solo",
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_collaboration_signal"),
+      ).toBeUndefined();
+      expect(confidence).toBe(100);
+    });
+
+    it("skips generated_change_pattern for solo profiles", () => {
+      const { confidence, penalties } = computeConfidence(
+        makeStats({
+          linesAdded: 25000,
+          linesDeleted: 5000,
+          reviewsSubmittedCount: 0,
+        }),
+        "solo",
+      );
+      expect(
+        penalties.find((p) => p.flag === "generated_change_pattern"),
+      ).toBeUndefined();
+      expect(confidence).toBe(100);
+    });
+
+    it("still applies burst_activity for solo profiles", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ maxCommitsIn10Min: 25 }),
+        "solo",
+      );
+      expect(penalties.find((p) => p.flag === "burst_activity")).toBeDefined();
+    });
+
+    it("still applies micro_commit_pattern for solo profiles", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ microCommitRatio: 0.8 }),
+        "solo",
+      );
+      expect(
+        penalties.find((p) => p.flag === "micro_commit_pattern"),
+      ).toBeDefined();
+    });
+
+    it("still applies single_repo_concentration for solo profiles", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ topRepoShare: 1.0, reposContributed: 1 }),
+        "solo",
+      );
+      expect(
+        penalties.find((p) => p.flag === "single_repo_concentration"),
+      ).toBeDefined();
+    });
+
+    it("still applies supplemental_unverified for solo profiles", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ hasSupplementalData: true }),
+        "solo",
+      );
+      expect(
+        penalties.find((p) => p.flag === "supplemental_unverified"),
+      ).toBeDefined();
+    });
+
+    it("defaults to collaborative when profileType is omitted", () => {
+      // This should still apply low_collaboration_signal
+      const { penalties } = computeConfidence(
+        makeStats({ prsMergedCount: 15, reviewsSubmittedCount: 0 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_collaboration_signal"),
+      ).toBeDefined();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

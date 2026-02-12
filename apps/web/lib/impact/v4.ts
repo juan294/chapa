@@ -3,6 +3,7 @@ import type {
   DimensionScores,
   DeveloperArchetype,
   ImpactV4Result,
+  ProfileType,
 } from "@chapa/shared";
 import { SCORING_CAPS, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { normalize, computeConfidence, computeAdjustedScore, getTier } from "./utils";
@@ -108,12 +109,26 @@ export function computeDimensions(stats: StatsData): DimensionScores {
 }
 
 // ---------------------------------------------------------------------------
+// Profile type detection
+// ---------------------------------------------------------------------------
+
+export function detectProfileType(stats: StatsData): ProfileType {
+  return stats.reviewsSubmittedCount === 0 ? "solo" : "collaborative";
+}
+
+// ---------------------------------------------------------------------------
 // Archetype derivation
 // ---------------------------------------------------------------------------
 
 const DIMENSION_KEYS: (keyof DimensionScores)[] = [
   "building",
   "guarding",
+  "consistency",
+  "breadth",
+];
+
+const SOLO_DIMENSION_KEYS: (keyof DimensionScores)[] = [
+  "building",
   "consistency",
   "breadth",
 ];
@@ -126,8 +141,13 @@ const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype
   { key: "building", archetype: "Builder" },
 ];
 
-export function deriveArchetype(dimensions: DimensionScores): DeveloperArchetype {
-  const values = DIMENSION_KEYS.map((k) => dimensions[k]);
+export function deriveArchetype(
+  dimensions: DimensionScores,
+  profileType: ProfileType = "collaborative",
+): DeveloperArchetype {
+  const isSolo = profileType === "solo";
+  const keys = isSolo ? SOLO_DIMENSION_KEYS : DIMENSION_KEYS;
+  const values = keys.map((k) => dimensions[k]);
   const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
   const max = Math.max(...values);
   const min = Math.min(...values);
@@ -144,7 +164,12 @@ export function deriveArchetype(dimensions: DimensionScores): DeveloperArchetype
   }
 
   // Specific archetypes: highest dimension >= 70, with tie-breaking priority
-  for (const { key, archetype } of ARCHETYPE_MAP) {
+  // Solo profiles skip Guardian
+  const candidates = isSolo
+    ? ARCHETYPE_MAP.filter((a) => a.archetype !== "Guardian")
+    : ARCHETYPE_MAP;
+
+  for (const { key, archetype } of candidates) {
     if (dimensions[key] >= 70 && dimensions[key] === max) {
       return archetype;
     }
@@ -161,24 +186,30 @@ export function deriveArchetype(dimensions: DimensionScores): DeveloperArchetype
 // ---------------------------------------------------------------------------
 
 export function computeImpactV4(stats: StatsData): ImpactV4Result {
+  const profileType = detectProfileType(stats);
   const dimensions = computeDimensions(stats);
-  const archetype = deriveArchetype(dimensions);
+  const archetype = deriveArchetype(dimensions, profileType);
 
-  const compositeScore = Math.round(
-    (dimensions.building +
-      dimensions.guarding +
-      dimensions.consistency +
-      dimensions.breadth) /
-      4
-  );
+  const compositeScore =
+    profileType === "solo"
+      ? Math.round(
+          (dimensions.building + dimensions.consistency + dimensions.breadth) / 3
+        )
+      : Math.round(
+          (dimensions.building +
+            dimensions.guarding +
+            dimensions.consistency +
+            dimensions.breadth) /
+            4
+        );
 
-  // Reuse v3 confidence system
-  const { confidence, penalties } = computeConfidence(stats);
+  const { confidence, penalties } = computeConfidence(stats, profileType);
   const adjustedComposite = computeAdjustedScore(compositeScore, confidence);
   const tier = getTier(adjustedComposite);
 
   return {
     handle: stats.handle,
+    profileType,
     dimensions,
     archetype,
     compositeScore,

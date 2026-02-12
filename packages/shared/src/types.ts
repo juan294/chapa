@@ -47,6 +47,9 @@ export interface ConfidencePenalty {
 /** Impact tier based on adjusted score */
 export type ImpactTier = "Emerging" | "Solid" | "High" | "Elite";
 
+/** Developer profile type — determines scoring behavior */
+export type ProfileType = "solo" | "collaborative";
+
 /** Four independent dimension scores (each 0..100) */
 export interface DimensionScores {
   building: number;
@@ -67,9 +70,10 @@ export type DeveloperArchetype =
 /** Full Impact v4 result */
 export interface ImpactV4Result {
   handle: string;
+  profileType: ProfileType;
   dimensions: DimensionScores;
   archetype: DeveloperArchetype;
-  compositeScore: number; // 0..100 — avg of 4 dimensions
+  compositeScore: number; // 0..100 — avg of dimensions (3 for solo, 4 for collaborative)
   confidence: number; // 50..100
   confidencePenalties: ConfidencePenalty[];
   adjustedComposite: number; // 0..100

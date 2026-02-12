@@ -90,6 +90,7 @@ const FAKE_STATS = {
 
 const FAKE_IMPACT = {
   handle: "testuser",
+  profileType: "collaborative",
   adjustedComposite: 65,
   tier: "Solid",
   confidence: 85,

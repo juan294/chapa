@@ -26,6 +26,7 @@ vi.mock("@/lib/validation", () => ({
 vi.mock("@/lib/impact/v4", () => ({
   computeImpactV4: vi.fn().mockReturnValue({
     handle: "testuser",
+    profileType: "collaborative",
     adjustedComposite: 72,
     compositeScore: 72,
     confidence: 85,

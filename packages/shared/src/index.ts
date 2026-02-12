@@ -5,6 +5,7 @@ export type {
   ConfidenceFlag,
   ConfidencePenalty,
   ImpactTier,
+  ProfileType,
   DimensionScores,
   DeveloperArchetype,
   ImpactV4Result,

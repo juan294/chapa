@@ -34,6 +34,7 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
 function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
   return {
     handle: "testuser",
+    profileType: "collaborative",
     dimensions: {
       building: 72,
       guarding: 55,

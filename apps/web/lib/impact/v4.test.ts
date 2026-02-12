@@ -6,6 +6,7 @@ import {
   computeBreadth,
   computeDimensions,
   deriveArchetype,
+  detectProfileType,
   computeImpactV4,
 } from "./v4";
 import type { StatsData, DimensionScores } from "@chapa/shared";
@@ -658,5 +659,188 @@ describe("computeImpactV4(stats)", () => {
   it("includes computedAt timestamp", () => {
     const result = computeImpactV4(makeStats());
     expect(result.computedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("includes profileType in result", () => {
+    const result = computeImpactV4(makeStats({ reviewsSubmittedCount: 5 }));
+    expect(result.profileType).toBe("collaborative");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectProfileType(stats)
+// ---------------------------------------------------------------------------
+
+describe("detectProfileType(stats)", () => {
+  it("returns 'solo' when reviewsSubmittedCount is 0", () => {
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 0 }))).toBe("solo");
+  });
+
+  it("returns 'collaborative' when reviewsSubmittedCount is 1", () => {
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 1 }))).toBe("collaborative");
+  });
+
+  it("returns 'collaborative' when reviewsSubmittedCount is high", () => {
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 100 }))).toBe("collaborative");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Solo developer scoring
+// ---------------------------------------------------------------------------
+
+describe("solo developer composite scoring", () => {
+  it("uses 3 dimensions (excludes guarding) for solo profiles", () => {
+    const stats = makeStats({
+      prsMergedWeight: 80,
+      issuesClosedCount: 40,
+      commitsTotal: 300,
+      activeDays: 200,
+      heatmapData: makeUniformHeatmap(14),
+      reposContributed: 8,
+      topRepoShare: 0.3,
+      totalStars: 50,
+      reviewsSubmittedCount: 0, // solo
+    });
+    const result = computeImpactV4(stats);
+    const dims = result.dimensions;
+
+    // Solo composite = (building + consistency + breadth) / 3
+    const expectedAvg = Math.round(
+      (dims.building + dims.consistency + dims.breadth) / 3
+    );
+    expect(result.compositeScore).toBe(expectedAvg);
+    expect(result.profileType).toBe("solo");
+  });
+
+  it("scores higher than 4-dim average for active solo devs", () => {
+    const soloStats = makeStats({
+      prsMergedWeight: 80,
+      issuesClosedCount: 40,
+      commitsTotal: 300,
+      activeDays: 200,
+      heatmapData: makeUniformHeatmap(14),
+      reposContributed: 8,
+      topRepoShare: 0.3,
+      totalStars: 50,
+      reviewsSubmittedCount: 0, // solo
+    });
+    const result = computeImpactV4(soloStats);
+    const dims = result.dimensions;
+
+    // The old 4-dim average would be lower because guarding = 0
+    const old4DimAvg = Math.round(
+      (dims.building + dims.guarding + dims.consistency + dims.breadth) / 4
+    );
+    expect(result.compositeScore).toBeGreaterThan(old4DimAvg);
+  });
+
+  it("collaborative profiles still use 4 dimensions", () => {
+    const stats = makeStats({
+      prsMergedWeight: 20,
+      reviewsSubmittedCount: 30,
+      activeDays: 60,
+      reposContributed: 5,
+      topRepoShare: 0.4,
+      heatmapData: makeUniformHeatmap(10),
+    });
+    const result = computeImpactV4(stats);
+    const dims = result.dimensions;
+    const expectedAvg = Math.round(
+      (dims.building + dims.guarding + dims.consistency + dims.breadth) / 4
+    );
+    expect(result.compositeScore).toBe(expectedAvg);
+    expect(result.profileType).toBe("collaborative");
+  });
+
+  it("solo with all zeros still scores 0", () => {
+    const result = computeImpactV4(makeStats());
+    expect(result.compositeScore).toBe(0);
+    expect(result.profileType).toBe("solo");
+    expect(result.tier).toBe("Emerging");
+  });
+
+  it("solo with maxed building/consistency/breadth scores near 100", () => {
+    const stats = makeStats({
+      prsMergedWeight: 120,
+      issuesClosedCount: 80,
+      commitsTotal: 600,
+      activeDays: 365,
+      heatmapData: makeUniformHeatmap(20),
+      maxCommitsIn10Min: 0,
+      reposContributed: 15,
+      topRepoShare: 0.1,
+      docsOnlyPrRatio: 0.5,
+      totalStars: 500,
+      reviewsSubmittedCount: 0,
+    });
+    const result = computeImpactV4(stats);
+    // Each dimension maxes at 100 individually but heatmap evenness
+    // depends on coverage — 13 weeks of data against 53-week window
+    expect(result.compositeScore).toBeGreaterThanOrEqual(95);
+  });
+
+  it("high-output solo dev gets >= 50 composite and at least Solid tier", () => {
+    // Simulates a solo dev with ~2100 contributions
+    const stats = makeStats({
+      commitsTotal: 500,
+      activeDays: 250,
+      prsMergedCount: 80,
+      prsMergedWeight: 90,
+      issuesClosedCount: 30,
+      linesAdded: 15000,
+      linesDeleted: 5000,
+      reposContributed: 5,
+      topRepoShare: 0.4,
+      maxCommitsIn10Min: 5,
+      heatmapData: makeUniformHeatmap(14),
+      reviewsSubmittedCount: 0,
+    });
+    const result = computeImpactV4(stats);
+    expect(result.compositeScore).toBeGreaterThanOrEqual(50);
+    expect(["Solid", "High", "Elite"]).toContain(result.tier);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Solo developer archetype derivation
+// ---------------------------------------------------------------------------
+
+describe("solo developer archetype", () => {
+  it("never assigns Guardian to solo profiles", () => {
+    // Even if guarding dimension were somehow high, solo should not get Guardian
+    const dims: DimensionScores = { building: 50, guarding: 85, consistency: 60, breadth: 55 };
+    expect(deriveArchetype(dims, "solo")).not.toBe("Guardian");
+  });
+
+  it("can assign Builder to solo profile", () => {
+    const dims: DimensionScores = { building: 80, guarding: 0, consistency: 50, breadth: 55 };
+    expect(deriveArchetype(dims, "solo")).toBe("Builder");
+  });
+
+  it("can assign Marathoner to solo profile", () => {
+    const dims: DimensionScores = { building: 50, guarding: 0, consistency: 80, breadth: 55 };
+    expect(deriveArchetype(dims, "solo")).toBe("Marathoner");
+  });
+
+  it("can assign Polymath to solo profile", () => {
+    const dims: DimensionScores = { building: 50, guarding: 0, consistency: 55, breadth: 80 };
+    expect(deriveArchetype(dims, "solo")).toBe("Polymath");
+  });
+
+  it("can assign Balanced to solo profile when 3 dims within 15 pts and avg >= 60", () => {
+    const dims: DimensionScores = { building: 70, guarding: 0, consistency: 65, breadth: 68 };
+    expect(deriveArchetype(dims, "solo")).toBe("Balanced");
+  });
+
+  it("returns Emerging for low solo dimensions", () => {
+    const dims: DimensionScores = { building: 20, guarding: 0, consistency: 25, breadth: 15 };
+    expect(deriveArchetype(dims, "solo")).toBe("Emerging");
+  });
+
+  it("defaults to collaborative behavior when profileType is omitted", () => {
+    const dims: DimensionScores = { building: 50, guarding: 85, consistency: 60, breadth: 55 };
+    // Without profileType arg, should use all 4 dims → Guardian
+    expect(deriveArchetype(dims)).toBe("Guardian");
   });
 });
