@@ -1,4 +1,4 @@
-import { createHash, createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { createHash, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,7 +57,10 @@ export function validateState(
     .find((c) => c.startsWith(`${STATE_COOKIE_NAME}=`));
   if (!match) return false;
   const cookieState = match.slice(STATE_COOKIE_NAME.length + 1);
-  return cookieState === queryState;
+  const cookieBuf = Buffer.from(cookieState, "utf8");
+  const queryBuf = Buffer.from(queryState, "utf8");
+  if (cookieBuf.length !== queryBuf.length) return false;
+  return timingSafeEqual(cookieBuf, queryBuf);
 }
 
 export function clearStateCookie(): string {
