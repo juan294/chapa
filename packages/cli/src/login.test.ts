@@ -152,6 +152,59 @@ describe("login", () => {
     errorSpy.mockRestore();
   });
 
+  it("logs each poll response in verbose mode", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount < 3) {
+        return new Response(JSON.stringify({ status: "pending" }), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { verbose: true });
+    await advancePoll(); // poll 1 → pending
+    await advancePoll(); // poll 2 → pending
+    await advancePoll(); // poll 3 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("[poll 1]");
+    expect(allErrors).toContain("pending");
+    expect(allErrors).toContain("[poll 3]");
+    expect(allErrors).toContain("approved");
+    errorSpy.mockRestore();
+  });
+
+  it("logs network errors in verbose mode", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("fetch failed");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { verbose: true });
+    await advancePoll(); // poll 1 → network error
+    await advancePoll(); // poll 2 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("[poll 1]");
+    expect(allErrors).toContain("network error");
+    errorSpy.mockRestore();
+  });
+
   it("exits with code 1 on expired session", { timeout: 10000 }, async () => {
     vi.useRealTimers(); // Use real timers for this test — fast enough with 2s sleep
 

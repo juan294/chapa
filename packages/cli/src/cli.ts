@@ -9,6 +9,7 @@ export interface CliArgs {
   emuToken?: string;
   token?: string;
   server: string;
+  verbose: boolean;
   version: boolean;
   help: boolean;
 }
@@ -33,6 +34,7 @@ export function parseArgs(argv: string[]): CliArgs {
       "emu-token": { type: "string" },
       token: { type: "string" },
       server: { type: "string", default: DEFAULT_SERVER },
+      verbose: { type: "boolean", default: false },
       version: { type: "boolean", short: "v", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
@@ -46,6 +48,7 @@ export function parseArgs(argv: string[]): CliArgs {
     emuToken: values["emu-token"] as string | undefined,
     token: values.token as string | undefined,
     server: (values.server as string) ?? DEFAULT_SERVER,
+    verbose: (values.verbose as boolean) ?? false,
     version: (values.version as boolean) ?? false,
     help: (values.help as boolean) ?? false,
   };

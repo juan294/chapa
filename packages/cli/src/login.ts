@@ -23,7 +23,12 @@ interface PollResponse {
   handle?: string;
 }
 
-export async function login(serverUrl: string): Promise<void> {
+export interface LoginOptions {
+  verbose?: boolean;
+}
+
+export async function login(serverUrl: string, opts: LoginOptions = {}): Promise<void> {
+  const { verbose = false } = opts;
   const baseUrl = serverUrl.replace(/\/+$/, "");
   const sessionId = randomUUID();
   const authorizeUrl = `${baseUrl}/cli/authorize?session=${sessionId}`;
@@ -49,15 +54,22 @@ export async function login(serverUrl: string): Promise<void> {
         `${baseUrl}/api/cli/auth/poll?session=${sessionId}`,
       );
       if (!res.ok) {
-        if (!serverErrorLogged) {
+        if (verbose) {
+          console.error(`[poll ${i + 1}] HTTP ${res.status}`);
+        } else if (!serverErrorLogged) {
           console.error(`\nServer returned ${res.status}. Retrying...`);
           serverErrorLogged = true;
         }
         continue;
       }
       data = await res.json();
-    } catch {
-      // Network error — keep trying
+      if (verbose) {
+        console.error(`[poll ${i + 1}] ${data?.status ?? "no status"}`);
+      }
+    } catch (err) {
+      if (verbose) {
+        console.error(`[poll ${i + 1}] network error: ${(err as Error).message}`);
+      }
       continue;
     }
 
