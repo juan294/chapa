@@ -24,6 +24,8 @@ Options:
   --handle <handle>       Override personal handle (auto-detected from login)
   --token <token>         Override auth token (auto-detected from login)
   --server <url>          Chapa server URL (default: https://chapa.thecreativetoken.com)
+  --verbose               Show detailed polling logs during login
+  --insecure              Skip TLS certificate verification (corporate networks)
   --version, -v           Show version number
   --help, -h              Show this help message
 `;
@@ -41,9 +43,16 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // Global TLS bypass for corporate networks — applies to all commands
+  if (args.insecure) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    console.warn("\n⚠ TLS certificate verification disabled (--insecure).");
+    console.warn("  Use only on corporate networks with TLS interception.\n");
+  }
+
   // ── login ────────────────────────────────────────────────────────────
   if (args.command === "login") {
-    await login(args.server);
+    await login(args.server, { verbose: args.verbose, insecure: args.insecure });
     return;
   }
 

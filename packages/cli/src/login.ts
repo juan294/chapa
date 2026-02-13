@@ -23,7 +23,62 @@ interface PollResponse {
   handle?: string;
 }
 
-export async function login(serverUrl: string): Promise<void> {
+export interface LoginOptions {
+  verbose?: boolean;
+  insecure?: boolean;
+}
+
+const TLS_ERROR_PATTERNS = [
+  // Node.js error codes (uppercase)
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "CERT_HAS_EXPIRED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "CERTIFICATE_VERIFY_FAILED",
+  // Human-readable messages (lowercase, as returned by Node.js fetch)
+  "self-signed certificate",
+  "unable to verify",
+  "certificate has expired",
+];
+
+function isTlsError(message: string): boolean {
+  return TLS_ERROR_PATTERNS.some((p) => message.includes(p));
+}
+
+/**
+ * Walk the error `.cause` chain and return the deepest message.
+ * Node.js `fetch()` wraps real errors: Error("fetch failed", { cause: Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE") })
+ */
+function getRootErrorMessage(err: unknown): string {
+  let current = err;
+  let message = "";
+  while (current instanceof Error) {
+    message = current.message;
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return message;
+}
+
+/**
+ * Collect all messages and error codes from the cause chain (for TLS pattern matching).
+ * Includes both .message and .code from each error in the chain.
+ */
+function getFullErrorChain(err: unknown): string {
+  const parts: string[] = [];
+  let current = err;
+  while (current instanceof Error) {
+    parts.push(current.message);
+    const code = (current as Error & { code?: string }).code;
+    if (code) parts.push(code);
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return parts.join(" | ");
+}
+
+export async function login(serverUrl: string, opts: LoginOptions = {}): Promise<void> {
+  const { verbose = false, insecure = false } = opts;
+
   const baseUrl = serverUrl.replace(/\/+$/, "");
   const sessionId = randomUUID();
   const authorizeUrl = `${baseUrl}/cli/authorize?session=${sessionId}`;
@@ -49,15 +104,29 @@ export async function login(serverUrl: string): Promise<void> {
         `${baseUrl}/api/cli/auth/poll?session=${sessionId}`,
       );
       if (!res.ok) {
-        if (!serverErrorLogged) {
+        if (verbose) {
+          console.error(`[poll ${i + 1}] HTTP ${res.status}`);
+        } else if (!serverErrorLogged) {
           console.error(`\nServer returned ${res.status}. Retrying...`);
           serverErrorLogged = true;
         }
         continue;
       }
       data = await res.json();
-    } catch {
-      // Network error — keep trying
+      if (verbose) {
+        console.error(`[poll ${i + 1}] ${data?.status ?? "no status"}`);
+      }
+    } catch (err) {
+      const rootMsg = getRootErrorMessage(err);
+      const fullChain = getFullErrorChain(err);
+      if (verbose) {
+        console.error(`[poll ${i + 1}] network error: ${rootMsg}`);
+      }
+      if (!insecure && isTlsError(fullChain)) {
+        console.error(`\nTLS certificate error: ${rootMsg}`);
+        console.error("This looks like a corporate network with TLS interception.");
+        console.error("  try: chapa login --insecure\n");
+      }
       continue;
     }
 

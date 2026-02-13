@@ -78,7 +78,7 @@ npx chapa-cli --help
 You should see:
 
 ```
-chapa-cli v0.2.0
+chapa-cli v0.2.4
 
 Merge GitHub EMU (Enterprise Managed User) contributions into your Chapa badge.
 
@@ -93,6 +93,8 @@ Options:
   --handle <handle>       Override personal handle (auto-detected from login)
   --token <token>         Override auth token (auto-detected from login)
   --server <url>          Chapa server URL (default: https://chapa.thecreativetoken.com)
+  --verbose               Show detailed polling logs during login
+  --insecure              Skip TLS certificate verification (corporate networks)
   --version, -v           Show version number
   --help, -h              Show this help message
 ```
@@ -139,21 +141,17 @@ Credentials saved to ~/.chapa/credentials.json
 
 Your credentials are stored locally at `~/.chapa/credentials.json` with restricted file permissions (readable only by you). The token expires after 90 days — just run `chapa login` again to refresh.
 
-### Log out
+### Log out (when needed)
+
+To clear your credentials later (e.g., switching accounts or revoking access):
 
 ```bash
 npx chapa-cli logout
 ```
 
-This removes the stored credentials from `~/.chapa/credentials.json`.
+This removes `~/.chapa/credentials.json`. You'll need to run `chapa login` again before using `merge`.
 
-### Check if you're logged in
-
-If you run `chapa merge` without being logged in, the CLI will tell you:
-
-```
-Error: Not authenticated. Run 'chapa login' first, or pass --token.
-```
+> **Don't log out now** — you need your credentials for the merge step below.
 
 ---
 
@@ -221,27 +219,19 @@ Should print your EMU GitHub username. If it returns an error, see [Troubleshoot
 
 ## 5. Running the CLI
 
-### Step 1: Log in (one time)
+Once you've logged in ([Step 3](#3-authentication)) and set up your EMU token ([Step 4](#4-emu-token-setup)), run:
 
 ```bash
-npx chapa-cli login
+npx chapa-cli merge --emu-handle Juan-GonzalezPonce_avoltagh
 ```
 
-### Step 2: Merge EMU stats
-
-```bash
-npx chapa-cli merge --emu-handle juan294-corp
-```
-
-Replace `juan294-corp` with your **EMU** GitHub handle.
-
-That's it! Your personal handle and auth token are automatically loaded from the login step.
+Replace `Juan-GonzalezPonce_avoltagh` with your **EMU** GitHub handle. Your personal handle and auth token are loaded from `~/.chapa/credentials.json` (saved during login).
 
 ### Passing the EMU token as a flag (no env var)
 
 ```bash
 npx chapa-cli merge \
-  --emu-handle juan294-corp \
+  --emu-handle Juan-GonzalezPonce_avoltagh \
   --emu-token ghp_your_emu_token
 ```
 
@@ -251,7 +241,7 @@ If your Chapa handle differs from what was saved during login:
 
 ```bash
 npx chapa-cli merge \
-  --emu-handle juan294-corp \
+  --emu-handle Juan-GonzalezPonce_avoltagh \
   --handle my-other-handle
 ```
 
@@ -259,14 +249,14 @@ npx chapa-cli merge \
 
 ```bash
 npx chapa-cli merge \
-  --emu-handle juan294-corp \
+  --emu-handle Juan-GonzalezPonce_avoltagh \
   --server http://localhost:3001
 ```
 
 ### Expected output
 
 ```
-Fetching stats for EMU account: juan294-corp...
+Fetching stats for EMU account: Juan-GonzalezPonce_avoltagh...
 Found: 142 commits, 23 PRs merged, 45 reviews
 Uploading supplemental stats to https://chapa.thecreativetoken.com...
 Success! Supplemental stats uploaded. Your badge will reflect combined data on next refresh.
@@ -337,15 +327,32 @@ The CLI needs access to these domains:
 npm config set registry https://npm.yourcompany.com/
 ```
 
-### 7.3 Self-signed SSL certificates
+### 7.3 Self-signed SSL certificates (TLS interception)
 
-Some corporate proxies use self-signed certificates for TLS inspection.
+Many corporate networks perform TLS interception (man-in-the-middle) by replacing SSL certificates with corporate CA-signed ones. This causes Node.js to reject the connection because it doesn't trust the corporate CA.
 
 **Symptoms:**
-- `SELF_SIGNED_CERT_IN_CHAIN` errors
 - `UNABLE_TO_VERIFY_LEAF_SIGNATURE` errors
+- `SELF_SIGNED_CERT_IN_CHAIN` errors
+- `CERT_HAS_EXPIRED` errors
+- `DEPTH_ZERO_SELF_SIGNED_CERT` errors
+- `chapa login` hangs or fails with TLS errors
 
-**Fix — Tell Node.js to trust your corporate CA:**
+**Quick fix — Use the `--insecure` flag:**
+
+```bash
+npx chapa-cli login --insecure
+```
+
+This disables TLS certificate verification for the login session only. The CLI will warn you and automatically re-enable verification after login completes. The flag also works with `merge`:
+
+```bash
+npx chapa-cli merge --emu-handle Juan-GonzalezPonce_avoltagh --insecure
+```
+
+> **Note:** The CLI auto-detects TLS errors. If you see a TLS error without `--insecure`, the CLI will suggest it automatically.
+
+**Proper fix — Tell Node.js to trust your corporate CA:**
 
 ```bash
 export NODE_EXTRA_CA_CERTS="/path/to/corporate-ca-bundle.pem"
@@ -356,14 +363,14 @@ Ask your IT team for the CA certificate file. Common locations:
 - Linux: `/etc/ssl/certs/ca-certificates.crt`
 - Windows: Export from Certificate Manager (`certmgr.msc`)
 
-**Last resort (not recommended for production):**
+**Manual last resort (not recommended for production):**
 
 ```bash
 export NODE_TLS_REJECT_UNAUTHORIZED=0
 npm config set strict-ssl false
 ```
 
-This disables certificate verification entirely. Only use this for testing.
+This disables certificate verification for all Node.js processes. Prefer `--insecure` which scopes the bypass to the CLI session only.
 
 ### 7.4 Restricted Node.js installation
 
@@ -451,6 +458,18 @@ chapa merge --emu-handle <emu>
 
 Run `chapa login` to authenticate via your browser. If you've logged in before but see this error, your token may have expired (90-day expiry). Log in again.
 
+### `chapa login` hangs or shows TLS errors
+
+If `chapa login` starts polling but never completes, or fails with certificate errors:
+
+1. **On a corporate network?** Try `chapa login --insecure` — corporate TLS interception is the most common cause
+2. **Use `--verbose` for diagnostics:** `chapa login --verbose` shows each poll attempt and its result, helping pinpoint where the connection fails
+3. **Check network access** to `chapa.thecreativetoken.com`:
+   ```bash
+   curl -v https://chapa.thecreativetoken.com/api/health
+   ```
+4. See [section 7.3](#73-self-signed-ssl-certificates-tls-interception) for the full corporate TLS guide
+
 ### `ECONNREFUSED` or `ETIMEDOUT`
 
 - Check your internet connection
@@ -498,17 +517,19 @@ If not found, reinstall Node.js and check "Add to PATH" during installation.
 | `chapa logout` | Clear stored credentials |
 | `chapa merge` | Merge EMU stats into your badge |
 
-### All flags (for merge)
+### All flags
 
-| Flag | Short | Description | Default |
-|------|-------|-------------|---------|
-| `--emu-handle` | | EMU GitHub handle | (required) |
-| `--emu-token` | | EMU token | `$GITHUB_EMU_TOKEN` |
-| `--handle` | | Override personal handle | Auto-detected from login |
-| `--token` | | Override auth token | Auto-detected from login |
-| `--server` | | Chapa server URL | `https://chapa.thecreativetoken.com` |
-| `--version` | `-v` | Print version | |
-| `--help` | `-h` | Print help | |
+| Flag | Short | Applies to | Description | Default |
+|------|-------|-----------|-------------|---------|
+| `--emu-handle` | | `merge` | EMU GitHub handle | (required) |
+| `--emu-token` | | `merge` | EMU token | `$GITHUB_EMU_TOKEN` |
+| `--handle` | | `merge` | Override personal handle | Auto-detected from login |
+| `--token` | | `merge` | Override auth token | Auto-detected from login |
+| `--server` | | all | Chapa server URL | `https://chapa.thecreativetoken.com` |
+| `--verbose` | | `login` | Show detailed polling logs | `false` |
+| `--insecure` | | `login`, `merge` | Skip TLS certificate verification | `false` |
+| `--version` | `-v` | all | Print version | |
+| `--help` | `-h` | all | Print help | |
 
 ### Token resolution order
 

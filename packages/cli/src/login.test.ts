@@ -152,6 +152,305 @@ describe("login", () => {
     errorSpy.mockRestore();
   });
 
+  it("logs each poll response in verbose mode", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount < 3) {
+        return new Response(JSON.stringify({ status: "pending" }), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { verbose: true });
+    await advancePoll(); // poll 1 → pending
+    await advancePoll(); // poll 2 → pending
+    await advancePoll(); // poll 3 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("[poll 1]");
+    expect(allErrors).toContain("pending");
+    expect(allErrors).toContain("[poll 3]");
+    expect(allErrors).toContain("approved");
+    errorSpy.mockRestore();
+  });
+
+  it("logs network errors in verbose mode", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("fetch failed");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { verbose: true });
+    await advancePoll(); // poll 1 → network error
+    await advancePoll(); // poll 2 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("[poll 1]");
+    expect(allErrors).toContain("network error");
+    errorSpy.mockRestore();
+  });
+
+  it("does not set or restore NODE_TLS_REJECT_UNAUTHORIZED (handled by index.ts)", async () => {
+    // TLS bypass is now global in index.ts, not in login().
+    // Verify login() does NOT touch the env var.
+    const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+
+    const warnSpy = vi.spyOn(console, "warn");
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      ),
+    );
+
+    const p = login("https://example.com", { insecure: true });
+    await advancePoll();
+    await p;
+
+    // login() should NOT have set NODE_TLS_REJECT_UNAUTHORIZED
+    expect(process.env.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined();
+
+    // login() should NOT print TLS warning (index.ts does that)
+    const allWarns = warnSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allWarns).not.toContain("TLS certificate verification disabled");
+
+    if (originalVal !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
+    }
+    warnSpy.mockRestore();
+  });
+
+  it("suggests --insecure when TLS error is detected", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll(); // poll 1 → TLS error
+    await advancePoll(); // poll 2 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    expect(allErrors).toContain("corporate network");
+    errorSpy.mockRestore();
+  });
+
+  it("suggests --insecure for CERT_HAS_EXPIRED errors", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("CERT_HAS_EXPIRED");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    errorSpy.mockRestore();
+  });
+
+  it("does not suggest --insecure for non-TLS errors", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("ECONNREFUSED");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).not.toContain("--insecure");
+    errorSpy.mockRestore();
+  });
+
+  it("verbose mode shows root cause from error.cause chain", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("fetch failed", {
+          cause: new Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE"),
+        });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { verbose: true });
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("UNABLE_TO_VERIFY_LEAF_SIGNATURE");
+    errorSpy.mockRestore();
+  });
+
+  it("suggests --insecure when TLS error is nested in error.cause", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("fetch failed", {
+          cause: new Error("SELF_SIGNED_CERT_IN_CHAIN"),
+        });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    expect(allErrors).toContain("corporate network");
+    errorSpy.mockRestore();
+  });
+
+  it("suggests --insecure for human-readable TLS messages with error code", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // Real-world Node.js fetch error: human-readable message + code property
+        const cause = Object.assign(
+          new Error("self-signed certificate in certificate chain"),
+          { code: "SELF_SIGNED_CERT_IN_CHAIN" },
+        );
+        throw new Error("fetch failed", { cause });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    expect(allErrors).toContain("self-signed certificate");
+    errorSpy.mockRestore();
+  });
+
+  it("suggests --insecure for human-readable TLS message without code property", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // Some environments only set the message, no code
+        throw new Error("fetch failed", {
+          cause: new Error("unable to verify the first certificate"),
+        });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    errorSpy.mockRestore();
+  });
+
+  it("does not suggest --insecure when insecure is already enabled", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { insecure: true });
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    // Should NOT suggest --insecure since it's already enabled
+    expect(allErrors).not.toContain("try: chapa login --insecure");
+    errorSpy.mockRestore();
+
+    if (originalVal === undefined) {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    } else {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
+    }
+  });
+
   it("exits with code 1 on expired session", { timeout: 10000 }, async () => {
     vi.useRealTimers(); // Use real timers for this test — fast enough with 2s sleep
 
