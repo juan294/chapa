@@ -92,13 +92,36 @@ describe("verifyCliToken", () => {
 });
 
 describe("isCliToken", () => {
-  it("returns true for tokens with a dot", () => {
+  it("returns false for string with no dot", () => {
+    expect(isCliToken("abc")).toBe(false);
+  });
+
+  it("returns true for valid format (two base64url parts separated by dot)", () => {
+    expect(isCliToken("abc.def")).toBe(true);
+  });
+
+  it("returns true for a real generated CLI token", () => {
     const token = generateCliToken("juan294", SECRET);
     expect(isCliToken(token)).toBe(true);
   });
 
-  it("returns false for GitHub PAT format", () => {
-    expect(isCliToken("ghp_abc123def456")).toBe(false);
-    expect(isCliToken("gho_xyz789")).toBe(false);
+  it("returns false for GitHub PAT format (no dot, underscore prefix)", () => {
+    expect(isCliToken("ghp_abc123")).toBe(false);
+  });
+
+  it("returns false when first part is empty", () => {
+    expect(isCliToken(".abc")).toBe(false);
+  });
+
+  it("returns false when second part is empty", () => {
+    expect(isCliToken("abc.")).toBe(false);
+  });
+
+  it("returns false for multiple dots", () => {
+    expect(isCliToken("abc.def.ghi")).toBe(false);
+  });
+
+  it("returns false when signature contains invalid chars (space)", () => {
+    expect(isCliToken("abc.de f")).toBe(false);
   });
 });

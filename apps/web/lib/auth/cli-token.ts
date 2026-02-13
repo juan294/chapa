@@ -61,9 +61,16 @@ export function verifyCliToken(
 }
 
 /**
- * Detect whether a Bearer token is a Chapa CLI token (has a `.` separator)
+ * Detect whether a Bearer token is a Chapa CLI token
+ * (exactly one dot, both parts non-empty and base64url-safe)
  * vs a GitHub PAT (starts with ghp_ / gho_ / ghu_ or has no dot).
  */
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+
 export function isCliToken(token: string): boolean {
-  return token.includes(".");
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [payload, sig] = parts;
+  if (!payload || !sig) return false;
+  return BASE64URL_RE.test(payload) && BASE64URL_RE.test(sig);
 }

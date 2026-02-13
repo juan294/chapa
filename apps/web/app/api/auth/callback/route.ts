@@ -19,6 +19,25 @@ function cookieFlags(): string {
 }
 
 /**
+ * Validate that a redirect URL is safe (same-origin only).
+ * Prevents open-redirect attacks via the postLoginRedirect cookie.
+ */
+function isSafeRedirect(url: string): boolean {
+  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (base) {
+    try {
+      const parsed = new URL(url, base);
+      const origin = new URL(base);
+      return parsed.origin === origin.origin;
+    } catch {
+      // URL parsing failed — fall through to path check
+    }
+  }
+  // Fallback: only allow paths starting with "/"
+  return url.startsWith("/") && !url.startsWith("//");
+}
+
+/**
  * Read and consume the post-login redirect cookie, if present.
  */
 function readRedirectCookie(cookieHeader: string | null): string | null {
@@ -87,9 +106,12 @@ export async function GET(request: NextRequest) {
     sessionSecret,
   );
 
-  // Use post-login redirect if available, otherwise default to profile page
+  // Use post-login redirect if available and safe, otherwise default to profile page
   const postLoginRedirect = readRedirectCookie(cookieHeader);
-  const redirectUrl = postLoginRedirect ?? `/u/${user.login}`;
+  const redirectUrl =
+    postLoginRedirect && isSafeRedirect(postLoginRedirect)
+      ? postLoginRedirect
+      : `/u/${user.login}`;
 
   const response = NextResponse.redirect(
     new URL(redirectUrl, request.url),
