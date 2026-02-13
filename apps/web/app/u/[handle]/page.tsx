@@ -220,11 +220,9 @@ export default async function SharePage({ params }: SharePageProps) {
                 </div>
               </section>
             )}
-          </>
-        )}
 
-        {/* ── Embed Snippets ──────────────────────────────────── */}
-        <section className="space-y-6 animate-fade-in-up [animation-delay:500ms]">
+            {/* ── Embed Snippets ──────────────────────────────────── */}
+            <section className="space-y-6 animate-fade-in-up [animation-delay:500ms]">
           <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary">
             Embed This Badge
           </h2>
@@ -278,8 +276,10 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-amber">{" />"}</span>
               </p>
             </div>
-          </div>
-        </section>
+            </div>
+          </section>
+          </>
+        )}
       </div>
 
       <GlobalCommandBar />
