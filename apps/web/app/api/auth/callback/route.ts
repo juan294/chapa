@@ -8,6 +8,34 @@ import {
 } from "@/lib/auth/github";
 import { rateLimit } from "@/lib/cache/redis";
 
+function isSecureOrigin(): boolean {
+  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
+  return base.startsWith("https://");
+}
+
+function cookieFlags(): string {
+  const secure = isSecureOrigin() ? " Secure;" : "";
+  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+}
+
+/**
+ * Read and consume the post-login redirect cookie, if present.
+ */
+function readRedirectCookie(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("chapa_redirect="));
+  if (!match) return null;
+  const raw = match.slice("chapa_redirect=".length);
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 15 minutes
   const ip =
@@ -59,10 +87,19 @@ export async function GET(request: NextRequest) {
     sessionSecret,
   );
 
+  // Use post-login redirect if available, otherwise default to profile page
+  const postLoginRedirect = readRedirectCookie(cookieHeader);
+  const redirectUrl = postLoginRedirect ?? `/u/${user.login}`;
+
   const response = NextResponse.redirect(
-    new URL(`/u/${user.login}`, request.url),
+    new URL(redirectUrl, request.url),
   );
   response.headers.append("Set-Cookie", cookie);
   response.headers.append("Set-Cookie", clearStateCookie());
+  // Clear the redirect cookie
+  response.headers.append(
+    "Set-Cookie",
+    `chapa_redirect=; ${cookieFlags()}; Max-Age=0`,
+  );
   return response;
 }

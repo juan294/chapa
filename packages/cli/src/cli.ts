@@ -3,7 +3,7 @@ import { parseArgs as nodeParseArgs } from "node:util";
 const DEFAULT_SERVER = "https://chapa.thecreativetoken.com";
 
 export interface CliArgs {
-  command: "merge" | null;
+  command: "merge" | "login" | "logout" | null;
   handle?: string;
   emuHandle?: string;
   emuToken?: string;
@@ -13,10 +13,14 @@ export interface CliArgs {
   help: boolean;
 }
 
+const VALID_COMMANDS = ["merge", "login", "logout"] as const;
+
 export function parseArgs(argv: string[]): CliArgs {
   // Extract positional command before flags
-  const positional = argv.find((a) => !a.startsWith("--"));
-  const command = positional === "merge" ? "merge" : null;
+  const positional = argv.find((a) => !a.startsWith("--") && !a.startsWith("-"));
+  const command = VALID_COMMANDS.includes(positional as (typeof VALID_COMMANDS)[number])
+    ? (positional as CliArgs["command"])
+    : null;
 
   // Remove positional from argv for nodeParseArgs
   const flagArgs = argv.filter((a) => a !== positional || a.startsWith("--"));
