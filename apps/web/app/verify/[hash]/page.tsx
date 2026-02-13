@@ -3,7 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import Link from "next/link";
 import type { Metadata } from "next";
 
-const HASH_PATTERN = /^[0-9a-f]{8}$/;
+const HASH_PATTERN = /^[0-9a-f]{8}([0-9a-f]{8})?$/;
 
 interface VerifyPageProps {
   params: Promise<{ hash: string }>;
@@ -290,7 +290,7 @@ function InvalidHashCard({ hash }: { hash: string }) {
             Invalid Hash
           </h1>
           <p className="text-sm text-text-secondary">
-            The verification hash must be exactly 8 hex characters.
+            The verification hash must be 8 or 16 hex characters.
           </p>
         </div>
       </div>

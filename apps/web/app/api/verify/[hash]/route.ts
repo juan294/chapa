@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getVerificationRecord } from "@/lib/verification/store";
 import { rateLimit } from "@/lib/cache/redis";
 
-const HASH_PATTERN = /^[0-9a-f]{8}$/;
+const HASH_PATTERN = /^[0-9a-f]{8}([0-9a-f]{8})?$/;
 
 export async function GET(
   request: NextRequest,
@@ -13,8 +13,8 @@ export async function GET(
   // Validate hash format
   if (!HASH_PATTERN.test(hash)) {
     return NextResponse.json(
-      { error: "Invalid hash format. Expected 8 hex characters." },
-      { status: 400 },
+      { error: "Invalid hash format. Expected 8 or 16 hex characters." },
+      { status: 400, headers: { "Access-Control-Allow-Origin": "*" } },
     );
   }
 
@@ -25,7 +25,7 @@ export async function GET(
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "60" } },
+      { status: 429, headers: { "Retry-After": "60", "Access-Control-Allow-Origin": "*" } },
     );
   }
 
@@ -55,4 +55,15 @@ export async function GET(
       },
     },
   );
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
 }
