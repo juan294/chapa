@@ -120,6 +120,7 @@ export default async function Home({
                 <p><span className="text-terminal-dim select-none">&gt;</span> AI writes the code. What matters is how you drive impact.</p>
                 <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions beyond commits and lines of code.</p>
                 <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Every score is cryptographically sealed. Verifiable, not just trusted.</p>
               </div>
               <div className="pt-4">
                 <a
