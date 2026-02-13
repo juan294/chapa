@@ -1,16 +1,11 @@
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
 import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
 import { renderVerificationStrip } from "./VerificationStrip";
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  return String(n);
-}
 
 interface BadgeOptions {
   includeGithubBranding?: boolean;
