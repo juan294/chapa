@@ -117,9 +117,9 @@ export default async function Home({
                 <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions showing what kind of developer you are.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Not just how much code you write.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Archetype + Dimensions + Confidence.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> AI writes the code. What matters is how you drive impact.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions beyond commits and lines of code.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
               </div>
               <div className="pt-4">
                 <a
