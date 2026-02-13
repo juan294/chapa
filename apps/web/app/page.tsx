@@ -8,8 +8,7 @@ import Link from "next/link";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   includeGithubBranding: true,
-  verificationHash: "d3m0b4dg",
-  verificationDate: "2025-01-01",
+  demoMode: true,
 });
 
 const NAV_LINKS = [
