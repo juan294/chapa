@@ -11,6 +11,7 @@ const {
   mockReadSessionCookie,
   mockIsValidHandle,
   mockRateLimit,
+  mockTrackBadgeGenerated,
   mockFetchAvatarBase64,
   mockGenerateVerificationCode,
   mockStoreVerificationRecord,
@@ -21,6 +22,7 @@ const {
   mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockTrackBadgeGenerated: vi.fn(),
   mockFetchAvatarBase64: vi.fn(),
   mockGenerateVerificationCode: vi.fn(),
   mockStoreVerificationRecord: vi.fn(),
@@ -48,6 +50,7 @@ vi.mock("@/lib/validation", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  trackBadgeGenerated: mockTrackBadgeGenerated,
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
@@ -60,6 +63,11 @@ vi.mock("@/lib/verification/hmac", () => ({
 
 vi.mock("@/lib/verification/store", () => ({
   storeVerificationRecord: mockStoreVerificationRecord,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: (req: Request) =>
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
 // escapeXml is used in fallbackSvg — provide real implementation
@@ -127,6 +135,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockGenerateVerificationCode.mockReturnValue(null);
     mockStoreVerificationRecord.mockResolvedValue(undefined);
+    mockTrackBadgeGenerated.mockResolvedValue(undefined);
   });
 
   // -------------------------------------------------------------------------
@@ -373,6 +382,39 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Badge generation tracking
+  // -------------------------------------------------------------------------
+
+  describe("badge generation tracking", () => {
+    it("tracks badge generation on successful render", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
+    });
+
+    it("does not track when stats fetch fails", async () => {
+      mockGetStatsData.mockResolvedValue(null);
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
+    });
+
+    it("does not track when handle is invalid", async () => {
+      mockIsValidHandle.mockReturnValue(false);
+      const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
+    });
+
+    it("does not track when rate limited", async () => {
+      mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,6 +7,7 @@ import {
   clearStateCookie,
 } from "@/lib/auth/github";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
@@ -16,6 +17,25 @@ function isSecureOrigin(): boolean {
 function cookieFlags(): string {
   const secure = isSecureOrigin() ? " Secure;" : "";
   return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+}
+
+/**
+ * Validate that a redirect URL is safe (same-origin only).
+ * Prevents open-redirect attacks via the postLoginRedirect cookie.
+ */
+function isSafeRedirect(url: string): boolean {
+  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (base) {
+    try {
+      const parsed = new URL(url, base);
+      const origin = new URL(base);
+      return parsed.origin === origin.origin;
+    } catch {
+      // URL parsing failed — fall through to path check
+    }
+  }
+  // Fallback: only allow paths starting with "/"
+  return url.startsWith("/") && !url.startsWith("//");
 }
 
 /**
@@ -38,8 +58,7 @@ function readRedirectCookie(cookieHeader: string | null): string | null {
 
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 15 minutes
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:callback:${ip}`, 10, 900);
   if (!rl.allowed) {
     return NextResponse.json(
@@ -87,9 +106,12 @@ export async function GET(request: NextRequest) {
     sessionSecret,
   );
 
-  // Use post-login redirect if available, otherwise default to profile page
+  // Use post-login redirect if available and safe, otherwise default to profile page
   const postLoginRedirect = readRedirectCookie(cookieHeader);
-  const redirectUrl = postLoginRedirect ?? `/u/${user.login}`;
+  const redirectUrl =
+    postLoginRedirect && isSafeRedirect(postLoginRedirect)
+      ? postLoginRedirect
+      : `/u/${user.login}`;
 
   const response = NextResponse.redirect(
     new URL(redirectUrl, request.url),

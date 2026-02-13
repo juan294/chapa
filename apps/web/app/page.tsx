@@ -4,11 +4,11 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+import Link from "next/link";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   includeGithubBranding: true,
-  verificationHash: "d3m0b4dg",
-  verificationDate: "2025-01-01",
+  demoMode: true,
 });
 
 const NAV_LINKS = [
@@ -24,7 +24,7 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: "Builder, Guardian, Marathoner, Polymath — your profile shape tells a story.",
+    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#F472B6] hover:text-[#F9A8D4] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="text-text-primary hover:text-white transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="text-[#9AA4B2] hover:text-[#C0C7D0] transition-colors">Emerging</Link> — your profile shape tells a story.</>),
   },
   {
     title: "CONFIDENCE RATING",
@@ -47,10 +47,9 @@ const STEPS = [
 ];
 
 const STATS = [
-  { value: "12,400+", label: "badges generated" },
   { value: "6", label: "archetypes" },
   { value: "4", label: "dimensions" },
-  { value: "90", label: "days analyzed" },
+  { value: "365", label: "days scored" },
 ];
 
 /* ── Icons ─────────────────────────────────────────────────────── */
@@ -86,6 +85,19 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
+function ShieldCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
+    </svg>
+  );
+}
+
 /* ── Page ──────────────────────────────────────────────────────── */
 
 export default async function Home({
@@ -113,16 +125,17 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
               <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[0.95]">
-                Developer Impact
+                Developer Impact,
                 <br />
-                <span className="text-amber">Profile</span>
+                <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions showing what kind of developer you are.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Not just how much code you write.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Archetype + Dimensions + Confidence.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> AI writes the code. What matters is how you drive impact.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Building, Guarding, Breadth, Consistency — four dimensions beyond commits and lines of code.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Every score is cryptographically sealed. Verifiable, not just trusted.</p>
               </div>
-              <div className="pt-4">
+              <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
                   href="/api/auth/login"
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
@@ -131,6 +144,14 @@ export default async function Home({
                   Get Your Badge
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
+                <Link
+                  href="/verify"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#34D399] hover:shadow-xl hover:shadow-complement/25"
+                >
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  Verify a Badge
+                  <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </Link>
               </div>
             </div>
           </section>
@@ -305,7 +326,7 @@ export default async function Home({
                     NO EMU?
                   </span>
                   <span className="text-text-secondary text-sm">
-                    No problem — the CLI also works for supplemental stats and manual overrides.
+                    No problem — your public GitHub activity is all you need. The CLI is optional.
                   </span>
                 </div>
               </div>

@@ -78,6 +78,17 @@ describe("getStats", () => {
     expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:test-user", fresh, 21600);
   });
 
+  it("normalizes handle to lowercase for cache keys", async () => {
+    const fresh = makeStats();
+    mockCacheGet.mockResolvedValue(null);
+    mockFetchStatsData.mockResolvedValue(fresh);
+
+    await getStats("Test-User");
+    // Cache key should use lowercase handle
+    expect(mockCacheGet).toHaveBeenCalledWith("stats:v2:test-user");
+    expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:test-user", fresh, 21600);
+  });
+
   it("returns null when GitHub returns null", async () => {
     mockCacheGet.mockResolvedValue(null);
     mockFetchStatsData.mockResolvedValue(null);

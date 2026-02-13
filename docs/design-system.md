@@ -2,20 +2,27 @@
 
 This is the single source of truth for visual design decisions. All agents working on UI must follow these guidelines.
 
-## Theme: Terminal Dark + Purple Accent
+## Theme: Terminal Dark + Purple Accent (with Light Mode)
 
-Bold, developer-tool aesthetic inspired by terminal UIs. Dark backgrounds dominate, with purple (`#7C6AEF`) used sparingly for CTAs, highlights, and active states. Terminal-specific colors (green, red, yellow) for output types. Badge SVG is dark-themed as an independent embeddable asset.
+Bold, developer-tool aesthetic inspired by terminal UIs. The dark theme is the signature brand look, with purple (`#7C6AEF`) used sparingly for CTAs, highlights, and active states. Terminal-specific colors (green, red, yellow) for output types. A light theme is supported as an alternative, toggled via the `ThemeToggle` component in the nav bar. Badge SVG always renders in dark theme as an independent embeddable asset.
+
+### Theme switching
+
+- Powered by `next-themes` with `attribute="data-theme"` and `defaultTheme="light"`.
+- `ThemeProvider` wraps the app in `layout.tsx`; `ThemeToggle` lives in the nav bar.
+- All color tokens are CSS custom properties defined twice in `globals.css`: light values in `:root` and dark values in `[data-theme="dark"]`. Tailwind utilities (`bg-bg`, `text-text-primary`, etc.) resolve at runtime via `var()`.
+- When adding new color tokens, always define both light and dark values.
 
 ## Colors
 
-Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`:
+Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown below are the **dark** theme values; light equivalents are defined in `:root` (see `globals.css`).
 
-| Token | Hex | Tailwind class | Usage |
-|-------|-----|----------------|-------|
-| `--color-bg` | `#0A0A0F` | `bg-bg` | Page background (true dark) |
-| `--color-card` | `#111118` | `bg-card` | Card/panel surfaces |
-| `--color-text-primary` | `#E2E4E9` | `text-text-primary` | Headings, body text (light) |
-| `--color-text-secondary` | `#6B6F7B` | `text-text-secondary` | Muted text, labels |
+| Token | Dark value | Light value | Tailwind class | Usage |
+|-------|-----------|-------------|----------------|-------|
+| `--color-bg` | `#0A0A0F` | `#FFFFFF` | `bg-bg` | Page background |
+| `--color-card` | `#111118` | `#F9FAFB` | `bg-card` | Card/panel surfaces |
+| `--color-text-primary` | `#E2E4E9` | `#1A1A2E` | `text-text-primary` | Headings, body text |
+| `--color-text-secondary` | `#6B6F7B` | `#6B7280` | `text-text-secondary` | Muted text, labels |
 | `--color-amber` | `#7C6AEF` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
 | `--color-amber-light` | `#9D8FFF` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
 | `--color-amber-dark` | `#5E4FCC` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
@@ -36,13 +43,13 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`:
 ### Color rules
 
 - Purple (`#7C6AEF`) is the signature accent. Use sparingly — CTAs, active states, key data points.
-- Dark backgrounds dominate. `bg-bg` for page, `bg-card` for surfaces.
+- Use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, etc.) — they resolve correctly in both themes.
+- Never hardcode hex colors in components; always use the CSS variable tokens so theme switching works.
 - Purple-tinted borders (`border-stroke`) are the default for all dividers.
-- Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings.
+- Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings. These also have light-appropriate values.
 - Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
 - Cards use `bg-card` with `border-stroke`.
 - Button text on purple background: always `text-white`.
-- No ambient glow blurs — they are invisible on dark backgrounds.
 
 ## Typography
 
@@ -130,9 +137,8 @@ Terminal dots: `bg-terminal-red/60`, `bg-terminal-yellow/60`, `bg-terminal-green
 
 ## Background Effects
 
-- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity, purple-tinted.
+- **Grid pattern**: `.bg-grid-warm` — faint 72px grid lines at 4% opacity. Uses subtle black lines in light mode and purple-tinted lines in dark mode (both defined in `globals.css`).
 - No ambient glow on dark backgrounds.
-- Dark theme ONLY. No light mode toggle.
 
 ## Animations
 
@@ -157,9 +163,8 @@ Defined in `globals.css`:
 
 ## Do NOT
 
-- Use light colors (`#FFFFFF`, `#F9FAFB`) for page or card backgrounds.
+- Hardcode hex background/text colors in components — always use semantic tokens (`bg-bg`, `text-text-primary`, etc.) so both themes work.
 - Use italic on monospace headings.
-- Add a light mode or theme toggle.
 - Use icon libraries (lucide, heroicons, etc.) — keep inline SVGs.
 - Use `Inter`, `Roboto`, `Arial`, or other generic fonts.
 - Add ambient glow blurs on dark backgrounds (invisible, wastes DOM).

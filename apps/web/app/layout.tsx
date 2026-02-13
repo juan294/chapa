@@ -28,11 +28,11 @@ const BASE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: "Chapa — Developer Impact Profile",
+    default: "Chapa — Developer Impact, Decoded",
     template: "%s — Chapa",
   },
   description:
-    "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions — Building, Guarding, Consistency, Breadth — from 12 months of GitHub activity.",
+    "Your developer impact, decoded into four dimensions — Building, Guarding, Consistency, Breadth — from 12 months of GitHub activity. Live, embeddable SVG badge.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Chapa",
-    title: "Chapa — Developer Impact Profile",
+    title: "Chapa — Developer Impact, Decoded",
     description:
-      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile. Four dimensions from 12 months of GitHub activity.",
+      "Your developer impact, decoded into four dimensions from 12 months of GitHub activity. Live, embeddable SVG badge.",
     url: BASE_URL,
     images: [
       {
@@ -55,9 +55,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Chapa — Developer Impact Profile",
+    title: "Chapa — Developer Impact, Decoded",
     description:
-      "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile.",
+      "Your developer impact, decoded into four dimensions. Live, embeddable SVG badge.",
     images: ["/logo-512.png"],
   },
   alternates: {
@@ -86,7 +86,7 @@ export default function RootLayout({
               name: "Chapa",
               url: BASE_URL,
               description:
-                "Generate a live, embeddable SVG badge showcasing your Developer Impact Profile — Building, Guarding, Consistency, and Breadth from 12 months of GitHub activity.",
+                "Your developer impact, decoded — Building, Guarding, Consistency, and Breadth from 12 months of GitHub activity. Live, embeddable SVG badge.",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               offers: {

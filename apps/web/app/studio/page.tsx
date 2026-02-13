@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { isStudioEnabled } from "@/lib/feature-flags";
 import { readSessionCookie } from "@/lib/auth/github";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
@@ -49,6 +50,11 @@ export const metadata: Metadata = {
 };
 
 export default async function StudioPage() {
+  // Feature flag gate — redirect when studio is disabled
+  if (!isStudioEnabled()) {
+    redirect("/");
+  }
+
   // Auth gate — redirect unauthenticated users to login
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
   if (!sessionSecret) {

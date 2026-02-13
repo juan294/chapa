@@ -6,10 +6,11 @@ import { fetchAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
+import { getClientIp } from "@/lib/http/client-ip";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -34,8 +35,7 @@ export async function GET(
   const { handle } = await params;
 
   // Rate limit: 100 requests per IP per 60 seconds
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:badge:${ip}`, 100, 60);
   if (!rl.allowed) {
     return new NextResponse("Too many requests. Please try again later.", {
@@ -111,6 +111,9 @@ export async function GET(
     };
     void storeVerificationRecord(verification.hash, record);
   }
+
+  // Track badge generation (fire-and-forget — don't block render)
+  void trackBadgeGenerated(handle);
 
   // Render full badge
   const svg = renderBadgeSvg(stats, impact, {

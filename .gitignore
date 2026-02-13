@@ -38,6 +38,7 @@ Thumbs.db
 coverage/
 playwright-report/
 test-results/
+playwright/.cache/
 
 # vercel
 .vercel

@@ -1,3 +1,5 @@
+import { isStudioEnabled } from "../../lib/feature-flags";
+
 export type OutputLineType =
   | "info"
   | "success"
@@ -65,23 +67,27 @@ export function resolveCategory(input: string): string | null {
 
 /** Navigation commands available on all pages (global command bar). */
 export function createNavigationCommands(): CommandDef[] {
-  return [
+  const studioEnabled = isStudioEnabled();
+
+  const helpLines: OutputLine[] = [
+    makeLine("system", "Available commands:"),
+    makeLine("info", "  /help              List available commands"),
+    makeLine("info", "  /home              Go to home page"),
+    ...(studioEnabled
+      ? [makeLine("info", "  /studio            Open Creator Studio")]
+      : []),
+    makeLine("info", "  /login             Sign in with GitHub"),
+    makeLine("info", "  /badge <handle>    View a developer badge"),
+    makeLine("info", "  /about             About Chapa"),
+    makeLine("info", "  /terms             Terms of Service"),
+    makeLine("info", "  /privacy           Privacy Policy"),
+  ];
+
+  const commands: CommandDef[] = [
     {
       name: "/help",
       description: "List available commands",
-      execute: () => ({
-        lines: [
-          makeLine("system", "Available commands:"),
-          makeLine("info", "  /help              List available commands"),
-          makeLine("info", "  /home              Go to home page"),
-          makeLine("info", "  /studio            Open Creator Studio"),
-          makeLine("info", "  /login             Sign in with GitHub"),
-          makeLine("info", "  /badge <handle>    View a developer badge"),
-          makeLine("info", "  /about             About Chapa"),
-          makeLine("info", "  /terms             Terms of Service"),
-          makeLine("info", "  /privacy           Privacy Policy"),
-        ],
-      }),
+      execute: () => ({ lines: helpLines }),
     },
     {
       name: "/home",
@@ -91,14 +97,18 @@ export function createNavigationCommands(): CommandDef[] {
         action: { type: "navigate", path: "/" },
       }),
     },
-    {
-      name: "/studio",
-      description: "Open Creator Studio",
-      execute: () => ({
-        lines: [makeLine("system", "Opening Creator Studio...")],
-        action: { type: "navigate", path: "/studio" },
-      }),
-    },
+    ...(studioEnabled
+      ? [
+          {
+            name: "/studio",
+            description: "Open Creator Studio",
+            execute: () => ({
+              lines: [makeLine("system", "Opening Creator Studio...")],
+              action: { type: "navigate" as const, path: "/studio" },
+            }),
+          },
+        ]
+      : []),
     {
       name: "/login",
       description: "Sign in with GitHub",
@@ -150,6 +160,8 @@ export function createNavigationCommands(): CommandDef[] {
       }),
     },
   ];
+
+  return commands;
 }
 
 export function parseCommand(input: string): { name: string; args: string[] } | null {

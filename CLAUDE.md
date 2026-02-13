@@ -58,7 +58,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - Accent color: `#7C6AEF` (cool indigo/violet). Use `text-amber`, `bg-amber`.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
-- Dark theme only. No light mode. Terminal dark backgrounds (`#0A0A0F`).
+- Light/dark theme support via `next-themes`. Light is the default; dark (`#0A0A0F`) is the signature brand look. Badge SVG always renders dark.
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## GitHub branding
@@ -70,8 +70,8 @@ Must be easy to swap/remove:
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)
 - Cache SVG output per user/day + theme (TTL 24h)
-- Response headers for badge endpoint:
-  - `Cache-Control: public, s-maxage=86400, stale-while-revalidate=604800`
+- Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
+  - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
 
 ## Agent team roles (no file overlap)
 - OAuth Engineer: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
@@ -328,6 +328,9 @@ NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)
 SUPPORT_FORWARD_EMAIL=     # Gmail address for email forwarding (optional)
+
+COMING_SOON=               # When set to any truthy value, enables coming-soon gate that blocks most routes (optional)
+CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 ```
 
 ### Environment Variable Safety

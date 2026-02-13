@@ -12,7 +12,7 @@ vi.mock("@/lib/auth/github", () => ({
   clearSessionCookie: mockClearSessionCookie,
 }));
 
-import { GET } from "./route";
+import { POST } from "./route";
 import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,7 @@ import { NextRequest } from "next/server";
 function makeRequest(): NextRequest {
   return new NextRequest(
     "https://chapa.thecreativetoken.com/api/auth/logout",
+    { method: "POST" },
   );
 }
 
@@ -29,7 +30,7 @@ function makeRequest(): NextRequest {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("GET /api/auth/logout", () => {
+describe("POST /api/auth/logout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockClearSessionCookie.mockReturnValue(
@@ -38,13 +39,13 @@ describe("GET /api/auth/logout", () => {
   });
 
   it("returns a redirect response (307)", async () => {
-    const res = await GET(makeRequest());
+    const res = await POST(makeRequest());
 
     expect(res.status).toBe(307);
   });
 
   it("redirects to the root URL", async () => {
-    const res = await GET(makeRequest());
+    const res = await POST(makeRequest());
 
     const location = res.headers.get("Location");
     expect(location).toBeTruthy();
@@ -53,7 +54,7 @@ describe("GET /api/auth/logout", () => {
   });
 
   it("sets Set-Cookie header to clear the session cookie", async () => {
-    const res = await GET(makeRequest());
+    const res = await POST(makeRequest());
 
     const setCookie = res.headers.get("Set-Cookie");
     expect(setCookie).toBe(
@@ -62,7 +63,7 @@ describe("GET /api/auth/logout", () => {
   });
 
   it("calls clearSessionCookie to generate the cookie string", async () => {
-    await GET(makeRequest());
+    await POST(makeRequest());
 
     expect(mockClearSessionCookie).toHaveBeenCalledOnce();
   });

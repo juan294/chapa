@@ -5,6 +5,8 @@ import {
   fetchReceivedEmail,
   forwardEmail,
 } from "@/lib/email/resend";
+import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 /**
  * POST /api/webhooks/resend
@@ -16,6 +18,16 @@ import {
  * failures gives automatic retry for free.
  */
 export async function POST(request: Request) {
+  // Rate limit: 20 requests per IP per 60 seconds
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:webhook:${ip}`, 20, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   // 1. Read raw body BEFORE any JSON parsing (Svix needs exact bytes)
   const rawBody = await request.text();
 

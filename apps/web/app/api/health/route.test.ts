@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import webPackageJson from "../../../package.json";
 
 vi.mock("@/lib/cache/redis", () => ({
   pingRedis: vi.fn(),
@@ -23,7 +22,7 @@ describe("GET /api/health", () => {
     expect(body.status).toBe("ok");
     expect(body.dependencies.redis).toBe("ok");
     expect(body.timestamp).toBeDefined();
-    expect(body.version).toBe(webPackageJson.version);
+    expect(body.version).toBeUndefined();
   });
 
   it("returns 200 with status 'degraded' when Redis ping fails", async () => {

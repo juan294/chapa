@@ -27,7 +27,7 @@ describe("fetchAvatarBase64", () => {
       new Response(fakeBytes, { status: 200 }),
     );
 
-    const result = await fetchAvatarBase64("https://example.com/avatar.jpg");
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/456");
     expect(result).toMatch(/^data:image\/png;base64,/);
   });
 
@@ -36,14 +36,14 @@ describe("fetchAvatarBase64", () => {
       new Response("Not found", { status: 404 }),
     );
 
-    const result = await fetchAvatarBase64("https://example.com/missing.png");
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/missing");
     expect(result).toBeUndefined();
   });
 
   it("returns undefined when fetch throws (network error)", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
-    const result = await fetchAvatarBase64("https://example.com/avatar.png");
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/err");
     expect(result).toBeUndefined();
   });
 
@@ -56,7 +56,7 @@ describe("fetchAvatarBase64", () => {
       }),
     );
 
-    const result = await fetchAvatarBase64("https://example.com/avatar");
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/789");
     // Must fall back to image/png, never use arbitrary content-type
     expect(result).toMatch(/^data:image\/png;base64,/);
   });
@@ -70,7 +70,7 @@ describe("fetchAvatarBase64", () => {
       }),
     );
 
-    const result = await fetchAvatarBase64("https://example.com/avatar.jpg");
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/101");
     expect(result).toMatch(/^data:image\/jpeg;base64,/);
   });
 
@@ -83,7 +83,47 @@ describe("fetchAvatarBase64", () => {
       }),
     );
 
-    const result = await fetchAvatarBase64("https://example.com/avatar.svg");
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/svg");
     expect(result).toMatch(/^data:image\/svg\+xml;base64,/);
+  });
+});
+
+describe("fetchAvatarBase64 — SSRF prevention", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects URLs from non-allowed hosts", async () => {
+    const result = await fetchAvatarBase64("https://evil.com/avatar.png");
+    expect(result).toBeUndefined();
+  });
+
+  it("rejects localhost URLs", async () => {
+    const result = await fetchAvatarBase64("http://localhost:3000/internal");
+    expect(result).toBeUndefined();
+  });
+
+  it("rejects internal network URLs", async () => {
+    const result = await fetchAvatarBase64("http://169.254.169.254/metadata");
+    expect(result).toBeUndefined();
+  });
+
+  it("allows avatars.githubusercontent.com", async () => {
+    const fakeBytes = new Uint8Array([137, 80, 78, 71]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(fakeBytes, {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      }),
+    );
+    const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/1?v=4");
+    expect(result).toBeDefined();
+    expect(result).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("does not call fetch for blocked hosts", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    await fetchAvatarBase64("https://evil.com/avatar.png");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

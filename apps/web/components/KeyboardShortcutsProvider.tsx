@@ -11,7 +11,16 @@ import {
 import { useRouter } from "next/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
 import { type ShortcutScope } from "@/lib/keyboard/shortcuts";
-import { ShortcutCheatSheet } from "./ShortcutCheatSheet";
+import { isStudioEnabled } from "@/lib/feature-flags";
+import dynamic from "next/dynamic";
+
+const ShortcutCheatSheet = dynamic(
+  () =>
+    import("./ShortcutCheatSheet").then((m) => ({
+      default: m.ShortcutCheatSheet,
+    })),
+  { ssr: false },
+);
 
 type PageShortcutHandler = (id: string) => void;
 
@@ -95,7 +104,9 @@ export function KeyboardShortcutsProvider({ children }: Props) {
           return;
         }
         case "go-studio":
-          router.push("/studio");
+          if (isStudioEnabled()) {
+            router.push("/studio");
+          }
           return;
         case "open-cheatsheet":
           setCheatSheetOpen((v) => !v);

@@ -1,4 +1,4 @@
-import { createHash, createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { createHash, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,7 +57,10 @@ export function validateState(
     .find((c) => c.startsWith(`${STATE_COOKIE_NAME}=`));
   if (!match) return false;
   const cookieState = match.slice(STATE_COOKIE_NAME.length + 1);
-  return cookieState === queryState;
+  const cookieBuf = Buffer.from(cookieState, "utf8");
+  const queryBuf = Buffer.from(queryState, "utf8");
+  if (cookieBuf.length !== queryBuf.length) return false;
+  return timingSafeEqual(cookieBuf, queryBuf);
 }
 
 export function clearStateCookie(): string {
@@ -188,6 +191,16 @@ export function createSessionCookie(
   return `${COOKIE_NAME}=${encrypted}; ${cookieFlags()}; Max-Age=86400`;
 }
 
+function isValidSessionPayload(value: unknown): value is SessionPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.login !== "string") return false;
+  if (typeof obj.token !== "string") return false;
+  if (obj.name !== null && typeof obj.name !== "string") return false;
+  if (typeof obj.avatar_url !== "string") return false;
+  return true;
+}
+
 export function readSessionCookie(
   cookieHeader: string | null,
   secret: string,
@@ -202,7 +215,9 @@ export function readSessionCookie(
   const json = decryptToken(value, secret);
   if (!json) return null;
   try {
-    return JSON.parse(json) as SessionPayload;
+    const parsed: unknown = JSON.parse(json);
+    if (!isValidSessionPayload(parsed)) return null;
+    return parsed;
   } catch {
     return null;
   }

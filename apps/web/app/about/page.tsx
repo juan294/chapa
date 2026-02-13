@@ -5,17 +5,17 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Learn about Chapa, the developer impact profile platform. Discover how the four-dimension scoring model works and what data we analyze.",
+    "Learn about Chapa — developer impact, decoded. Discover how the four-dimension scoring model works and what data we analyze.",
   openGraph: {
     title: "About Chapa",
     description:
-      "Learn about Chapa, the developer impact profile platform. Four dimensions that show what kind of developer you are.",
+      "Learn about Chapa — developer impact, decoded. Four dimensions that show what kind of developer you are.",
   },
   twitter: {
     card: "summary",
     title: "About Chapa",
     description:
-      "Learn about Chapa, the developer impact badge platform.",
+      "Learn about Chapa — developer impact, decoded.",
   },
 };
 
@@ -38,8 +38,8 @@ export default function AboutPage() {
             </p>
 
             <p>
-              Chapa generates a live, embeddable SVG badge that showcases your
-              Developer Impact Profile from GitHub activity. It analyzes your
+              Chapa generates a live, embeddable SVG badge that decodes your
+              developer impact from GitHub activity. It analyzes your
               last 12 months across four independent dimensions to show what kind
               of developer you are.
             </p>

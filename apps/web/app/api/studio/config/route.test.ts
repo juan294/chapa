@@ -30,6 +30,10 @@ vi.mock("@/lib/validation", async () => {
   return actual;
 });
 
+vi.mock("@/lib/feature-flags", () => ({
+  isStudioEnabled: () => true,
+}));
+
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
@@ -75,12 +79,11 @@ describe("GET /api/studio/config", () => {
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
   });
 
-  it("returns { config: null } when no session", async () => {
+  it("returns 401 when no session", async () => {
     mockReadSessionCookie.mockReturnValue(null);
 
     const res = await GET(makeGetRequest());
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ config: null });
+    expect(res.status).toBe(401);
   });
 
   it("returns { config: null } when no NEXTAUTH_SECRET", async () => {
@@ -157,7 +160,7 @@ describe("PUT /api/studio/config", () => {
     expect(res.status).toBe(429);
   });
 
-  it("saves valid config to Redis with no TTL (persistent)", async () => {
+  it("saves valid config to Redis with 365-day TTL", async () => {
     mockReadSessionCookie.mockReturnValue(SESSION);
     mockCacheSet.mockResolvedValue(undefined);
 
@@ -166,7 +169,7 @@ describe("PUT /api/studio/config", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
-    expect(mockCacheSet).toHaveBeenCalledWith("config:juan294", config, 0);
+    expect(mockCacheSet).toHaveBeenCalledWith("config:juan294", config, 31536000);
   });
 
   it("rate limits by user login", async () => {

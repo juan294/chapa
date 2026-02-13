@@ -32,6 +32,11 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
 }));
 
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: (req: Request) =>
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
+}));
+
 import { GET } from "./route";
 import { NextRequest } from "next/server";
 
@@ -316,5 +321,32 @@ describe("GET /api/auth/callback — OAuth flow", () => {
       },
       "test-session-secret",
     );
+  });
+
+  it("ignores malicious redirect cookie and falls back to profile page", async () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("https://evil.com/steal")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/u/octocat");
+
+    delete process.env.NEXT_PUBLIC_BASE_URL;
   });
 });
