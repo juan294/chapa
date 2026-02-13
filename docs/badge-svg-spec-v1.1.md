@@ -1,6 +1,6 @@
-# Embeddable SVG Badge — Design Spec v1.0
+# Embeddable SVG Badge — Design Spec v1.1
 
-> **Version**: 1.0
+> **Version**: 1.1
 > **Source of truth for**: The server-rendered SVG badge at `/u/:handle/badge.svg`
 > **NOT for**: The React component (`BadgeContent.tsx`) used in Creator Studio — see [`badge-design-v1.md`](./badge-design-v1.md)
 >
@@ -670,18 +670,26 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
       stroke="#E05A47" stroke-width="1" opacity="0.15"/>
 ```
 
-### 9c. Rotated Text
+### 9c. Clickable Link + Rotated Text
+
+**v1.1 change**: The verification text is now wrapped in an SVG `<a>` element, making the hash clickable. Clicking opens the verification page in a new tab.
 
 ```xml
-<text transform="rotate(-90 1168 315)"
-      x="1168" y="315"
-      font-family="'JetBrains Mono', monospace" font-size="11"
-      fill="#E05A47" opacity="0.50"
-      text-anchor="middle" letter-spacing="2">
-  VERIFIED · {hash} · {date}
-</text>
+<a href="https://chapa.thecreativetoken.com/verify/{hash}" target="_blank">
+  <text transform="rotate(-90 1168 315)"
+        x="1168" y="315"
+        font-family="'JetBrains Mono', monospace" font-size="11"
+        fill="#E05A47" opacity="0.50"
+        text-anchor="middle" letter-spacing="2"
+        style="cursor:pointer">
+    VERIFIED · {hash} · {date}
+  </text>
+</a>
 ```
 
+- **Link URL**: `https://chapa.thecreativetoken.com/verify/{hash}` — uses the XML-escaped hash
+- **`target="_blank"`**: Opens in a new tab (standard for embedded SVGs)
+- **`style="cursor:pointer"`**: Provides visual click affordance on hover
 - Rotation: `-90°` around `(1168, 315)` — text reads bottom-to-top
 - Separator `·` is `\u00B7` (middle dot)
 - Hash and date values are XML-escaped
@@ -911,4 +919,5 @@ Route handler: `apps/web/app/u/[handle]/badge.svg/route.ts`
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-02-13 | **Clickable verification hash** — Verification strip text (Section 9c) is now wrapped in an SVG `<a href>` element linking to `https://chapa.thecreativetoken.com/verify/{hash}` with `target="_blank"`. Added `style="cursor:pointer"` for hover affordance. No visual change to the badge appearance — only adds interactivity. Fixes #187. |
 | 1.0 | 2026-02-13 | Initial spec — documents current production SVG badge |

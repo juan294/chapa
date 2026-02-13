@@ -62,4 +62,30 @@ describe("renderVerificationStrip", () => {
     expect(svg).not.toContain('2025"06"15');
     expect(svg).toContain("2025&quot;06&quot;15");
   });
+
+  it("wraps verification text in an SVG <a> element", () => {
+    const svg = renderVerificationStrip(hash, date);
+    expect(svg).toContain("<a");
+    expect(svg).toContain("</a>");
+  });
+
+  it("links to the verification page for the given hash", () => {
+    const svg = renderVerificationStrip(hash, date);
+    expect(svg).toContain(
+      "https://chapa.thecreativetoken.com/verify/abc12345",
+    );
+  });
+
+  it("opens the verification link in a new tab via target=_blank", () => {
+    const svg = renderVerificationStrip(hash, date);
+    expect(svg).toContain('target="_blank"');
+  });
+
+  it("uses the escaped hash in the verification URL", () => {
+    // Even with special characters in hash, URL should use the escaped form
+    const svg = renderVerificationStrip("a1b2c3d4", date);
+    expect(svg).toContain(
+      "https://chapa.thecreativetoken.com/verify/a1b2c3d4",
+    );
+  });
 });

@@ -4,6 +4,7 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+import Link from "next/link";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   includeGithubBranding: true,
@@ -122,7 +123,7 @@ export default async function Home({
                 <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
                 <p><span className="text-terminal-dim select-none">&gt;</span> Every score is cryptographically sealed. Verifiable, not just trusted.</p>
               </div>
-              <div className="pt-4">
+              <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
                   href="/api/auth/login"
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
@@ -131,6 +132,12 @@ export default async function Home({
                   Get Your Badge
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
+                <Link
+                  href="/verify"
+                  className="inline-flex items-center gap-2 rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary"
+                >
+                  Verify a Badge
+                </Link>
               </div>
             </div>
           </section>
