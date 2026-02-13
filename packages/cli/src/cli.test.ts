@@ -61,4 +61,14 @@ describe("parseArgs", () => {
     expect(args.version).toBe(false);
     expect(args.help).toBe(false);
   });
+
+  it("sets insecure flag when --insecure is passed", () => {
+    const args = parseArgs(["login", "--insecure"]);
+    expect(args.insecure).toBe(true);
+  });
+
+  it("insecure defaults to false", () => {
+    const args = parseArgs(["login"]);
+    expect(args.insecure).toBe(false);
+  });
 });

@@ -25,6 +25,7 @@ Options:
   --token <token>         Override auth token (auto-detected from login)
   --server <url>          Chapa server URL (default: https://chapa.thecreativetoken.com)
   --verbose               Show detailed polling logs during login
+  --insecure              Skip TLS certificate verification (corporate networks)
   --version, -v           Show version number
   --help, -h              Show this help message
 `;
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
 
   // ── login ────────────────────────────────────────────────────────────
   if (args.command === "login") {
-    await login(args.server, { verbose: args.verbose });
+    await login(args.server, { verbose: args.verbose, insecure: args.insecure });
     return;
   }
 

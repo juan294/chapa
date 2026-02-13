@@ -205,6 +205,171 @@ describe("login", () => {
     errorSpy.mockRestore();
   });
 
+  it("disables TLS verification and warns when insecure is true", async () => {
+    const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+
+    const warnSpy = vi.spyOn(console, "warn");
+    // Capture the env var value during fetch (i.e., during polling)
+    let tlsDuringFetch: string | undefined;
+    vi.mocked(fetch).mockImplementation(async () => {
+      tlsDuringFetch = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { insecure: true });
+    await advancePoll();
+    await p;
+
+    // Should have been "0" during the fetch call
+    expect(tlsDuringFetch).toBe("0");
+
+    // Should have printed a warning
+    const allWarns = warnSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allWarns).toContain("TLS certificate verification disabled");
+
+    // Should have restored after login completed
+    expect(process.env.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined();
+
+    // Restore in case test fails
+    if (originalVal !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
+    }
+    warnSpy.mockRestore();
+  });
+
+  it("restores NODE_TLS_REJECT_UNAUTHORIZED after login completes", async () => {
+    const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      ),
+    );
+
+    const p = login("https://example.com", { insecure: true });
+    await advancePoll();
+    await p;
+
+    // Should have restored the original value (undefined → deleted)
+    expect(process.env.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined();
+
+    // Restore in case test fails
+    if (originalVal !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
+    }
+  });
+
+  it("suggests --insecure when TLS error is detected", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll(); // poll 1 → TLS error
+    await advancePoll(); // poll 2 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    expect(allErrors).toContain("corporate network");
+    errorSpy.mockRestore();
+  });
+
+  it("suggests --insecure for CERT_HAS_EXPIRED errors", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("CERT_HAS_EXPIRED");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    errorSpy.mockRestore();
+  });
+
+  it("does not suggest --insecure for non-TLS errors", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("ECONNREFUSED");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).not.toContain("--insecure");
+    errorSpy.mockRestore();
+  });
+
+  it("does not suggest --insecure when insecure is already enabled", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE");
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com", { insecure: true });
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    // Should NOT suggest --insecure since it's already enabled
+    expect(allErrors).not.toContain("try: chapa login --insecure");
+    errorSpy.mockRestore();
+
+    if (originalVal === undefined) {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    } else {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
+    }
+  });
+
   it("exits with code 1 on expired session", { timeout: 10000 }, async () => {
     vi.useRealTimers(); // Use real timers for this test — fast enough with 2s sleep
 
