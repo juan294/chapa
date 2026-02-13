@@ -69,5 +69,9 @@ describe("shouldRedirect", () => {
     it("does not redirect sitemap.xml", () => {
       expect(shouldRedirect("/sitemap.xml", true)).toBe(false);
     });
+
+    it("does not redirect CLI authorize page", () => {
+      expect(shouldRedirect("/cli/authorize", true)).toBe(false);
+    });
   });
 });

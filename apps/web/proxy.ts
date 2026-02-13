@@ -8,6 +8,7 @@ const ALLOW_PATTERNS: RegExp[] = [
   /^\/coming-soon$/,
   /^\/u\/[^/]+\/badge\.svg$/,
   /^\/api(\/|$)/,
+  /^\/cli(\/|$)/,
   /^\/_next(\/|$)/,
   /^\/favicon\./,
   /^\/logo/,
