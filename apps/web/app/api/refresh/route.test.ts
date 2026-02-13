@@ -130,8 +130,8 @@ describe("POST /api/refresh", () => {
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(200);
 
-    // Should have deleted cache first
-    expect(cacheDel).toHaveBeenCalledWith("stats:testuser");
+    // Should have deleted cache first (must match client.ts cache key: stats:v2:<handle>)
+    expect(cacheDel).toHaveBeenCalledWith("stats:v2:testuser");
 
     // Should have fetched fresh stats with token
     expect(getStats).toHaveBeenCalledWith("testuser", "tok");

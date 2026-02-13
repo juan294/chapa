@@ -106,6 +106,10 @@ export default async function SharePage({ params }: SharePageProps) {
   const isOwner = sessionLogin !== null && sessionLogin === handle;
   const useInteractivePreview = hasCustomConfig(savedConfig) && stats && impact;
 
+  // Cache-busting param for the badge <img> on the share page.
+  // External embeds (README badges) use the CDN-cached URL without this param.
+  const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
+
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
   const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
 
@@ -153,7 +157,7 @@ export default async function SharePage({ params }: SharePageProps) {
             <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/u/${encodeURIComponent(handle)}/badge.svg`}
+                src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
                 alt={`Chapa badge for ${handle}`}
                 width={1200}
                 height={630}
