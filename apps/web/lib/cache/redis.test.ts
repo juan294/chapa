@@ -77,11 +77,12 @@ describe("cacheGet", () => {
 // ---------------------------------------------------------------------------
 
 describe("cacheSet", () => {
-  it("stores value with default TTL (21600s)", async () => {
+  it("returns true on successful write with default TTL", async () => {
     mockSet.mockResolvedValueOnce("OK");
 
-    await cacheSet("impact:test-user", { score: 42 });
+    const result = await cacheSet("impact:test-user", { score: 42 });
 
+    expect(result).toBe(true);
     expect(mockSet).toHaveBeenCalledWith(
       "impact:test-user",
       { score: 42 },
@@ -89,11 +90,12 @@ describe("cacheSet", () => {
     );
   });
 
-  it("stores value with custom TTL", async () => {
+  it("returns true on successful write with custom TTL", async () => {
     mockSet.mockResolvedValueOnce("OK");
 
-    await cacheSet("stats:test-user", { commits: 10 }, 3600);
+    const result = await cacheSet("stats:test-user", { commits: 10 }, 3600);
 
+    expect(result).toBe(true);
     expect(mockSet).toHaveBeenCalledWith(
       "stats:test-user",
       { commits: 10 },
@@ -101,13 +103,23 @@ describe("cacheSet", () => {
     );
   });
 
-  it("does not throw when Redis is down (graceful degradation)", async () => {
+  it("returns false when Redis throws (graceful degradation)", async () => {
     mockSet.mockRejectedValueOnce(new Error("Connection refused"));
 
-    // Should not throw — just silently fail
-    await expect(
-      cacheSet("impact:test-user", { score: 42 }),
-    ).resolves.toBeUndefined();
+    const result = await cacheSet("impact:test-user", { score: 42 });
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when Redis is unavailable (no env vars)", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await cacheSet("anything", { data: true });
+
+    expect(result).toBe(false);
+    expect(mockSet).not.toHaveBeenCalled();
   });
 });
 
@@ -149,13 +161,14 @@ describe("missing env vars (no-op fallback)", () => {
     expect(mockGet).not.toHaveBeenCalled();
   });
 
-  it("cacheSet is a no-op when env vars are missing", async () => {
+  it("cacheSet returns false when env vars are missing", async () => {
     _resetClient();
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
-    await cacheSet("anything", { data: true });
+    const result = await cacheSet("anything", { data: true });
 
+    expect(result).toBe(false);
     expect(mockSet).not.toHaveBeenCalled();
   });
 

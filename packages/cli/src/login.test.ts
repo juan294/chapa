@@ -102,6 +102,56 @@ describe("login", () => {
     expect(mockSaveConfig).toHaveBeenCalledOnce();
   });
 
+  it("writes progress dots during polling", async () => {
+    const writeSpy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount < 6) {
+        return new Response(JSON.stringify({ status: "pending" }), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    for (let i = 0; i < 6; i++) await advancePoll();
+    await p;
+
+    const dots = writeSpy.mock.calls.filter(c => c[0] === ".").length;
+    expect(dots).toBeGreaterThan(0);
+    writeSpy.mockRestore();
+  });
+
+  it("logs server error status during polling", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return new Response(
+          JSON.stringify({ error: "Service temporarily unavailable" }),
+          { status: 503 },
+        );
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll(); // poll 1 → 503
+    await advancePoll(); // poll 2 → approved
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("503");
+    errorSpy.mockRestore();
+  });
+
   it("exits with code 1 on expired session", { timeout: 10000 }, async () => {
     vi.useRealTimers(); // Use real timers for this test — fast enough with 2s sleep
 
