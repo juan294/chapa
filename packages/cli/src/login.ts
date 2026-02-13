@@ -2,29 +2,16 @@
  * Device authorization flow for Chapa CLI.
  *
  * 1. Generate a session ID (UUID)
- * 2. Open browser to the Chapa authorize page
+ * 2. Display authorize URL for user to open in their personal browser
  * 3. Poll the server until the user approves
  * 4. Save the token locally
  */
 
 import { randomUUID } from "node:crypto";
-import { exec } from "node:child_process";
 import { saveConfig } from "./config.js";
 
 export const POLL_INTERVAL_MS = 2000;
 export const MAX_POLL_ATTEMPTS = 150; // 5 minutes at 2s intervals
-
-function openBrowser(url: string): void {
-  const cmd =
-    process.platform === "win32"
-      ? `start "" "${url}"`
-      : process.platform === "darwin"
-        ? `open "${url}"`
-        : `xdg-open "${url}"`;
-  exec(cmd, () => {
-    // Ignore errors — user can open manually
-  });
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,10 +28,10 @@ export async function login(serverUrl: string): Promise<void> {
   const sessionId = randomUUID();
   const authorizeUrl = `${baseUrl}/cli/authorize?session=${sessionId}`;
 
-  console.log("Opening browser for authentication...");
-  console.log(`If your browser didn't open, visit:\n  ${authorizeUrl}\n`);
-  openBrowser(authorizeUrl);
-
+  console.log("\nOpen this URL in a browser where your personal GitHub account is logged in:");
+  console.log(`\n  ${authorizeUrl}\n`);
+  console.log("Tip: If your default browser has your work (EMU) account,");
+  console.log("     use a different browser or an incognito/private window.\n");
   console.log("Waiting for approval...");
 
   for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {

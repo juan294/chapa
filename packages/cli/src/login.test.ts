@@ -2,14 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock dependencies
 const mockSaveConfig = vi.hoisted(() => vi.fn());
-const mockExec = vi.hoisted(() => vi.fn());
 
 vi.mock("./config.js", () => ({
   saveConfig: mockSaveConfig,
-}));
-
-vi.mock("node:child_process", () => ({
-  exec: mockExec,
 }));
 
 import { login, POLL_INTERVAL_MS } from "./login";
@@ -29,7 +24,8 @@ describe("login", () => {
     return vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS + 10);
   }
 
-  it("opens browser with correct URL format", async () => {
+  it("prints authorize URL and personal account hint to stdout", async () => {
+    const logSpy = vi.spyOn(console, "log");
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify({ status: "approved", token: "tok", handle: "juan294" }),
@@ -41,9 +37,10 @@ describe("login", () => {
     await advancePoll();
     await p;
 
-    expect(mockExec).toHaveBeenCalledOnce();
-    const cmd = mockExec.mock.calls[0][0] as string;
-    expect(cmd).toContain("chapa.thecreativetoken.com/cli/authorize?session=");
+    const allOutput = logSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allOutput).toContain("chapa.thecreativetoken.com/cli/authorize?session=");
+    expect(allOutput).toContain("personal GitHub account");
+    logSpy.mockRestore();
   });
 
   it("saves config on successful approval", async () => {

@@ -103,26 +103,36 @@ Options:
 
 The CLI uses browser-based authentication — similar to `npm login` or `gh auth login`. No personal GitHub token is needed.
 
+> **Important: Use your personal GitHub account.** The login step requires your **personal** GitHub account (the one linked to your Chapa badge), not your work/EMU account. If you're on a work computer where the default browser is logged into your EMU account, copy the URL and open it in:
+> - A **different browser** where your personal GitHub is logged in (e.g., Safari if you use Chrome for work)
+> - An **incognito/private window** and log in with your personal GitHub credentials
+
 ### Log in
 
 ```bash
 npx chapa-cli login
 ```
 
-This will:
-
-1. Open your browser to the Chapa authorization page
-2. Ask you to sign in with your personal GitHub account (if not already signed in)
-3. Click **"Authorize CLI"** to approve
-4. The CLI automatically detects the approval and saves your credentials
+The CLI will display a URL — copy it and open it in the browser where your **personal** GitHub account is logged in:
 
 ```
-Opening browser for authentication...
-If your browser didn't open, visit:
+Open this URL in a browser where your personal GitHub account is logged in:
+
   https://chapa.thecreativetoken.com/cli/authorize?session=...
 
-Waiting for approval...
+Tip: If your default browser has your work (EMU) account,
+     use a different browser or an incognito/private window.
 
+Waiting for approval...
+```
+
+Once you open the URL:
+
+1. Sign in with your **personal** GitHub account (if not already signed in)
+2. Click **"Authorize CLI"** to approve
+3. The CLI automatically detects the approval and saves your credentials
+
+```
 Logged in as juan294!
 Credentials saved to ~/.chapa/credentials.json
 ```
