@@ -2,17 +2,9 @@
 
 Generate a **live, embeddable, animated SVG badge** that showcases your developer impact from GitHub activity — with multi-dimensional scoring, verification, and one-click sharing.
 
-<p align="center">
-  <a href="https://chapa.thecreativetoken.com/u/juan294">
-    <img src="https://chapa.thecreativetoken.com/u/juan294/badge.svg" alt="juan294's Chapa Impact Badge" width="600" />
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://chapa.thecreativetoken.com">chapa.thecreativetoken.com</a> ·
-  <a href="https://www.npmjs.com/package/chapa-cli">chapa-cli on npm</a> ·
-  <a href="https://x.com/chapabadge">@chapabadge</a>
-</p>
+<a href="https://chapa.thecreativetoken.com/u/juan294">
+  <img src="https://chapa.thecreativetoken.com/u/juan294/badge.svg" alt="juan294's Chapa Impact Badge" width="100%" />
+</a>
 
 ---
 
