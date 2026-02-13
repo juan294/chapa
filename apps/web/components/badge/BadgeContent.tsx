@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import type {
   BadgeConfig,
   StatsData,
@@ -116,8 +117,7 @@ export function BadgeContent({
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           {stats.avatarUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element -- dynamic external avatar URL */
-            <img
+            <Image
               src={stats.avatarUrl}
               alt=""
               className="w-8 h-8 rounded-full ring-2 ring-amber/30"
