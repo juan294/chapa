@@ -19,9 +19,9 @@ export default function VerifyInputPage() {
                 Verify a <span className="text-amber">Badge</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2">
-                Enter the 8-character verification hash from any Chapa badge to
-                confirm its authenticity. You can find it on the right edge of
-                the badge.
+                Enter the 8 or 16 character verification hash from any Chapa badge
+                to confirm its authenticity. You can find it on the right edge
+                of the badge.
               </p>
             </div>
 

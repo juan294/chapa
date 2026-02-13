@@ -28,10 +28,10 @@ export function buildPayload(
 }
 
 /**
- * Compute a truncated HMAC-SHA256 hash (8 hex chars) from a payload string.
+ * Compute a truncated HMAC-SHA256 hash (16 hex chars) from a payload string.
  */
 export function computeHash(payload: string, secret: string): string {
-  return createHmac("sha256", secret).update(payload).digest("hex").slice(0, 8);
+  return createHmac("sha256", secret).update(payload).digest("hex").slice(0, 16);
 }
 
 /**

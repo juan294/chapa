@@ -70,9 +70,9 @@ describe("buildPayload", () => {
 });
 
 describe("computeHash", () => {
-  it("returns an 8-character hex string", () => {
+  it("returns a 16-character hex string", () => {
     const hash = computeHash("some-payload", "secret");
-    expect(hash).toMatch(/^[0-9a-f]{8}$/);
+    expect(hash).toMatch(/^[0-9a-f]{16}$/);
   });
 
   it("is deterministic for same input", () => {
@@ -124,7 +124,7 @@ describe("generateVerificationCode", () => {
     process.env.CHAPA_VERIFICATION_SECRET = "test-secret-with-enough-length-32chars!";
     const result = generateVerificationCode(baseStats, baseImpact);
     expect(result).not.toBeNull();
-    expect(result!.hash).toMatch(/^[0-9a-f]{8}$/);
+    expect(result!.hash).toMatch(/^[0-9a-f]{16}$/);
     expect(result!.date).toBe("2025-06-15");
   });
 
@@ -149,6 +149,6 @@ describe("generateVerificationCode", () => {
     process.env.CHAPA_VERIFICATION_SECRET = "  test-secret-with-enough-length-32chars!  \n";
     const result = generateVerificationCode(baseStats, baseImpact);
     expect(result).not.toBeNull();
-    expect(result!.hash).toMatch(/^[0-9a-f]{8}$/);
+    expect(result!.hash).toMatch(/^[0-9a-f]{16}$/);
   });
 });

@@ -13,7 +13,7 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
 }));
 
-import { GET } from "./route";
+import { GET, OPTIONS } from "./route";
 import { NextRequest } from "next/server";
 
 function makeRequest(
@@ -60,10 +60,23 @@ describe("GET /api/verify/[hash]", () => {
       expect(body.error).toBeDefined();
     });
 
-    it("returns 400 for hash longer than 8 characters", async () => {
+    it("returns 400 for hash of 9 characters (neither 8 nor 16)", async () => {
       const [req, ctx] = makeRequest("abc123456", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.status).toBe(400);
+    });
+
+    it("returns 400 for hash longer than 16 characters", async () => {
+      const [req, ctx] = makeRequest("abc12345abc12345a", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(400);
+    });
+
+    it("accepts valid 16-char hex hash", async () => {
+      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
+      const [req, ctx] = makeRequest("abc12345abc12345", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
     });
 
     it("returns 400 for hash shorter than 8 characters", async () => {
@@ -149,6 +162,35 @@ describe("GET /api/verify/[hash]", () => {
       const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    });
+
+    it("includes CORS header on 400 responses", async () => {
+      const [req, ctx] = makeRequest("not-hex!", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(400);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    });
+
+    it("includes CORS header on 429 responses", async () => {
+      mockRateLimit.mockResolvedValue({ allowed: false, current: 31, limit: 30 });
+      const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(429);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    });
+  });
+
+  describe("OPTIONS preflight", () => {
+    it("returns 204 with no body", async () => {
+      const res = await OPTIONS();
+      expect(res.status).toBe(204);
+    });
+
+    it("returns CORS headers", async () => {
+      const res = await OPTIONS();
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(res.headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
+      expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
     });
   });
 });
