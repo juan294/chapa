@@ -2,10 +2,17 @@
  * Fetch a GitHub avatar URL and return it as a base64 data URI.
  * Returns undefined if the fetch fails (caller should fall back to octocat icon).
  */
+
+const ALLOWED_AVATAR_HOSTS = new Set(["avatars.githubusercontent.com"]);
+
 export async function fetchAvatarBase64(
   avatarUrl: string,
 ): Promise<string | undefined> {
   try {
+    const parsed = new URL(avatarUrl);
+    if (!ALLOWED_AVATAR_HOSTS.has(parsed.hostname)) {
+      return undefined;
+    }
     const res = await fetch(avatarUrl, {
       signal: AbortSignal.timeout(5000),
     });
