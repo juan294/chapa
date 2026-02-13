@@ -7,17 +7,19 @@ interface RefreshBadgeButtonProps {
 }
 
 export function RefreshBadgeButton({ handle }: RefreshBadgeButtonProps) {
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
 
   async function handleRefresh() {
     setStatus("loading");
     try {
-      const res = await fetch(`/api/refresh?handle=${encodeURIComponent(handle)}`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/refresh?handle=${encodeURIComponent(handle)}`,
+        { method: "POST" },
+      );
       if (res.ok) {
         setStatus("success");
-        // Reload page to show fresh data
         setTimeout(() => window.location.reload(), 500);
       } else {
         setStatus("error");
@@ -33,7 +35,17 @@ export function RefreshBadgeButton({ handle }: RefreshBadgeButtonProps) {
     <button
       onClick={handleRefresh}
       disabled={status === "loading" || status === "success"}
-      className="inline-flex items-center gap-2 rounded-lg border border-stroke px-4 py-2.5 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      title={
+        status === "idle"
+          ? "Refresh badge data"
+          : status === "loading"
+            ? "Refreshing\u2026"
+            : status === "success"
+              ? "Refreshed!"
+              : "Failed \u2014 try again"
+      }
+      className="absolute top-6 right-6 z-10 rounded-full p-2 border border-stroke bg-card/80 backdrop-blur-sm text-text-secondary hover:text-amber hover:border-amber/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      aria-label="Refresh badge data"
     >
       <svg
         className={`w-4 h-4 ${status === "loading" ? "animate-spin" : ""}`}
@@ -50,10 +62,6 @@ export function RefreshBadgeButton({ handle }: RefreshBadgeButtonProps) {
         <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
         <path d="M16 16h5v5" />
       </svg>
-      {status === "idle" && "Refresh Badge"}
-      {status === "loading" && "Refreshing..."}
-      {status === "success" && "Refreshed!"}
-      {status === "error" && "Failed — try again"}
     </button>
   );
 }

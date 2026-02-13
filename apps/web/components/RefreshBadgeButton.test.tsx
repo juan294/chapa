@@ -39,21 +39,25 @@ describe("RefreshBadgeButton", () => {
     });
   });
 
-  describe("button text states", () => {
-    it("shows 'Refresh Badge' text when idle", () => {
-      expect(SOURCE).toContain('"Refresh Badge"');
+  describe("icon-only button with title states (#202)", () => {
+    it("shows 'Refresh badge data' title when idle", () => {
+      expect(SOURCE).toContain('"Refresh badge data"');
     });
 
-    it("shows 'Refreshing...' text when loading", () => {
-      expect(SOURCE).toContain('"Refreshing..."');
+    it("shows refreshing title when loading", () => {
+      expect(SOURCE).toMatch(/Refreshing/);
     });
 
-    it("shows 'Refreshed!' text on success", () => {
+    it("shows refreshed title on success", () => {
       expect(SOURCE).toContain('"Refreshed!"');
     });
 
-    it("shows 'Failed — try again' text on error", () => {
+    it("shows failed title on error", () => {
       expect(SOURCE).toMatch(/Failed.*try again/);
+    });
+
+    it("has aria-label for accessibility", () => {
+      expect(SOURCE).toContain('aria-label="Refresh badge data"');
     });
   });
 
@@ -76,7 +80,6 @@ describe("RefreshBadgeButton", () => {
     });
 
     it("resets to idle on error after delay", () => {
-      // After error, setTimeout resets status back to idle
       expect(SOURCE).toContain('setStatus("error")');
       expect(SOURCE).toContain('setStatus("idle")');
     });
@@ -122,10 +125,10 @@ describe("RefreshBadgeButton", () => {
     });
   });
 
-  describe("design system compliance", () => {
-    it("uses ghost/outline button style", () => {
+  describe("design system compliance (#202)", () => {
+    it("uses icon-only circular button style", () => {
       expect(SOURCE).toContain("border border-stroke");
-      expect(SOURCE).toContain("rounded-lg");
+      expect(SOURCE).toContain("rounded-full");
     });
 
     it("uses text-secondary color", () => {
@@ -133,8 +136,12 @@ describe("RefreshBadgeButton", () => {
     });
 
     it("has hover state with amber accent", () => {
-      expect(SOURCE).toContain("hover:border-amber/20");
-      expect(SOURCE).toContain("hover:text-text-primary");
+      expect(SOURCE).toContain("hover:border-amber/30");
+      expect(SOURCE).toContain("hover:text-amber");
+    });
+
+    it("is positioned absolutely for badge overlay", () => {
+      expect(SOURCE).toContain("absolute");
     });
   });
 });
