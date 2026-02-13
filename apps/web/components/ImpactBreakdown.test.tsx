@@ -84,20 +84,14 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain("stats.reposContributed");
     });
 
-    it("has a circular score gauge SVG", () => {
-      expect(SOURCE).toContain("GAUGE_CIRCUMFERENCE");
-      expect(SOURCE).toContain("strokeDasharray");
-      expect(SOURCE).toContain("strokeDashoffset");
+    it("does not contain a circular score gauge (score shown in badge)", () => {
+      expect(SOURCE).not.toContain("GAUGE_CIRCUMFERENCE");
+      expect(SOURCE).not.toContain("strokeDasharray");
     });
 
     it("has unique colors per dimension (DIMENSION_COLORS)", () => {
       expect(SOURCE).toContain("DIMENSION_COLORS");
       expect(SOURCE).toContain("linear-gradient");
-    });
-
-    it("has a multi-color gauge gradient (pink to orange)", () => {
-      expect(SOURCE).toContain("#EC4899");
-      expect(SOURCE).toContain("#FB923C");
     });
   });
 });

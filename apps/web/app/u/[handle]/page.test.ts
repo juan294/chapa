@@ -48,6 +48,16 @@ describe("SharePage", () => {
     });
   });
 
+  describe("archetype header", () => {
+    it("renders the archetype name from impact data", () => {
+      expect(SOURCE).toContain("impact.archetype");
+    });
+
+    it("renders the archetype description", () => {
+      expect(SOURCE).toContain("ARCHETYPE_DESCRIPTIONS");
+    });
+  });
+
   describe("toolbar with share + customize", () => {
     it("uses BadgeToolbar component", () => {
       expect(SOURCE).toContain("BadgeToolbar");

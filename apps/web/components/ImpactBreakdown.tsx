@@ -22,7 +22,7 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   breadth: { from: "#ec4899", to: "#f9a8d4" },
 };
 
-const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
+export const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
   Builder:
     "You ship. PRs merged, issues closed, meaningful code changes \u2014 building is your strongest dimension.",
   Guardian:
@@ -37,9 +37,6 @@ const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
     "You\u2019re getting started. Keep contributing and your profile will take shape.",
 };
 
-const GAUGE_RADIUS = 54;
-const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
-
 interface ImpactBreakdownProps {
   impact: ImpactV4Result;
   stats: StatsData;
@@ -47,84 +44,9 @@ interface ImpactBreakdownProps {
 
 export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
   const dims = impact.dimensions;
-  const gaugeOffset =
-    GAUGE_CIRCUMFERENCE * (1 - impact.adjustedComposite / 100);
 
   return (
     <div className="space-y-10">
-      {/* ── Score + Archetype ─────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-[11rem_1fr] gap-8 items-center">
-        {/* Circular score gauge */}
-        <div className="flex flex-col items-center">
-          <div className="relative w-44 h-44">
-            <svg
-              viewBox="0 0 120 120"
-              className="w-full h-full"
-              style={{ transform: "rotate(-90deg)" }}
-              aria-hidden="true"
-            >
-              <circle
-                cx="60"
-                cy="60"
-                r={GAUGE_RADIUS}
-                fill="none"
-                stroke="var(--color-track)"
-                strokeWidth="7"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r={GAUGE_RADIUS}
-                fill="none"
-                stroke="url(#gaugeGrad)"
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeDasharray={GAUGE_CIRCUMFERENCE}
-                strokeDashoffset={gaugeOffset}
-                className="animate-gauge-fill"
-              />
-              <defs>
-                <linearGradient
-                  id="gaugeGrad"
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="0%"
-                >
-                  <stop offset="0%" stopColor="#EC4899" />
-                  <stop offset="100%" stopColor="#FB923C" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-heading text-5xl font-extrabold text-text-primary leading-none">
-                {impact.adjustedComposite}
-              </span>
-              <span className="text-[11px] text-text-secondary font-body mt-1 uppercase tracking-wider">
-                Impact Score
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Archetype info */}
-        <div className="text-center md:text-left">
-          <div className="flex items-baseline gap-3 justify-center md:justify-start mb-2">
-            <h3 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
-              {impact.archetype}
-            </h3>
-            {impact.tier !== impact.archetype && (
-              <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
-                {impact.tier}
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-text-secondary leading-relaxed max-w-md mx-auto md:mx-0">
-            {ARCHETYPE_DESCRIPTIONS[impact.archetype]}
-          </p>
-        </div>
-      </div>
-
       {/* ── Dimension Cards ────────────────────────────────── */}
       <div>
         <h3 className="font-heading text-[11px] tracking-[0.2em] uppercase text-text-secondary mb-4">

@@ -1,6 +1,6 @@
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
-import { ImpactBreakdown } from "@/components/ImpactBreakdown";
+import { ImpactBreakdown, ARCHETYPE_DESCRIPTIONS } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -163,6 +163,25 @@ export default async function SharePage({ params }: SharePageProps) {
             </div>
           )}
         </div>
+
+        {/* ── Archetype Header ──────────────────────────────────── */}
+        {impact && (
+          <div className="mb-4 animate-fade-in-up [animation-delay:250ms]">
+            <div className="flex items-baseline gap-3 mb-2">
+              <h2 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
+                {impact.archetype}
+              </h2>
+              {impact.tier !== impact.archetype && (
+                <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
+                  {impact.tier}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed max-w-lg">
+              {ARCHETYPE_DESCRIPTIONS[impact.archetype]}
+            </p>
+          </div>
+        )}
 
         {/* ── Toolbar ──────────────────────────────────────────── */}
         <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
