@@ -1,6 +1,64 @@
 # Chapa — Developer Impact Badge
 
-Generate a live, embeddable, animated SVG badge showcasing your GitHub Impact Score.
+Generate a **live, embeddable, animated SVG badge** that showcases your developer impact from GitHub activity — with multi-dimensional scoring, verification, and one-click sharing.
+
+<p align="center">
+  <a href="https://chapa.thecreativetoken.com/u/juan294">
+    <img src="https://chapa.thecreativetoken.com/u/juan294/badge.svg" alt="juan294's Chapa Impact Badge" width="600" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://chapa.thecreativetoken.com">chapa.thecreativetoken.com</a> ·
+  <a href="https://www.npmjs.com/package/chapa-cli">chapa-cli on npm</a> ·
+  <a href="https://x.com/chapabadge">@chapabadge</a>
+</p>
+
+---
+
+## What It Does
+
+Chapa analyzes your last 12 months of GitHub activity and generates a badge with:
+
+- **Impact Score** (0–100) with confidence rating and tier (Emerging → Solid → High → Elite)
+- **4-Dimension Profile** — Building, Guarding, Consistency, Breadth
+- **Developer Archetype** — Builder, Guardian, Marathoner, Polymath, Balanced, or Emerging
+- **Activity Heatmap** — 13-week daily contribution visualization
+- **Radar Chart** — visual breakdown of your 4 dimensions
+- **Verification Hash** — HMAC-SHA256 watermark proving badge authenticity
+
+## Features
+
+### Embeddable Badge (`/u/:handle/badge.svg`)
+
+A 1200×630 animated SVG you can embed anywhere — GitHub profile READMEs, personal sites, portfolios. Cached at the CDN edge for 24 hours.
+
+```markdown
+![My Chapa Badge](https://chapa.thecreativetoken.com/u/YOUR_HANDLE/badge.svg)
+```
+
+### Share Page (`/u/:handle`)
+
+Public profile page with full score breakdown, confidence reasons, dimension details, embed snippets (Markdown + HTML), and one-click sharing to X.
+
+### Creator Studio (`/studio`)
+
+Terminal-first badge customization UI with 9 visual effect categories, live preview, and config persistence. Requires GitHub login.
+
+### CLI Tool (`chapa-cli`)
+
+For developers on **GitHub Enterprise (EMU)** — merge your work contributions into your personal Chapa badge via a secure device auth flow.
+
+```bash
+npx chapa-cli login
+npx chapa-cli merge
+```
+
+Supports `--insecure` for corporate networks with TLS interception and `--verbose` for diagnostics.
+
+### Badge Verification
+
+Every badge includes an 8-character HMAC-SHA256 hash. Anyone can verify a badge is authentic at `/api/verify/:hash` — no tampering possible.
 
 ## Quick Start
 
@@ -14,7 +72,7 @@ pnpm install
 # Copy env vars and fill in values
 cp .env.example .env.local
 
-# Run dev server
+# Run dev server (port 3001)
 pnpm run dev
 ```
 
@@ -22,20 +80,54 @@ pnpm run dev
 
 ```
 chapa/
-├── apps/web/           # Next.js 15 app (App Router)
-│   ├── app/            # Pages and API routes
-│   ├── components/     # React components
-│   ├── lib/            # Business logic
-│   │   ├── auth/       # GitHub OAuth
-│   │   ├── cache/      # Redis caching
-│   │   ├── github/     # GitHub API client + queries
-│   │   ├── impact/     # Impact v3 scoring engine
-│   │   └── render/     # SVG badge renderer
-│   └── styles/         # Global CSS (Tailwind v4)
-├── packages/shared/    # Shared types (@chapa/shared)
-├── docs/               # Specs and design docs
-└── scripts/            # Setup scripts
+├── apps/web/              # Next.js 16 app (App Router)
+│   ├── app/               # Pages and API routes
+│   │   ├── api/           # Auth, refresh, verify, health, CLI endpoints
+│   │   ├── u/[handle]/    # Share page + badge.svg route
+│   │   ├── studio/        # Creator Studio
+│   │   └── verify/        # Badge verification landing
+│   ├── components/        # React components (terminal UI, badge, nav)
+│   └── lib/               # Business logic
+│       ├── auth/          # GitHub OAuth + CLI token management
+│       ├── cache/         # Upstash Redis (24h TTL)
+│       ├── github/        # GraphQL client + stats aggregation
+│       ├── impact/        # Impact v4 scoring engine
+│       ├── render/        # React-to-SVG badge renderer
+│       ├── verification/  # HMAC-SHA256 badge signing
+│       ├── effects/       # Visual effects library
+│       └── email/         # Resend integration
+├── packages/
+│   ├── cli/               # chapa-cli npm package (v0.2.7)
+│   └── shared/            # Shared types, constants, scoring utils
+└── docs/                  # Specs, design system, guides
 ```
+
+## Impact v4 Scoring
+
+Chapa computes a multi-dimensional developer profile from commits, PRs, code reviews, and activity patterns:
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| **Building** | Commits landed, PRs merged, code volume |
+| **Guarding** | Code reviews, review comments, review depth |
+| **Consistency** | Activity spread, heatmap evenness, streak patterns |
+| **Breadth** | Repository diversity, language variety |
+
+A **confidence score** (50–100) reflects data completeness — messaging is always non-accusatory. The composite score is gently weighted by confidence to produce the final tier.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
+| Styling | Tailwind CSS v4 (dark theme, purple accent) |
+| Caching | Upstash Redis |
+| Data | GitHub GraphQL API |
+| Analytics | PostHog |
+| Email | Resend |
+| CLI | Node.js, tsup, device auth flow |
+| Hosting | Vercel |
+| Testing | Vitest, 77+ test files, TDD workflow |
 
 ## Environment Variables
 
@@ -44,20 +136,23 @@ chapa/
 | `GITHUB_CLIENT_ID` | Yes | GitHub OAuth App client ID |
 | `GITHUB_CLIENT_SECRET` | Yes | GitHub OAuth App client secret |
 | `NEXTAUTH_SECRET` | Yes | Session signing secret |
+| `NEXT_PUBLIC_BASE_URL` | Yes | Base URL for OAuth redirects |
 | `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis REST URL |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis REST token |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog project API key |
 | `NEXT_PUBLIC_POSTHOG_HOST` | No | PostHog ingestion host |
+| `RESEND_API_KEY` | No | Resend email service |
+| `RESEND_WEBHOOK_SECRET` | No | Resend webhook HMAC secret |
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `pnpm run dev` | Start development server |
+| `pnpm run dev` | Start dev server (port 3001) |
 | `pnpm run build` | Production build |
 | `pnpm run test` | Run all tests |
-| `pnpm run test:watch` | Run tests in watch mode |
-| `pnpm run test:coverage` | Run tests with coverage |
+| `pnpm run test:watch` | Tests in watch mode |
+| `pnpm run test:coverage` | Tests with coverage report |
 | `pnpm run typecheck` | TypeScript check (all workspaces) |
 | `pnpm run lint` | ESLint check |
 
@@ -66,9 +161,26 @@ chapa/
 | Endpoint | Description |
 |----------|-------------|
 | `GET /` | Landing page |
-| `GET /u/:handle` | Share page with badge + breakdown |
-| `GET /u/:handle/badge.svg` | Embeddable SVG badge |
+| `GET /u/:handle` | Share page — badge preview, breakdown, embed snippets |
+| `GET /u/:handle/badge.svg` | Embeddable SVG badge (CDN-cached) |
+| `GET /studio` | Creator Studio (auth required) |
 | `GET /api/health` | Health check |
+| `GET /api/verify/:hash` | Badge verification |
+| `POST /api/refresh?handle=` | Force refresh (rate-limited) |
+
+## Embed Your Badge
+
+**Markdown:**
+```markdown
+[![Chapa Badge](https://chapa.thecreativetoken.com/u/YOUR_HANDLE/badge.svg)](https://chapa.thecreativetoken.com/u/YOUR_HANDLE)
+```
+
+**HTML:**
+```html
+<a href="https://chapa.thecreativetoken.com/u/YOUR_HANDLE">
+  <img src="https://chapa.thecreativetoken.com/u/YOUR_HANDLE/badge.svg" alt="Chapa Impact Badge" width="600" />
+</a>
+```
 
 ## License
 
