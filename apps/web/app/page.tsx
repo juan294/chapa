@@ -15,6 +15,7 @@ const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
   { label: "How it Works", href: "#how-it-works" },
+  { label: "Enterprise", href: "#enterprise" },
   { label: "Stats", href: "#stats" },
 ];
 
@@ -258,7 +259,7 @@ export default async function Home({
 
           {/* ── Enterprise: $ chapa enterprise ────────────── */}
           <h2 className="sr-only">Enterprise</h2>
-          <section className="animate-fade-in-up [animation-delay:900ms]">
+          <section id="enterprise" className="animate-fade-in-up [animation-delay:900ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa enterprise</span>
