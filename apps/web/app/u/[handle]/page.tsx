@@ -17,6 +17,7 @@ import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
+import { isStudioEnabled } from "@/lib/feature-flags";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
@@ -170,24 +171,26 @@ export default async function SharePage({ params }: SharePageProps) {
         {/* Owner actions — Customize + Refresh */}
         {isOwner && (
           <div className="mb-8 flex items-center gap-4 animate-fade-in-up [animation-delay:250ms]">
-            <Link
-              href="/studio"
-              className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            {isStudioEnabled() && (
+              <Link
+                href="/studio"
+                className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-lg hover:shadow-amber/20"
               >
-                <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
-              </svg>
-              Customize Badge
-            </Link>
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
+                </svg>
+                Customize Badge
+              </Link>
+            )}
             <RefreshBadgeButton handle={handle} />
           </div>
         )}

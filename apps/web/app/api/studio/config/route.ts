@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
+import { isStudioEnabled } from "@/lib/feature-flags";
 import type { BadgeConfig } from "@chapa/shared";
 
 /**
@@ -9,6 +10,10 @@ import type { BadgeConfig } from "@chapa/shared";
  * Returns { config: BadgeConfig | null }.
  */
 export async function GET(request: NextRequest): Promise<Response> {
+  if (!isStudioEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
   if (!sessionSecret) {
     return NextResponse.json({ config: null });
@@ -32,6 +37,10 @@ export async function GET(request: NextRequest): Promise<Response> {
  * Auth required. Rate limited: 30 requests/hour per user.
  */
 export async function PUT(request: NextRequest): Promise<Response> {
+  if (!isStudioEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
   if (!sessionSecret) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });

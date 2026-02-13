@@ -30,6 +30,10 @@ vi.mock("@/lib/validation", async () => {
   return actual;
 });
 
+vi.mock("@/lib/feature-flags", () => ({
+  isStudioEnabled: () => true,
+}));
+
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------

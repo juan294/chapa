@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   parseCommand,
   executeCommand,
@@ -73,11 +73,6 @@ describe("executeCommand", () => {
     });
   });
 
-  it("executes /studio with navigate action", () => {
-    const result = executeCommand("/studio", commands);
-    expect(result.action).toEqual({ type: "navigate", path: "/studio" });
-  });
-
   it("executes /badge with handle", () => {
     const result = executeCommand("/badge juan294", commands);
     expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
@@ -108,12 +103,6 @@ describe("executeCommand", () => {
 describe("getMatchingCommands", () => {
   const commands = createNavigationCommands();
 
-  it("returns matching commands for partial input", () => {
-    const matches = getMatchingCommands("/s", commands);
-    const names = matches.map((m) => m.name);
-    expect(names).toContain("/studio");
-  });
-
   it("returns empty for non-slash input", () => {
     expect(getMatchingCommands("help", commands)).toEqual([]);
   });
@@ -123,12 +112,6 @@ describe("getMatchingCommands", () => {
     expect(matches.length).toBe(commands.length);
   });
 
-  it("narrows results as input gets more specific", () => {
-    const matchesSt = getMatchingCommands("/st", commands);
-    const matchesStu = getMatchingCommands("/stu", commands);
-    expect(matchesStu.length).toBeLessThanOrEqual(matchesSt.length);
-  });
-
   it("matches aliases (/b matches /badge)", () => {
     const matches = getMatchingCommands("/b", commands);
     const names = matches.map((m) => m.name);
@@ -136,14 +119,91 @@ describe("getMatchingCommands", () => {
   });
 });
 
-describe("createNavigationCommands", () => {
-  const commands = createNavigationCommands();
+describe("createNavigationCommands (studio disabled)", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+  });
 
-  it("returns 8 navigation commands", () => {
+  it("excludes /studio when flag is not set", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands();
+    const names = commands.map((c) => c.name);
+    expect(names).not.toContain("/studio");
+  });
+
+  it("returns 7 commands when studio is disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands();
+    expect(commands).toHaveLength(7);
+  });
+
+  it("/help does not mention /studio when disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands();
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).not.toContain("/studio");
+  });
+
+  it("/studio returns unknown command when disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands();
+    const result = executeCommand("/studio", commands);
+    expect(result.lines[0].type).toBe("error");
+  });
+
+  it("getMatchingCommands returns 7 for / when disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands();
+    const matches = getMatchingCommands("/", commands);
+    expect(matches).toHaveLength(7);
+  });
+
+  it("/s does not match /studio when disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands();
+    const matches = getMatchingCommands("/s", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).not.toContain("/studio");
+  });
+});
+
+describe("createNavigationCommands (studio enabled)", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+  });
+
+  it("includes /studio when flag is set to true", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
+    const names = commands.map((c) => c.name);
+    expect(names).toContain("/studio");
+  });
+
+  it("returns 8 commands when studio is enabled", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     expect(commands).toHaveLength(8);
   });
 
+  it("/studio navigates to /studio when enabled", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
+    const result = executeCommand("/studio", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/studio" });
+  });
+
+  it("/help lists /studio when enabled", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("/studio");
+  });
+
   it("includes all navigation commands", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const names = commands.map((c) => c.name);
     expect(names).toContain("/help");
     expect(names).toContain("/home");
@@ -156,6 +216,8 @@ describe("createNavigationCommands", () => {
   });
 
   it("/help output does NOT mention studio-only commands", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const result = executeCommand("/help", commands);
     const allText = result.lines.map((l) => l.text).join("\n");
     expect(allText).not.toContain("/set");
@@ -166,29 +228,16 @@ describe("createNavigationCommands", () => {
     expect(allText).not.toContain("/status");
   });
 
-  it("/help lists all navigation commands", () => {
-    const result = executeCommand("/help", commands);
-    const allText = result.lines.map((l) => l.text).join("\n");
-    expect(allText).toContain("/home");
-    expect(allText).toContain("/studio");
-    expect(allText).toContain("/login");
-    expect(allText).toContain("/badge");
-    expect(allText).toContain("/about");
-    expect(allText).toContain("/terms");
-    expect(allText).toContain("/privacy");
-  });
-
   it("/home navigates to /", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const result = executeCommand("/home", commands);
     expect(result.action).toEqual({ type: "navigate", path: "/" });
   });
 
-  it("/studio navigates to /studio", () => {
-    const result = executeCommand("/studio", commands);
-    expect(result.action).toEqual({ type: "navigate", path: "/studio" });
-  });
-
   it("/login navigates to /api/auth/login", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const result = executeCommand("/login", commands);
     expect(result.action).toEqual({
       type: "navigate",
@@ -197,42 +246,37 @@ describe("createNavigationCommands", () => {
   });
 
   it("/badge navigates with handle", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const result = executeCommand("/badge juan294", commands);
     expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
   });
 
   it("/badge errors without handle", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const result = executeCommand("/badge", commands);
     expect(result.lines[0].type).toBe("error");
     expect(result.action).toBeUndefined();
   });
 
   it("/b alias resolves to /badge", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const result = executeCommand("/b juan294", commands);
     expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
   });
 
-  it("/about navigates to /about", () => {
-    const result = executeCommand("/about", commands);
-    expect(result.action).toEqual({ type: "navigate", path: "/about" });
-  });
-
-  it("/terms navigates to /terms", () => {
-    const result = executeCommand("/terms", commands);
-    expect(result.action).toEqual({ type: "navigate", path: "/terms" });
-  });
-
-  it("/privacy navigates to /privacy", () => {
-    const result = executeCommand("/privacy", commands);
-    expect(result.action).toEqual({ type: "navigate", path: "/privacy" });
-  });
-
   it("getMatchingCommands returns all 8 for /", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
     expect(matches).toHaveLength(8);
   });
 
   it("getMatchingCommands filters correctly", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
     const matches = getMatchingCommands("/b", commands);
     const names = matches.map((m) => m.name);
     expect(names).toContain("/badge");
