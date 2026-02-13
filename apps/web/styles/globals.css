@@ -210,6 +210,30 @@ html {
   to { width: 100%; }
 }
 
+/* ── Score gauge + bar fill ─────────────────────────────── */
+
+@keyframes gauge-fill {
+  from {
+    stroke-dashoffset: 339.292;
+  }
+}
+
+.animate-gauge-fill {
+  animation: gauge-fill 1.5s ease-out both;
+}
+
+@keyframes bar-fill {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+}
+
+.animate-bar-fill {
+  transform-origin: left;
+  animation: bar-fill 0.8s ease-out both;
+}
+
 /* ── Animation utilities ─────────────────────────────────── */
 
 .animate-float-slow {
