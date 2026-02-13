@@ -54,7 +54,7 @@ describe("SharePage", () => {
     });
 
     it("renders the archetype description", () => {
-      expect(SOURCE).toContain("ARCHETYPE_DESCRIPTIONS");
+      expect(SOURCE).toContain("getArchetypeProfile");
     });
   });
 

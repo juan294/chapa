@@ -1,3 +1,4 @@
+import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Navbar } from "@/components/Navbar";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
@@ -24,11 +25,11 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#F472B6] hover:text-[#F9A8D4] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="text-text-primary hover:text-white transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="text-[#9AA4B2] hover:text-[#C0C7D0] transition-colors">Emerging</Link> — your profile shape tells a story.</>),
+    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#F472B6] hover:text-[#F9A8D4] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="text-text-primary hover:text-white transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="text-[#9AA4B2] hover:text-[#C0C7D0] transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
   },
   {
     title: "CONFIDENCE RATING",
-    description: "Transparent quality signals. No false positives.",
+    description: "Every badge includes a confidence score (50\u2013100) that reflects how much data backs the profile. Less activity means lower confidence \u2014 no false positives.",
   },
   {
     title: "VERIFIED METRICS",
@@ -41,8 +42,8 @@ const FEATURES = [
 ];
 
 const STEPS = [
-  { number: "01", title: "Sign in with GitHub", description: "OAuth login — we only request access to public data." },
-  { number: "02", title: "We build your profile", description: "12 months of activity → 4 dimensions, archetype, and composite score." },
+  { number: "01", title: "Sign in with GitHub", description: "Secure OAuth over HTTPS \u2014 we only request read access to public data. No passwords stored, no private repos accessed." },
+  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity \u2014 4 dimensions, archetype, and composite score. The badge heatmap shows the last 90 days at a glance." },
   { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere." },
 ];
 
@@ -185,6 +186,9 @@ export default async function Home({
                   <span className="ml-2 text-xs text-terminal-dim font-heading">
                     embed snippet
                   </span>
+                  <div className="ml-auto">
+                    <CopyButton text="![Impact Badge](https://chapa.thecreativetoken.com/u/developer/badge.svg)" />
+                  </div>
                 </div>
                 <div className="p-4 font-heading text-sm leading-relaxed">
                   <p className="text-terminal-dim">

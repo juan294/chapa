@@ -17,9 +17,19 @@ export function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       aria-label="Copy embed snippet"
-      className="rounded-lg border border-stroke bg-card px-4 py-1.5 text-sm text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors"
+      className="p-1.5 rounded-lg text-text-secondary hover:text-amber transition-colors"
     >
-      <span aria-live="polite">{copied ? "Copied!" : "Copy"}</span>
+      <span aria-live="polite" className="sr-only">{copied ? "Copied!" : "Copy"}</span>
+      {copied ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
     </button>
   );
 }

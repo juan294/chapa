@@ -1,6 +1,6 @@
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
-import { ImpactBreakdown, ARCHETYPE_DESCRIPTIONS } from "@/components/ImpactBreakdown";
+import { ImpactBreakdown, getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -142,8 +142,13 @@ export default async function SharePage({ params }: SharePageProps) {
           @{handle} — Developer Impact, Decoded
         </h1>
 
+        {/* ── Badge Section Title ──────────────────────────────── */}
+        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:150ms]">
+          Your Impact, Decoded
+        </h2>
+
         {/* ── Badge Preview ──────────────────────────────────── */}
-        <div className="mb-10 animate-scale-in [animation-delay:200ms]">
+        <div className="mb-4 animate-scale-in [animation-delay:200ms]">
           {useInteractivePreview ? (
             <ShareBadgePreviewLazy
               config={savedConfig}
@@ -164,11 +169,25 @@ export default async function SharePage({ params }: SharePageProps) {
           )}
         </div>
 
+        {/* ── Toolbar ──────────────────────────────────────────── */}
+        <div className="flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
+          <BadgeToolbar
+            handle={handle}
+            isOwner={isOwner}
+            studioEnabled={isStudioEnabled()}
+          />
+        </div>
+
         <hr className="border-stroke mb-10" />
+
+        {/* ── Breakdown Section Title ─────────────────────────── */}
+        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up [animation-delay:280ms]">
+          Impact Breakdown
+        </h2>
 
         {/* ── Archetype Header ──────────────────────────────────── */}
         {impact && (
-          <div className="mb-4 animate-fade-in-up [animation-delay:250ms]">
+          <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
             <div className="flex items-baseline gap-3 mb-2">
               <h2 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
                 {impact.archetype}
@@ -180,19 +199,10 @@ export default async function SharePage({ params }: SharePageProps) {
               )}
             </div>
             <p className="text-sm text-text-secondary leading-relaxed">
-              {ARCHETYPE_DESCRIPTIONS[impact.archetype]}
+              {getArchetypeProfile(impact)}
             </p>
           </div>
         )}
-
-        {/* ── Toolbar ──────────────────────────────────────────── */}
-        <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
-          <BadgeToolbar
-            handle={handle}
-            isOwner={isOwner}
-            studioEnabled={isStudioEnabled()}
-          />
-        </div>
 
         {/* ── Impact Dashboard ────────────────────────────────── */}
         {impact && stats ? (
