@@ -537,4 +537,37 @@ describe("renderBadgeSvg", () => {
       }
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // SVG XSS prevention
+  // ---------------------------------------------------------------------------
+
+  describe("SVG XSS prevention", () => {
+    it("escapes special XML characters in archetype", () => {
+      const maliciousImpact = makeImpact({
+        archetype: 'Builder<script>alert("xss")</script>' as unknown as ImpactV4Result["archetype"],
+      });
+      const svg = renderBadgeSvg(makeStats(), maliciousImpact);
+      expect(svg).not.toContain('<script>');
+      expect(svg).toContain('&lt;script&gt;');
+    });
+
+    it("escapes special XML characters in tier", () => {
+      const maliciousImpact = makeImpact({
+        tier: 'Elite"onload="alert(1)' as unknown as ImpactV4Result["tier"],
+      });
+      const svg = renderBadgeSvg(makeStats(), maliciousImpact);
+      expect(svg).not.toContain('"onload=');
+      expect(svg).toContain('&quot;onload=');
+    });
+
+    it("escapes special XML characters in avatarDataUri", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        avatarDataUri: 'data:image/png;base64,abc"onload="alert(1)',
+      });
+      expect(svg).not.toContain('"onload="alert(1)"');
+      expect(svg).toContain('&quot;onload=');
+    });
+  });
+
 });
