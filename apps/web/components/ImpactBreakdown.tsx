@@ -22,20 +22,6 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   breadth: { from: "#ec4899", to: "#f9a8d4" },
 };
 
-const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
-  Builder:
-    "You ship. PRs merged, issues closed, meaningful code changes \u2014 building is your strongest dimension.",
-  Guardian:
-    "You protect quality. Code reviews and gatekeeping are where you make the biggest impact.",
-  Marathoner:
-    "You show up. Consistent, sustained activity over time \u2014 reliability is your hallmark.",
-  Polymath:
-    "You reach across projects. Contributing to multiple repos and diverse work areas sets you apart.",
-  Balanced:
-    "You do it all. Your dimensions are well-rounded with no single weakness.",
-  Emerging:
-    "You\u2019re getting started. Keep contributing and your profile will take shape.",
-};
 
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
   Builder:
