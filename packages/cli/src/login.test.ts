@@ -391,6 +391,63 @@ describe("login", () => {
     errorSpy.mockRestore();
   });
 
+  it("suggests --insecure for human-readable TLS messages with error code", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // Real-world Node.js fetch error: human-readable message + code property
+        const cause = Object.assign(
+          new Error("self-signed certificate in certificate chain"),
+          { code: "SELF_SIGNED_CERT_IN_CHAIN" },
+        );
+        throw new Error("fetch failed", { cause });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    expect(allErrors).toContain("self-signed certificate");
+    errorSpy.mockRestore();
+  });
+
+  it("suggests --insecure for human-readable TLS message without code property", async () => {
+    const errorSpy = vi.spyOn(console, "error");
+    let callCount = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // Some environments only set the message, no code
+        throw new Error("fetch failed", {
+          cause: new Error("unable to verify the first certificate"),
+        });
+      }
+      return new Response(
+        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
+        { status: 200 },
+      );
+    });
+
+    const p = login("https://example.com");
+    await advancePoll();
+    await advancePoll();
+    await p;
+
+    const allErrors = errorSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allErrors).toContain("--insecure");
+    errorSpy.mockRestore();
+  });
+
   it("does not suggest --insecure when insecure is already enabled", async () => {
     const errorSpy = vi.spyOn(console, "error");
     const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;

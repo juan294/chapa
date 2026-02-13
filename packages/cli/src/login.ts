@@ -38,13 +38,17 @@ export interface LoginOptions {
 }
 
 const TLS_ERROR_PATTERNS = [
+  // Node.js error codes (uppercase)
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
   "CERT_HAS_EXPIRED",
   "DEPTH_ZERO_SELF_SIGNED_CERT",
   "SELF_SIGNED_CERT_IN_CHAIN",
   "ERR_TLS_CERT_ALTNAME_INVALID",
   "CERTIFICATE_VERIFY_FAILED",
-  "SSL",
+  // Human-readable messages (lowercase, as returned by Node.js fetch)
+  "self-signed certificate",
+  "unable to verify",
+  "certificate has expired",
 ];
 
 function isTlsError(message: string): boolean {
@@ -66,16 +70,19 @@ function getRootErrorMessage(err: unknown): string {
 }
 
 /**
- * Collect all messages from the error cause chain (for TLS pattern matching).
+ * Collect all messages and error codes from the cause chain (for TLS pattern matching).
+ * Includes both .message and .code from each error in the chain.
  */
 function getFullErrorChain(err: unknown): string {
-  const messages: string[] = [];
+  const parts: string[] = [];
   let current = err;
   while (current instanceof Error) {
-    messages.push(current.message);
+    parts.push(current.message);
+    const code = (current as Error & { code?: string }).code;
+    if (code) parts.push(code);
     current = (current as Error & { cause?: unknown }).cause;
   }
-  return messages.join(" | ");
+  return parts.join(" | ");
 }
 
 export async function login(serverUrl: string, opts: LoginOptions = {}): Promise<void> {
