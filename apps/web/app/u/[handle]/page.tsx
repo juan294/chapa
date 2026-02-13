@@ -143,7 +143,7 @@ export default async function SharePage({ params }: SharePageProps) {
         </h1>
 
         {/* ── Badge Preview ──────────────────────────────────── */}
-        <div className="mb-4 animate-scale-in [animation-delay:200ms]">
+        <div className="mb-10 animate-scale-in [animation-delay:200ms]">
           {useInteractivePreview ? (
             <ShareBadgePreviewLazy
               config={savedConfig}
@@ -163,6 +163,8 @@ export default async function SharePage({ params }: SharePageProps) {
             </div>
           )}
         </div>
+
+        <hr className="border-stroke mb-10" />
 
         {/* ── Archetype Header ──────────────────────────────────── */}
         {impact && (
