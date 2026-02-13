@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import Link from "next/link";
 
@@ -52,10 +52,24 @@ export function BadgeToolbar({
     }
   }
 
+  const [copied, setCopied] = useState(false);
+
   const shareUrl = `https://chapa.thecreativetoken.com/u/${handle}`;
   const tweetText = encodeURIComponent(
     `Check out my developer impact badge on Chapa! ${shareUrl}`,
   );
+
+  const handleCopyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      trackEvent("share_clicked", { platform: "copy_link" });
+      setShareOpen(false);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard API may be blocked */
+    }
+  }, [shareUrl]);
 
   const btnClass =
     "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
@@ -152,6 +166,32 @@ export function BadgeToolbar({
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
             </a>
+            <button
+              onClick={handleCopyLink}
+              role="menuitem"
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors w-full"
+            >
+              {copied ? "Copied!" : "Copy link"}
+              <svg
+                className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {copied ? (
+                  <path d="M20 6L9 17l-5-5" />
+                ) : (
+                  <>
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </>
+                )}
+              </svg>
+            </button>
           </div>
         )}
       </div>
