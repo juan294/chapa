@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { SHORTCUTS, groupByScope } from "@/lib/keyboard/shortcuts";
+import { isStudioEnabled } from "@/lib/feature-flags";
 
 const SCOPE_LABELS: Record<string, string> = {
   navigation: "Navigation",
@@ -71,7 +72,11 @@ export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
 
   if (!open) return null;
 
-  const groups = groupByScope(SHORTCUTS);
+  const studioEnabled = isStudioEnabled();
+  const filtered = studioEnabled
+    ? SHORTCUTS
+    : SHORTCUTS.filter((s) => s.scope !== "studio" && s.id !== "go-studio");
+  const groups = groupByScope(filtered);
 
   return (
     <div
