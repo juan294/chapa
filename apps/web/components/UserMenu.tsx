@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 interface UserMenuProps {
@@ -85,8 +86,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
             {fallbackLetter}
           </div>
         ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
+          <Image
             src={avatarUrl}
             alt={`${login}'s avatar`}
             width={32}
@@ -126,8 +126,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
                   {fallbackLetter}
                 </div>
               ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
+                <Image
                   src={avatarUrl}
                   alt=""
                   width={40}
@@ -259,25 +258,27 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
 
           {/* Sign out */}
           <div className="px-2 py-1.5">
-            <a
-              href="/api/auth/logout"
-              role="menuitem"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            <form method="POST" action="/api/auth/logout">
+              <button
+                type="submit"
+                role="menuitem"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
               >
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
-              Sign out
-            </a>
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
       )}

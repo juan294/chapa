@@ -82,6 +82,14 @@ const defaultHeaders = [
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@chapa/shared"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
+      },
+    ],
+  },
   async headers() {
     return [
       // Badge SVG is designed to be embedded in READMEs, iframes, etc.
