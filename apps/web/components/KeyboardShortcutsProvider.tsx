@@ -11,7 +11,15 @@ import {
 import { useRouter } from "next/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
 import { type ShortcutScope } from "@/lib/keyboard/shortcuts";
-import { ShortcutCheatSheet } from "./ShortcutCheatSheet";
+import dynamic from "next/dynamic";
+
+const ShortcutCheatSheet = dynamic(
+  () =>
+    import("./ShortcutCheatSheet").then((m) => ({
+      default: m.ShortcutCheatSheet,
+    })),
+  { ssr: false },
+);
 
 type PageShortcutHandler = (id: string) => void;
 
