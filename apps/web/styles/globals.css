@@ -1,74 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  /* Light defaults — Tailwind reads these to generate utility classes (bg-bg, text-text-primary, etc.).
-     Runtime values are overridden below in unlayered :root / [data-theme="dark"] blocks. */
-  --color-bg: #FFFFFF;
-  --color-card: #F9FAFB;
-  --color-text-primary: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-stroke: #00000014;
-
-  --color-amber: #7C6AEF;
-  --color-amber-light: #9D8FFF;
-  --color-amber-dark: #5E4FCC;
-
-  --color-warm-bg: #FFFFFF;
-  --color-warm-card: #F9FAFB;
-  --color-warm-stroke: #00000014;
-
-  --color-dark-section: #1A1A2E;
-  --color-dark-card: #252542;
-  --color-purple-tint: #F5F3FF;
-  --color-complement: #10B981;
-  --color-complement-light: #D1FAE5;
-
-  --color-terminal-green: #16A34A;
-  --color-terminal-red: #DC2626;
-  --color-terminal-yellow: #D97706;
-  --color-terminal-dim: #9CA3AF;
-
-  --color-track: #0000000F;
-
-  /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
-  --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
-  --font-body: var(--font-plus-jakarta), system-ui, sans-serif;
-  --font-terminal: var(--font-jetbrains-mono), ui-monospace, monospace;
-}
-
-/* ── Theme values (unlayered — same cascade level) ─────── */
-
-:root {
-  /* Light palette (default) */
-  --color-bg: #FFFFFF;
-  --color-card: #F9FAFB;
-  --color-text-primary: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-stroke: rgba(0, 0, 0, 0.08);
-
-  --color-warm-bg: #FFFFFF;
-  --color-warm-card: #F9FAFB;
-  --color-warm-stroke: rgba(0, 0, 0, 0.08);
-
-  --color-dark-section: #1A1A2E;
-  --color-dark-card: #252542;
-  --color-purple-tint: #F5F3FF;
-  --color-complement-light: #D1FAE5;
-
-  --color-terminal-green: #16A34A;
-  --color-terminal-red: #DC2626;
-  --color-terminal-yellow: #D97706;
-  --color-terminal-dim: #9CA3AF;
-
-  --color-track: rgba(0, 0, 0, 0.06);
-}
-
-[data-theme="dark"] {
+  /* Dark-only palette — single theme, no runtime switching needed. */
   --color-bg: #0A0A0F;
   --color-card: #111118;
   --color-text-primary: #E2E4E9;
   --color-text-secondary: #6B6F7B;
   --color-stroke: rgba(124, 106, 239, 0.10);
+
+  --color-amber: #7C6AEF;
+  --color-amber-light: #9D8FFF;
+  --color-amber-dark: #5E4FCC;
 
   --color-warm-bg: #0A0A0F;
   --color-warm-card: #111118;
@@ -77,6 +19,7 @@
   --color-dark-section: #06060A;
   --color-dark-card: #0E0E16;
   --color-purple-tint: rgba(124, 106, 239, 0.06);
+  --color-complement: #10B981;
   --color-complement-light: rgba(16, 185, 129, 0.15);
 
   --color-terminal-green: #4ADE80;
@@ -85,6 +28,11 @@
   --color-terminal-dim: #3A3A4A;
 
   --color-track: rgba(255, 255, 255, 0.06);
+
+  /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
+  --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
+  --font-body: var(--font-plus-jakarta), system-ui, sans-serif;
+  --font-terminal: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
 html {
@@ -248,19 +196,11 @@ html {
 
 .bg-grid-warm {
   background-image: linear-gradient(
-      rgba(0, 0, 0, 0.03) 1px,
-      transparent 1px
-    ),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-  background-size: 72px 72px;
-}
-
-[data-theme="dark"] .bg-grid-warm {
-  background-image: linear-gradient(
       rgba(124, 106, 239, 0.04) 1px,
       transparent 1px
     ),
     linear-gradient(90deg, rgba(124, 106, 239, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
 /* ── Focus indicators (accessibility) ────────────────────── */
@@ -302,16 +242,9 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(124, 106, 239, 0.15);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(124, 106, 239, 0.15);
-}
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(124, 106, 239, 0.25);
 }
