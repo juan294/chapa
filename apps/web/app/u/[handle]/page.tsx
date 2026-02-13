@@ -2,8 +2,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { ImpactBreakdown } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
-import { ShareButton } from "@/components/ShareButton";
-import { RefreshBadgeButton } from "@/components/RefreshBadgeButton";
+import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { cacheGet } from "@/lib/cache/redis";
@@ -11,7 +10,6 @@ import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
@@ -145,7 +143,7 @@ export default async function SharePage({ params }: SharePageProps) {
         </h1>
 
         {/* ── Badge Preview ──────────────────────────────────── */}
-        <div className="relative mb-8 animate-scale-in [animation-delay:200ms]">
+        <div className="mb-4 animate-scale-in [animation-delay:200ms]">
           {useInteractivePreview ? (
             <ShareBadgePreviewLazy
               config={savedConfig}
@@ -164,32 +162,15 @@ export default async function SharePage({ params }: SharePageProps) {
               />
             </div>
           )}
-          {isOwner && <RefreshBadgeButton handle={handle} />}
         </div>
 
-        {/* ── Actions: Share + Customize ──────────────────────── */}
-        <div className="flex items-center gap-3 mb-12 animate-fade-in-up [animation-delay:300ms]">
-          <ShareButton handle={handle} />
-          {isOwner && isStudioEnabled() && (
-            <Link
-              href="/studio"
-              className="inline-flex items-center gap-2 rounded-xl border border-stroke px-6 py-3.5 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04] transition-colors"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
-              </svg>
-              Customize
-            </Link>
-          )}
+        {/* ── Toolbar ──────────────────────────────────────────── */}
+        <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
+          <BadgeToolbar
+            handle={handle}
+            isOwner={isOwner}
+            studioEnabled={isStudioEnabled()}
+          />
         </div>
 
         {/* ── Impact Dashboard ────────────────────────────────── */}

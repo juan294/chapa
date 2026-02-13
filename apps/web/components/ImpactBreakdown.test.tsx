@@ -90,8 +90,14 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain("strokeDashoffset");
     });
 
-    it("renders dimension cards with gradient bars", () => {
-      expect(SOURCE).toContain("bg-gradient-to-r from-amber-dark to-amber-light");
+    it("has unique colors per dimension (DIMENSION_COLORS)", () => {
+      expect(SOURCE).toContain("DIMENSION_COLORS");
+      expect(SOURCE).toContain("linear-gradient");
+    });
+
+    it("has a multi-color gauge gradient (pink to orange)", () => {
+      expect(SOURCE).toContain("#EC4899");
+      expect(SOURCE).toContain("#FB923C");
     });
   });
 });

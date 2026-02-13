@@ -15,6 +15,13 @@ const DIMENSION_SUBTITLES: Record<string, string> = {
   breadth: "Repos contributed \u00b7 community reach",
 };
 
+const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
+  building: { from: "#22c55e", to: "#86efac" },
+  guarding: { from: "#f97316", to: "#fdba74" },
+  consistency: { from: "#06b6d4", to: "#67e8f9" },
+  breadth: { from: "#ec4899", to: "#f9a8d4" },
+};
+
 const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
   Builder:
     "You ship. PRs merged, issues closed, meaningful code changes \u2014 building is your strongest dimension.",
@@ -84,8 +91,8 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   x2="100%"
                   y2="0%"
                 >
-                  <stop offset="0%" stopColor="var(--color-amber-dark)" />
-                  <stop offset="100%" stopColor="var(--color-amber-light)" />
+                  <stop offset="0%" stopColor="#EC4899" />
+                  <stop offset="100%" stopColor="#FB923C" />
                 </linearGradient>
               </defs>
             </svg>
@@ -141,7 +148,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                 </div>
                 <div className="h-1.5 rounded-full bg-track overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-dark to-amber-light animate-bar-fill"
+                    className="h-full rounded-full animate-bar-fill"
                     role="progressbar"
                     aria-valuenow={dims[key]}
                     aria-valuemin={0}
@@ -149,6 +156,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                     aria-label={`${DIMENSION_LABELS[key]} score`}
                     style={{
                       width: `${dims[key]}%`,
+                      background: `linear-gradient(to right, ${DIMENSION_COLORS[key].from}, ${DIMENSION_COLORS[key].to})`,
                       animationDelay: `${600 + i * 100}ms`,
                     }}
                   />

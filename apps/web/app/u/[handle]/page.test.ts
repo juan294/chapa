@@ -48,12 +48,16 @@ describe("SharePage", () => {
     });
   });
 
-  describe("customize badge CTA", () => {
-    it("has Customize Badge link", () => {
-      expect(SOURCE).toContain("/studio");
+  describe("toolbar with share + customize", () => {
+    it("uses BadgeToolbar component", () => {
+      expect(SOURCE).toContain("BadgeToolbar");
     });
 
-    it("only shows CTA for badge owner", () => {
+    it("passes studioEnabled to toolbar", () => {
+      expect(SOURCE).toContain("studioEnabled");
+    });
+
+    it("passes isOwner to toolbar", () => {
       expect(SOURCE).toContain("isOwner");
     });
   });
