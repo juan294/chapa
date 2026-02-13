@@ -5,7 +5,6 @@ import {
   matchShortcut,
   isInputFocused,
   groupByScope,
-  type Shortcut,
 } from "./shortcuts";
 
 /* ------------------------------------------------------------------ */

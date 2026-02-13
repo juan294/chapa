@@ -10,8 +10,8 @@ export default function GlobalError({
     <html lang="en">
       <body
         style={{
-          backgroundColor: "#FFFFFF",
-          color: "#1A1A2E",
+          backgroundColor: "#0A0A0F",
+          color: "#E2E4E9",
           fontFamily: "system-ui, sans-serif",
           margin: 0,
         }}
@@ -32,7 +32,7 @@ export default function GlobalError({
             style={{
               fontSize: "2.25rem",
               fontWeight: 700,
-              color: "#7C6AEF",
+              color: "#F87171",
               fontFamily: '"JetBrains Mono", "Courier New", monospace',
               margin: 0,
             }}
@@ -43,7 +43,7 @@ export default function GlobalError({
             style={{
               marginTop: "1rem",
               fontSize: "0.875rem",
-              color: "#6B7280",
+              color: "#6B6F7B",
             }}
           >
             A critical error occurred. Please try again.
@@ -76,11 +76,11 @@ export default function GlobalError({
               href="/"
               style={{
                 borderRadius: "9999px",
-                border: "1px solid rgba(0, 0, 0, 0.08)",
+                border: "1px solid rgba(124, 106, 239, 0.10)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#6B7280",
+                color: "#6B6F7B",
                 textDecoration: "none",
                 cursor: "pointer",
               }}
