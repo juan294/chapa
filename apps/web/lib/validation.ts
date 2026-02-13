@@ -76,6 +76,9 @@ export function isValidStatsShape(value: unknown): boolean {
     "reposContributed",
     "topRepoShare",
     "maxCommitsIn10Min",
+    "totalStars",
+    "totalForks",
+    "totalWatchers",
   ] as const;
   for (const key of requiredNumbers) {
     if (typeof obj[key] !== "number" || obj[key] < 0) return false;

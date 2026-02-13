@@ -162,6 +162,28 @@ describe("isValidStatsShape", () => {
     expect(isValidStatsShape({ ...validStats, commitsTotal: -1 })).toBe(false);
   });
 
+  it("rejects stats missing totalStars", () => {
+    const noStars = { ...validStats };
+    delete (noStars as Record<string, unknown>).totalStars;
+    expect(isValidStatsShape(noStars)).toBe(false);
+  });
+
+  it("rejects stats missing totalForks", () => {
+    const noForks = { ...validStats };
+    delete (noForks as Record<string, unknown>).totalForks;
+    expect(isValidStatsShape(noForks)).toBe(false);
+  });
+
+  it("rejects stats missing totalWatchers", () => {
+    const noWatchers = { ...validStats };
+    delete (noWatchers as Record<string, unknown>).totalWatchers;
+    expect(isValidStatsShape(noWatchers)).toBe(false);
+  });
+
+  it("accepts stats with valid totalStars, totalForks, totalWatchers", () => {
+    expect(isValidStatsShape({ ...validStats, totalStars: 42, totalForks: 10, totalWatchers: 5 })).toBe(true);
+  });
+
   it("rejects non-array heatmapData", () => {
     expect(isValidStatsShape({ ...validStats, heatmapData: "not-array" })).toBe(false);
   });
