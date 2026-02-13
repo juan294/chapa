@@ -10,12 +10,13 @@ If your employer uses GitHub Enterprise Managed Users (EMU), your work contribut
 
 1. [Prerequisites](#1-prerequisites)
 2. [Installation](#2-installation)
-3. [Token setup](#3-token-setup)
-4. [Running the CLI](#4-running-the-cli)
-5. [Verifying it worked](#5-verifying-it-worked)
-6. [Corporate environment guide](#6-corporate-environment-guide)
-7. [Troubleshooting](#7-troubleshooting)
-8. [Reference](#8-reference)
+3. [Authentication](#3-authentication)
+4. [EMU token setup](#4-emu-token-setup)
+5. [Running the CLI](#5-running-the-cli)
+6. [Verifying it worked](#6-verifying-it-worked)
+7. [Corporate environment guide](#7-corporate-environment-guide)
+8. [Troubleshooting](#8-troubleshooting)
+9. [Reference](#9-reference)
 
 ---
 
@@ -77,18 +78,20 @@ npx chapa-cli --help
 You should see:
 
 ```
-chapa-cli v0.1.4
+chapa-cli v0.2.0
 
 Merge GitHub EMU (Enterprise Managed User) contributions into your Chapa badge.
 
-Usage:
-  chapa merge --handle <personal> --emu-handle <emu> [options]
+Commands:
+  chapa login                          Authenticate with Chapa (opens browser)
+  chapa logout                         Clear stored credentials
+  chapa merge --emu-handle <emu>       Merge EMU stats into your badge
 
 Options:
-  --handle <handle>       Your personal GitHub handle (required)
-  --emu-handle <handle>   Your EMU GitHub handle (required)
+  --emu-handle <handle>   Your EMU GitHub handle (required for merge)
   --emu-token <token>     EMU GitHub token (or set GITHUB_EMU_TOKEN)
-  --token <token>         Personal GitHub token (or set GITHUB_TOKEN)
+  --handle <handle>       Override personal handle (auto-detected from login)
+  --token <token>         Override auth token (auto-detected from login)
   --server <url>          Chapa server URL (default: https://chapa.thecreativetoken.com)
   --version, -v           Show version number
   --help, -h              Show this help message
@@ -96,26 +99,59 @@ Options:
 
 ---
 
-## 3. Token setup
+## 3. Authentication
 
-You need **two GitHub tokens** — one from your personal account and one from your EMU account. Each token needs specific permissions to read your activity.
+The CLI uses browser-based authentication — similar to `npm login` or `gh auth login`. No personal GitHub token is needed.
 
-### 3.1 Personal GitHub token
+### Log in
 
-This authenticates you as the owner of your Chapa badge.
+```bash
+npx chapa-cli login
+```
 
-1. Go to [github.com/settings/tokens](https://github.com/settings/tokens) (make sure you are logged into your **personal** GitHub account)
-2. Click **"Generate new token (classic)"**
-3. Give it a descriptive name: `Chapa CLI - Personal`
-4. Set expiration to 90 days (or longer if you prefer)
-5. Select these scopes:
-   - `read:user` (required)
-6. Click **"Generate token"**
-7. **Copy the token immediately** — you won't see it again
+This will:
 
-### 3.2 EMU GitHub token
+1. Open your browser to the Chapa authorization page
+2. Ask you to sign in with your personal GitHub account (if not already signed in)
+3. Click **"Authorize CLI"** to approve
+4. The CLI automatically detects the approval and saves your credentials
 
-This allows the CLI to read your work contributions.
+```
+Opening browser for authentication...
+If your browser didn't open, visit:
+  https://chapa.thecreativetoken.com/cli/authorize?session=...
+
+Waiting for approval...
+
+Logged in as juan294!
+Credentials saved to ~/.chapa/credentials.json
+```
+
+Your credentials are stored locally at `~/.chapa/credentials.json` with restricted file permissions (readable only by you). The token expires after 90 days — just run `chapa login` again to refresh.
+
+### Log out
+
+```bash
+npx chapa-cli logout
+```
+
+This removes the stored credentials from `~/.chapa/credentials.json`.
+
+### Check if you're logged in
+
+If you run `chapa merge` without being logged in, the CLI will tell you:
+
+```
+Error: Not authenticated. Run 'chapa login' first, or pass --token.
+```
+
+---
+
+## 4. EMU token setup
+
+You need **one token** — from your EMU (work) GitHub account. This allows the CLI to read your work contributions.
+
+### Create an EMU token
 
 1. Log into your **EMU GitHub account** (usually `https://github.com` with your corporate SSO, or your company's GitHub Enterprise URL)
 2. Go to **Settings > Developer settings > Personal access tokens > Tokens (classic)**
@@ -127,18 +163,17 @@ This allows the CLI to read your work contributions.
    - `read:user` (required)
    - `read:org` (may be required if your org restricts token access)
 7. Click **"Generate token"**
-8. **Copy the token immediately**
+8. **Copy the token immediately** — you won't see it again
 
 > **Important:** Some organizations require admin approval for Personal Access Tokens. If token creation is blocked, check with your IT/security team. You may need to use a Fine-Grained Personal Access Token instead — see [Troubleshooting](#cannot-create-a-token-on-emu-account).
 
-### 3.3 Store tokens as environment variables
+### Store the token as an environment variable
 
-Instead of passing tokens on every run, store them in your shell profile.
+Instead of passing the token on every run, store it in your shell profile.
 
 **macOS / Linux** — Add to `~/.zshrc`, `~/.bashrc`, or `~/.bash_profile`:
 
 ```bash
-export GITHUB_TOKEN="ghp_your_personal_token_here"
 export GITHUB_EMU_TOKEN="ghp_your_emu_token_here"
 ```
 
@@ -151,70 +186,69 @@ source ~/.zshrc   # or ~/.bashrc
 **Windows (PowerShell)** — Add to your PowerShell profile (`$PROFILE`):
 
 ```powershell
-$env:GITHUB_TOKEN = "ghp_your_personal_token_here"
 $env:GITHUB_EMU_TOKEN = "ghp_your_emu_token_here"
 ```
 
-Or set them permanently via System Properties > Environment Variables.
+Or set it permanently via System Properties > Environment Variables.
 
 **Windows (CMD)**:
 
 ```cmd
-setx GITHUB_TOKEN "ghp_your_personal_token_here"
 setx GITHUB_EMU_TOKEN "ghp_your_emu_token_here"
 ```
 
-> **Security note:** Tokens in environment variables are visible to any process running under your user. If your corporate policy prohibits this, pass them as flags instead (see section 4).
+> **Security note:** Tokens in environment variables are visible to any process running under your user. If your corporate policy prohibits this, pass the token as a flag instead (see section 5).
 
-### 3.4 Verify tokens work
-
-Test your personal token:
-
-```bash
-curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user | grep login
-```
-
-Should print your personal GitHub username.
-
-Test your EMU token:
+### Verify the token works
 
 ```bash
 curl -s -H "Authorization: Bearer $GITHUB_EMU_TOKEN" https://api.github.com/user | grep login
 ```
 
-Should print your EMU GitHub username.
-
-If either returns an error, see [Troubleshooting](#token-returns-401-unauthorized).
+Should print your EMU GitHub username. If it returns an error, see [Troubleshooting](#token-returns-401-unauthorized).
 
 ---
 
-## 4. Running the CLI
+## 5. Running the CLI
 
-### Basic usage (with env vars set)
+### Step 1: Log in (one time)
 
 ```bash
-npx chapa-cli merge --handle juan294 --emu-handle juan294-corp
+npx chapa-cli login
 ```
 
-Replace:
-- `juan294` with your **personal** GitHub handle
-- `juan294-corp` with your **EMU** GitHub handle
+### Step 2: Merge EMU stats
 
-### Passing tokens as flags (no env vars)
+```bash
+npx chapa-cli merge --emu-handle juan294-corp
+```
+
+Replace `juan294-corp` with your **EMU** GitHub handle.
+
+That's it! Your personal handle and auth token are automatically loaded from the login step.
+
+### Passing the EMU token as a flag (no env var)
 
 ```bash
 npx chapa-cli merge \
-  --handle juan294 \
   --emu-handle juan294-corp \
-  --emu-token ghp_your_emu_token \
-  --token ghp_your_personal_token
+  --emu-token ghp_your_emu_token
+```
+
+### Overriding the personal handle
+
+If your Chapa handle differs from what was saved during login:
+
+```bash
+npx chapa-cli merge \
+  --emu-handle juan294-corp \
+  --handle my-other-handle
 ```
 
 ### Custom server URL (for testing)
 
 ```bash
 npx chapa-cli merge \
-  --handle juan294 \
   --emu-handle juan294-corp \
   --server http://localhost:3001
 ```
@@ -230,7 +264,7 @@ Success! Supplemental stats uploaded. Your badge will reflect combined data on n
 
 ---
 
-## 5. Verifying it worked
+## 6. Verifying it worked
 
 After running the CLI:
 
@@ -240,11 +274,11 @@ After running the CLI:
 
 ---
 
-## 6. Corporate environment guide
+## 7. Corporate environment guide
 
 Corporate machines often have restrictions that can interfere with npm and GitHub API access. This section covers common scenarios.
 
-### 6.1 Behind a corporate proxy
+### 7.1 Behind a corporate proxy
 
 If your company routes internet traffic through a proxy, npm and the CLI may fail to connect.
 
@@ -277,14 +311,14 @@ The CLI uses Node.js `fetch()` which respects the `HTTPS_PROXY` environment vari
 export HTTPS_PROXY=http://proxy.yourcompany.com:8080
 ```
 
-### 6.2 Corporate firewall blocking domains
+### 7.2 Corporate firewall blocking domains
 
-The CLI needs access to two domains:
+The CLI needs access to these domains:
 
 | Domain | Purpose | Required |
 |--------|---------|----------|
 | `api.github.com` | Fetch EMU stats via GraphQL API | Yes |
-| `chapa.thecreativetoken.com` | Upload merged stats | Yes |
+| `chapa.thecreativetoken.com` | Authentication + upload merged stats | Yes |
 | `registry.npmjs.org` | Download the CLI package (npx/npm install) | For installation only |
 
 **If any are blocked**, ask your IT team to allowlist them. If `registry.npmjs.org` is blocked but you have a corporate npm registry (Artifactory, Nexus), you can configure npm to use it:
@@ -293,7 +327,7 @@ The CLI needs access to two domains:
 npm config set registry https://npm.yourcompany.com/
 ```
 
-### 6.3 Self-signed SSL certificates
+### 7.3 Self-signed SSL certificates
 
 Some corporate proxies use self-signed certificates for TLS inspection.
 
@@ -321,7 +355,7 @@ npm config set strict-ssl false
 
 This disables certificate verification entirely. Only use this for testing.
 
-### 6.4 Restricted Node.js installation
+### 7.4 Restricted Node.js installation
 
 If you cannot install Node.js system-wide, options:
 
@@ -338,12 +372,12 @@ If you cannot install Node.js system-wide, options:
    docker run --rm -it node:18-slim npx chapa-cli --version
    ```
 
-### 6.5 VPN-related issues
+### 7.5 VPN-related issues
 
 If you're on a corporate VPN:
 
 - The VPN may split-tunnel, routing only company traffic through the VPN. GitHub API and Chapa should work normally in this case.
-- If the VPN routes ALL traffic, the proxy/firewall rules from sections 6.1-6.2 apply.
+- If the VPN routes ALL traffic, the proxy/firewall rules from sections 7.1-7.2 apply.
 - Some VPNs cause DNS resolution issues. Try using explicit DNS:
   ```bash
   # Test if DNS resolves
@@ -351,38 +385,47 @@ If you're on a corporate VPN:
   nslookup chapa.thecreativetoken.com
   ```
 
-### 6.6 GitHub Enterprise Server (on-premise)
+### 7.6 GitHub Enterprise Server (on-premise)
 
 If your company runs GitHub Enterprise Server (not github.com), the CLI currently targets `api.github.com`. On-premise GitHub Enterprise uses a different API URL (e.g., `https://github.yourcompany.com/api/graphql`). This is **not yet supported** — let us know if you need it and we can add a `--github-api-url` flag.
 
-### 6.7 EMU token restrictions
+### 7.7 EMU token restrictions
 
 Some organizations restrict what tokens EMU accounts can create:
 
 - **Personal Access Tokens may be disabled** — The org admin can disable classic PATs. Try Fine-Grained tokens instead.
-- **IP allowlisting** — The org may restrict API access to specific IPs. You may need to run the CLI from within the corporate network (on VPN).
+- **IP allowlisting** — The org may restrict API access to specific IPs. You may need to run the CLI from the corporate network (on VPN).
 - **SSO enforcement** — After creating the token, you may need to "Authorize" it for SSO. Go to [github.com/settings/tokens](https://github.com/settings/tokens) and click "Enable SSO" next to your token, then authorize it for your organization.
+
+### 7.8 Browser doesn't open during login
+
+If `chapa login` doesn't open your browser automatically:
+
+1. Copy the URL printed in the terminal
+2. Open it manually in any browser
+3. The CLI will detect the approval automatically once you click "Authorize CLI"
+
+On headless servers or remote machines, you can open the URL on a different machine — the CLI polls the server regardless of which browser you use.
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 ### `npx chapa-cli` hangs or fails to download
 
 **Try installing globally instead:**
 ```bash
 npm install -g chapa-cli
-chapa merge --handle <personal> --emu-handle <emu>
+chapa merge --emu-handle <emu>
 ```
 
-**If behind a proxy**, see [section 6.1](#61-behind-a-corporate-proxy).
+**If behind a proxy**, see [section 7.1](#71-behind-a-corporate-proxy).
 
 ### Token returns 401 Unauthorized
 
 1. **Check the token hasn't expired** — Go to GitHub Settings > Tokens and verify
-2. **Check you're using the right token for the right account** — EMU token for `--emu-token`, personal token for `--token`
-3. **Check SSO authorization** — For EMU tokens in SSO-enabled orgs, you need to authorize the token. Go to your token settings and click "Enable SSO"
-4. **Check scopes** — The token needs at least `read:user`
+2. **Check SSO authorization** — For EMU tokens in SSO-enabled orgs, you need to authorize the token. Go to your token settings and click "Enable SSO"
+3. **Check scopes** — The token needs at least `read:user`
 
 ### `Error: Failed to fetch EMU stats`
 
@@ -394,10 +437,14 @@ chapa merge --handle <personal> --emu-handle <emu>
   ```
 - If your EMU account is on GitHub Enterprise Server (not github.com), the CLI does not support custom API URLs yet
 
+### `Error: Not authenticated. Run 'chapa login' first`
+
+Run `chapa login` to authenticate via your browser. If you've logged in before but see this error, your token may have expired (90-day expiry). Log in again.
+
 ### `ECONNREFUSED` or `ETIMEDOUT`
 
 - Check your internet connection
-- If behind a proxy/VPN, see [section 6](#6-corporate-environment-guide)
+- If behind a proxy/VPN, see [section 7](#7-corporate-environment-guide)
 - Check if the target domains are accessible:
   ```bash
   curl -s https://api.github.com/zen          # Should print a random quote
@@ -406,7 +453,7 @@ chapa merge --handle <personal> --emu-handle <emu>
 
 ### `Error: Server returned 403`
 
-- Your personal token may lack the required scope
+- Your auth token may have expired — run `chapa login` again
 - The Chapa server may be rate-limiting requests — wait a minute and try again
 
 ### Cannot create a token on EMU account
@@ -431,32 +478,40 @@ If not found, reinstall Node.js and check "Add to PATH" during installation.
 
 ---
 
-## 8. Reference
+## 9. Reference
 
-### Command syntax
+### Commands
 
-```
-chapa merge --handle <personal> --emu-handle <emu> [options]
-```
+| Command | Description |
+|---------|-------------|
+| `chapa login` | Authenticate with Chapa (opens browser) |
+| `chapa logout` | Clear stored credentials |
+| `chapa merge` | Merge EMU stats into your badge |
 
-### All flags
+### All flags (for merge)
 
 | Flag | Short | Description | Default |
 |------|-------|-------------|---------|
-| `--handle` | | Personal GitHub handle | (required) |
 | `--emu-handle` | | EMU GitHub handle | (required) |
 | `--emu-token` | | EMU token | `$GITHUB_EMU_TOKEN` |
-| `--token` | | Personal token | `$GITHUB_TOKEN` |
+| `--handle` | | Override personal handle | Auto-detected from login |
+| `--token` | | Override auth token | Auto-detected from login |
 | `--server` | | Chapa server URL | `https://chapa.thecreativetoken.com` |
 | `--version` | `-v` | Print version | |
 | `--help` | `-h` | Print help | |
 
 ### Token resolution order
 
-For both `--token` and `--emu-token`:
+**Auth token** (for uploading to Chapa):
 
-1. Flag value (e.g., `--emu-token ghp_abc`)
-2. Environment variable (`GITHUB_EMU_TOKEN` / `GITHUB_TOKEN`)
+1. `--token` flag
+2. Saved credentials from `chapa login` (`~/.chapa/credentials.json`)
+3. Error — run `chapa login` first
+
+**EMU token** (for reading EMU stats):
+
+1. `--emu-token` flag
+2. `GITHUB_EMU_TOKEN` environment variable
 3. Error — token is required
 
 ### What data is collected
@@ -471,11 +526,18 @@ The CLI reads the following from your EMU account (last 12 months):
 
 This data is uploaded to the Chapa server and merged with your personal account stats. No source code, commit messages, or repository names are accessed.
 
+### Credential storage
+
+Login credentials are stored at `~/.chapa/credentials.json` with restricted permissions:
+- Directory: `0700` (owner only)
+- File: `0600` (owner read/write only)
+
+The file contains your Chapa handle, server URL, and a signed authentication token (not your GitHub password or OAuth token).
+
 ### Environment variables
 
 | Variable | Purpose |
 |----------|---------|
-| `GITHUB_TOKEN` | Personal GitHub token |
 | `GITHUB_EMU_TOKEN` | EMU GitHub token |
 | `HTTPS_PROXY` | Corporate proxy URL |
 | `NODE_EXTRA_CA_CERTS` | Path to corporate CA certificate |
