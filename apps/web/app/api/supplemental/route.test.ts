@@ -203,7 +203,7 @@ describe("POST /api/supplemental", () => {
     );
   });
 
-  it("invalidates the primary stats cache", async () => {
+  it("invalidates the v2 stats cache key (must match client.ts cache key)", async () => {
     mockFetchGitHubUser.mockResolvedValue({
       login: "juan294",
       name: "Juan",
@@ -215,7 +215,9 @@ describe("POST /api/supplemental", () => {
     );
     await POST(req);
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:juan294");
+    // The stats client (lib/github/client.ts) uses "stats:v2:<handle>" as cache key.
+    // The supplemental handler MUST delete the same key to force a re-merge.
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:juan294");
   });
 
   it("handle comparison is case-insensitive", async () => {
