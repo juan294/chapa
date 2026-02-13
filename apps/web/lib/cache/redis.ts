@@ -138,6 +138,61 @@ export async function rateLimit(
 }
 
 // ---------------------------------------------------------------------------
+// Badge generation tracking
+// ---------------------------------------------------------------------------
+
+const BADGES_TOTAL_KEY = "stats:badges_generated";
+const BADGES_UNIQUE_KEY = "stats:unique_badges";
+
+/**
+ * Track a badge generation event (fire-and-forget).
+ *
+ * Increments the total badge counter and adds the handle to a HyperLogLog
+ * for approximate unique developer count. Both operations are non-blocking
+ * and fail silently if Redis is unavailable.
+ */
+export async function trackBadgeGenerated(handle: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    await Promise.all([
+      redis.incr(BADGES_TOTAL_KEY),
+      redis.pfadd(BADGES_UNIQUE_KEY, handle.toLowerCase()),
+    ]);
+  } catch {
+    // Fire-and-forget — badge tracking is non-critical
+  }
+}
+
+export interface BadgeStats {
+  total: number;
+  unique: number;
+}
+
+/**
+ * Retrieve badge generation stats.
+ * Returns `{ total: 0, unique: 0 }` if Redis is unavailable or keys don't exist.
+ */
+export async function getBadgeStats(): Promise<BadgeStats> {
+  const redis = getRedis();
+  if (!redis) return { total: 0, unique: 0 };
+
+  try {
+    const [total, unique] = await Promise.all([
+      redis.get<number>(BADGES_TOTAL_KEY),
+      redis.pfcount(BADGES_UNIQUE_KEY),
+    ]);
+    return {
+      total: total ?? 0,
+      unique: unique ?? 0,
+    };
+  } catch {
+    return { total: 0, unique: 0 };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
 
