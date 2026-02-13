@@ -1,6 +1,8 @@
-# Badge Design v1 Spec
+# Badge Design v1 Spec — React Component (Creator Studio)
 
-> Single source of truth for the Chapa badge visual layout.
+> **Scope**: This spec covers the **React component** (`BadgeContent.tsx`) used in the Creator Studio preview — NOT the embeddable SVG badge.
+> For the **embeddable SVG badge** served at `/u/:handle/badge.svg`, see [`badge-svg-spec-v1.0.md`](./badge-svg-spec-v1.0.md).
+>
 > Implemented in `apps/web/components/badge/BadgeContent.tsx`.
 
 ## Overview
