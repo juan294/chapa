@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cacheGet, cacheDel } from "@/lib/cache/redis";
+import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { generateCliToken } from "@/lib/auth/cli-token";
 
 interface DeviceSession {
@@ -8,6 +8,17 @@ interface DeviceSession {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  // Rate limit: 30 requests per IP per 60 seconds
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = await rateLimit(`ratelimit:cli-poll:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get("session");
 
