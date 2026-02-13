@@ -25,7 +25,7 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: "Builder, Guardian, Marathoner, Polymath — your profile shape tells a story.",
+    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#9D8FFF] hover:text-[#B8ADFF] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link> — your profile shape tells a story.</>),
   },
   {
     title: "CONFIDENCE RATING",
@@ -86,6 +86,19 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
+function ShieldCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" />
+    </svg>
+  );
+}
+
 /* ── Page ──────────────────────────────────────────────────────── */
 
 export default async function Home({
@@ -119,7 +132,7 @@ export default async function Home({
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
                 <p><span className="text-terminal-dim select-none">&gt;</span> AI writes the code. What matters is how you drive impact.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions beyond commits and lines of code.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Building, Guarding, Breadth, Consistency — four dimensions beyond commits and lines of code.</p>
                 <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
                 <p><span className="text-terminal-dim select-none">&gt;</span> Every score is cryptographically sealed. Verifiable, not just trusted.</p>
               </div>
@@ -134,9 +147,11 @@ export default async function Home({
                 </a>
                 <Link
                   href="/verify"
-                  className="inline-flex items-center gap-2 rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary transition-all hover:border-amber/20 hover:text-text-primary"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#34D399] hover:shadow-xl hover:shadow-complement/25"
                 >
+                  <ShieldCheckIcon className="w-4 h-4" />
                   Verify a Badge
+                  <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
             </div>
