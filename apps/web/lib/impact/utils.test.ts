@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { StatsData } from "@chapa/shared";
 import {
   normalize,
+  clampScore,
   computeConfidence,
   computeAdjustedScore,
   getTier,
@@ -80,6 +81,36 @@ describe("normalize", () => {
     const result = normalize(25, 200);
     expect(result).toBeGreaterThan(0);
     expect(result).toBeLessThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// clampScore(raw)
+// ---------------------------------------------------------------------------
+
+describe("clampScore", () => {
+  it("returns the value unchanged when within 0–100", () => {
+    expect(clampScore(50)).toBe(50);
+  });
+
+  it("clamps negative values to 0", () => {
+    expect(clampScore(-10)).toBe(0);
+  });
+
+  it("clamps values above 100 to 100", () => {
+    expect(clampScore(150)).toBe(100);
+  });
+
+  it("rounds fractional values", () => {
+    expect(clampScore(75.6)).toBe(76);
+  });
+
+  it("returns 0 for input 0", () => {
+    expect(clampScore(0)).toBe(0);
+  });
+
+  it("returns 100 for input 100", () => {
+    expect(clampScore(100)).toBe(100);
   });
 });
 

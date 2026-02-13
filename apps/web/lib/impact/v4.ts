@@ -6,7 +6,7 @@ import type {
   ProfileType,
 } from "@chapa/shared";
 import { SCORING_CAPS, SCORING_WINDOW_DAYS } from "@chapa/shared";
-import { normalize, computeConfidence, computeAdjustedScore, getTier } from "./utils";
+import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness } from "./heatmap-evenness";
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ export function computeBuilding(stats: StatsData): number {
   const commits = normalize(stats.commitsTotal, CAPS.commits);
 
   const raw = 100 * (0.7 * pr + 0.2 * issues + 0.1 * commits);
-  return Math.round(Math.max(0, Math.min(100, raw)));
+  return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ export function computeGuarding(stats: StatsData): number {
   const inverseMicro = 1 - microRatio;
 
   const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * inverseMicro);
-  return Math.round(Math.max(0, Math.min(100, raw)));
+  return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ export function computeConsistency(stats: StatsData): number {
   const inverseBurst = 1 - Math.min(stats.maxCommitsIn10Min, burstCap) / burstCap;
 
   const raw = 100 * (0.5 * streak + 0.35 * evenness + 0.15 * inverseBurst);
-  return Math.round(Math.max(0, Math.min(100, raw)));
+  return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ export function computeBreadth(stats: StatsData): number {
   const docsRatio = stats.docsOnlyPrRatio ?? 0;
 
   const raw = 100 * (0.35 * repos + 0.25 * inverseConcentration + 0.15 * stars + 0.1 * forks + 0.05 * watchers + 0.1 * docsRatio);
-  return Math.round(Math.max(0, Math.min(100, raw)));
+  return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
