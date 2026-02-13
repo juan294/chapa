@@ -248,3 +248,115 @@ export const POLYMATH_IMPACT: ImpactV4Result = {
   tier: "High",
   computedAt: "2025-01-01T00:00:00Z",
 };
+
+/* ── Balanced: all dimensions within 15pts, avg ≥ 60 ─────────────────── */
+const BALANCED_GRID: number[][] = [
+  [0, 2, 2, 3, 2, 1, 0],
+  [1, 3, 2, 2, 3, 0, 0],
+  [0, 2, 3, 2, 2, 1, 1],
+  [1, 2, 2, 3, 2, 0, 0],
+  [0, 3, 2, 2, 3, 1, 0],
+  [1, 2, 3, 2, 2, 0, 1],
+  [0, 2, 2, 3, 2, 1, 0],
+  [1, 3, 2, 2, 2, 0, 0],
+  [0, 2, 3, 2, 3, 1, 1],
+  [1, 2, 2, 3, 2, 0, 0],
+  [0, 3, 2, 2, 2, 1, 0],
+  [1, 2, 2, 3, 3, 0, 1],
+  [0, 2, 3, 2, 2, 1, 0],
+];
+
+export const BALANCED_STATS: StatsData = {
+  handle: "balanced",
+  displayName: "Taylor Kim",
+  commitsTotal: 360,
+  activeDays: 210,
+  prsMergedCount: 62,
+  prsMergedWeight: 75,
+  reviewsSubmittedCount: 58,
+  issuesClosedCount: 30,
+  linesAdded: 32600,
+  linesDeleted: 16800,
+  reposContributed: 7,
+  topRepoShare: 0.28,
+  maxCommitsIn10Min: 2,
+  totalStars: 480,
+  totalForks: 120,
+  totalWatchers: 45,
+  heatmapData: buildHeatmap(BALANCED_GRID),
+  fetchedAt: "2025-01-01T00:00:00Z",
+};
+
+export const BALANCED_IMPACT: ImpactV4Result = {
+  handle: "balanced",
+  profileType: "collaborative",
+  dimensions: {
+    building: 72,
+    guarding: 68,
+    consistency: 74,
+    breadth: 66,
+  },
+  archetype: "Balanced",
+  compositeScore: 70,
+  confidence: 90,
+  confidencePenalties: [],
+  adjustedComposite: 76,
+  tier: "High",
+  computedAt: "2025-01-01T00:00:00Z",
+};
+
+/* ── Emerging: early-stage, low activity across all dimensions ───────── */
+const EMERGING_GRID: number[][] = [
+  [0, 0, 1, 0, 0, 0, 0],
+  [0, 1, 0, 0, 1, 0, 0],
+  [0, 0, 0, 1, 0, 0, 0],
+  [0, 0, 1, 0, 0, 0, 0],
+  [0, 1, 0, 0, 0, 1, 0],
+  [0, 0, 0, 1, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0],
+  [0, 1, 0, 1, 0, 0, 0],
+  [0, 0, 0, 0, 1, 0, 0],
+  [0, 0, 1, 0, 0, 0, 0],
+  [0, 1, 0, 0, 0, 0, 0],
+  [0, 0, 0, 1, 0, 0, 0],
+];
+
+export const EMERGING_STATS: StatsData = {
+  handle: "emerging",
+  displayName: "Casey Morales",
+  commitsTotal: 45,
+  activeDays: 28,
+  prsMergedCount: 6,
+  prsMergedWeight: 12,
+  reviewsSubmittedCount: 3,
+  issuesClosedCount: 4,
+  linesAdded: 3200,
+  linesDeleted: 800,
+  reposContributed: 2,
+  topRepoShare: 0.85,
+  maxCommitsIn10Min: 1,
+  totalStars: 8,
+  totalForks: 2,
+  totalWatchers: 1,
+  heatmapData: buildHeatmap(EMERGING_GRID),
+  fetchedAt: "2025-01-01T00:00:00Z",
+};
+
+export const EMERGING_IMPACT: ImpactV4Result = {
+  handle: "emerging",
+  profileType: "solo",
+  dimensions: {
+    building: 22,
+    guarding: 8,
+    consistency: 18,
+    breadth: 15,
+  },
+  archetype: "Emerging",
+  compositeScore: 16,
+  confidence: 55,
+  confidencePenalties: [],
+  adjustedComposite: 14,
+  tier: "Emerging",
+  computedAt: "2025-01-01T00:00:00Z",
+};
