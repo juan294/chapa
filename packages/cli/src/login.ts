@@ -34,15 +34,27 @@ export async function login(serverUrl: string): Promise<void> {
   console.log("     use a different browser or an incognito/private window.\n");
   console.log("Waiting for approval...");
 
+  let serverErrorLogged = false;
   for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
     await sleep(POLL_INTERVAL_MS);
+
+    // Progress feedback every 5 polls
+    if (i > 0 && i % 5 === 0) {
+      process.stdout.write(".");
+    }
 
     let data: PollResponse | null = null;
     try {
       const res = await fetch(
         `${baseUrl}/api/cli/auth/poll?session=${sessionId}`,
       );
-      if (!res.ok) continue;
+      if (!res.ok) {
+        if (!serverErrorLogged) {
+          console.error(`\nServer returned ${res.status}. Retrying...`);
+          serverErrorLogged = true;
+        }
+        continue;
+      }
       data = await res.json();
     } catch {
       // Network error — keep trying

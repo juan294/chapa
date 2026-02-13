@@ -34,11 +34,18 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // 3. Store approval in Redis
-  await cacheSet(
+  const stored = await cacheSet(
     `cli:device:${sessionId}`,
     { status: "approved", handle: session.login },
     DEVICE_SESSION_TTL,
   );
+
+  if (!stored) {
+    return NextResponse.json(
+      { error: "Service temporarily unavailable. Please try again." },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ success: true, handle: session.login });
 }
