@@ -36,7 +36,7 @@ export async function generateMetadata({
   const pageUrl = `${BASE_URL}/u/${handle}`;
   return {
     title: `@${handle} — Developer Impact, Decoded`,
-    description: `View ${handle}'s developer impact on Chapa. See their archetype, four dimension scores, and embeddable badge.`,
+    description: `View ${handle}'s developer impact score and badge on Chapa.`,
     openGraph: {
       type: "profile",
       title: `@${handle} — Chapa Developer Impact, Decoded`,
@@ -178,45 +178,49 @@ export default async function SharePage({ params }: SharePageProps) {
           />
         </div>
 
-        <hr className="border-stroke mb-10" />
+        {/* ── Impact Breakdown (owner only) ─────────────────── */}
+        {isOwner && (
+          <>
+            <hr className="border-stroke mb-10" />
 
-        {/* ── Breakdown Section Title ─────────────────────────── */}
-        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up [animation-delay:280ms]">
-          Impact Breakdown
-        </h2>
+            <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up [animation-delay:280ms]">
+              Impact Breakdown
+            </h2>
 
-        {/* ── Archetype Header ──────────────────────────────────── */}
-        {impact && (
-          <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
-            <div className="flex items-baseline gap-3 mb-2">
-              <h2 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
-                {impact.archetype}
-              </h2>
-              {impact.tier !== impact.archetype && (
-                <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
-                  {impact.tier}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              {getArchetypeProfile(impact)}
-            </p>
-          </div>
-        )}
+            {/* ── Archetype Header ──────────────────────────────── */}
+            {impact && (
+              <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
+                <div className="flex items-baseline gap-3 mb-2">
+                  <h2 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
+                    {impact.archetype}
+                  </h2>
+                  {impact.tier !== impact.archetype && (
+                    <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
+                      {impact.tier}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  {getArchetypeProfile(impact)}
+                </p>
+              </div>
+            )}
 
-        {/* ── Impact Dashboard ────────────────────────────────── */}
-        {impact && stats ? (
-          <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-            <ImpactBreakdown impact={impact} stats={stats} />
-          </section>
-        ) : (
-          <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-            <div className="rounded-2xl border border-stroke bg-card p-8">
-              <p className="text-text-secondary">
-                Could not load impact data for this user. Try again later.
-              </p>
-            </div>
-          </section>
+            {/* ── Impact Dashboard ──────────────────────────────── */}
+            {impact && stats ? (
+              <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
+                <ImpactBreakdown impact={impact} stats={stats} />
+              </section>
+            ) : (
+              <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
+                <div className="rounded-2xl border border-stroke bg-card p-8">
+                  <p className="text-text-secondary">
+                    Could not load impact data for this user. Try again later.
+                  </p>
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         {/* ── Embed Snippets ──────────────────────────────────── */}
