@@ -7,6 +7,7 @@ import {
   clearStateCookie,
 } from "@/lib/auth/github";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
@@ -57,8 +58,7 @@ function readRedirectCookie(cookieHeader: string | null): string | null {
 
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 15 minutes
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:callback:${ip}`, 10, 900);
   if (!rl.allowed) {
     return NextResponse.json(

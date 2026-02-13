@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getVerificationRecord } from "@/lib/verification/store";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 const HASH_PATTERN = /^[0-9a-f]{8}([0-9a-f]{8})?$/;
 
@@ -19,8 +20,7 @@ export async function GET(
   }
 
   // Rate limit: 30 requests per IP per 60 seconds
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:verify:${ip}`, 30, 60);
   if (!rl.allowed) {
     return NextResponse.json(

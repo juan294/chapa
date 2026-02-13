@@ -6,6 +6,7 @@ import {
   forwardEmail,
 } from "@/lib/email/resend";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 /**
  * POST /api/webhooks/resend
@@ -18,8 +19,7 @@ import { rateLimit } from "@/lib/cache/redis";
  */
 export async function POST(request: Request) {
   // Rate limit: 20 requests per IP per 60 seconds
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:webhook:${ip}`, 20, 60);
   if (!rl.allowed) {
     return NextResponse.json(

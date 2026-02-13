@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { generateCliToken } from "@/lib/auth/cli-token";
+import { getClientIp } from "@/lib/http/client-ip";
 
 interface DeviceSession {
   status: "pending" | "approved";
@@ -9,8 +10,7 @@ interface DeviceSession {
 
 export async function GET(request: Request): Promise<Response> {
   // Rate limit: 30 requests per IP per 60 seconds
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:cli-poll:${ip}`, 30, 60);
   if (!rl.allowed) {
     return NextResponse.json(

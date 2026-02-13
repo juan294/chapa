@@ -62,6 +62,11 @@ vi.mock("@/lib/verification/store", () => ({
   storeVerificationRecord: mockStoreVerificationRecord,
 }));
 
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: (req: Request) =>
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
+}));
+
 // escapeXml is used in fallbackSvg — provide real implementation
 vi.mock("@/lib/render/escape", () => ({
   escapeXml: (s: string) =>

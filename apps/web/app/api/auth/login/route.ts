@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { buildAuthUrl, createStateCookie } from "@/lib/auth/github";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
@@ -28,8 +29,7 @@ function isSafeRedirect(url: string, baseUrl: string): boolean {
 
 export async function GET(request: NextRequest) {
   // Rate limit: 20 requests per IP per 15 minutes
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:login:${ip}`, 20, 900);
   if (!rl.allowed) {
     return NextResponse.json(

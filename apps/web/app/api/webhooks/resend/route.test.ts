@@ -27,6 +27,11 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
 }));
 
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: (req: Request) =>
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
+}));
+
 // Import after mocks
 import { POST } from "./route";
 

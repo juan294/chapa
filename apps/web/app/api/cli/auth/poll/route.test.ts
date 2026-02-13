@@ -14,6 +14,11 @@ vi.mock("@/lib/auth/cli-token", () => ({
   generateCliToken: vi.fn(),
 }));
 
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: (req: Request) =>
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
+}));
+
 import { GET } from "./route";
 import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { generateCliToken } from "@/lib/auth/cli-token";
