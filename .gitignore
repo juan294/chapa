@@ -20,9 +20,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# IDE
+# IDE & agent tools
 .vscode/
 .idea/
+.cursor/
+.kiro/
+.agents/
 *.swp
 *.swo
 *~

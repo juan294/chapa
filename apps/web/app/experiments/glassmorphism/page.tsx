@@ -2,27 +2,8 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-
-/* ------------------------------------------------------------------ */
-/*  Mock heatmap data (13 weeks x 7 days)                              */
-/* ------------------------------------------------------------------ */
-const HEATMAP = Array.from({ length: 13 * 7 }, (_, i) => {
-  const v = Math.abs(Math.sin(i * 0.7 + 3) * 4);
-  return Math.floor(v); // 0-3
-});
-
-function heatmapColor(level: number): string {
-  switch (level) {
-    case 0:
-      return "rgba(124,106,239,0.06)";
-    case 1:
-      return "rgba(124,106,239,0.25)";
-    case 2:
-      return "rgba(124,106,239,0.5)";
-    default:
-      return "rgba(124,106,239,0.85)";
-  }
-}
+import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Glass style helpers                                                */
@@ -123,109 +104,14 @@ function presetToStyle(variant: GlassVariant, showBorder: boolean): React.CSSPro
 /*  Badge Card Component (reused across variants)                      */
 /* ------------------------------------------------------------------ */
 function BadgeCard() {
-  return (
-    <>
-      {/* Header row */}
-      <div className="mb-6 flex items-center justify-between">
-        <span className="font-body text-lg text-text-primary">@juan294</span>
-        <span className="font-heading text-xl font-bold text-amber">
-          Chapa<span className="text-amber">.</span>
-        </span>
-      </div>
-
-      {/* Two columns */}
-      <div className="flex gap-8">
-        {/* Left: Heatmap grid */}
-        <div className="flex-1">
-          <p className="mb-3 text-xs uppercase tracking-widest text-text-secondary">
-            Activity
-          </p>
-          <div
-            className="grid gap-[3px]"
-            style={{
-              gridTemplateColumns: "repeat(13, 1fr)",
-              gridTemplateRows: "repeat(7, 1fr)",
-            }}
-          >
-            {HEATMAP.map((level, i) => (
-              <div
-                key={i}
-                className="aspect-square rounded-[2px]"
-                style={{ backgroundColor: heatmapColor(level) }}
-                aria-hidden="true"
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Right: Score */}
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <p className="mb-2 text-xs uppercase tracking-widest text-text-secondary">
-            Impact Score
-          </p>
-          <span className="font-heading text-7xl font-extrabold text-amber">
-            87
-          </span>
-          <span className="mt-2 rounded-full border border-amber/20 bg-amber/10 px-3 py-1 text-sm text-amber">
-            &#9733; Elite
-          </span>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="mt-6 text-center text-sm text-text-secondary">
-        523 commits &middot; 47 PRs &middot; 89 reviews
-      </div>
-    </>
-  );
+  return <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Compact Badge Card (for grid layout)                               */
 /* ------------------------------------------------------------------ */
 function CompactBadgeCard() {
-  return (
-    <>
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <span className="font-body text-sm text-text-primary">@juan294</span>
-        <span className="font-heading text-sm font-bold text-amber">
-          Chapa.
-        </span>
-      </div>
-
-      {/* Heatmap */}
-      <div
-        className="mb-4 grid gap-[2px]"
-        style={{
-          gridTemplateColumns: "repeat(13, 1fr)",
-          gridTemplateRows: "repeat(7, 1fr)",
-        }}
-      >
-        {HEATMAP.map((level, i) => (
-          <div
-            key={i}
-            className="aspect-square rounded-[1px]"
-            style={{ backgroundColor: heatmapColor(level) }}
-            aria-hidden="true"
-          />
-        ))}
-      </div>
-
-      {/* Score + tier row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
-          <span className="font-heading text-3xl font-extrabold text-amber">
-            87
-          </span>
-          <span className="rounded-full border border-amber/20 bg-amber/10 px-2 py-0.5 text-xs text-amber">
-            &#9733; Elite
-          </span>
-        </div>
-        <span className="text-xs text-text-secondary">523c &middot; 47pr</span>
-      </div>
-    </>
-  );
+  return <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -445,6 +331,7 @@ export default function GlassmorphismExperimentPage() {
       id="main-content"
       className="relative min-h-screen bg-bg"
     >
+      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Background blobs — essential for glass to look like glass */}
       <BackgroundBlobs visible={showBlobs} />
 
@@ -611,21 +498,21 @@ export default function GlassmorphismExperimentPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
-              label="Code Output"
+              label="Building"
               value={34}
               maxValue={40}
-              detail="523 commits across 12 repos. Consistent daily contribution pattern with weekend peaks."
+              detail="Core code contributions across 12 repos. Consistent daily contribution pattern with weekend peaks."
               style={presetToStyle("medium", showBorder)}
             />
             <StatCard
-              label="Collaboration"
+              label="Guarding"
               value={28}
               maxValue={30}
-              detail="47 PRs merged, 89 code reviews. Active reviewer with thoughtful feedback."
+              detail="Code reviews, issue triage, and quality enforcement. Active reviewer with thoughtful feedback."
               style={presetToStyle("medium", showBorder)}
             />
             <StatCard
-              label="Complexity"
+              label="Breadth"
               value={15}
               maxValue={20}
               detail="Contributions to 5 repos with 50K+ stars. Non-trivial changes across diverse codebases."

@@ -36,9 +36,9 @@ describe("renderVerificationStrip", () => {
     expect(svg).toContain("<line");
   });
 
-  it("includes a shield icon path", () => {
+  it("does not include a shield icon (already on header)", () => {
     const svg = renderVerificationStrip(hash, date);
-    expect(svg).toContain("<path");
+    expect(svg).not.toContain("<path");
   });
 
   it("uses rotation for vertical text", () => {

@@ -139,6 +139,49 @@ describe("fetchEmuStats", () => {
     expect(result).toBeNull();
   });
 
+  it("logs GraphQL errors when present alongside valid data", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const graphqlErrors = [{ message: "Could not resolve to a User", type: "NOT_FOUND" }];
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        errors: graphqlErrors,
+        data: {
+          user: {
+            login: "corp_user",
+            name: null,
+            avatarUrl: "https://example.com/avatar.png",
+            contributionsCollection: {
+              contributionCalendar: {
+                totalContributions: 10,
+                weeks: [],
+              },
+              pullRequestContributions: {
+                totalCount: 0,
+                nodes: [],
+              },
+              pullRequestReviewContributions: { totalCount: 0 },
+              issueContributions: { totalCount: 0 },
+            },
+            repositories: { totalCount: 0, nodes: [] },
+            ownedRepos: { nodes: [] },
+          },
+        },
+      }),
+    });
+
+    const result = await fetchEmuStats("corp_user", "ghp_token");
+    expect(result).not.toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[cli] GraphQL errors"),
+      graphqlErrors,
+    );
+
+    errorSpy.mockRestore();
+  });
+
   it("filters out null PR nodes", async () => {
     mockFetch.mockResolvedValue({
       ok: true,

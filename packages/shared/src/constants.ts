@@ -18,4 +18,6 @@ export const SCORING_CAPS = {
   reviews: 180,
   repos: 15,
   stars: 500,
+  forks: 200,
+  watchers: 100,
 } as const;

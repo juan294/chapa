@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -109,103 +111,11 @@ function AuroraBackground({
 /*  Mock Badge Card                                                    */
 /* ------------------------------------------------------------------ */
 
-function MockHeatmapGrid() {
-  // 7 rows x 13 cols = 91 cells (roughly 13 weeks)
-  // Deterministic pseudo-random values (seeded) to avoid impure render
-  const cells: number[] = [];
-  let seed = 42;
-  for (let i = 0; i < 91; i++) {
-    seed = (seed * 16807 + 0) % 2147483647;
-    cells.push(seed / 2147483647);
-  }
-
-  return (
-    <div
-      className="grid gap-[3px]"
-      style={{ gridTemplateColumns: "repeat(13, 1fr)" }}
-      aria-label="Activity heatmap"
-    >
-      {cells.map((v, i) => {
-        let bg: string;
-        if (v < 0.2) bg = "bg-[#7C6AEF]/5";
-        else if (v < 0.4) bg = "bg-[#7C6AEF]/15";
-        else if (v < 0.6) bg = "bg-[#7C6AEF]/30";
-        else if (v < 0.8) bg = "bg-[#7C6AEF]/50";
-        else bg = "bg-[#7C6AEF]/80";
-
-        return (
-          <div
-            key={i}
-            className={`w-[10px] h-[10px] rounded-[2px] ${bg}`}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 function MockBadgeCard() {
   return (
     <div className="relative rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/80 backdrop-blur-sm p-8 w-full max-w-[560px]">
-      {/* Top shimmer edge */}
-      <div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[#7C6AEF]/40 to-transparent" />
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#7C6AEF]/20 flex items-center justify-center">
-            <span className="text-[#7C6AEF] font-heading text-sm font-bold">
-              JD
-            </span>
-          </div>
-          <div>
-            <p className="font-heading text-sm font-medium text-[#E6EDF3]">
-              @juandeveloper
-            </p>
-            <p className="text-xs text-[#9AA4B2]">Last 12 months</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="font-heading text-2xl font-bold text-[#7C6AEF]">76</p>
-          <p className="text-xs text-[#9AA4B2] uppercase tracking-wider">
-            Impact
-          </p>
-        </div>
-      </div>
-
-      {/* Heatmap */}
-      <div className="mb-6">
-        <MockHeatmapGrid />
-      </div>
-
-      {/* Tier badge */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="inline-flex items-center rounded-full bg-[#7C6AEF]/10 border border-[#7C6AEF]/20 px-3 py-1 text-xs font-semibold text-[#7C6AEF] uppercase tracking-wider">
-          Standout
-        </span>
-        <span className="text-xs text-[#9AA4B2]">
-          Confidence: <span className="text-[#E6EDF3]">82%</span>
-        </span>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: "Commits", value: "247" },
-          { label: "PRs Merged", value: "18" },
-          { label: "Reviews", value: "32" },
-          { label: "Issues", value: "14" },
-        ].map((stat) => (
-          <div key={stat.label} className="text-center">
-            <p className="font-heading text-lg font-bold text-[#E6EDF3]">
-              {stat.value}
-            </p>
-            <p className="text-[10px] text-[#9AA4B2] uppercase tracking-wider">
-              {stat.label}
-            </p>
-          </div>
-        ))}
-      </div>
+      <style>{getBadgeContentCSS({}).join("\n")}</style>
+      <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );
 }

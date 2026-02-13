@@ -269,19 +269,19 @@ function ApplicationPreview() {
           effect="neon-amber"
           className="font-heading text-xs font-semibold"
         >
-          247 commits
+          1.2k stars
         </EffectText>
         <EffectText
           effect="neon-amber"
           className="font-heading text-xs font-semibold"
         >
-          18 PRs
+          89 forks
         </EffectText>
         <EffectText
           effect="neon-amber"
           className="font-heading text-xs font-semibold"
         >
-          34 reviews
+          34 watchers
         </EffectText>
       </div>
     </div>

@@ -15,6 +15,11 @@ vi.mock("@/lib/auth/github", () => ({
   fetchGitHubUser: mockFetchGitHubUser,
 }));
 
+vi.mock("@/lib/auth/cli-token", () => ({
+  isCliToken: (t: string) => t.includes("."),
+  verifyCliToken: () => null, // CLI token verification not tested here
+}));
+
 vi.mock("@/lib/cache/redis", () => ({
   cacheSet: mockCacheSet,
   cacheDel: mockCacheDel,

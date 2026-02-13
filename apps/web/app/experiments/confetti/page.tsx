@@ -8,94 +8,17 @@ import {
   fireSubtleSparkle,
   type ConfettiPalette,
 } from "@/lib/effects/celebrations/confetti";
+import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 type Palette = ConfettiPalette;
 
-/* ── Deterministic pseudo-random for heatmap ─────────────── */
-
-/** Simple hash to produce a 0-1 float from an integer seed. */
-function pseudoRandom(seed: number): number {
-  let x = Math.sin(seed * 127.1 + seed * 311.7) * 43758.5453;
-  x = x - Math.floor(x);
-  return x;
-}
-
 /* ── Mock badge card ─────────────────────────────────────── */
 
-function MockBadgeCard({ tier, score }: { tier: string; score: number }) {
-  const tierColor =
-    tier === "Elite"
-      ? "text-amber bg-amber/10 border-amber/30"
-      : tier === "High"
-        ? "text-amber-light bg-amber-light/10 border-amber-light/30"
-        : tier === "Solid"
-          ? "text-text-secondary bg-text-secondary/10 border-text-secondary/30"
-          : "text-text-secondary bg-text-secondary/5 border-text-secondary/20";
-
+function MockBadgeCard() {
   return (
     <div className="rounded-2xl border border-warm-stroke bg-warm-card p-6 w-full max-w-sm mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-amber/20 flex items-center justify-center">
-            <span className="text-amber text-xs font-bold font-heading">C</span>
-          </div>
-          <div>
-            <p className="text-text-primary text-sm font-semibold font-heading">
-              @devhero
-            </p>
-            <p className="text-text-secondary text-xs">Dev Impact Badge</p>
-          </div>
-        </div>
-        <span
-          className={`rounded-full border px-3 py-0.5 text-xs font-semibold ${tierColor}`}
-        >
-          {tier}
-        </span>
-      </div>
-
-      {/* Score */}
-      <div className="text-center mb-4">
-        <p className="text-4xl font-extrabold font-heading text-amber tracking-tight">
-          {score}
-        </p>
-        <p className="text-text-secondary text-xs mt-1">Impact Score</p>
-      </div>
-
-      {/* Heatmap placeholder */}
-      <div className="grid grid-cols-13 gap-[2px] mb-4">
-        {Array.from({ length: 91 }).map((_, i) => {
-          const intensity = pseudoRandom(i + score);
-          const bg =
-            intensity > 0.7
-              ? "bg-amber"
-              : intensity > 0.4
-                ? "bg-amber/40"
-                : intensity > 0.15
-                  ? "bg-amber/15"
-                  : "bg-amber/[0.04]";
-          return (
-            <div
-              key={i}
-              className={`w-2 h-2 rounded-[2px] ${bg}`}
-              aria-hidden="true"
-            />
-          );
-        })}
-      </div>
-
-      {/* Stats row */}
-      <div className="flex justify-between text-xs text-text-secondary">
-        <span>
-          <span className="text-text-primary font-semibold">247</span> commits
-        </span>
-        <span>
-          <span className="text-text-primary font-semibold">18</span> PRs
-        </span>
-        <span>
-          <span className="text-text-primary font-semibold">34</span> reviews
-        </span>
-      </div>
+      <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );
 }
@@ -184,6 +107,7 @@ export default function ConfettiExperimentPage() {
 
   return (
     <div className="min-h-screen bg-bg bg-grid-warm">
+      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
         className="pointer-events-none fixed top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]"
@@ -303,7 +227,7 @@ export default function ConfettiExperimentPage() {
           <DemoSection
             title="A. Single Burst"
             description="Fires once on initial badge view. Clean and celebratory."
-            badge={<MockBadgeCard tier="Elite" score={94} />}
+            badge={<MockBadgeCard />}
           >
             <button
               onClick={handleSingleBurst}
@@ -317,7 +241,7 @@ export default function ConfettiExperimentPage() {
           <DemoSection
             title="B. Multi-Burst"
             description="Three staggered bursts from different origins. Party-like feel."
-            badge={<MockBadgeCard tier="Elite" score={97} />}
+            badge={<MockBadgeCard />}
           >
             <button
               onClick={handleMultiBurst}
@@ -331,7 +255,7 @@ export default function ConfettiExperimentPage() {
           <DemoSection
             title="C. Fireworks"
             description="Continuous firework-style pops for 2 seconds. Most dramatic option."
-            badge={<MockBadgeCard tier="Elite" score={99} />}
+            badge={<MockBadgeCard />}
           >
             <button
               onClick={handleFireworks}
@@ -345,7 +269,7 @@ export default function ConfettiExperimentPage() {
           <DemoSection
             title="D. Subtle Sparkle"
             description="Very light ambient particles. Best for 'always on' celebration."
-            badge={<MockBadgeCard tier="High" score={82} />}
+            badge={<MockBadgeCard />}
           >
             <button
               onClick={toggleSparkle}

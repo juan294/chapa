@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -239,12 +241,6 @@ function useParticles(
 /*  Deterministic pseudo-random for heatmap                            */
 /* ------------------------------------------------------------------ */
 
-function pseudoRandom(seed: number): number {
-  let x = Math.sin(seed * 127.1 + seed * 311.7) * 43758.5453;
-  x = x - Math.floor(x);
-  return x;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Mock Badge Card                                                    */
 /* ------------------------------------------------------------------ */
@@ -252,71 +248,7 @@ function pseudoRandom(seed: number): number {
 function MockBadgeCard() {
   return (
     <div className="relative rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/90 backdrop-blur-sm p-6 w-full max-w-sm">
-      {/* Top shimmer edge */}
-      <div className="absolute top-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[#7C6AEF]/40 to-transparent" />
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#7C6AEF]/20 flex items-center justify-center">
-            <span className="text-[#7C6AEF] text-xs font-bold font-heading">
-              C
-            </span>
-          </div>
-          <div>
-            <p className="text-[#E6EDF3] text-sm font-semibold font-heading">
-              @devhero
-            </p>
-            <p className="text-[#9AA4B2] text-xs">Dev Impact Badge</p>
-          </div>
-        </div>
-        <span className="rounded-full border border-[#7C6AEF]/30 bg-[#7C6AEF]/10 px-3 py-0.5 text-xs font-semibold text-[#7C6AEF]">
-          Elite
-        </span>
-      </div>
-
-      {/* Score */}
-      <div className="text-center mb-4">
-        <p className="text-4xl font-extrabold font-heading text-[#7C6AEF] tracking-tight">
-          87
-        </p>
-        <p className="text-[#9AA4B2] text-xs mt-1">Impact Score</p>
-      </div>
-
-      {/* Heatmap */}
-      <div className="grid grid-cols-13 gap-[2px] mb-4">
-        {Array.from({ length: 91 }).map((_, i) => {
-          const intensity = pseudoRandom(i + 87);
-          const bg =
-            intensity > 0.7
-              ? "bg-[#7C6AEF]"
-              : intensity > 0.4
-                ? "bg-[#7C6AEF]/40"
-                : intensity > 0.15
-                  ? "bg-[#7C6AEF]/15"
-                  : "bg-[#7C6AEF]/[0.04]";
-          return (
-            <div
-              key={i}
-              className={`w-2 h-2 rounded-[2px] ${bg}`}
-              aria-hidden="true"
-            />
-          );
-        })}
-      </div>
-
-      {/* Stats */}
-      <div className="flex justify-between text-xs text-[#9AA4B2]">
-        <span>
-          <span className="text-[#E6EDF3] font-semibold">247</span> commits
-        </span>
-        <span>
-          <span className="text-[#E6EDF3] font-semibold">18</span> PRs
-        </span>
-        <span>
-          <span className="text-[#E6EDF3] font-semibold">34</span> reviews
-        </span>
-      </div>
+      <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );
 }
@@ -718,6 +650,7 @@ const INTERACTIVE_CONFIG: ParticleConfig = {
 export default function ParticlesExperimentPage() {
   return (
     <div className="min-h-screen bg-[#0C0D14]">
+      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
         className="pointer-events-none fixed top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-[#7C6AEF]/[0.03] blur-[150px]"

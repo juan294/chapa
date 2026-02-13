@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ══════════════════════════════════════════════════════════════
    Experiment #47 — Tier-Specific Progressive Visual Treatment
@@ -16,9 +17,9 @@ interface TierData {
   tier: TierName;
   score: number;
   handle: string;
-  commits: number;
-  prs: number;
-  reviews: number;
+  stars: string;
+  forks: number;
+  watchers: number;
   heatmapDensity: number;
 }
 
@@ -27,36 +28,36 @@ const TIERS: TierData[] = [
     tier: "Emerging",
     score: 32,
     handle: "@newdev",
-    commits: 45,
-    prs: 3,
-    reviews: 5,
+    stars: "12",
+    forks: 2,
+    watchers: 1,
     heatmapDensity: 0.15,
   },
   {
     tier: "Solid",
     score: 62,
     handle: "@steadycoder",
-    commits: 189,
-    prs: 18,
-    reviews: 32,
+    stars: "234",
+    forks: 18,
+    watchers: 8,
     heatmapDensity: 0.4,
   },
   {
     tier: "High",
     score: 81,
     handle: "@probuilder",
-    commits: 412,
-    prs: 35,
-    reviews: 67,
+    stars: "890",
+    forks: 45,
+    watchers: 19,
     heatmapDensity: 0.65,
   },
   {
     tier: "Elite",
-    score: 95,
-    handle: "@juan294",
-    commits: 523,
-    prs: 47,
-    reviews: 89,
+    score: MOCK_IMPACT.adjustedComposite,
+    handle: `@${MOCK_STATS.handle}`,
+    stars: `${(MOCK_STATS.totalStars / 1000).toFixed(1)}k`,
+    forks: MOCK_STATS.totalForks,
+    watchers: MOCK_STATS.totalWatchers,
     heatmapDensity: 0.85,
   },
 ];
@@ -268,11 +269,11 @@ function BadgeCard({ data, scoreOverride, tierOverride }: BadgeCardProps) {
 
           {/* Footer stats */}
           <div className="flex items-center gap-1.5 sm:gap-3 text-text-secondary text-[8px] sm:text-[10px] font-medium">
-            <span>{data.commits} commits</span>
+            <span>{data.stars} stars</span>
             <span className="text-amber/30" aria-hidden="true">|</span>
-            <span>{data.prs} PRs</span>
+            <span>{data.forks} forks</span>
             <span className="text-amber/30" aria-hidden="true">|</span>
-            <span>{data.reviews} reviews</span>
+            <span>{data.watchers} watchers</span>
           </div>
         </div>
       </div>

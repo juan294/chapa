@@ -7,6 +7,7 @@ import {
   useCallback,
   type RefObject,
 } from "react";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Easing functions                                                   */
@@ -306,9 +307,9 @@ interface StatDef {
 }
 
 const STATS: StatDef[] = [
-  { label: "Commits", value: 523, suffix: " commits", delay: 0 },
-  { label: "PRs Merged", value: 47, suffix: " PRs merged", delay: 200 },
-  { label: "Reviews", value: 89, suffix: " reviews", delay: 400 },
+  { label: "Stars", value: MOCK_STATS.totalStars, suffix: " stars", delay: 0 },
+  { label: "Forks", value: MOCK_STATS.totalForks, suffix: " forks", delay: 200 },
+  { label: "Watchers", value: MOCK_STATS.totalWatchers, suffix: " watchers", delay: 400 },
 ];
 
 function StatsSection({
@@ -579,7 +580,7 @@ function ControlsSection({
 export default function NumberCountersPage() {
   const [easing, setEasing] = useState("easeOut");
   const [duration, setDuration] = useState(2000);
-  const [target, setTarget] = useState(87);
+  const [target, setTarget] = useState(MOCK_IMPACT.adjustedComposite);
   const [replayKey, setReplayKey] = useState(0);
 
   const handleReplayAll = useCallback(() => {

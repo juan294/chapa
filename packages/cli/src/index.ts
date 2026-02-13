@@ -2,6 +2,8 @@ import { parseArgs } from "./cli.js";
 import { resolveToken } from "./auth.js";
 import { fetchEmuStats } from "./fetch-emu.js";
 import { uploadSupplementalStats } from "./upload.js";
+import { loadConfig, deleteConfig } from "./config.js";
+import { login } from "./login.js";
 
 // Injected by tsup at build time; falls back for dev/test
 declare const __CLI_VERSION__: string;
@@ -11,14 +13,16 @@ const HELP_TEXT = `chapa-cli v${VERSION}
 
 Merge GitHub EMU (Enterprise Managed User) contributions into your Chapa badge.
 
-Usage:
-  chapa merge --handle <personal> --emu-handle <emu> [options]
+Commands:
+  chapa login                          Authenticate with Chapa (opens browser)
+  chapa logout                         Clear stored credentials
+  chapa merge --emu-handle <emu>       Merge EMU stats into your badge
 
 Options:
-  --handle <handle>       Your personal GitHub handle (required)
-  --emu-handle <handle>   Your EMU GitHub handle (required)
+  --emu-handle <handle>   Your EMU GitHub handle (required for merge)
   --emu-token <token>     EMU GitHub token (or set GITHUB_EMU_TOKEN)
-  --token <token>         Personal GitHub token (or set GITHUB_TOKEN)
+  --handle <handle>       Override personal handle (auto-detected from login)
+  --token <token>         Override auth token (auto-detected from login)
   --server <url>          Chapa server URL (default: https://chapa.thecreativetoken.com)
   --version, -v           Show version number
   --help, -h              Show this help message
@@ -37,30 +41,56 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // ── login ────────────────────────────────────────────────────────────
+  if (args.command === "login") {
+    await login(args.server);
+    return;
+  }
+
+  // ── logout ───────────────────────────────────────────────────────────
+  if (args.command === "logout") {
+    const removed = deleteConfig();
+    if (removed) {
+      console.log("Logged out. Credentials removed from ~/.chapa/credentials.json");
+    } else {
+      console.log("Not logged in (no credentials found).");
+    }
+    return;
+  }
+
+  // ── merge ────────────────────────────────────────────────────────────
   if (args.command !== "merge") {
-    console.error("Usage: chapa merge --handle <personal> --emu-handle <emu> [--emu-token <token>] [--token <token>] [--server <url>]");
+    console.error("Usage: chapa <login | logout | merge> [options]");
     console.error("\nRun 'chapa --help' for more information.");
     process.exit(1);
   }
 
-  const handle = args.handle;
+  // Load saved config for handle and token fallback
+  const config = loadConfig();
+
+  const handle = args.handle ?? config?.handle;
   const emuHandle = args.emuHandle;
 
-  if (!handle || !emuHandle) {
-    console.error("Error: --handle and --emu-handle are required.");
+  if (!emuHandle) {
+    console.error("Error: --emu-handle is required.");
     process.exit(1);
   }
 
-  // Resolve tokens
+  if (!handle) {
+    console.error("Error: No personal handle found. Run 'chapa login' first, or pass --handle.");
+    process.exit(1);
+  }
+
+  // Resolve tokens — CLI config token takes priority over GITHUB_TOKEN for auth
   const emuToken = resolveToken(args.emuToken, "GITHUB_EMU_TOKEN");
   if (!emuToken) {
-    console.error("Error: EMU token required. Use --emu-token, set GITHUB_EMU_TOKEN, or ensure `gh auth token` works.");
+    console.error("Error: EMU token required. Use --emu-token or set GITHUB_EMU_TOKEN.");
     process.exit(1);
   }
 
-  const personalToken = resolveToken(args.token, "GITHUB_TOKEN");
-  if (!personalToken) {
-    console.error("Error: Personal token required. Use --token, set GITHUB_TOKEN, or ensure `gh auth token` works.");
+  const authToken = args.token ?? config?.token;
+  if (!authToken) {
+    console.error("Error: Not authenticated. Run 'chapa login' first, or pass --token.");
     process.exit(1);
   }
 
@@ -75,13 +105,14 @@ async function main(): Promise<void> {
   console.log(`Found: ${emuStats.commitsTotal} commits, ${emuStats.prsMergedCount} PRs merged, ${emuStats.reviewsSubmittedCount} reviews`);
 
   // Upload to Chapa
-  console.log(`Uploading supplemental stats to ${args.server}...`);
+  const serverUrl = args.server !== "https://chapa.thecreativetoken.com" ? args.server : (config?.server ?? args.server);
+  console.log(`Uploading supplemental stats to ${serverUrl}...`);
   const result = await uploadSupplementalStats({
     targetHandle: handle,
     sourceHandle: emuHandle,
     stats: emuStats,
-    token: personalToken,
-    serverUrl: args.server,
+    token: authToken,
+    serverUrl,
   });
 
   if (!result.success) {

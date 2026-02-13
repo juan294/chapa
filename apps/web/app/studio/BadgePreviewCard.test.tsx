@@ -32,6 +32,32 @@ describe("BadgePreviewCard", () => {
     });
   });
 
+  describe("delegates content to BadgeContent", () => {
+    it("imports BadgeContent component", () => {
+      expect(SOURCE).toContain("BadgeContent");
+    });
+
+    it("imports getBadgeContentCSS helper", () => {
+      expect(SOURCE).toContain("getBadgeContentCSS");
+    });
+
+    it("passes scoreEffect to BadgeContent", () => {
+      expect(SOURCE).toContain("scoreEffect={config.scoreEffect}");
+    });
+
+    it("passes heatmapAnimation to BadgeContent", () => {
+      expect(SOURCE).toContain("heatmapAnimation={config.heatmapAnimation}");
+    });
+
+    it("passes statsDisplay to BadgeContent", () => {
+      expect(SOURCE).toContain("statsDisplay={config.statsDisplay}");
+    });
+
+    it("passes tierTreatment to BadgeContent", () => {
+      expect(SOURCE).toContain("tierTreatment={config.tierTreatment}");
+    });
+  });
+
   describe("testability attributes", () => {
     it("has badge-preview test id on outer container", () => {
       expect(SOURCE).toContain('data-testid="badge-preview"');
@@ -43,10 +69,6 @@ describe("BadgePreviewCard", () => {
 
     it("tracks card style via data attribute", () => {
       expect(SOURCE).toContain("data-card-style={config.cardStyle}");
-    });
-
-    it("tracks score effect via data attribute", () => {
-      expect(SOURCE).toContain("data-score-effect={config.scoreEffect}");
     });
   });
 
@@ -87,34 +109,6 @@ describe("BadgePreviewCard", () => {
     });
   });
 
-  describe("score rendering", () => {
-    it("uses ScoreEffectText component", () => {
-      expect(SOURCE).toContain("ScoreEffectText");
-    });
-
-    it("passes config.scoreEffect to score component", () => {
-      expect(SOURCE).toContain("config.scoreEffect");
-    });
-
-    it("renders adjustedComposite from impact", () => {
-      expect(SOURCE).toContain("impact.adjustedComposite");
-    });
-  });
-
-  describe("heatmap", () => {
-    it("renders HeatmapGrid component", () => {
-      expect(SOURCE).toContain("HeatmapGrid");
-    });
-
-    it("passes heatmap data from stats", () => {
-      expect(SOURCE).toContain("stats.heatmapData");
-    });
-
-    it("passes animation variant from config", () => {
-      expect(SOURCE).toContain("config.heatmapAnimation");
-    });
-  });
-
   describe("interaction layer", () => {
     it("supports tilt-3d interaction", () => {
       expect(SOURCE).toContain('"tilt-3d"');
@@ -124,39 +118,6 @@ describe("BadgePreviewCard", () => {
     it("supports holographic interaction", () => {
       expect(SOURCE).toContain('"holographic"');
       expect(SOURCE).toContain("HolographicOverlay");
-    });
-  });
-
-  describe("dimension display", () => {
-    it("renders building dimension score", () => {
-      expect(SOURCE).toContain("impact.dimensions.building");
-    });
-
-    it("renders guarding dimension score", () => {
-      expect(SOURCE).toContain("impact.dimensions.guarding");
-    });
-
-    it("renders consistency dimension score", () => {
-      expect(SOURCE).toContain("impact.dimensions.consistency");
-    });
-
-    it("renders breadth dimension score", () => {
-      expect(SOURCE).toContain("impact.dimensions.breadth");
-    });
-
-    it("supports animated counters", () => {
-      expect(SOURCE).toContain("useAnimatedCounter");
-    });
-  });
-
-  describe("tier treatment", () => {
-    it("conditionally renders SparkleDots for enhanced tier", () => {
-      expect(SOURCE).toContain("SparkleDots");
-      expect(SOURCE).toContain('config.tierTreatment === "enhanced"');
-    });
-
-    it("uses tierPillClasses", () => {
-      expect(SOURCE).toContain("tierPillClasses");
     });
   });
 
@@ -172,12 +133,8 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("<style>");
     });
 
-    it("includes HEATMAP_GRID_CSS", () => {
-      expect(SOURCE).toContain("HEATMAP_GRID_CSS");
-    });
-
-    it("conditionally includes SCORE_EFFECT_CSS", () => {
-      expect(SOURCE).toContain("SCORE_EFFECT_CSS");
+    it("uses getBadgeContentCSS for content CSS", () => {
+      expect(SOURCE).toContain("getBadgeContentCSS");
     });
 
     it("conditionally includes GRADIENT_BORDER_CSS", () => {
@@ -186,74 +143,6 @@ describe("BadgePreviewCard", () => {
 
     it("conditionally includes HOLOGRAPHIC_CSS", () => {
       expect(SOURCE).toContain("HOLOGRAPHIC_CSS");
-    });
-
-    it("conditionally includes TIER_VISUALS_CSS", () => {
-      expect(SOURCE).toContain("TIER_VISUALS_CSS");
-    });
-  });
-
-  describe("accessibility", () => {
-    it("decorative avatar has empty alt", () => {
-      expect(SOURCE).toContain('alt=""');
-    });
-
-    it("heatmap has role=img", () => {
-      // Delegated to HeatmapGrid but imported
-      expect(SOURCE).toContain("HeatmapGrid");
-    });
-  });
-
-  describe("unified badge elements", () => {
-    it("has verified badge icon", () => {
-      // Verified shield SVG path must be present
-      expect(SOURCE).toContain("M12 1L3 5v6c0 5.55");
-    });
-
-    it("has Chapa_ logo text", () => {
-      expect(SOURCE).toContain("Chapa");
-      expect(SOURCE).toMatch(/Chapa.*_/);
-    });
-
-    it("has Powered by GitHub footer", () => {
-      expect(SOURCE).toContain("Powered by GitHub");
-    });
-
-    it("has chapa.thecreativetoken.com URL", () => {
-      expect(SOURCE).toContain("chapa.thecreativetoken.com");
-    });
-
-    it("uses Activity label instead of Contributions", () => {
-      expect(SOURCE).not.toContain('"Contributions"');
-      expect(SOURCE).toContain("Activity");
-    });
-
-    it("shows displayName as primary header when available", () => {
-      expect(SOURCE).toContain("stats.displayName");
-    });
-
-    it("falls back to @handle when no displayName", () => {
-      // Should show @handle as fallback
-      expect(SOURCE).toMatch(/@.*stats\.handle/);
-    });
-  });
-
-  describe("dimension cards", () => {
-    it("has dimension labels", () => {
-      expect(SOURCE).toContain('"Building"');
-      expect(SOURCE).toContain('"Guarding"');
-      expect(SOURCE).toContain('"Consistency"');
-      expect(SOURCE).toContain('"Breadth"');
-    });
-  });
-
-  describe("archetype display", () => {
-    it("renders archetype from impact", () => {
-      expect(SOURCE).toContain("impact.archetype");
-    });
-
-    it("shows Developer Profile label", () => {
-      expect(SOURCE).toContain("Developer Profile");
     });
   });
 });

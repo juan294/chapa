@@ -16,12 +16,12 @@ describe("Landing page — Enterprise EMU section", () => {
     expect(SOURCE).toMatch(/Enterprise Managed Users|EMU/);
   });
 
-  it("references the @chapa/cli package", () => {
-    expect(SOURCE).toContain("@chapa/cli");
+  it("references the chapa-cli package", () => {
+    expect(SOURCE).toContain("chapa-cli");
   });
 
   it("includes the npx command for the CLI", () => {
-    expect(SOURCE).toContain("npx @chapa/cli");
+    expect(SOURCE).toContain("npx chapa-cli");
   });
 
   it("follows the terminal output pattern with border-l border-stroke", () => {

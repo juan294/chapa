@@ -72,9 +72,17 @@ export default function AboutPage() {
               Open and transparent
             </h2>
             <p>
-              Chapa only requests access to public GitHub data. The scoring
-              methodology is documented and transparent. Confidence messaging
-              is designed to surface patterns without making accusations.
+              Chapa only requests access to public GitHub data. Confidence
+              messaging is designed to surface patterns without making
+              accusations. Every weight, cap, and decision behind the scoring is
+              published in our{" "}
+              <a
+                href="/about/scoring"
+                className="text-amber hover:text-amber-light transition-colors"
+              >
+                full scoring methodology
+              </a>
+              .
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">

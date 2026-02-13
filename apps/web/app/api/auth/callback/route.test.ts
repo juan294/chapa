@@ -264,9 +264,10 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     // Verify Set-Cookie headers are present
     const setCookies = res.headers.getSetCookie();
-    expect(setCookies).toHaveLength(2);
+    expect(setCookies).toHaveLength(3);
     expect(setCookies[0]).toContain("chapa_session=");
     expect(setCookies[1]).toContain("chapa_oauth_state=");
+    expect(setCookies[2]).toContain("chapa_redirect=");
   });
 
   it("passes correct arguments to exchangeCodeForToken", async () => {

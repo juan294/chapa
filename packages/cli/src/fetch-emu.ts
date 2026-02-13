@@ -40,6 +40,11 @@ export async function fetchEmuStats(
     }
 
     const json = await res.json();
+
+    if (json.errors) {
+      console.error(`[cli] GraphQL errors for ${login}:`, json.errors);
+    }
+
     if (!json.data?.user) return null;
 
     const user = json.data.user;

@@ -80,7 +80,7 @@ export function computeConsistency(stats: StatsData): number {
 
 // ---------------------------------------------------------------------------
 // Breadth: cross-project influence
-// reposContributed (40%), inverse topRepoShare (30%), stars (20%), docsOnlyPrRatio (10%)
+// reposContributed (35%), inverse topRepoShare (25%), stars (15%), forks (10%), watchers (5%), docsOnlyPrRatio (10%)
 // ---------------------------------------------------------------------------
 
 export function computeBreadth(stats: StatsData): number {
@@ -89,9 +89,11 @@ export function computeBreadth(stats: StatsData): number {
   const repos = Math.min(stats.reposContributed, CAPS.repos) / CAPS.repos;
   const inverseConcentration = 1 - stats.topRepoShare;
   const stars = normalize(stats.totalStars, CAPS.stars);
+  const forks = normalize(stats.totalForks, CAPS.forks);
+  const watchers = normalize(stats.totalWatchers, CAPS.watchers);
   const docsRatio = stats.docsOnlyPrRatio ?? 0;
 
-  const raw = 100 * (0.4 * repos + 0.3 * inverseConcentration + 0.2 * stars + 0.1 * docsRatio);
+  const raw = 100 * (0.35 * repos + 0.25 * inverseConcentration + 0.15 * stars + 0.1 * forks + 0.05 * watchers + 0.1 * docsRatio);
   return Math.round(Math.max(0, Math.min(100, raw)));
 }
 
