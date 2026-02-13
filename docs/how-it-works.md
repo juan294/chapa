@@ -1,13 +1,13 @@
 # How Chapa Works
 
-This document explains Chapa's Impact Score calculation, security model, verification flow, and the EMU account merge feature. It is the reference for anyone asking "how does this work?" or "how is this secure?"
+This document explains Chapa's Impact v4 Profile calculation, security model, verification flow, and the EMU account merge feature. It is the reference for anyone asking "how does this work?" or "how is this secure?"
 
 ---
 
 ## Table of Contents
 
 1. [What Chapa Measures](#what-chapa-measures)
-2. [Impact Score Calculation](#impact-score-calculation)
+2. [Impact v4 Profile](#impact-v4-profile)
 3. [Confidence System](#confidence-system)
 4. [Tiers](#tiers)
 5. [Data Sources and Verification](#data-sources-and-verification)
@@ -19,7 +19,7 @@ This document explains Chapa's Impact Score calculation, security model, verific
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a single **Impact Score** (0-100) with a **Confidence** rating (50-100). The score reflects the quality and breadth of contributions, not just volume.
+Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a **multi-dimensional Impact v4 Profile** — four independent dimension scores (0-100 each), a developer archetype label, a composite score (0-100), and a **Confidence** rating (50-100). The profile reflects the quality and breadth of contributions, not just volume.
 
 ### Signals we track
 
@@ -31,32 +31,35 @@ Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity an
 | **Issues Closed** | Issues resolved | Problem-solving activity |
 | **Active Days** | Days with at least one contribution | Consistency over time |
 | **Repos Contributed To** | Distinct repositories with commits | Cross-project breadth |
+| **Stars** | Total stars across owned repositories | Community recognition signal (used in Breadth dimension) |
+| **Forks** | Total forks across owned repositories | Displayed on badge as a community metric |
+| **Watchers** | Total watchers across owned repositories | Displayed on badge as a community metric |
 
-### What we deliberately ignore
+### What we deliberately ignore for scoring
 
-- **Stars and followers** - social metrics, not engineering output
-- **Forks** - not a measure of the developer's work
-- **Lines of code** - easily gamed; we use it only for confidence heuristics, never for scoring
-- **Private repo names** - we never expose repository names or code content
+- **Followers** — social metric, not engineering output
+- **Lines of code** — easily gamed; we use it only for confidence heuristics, never for scoring
+- **Private repo names** — we never expose repository names or code content
 
 ---
 
-## Impact Score Calculation
+## Impact v4 Profile
 
-The Impact Score uses **logarithmic normalization** to reward genuine contribution while making gaming impractical. Pushing 1000 commits does not produce a score 10x higher than 100 commits.
+Impact v4 replaces a single weighted-sum score with a **multi-dimensional Developer Impact Profile**. Instead of one number, developers get four independent dimension scores and a developer archetype that describes their contribution shape.
 
-### Step 1: Normalize each signal
+### Why multi-dimensional?
 
-Each raw metric is transformed using:
+AI-assisted development makes traditional volume metrics (commits, LOC, PR counts) increasingly meaningless. A single score that blends everything together hides the difference between a prolific code shipper and a dedicated reviewer. Four independent dimensions let each contribution style shine.
+
+### Normalization
+
+Most raw metrics are transformed using logarithmic normalization to reward genuine contribution while making gaming impractical:
 
 ```
 f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)
 ```
 
-This produces a value between 0 and 1. The logarithmic curve means:
-- Early contributions add significant value
-- Volume beyond the cap has zero effect
-- Gaming by inflating numbers hits diminishing returns fast
+This produces a value between 0 and 1. Pushing 1000 commits does not produce a score 10x higher than 100 commits.
 
 **Caps per signal:**
 
@@ -67,23 +70,43 @@ This produces a value between 0 and 1. The logarithmic curve means:
 | Reviews | 180 | Encourages collaboration without requiring extreme volume |
 | Issues | 80 | Meaningful issue resolution, not ticket churn |
 | Repos | 15 | Cross-project work beyond 15 repos is fully credited |
+| Stars | 500 | Community recognition signal; log-normalized |
 
-### Step 2: Weighted sum
+### The four dimensions (each 0-100)
 
-Each normalized signal is multiplied by a weight reflecting its importance:
+| Dimension | What it measures | Signals & weights |
+|-----------|-----------------|-------------------|
+| **Building** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
+| **Guarding** | Reviewing & quality gatekeeping | Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%) |
+| **Consistency** | Reliable, sustained contributions | Active days / 365 (50%), heatmap evenness (35%), inverse burst activity (15%) |
+| **Breadth** | Cross-project influence | Repos contributed (40%), inverse top-repo share (30%), stars (20%), docs-only PR ratio (10%) |
 
-| Signal | Weight | Rationale |
-|--------|--------|-----------|
-| PR Weight | **33%** | Merged PRs with meaningful changes are the strongest signal |
-| Reviews | **22%** | Reviewing others' code demonstrates expertise and collaboration |
-| Streak (active days) | **13%** | Consistency matters; 180 active days out of 365 is solid |
-| Commits | **12%** | Raw commit count is a weaker signal (easy to inflate) |
-| Issues | **10%** | Issue resolution shows end-to-end ownership |
-| Collaboration (repos) | **10%** | Cross-project work shows breadth |
+Each dimension returns 0 when the primary signal is absent (e.g., Guarding = 0 if no reviews).
 
-**Base Score** = 100 * weighted sum, rounded to integer.
+### Developer archetypes
 
-### Step 3: PR Weight formula
+Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Guardian > Marathoner > Builder.
+
+| Archetype | Rule |
+|-----------|------|
+| **Emerging** | Average < 40 OR no dimension >= 50 |
+| **Balanced** | All dimensions within 15 pts AND average >= 60 |
+| **Polymath** | Breadth is highest AND >= 70 |
+| **Guardian** | Guarding is highest AND >= 70 |
+| **Marathoner** | Consistency is highest AND >= 70 |
+| **Builder** | Building is highest AND >= 70 |
+
+### Composite score
+
+The composite score is the average of all four dimensions, rounded to an integer:
+
+```
+compositeScore = round(avg(building, guarding, consistency, breadth))
+```
+
+The composite is then adjusted by confidence (see below) and mapped to a tier.
+
+### PR Weight formula
 
 Not all PRs are equal. Each merged PR's weight is calculated as:
 
@@ -94,11 +117,6 @@ w = 0.5 + 0.25 * ln(1 + filesChanged) + 0.25 * ln(1 + additions + deletions)
 - Minimum weight: 0.5 (even a tiny PR counts for something)
 - Maximum weight per PR: 3.0 (prevents a single massive PR from dominating)
 - Total PR weight is capped at 120 across all PRs
-
-This means:
-- A 1-file PR touching 10 lines: weight ~0.9
-- A 5-file PR touching 200 lines: weight ~1.9
-- A 20-file PR touching 2000 lines: weight ~2.8
 
 ---
 
@@ -124,14 +142,14 @@ Confidence starts at 100 and can be reduced by detected patterns:
 ### How confidence affects the final score
 
 ```
-Adjusted Score = Base Score * (0.85 + 0.15 * (Confidence / 100))
+Adjusted Score = Composite Score * (0.85 + 0.15 * (Confidence / 100))
 ```
 
 This means:
-- At **confidence 100**: adjusted = base score (no reduction)
-- At **confidence 50**: adjusted = base * 0.925 (only 7.5% reduction)
+- At **confidence 100**: adjusted = composite score (no reduction)
+- At **confidence 50**: adjusted = composite * 0.925 (only 7.5% reduction)
 
-The adjustment is deliberately gentle. Confidence provides transparency, not punishment. A developer with a 75 base score and 70 confidence gets an adjusted score of 73, not 52.
+The adjustment is deliberately gentle. Confidence provides transparency, not punishment. A developer with a 75 composite score and 70 confidence gets an adjusted score of 73, not 52.
 
 ### Why this matters
 
@@ -200,7 +218,7 @@ This means a developer who writes code 8 hours a day at work, then contributes t
 
 ### The solution: Client-side merge
 
-Chapa provides a CLI tool (`@chapa/cli`) that solves this without compromising security:
+Chapa provides a CLI tool (`chapa-cli`) that solves this without compromising security:
 
 ```
 chapa merge --handle juan294 --emu-handle Juan-GonzalezPonce_avoltagh \
@@ -384,3 +402,6 @@ A: The supplemental data expires after 24 hours. Your badge will revert to showi
 
 **Q: Why log normalization instead of linear?**
 A: Linear scoring rewards volume -- 200 commits would score 2x higher than 100. Logarithmic normalization means the first 50 commits contribute more marginal value than the next 50. This makes gaming impractical: you can't just "commit more" to get a better score. You need genuine breadth across PRs, reviews, issues, and multiple repos.
+
+**Q: What are the four dimensions?**
+A: Building (shipping code), Guarding (reviewing others), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Builder, Guardian, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.

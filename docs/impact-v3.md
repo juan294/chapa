@@ -1,4 +1,10 @@
-# Impact Score v3 (Single Source of Truth)
+# Impact Score v3 (DEPRECATED)
+
+> **This document is superseded by [Impact v4](./impact-v4.md).** The v3 single weighted-sum scoring has been replaced by a 4-dimension Developer Impact Profile. This file is kept for historical reference only.
+
+---
+
+# Impact Score v3 (Original Spec)
 
 ## Window
 - 365 days fixed ("12 months"), updated daily.

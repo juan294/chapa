@@ -1,22 +1,26 @@
 # Chapa — Dev Impact Badge
 
 ## One-liner
-Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact Score v3** (Impact + Confidence) from GitHub activity, with a share page and one-click sharing.
+Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v4 Profile** (4 dimensions + archetype + confidence) from GitHub activity, with a Creator Studio for badge customization, a share page, and one-click sharing.
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
-2. Compute **Impact Score v3** from last 12 months (365 days):
-   - base score (0–100), confidence (50–100) + reasons, adjusted score, tier.
-3. Serve **embeddable SVG badge**: `/u/:handle/badge.svg`
-4. Serve **share page**: `/u/:handle`
-5. Caching + rate limit friendliness (daily cache is fine).
-6. Minimal analytics (PostHog) for key events.
+2. Compute **Impact v4 Profile** from last 12 months (365 days):
+   - 4 dimensions (Building, Guarding, Consistency, Breadth), each 0–100
+   - developer archetype (Builder, Guardian, Marathoner, Polymath, Balanced, Emerging)
+   - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
+
+3. Serve **Creator Studio**: `/studio` (badge customization with 9 visual categories).
+4. Serve **embeddable SVG badge**: `/u/:handle/badge.svg`
+5. Serve **share page**: `/u/:handle`
+6. Badge **verification** via HMAC-SHA256 hash (proves badge data hasn't been tampered with).
+7. Caching + rate limit friendliness (daily cache is fine).
+8. Minimal analytics (PostHog) for key events.
 
 ## Non-goals (current scope)
 - No long-term history charts
 - No leaderboard
 - No paid tiers
-- No complex theming system beyond 1–3 theme presets
 
 ## Stack decisions
 - Next.js (App Router) + TypeScript + Tailwind
@@ -26,15 +30,22 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - Domain: chapa.thecreativetoken.com
 
 ## Key routes
-- GET `/` Landing + GitHub login
+- GET `/` Landing + GitHub login (terminal-first UI)
+- GET `/studio` Creator Studio (badge customization, requires auth)
 - GET `/u/:handle` Share page (badge preview, breakdown, embed snippet, share CTA)
 - GET `/u/:handle/badge.svg` Embeddable badge SVG (cacheable)
-- (Optional) POST `/api/refresh?handle=` Force refresh (rate-limited)
+- GET `/api/verify/:hash` Badge verification endpoint
+- POST `/api/supplemental` Upload EMU supplemental stats (CLI)
+- POST `/api/studio/config` Save/load badge customization config
+- POST `/api/refresh?handle=` Force refresh (rate-limited)
 
 ## Data & types
-Shared types live in: `packages/shared/types.ts`
-- `StatsData`
-- `ImpactV3Result`
+Shared types live in: `packages/shared/src/types.ts`
+- `StatsData` — aggregated GitHub stats (23 fields)
+- `ImpactV4Result` — 4 dimensions, archetype, composite score, confidence, tier
+- `BadgeConfig` — Creator Studio visual customization (9 categories)
+- `SupplementalStats` — EMU account merge payload
+- `RawContributionData` — raw GraphQL response shape
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
@@ -65,18 +76,19 @@ Must be easy to swap/remove:
 ## Agent team roles (no file overlap)
 - OAuth Engineer: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
 - GitHub Data Engineer: `apps/web/lib/github/*`, `apps/web/lib/cache/*`
-- Impact v3 Engineer: `apps/web/lib/impact/*`, types section in shared
+- Impact v4 Engineer: `apps/web/lib/impact/*`, types section in shared
 - SVG Renderer Engineer: `apps/web/lib/render/*`, `apps/web/app/u/[handle]/badge.svg/route.ts`
 - Share Page Engineer: `apps/web/app/u/[handle]/page.tsx`, `apps/web/components/*`
 
 ## Acceptance criteria (must pass)
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
-- Badge shows: heatmap, commits, PRs merged, reviews, Impact tier, Score, Confidence.
+- Badge shows: heatmap, radar chart (4 dimensions), archetype label, stars/forks/watchers, Impact tier, adjusted score.
 - `/u/:handle` shows badge + breakdown + confidence reasons + embed snippet.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
-- Repo contains `docs/impact-v3.md` and `docs/svg-design.md` as spec truth.
+- Repo contains `docs/impact-v4.md` and `docs/svg-design.md` as spec truth.
+- Creator Studio at `/studio` allows badge visual customization (9 categories).
 
 ## Engineering rules
 - Keep edits separated by files to avoid overwrites in agent teams.
@@ -88,7 +100,7 @@ Must be easy to swap/remove:
 1) Shared types
 2) GitHub OAuth + token storage
 3) StatsData gatherer + caching
-4) Impact v3 compute + tests
+4) Impact v4 compute + tests
 5) Badge SVG endpoint
 6) Share page + embed snippet + sharing
 
@@ -343,7 +355,7 @@ if (rawLength !== trimmedLength) {
 3. **Escape user input in SVG** — Any user-controlled text (handle, display name) must be escaped before rendering into SVG markup. This prevents XSS in embeddable badges.
 4. **Health endpoint** — `/api/health` should exist for monitoring. Don't break it.
 5. **No dead code** — Remove unused exports, imports, and files. Clean as you go.
-6. **Pure functions for scoring** — Impact v3 compute and normalization must be pure functions with deterministic output for a given input. This makes them trivially testable.
+6. **Pure functions for scoring** — Impact v4 compute and normalization must be pure functions with deterministic output for a given input. This makes them trivially testable.
 
 ---
 
@@ -436,7 +448,7 @@ If unsure about priority, default to `priority: medium`.
 | Label | Scope |
 |-------|-------|
 | `area: oauth` | GitHub OAuth, sessions, tokens |
-| `area: scoring` | Impact v3 compute, normalization, tiers |
+| `area: scoring` | Impact v4 compute, dimensions, archetypes, normalization, tiers |
 | `area: badge` | SVG rendering, themes, animations |
 | `area: share-page` | Share page UI, embed snippets, OG meta |
 | `area: cache` | Upstash Redis, TTL, cache invalidation |
