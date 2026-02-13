@@ -107,6 +107,36 @@ describe("GET /api/auth/login — rate limiting", () => {
   });
 });
 
+describe("GET /api/auth/login — redirect validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("GITHUB_CLIENT_ID", "test-client-id");
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+    mockCreateStateCookie.mockReturnValue({
+      state: "abc",
+      cookie: "gh_oauth_state=abc; Path=/",
+    });
+    mockBuildAuthUrl.mockReturnValue(
+      "https://github.com/login/oauth/authorize?state=abc",
+    );
+  });
+
+  it("rejects protocol-relative URL //evil.com as redirect", async () => {
+    const req = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/auth/login?redirect=//evil.com",
+    );
+
+    const res = await GET(req);
+
+    // Should redirect to GitHub OAuth (307), but must NOT set chapa_redirect cookie
+    expect(res.status).toBe(307);
+    const cookies = res.headers.getSetCookie();
+    const redirectCookie = cookies.find((c) => c.startsWith("chapa_redirect="));
+    expect(redirectCookie).toBeUndefined();
+  });
+});
+
 describe("GET /api/auth/login — fallback URL", () => {
   beforeEach(() => {
     vi.clearAllMocks();

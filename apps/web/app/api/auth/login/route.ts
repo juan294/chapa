@@ -23,7 +23,7 @@ function isSafeRedirect(url: string, baseUrl: string): boolean {
     return parsed.origin === base.origin;
   } catch {
     // Relative paths are OK
-    return url.startsWith("/");
+    return url.startsWith("/") && !url.startsWith("//");
   }
 }
 
