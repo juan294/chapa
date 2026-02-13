@@ -283,3 +283,52 @@ describe("token encryption", () => {
     expect(result).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// readSessionCookie — shape validation
+// ---------------------------------------------------------------------------
+
+describe("readSessionCookie — shape validation", () => {
+  const secret = "secret-key-for-test-32-chars!!!!";
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+  });
+
+  it("returns null for session with missing login field", () => {
+    // Encrypt an object that lacks the `login` field
+    const badPayload = JSON.stringify({ token: "t", name: null, avatar_url: "https://img" });
+    const encrypted = encryptToken(badPayload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for session with missing token field", () => {
+    const badPayload = JSON.stringify({ login: "user", name: null, avatar_url: "https://img" });
+    const encrypted = encryptToken(badPayload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for session where name is a number instead of string|null", () => {
+    const badPayload = JSON.stringify({ token: "t", login: "user", name: 42, avatar_url: "https://img" });
+    const encrypted = encryptToken(badPayload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns a valid payload when shape is correct", () => {
+    const goodPayload = { token: "gho_abc", login: "juan294", name: "Juan", avatar_url: "https://img" };
+    const cookie = createSessionCookie(goodPayload, secret);
+    const cookieHeader = cookie.split(";")[0];
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toEqual(goodPayload);
+  });
+});
