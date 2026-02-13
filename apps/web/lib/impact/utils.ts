@@ -7,6 +7,14 @@ import type {
 } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
+// Clamp + round a raw score to 0–100 integer
+// ---------------------------------------------------------------------------
+
+export function clampScore(raw: number): number {
+  return Math.round(Math.max(0, Math.min(100, raw)));
+}
+
+// ---------------------------------------------------------------------------
 // Normalization: f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)
 // ---------------------------------------------------------------------------
 
@@ -116,7 +124,7 @@ export function computeAdjustedScore(
   confidence: number,
 ): number {
   const adjusted = base * (0.85 + 0.15 * (confidence / 100));
-  return Math.round(Math.max(0, Math.min(100, adjusted)));
+  return clampScore(adjusted);
 }
 
 // ---------------------------------------------------------------------------
