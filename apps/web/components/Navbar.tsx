@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { readSessionCookie } from "@/lib/auth/github";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface NavLink {
   label: string;
@@ -60,8 +61,9 @@ export async function Navbar({ navLinks }: NavbarProps) {
           <MobileNav links={navLinks} />
         )}
 
-        {/* Right: User or login */}
+        {/* Right: Theme toggle + User or login */}
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {session ? (
             <UserMenu
               login={session.login}

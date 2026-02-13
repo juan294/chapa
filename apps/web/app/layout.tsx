@@ -3,6 +3,7 @@ import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import PostHogProvider from "@/components/PostHogProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -72,6 +73,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${jetbrainsMono.variable} ${plusJakarta.variable}`}
+      suppressHydrationWarning
     >
       <body className="bg-bg text-text-primary font-body antialiased">
         <script
@@ -100,9 +102,11 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <PostHogProvider>
-          <KeyboardShortcutsProvider>{children}</KeyboardShortcutsProvider>
-        </PostHogProvider>
+        <ThemeProvider>
+          <PostHogProvider>
+            <KeyboardShortcutsProvider>{children}</KeyboardShortcutsProvider>
+          </PostHogProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>
