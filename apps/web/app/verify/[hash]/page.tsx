@@ -29,7 +29,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     return (
       <div className="min-h-screen bg-bg text-text-primary">
         <Navbar />
-        <main className="mx-auto max-w-2xl px-6 pt-32">
+        <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
           <InvalidHashCard hash={hash} />
         </main>
       </div>
@@ -41,7 +41,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <Navbar />
-      <main className="mx-auto max-w-2xl px-6 pt-32 pb-16">
+      <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
           <VerifiedCard hash={hash} record={record} />
         ) : (
@@ -108,7 +108,7 @@ function VerifiedCard({
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">Verification Code</p>
-        <p className="font-heading text-lg tracking-widest text-[#E05A47]">
+        <p className="font-heading text-lg tracking-widest text-terminal-red">
           {hash}
         </p>
       </div>

@@ -12,7 +12,7 @@ export default function GuardianPage() {
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <Navbar />
-      <main className="mx-auto max-w-3xl px-6 pt-32 pb-16">
+      <main id="main-content" className="mx-auto max-w-3xl px-6 pt-32 pb-16">
         <article className="animate-fade-in-up">
           {/* Terminal command */}
           <div className="flex items-center gap-2 mb-6 font-heading text-sm">
@@ -24,10 +24,10 @@ export default function GuardianPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-[#9D8FFF]">Guardian</span>
+                The <span className="text-amber-light">Guardian</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-[#9D8FFF]">Guarding</span>
+                Dominant dimension: <span className="text-amber-light">Guarding</span>
               </p>
             </div>
 

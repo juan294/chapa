@@ -5,7 +5,7 @@ export default function VerifyInputPage() {
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <Navbar />
-      <main className="mx-auto max-w-2xl px-6 pt-32 pb-16">
+      <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         <div className="animate-fade-in-up">
           {/* Terminal command line */}
           <div className="flex items-center gap-2 mb-6 font-heading text-sm">
