@@ -22,7 +22,7 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   breadth: { from: "#ec4899", to: "#f9a8d4" },
 };
 
-export const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
+const ARCHETYPE_DESCRIPTIONS: Record<DeveloperArchetype, string> = {
   Builder:
     "You ship. PRs merged, issues closed, meaningful code changes \u2014 building is your strongest dimension.",
   Guardian:
