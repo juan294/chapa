@@ -220,30 +220,59 @@ export default async function SharePage({ params }: SharePageProps) {
         )}
 
         {/* ── Embed Snippets ──────────────────────────────────── */}
-        <section className="animate-fade-in-up [animation-delay:500ms]">
-          <div className="rounded-2xl border border-stroke bg-card p-6 space-y-4">
-            <h2 className="font-heading text-[11px] tracking-[0.2em] uppercase text-text-secondary">
-              Embed This Badge
-            </h2>
+        <section className="space-y-6 animate-fade-in-up [animation-delay:500ms]">
+          <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary">
+            Embed This Badge
+          </h2>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">Markdown</span>
+          {/* Markdown snippet */}
+          <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
+              <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
+              <span className="ml-2 text-xs text-terminal-dim font-heading">
+                Markdown
+              </span>
+              <div className="ml-auto">
                 <CopyButton text={embedMarkdown} />
               </div>
-              <pre className="overflow-x-auto rounded-lg border border-stroke bg-dark-card p-3 text-xs text-text-secondary font-heading">
-                {embedMarkdown}
-              </pre>
             </div>
+            <div className="p-4 font-heading text-sm leading-relaxed overflow-x-auto">
+              <p className="text-text-primary/80 whitespace-nowrap">
+                <span className="text-amber">{"![Chapa Badge]("}</span>
+                <span className="text-text-secondary">
+                  {`https://chapa.thecreativetoken.com/u/${handle}/badge.svg`}
+                </span>
+                <span className="text-amber">{")"}</span>
+              </p>
+            </div>
+          </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">HTML</span>
+          {/* HTML snippet */}
+          <div className="rounded-xl border border-stroke bg-card overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
+              <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
+              <span className="ml-2 text-xs text-terminal-dim font-heading">
+                HTML
+              </span>
+              <div className="ml-auto">
                 <CopyButton text={embedHtml} />
               </div>
-              <pre className="overflow-x-auto rounded-lg border border-stroke bg-dark-card p-3 text-xs text-text-secondary font-heading">
-                {embedHtml}
-              </pre>
+            </div>
+            <div className="p-4 font-heading text-sm leading-relaxed overflow-x-auto">
+              <p className="text-text-primary/80 whitespace-nowrap">
+                <span className="text-amber">{"<img "}</span>
+                <span className="text-text-secondary">{"src="}</span>
+                <span className="text-amber/70">{`"https://chapa.thecreativetoken.com/u/${handle}/badge.svg"`}</span>
+                <span className="text-text-secondary">{" alt="}</span>
+                <span className="text-amber/70">{`"Chapa Badge for ${handle}"`}</span>
+                <span className="text-text-secondary">{" width="}</span>
+                <span className="text-amber/70">{'"600"'}</span>
+                <span className="text-amber">{" />"}</span>
+              </p>
             </div>
           </div>
         </section>
