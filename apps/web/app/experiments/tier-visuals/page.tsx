@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ══════════════════════════════════════════════════════════════
    Experiment #47 — Tier-Specific Progressive Visual Treatment
@@ -52,11 +53,11 @@ const TIERS: TierData[] = [
   },
   {
     tier: "Elite",
-    score: 95,
-    handle: "@juan294",
-    stars: "1.2k",
-    forks: 89,
-    watchers: 34,
+    score: MOCK_IMPACT.adjustedComposite,
+    handle: `@${MOCK_STATS.handle}`,
+    stars: `${(MOCK_STATS.totalStars / 1000).toFixed(1)}k`,
+    forks: MOCK_STATS.totalForks,
+    watchers: MOCK_STATS.totalWatchers,
     heatmapDensity: 0.85,
   },
 ];

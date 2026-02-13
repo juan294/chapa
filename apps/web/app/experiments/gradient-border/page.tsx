@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, useId } from "react";
+import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ──────────────────────────────────────────────────────────────
    Animated Gradient Border — Experiment #40
@@ -8,98 +10,12 @@ import { useState, useMemo, useId } from "react";
    mock badge card. Includes animation toggle + speed control.
    ────────────────────────────────────────────────────────────── */
 
-// ── Heatmap data (mock 7x13 grid like a contribution graph) ──
-const HEATMAP_ROWS = 7;
-const HEATMAP_COLS = 13;
-
-function generateHeatmap(): number[][] {
-  // Deterministic pseudo-random based on position
-  const grid: number[][] = [];
-  for (let row = 0; row < HEATMAP_ROWS; row++) {
-    const r: number[] = [];
-    for (let col = 0; col < HEATMAP_COLS; col++) {
-      const seed = (row * 17 + col * 31 + 7) % 100;
-      if (seed < 20) r.push(0);
-      else if (seed < 45) r.push(1);
-      else if (seed < 70) r.push(2);
-      else if (seed < 88) r.push(3);
-      else r.push(4);
-    }
-    grid.push(r);
-  }
-  return grid;
-}
-
-const HEATMAP = generateHeatmap();
-
-const HEAT_COLORS = [
-  "rgba(124,106,239,0.06)", // 0 — empty
-  "rgba(124,106,239,0.18)", // 1 — low
-  "rgba(124,106,239,0.35)", // 2 — medium
-  "rgba(124,106,239,0.60)", // 3 — high
-  "rgba(124,106,239,0.90)", // 4 — max
-];
-
 // ── Mock badge card ──────────────────────────────────────────
 
 function MockBadgeCard() {
   return (
-    <div className="relative z-10 rounded-2xl bg-[#13141E] p-6 sm:p-8 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className="font-heading text-sm sm:text-base text-text-secondary">
-          @juan294
-        </span>
-        <span className="font-heading text-sm sm:text-base font-bold text-amber">
-          Chapa.
-        </span>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex items-center gap-4 sm:gap-8 py-4">
-        {/* Heatmap */}
-        <div className="flex-1 min-w-0">
-          <div
-            className="grid gap-[2px] sm:gap-[3px]"
-            style={{
-              gridTemplateColumns: `repeat(${HEATMAP_COLS}, 1fr)`,
-              gridTemplateRows: `repeat(${HEATMAP_ROWS}, 1fr)`,
-            }}
-            role="img"
-            aria-label="Activity heatmap showing commit frequency over 12 months"
-          >
-            {HEATMAP.flat().map((level, i) => (
-              <div
-                key={i}
-                className="rounded-[2px] sm:rounded-[3px] aspect-square"
-                style={{ backgroundColor: HEAT_COLORS[level] }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Score + Tier */}
-        <div className="flex flex-col items-center gap-1 sm:gap-2 shrink-0">
-          <span className="font-heading text-4xl sm:text-5xl md:text-6xl font-extrabold text-amber leading-none">
-            87
-          </span>
-          <span className="rounded-full bg-amber/10 border border-amber/20 px-3 py-0.5 sm:px-4 sm:py-1 text-xs sm:text-sm font-semibold text-amber tracking-wide uppercase">
-            Elite
-          </span>
-          <span className="rounded-full bg-amber/5 border border-amber/10 px-3 py-0.5 text-[10px] font-medium text-text-secondary tracking-wide">
-            Builder
-          </span>
-        </div>
-      </div>
-
-      {/* Footer stats */}
-      <div className="flex items-center gap-2 sm:gap-4 text-text-secondary text-[10px] sm:text-xs font-medium">
-        <span>1.2k stars</span>
-        <span className="text-amber/30" aria-hidden="true">|</span>
-        <span>89 forks</span>
-        <span className="text-amber/30" aria-hidden="true">|</span>
-        <span>34 watchers</span>
-      </div>
+    <div className="relative z-10 rounded-2xl bg-[#13141E] p-6 sm:p-8 w-full aspect-[1200/630] overflow-hidden">
+      <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );
 }
@@ -192,6 +108,7 @@ export default function GradientBorderExperiment() {
 
   return (
     <>
+      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Inline styles for the animated gradient border techniques */}
       <style
         dangerouslySetInnerHTML={{

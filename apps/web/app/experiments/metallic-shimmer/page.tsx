@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Metallic Gold Shimmer — Experiment #39                            */

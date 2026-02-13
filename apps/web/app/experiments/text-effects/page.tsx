@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Effect types                                                       */

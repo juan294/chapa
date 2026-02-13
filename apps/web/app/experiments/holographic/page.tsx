@@ -1,37 +1,14 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
 type Variant = "amber" | "rainbow" | "mouse";
-
-/* ------------------------------------------------------------------ */
-/*  Mock heatmap data (13 weeks x 7 days)                              */
-/* ------------------------------------------------------------------ */
-
-function generateHeatmap(): number[][] {
-  const seed = 42;
-  let s = seed;
-  const next = () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s & 0x7fffffff) / 0x7fffffff;
-  };
-  return Array.from({ length: 13 }, () =>
-    Array.from({ length: 7 }, () => {
-      const v = next();
-      if (v < 0.25) return 0;
-      if (v < 0.5) return 0.2;
-      if (v < 0.7) return 0.45;
-      if (v < 0.85) return 0.7;
-      return 1;
-    }),
-  );
-}
-
-const HEATMAP = generateHeatmap();
 
 /* ------------------------------------------------------------------ */
 /*  HoloCard                                                           */
@@ -102,61 +79,8 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
       />
 
       {/* Card content */}
-      <div className="relative z-[5] flex h-full flex-col justify-between p-6 sm:p-8">
-        {/* Header row */}
-        <div className="flex items-center justify-between">
-          <span className="font-heading text-base font-bold text-[#7C6AEF] sm:text-lg">
-            @juan294
-          </span>
-          <span className="font-heading text-sm font-medium tracking-widest text-[#9AA4B2]">
-            Chapa.
-          </span>
-        </div>
-
-        {/* Middle: heatmap + score */}
-        <div className="flex flex-1 items-center gap-6 py-4 sm:gap-10">
-          {/* Heatmap grid */}
-          <div className="flex gap-[3px]">
-            {HEATMAP.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-[3px]">
-                {week.map((val, di) => (
-                  <div
-                    key={di}
-                    className="h-[6px] w-[6px] rounded-[1.5px] sm:h-[8px] sm:w-[8px] sm:rounded-[2px]"
-                    style={{
-                      backgroundColor:
-                        val === 0
-                          ? "rgba(124,106,239,0.06)"
-                          : `rgba(124,106,239,${val})`,
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-
-          {/* Score + Tier */}
-          <div className="flex flex-col items-end ml-auto">
-            <span className="font-heading text-5xl font-extrabold leading-none text-[#E6EDF3] sm:text-6xl">
-              87
-            </span>
-            <span className="mt-2 inline-block rounded-full bg-[#7C6AEF]/15 px-3 py-0.5 text-xs font-semibold tracking-wide text-[#7C6AEF]">
-              Elite
-            </span>
-            <span className="mt-1 inline-block rounded-full bg-[#7C6AEF]/5 px-3 py-0.5 text-[10px] font-medium tracking-wide text-[#9AA4B2]">
-              Builder
-            </span>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div className="flex items-center gap-4 text-xs text-[#9AA4B2] sm:text-sm">
-          <span>1.2k stars</span>
-          <span className="text-[rgba(124,106,239,0.25)]">|</span>
-          <span>89 forks</span>
-          <span className="text-[rgba(124,106,239,0.25)]">|</span>
-          <span>34 watchers</span>
-        </div>
+      <div className="relative z-[5] p-6 sm:p-8">
+        <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
       </div>
     </div>
   );
@@ -282,6 +206,7 @@ export default function HolographicExperimentPage() {
 
   return (
     <>
+      <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Inline styles for the holographic effect (self-contained) */}
       <style>{`
         /* ---- Holographic card base ---- */
