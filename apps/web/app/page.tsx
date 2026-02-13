@@ -112,9 +112,9 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
               <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[0.95]">
-                Developer Impact
+                Developer Impact,
                 <br />
-                <span className="text-amber">Profile</span>
+                <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
                 <p><span className="text-terminal-dim select-none">&gt;</span> Four dimensions showing what kind of developer you are.</p>

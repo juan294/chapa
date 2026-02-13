@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Scoring Methodology",
   description:
-    "How Chapa calculates your Developer Impact Profile. Every dimension, weight, cap, and confidence penalty explained with full rationale.",
+    "How Chapa decodes your developer impact. Every dimension, weight, cap, and confidence penalty explained with full rationale.",
   openGraph: {
     title: "Chapa Scoring Methodology",
     description:
@@ -100,8 +100,8 @@ export default function ScoringMethodologyPage() {
           </h1>
 
           <p className="text-text-secondary text-lg mb-8 animate-fade-in-up [animation-delay:100ms]">
-            Full transparency on how Chapa calculates your Developer Impact
-            Profile. Every weight, cap, and decision is explained here.
+            Full transparency on how Chapa decodes your developer impact.
+            Every weight, cap, and decision is explained here.
           </p>
 
           <div className="space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
@@ -118,7 +118,7 @@ export default function ScoringMethodologyPage() {
             <p>
               Impact v4 replaces that single number with a{" "}
               <strong className="text-text-primary">
-                multi-dimensional Developer Impact Profile
+                multi-dimensional impact breakdown
               </strong>
               : four independent dimension scores (each 0-100), a developer
               archetype, a composite score, and a confidence rating. Each

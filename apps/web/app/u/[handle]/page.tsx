@@ -36,19 +36,19 @@ export async function generateMetadata({
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   return {
-    title: `@${handle} — Developer Impact Profile`,
-    description: `View ${handle}'s Developer Impact Profile on Chapa. See their archetype, four dimension scores, and embeddable badge.`,
+    title: `@${handle} — Developer Impact, Decoded`,
+    description: `View ${handle}'s developer impact on Chapa. See their archetype, four dimension scores, and embeddable badge.`,
     openGraph: {
       type: "profile",
-      title: `@${handle} — Chapa Developer Impact Profile`,
-      description: `View ${handle}'s Developer Impact Profile and badge on Chapa.`,
+      title: `@${handle} — Chapa Developer Impact, Decoded`,
+      description: `View ${handle}'s developer impact and badge on Chapa.`,
       url: pageUrl,
       images: [`/u/${handle}/badge.svg`],
     },
     twitter: {
       card: "summary_large_image",
-      title: `@${handle} — Chapa Developer Impact Profile`,
-      description: `View ${handle}'s Developer Impact Profile and badge on Chapa.`,
+      title: `@${handle} — Chapa Developer Impact, Decoded`,
+      description: `View ${handle}'s developer impact and badge on Chapa.`,
       images: [`/u/${handle}/badge.svg`],
     },
     alternates: {
@@ -143,7 +143,7 @@ export default async function SharePage({ params }: SharePageProps) {
       <Navbar />
 
       <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-24">
-        <h1 className="sr-only">@{handle} — Developer Impact Profile</h1>
+        <h1 className="sr-only">@{handle} — Developer Impact, Decoded</h1>
 
         {/* Badge preview — interactive if user has custom config, static SVG otherwise */}
         <div className="mb-12 animate-scale-in [animation-delay:200ms]">
