@@ -203,7 +203,7 @@ describe("computeConfidence", () => {
     });
 
     it("does NOT apply when PRs < 10", () => {
-      const { confidence, penalties } = computeConfidence(
+      const { penalties } = computeConfidence(
         makeStats({ prsMergedCount: 9, reviewsSubmittedCount: 0 }),
       );
       expect(
@@ -212,7 +212,7 @@ describe("computeConfidence", () => {
     });
 
     it("does NOT apply when reviews > 1", () => {
-      const { confidence, penalties } = computeConfidence(
+      const { penalties } = computeConfidence(
         makeStats({ prsMergedCount: 20, reviewsSubmittedCount: 2 }),
       );
       expect(
@@ -234,7 +234,7 @@ describe("computeConfidence", () => {
     });
 
     it("does NOT apply when topRepoShare < 0.95", () => {
-      const { confidence, penalties } = computeConfidence(
+      const { penalties } = computeConfidence(
         makeStats({ topRepoShare: 0.94, reposContributed: 1 }),
       );
       expect(
@@ -243,7 +243,7 @@ describe("computeConfidence", () => {
     });
 
     it("does NOT apply when repos > 1 even with high topRepoShare", () => {
-      const { confidence, penalties } = computeConfidence(
+      const { penalties } = computeConfidence(
         makeStats({ topRepoShare: 1.0, reposContributed: 2 }),
       );
       expect(
@@ -265,7 +265,7 @@ describe("computeConfidence", () => {
     });
 
     it("does NOT apply when hasSupplementalData is false", () => {
-      const { confidence, penalties } = computeConfidence(
+      const { penalties } = computeConfidence(
         makeStats({ hasSupplementalData: false }),
       );
       expect(
@@ -274,7 +274,7 @@ describe("computeConfidence", () => {
     });
 
     it("does NOT apply when hasSupplementalData is undefined", () => {
-      const { confidence, penalties } = computeConfidence(
+      const { penalties } = computeConfidence(
         makeStats({ hasSupplementalData: undefined }),
       );
       expect(
