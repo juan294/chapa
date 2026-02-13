@@ -51,6 +51,33 @@ function isTlsError(message: string): boolean {
   return TLS_ERROR_PATTERNS.some((p) => message.includes(p));
 }
 
+/**
+ * Walk the error `.cause` chain and return the deepest message.
+ * Node.js `fetch()` wraps real errors: Error("fetch failed", { cause: Error("UNABLE_TO_VERIFY_LEAF_SIGNATURE") })
+ */
+function getRootErrorMessage(err: unknown): string {
+  let current = err;
+  let message = "";
+  while (current instanceof Error) {
+    message = current.message;
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return message;
+}
+
+/**
+ * Collect all messages from the error cause chain (for TLS pattern matching).
+ */
+function getFullErrorChain(err: unknown): string {
+  const messages: string[] = [];
+  let current = err;
+  while (current instanceof Error) {
+    messages.push(current.message);
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return messages.join(" | ");
+}
+
 export async function login(serverUrl: string, opts: LoginOptions = {}): Promise<void> {
   const { verbose = false, insecure = false } = opts;
 
@@ -100,12 +127,13 @@ export async function login(serverUrl: string, opts: LoginOptions = {}): Promise
         console.error(`[poll ${i + 1}] ${data?.status ?? "no status"}`);
       }
     } catch (err) {
-      const errMsg = (err as Error).message;
+      const rootMsg = getRootErrorMessage(err);
+      const fullChain = getFullErrorChain(err);
       if (verbose) {
-        console.error(`[poll ${i + 1}] network error: ${errMsg}`);
+        console.error(`[poll ${i + 1}] network error: ${rootMsg}`);
       }
-      if (!insecure && isTlsError(errMsg)) {
-        console.error(`\nTLS certificate error: ${errMsg}`);
+      if (!insecure && isTlsError(fullChain)) {
+        console.error(`\nTLS certificate error: ${rootMsg}`);
         console.error("This looks like a corporate network with TLS interception.");
         console.error("  try: chapa login --insecure\n");
       }
