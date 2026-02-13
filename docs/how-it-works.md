@@ -71,6 +71,8 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 | Issues | 80 | Meaningful issue resolution, not ticket churn |
 | Repos | 15 | Cross-project work beyond 15 repos is fully credited |
 | Stars | 500 | Community recognition signal; log-normalized |
+| Forks | 200 | People building on your work; log-normalized |
+| Watchers | 100 | People actively following your repos; log-normalized |
 
 ### The four dimensions (each 0-100)
 
@@ -79,7 +81,7 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 | **Building** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
 | **Guarding** | Reviewing & quality gatekeeping | Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%) |
 | **Consistency** | Reliable, sustained contributions | Active days / 365 (50%), heatmap evenness (35%), inverse burst activity (15%) |
-| **Breadth** | Cross-project influence | Repos contributed (40%), inverse top-repo share (30%), stars (20%), docs-only PR ratio (10%) |
+| **Breadth** | Cross-project influence | Repos contributed (35%), inverse top-repo share (25%), stars (15%), forks (10%), watchers (5%), docs-only PR ratio (10%) |
 
 Each dimension returns 0 when the primary signal is absent (e.g., Guarding = 0 if no reviews).
 

@@ -280,23 +280,24 @@ describe("computeBreadth(stats)", () => {
     expect(computeBreadth(makeStats())).toBe(0);
   });
 
-  it("returns high score for many repos with low concentration and stars", () => {
+  it("returns high score for many repos with low concentration, stars, forks, watchers", () => {
     const stats = makeStats({
       reposContributed: 15,
       topRepoShare: 0.2,
       docsOnlyPrRatio: 0.3,
       totalStars: 200,
+      totalForks: 100,
+      totalWatchers: 50,
     });
     const score = computeBreadth(stats);
     expect(score).toBeGreaterThan(70);
   });
 
-  it("weights repos at 40%", () => {
+  it("weights repos at 35%", () => {
     const repoOnly = makeStats({ reposContributed: 15, topRepoShare: 1.0 });
-    // 40% from repos (maxed), 0% from inverse topRepoShare (1.0 = no diversity), 0% from docs, 0% from stars
+    // 35% from repos (maxed), 0% from inverse topRepoShare (1.0 = no diversity), 0% from others
     const score = computeBreadth(repoOnly);
-    expect(score).toBeGreaterThanOrEqual(30);
-    expect(score).toBeLessThanOrEqual(50);
+    expect(score).toBe(35);
   });
 
   it("rewards low topRepoShare (diverse)", () => {
@@ -311,7 +312,7 @@ describe("computeBreadth(stats)", () => {
     expect(computeBreadth(withDocs)).toBeGreaterThan(computeBreadth(noDocs));
   });
 
-  it("rewards totalStars (20% weight)", () => {
+  it("rewards totalStars (15% weight)", () => {
     const noStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 0 });
     const withStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 300 });
     expect(computeBreadth(withStars)).toBeGreaterThan(computeBreadth(noStars));
@@ -321,6 +322,30 @@ describe("computeBreadth(stats)", () => {
     const at500 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 500 });
     const at1000 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 1000 });
     expect(computeBreadth(at1000)).toBe(computeBreadth(at500));
+  });
+
+  it("rewards totalForks (10% weight)", () => {
+    const noForks = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 0 });
+    const withForks = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 100 });
+    expect(computeBreadth(withForks)).toBeGreaterThan(computeBreadth(noForks));
+  });
+
+  it("caps forks contribution at 200", () => {
+    const at200 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 200 });
+    const at500 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 500 });
+    expect(computeBreadth(at500)).toBe(computeBreadth(at200));
+  });
+
+  it("rewards totalWatchers (5% weight)", () => {
+    const noWatch = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 0 });
+    const withWatch = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 50 });
+    expect(computeBreadth(withWatch)).toBeGreaterThan(computeBreadth(noWatch));
+  });
+
+  it("caps watchers contribution at 100", () => {
+    const at100 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 100 });
+    const at300 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 300 });
+    expect(computeBreadth(at300)).toBe(computeBreadth(at100));
   });
 
   it("handles missing docsOnlyPrRatio gracefully", () => {
@@ -774,6 +799,8 @@ describe("solo developer composite scoring", () => {
       topRepoShare: 0.1,
       docsOnlyPrRatio: 0.5,
       totalStars: 500,
+      totalForks: 200,
+      totalWatchers: 100,
       reviewsSubmittedCount: 0,
     });
     const result = computeImpactV4(stats);

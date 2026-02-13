@@ -13,7 +13,7 @@ AI-assisted development makes traditional volume metrics (commits, LOC, PR count
 | **Building** | Shipping meaningful changes | `prsMergedWeight` (70%), `issuesClosedCount` (20%), `commitsTotal` (10%) | Log-normalized with caps |
 | **Guarding** | Reviewing & quality gatekeeping | `reviewsSubmittedCount` (60%), review-to-PR ratio (25%), inverse `microCommitRatio` (15%) | Reviews log-normalized; ratio capped at 5:1 |
 | **Consistency** | Reliable, sustained contributions | `activeDays/365` (50%), heatmap evenness (35%), inverse burst activity (15%) | Linear for streak; CV-based for evenness |
-| **Breadth** | Cross-project influence | `reposContributed` (40%), inverse `topRepoShare` (30%), `totalStars` (20%), `docsOnlyPrRatio` (10%) | Linear with caps; stars log-normalized (cap 500) |
+| **Breadth** | Cross-project influence | `reposContributed` (35%), inverse `topRepoShare` (25%), `totalStars` (15%), `totalForks` (10%), `totalWatchers` (5%), `docsOnlyPrRatio` (10%) | Linear with caps; community metrics log-normalized (stars cap 500, forks cap 200, watchers cap 100) |
 
 ### Guards
 
