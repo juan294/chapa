@@ -14,7 +14,7 @@ export async function storeVerificationRecord(
   try {
     await Promise.all([
       cacheSet(`verify:${hash}`, record, VERIFY_TTL),
-      cacheSet(`verify-handle:${record.handle}`, hash, VERIFY_TTL),
+      cacheSet(`verify-handle:${record.handle.toLowerCase()}`, hash, VERIFY_TTL),
     ]);
   } catch {
     // Fail open — verification is non-critical

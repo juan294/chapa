@@ -76,6 +76,38 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(403);
   });
 
+  it("allows case-insensitive handle comparison", async () => {
+    vi.mocked(readSessionCookie).mockReturnValue({
+      login: "TestUser",
+      token: "tok",
+      name: "Test User",
+      avatar_url: "https://example.com/avatar.png",
+    });
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockResolvedValue({
+      handle: "testuser",
+      commitsTotal: 10,
+      activeDays: 5,
+      prsMergedCount: 1,
+      prsMergedWeight: 2,
+      reviewsSubmittedCount: 3,
+      issuesClosedCount: 1,
+      linesAdded: 100,
+      linesDeleted: 50,
+      reposContributed: 1,
+      topRepoShare: 1,
+      maxCommitsIn10Min: 1,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
+      heatmapData: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(200);
+  });
+
   it("returns 400 when handle is missing", async () => {
     vi.mocked(readSessionCookie).mockReturnValue({
       login: "testuser",
@@ -130,7 +162,7 @@ describe("POST /api/refresh", () => {
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(200);
 
-    // Should have deleted cache first (must match client.ts cache key: stats:v2:<handle>)
+    // Should have deleted cache first (must match client.ts cache key: stats:v2:<handle> lowercase)
     expect(cacheDel).toHaveBeenCalledWith("stats:v2:testuser");
 
     // Should have fetched fresh stats with token
