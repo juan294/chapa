@@ -222,16 +222,16 @@ Should print your EMU GitHub username. If it returns an error, see [Troubleshoot
 Once you've logged in ([Step 3](#3-authentication)) and set up your EMU token ([Step 4](#4-emu-token-setup)), run:
 
 ```bash
-npx chapa-cli merge --emu-handle juan294-corp
+npx chapa-cli merge --emu-handle Juan-GonzalezPonce_avoltagh
 ```
 
-Replace `juan294-corp` with your **EMU** GitHub handle. Your personal handle and auth token are loaded from `~/.chapa/credentials.json` (saved during login).
+Replace `Juan-GonzalezPonce_avoltagh` with your **EMU** GitHub handle. Your personal handle and auth token are loaded from `~/.chapa/credentials.json` (saved during login).
 
 ### Passing the EMU token as a flag (no env var)
 
 ```bash
 npx chapa-cli merge \
-  --emu-handle juan294-corp \
+  --emu-handle Juan-GonzalezPonce_avoltagh \
   --emu-token ghp_your_emu_token
 ```
 
@@ -241,7 +241,7 @@ If your Chapa handle differs from what was saved during login:
 
 ```bash
 npx chapa-cli merge \
-  --emu-handle juan294-corp \
+  --emu-handle Juan-GonzalezPonce_avoltagh \
   --handle my-other-handle
 ```
 
@@ -249,14 +249,14 @@ npx chapa-cli merge \
 
 ```bash
 npx chapa-cli merge \
-  --emu-handle juan294-corp \
+  --emu-handle Juan-GonzalezPonce_avoltagh \
   --server http://localhost:3001
 ```
 
 ### Expected output
 
 ```
-Fetching stats for EMU account: juan294-corp...
+Fetching stats for EMU account: Juan-GonzalezPonce_avoltagh...
 Found: 142 commits, 23 PRs merged, 45 reviews
 Uploading supplemental stats to https://chapa.thecreativetoken.com...
 Success! Supplemental stats uploaded. Your badge will reflect combined data on next refresh.
@@ -347,7 +347,7 @@ npx chapa-cli login --insecure
 This disables TLS certificate verification for the login session only. The CLI will warn you and automatically re-enable verification after login completes. The flag also works with `merge`:
 
 ```bash
-npx chapa-cli merge --emu-handle juan294-corp --insecure
+npx chapa-cli merge --emu-handle Juan-GonzalezPonce_avoltagh --insecure
 ```
 
 > **Note:** The CLI auto-detects TLS errors. If you see a TLS error without `--insecure`, the CLI will suggest it automatically.
