@@ -46,6 +46,46 @@ const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
 // OG Image handler
 // ---------------------------------------------------------------------------
 
+/**
+ * Safely load all data needed for OG image rendering.
+ * Returns the resolved data or a string error message for the fallback.
+ */
+type OgDataSuccess = {
+  ok: true;
+  stats: NonNullable<Awaited<ReturnType<typeof getStats>>>;
+  impact: ReturnType<typeof computeImpactV4>;
+  fonts: [ArrayBuffer, ArrayBuffer];
+};
+type OgDataError = {
+  ok: false;
+  error: string;
+  fonts: [ArrayBuffer, ArrayBuffer] | null;
+};
+
+async function loadOgData(handle: string): Promise<OgDataSuccess | OgDataError> {
+  let fonts: [ArrayBuffer, ArrayBuffer];
+  try {
+    fonts = await loadOgFonts();
+  } catch (e) {
+    console.error("[og-image] font load failed:", e);
+    return { ok: false, error: "Font load failed", fonts: null };
+  }
+
+  if (!isValidHandle(handle)) {
+    return { ok: false, error: "Invalid GitHub handle", fonts };
+  }
+
+  try {
+    const stats = await getStats(handle);
+    if (!stats) return { ok: false, error: "Could not load data", fonts };
+    const impact = computeImpactV4(stats);
+    return { ok: true, stats, impact, fonts };
+  } catch (e) {
+    console.error("[og-image] data fetch failed:", e);
+    return { ok: false, error: "Could not generate image", fonts };
+  }
+}
+
 export default async function OgImage({
   params,
 }: {
@@ -53,18 +93,15 @@ export default async function OgImage({
 }) {
   const { handle } = await params;
 
-  const [fontHeading, fontBody] = await loadOgFonts();
+  const data = await loadOgData(handle);
 
-  if (!isValidHandle(handle)) {
-    return renderFallback(handle, "Invalid GitHub handle", fontHeading, fontBody);
+  if (!data.ok) {
+    if (!data.fonts) return renderMinimalFallback(handle);
+    return renderFallback(handle, data.error, data.fonts[0], data.fonts[1]);
   }
 
-  const stats = await getStats(handle);
-  if (!stats) {
-    return renderFallback(handle, "Could not load data", fontHeading, fontBody);
-  }
-
-  const impact = computeImpactV4(stats);
+  const [fontHeading, fontBody] = data.fonts;
+  const { impact, stats } = data;
 
   const tierColor = TIER_COLORS[impact.tier];
   const archetypeColor = ARCHETYPE_COLORS[impact.archetype];
@@ -408,5 +445,32 @@ function renderFallback(
         { name: "Plus Jakarta Sans", data: fontBody, style: "normal", weight: 600 },
       ],
     },
+  );
+}
+
+/**
+ * Ultra-minimal fallback when even fonts fail to load — no custom fonts needed.
+ */
+function renderMinimalFallback(handle: string) {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+          backgroundColor: T.bg,
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "16px",
+        }}
+      >
+        <span style={{ fontSize: "36px", color: T.accent }}>CHAPA</span>
+        <span style={{ fontSize: "20px", color: T.textSecondary }}>
+          @{handle}
+        </span>
+      </div>
+    ),
+    { ...size },
   );
 }
