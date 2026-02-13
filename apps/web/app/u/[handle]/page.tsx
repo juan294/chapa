@@ -177,7 +177,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 </span>
               )}
             </div>
-            <p className="text-sm text-text-secondary leading-relaxed max-w-lg">
+            <p className="text-sm text-text-secondary leading-relaxed">
               {ARCHETYPE_DESCRIPTIONS[impact.archetype]}
             </p>
           </div>
