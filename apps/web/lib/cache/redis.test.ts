@@ -10,6 +10,8 @@ const mockSet = vi.fn();
 const mockDel = vi.fn();
 const mockIncr = vi.fn();
 const mockExpire = vi.fn();
+const mockPfadd = vi.fn();
+const mockPfcount = vi.fn();
 
 vi.mock("@upstash/redis", () => ({
   Redis: class MockRedis {
@@ -18,11 +20,21 @@ vi.mock("@upstash/redis", () => ({
     del = mockDel;
     incr = mockIncr;
     expire = mockExpire;
+    pfadd = mockPfadd;
+    pfcount = mockPfcount;
   },
 }));
 
 // Import after mock is set up
-import { cacheGet, cacheSet, cacheDel, rateLimit, _resetClient } from "./redis";
+import {
+  cacheGet,
+  cacheSet,
+  cacheDel,
+  rateLimit,
+  trackBadgeGenerated,
+  getBadgeStats,
+  _resetClient,
+} from "./redis";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -247,5 +259,93 @@ describe("rateLimit", () => {
 
     expect(result.allowed).toBe(true);
     expect(mockIncr).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trackBadgeGenerated
+// ---------------------------------------------------------------------------
+
+describe("trackBadgeGenerated", () => {
+  it("increments total counter and adds handle to HyperLogLog", async () => {
+    mockIncr.mockResolvedValueOnce(5);
+    mockPfadd.mockResolvedValueOnce(1);
+
+    await trackBadgeGenerated("juan294");
+
+    expect(mockIncr).toHaveBeenCalledWith("stats:badges_generated");
+    expect(mockPfadd).toHaveBeenCalledWith("stats:unique_badges", "juan294");
+  });
+
+  it("lowercases the handle for HyperLogLog dedup", async () => {
+    mockIncr.mockResolvedValueOnce(1);
+    mockPfadd.mockResolvedValueOnce(1);
+
+    await trackBadgeGenerated("Juan294");
+
+    expect(mockPfadd).toHaveBeenCalledWith("stats:unique_badges", "juan294");
+  });
+
+  it("does not throw when Redis fails (fire-and-forget safe)", async () => {
+    mockIncr.mockRejectedValueOnce(new Error("Connection refused"));
+
+    await expect(trackBadgeGenerated("juan294")).resolves.toBeUndefined();
+  });
+
+  it("is a no-op when Redis is unavailable", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    await trackBadgeGenerated("juan294");
+
+    expect(mockIncr).not.toHaveBeenCalled();
+    expect(mockPfadd).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getBadgeStats
+// ---------------------------------------------------------------------------
+
+describe("getBadgeStats", () => {
+  it("returns total and unique counts", async () => {
+    mockGet.mockResolvedValueOnce(42);
+    mockPfcount.mockResolvedValueOnce(15);
+
+    const result = await getBadgeStats();
+
+    expect(result).toEqual({ total: 42, unique: 15 });
+    expect(mockGet).toHaveBeenCalledWith("stats:badges_generated");
+    expect(mockPfcount).toHaveBeenCalledWith("stats:unique_badges");
+  });
+
+  it("returns zeros when keys don't exist yet", async () => {
+    mockGet.mockResolvedValueOnce(null);
+    mockPfcount.mockResolvedValueOnce(0);
+
+    const result = await getBadgeStats();
+
+    expect(result).toEqual({ total: 0, unique: 0 });
+  });
+
+  it("returns zeros when Redis is unavailable", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await getBadgeStats();
+
+    expect(result).toEqual({ total: 0, unique: 0 });
+    expect(mockGet).not.toHaveBeenCalled();
+    expect(mockPfcount).not.toHaveBeenCalled();
+  });
+
+  it("returns zeros when Redis throws (graceful degradation)", async () => {
+    mockGet.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const result = await getBadgeStats();
+
+    expect(result).toEqual({ total: 0, unique: 0 });
   });
 });

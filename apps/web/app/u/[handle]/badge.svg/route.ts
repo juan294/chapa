@@ -6,7 +6,7 @@ import { fetchAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
@@ -111,6 +111,9 @@ export async function GET(
     };
     void storeVerificationRecord(verification.hash, record);
   }
+
+  // Track badge generation (fire-and-forget — don't block render)
+  void trackBadgeGenerated(handle);
 
   // Render full badge
   const svg = renderBadgeSvg(stats, impact, {
