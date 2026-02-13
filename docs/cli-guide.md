@@ -141,21 +141,17 @@ Credentials saved to ~/.chapa/credentials.json
 
 Your credentials are stored locally at `~/.chapa/credentials.json` with restricted file permissions (readable only by you). The token expires after 90 days — just run `chapa login` again to refresh.
 
-### Log out
+### Log out (when needed)
+
+To clear your credentials later (e.g., switching accounts or revoking access):
 
 ```bash
 npx chapa-cli logout
 ```
 
-This removes the stored credentials from `~/.chapa/credentials.json`.
+This removes `~/.chapa/credentials.json`. You'll need to run `chapa login` again before using `merge`.
 
-### Check if you're logged in
-
-If you run `chapa merge` without being logged in, the CLI will tell you:
-
-```
-Error: Not authenticated. Run 'chapa login' first, or pass --token.
-```
+> **Don't log out now** — you need your credentials for the merge step below.
 
 ---
 
@@ -229,9 +225,7 @@ Once you've logged in ([Step 3](#3-authentication)) and set up your EMU token ([
 npx chapa-cli merge --emu-handle juan294-corp
 ```
 
-Replace `juan294-corp` with your **EMU** GitHub handle.
-
-That's it! Your personal handle and auth token are automatically loaded from the login step.
+Replace `juan294-corp` with your **EMU** GitHub handle. Your personal handle and auth token are loaded from `~/.chapa/credentials.json` (saved during login).
 
 ### Passing the EMU token as a flag (no env var)
 
