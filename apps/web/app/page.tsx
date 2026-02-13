@@ -262,7 +262,7 @@ export default async function Home({
                 <div className="p-4 font-heading text-sm leading-relaxed space-y-1">
                   <p>
                     <span className="text-terminal-dim select-none">$ </span>
-                    <span className="text-text-primary/80">npx @chapa/cli</span>
+                    <span className="text-text-primary/80">npx chapa-cli</span>
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
@@ -295,7 +295,7 @@ export default async function Home({
                   <span className="text-text-secondary text-sm">
                     Run{" "}
                     <code className="font-heading text-text-primary/80 bg-amber/10 px-1.5 py-0.5 rounded text-xs">
-                      npx @chapa/cli
+                      npx chapa-cli
                     </code>{" "}
                     and follow the prompts. Takes under a minute.
                   </span>
