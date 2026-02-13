@@ -24,7 +24,7 @@ npx chapa-cli merge \
 | `--version`, `-v` | Show version number | |
 | `--help`, `-h` | Show help message | |
 
-*Tokens are resolved in order: flag > environment variable > `gh auth token`.
+*Tokens are resolved in order: flag > environment variable (`GITHUB_TOKEN` / `GITHUB_EMU_TOKEN`).
 
 ## Token setup
 

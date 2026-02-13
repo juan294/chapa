@@ -54,13 +54,13 @@ async function main(): Promise<void> {
   // Resolve tokens
   const emuToken = resolveToken(args.emuToken, "GITHUB_EMU_TOKEN");
   if (!emuToken) {
-    console.error("Error: EMU token required. Use --emu-token, set GITHUB_EMU_TOKEN, or ensure `gh auth token` works.");
+    console.error("Error: EMU token required. Use --emu-token or set GITHUB_EMU_TOKEN.");
     process.exit(1);
   }
 
   const personalToken = resolveToken(args.token, "GITHUB_TOKEN");
   if (!personalToken) {
-    console.error("Error: Personal token required. Use --token, set GITHUB_TOKEN, or ensure `gh auth token` works.");
+    console.error("Error: Personal token required. Use --token or set GITHUB_TOKEN.");
     process.exit(1);
   }
 

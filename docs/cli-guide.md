@@ -77,7 +77,7 @@ npx chapa-cli --help
 You should see:
 
 ```
-chapa-cli v0.1.2
+chapa-cli v0.1.4
 
 Merge GitHub EMU (Enterprise Managed User) contributions into your Chapa badge.
 
