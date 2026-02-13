@@ -106,12 +106,14 @@ export async function GET(request: NextRequest) {
     sessionSecret,
   );
 
-  // Use post-login redirect if available and safe, otherwise default to profile page
+  // Use post-login redirect if available and safe, otherwise show the
+  // generating progress page which warms the cache before redirecting
+  // to the share page.
   const postLoginRedirect = readRedirectCookie(cookieHeader);
   const redirectUrl =
     postLoginRedirect && isSafeRedirect(postLoginRedirect)
       ? postLoginRedirect
-      : `/u/${user.login}`;
+      : `/generating/${user.login}`;
 
   const response = NextResponse.redirect(
     new URL(redirectUrl, request.url),
