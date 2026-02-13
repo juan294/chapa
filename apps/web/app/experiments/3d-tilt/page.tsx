@@ -107,6 +107,9 @@ function BadgeCard({ glare, depth, tilt }: BadgeCardProps) {
           <span className="mt-2 rounded-full border border-amber/20 bg-amber/10 px-3 py-1 text-sm text-amber">
             &#9733; Elite
           </span>
+          <span className="mt-1 rounded-full bg-amber/5 border border-amber/10 px-2.5 py-0.5 text-[10px] font-medium text-text-secondary">
+            Builder
+          </span>
         </div>
       </div>
 
@@ -115,7 +118,7 @@ function BadgeCard({ glare, depth, tilt }: BadgeCardProps) {
         className="relative z-[1] mt-6 text-center text-sm text-text-secondary"
         style={{ transform: depthMid }}
       >
-        523 commits &middot; 47 PRs &middot; 89 reviews
+        1.2k stars &middot; 89 forks &middot; 34 watchers
       </div>
     </>
   );

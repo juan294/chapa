@@ -84,16 +84,23 @@ function MockBadgeCard({ tier, score }: { tier: string; score: number }) {
         })}
       </div>
 
+      {/* Archetype pill */}
+      <div className="flex justify-center mb-3">
+        <span className="rounded-full border border-amber/10 bg-amber/5 px-3 py-0.5 text-[10px] text-text-secondary">
+          Builder
+        </span>
+      </div>
+
       {/* Stats row */}
       <div className="flex justify-between text-xs text-text-secondary">
         <span>
-          <span className="text-text-primary font-semibold">247</span> commits
+          <span className="text-text-primary font-semibold">1.2k</span> stars
         </span>
         <span>
-          <span className="text-text-primary font-semibold">18</span> PRs
+          <span className="text-text-primary font-semibold">89</span> forks
         </span>
         <span>
-          <span className="text-text-primary font-semibold">34</span> reviews
+          <span className="text-text-primary font-semibold">34</span> watchers
         </span>
       </div>
     </div>

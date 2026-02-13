@@ -86,16 +86,19 @@ function MockBadgeCard() {
           <span className="rounded-full bg-amber/10 border border-amber/20 px-3 py-0.5 sm:px-4 sm:py-1 text-xs sm:text-sm font-semibold text-amber tracking-wide uppercase">
             Elite
           </span>
+          <span className="rounded-full bg-amber/5 border border-amber/10 px-3 py-0.5 text-[10px] font-medium text-text-secondary tracking-wide">
+            Builder
+          </span>
         </div>
       </div>
 
       {/* Footer stats */}
       <div className="flex items-center gap-2 sm:gap-4 text-text-secondary text-[10px] sm:text-xs font-medium">
-        <span>523 commits</span>
+        <span>1.2k stars</span>
         <span className="text-amber/30" aria-hidden="true">|</span>
-        <span>47 PRs</span>
+        <span>89 forks</span>
         <span className="text-amber/30" aria-hidden="true">|</span>
-        <span>89 reviews</span>
+        <span>34 watchers</span>
       </div>
     </div>
   );

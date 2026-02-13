@@ -192,6 +192,17 @@ function useRegisterChapaBadge() {
               color: #7C6AEF;
               font-size: ${Math.round(s.scoreSize * 0.2)}px;
               font-weight: 600;
+              margin-bottom: 4px;
+            }
+            .archetype-pill {
+              display: inline-flex;
+              padding: 2px 10px;
+              border-radius: 999px;
+              background: rgba(124,106,239,0.05);
+              border: 1px solid rgba(124,106,239,0.1);
+              color: #9AA4B2;
+              font-size: ${Math.round(s.scoreSize * 0.15)}px;
+              font-weight: 500;
               margin-bottom: 8px;
             }
             .stats {
@@ -221,10 +232,11 @@ function useRegisterChapaBadge() {
               <div class="score-section">
                 <div class="label">Impact Score</div>
                 <div class="tier-pill">\u2605 Elite</div>
+                <div class="archetype-pill">Builder</div>
                 <div class="score">87</div>
               </div>
             </div>
-            <div class="stats">523 commits \u00b7 47 PRs \u00b7 89 reviews</div>
+            <div class="stats">1.2k stars \u00b7 89 forks \u00b7 34 watchers</div>
           </div>
         `;
       }

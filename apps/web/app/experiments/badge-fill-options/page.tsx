@@ -152,9 +152,9 @@ function OptionA() {
 
         {/* Row 1: core stats */}
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <StatCard value="847" label="commits" />
-          <StatCard value="42" label="PRs merged" />
-          <StatCard value="28" label="reviews" />
+          <StatCard value="1.2k" label="stars" />
+          <StatCard value="89" label="forks" />
+          <StatCard value="34" label="watchers" />
         </div>
 
         {/* Row 2: additional stats */}
@@ -185,9 +185,9 @@ function OptionB() {
 
         {/* Stats row */}
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <StatCard value="847" label="commits" />
-          <StatCard value="42" label="PRs merged" />
-          <StatCard value="28" label="reviews" />
+          <StatCard value="1.2k" label="stars" />
+          <StatCard value="89" label="forks" />
+          <StatCard value="34" label="watchers" />
         </div>
 
         {/* Lines of code */}
@@ -231,11 +231,10 @@ function OptionB() {
 
 function OptionC() {
   const breakdown = [
-    { label: "Commits", value: 0.71, color: "bg-amber" },
-    { label: "PR Weight", value: 0.55, color: "bg-amber-light" },
-    { label: "Reviews", value: 0.52, color: "bg-complement" },
-    { label: "Issues", value: 0.17, color: "bg-terminal-yellow" },
-    { label: "Streak", value: 0.50, color: "bg-terminal-green" },
+    { label: "Building", value: 0.82, color: "bg-amber" },
+    { label: "Guarding", value: 0.68, color: "bg-amber-light" },
+    { label: "Consistency", value: 0.74, color: "bg-complement" },
+    { label: "Breadth", value: 0.61, color: "bg-terminal-green" },
   ];
 
   return (
@@ -245,9 +244,9 @@ function OptionC() {
 
         {/* Stats row */}
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <StatCard value="847" label="commits" />
-          <StatCard value="42" label="PRs merged" />
-          <StatCard value="28" label="reviews" />
+          <StatCard value="1.2k" label="stars" />
+          <StatCard value="89" label="forks" />
+          <StatCard value="34" label="watchers" />
         </div>
 
         {/* Impact breakdown */}

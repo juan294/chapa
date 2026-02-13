@@ -143,16 +143,19 @@ function HoloCard({ variant, intensity, speed, autoAnimate }: HoloCardProps) {
             <span className="mt-2 inline-block rounded-full bg-[#7C6AEF]/15 px-3 py-0.5 text-xs font-semibold tracking-wide text-[#7C6AEF]">
               Elite
             </span>
+            <span className="mt-1 inline-block rounded-full bg-[#7C6AEF]/5 px-3 py-0.5 text-[10px] font-medium tracking-wide text-[#9AA4B2]">
+              Builder
+            </span>
           </div>
         </div>
 
         {/* Stats row */}
         <div className="flex items-center gap-4 text-xs text-[#9AA4B2] sm:text-sm">
-          <span>523 commits</span>
+          <span>1.2k stars</span>
           <span className="text-[rgba(124,106,239,0.25)]">|</span>
-          <span>47 PRs</span>
+          <span>89 forks</span>
           <span className="text-[rgba(124,106,239,0.25)]">|</span>
-          <span>89 reviews</span>
+          <span>34 watchers</span>
         </div>
       </div>
     </div>

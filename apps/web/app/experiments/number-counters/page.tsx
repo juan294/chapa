@@ -306,9 +306,9 @@ interface StatDef {
 }
 
 const STATS: StatDef[] = [
-  { label: "Commits", value: 523, suffix: " commits", delay: 0 },
-  { label: "PRs Merged", value: 47, suffix: " PRs merged", delay: 200 },
-  { label: "Reviews", value: 89, suffix: " reviews", delay: 400 },
+  { label: "Stars", value: 1200, suffix: " stars", delay: 0 },
+  { label: "Forks", value: 89, suffix: " forks", delay: 200 },
+  { label: "Watchers", value: 34, suffix: " watchers", delay: 400 },
 ];
 
 function StatsSection({

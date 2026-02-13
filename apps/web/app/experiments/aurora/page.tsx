@@ -178,10 +178,13 @@ function MockBadgeCard() {
         <MockHeatmapGrid />
       </div>
 
-      {/* Tier badge */}
+      {/* Tier + archetype badges */}
       <div className="flex items-center gap-3 mb-4">
         <span className="inline-flex items-center rounded-full bg-[#7C6AEF]/10 border border-[#7C6AEF]/20 px-3 py-1 text-xs font-semibold text-[#7C6AEF] uppercase tracking-wider">
-          Standout
+          Elite
+        </span>
+        <span className="inline-flex items-center rounded-full bg-[#7C6AEF]/5 border border-[#7C6AEF]/10 px-3 py-1 text-xs font-medium text-[#9AA4B2] uppercase tracking-wider">
+          Builder
         </span>
         <span className="text-xs text-[#9AA4B2]">
           Confidence: <span className="text-[#E6EDF3]">82%</span>
@@ -189,12 +192,11 @@ function MockBadgeCard() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Commits", value: "247" },
-          { label: "PRs Merged", value: "18" },
-          { label: "Reviews", value: "32" },
-          { label: "Issues", value: "14" },
+          { label: "Stars", value: "1.2k" },
+          { label: "Forks", value: "89" },
+          { label: "Watchers", value: "34" },
         ].map((stat) => (
           <div key={stat.label} className="text-center">
             <p className="font-heading text-lg font-bold text-[#E6EDF3]">
@@ -202,6 +204,25 @@ function MockBadgeCard() {
             </p>
             <p className="text-[10px] text-[#9AA4B2] uppercase tracking-wider">
               {stat.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Dimensions */}
+      <div className="grid grid-cols-4 gap-4 mt-4">
+        {[
+          { label: "Building", value: 82 },
+          { label: "Guarding", value: 68 },
+          { label: "Consistency", value: 74 },
+          { label: "Breadth", value: 61 },
+        ].map((dim) => (
+          <div key={dim.label} className="text-center">
+            <p className="font-heading text-lg font-bold text-[#E6EDF3]">
+              {dim.value}
+            </p>
+            <p className="text-[10px] text-[#9AA4B2] uppercase tracking-wider">
+              {dim.label}
             </p>
           </div>
         ))}

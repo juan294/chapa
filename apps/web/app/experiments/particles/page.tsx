@@ -270,9 +270,14 @@ function MockBadgeCard() {
             <p className="text-[#9AA4B2] text-xs">Dev Impact Badge</p>
           </div>
         </div>
-        <span className="rounded-full border border-[#7C6AEF]/30 bg-[#7C6AEF]/10 px-3 py-0.5 text-xs font-semibold text-[#7C6AEF]">
-          Elite
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-[#7C6AEF]/30 bg-[#7C6AEF]/10 px-3 py-0.5 text-xs font-semibold text-[#7C6AEF]">
+            Elite
+          </span>
+          <span className="rounded-full bg-[#7C6AEF]/5 border border-[#7C6AEF]/10 px-2 py-0.5 text-[10px] font-medium text-[#9AA4B2]">
+            Builder
+          </span>
+        </div>
       </div>
 
       {/* Score */}
@@ -308,13 +313,13 @@ function MockBadgeCard() {
       {/* Stats */}
       <div className="flex justify-between text-xs text-[#9AA4B2]">
         <span>
-          <span className="text-[#E6EDF3] font-semibold">247</span> commits
+          <span className="text-[#E6EDF3] font-semibold">1.2k</span> stars
         </span>
         <span>
-          <span className="text-[#E6EDF3] font-semibold">18</span> PRs
+          <span className="text-[#E6EDF3] font-semibold">89</span> forks
         </span>
         <span>
-          <span className="text-[#E6EDF3] font-semibold">34</span> reviews
+          <span className="text-[#E6EDF3] font-semibold">34</span> watchers
         </span>
       </div>
     </div>

@@ -215,7 +215,7 @@ function BadgeCard({ preset }: { preset: MaterialPreset }) {
           anchorX="center"
           anchorY="middle"
         >
-          487 commits · 38 PRs · 124 reviews
+          1.2k stars · 89 forks · 34 watchers
         </Text>
 
         {/* Heatmap — single instanced mesh */}

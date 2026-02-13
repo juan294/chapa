@@ -172,9 +172,16 @@ function BadgeCard() {
         </div>
       </div>
 
+      {/* Archetype pill */}
+      <div className="mt-4 flex items-center justify-center gap-2">
+        <span className="rounded-full border border-amber/10 bg-amber/5 px-3 py-0.5 text-xs text-text-secondary">
+          Builder
+        </span>
+      </div>
+
       {/* Stats row */}
-      <div className="mt-6 text-center text-sm text-text-secondary">
-        523 commits &middot; 47 PRs &middot; 89 reviews
+      <div className="mt-4 text-center text-sm text-text-secondary">
+        1.2k stars &middot; 89 forks &middot; 34 watchers
       </div>
     </>
   );
@@ -222,7 +229,7 @@ function CompactBadgeCard() {
             &#9733; Elite
           </span>
         </div>
-        <span className="text-xs text-text-secondary">523c &middot; 47pr</span>
+        <span className="text-xs text-text-secondary">1.2k&#9733; &middot; 89fk</span>
       </div>
     </>
   );
@@ -611,21 +618,21 @@ export default function GlassmorphismExperimentPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
-              label="Code Output"
+              label="Building"
               value={34}
               maxValue={40}
-              detail="523 commits across 12 repos. Consistent daily contribution pattern with weekend peaks."
+              detail="Core code contributions across 12 repos. Consistent daily contribution pattern with weekend peaks."
               style={presetToStyle("medium", showBorder)}
             />
             <StatCard
-              label="Collaboration"
+              label="Guarding"
               value={28}
               maxValue={30}
-              detail="47 PRs merged, 89 code reviews. Active reviewer with thoughtful feedback."
+              detail="Code reviews, issue triage, and quality enforcement. Active reviewer with thoughtful feedback."
               style={presetToStyle("medium", showBorder)}
             />
             <StatCard
-              label="Complexity"
+              label="Breadth"
               value={15}
               maxValue={20}
               detail="Contributions to 5 repos with 50K+ stars. Non-trivial changes across diverse codebases."
