@@ -81,6 +81,14 @@ export function createNavigationCommands(): CommandDef[] {
     makeLine("info", "  /about             About Chapa"),
     makeLine("info", "  /terms             Terms of Service"),
     makeLine("info", "  /privacy           Privacy Policy"),
+    makeLine("dim", ""),
+    makeLine("system", "Archetypes:"),
+    makeLine("info", "  /builder           The Builder archetype"),
+    makeLine("info", "  /guardian           The Guardian archetype"),
+    makeLine("info", "  /marathoner        The Marathoner archetype"),
+    makeLine("info", "  /polymath          The Polymath archetype"),
+    makeLine("info", "  /balanced          The Balanced archetype"),
+    makeLine("info", "  /emerging          The Emerging archetype"),
   ];
 
   const commands: CommandDef[] = [
@@ -157,6 +165,54 @@ export function createNavigationCommands(): CommandDef[] {
       execute: () => ({
         lines: [makeLine("system", "Opening privacy policy...")],
         action: { type: "navigate", path: "/privacy" },
+      }),
+    },
+    {
+      name: "/builder",
+      description: "The Builder archetype",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Builder archetype...")],
+        action: { type: "navigate", path: "/archetypes/builder" },
+      }),
+    },
+    {
+      name: "/guardian",
+      description: "The Guardian archetype",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Guardian archetype...")],
+        action: { type: "navigate", path: "/archetypes/guardian" },
+      }),
+    },
+    {
+      name: "/marathoner",
+      description: "The Marathoner archetype",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Marathoner archetype...")],
+        action: { type: "navigate", path: "/archetypes/marathoner" },
+      }),
+    },
+    {
+      name: "/polymath",
+      description: "The Polymath archetype",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Polymath archetype...")],
+        action: { type: "navigate", path: "/archetypes/polymath" },
+      }),
+    },
+    {
+      name: "/balanced",
+      description: "The Balanced archetype",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Balanced archetype...")],
+        action: { type: "navigate", path: "/archetypes/balanced" },
+      }),
+    },
+    {
+      name: "/emerging",
+      description: "The Emerging archetype",
+      execute: () => ({
+        lines: [makeLine("system", "Opening Emerging archetype...")],
+        action: { type: "navigate", path: "/archetypes/emerging" },
       }),
     },
   ];

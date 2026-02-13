@@ -131,10 +131,10 @@ describe("createNavigationCommands (studio disabled)", () => {
     expect(names).not.toContain("/studio");
   });
 
-  it("returns 7 commands when studio is disabled", () => {
+  it("returns 13 commands when studio is disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
-    expect(commands).toHaveLength(7);
+    expect(commands).toHaveLength(13);
   });
 
   it("/help does not mention /studio when disabled", () => {
@@ -152,11 +152,11 @@ describe("createNavigationCommands (studio disabled)", () => {
     expect(result.lines[0].type).toBe("error");
   });
 
-  it("getMatchingCommands returns 7 for / when disabled", () => {
+  it("getMatchingCommands returns 13 for / when disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(7);
+    expect(matches).toHaveLength(13);
   });
 
   it("/s does not match /studio when disabled", () => {
@@ -180,10 +180,10 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(names).toContain("/studio");
   });
 
-  it("returns 8 commands when studio is enabled", () => {
+  it("returns 14 commands when studio is enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
-    expect(commands).toHaveLength(8);
+    expect(commands).toHaveLength(14);
   });
 
   it("/studio navigates to /studio when enabled", () => {
@@ -213,6 +213,12 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(names).toContain("/about");
     expect(names).toContain("/terms");
     expect(names).toContain("/privacy");
+    expect(names).toContain("/builder");
+    expect(names).toContain("/guardian");
+    expect(names).toContain("/marathoner");
+    expect(names).toContain("/polymath");
+    expect(names).toContain("/balanced");
+    expect(names).toContain("/emerging");
   });
 
   it("/help output does NOT mention studio-only commands", () => {
@@ -267,11 +273,11 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
   });
 
-  it("getMatchingCommands returns all 8 for /", () => {
+  it("getMatchingCommands returns all 14 for /", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(8);
+    expect(matches).toHaveLength(14);
   });
 
   it("getMatchingCommands filters correctly", () => {

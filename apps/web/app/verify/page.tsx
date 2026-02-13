@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { VerifyForm } from "./VerifyForm";
+
+export const metadata: Metadata = {
+  title: "Verify a Badge",
+  description:
+    "Verify the authenticity of any Chapa badge using its verification hash.",
+  robots: { index: false, follow: true },
+};
 
 export default function VerifyInputPage() {
   return (

@@ -8,7 +8,7 @@ Chapa is a developer tool that generates a live, embeddable SVG badge showcasing
 
 ## Key Concepts
 
-- **Impact Score v3**: A composite score (0-100) based on commits, PRs merged, code reviews, and issues from the last 12 months of GitHub activity.
+- **Impact v4 Profile**: A composite score (0-100) based on four dimensions (Building, Guarding, Consistency, Breadth) computed from the last 12 months of GitHub activity.
 - **Confidence Rating**: A quality signal (50-100) that surfaces data patterns without making accusations. Higher confidence means more consistent, diverse activity.
 - **Tier System**: Four tiers based on adjusted score — Newcomer, Rising, Established, and Elite.
 
@@ -21,7 +21,7 @@ Chapa is a developer tool that generates a live, embeddable SVG badge showcasing
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
-2. Chapa computes your Impact Score v3 from public GitHub data.
+2. Chapa computes your Impact v4 Profile from public GitHub data.
 3. Embed the badge in your README, portfolio, or resume:
 
 Markdown:

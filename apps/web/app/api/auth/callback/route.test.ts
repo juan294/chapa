@@ -265,7 +265,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("Location")!);
-    expect(location.pathname).toBe("/u/octocat");
+    expect(location.pathname).toBe("/generating/octocat");
 
     // Verify Set-Cookie headers are present
     const setCookies = res.headers.getSetCookie();
@@ -345,7 +345,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("Location")!);
-    expect(location.pathname).toBe("/u/octocat");
+    expect(location.pathname).toBe("/generating/octocat");
 
     delete process.env.NEXT_PUBLIC_BASE_URL;
   });

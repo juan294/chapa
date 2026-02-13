@@ -12,7 +12,8 @@ const HOME_TEXT = "</> JG";
 /** Rotating messages that cycle after the initial hold period. */
 const MESSAGES = [
   HOME_TEXT,
-  "made with \u2665 in Asturias",
+  "built with \u2665 in the EU",
+  "built by Creative Tokens",
   "probably \ud83c\udfd4\ufe0f rn",
   "probably \ud83d\udeb4 rn",
   "404: sleep not found",

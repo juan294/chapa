@@ -48,12 +48,26 @@ describe("SharePage", () => {
     });
   });
 
-  describe("customize badge CTA", () => {
-    it("has Customize Badge link", () => {
-      expect(SOURCE).toContain("/studio");
+  describe("archetype header", () => {
+    it("renders the archetype name from impact data", () => {
+      expect(SOURCE).toContain("impact.archetype");
     });
 
-    it("only shows CTA for badge owner", () => {
+    it("renders the archetype description", () => {
+      expect(SOURCE).toContain("getArchetypeProfile");
+    });
+  });
+
+  describe("toolbar with share + customize", () => {
+    it("uses BadgeToolbar component", () => {
+      expect(SOURCE).toContain("BadgeToolbar");
+    });
+
+    it("passes studioEnabled to toolbar", () => {
+      expect(SOURCE).toContain("studioEnabled");
+    });
+
+    it("passes isOwner to toolbar", () => {
       expect(SOURCE).toContain("isOwner");
     });
   });
