@@ -29,7 +29,7 @@ export function AuthorizeClient({ sessionId, handle }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-6">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-md rounded-xl border border-stroke bg-card p-8">
         <h1 className="font-heading text-xl font-bold text-text-primary mb-2">
           Authorize Chapa CLI
@@ -74,6 +74,6 @@ export function AuthorizeClient({ sessionId, handle }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
