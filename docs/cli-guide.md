@@ -223,11 +223,13 @@ Should print your EMU GitHub username. If it returns an error, see [Troubleshoot
 
 ## 5. Running the CLI
 
-### Step 1: Log in (one time)
+### Step 1: Log in with your personal GitHub (one time)
 
 ```bash
 npx chapa-cli login
 ```
+
+> **This is the same personal GitHub login from [Step 3](#3-authentication).** If you already logged in there, skip this — your credentials are still saved. This login uses your **personal** GitHub account (not your EMU/work account). The EMU token from Step 4 handles your work contributions separately.
 
 ### Step 2: Merge EMU stats
 
