@@ -28,3 +28,19 @@ export function renderVerificationStrip(hash: string, date: string): string {
   </a>
 </g>`;
 }
+
+/**
+ * Render a demo/sample verification strip — same visual style as the real
+ * strip but with a "NOT A REAL BADGE" message instead of a hash.
+ * No clickable link. Used on archetype showcase pages.
+ */
+export function renderDemoVerificationStrip(): string {
+  const lineX = 1145;
+  const centerX = 1168;
+  const textY = 315;
+
+  return `<g aria-label="Sample badge indicator">
+  <line x1="${lineX}" y1="30" x2="${lineX}" y2="600" stroke="${CORAL}" stroke-width="1" opacity="0.15"/>
+  <text transform="rotate(-90 ${centerX} ${textY})" x="${centerX}" y="${textY}" font-family="'JetBrains Mono', monospace" font-size="11" fill="${CORAL}" opacity="0.50" text-anchor="middle" letter-spacing="2">SAMPLE \u00B7 NOT A REAL BADGE \u00B7 FOR ILLUSTRATION ONLY</text>
+</g>`;
+}

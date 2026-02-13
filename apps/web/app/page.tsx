@@ -25,7 +25,7 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#9D8FFF] hover:text-[#B8ADFF] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link> — your profile shape tells a story.</>),
+    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#F472B6] hover:text-[#F9A8D4] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link> — your profile shape tells a story.</>),
   },
   {
     title: "CONFIDENCE RATING",

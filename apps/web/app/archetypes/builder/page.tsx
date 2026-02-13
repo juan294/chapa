@@ -1,4 +1,6 @@
 import { Navbar } from "@/components/Navbar";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { BUILDER_STATS, BUILDER_IMPACT } from "@/lib/render/archetypeDemoData";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -7,6 +9,11 @@ export const metadata: Metadata = {
   description:
     "Builders are the shipping engine of every team. They turn ideas into merged pull requests, close issues, and move codebases forward.",
 };
+
+const badgeSvg = renderBadgeSvg(BUILDER_STATS, BUILDER_IMPACT, {
+  includeGithubBranding: true,
+  demoMode: true,
+});
 
 export default function BuilderPage() {
   return (
@@ -30,6 +37,12 @@ export default function BuilderPage() {
                 Dominant dimension: <span className="text-amber">Building</span>
               </p>
             </div>
+
+            {/* Badge */}
+            <div
+              className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              dangerouslySetInnerHTML={{ __html: badgeSvg }}
+            />
 
             {/* Essay */}
             <div className="space-y-6 text-text-secondary text-sm leading-relaxed">

@@ -109,7 +109,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 | Archetype | Color |
 |-----------|-------|
 | Builder | `#7C6AEF` (purple) |
-| Guardian | `#9D8FFF` (light purple) |
+| Guardian | `#F472B6` (pink) |
 | Marathoner | `#4ADE80` (green) |
 | Polymath | `#FBBF24` (amber/gold) |
 | Balanced | `#E6EDF3` (light gray) |

@@ -1,4 +1,6 @@
 import { Navbar } from "@/components/Navbar";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { GUARDIAN_STATS, GUARDIAN_IMPACT } from "@/lib/render/archetypeDemoData";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -7,6 +9,11 @@ export const metadata: Metadata = {
   description:
     "Guardians are the quality gatekeepers. They review pull requests, catch bugs before they ship, and raise the bar for everyone around them.",
 };
+
+const badgeSvg = renderBadgeSvg(GUARDIAN_STATS, GUARDIAN_IMPACT, {
+  includeGithubBranding: true,
+  demoMode: true,
+});
 
 export default function GuardianPage() {
   return (
@@ -24,12 +31,18 @@ export default function GuardianPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-amber-light">Guardian</span>
+                The <span className="text-[#F472B6]">Guardian</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-amber-light">Guarding</span>
+                Dominant dimension: <span className="text-[#F472B6]">Guarding</span>
               </p>
             </div>
+
+            {/* Badge */}
+            <div
+              className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              dangerouslySetInnerHTML={{ __html: badgeSvg }}
+            />
 
             {/* Essay */}
             <div className="space-y-6 text-text-secondary text-sm leading-relaxed">

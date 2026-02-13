@@ -1,4 +1,6 @@
 import { Navbar } from "@/components/Navbar";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { POLYMATH_STATS, POLYMATH_IMPACT } from "@/lib/render/archetypeDemoData";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -7,6 +9,11 @@ export const metadata: Metadata = {
   description:
     "Polymaths spread their impact across many projects and domains. They contribute to diverse repositories, write documentation, and influence the broader ecosystem.",
 };
+
+const badgeSvg = renderBadgeSvg(POLYMATH_STATS, POLYMATH_IMPACT, {
+  includeGithubBranding: true,
+  demoMode: true,
+});
 
 export default function PolymathPage() {
   return (
@@ -30,6 +37,12 @@ export default function PolymathPage() {
                 Dominant dimension: <span className="text-terminal-yellow">Breadth</span>
               </p>
             </div>
+
+            {/* Badge */}
+            <div
+              className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              dangerouslySetInnerHTML={{ __html: badgeSvg }}
+            />
 
             {/* Essay */}
             <div className="space-y-6 text-text-secondary text-sm leading-relaxed">

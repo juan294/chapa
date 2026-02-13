@@ -1,4 +1,6 @@
 import { Navbar } from "@/components/Navbar";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { MARATHONER_STATS, MARATHONER_IMPACT } from "@/lib/render/archetypeDemoData";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -7,6 +9,11 @@ export const metadata: Metadata = {
   description:
     "Marathoners show up every day. They value consistency over intensity, sustaining contributions across months rather than shipping in bursts.",
 };
+
+const badgeSvg = renderBadgeSvg(MARATHONER_STATS, MARATHONER_IMPACT, {
+  includeGithubBranding: true,
+  demoMode: true,
+});
 
 export default function MarathonerPage() {
   return (
@@ -30,6 +37,12 @@ export default function MarathonerPage() {
                 Dominant dimension: <span className="text-terminal-green">Consistency</span>
               </p>
             </div>
+
+            {/* Badge */}
+            <div
+              className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              dangerouslySetInnerHTML={{ __html: badgeSvg }}
+            />
 
             {/* Essay */}
             <div className="space-y-6 text-text-secondary text-sm leading-relaxed">

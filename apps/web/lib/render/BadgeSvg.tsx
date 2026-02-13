@@ -5,13 +5,15 @@ import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
 import { renderGithubBranding } from "./GithubBranding";
 import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
-import { renderVerificationStrip } from "./VerificationStrip";
+import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
 
 interface BadgeOptions {
   includeGithubBranding?: boolean;
   avatarDataUri?: string;
   verificationHash?: string;
   verificationDate?: string;
+  /** Render as a demo/sample badge — shows "Simulated metrics" and a sample verification strip */
+  demoMode?: boolean;
 }
 
 export function renderBadgeSvg(
@@ -19,7 +21,7 @@ export function renderBadgeSvg(
   impact: ImpactV4Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeGithubBranding = true, avatarDataUri, verificationHash, verificationDate } = options;
+  const { includeGithubBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false } = options;
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
@@ -97,8 +99,9 @@ export function renderBadgeSvg(
     : "";
 
   // Verification strip (right edge)
-  const verificationSvg =
-    verificationHash && verificationDate
+  const verificationSvg = demoMode
+    ? renderDemoVerificationStrip()
+    : verificationHash && verificationDate
       ? renderVerificationStrip(verificationHash, verificationDate)
       : "";
 
@@ -134,11 +137,11 @@ export function renderBadgeSvg(
 
   <!-- Handle -->
   <text x="${PAD + 72}" y="${headerY - 6}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="26" font-weight="600" fill="${t.textPrimary}">${headerName}</text>
-  <!-- Verified icon (shield + checkmark) before subtitle -->
+  <!-- ${demoMode ? "Simulated" : "Verified"} icon (shield + checkmark) before subtitle -->
   <g transform="translate(${PAD + 72}, ${headerY + 6})" opacity="0.4">
-    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${t.accent}" transform="scale(0.7)"/>
+    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 1.41-1.41L10.5 12.67l5.59-5.59L17.5 8.5l-7 7z" fill="${demoMode ? "#6B6F7B" : t.accent}" transform="scale(0.7)"/>
   </g>
-  <text x="${PAD + 72 + 20}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">Verified metrics</text>
+  <text x="${PAD + 72 + 20}" y="${headerY + 20}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="19" fill="${t.textSecondary}">${demoMode ? "Simulated metrics" : "Verified metrics"}</text>
 
   <!-- Chapa_ logo (top-right) -->
   <text x="${W - PAD}" y="${headerY + 2}" font-family="'JetBrains Mono', monospace" font-size="22" fill="${t.textSecondary}" opacity="0.7" text-anchor="end" letter-spacing="-0.5">Chapa<tspan fill="${t.accent}">_</tspan></text>

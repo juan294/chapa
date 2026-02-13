@@ -733,7 +733,7 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
 | Archetype | Hex | Visual |
 |-----------|-----|--------|
 | `Builder` | `#7C6AEF` | Signature purple |
-| `Guardian` | `#9D8FFF` | Lighter purple |
+| `Guardian` | `#F472B6` | Pink |
 | `Marathoner` | `#4ADE80` | Green |
 | `Polymath` | `#FBBF24` | Amber/gold |
 | `Balanced` | `#E6EDF3` | Light gray |
