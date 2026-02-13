@@ -9,16 +9,22 @@ const {
   mockVerifyWebhookSignature,
   mockFetchReceivedEmail,
   mockForwardEmail,
+  mockRateLimit,
 } = vi.hoisted(() => ({
   mockVerifyWebhookSignature: vi.fn(),
   mockFetchReceivedEmail: vi.fn(),
   mockForwardEmail: vi.fn(),
+  mockRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/email/resend", () => ({
   verifyWebhookSignature: mockVerifyWebhookSignature,
   fetchReceivedEmail: mockFetchReceivedEmail,
   forwardEmail: mockForwardEmail,
+}));
+
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: mockRateLimit,
 }));
 
 // Import after mocks
@@ -31,11 +37,14 @@ import { POST } from "./route";
 function makeRequest(
   body: string,
   headers: Record<string, string> = {},
+  ip?: string,
 ): Request {
+  const allHeaders = { ...headers };
+  if (ip) allHeaders["x-forwarded-for"] = ip;
   return new Request("https://chapa.thecreativetoken.com/api/webhooks/resend", {
     method: "POST",
     body,
-    headers,
+    headers: allHeaders,
   });
 }
 
@@ -64,6 +73,7 @@ const sampleEmail = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
 });
 
 // ---------------------------------------------------------------------------
@@ -213,5 +223,69 @@ describe("POST /api/webhooks/resend", () => {
     );
 
     warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rate limiting
+// ---------------------------------------------------------------------------
+
+describe("POST /api/webhooks/resend — rate limiting", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 21, limit: 20 });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders, "1.2.3.4");
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toMatch(/too many/i);
+  });
+
+  it("rate limits by IP with correct key and window (20 req / 60s)", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_rl" });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders, "10.0.0.1");
+    await POST(req);
+
+    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:webhook:10.0.0.1", 20, 60);
+  });
+
+  it("uses 'unknown' when x-forwarded-for is absent", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_rl2" });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+    await POST(req);
+
+    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:webhook:unknown", 20, 60);
+  });
+
+  it("includes Retry-After header when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 21, limit: 20 });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders, "1.2.3.4");
+    const res = await POST(req);
+
+    expect(res.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("rate limit check runs before body parsing", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 21, limit: 20 });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders, "1.2.3.4");
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    // Signature verification should NOT have been called
+    expect(mockVerifyWebhookSignature).not.toHaveBeenCalled();
   });
 });

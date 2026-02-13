@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheDel: vi.fn(),
+  rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 30 }),
 }));
 
 vi.mock("@/lib/auth/cli-token", () => ({
@@ -14,7 +15,7 @@ vi.mock("@/lib/auth/cli-token", () => ({
 }));
 
 import { GET } from "./route";
-import { cacheGet, cacheDel } from "@/lib/cache/redis";
+import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { generateCliToken } from "@/lib/auth/cli-token";
 
 // ---------------------------------------------------------------------------
@@ -23,10 +24,12 @@ import { generateCliToken } from "@/lib/auth/cli-token";
 
 const VALID_UUID = "1feae8e3-6bc0-47da-84aa-0e24e2510454";
 
-function makeRequest(session?: string): Request {
+function makeRequest(session?: string, ip?: string): Request {
   const url = new URL("https://chapa.thecreativetoken.com/api/cli/auth/poll");
   if (session !== undefined) url.searchParams.set("session", session);
-  return new Request(url.toString());
+  const headers: Record<string, string> = {};
+  if (ip) headers["x-forwarded-for"] = ip;
+  return new Request(url.toString(), { headers });
 }
 
 beforeEach(() => {
@@ -213,5 +216,56 @@ describe("GET /api/cli/auth/poll", () => {
     // however cacheDel itself swallows errors internally in the redis module.
     // We test that the mock throwing still returns token data.
     await expect(GET(makeRequest(VALID_UUID))).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rate limiting
+// ---------------------------------------------------------------------------
+
+describe("GET /api/cli/auth/poll — rate limiting", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+    vi.mocked(cacheGet).mockResolvedValue(null);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 31, limit: 30 });
+
+    const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toMatch(/too many/i);
+  });
+
+  it("rate limits by IP with correct key and window (30 req / 60s)", async () => {
+    await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(rateLimit).toHaveBeenCalledWith("ratelimit:cli-poll:1.2.3.4", 30, 60);
+  });
+
+  it("uses 'unknown' when x-forwarded-for is absent", async () => {
+    await GET(makeRequest(VALID_UUID));
+
+    expect(rateLimit).toHaveBeenCalledWith("ratelimit:cli-poll:unknown", 30, 60);
+  });
+
+  it("includes Retry-After header when rate limited", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 31, limit: 30 });
+
+    const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(res.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("proceeds normally when not rate limited", async () => {
+    const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.status).toBe("pending");
   });
 });
