@@ -17,7 +17,10 @@ export async function GET(request: NextRequest): Promise<Response> {
   const cookieHeader = request.headers.get("cookie");
   const session = readSessionCookie(cookieHeader, sessionSecret);
   if (!session) {
-    return NextResponse.json({ config: null });
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 },
+    );
   }
 
   const config = await cacheGet<BadgeConfig>(`config:${session.login}`);
@@ -62,8 +65,8 @@ export async function PUT(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Persist config (no TTL — user-authored content)
-  await cacheSet(`config:${session.login}`, body as BadgeConfig, 0);
+  // Persist config (365-day TTL — user-authored content)
+  await cacheSet(`config:${session.login}`, body as BadgeConfig, 31536000);
 
   return NextResponse.json({ success: true });
 }

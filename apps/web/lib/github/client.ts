@@ -15,7 +15,7 @@ export async function getStats(
   handle: string,
   token?: string,
 ): Promise<StatsData | null> {
-  const cacheKey = `stats:v2:${handle}`;
+  const cacheKey = `stats:v2:${handle.toLowerCase()}`;
 
   // Try cache first
   const cached = await cacheGet<StatsData>(cacheKey);
@@ -26,7 +26,7 @@ export async function getStats(
   if (!primary) return null;
 
   // Check for supplemental data (e.g. EMU account)
-  const supplemental = await cacheGet<SupplementalStats>(`supplemental:${handle}`);
+  const supplemental = await cacheGet<SupplementalStats>(`supplemental:${handle.toLowerCase()}`);
   const stats = supplemental ? mergeStats(primary, supplemental.stats) : primary;
 
   // Cache the (possibly merged) result

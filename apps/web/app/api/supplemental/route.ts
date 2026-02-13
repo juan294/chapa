@@ -86,11 +86,11 @@ export async function POST(request: Request): Promise<Response> {
     uploadedAt: new Date().toISOString(),
   };
 
-  await cacheSet(`supplemental:${targetHandle}`, supplemental, CACHE_TTL);
+  await cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL);
 
   // 6. Invalidate primary stats cache (forces re-merge on next badge request)
   // Key must match lib/github/client.ts cache key: "stats:v2:<handle>"
-  await cacheDel(`stats:v2:${targetHandle}`);
+  await cacheDel(`stats:v2:${targetHandle.toLowerCase()}`);
 
   return NextResponse.json({ success: true });
 }

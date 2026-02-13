@@ -38,8 +38,18 @@ describe("storeVerificationRecord", () => {
     );
   });
 
-  it("also stores a handle index entry", async () => {
+  it("also stores a handle index entry (lowercase normalized)", async () => {
     await storeVerificationRecord("abc12345", record);
+    expect(vi.mocked(cacheSet)).toHaveBeenCalledWith(
+      "verify-handle:testuser",
+      "abc12345",
+      2_592_000,
+    );
+  });
+
+  it("normalizes handle to lowercase in handle index key", async () => {
+    const upperRecord = { ...record, handle: "TestUser" };
+    await storeVerificationRecord("abc12345", upperRecord);
     expect(vi.mocked(cacheSet)).toHaveBeenCalledWith(
       "verify-handle:testuser",
       "abc12345",

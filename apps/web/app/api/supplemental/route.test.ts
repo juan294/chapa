@@ -193,7 +193,7 @@ describe("POST /api/supplemental", () => {
     await POST(req);
 
     expect(mockCacheSet).toHaveBeenCalledWith(
-      "supplemental:juan294",
+      "supplemental:juan294",  // lowercase normalized
       expect.objectContaining({
         targetHandle: "juan294",
         sourceHandle: "juan_corp",
@@ -215,7 +215,7 @@ describe("POST /api/supplemental", () => {
     );
     await POST(req);
 
-    // The stats client (lib/github/client.ts) uses "stats:v2:<handle>" as cache key.
+    // The stats client (lib/github/client.ts) uses "stats:v2:<handle>" (lowercase) as cache key.
     // The supplemental handler MUST delete the same key to force a re-merge.
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:juan294");
   });

@@ -41,16 +41,17 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Only the badge owner can refresh their own badge
-  if (session.login !== handle) {
+  // Only the badge owner can refresh their own badge (case-insensitive)
+  if (session.login.toLowerCase() !== handle.toLowerCase()) {
     return NextResponse.json(
       { error: "You can only refresh your own badge" },
       { status: 403 },
     );
   }
 
-  // Rate limit: 5 refreshes per handle per hour
-  const rl = await rateLimit(`ratelimit:refresh:${handle}`, 5, 3600);
+  // Rate limit: 5 refreshes per handle per hour (normalize key)
+  const normalizedHandle = handle.toLowerCase();
+  const rl = await rateLimit(`ratelimit:refresh:${normalizedHandle}`, 5, 3600);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many refreshes. Please try again later." },
@@ -59,8 +60,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Clear cached stats so getStats fetches fresh from GitHub
-  // Key must match lib/github/client.ts cache key: "stats:v2:<handle>"
-  await cacheDel(`stats:v2:${handle}`);
+  // Key must match lib/github/client.ts cache key: "stats:v2:<handle>" (lowercase)
+  await cacheDel(`stats:v2:${normalizedHandle}`);
 
   // Fetch fresh stats with the user's OAuth token for better rate limits
   const stats = await getStats(handle, session.token);
