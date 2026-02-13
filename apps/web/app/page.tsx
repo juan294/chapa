@@ -47,10 +47,9 @@ const STEPS = [
 ];
 
 const STATS = [
-  { value: "12,400+", label: "badges generated" },
   { value: "6", label: "archetypes" },
   { value: "4", label: "dimensions" },
-  { value: "90", label: "days analyzed" },
+  { value: "365", label: "days scored" },
 ];
 
 /* ── Icons ─────────────────────────────────────────────────────── */
@@ -305,7 +304,7 @@ export default async function Home({
                     NO EMU?
                   </span>
                   <span className="text-text-secondary text-sm">
-                    No problem — the CLI also works for supplemental stats and manual overrides.
+                    No problem — your public GitHub activity is all you need. The CLI is optional.
                   </span>
                 </div>
               </div>
