@@ -7,7 +7,7 @@
  * Format: base64url(payload).base64url(hmac_sha256(payload_encoded, secret))
  */
 
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 interface CliTokenPayload {
   handle: string;
@@ -43,7 +43,10 @@ export function verifyCliToken(
   const expectedSig = createHmac("sha256", secret)
     .update(encoded)
     .digest("base64url");
-  if (sig !== expectedSig) return null;
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expectedBuf.length) return null;
+  if (!timingSafeEqual(sigBuf, expectedBuf)) return null;
 
   try {
     const payload: CliTokenPayload = JSON.parse(
