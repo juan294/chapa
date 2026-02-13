@@ -205,46 +205,13 @@ describe("login", () => {
     errorSpy.mockRestore();
   });
 
-  it("disables TLS verification and warns when insecure is true", async () => {
+  it("does not set or restore NODE_TLS_REJECT_UNAUTHORIZED (handled by index.ts)", async () => {
+    // TLS bypass is now global in index.ts, not in login().
+    // Verify login() does NOT touch the env var.
     const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
     delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
 
     const warnSpy = vi.spyOn(console, "warn");
-    // Capture the env var value during fetch (i.e., during polling)
-    let tlsDuringFetch: string | undefined;
-    vi.mocked(fetch).mockImplementation(async () => {
-      tlsDuringFetch = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      return new Response(
-        JSON.stringify({ status: "approved", token: "t", handle: "h" }),
-        { status: 200 },
-      );
-    });
-
-    const p = login("https://example.com", { insecure: true });
-    await advancePoll();
-    await p;
-
-    // Should have been "0" during the fetch call
-    expect(tlsDuringFetch).toBe("0");
-
-    // Should have printed a warning
-    const allWarns = warnSpy.mock.calls.map(c => c.join(" ")).join("\n");
-    expect(allWarns).toContain("TLS certificate verification disabled");
-
-    // Should have restored after login completed
-    expect(process.env.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined();
-
-    // Restore in case test fails
-    if (originalVal !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
-    }
-    warnSpy.mockRestore();
-  });
-
-  it("restores NODE_TLS_REJECT_UNAUTHORIZED after login completes", async () => {
-    const originalVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify({ status: "approved", token: "t", handle: "h" }),
@@ -256,13 +223,17 @@ describe("login", () => {
     await advancePoll();
     await p;
 
-    // Should have restored the original value (undefined → deleted)
+    // login() should NOT have set NODE_TLS_REJECT_UNAUTHORIZED
     expect(process.env.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined();
 
-    // Restore in case test fails
+    // login() should NOT print TLS warning (index.ts does that)
+    const allWarns = warnSpy.mock.calls.map(c => c.join(" ")).join("\n");
+    expect(allWarns).not.toContain("TLS certificate verification disabled");
+
     if (originalVal !== undefined) {
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalVal;
     }
+    warnSpy.mockRestore();
   });
 
   it("suggests --insecure when TLS error is detected", async () => {

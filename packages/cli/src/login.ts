@@ -17,15 +17,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function restoreTls(insecure: boolean, original: string | undefined): void {
-  if (!insecure) return;
-  if (original === undefined) {
-    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  } else {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = original;
-  }
-}
-
 interface PollResponse {
   status: "pending" | "approved" | "expired";
   token?: string;
@@ -88,14 +79,6 @@ function getFullErrorChain(err: unknown): string {
 export async function login(serverUrl: string, opts: LoginOptions = {}): Promise<void> {
   const { verbose = false, insecure = false } = opts;
 
-  // TLS interception bypass for corporate networks
-  const originalTlsSetting = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  if (insecure) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    console.warn("\n⚠ TLS certificate verification disabled (--insecure).");
-    console.warn("  Use only on corporate networks with TLS interception.\n");
-  }
-
   const baseUrl = serverUrl.replace(/\/+$/, "");
   const sessionId = randomUUID();
   const authorizeUrl = `${baseUrl}/cli/authorize?session=${sessionId}`;
@@ -155,18 +138,15 @@ export async function login(serverUrl: string, opts: LoginOptions = {}): Promise
       });
       console.log(`\nLogged in as ${data.handle}!`);
       console.log("Credentials saved to ~/.chapa/credentials.json");
-      restoreTls(insecure, originalTlsSetting);
       return;
     }
 
     if (data?.status === "expired") {
-      restoreTls(insecure, originalTlsSetting);
       console.error("\nSession expired. Please try again.");
       process.exit(1);
     }
   }
 
-  restoreTls(insecure, originalTlsSetting);
   console.error("\nTimed out waiting for approval. Please try again.");
   process.exit(1);
 }

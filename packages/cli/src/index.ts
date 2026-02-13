@@ -43,6 +43,13 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // Global TLS bypass for corporate networks — applies to all commands
+  if (args.insecure) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    console.warn("\n⚠ TLS certificate verification disabled (--insecure).");
+    console.warn("  Use only on corporate networks with TLS interception.\n");
+  }
+
   // ── login ────────────────────────────────────────────────────────────
   if (args.command === "login") {
     await login(args.server, { verbose: args.verbose, insecure: args.insecure });
