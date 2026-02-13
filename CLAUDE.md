@@ -70,8 +70,8 @@ Must be easy to swap/remove:
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)
 - Cache SVG output per user/day + theme (TTL 24h)
-- Response headers for badge endpoint:
-  - `Cache-Control: public, s-maxage=86400, stale-while-revalidate=604800`
+- Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
+  - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
 
 ## Agent team roles (no file overlap)
 - OAuth Engineer: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
@@ -328,6 +328,9 @@ NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)
 SUPPORT_FORWARD_EMAIL=     # Gmail address for email forwarding (optional)
+
+COMING_SOON=               # When set to any truthy value, enables coming-soon gate that blocks most routes (optional)
+CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 ```
 
 ### Environment Variable Safety
