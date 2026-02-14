@@ -16,6 +16,12 @@ import { notifyFirstBadge } from "@/lib/email/notifications";
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
   "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=604800",
+  // Badge SVG is designed to be embedded in READMEs, iframes, etc.
+  // These headers are set explicitly on the Response object to override the
+  // catch-all frame-ancestors 'none' + X-Frame-Options DENY from next.config.ts,
+  // which Next.js merges into all matching routes (see issue #270).
+  "Content-Security-Policy": "frame-ancestors *",
+  "X-Frame-Options": "ALLOWALL",
 };
 
 function fallbackSvg(handle: string, message: string): string {
