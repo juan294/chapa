@@ -268,6 +268,54 @@ describe("fetchContributionData", () => {
     expect(result!.pullRequests.nodes[1]!.additions).toBe(5);
   });
 
+  it("passes an AbortSignal with timeout to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: { totalContributions: 0, weeks: [] },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser", "token");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeDefined();
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null when fetch is aborted (timeout)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(abortError),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[github] fetch error for testuser:"),
+      expect.any(DOMException),
+    );
+    consoleSpy.mockRestore();
+  });
+
   it("logs network/fetch errors", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(

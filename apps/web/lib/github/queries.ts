@@ -8,6 +8,8 @@ export type { RawContributionData };
 // Fetch function
 // ---------------------------------------------------------------------------
 
+const FETCH_TIMEOUT_MS = 15_000; // 15 seconds — prevents SSR from hanging in CI
+
 export async function fetchContributionData(
   login: string,
   token?: string,
@@ -32,6 +34,7 @@ export async function fetchContributionData(
     const res = await fetch("https://api.github.com/graphql", {
       method: "POST",
       headers,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       body: JSON.stringify({
         query: CONTRIBUTION_QUERY,
         variables: {
