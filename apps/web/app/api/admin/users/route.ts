@@ -40,9 +40,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Scan for all cached stats keys
-  const keys = await scanKeys("stats:v2:*");
-  if (keys.length === 0) {
+  // Scan both primary (6h TTL) and stale (7d TTL) keys to find all users.
+  // A user whose primary cache expired still has stale data for up to 7 days.
+  const [primaryKeys, staleKeys] = await Promise.all([
+    scanKeys("stats:v2:*"),
+    scanKeys("stats:stale:*"),
+  ]);
+
+  // Build a deduplicated set of handles, preferring primary keys
+  const handleToKey = new Map<string, string>();
+  for (const key of staleKeys) {
+    const handle = key.replace("stats:stale:", "");
+    handleToKey.set(handle, key);
+  }
+  for (const key of primaryKeys) {
+    const handle = key.replace("stats:v2:", "");
+    handleToKey.set(handle, key); // overwrite stale with primary (fresher)
+  }
+
+  const allKeys = [...handleToKey.values()];
+  if (allKeys.length === 0) {
     return NextResponse.json(
       { users: [] },
       { headers: { "Cache-Control": "no-store" } },
@@ -50,7 +67,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Bulk-fetch all stats
-  const statsValues = await cacheMGet<StatsData>(keys);
+  const statsValues = await cacheMGet<StatsData>(allKeys);
 
   // Build user list with cherry-picked fields + computed impact
   const users = statsValues

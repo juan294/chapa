@@ -82,7 +82,10 @@ beforeEach(() => {
   });
   vi.mocked(isAdminHandle).mockReturnValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-  vi.mocked(scanKeys).mockResolvedValue(["stats:v2:testuser"]);
+  // scanKeys is called twice: once for stats:v2:* (primary), once for stats:stale:* (stale)
+  vi.mocked(scanKeys)
+    .mockResolvedValueOnce(["stats:v2:testuser"])  // primary
+    .mockResolvedValueOnce([]);                     // stale
   vi.mocked(cacheMGet).mockResolvedValue([MOCK_STATS]);
   vi.mocked(computeImpactV4).mockReturnValue(MOCK_IMPACT);
 });
@@ -127,7 +130,10 @@ describe("GET /api/admin/users", () => {
   });
 
   it("returns empty list when no stats keys in Redis", async () => {
-    vi.mocked(scanKeys).mockResolvedValue([]);
+    vi.mocked(scanKeys)
+      .mockReset()
+      .mockResolvedValueOnce([])   // primary
+      .mockResolvedValueOnce([]);  // stale
     const res = await GET(makeRequest());
     const body = await res.json();
 
@@ -135,8 +141,41 @@ describe("GET /api/admin/users", () => {
     expect(body.users).toEqual([]);
   });
 
+  it("finds users from stale keys when primary cache expired", async () => {
+    const staleUser = { ...MOCK_STATS, handle: "staleuser" };
+    vi.mocked(scanKeys)
+      .mockReset()
+      .mockResolvedValueOnce([])                        // primary — empty
+      .mockResolvedValueOnce(["stats:stale:staleuser"]); // stale
+    vi.mocked(cacheMGet).mockResolvedValue([staleUser]);
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.users).toHaveLength(1);
+    expect(body.users[0].handle).toBe("staleuser");
+  });
+
+  it("deduplicates users present in both primary and stale keys", async () => {
+    vi.mocked(scanKeys)
+      .mockReset()
+      .mockResolvedValueOnce(["stats:v2:user1"])      // primary
+      .mockResolvedValueOnce(["stats:stale:user1"]);   // stale (same user)
+    vi.mocked(cacheMGet).mockResolvedValue([MOCK_STATS]); // only 1 key fetched
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.users).toHaveLength(1);
+    // Should prefer the primary key
+    expect(vi.mocked(cacheMGet)).toHaveBeenCalledWith(["stats:v2:user1"]);
+  });
+
   it("skips null values from cacheMGet", async () => {
-    vi.mocked(scanKeys).mockResolvedValue(["stats:v2:user1", "stats:v2:user2"]);
+    vi.mocked(scanKeys)
+      .mockReset()
+      .mockResolvedValueOnce(["stats:v2:user1", "stats:v2:user2"])
+      .mockResolvedValueOnce([]);
     vi.mocked(cacheMGet).mockResolvedValue([MOCK_STATS, null]);
 
     const res = await GET(makeRequest());
