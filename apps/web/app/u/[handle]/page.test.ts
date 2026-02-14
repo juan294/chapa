@@ -72,6 +72,33 @@ describe("SharePage", () => {
     });
   });
 
+  // #230 — badge img must have fetchpriority="high" (LCP element)
+  describe("badge img fetchpriority", () => {
+    it("has fetchpriority=\"high\" on the badge img tag", () => {
+      // Find the JSX <img that contains badge.svg (multi-line JSX with \n between attrs)
+      // Use \n after <img to distinguish from the single-line embed HTML string
+      const imgMatch = SOURCE.match(/<img\n[\s\S]*?badge\.svg[\s\S]*?\/>/);
+      expect(imgMatch).not.toBeNull();
+      expect(imgMatch![0]).toContain('fetchPriority="high"');
+    });
+  });
+
+  // #234 — archetype name must be h3 (sub-section under "Impact Breakdown" h2)
+  describe("archetype heading level", () => {
+    it("renders archetype name as h3, not h2", () => {
+      // Find the heading tag that directly wraps {impact.archetype}
+      // It should be <h3 ...>{impact.archetype}</h3>
+      const archetypeLineMatch = SOURCE.match(/<(h\d)[^>]*>\s*\{impact\.archetype\}\s*<\/\1>/);
+      expect(archetypeLineMatch).not.toBeNull();
+      expect(archetypeLineMatch![1]).toBe("h3");
+    });
+
+    it("does not use h2 for archetype name", () => {
+      // There should be no <h2> that contains impact.archetype
+      expect(SOURCE).not.toMatch(/<h2[^>]*>\s*\{impact\.archetype\}\s*<\/h2>/);
+    });
+  });
+
   // #120 — JSON-LD script injection prevention
   describe("JSON-LD security", () => {
     it("escapes < characters in JSON-LD to prevent script injection", () => {

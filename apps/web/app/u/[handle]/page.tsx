@@ -166,6 +166,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 alt={`Chapa badge for ${handle}`}
                 width={1200}
                 height={630}
+                fetchPriority="high"
                 className="w-full rounded-xl"
               />
             </div>
@@ -194,9 +195,9 @@ export default async function SharePage({ params }: SharePageProps) {
             {impact && (
               <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
                 <div className="flex items-baseline gap-3 mb-2">
-                  <h2 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
+                  <h3 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
                     {impact.archetype}
-                  </h2>
+                  </h3>
                   {impact.tier !== impact.archetype && (
                     <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
                       {impact.tier}
