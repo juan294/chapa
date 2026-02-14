@@ -37,6 +37,10 @@ const FEATURES = [
     description: "Every badge carries an HMAC hash seal. Click it to cryptographically verify the scores haven\u2019t been tampered with.",
   },
   {
+    title: "LIVING DOCUMENT",
+    description: "Your badge is a live image that re-renders from fresh GitHub data daily — embed it once and it keeps itself up to date.",
+  },
+  {
     title: "ONE-CLICK EMBED",
     description: "Markdown or HTML, paste anywhere that renders images.",
   },
