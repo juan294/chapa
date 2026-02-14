@@ -1,3 +1,7 @@
+// This wraps the app tree as a client component, but Next.js correctly streams
+// RSC children through client boundaries via {children} passthrough.
+// The actual performance impact is minimal — only the shortcut listener and
+// cheat sheet modal are client-side; all page content remains server-rendered.
 "use client";
 
 import {

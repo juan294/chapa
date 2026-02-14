@@ -1,5 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchAvatarBase64 } from "./avatar";
+
+// ---------------------------------------------------------------------------
+// Mocks for cache layer (used by getAvatarBase64 tests)
+// ---------------------------------------------------------------------------
+
+const { mockCacheGet, mockCacheSet } = vi.hoisted(() => ({
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
+}));
+
+vi.mock("../cache/redis", () => ({
+  cacheGet: mockCacheGet,
+  cacheSet: mockCacheSet,
+}));
+
+import { fetchAvatarBase64, getAvatarBase64 } from "./avatar";
 
 describe("fetchAvatarBase64", () => {
   beforeEach(() => {
@@ -125,5 +140,92 @@ describe("fetchAvatarBase64 — SSRF prevention", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     await fetchAvatarBase64("https://evil.com/avatar.png");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAvatarBase64 — cached wrapper
+// ---------------------------------------------------------------------------
+
+describe("getAvatarBase64", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mockCacheGet.mockReset();
+    mockCacheSet.mockReset();
+  });
+
+  it("returns cached avatar when available (no network fetch)", async () => {
+    const cachedUri = "data:image/png;base64,cached123";
+    mockCacheGet.mockResolvedValue(cachedUri);
+
+    const result = await getAvatarBase64(
+      "testuser",
+      "https://avatars.githubusercontent.com/u/123",
+    );
+
+    expect(result).toBe(cachedUri);
+    expect(mockCacheGet).toHaveBeenCalledWith("avatar:testuser");
+    // Should NOT have called global fetch since cache hit
+  });
+
+  it("fetches from network on cache miss and caches result", async () => {
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
+
+    const fakeBytes = new Uint8Array([137, 80, 78, 71]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(fakeBytes, {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      }),
+    );
+
+    const result = await getAvatarBase64(
+      "testuser",
+      "https://avatars.githubusercontent.com/u/123",
+    );
+
+    expect(result).toMatch(/^data:image\/png;base64,/);
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "avatar:testuser",
+      expect.stringMatching(/^data:image\/png;base64,/),
+      21600,
+    );
+  });
+
+  it("normalizes handle to lowercase for cache key", async () => {
+    mockCacheGet.mockResolvedValue("data:image/png;base64,abc");
+
+    await getAvatarBase64(
+      "TestUser",
+      "https://avatars.githubusercontent.com/u/123",
+    );
+
+    expect(mockCacheGet).toHaveBeenCalledWith("avatar:testuser");
+  });
+
+  it("returns undefined when network fetch fails (no cache write)", async () => {
+    mockCacheGet.mockResolvedValue(null);
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
+
+    const result = await getAvatarBase64(
+      "testuser",
+      "https://avatars.githubusercontent.com/u/123",
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when avatar host is not allowed (no cache write)", async () => {
+    mockCacheGet.mockResolvedValue(null);
+
+    const result = await getAvatarBase64(
+      "testuser",
+      "https://evil.com/avatar.png",
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 });

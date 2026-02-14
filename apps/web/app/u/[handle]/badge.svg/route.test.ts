@@ -12,7 +12,7 @@ const {
   mockIsValidHandle,
   mockRateLimit,
   mockTrackBadgeGenerated,
-  mockFetchAvatarBase64,
+  mockGetAvatarBase64,
   mockGenerateVerificationCode,
   mockStoreVerificationRecord,
   mockNotifyFirstBadge,
@@ -24,7 +24,7 @@ const {
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
   mockTrackBadgeGenerated: vi.fn(),
-  mockFetchAvatarBase64: vi.fn(),
+  mockGetAvatarBase64: vi.fn(),
   mockGenerateVerificationCode: vi.fn(),
   mockStoreVerificationRecord: vi.fn(),
   mockNotifyFirstBadge: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
-  fetchAvatarBase64: mockFetchAvatarBase64,
+  getAvatarBase64: mockGetAvatarBase64,
 }));
 
 vi.mock("@/lib/verification/hmac", () => ({
@@ -138,7 +138,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockGetStatsData.mockResolvedValue(FAKE_STATS);
     mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
-    mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+    mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockGenerateVerificationCode.mockReturnValue(null);
     mockStoreVerificationRecord.mockResolvedValue(undefined);
     mockTrackBadgeGenerated.mockResolvedValue(undefined);
@@ -202,13 +202,14 @@ describe("GET /u/[handle]/badge.svg", () => {
     it("fetches avatar base64 from stats.avatarUrl", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockFetchAvatarBase64).toHaveBeenCalledWith(
+      expect(mockGetAvatarBase64).toHaveBeenCalledWith(
+        "testuser",
         "https://avatars.githubusercontent.com/u/12345",
       );
     });
 
     it("passes undefined avatarDataUri when avatar fetch fails", async () => {
-      mockFetchAvatarBase64.mockResolvedValue(undefined);
+      mockGetAvatarBase64.mockResolvedValue(undefined);
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
@@ -222,7 +223,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       mockGetStatsData.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockFetchAvatarBase64).not.toHaveBeenCalled();
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         { ...FAKE_STATS, avatarUrl: undefined },
         FAKE_IMPACT,

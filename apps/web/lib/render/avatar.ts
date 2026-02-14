@@ -3,8 +3,18 @@
  * Returns undefined if the fetch fails (caller should fall back to octocat icon).
  */
 
+import { cacheGet, cacheSet } from "../cache/redis";
+
 const ALLOWED_AVATAR_HOSTS = new Set(["avatars.githubusercontent.com"]);
 
+/** Cache TTL for avatar data URIs — matches stats TTL (6 hours). */
+const AVATAR_CACHE_TTL = 21600;
+
+/**
+ * Fetch an avatar from the network (no caching).
+ * Validates the host is `avatars.githubusercontent.com` and the content type
+ * is an allowed image MIME type before converting to a data URI.
+ */
 export async function fetchAvatarBase64(
   avatarUrl: string,
 ): Promise<string | undefined> {
@@ -27,4 +37,35 @@ export async function fetchAvatarBase64(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Get avatar base64 data URI — cache-first, then network fetch.
+ *
+ * Checks Redis for a cached avatar data URI keyed by handle. On cache miss,
+ * fetches from GitHub CDN, converts to base64 data URI, and caches the result
+ * with the same 6h TTL used for stats data.
+ *
+ * @param handle - GitHub username (used for cache key)
+ * @param avatarUrl - Full avatar URL from GitHub
+ * @returns base64 data URI string or undefined if fetch fails
+ */
+export async function getAvatarBase64(
+  handle: string,
+  avatarUrl: string,
+): Promise<string | undefined> {
+  const cacheKey = `avatar:${handle.toLowerCase()}`;
+
+  // Try cache first
+  const cached = await cacheGet<string>(cacheKey);
+  if (cached) return cached;
+
+  // Fetch from network
+  const dataUri = await fetchAvatarBase64(avatarUrl);
+  if (!dataUri) return undefined;
+
+  // Cache for reuse (fire-and-forget — don't block on cache write)
+  void cacheSet(cacheKey, dataUri, AVATAR_CACHE_TTL);
+
+  return dataUri;
 }
