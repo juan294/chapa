@@ -121,7 +121,6 @@ export function GlobalCommandBar() {
           onSubmit={handleSubmit}
           onPartialChange={handlePartialChange}
           prompt="chapa"
-          autoFocus
         />
       </div>
     </div>
