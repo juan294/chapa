@@ -37,12 +37,12 @@
   --color-dimension-breadth: #ec4899;
 
   /* Archetype colors — accent color per developer archetype */
-  --color-archetype-builder: #4ADE80;
+  --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #6EE7A0;
+  --color-archetype-marathoner: #16A34A;
   --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #9AA4B2;
-  --color-archetype-emerging: #9AA4B2;
+  --color-archetype-balanced: #64748B;
+  --color-archetype-emerging: #F97316;
 
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
@@ -81,12 +81,12 @@
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
 
-  --color-archetype-builder: #4ADE80;
+  --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #6EE7A0;
+  --color-archetype-marathoner: #16A34A;
   --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #9AA4B2;
-  --color-archetype-emerging: #9AA4B2;
+  --color-archetype-balanced: #64748B;
+  --color-archetype-emerging: #F97316;
 }
 
 [data-theme="dark"] {
@@ -117,12 +117,12 @@
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
 
-  --color-archetype-builder: #4ADE80;
+  --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #6EE7A0;
+  --color-archetype-marathoner: #16A34A;
   --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #9AA4B2;
-  --color-archetype-emerging: #9AA4B2;
+  --color-archetype-balanced: #64748B;
+  --color-archetype-emerging: #F97316;
 }
 
 html {
