@@ -15,6 +15,7 @@ const {
   mockFetchAvatarBase64,
   mockGenerateVerificationCode,
   mockStoreVerificationRecord,
+  mockNotifyFirstBadge,
 } = vi.hoisted(() => ({
   mockGetStatsData: vi.fn(),
   mockComputeImpactV4: vi.fn(),
@@ -26,6 +27,7 @@ const {
   mockFetchAvatarBase64: vi.fn(),
   mockGenerateVerificationCode: vi.fn(),
   mockStoreVerificationRecord: vi.fn(),
+  mockNotifyFirstBadge: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -63,6 +65,10 @@ vi.mock("@/lib/verification/hmac", () => ({
 
 vi.mock("@/lib/verification/store", () => ({
   storeVerificationRecord: mockStoreVerificationRecord,
+}));
+
+vi.mock("@/lib/email/notifications", () => ({
+  notifyFirstBadge: mockNotifyFirstBadge,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
