@@ -39,6 +39,7 @@ import {
   getBadgeStats,
   scanKeys,
   cacheMGet,
+  registerUser,
   _resetClient,
 } from "./redis";
 
@@ -441,5 +442,54 @@ describe("cacheMGet", () => {
     const result = await cacheMGet(["key1"]);
 
     expect(result).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// registerUser
+// ---------------------------------------------------------------------------
+
+describe("registerUser", () => {
+  it("writes a persistent key with handle and registeredAt", async () => {
+    mockSet.mockResolvedValueOnce("OK");
+
+    await registerUser("juan294");
+
+    expect(mockSet).toHaveBeenCalledWith(
+      "user:registered:juan294",
+      expect.objectContaining({ handle: "juan294", registeredAt: expect.any(String) }),
+    );
+    // No TTL option — key is persistent
+    expect(mockSet).toHaveBeenCalledWith(
+      "user:registered:juan294",
+      expect.anything(),
+    );
+  });
+
+  it("lowercases the handle", async () => {
+    mockSet.mockResolvedValueOnce("OK");
+
+    await registerUser("Juan294");
+
+    expect(mockSet).toHaveBeenCalledWith(
+      "user:registered:juan294",
+      expect.objectContaining({ handle: "juan294" }),
+    );
+  });
+
+  it("is a no-op when Redis is unavailable", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    await registerUser("juan294");
+
+    expect(mockSet).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when Redis fails (fire-and-forget safe)", async () => {
+    mockSet.mockRejectedValueOnce(new Error("Connection refused"));
+
+    await expect(registerUser("juan294")).resolves.toBeUndefined();
   });
 });

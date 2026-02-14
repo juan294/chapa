@@ -243,6 +243,32 @@ export async function getBadgeStats(): Promise<BadgeStats> {
 }
 
 // ---------------------------------------------------------------------------
+// Permanent user registry (no TTL — survives all cache expirations)
+// ---------------------------------------------------------------------------
+
+/**
+ * Register a user in the permanent registry.
+ * Writes `user:registered:<handle>` with no TTL so the admin dashboard
+ * always knows who has used Chapa, even after stats caches expire.
+ *
+ * Fire-and-forget safe — never throws, silently no-ops if Redis is down.
+ */
+export async function registerUser(handle: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  const lowerHandle = handle.toLowerCase();
+  try {
+    await redis.set(`user:registered:${lowerHandle}`, {
+      handle: lowerHandle,
+      registeredAt: new Date().toISOString(),
+    });
+  } catch {
+    // Fire-and-forget — user registration is non-critical
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
 

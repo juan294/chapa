@@ -13,6 +13,7 @@ vi.mock("@/lib/auth/admin", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   scanKeys: vi.fn(),
   cacheMGet: vi.fn(),
+  registerUser: vi.fn(),
   rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 10 }),
 }));
 
@@ -26,7 +27,7 @@ vi.mock("@/lib/impact/v4", () => ({
 
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { scanKeys, cacheMGet, rateLimit } from "@/lib/cache/redis";
+import { scanKeys, cacheMGet, registerUser, rateLimit } from "@/lib/cache/redis";
 import { computeImpactV4 } from "@/lib/impact/v4";
 
 const MOCK_STATS = {
@@ -82,16 +83,18 @@ beforeEach(() => {
   });
   vi.mocked(isAdminHandle).mockReturnValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-  // scanKeys is called 4 times: stats:v2:*, stats:stale:*, verify-handle:*, badge:notified:*
+  // scanKeys is called 5 times: user:registered:*, stats:v2:*, stats:stale:*, verify-handle:*, badge:notified:*
   vi.mocked(scanKeys)
-    .mockResolvedValueOnce(["stats:v2:testuser"])  // primary
-    .mockResolvedValueOnce([])                      // stale
-    .mockResolvedValueOnce([])                      // verify-handle
-    .mockResolvedValueOnce([]);                     // badge:notified
+    .mockResolvedValueOnce(["user:registered:testuser"]) // registry
+    .mockResolvedValueOnce(["stats:v2:testuser"])         // primary
+    .mockResolvedValueOnce([])                             // stale
+    .mockResolvedValueOnce([])                             // verify-handle
+    .mockResolvedValueOnce([]);                            // badge:notified
   // cacheMGet is called twice: primary keys, stale keys
   vi.mocked(cacheMGet)
     .mockResolvedValueOnce([MOCK_STATS])            // primary stats
     .mockResolvedValueOnce([null]);                  // stale stats (not needed)
+  vi.mocked(registerUser).mockResolvedValue(undefined);
   vi.mocked(computeImpactV4).mockReturnValue(MOCK_IMPACT);
 });
 
@@ -137,6 +140,7 @@ describe("GET /api/admin/users", () => {
   it("returns empty list when no keys in Redis", async () => {
     vi.mocked(scanKeys)
       .mockReset()
+      .mockResolvedValueOnce([])   // registry
       .mockResolvedValueOnce([])   // primary
       .mockResolvedValueOnce([])   // stale
       .mockResolvedValueOnce([])   // verify-handle
@@ -152,6 +156,7 @@ describe("GET /api/admin/users", () => {
     const staleUser = { ...MOCK_STATS, handle: "staleuser" };
     vi.mocked(scanKeys)
       .mockReset()
+      .mockResolvedValueOnce([])                         // registry — empty
       .mockResolvedValueOnce([])                         // primary — empty
       .mockResolvedValueOnce(["stats:stale:staleuser"])  // stale
       .mockResolvedValueOnce([])                         // verify-handle
@@ -172,6 +177,7 @@ describe("GET /api/admin/users", () => {
   it("shows statsExpired when all caches expired but verify-handle exists", async () => {
     vi.mocked(scanKeys)
       .mockReset()
+      .mockResolvedValueOnce([])                            // registry
       .mockResolvedValueOnce([])                            // primary
       .mockResolvedValueOnce([])                            // stale
       .mockResolvedValueOnce(["verify-handle:expireduser"]) // verify-handle
@@ -193,10 +199,11 @@ describe("GET /api/admin/users", () => {
   it("deduplicates users found across multiple key patterns", async () => {
     vi.mocked(scanKeys)
       .mockReset()
-      .mockResolvedValueOnce(["stats:v2:user1"])      // primary
-      .mockResolvedValueOnce(["stats:stale:user1"])    // stale (same user)
-      .mockResolvedValueOnce(["verify-handle:user1"])  // verify (same user)
-      .mockResolvedValueOnce([]);                      // badge:notified
+      .mockResolvedValueOnce(["user:registered:user1"]) // registry
+      .mockResolvedValueOnce(["stats:v2:user1"])         // primary (same user)
+      .mockResolvedValueOnce(["stats:stale:user1"])      // stale (same user)
+      .mockResolvedValueOnce(["verify-handle:user1"])    // verify (same user)
+      .mockResolvedValueOnce([]);                        // badge:notified
     vi.mocked(cacheMGet)
       .mockReset()
       .mockResolvedValueOnce([MOCK_STATS])  // primary
@@ -213,6 +220,56 @@ describe("GET /api/admin/users", () => {
     const body = await res.json();
 
     expect(body.users[0].statsExpired).toBe(false);
+  });
+
+  it("backfills registry for users found via legacy keys only", async () => {
+    vi.mocked(scanKeys)
+      .mockReset()
+      .mockResolvedValueOnce([])                            // registry — empty
+      .mockResolvedValueOnce(["stats:v2:legacyuser"])       // primary
+      .mockResolvedValueOnce([])                            // stale
+      .mockResolvedValueOnce([])                            // verify-handle
+      .mockResolvedValueOnce([]);                           // badge:notified
+    vi.mocked(cacheMGet)
+      .mockReset()
+      .mockResolvedValueOnce([{ ...MOCK_STATS, handle: "legacyuser" }])
+      .mockResolvedValueOnce([null]);
+
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+
+    // Should have backfilled the registry
+    expect(registerUser).toHaveBeenCalledWith("legacyuser");
+  });
+
+  it("does NOT backfill registry for users already registered", async () => {
+    // Default setup has testuser in both registry and primary
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(200);
+
+    // Already in registry — no backfill needed
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("discovers users from registry even when all other keys expired", async () => {
+    vi.mocked(scanKeys)
+      .mockReset()
+      .mockResolvedValueOnce(["user:registered:persistentuser"]) // registry
+      .mockResolvedValueOnce([])                                  // primary
+      .mockResolvedValueOnce([])                                  // stale
+      .mockResolvedValueOnce([])                                  // verify-handle
+      .mockResolvedValueOnce([]);                                 // badge:notified
+    vi.mocked(cacheMGet)
+      .mockReset()
+      .mockResolvedValueOnce([null])  // primary
+      .mockResolvedValueOnce([null]); // stale
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.users).toHaveLength(1);
+    expect(body.users[0].handle).toBe("persistentuser");
+    expect(body.users[0].statsExpired).toBe(true);
   });
 
   it("includes selected stats fields in response", async () => {

@@ -5,10 +5,11 @@ import type { StatsData, SupplementalStats } from "@chapa/shared";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockFetchStatsData, mockCacheGet, mockCacheSet } = vi.hoisted(() => ({
+const { mockFetchStatsData, mockCacheGet, mockCacheSet, mockRegisterUser } = vi.hoisted(() => ({
   mockFetchStatsData: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockRegisterUser: vi.fn(),
 }));
 
 vi.mock("./stats", () => ({
@@ -18,6 +19,7 @@ vi.mock("./stats", () => ({
 vi.mock("../cache/redis", () => ({
   cacheGet: mockCacheGet,
   cacheSet: mockCacheSet,
+  registerUser: mockRegisterUser,
 }));
 
 import { getStats, _resetInflight } from "./client";
@@ -180,6 +182,39 @@ describe("getStats", () => {
       expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
       604800,
     );
+  });
+
+  it("registers user in permanent registry on successful fetch", async () => {
+    const fresh = makeStats();
+    mockCacheGet
+      .mockResolvedValueOnce(null) // primary
+      .mockResolvedValueOnce(null) // stale
+      .mockResolvedValueOnce(null); // supplemental
+    mockFetchStatsData.mockResolvedValue(fresh);
+
+    await getStats("Test-User");
+
+    expect(mockRegisterUser).toHaveBeenCalledWith("Test-User");
+  });
+
+  it("does NOT register user when serving from cache", async () => {
+    const cached = makeStats();
+    mockCacheGet.mockResolvedValue(cached);
+
+    await getStats("test-user");
+
+    expect(mockRegisterUser).not.toHaveBeenCalled();
+  });
+
+  it("does NOT register user when API fails", async () => {
+    mockCacheGet
+      .mockResolvedValueOnce(null) // primary
+      .mockResolvedValueOnce(null); // stale
+    mockFetchStatsData.mockResolvedValue(null);
+
+    await getStats("test-user");
+
+    expect(mockRegisterUser).not.toHaveBeenCalled();
   });
 
   it("passes token argument through to fetchStats", async () => {

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { scanKeys, cacheMGet, rateLimit } from "@/lib/cache/redis";
+import { scanKeys, cacheMGet, registerUser, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import type { StatsData } from "@chapa/shared";
@@ -68,21 +68,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Discover all user handles from multiple key patterns.
-  // Some keys outlive stats caches (verify-handle has 29d TTL).
-  const [primaryKeys, staleKeys, verifyKeys, notifiedKeys] = await Promise.all([
+  // Discover all user handles.
+  // Primary source: user:registered:* (permanent, no TTL).
+  // Legacy fallback: stats, stale, verify-handle, badge:notified (all have TTLs).
+  const [registryKeys, primaryKeys, staleKeys, verifyKeys, notifiedKeys] = await Promise.all([
+    scanKeys("user:registered:*"),
     scanKeys("stats:v2:*"),
     scanKeys("stats:stale:*"),
     scanKeys("verify-handle:*"),
     scanKeys("badge:notified:*"),
   ]);
 
-  // Collect all unique handles
-  const allHandles = new Set<string>();
+  // Collect all unique handles from all sources
+  const registeredHandles = new Set(extractHandles(registryKeys, "user:registered:"));
+  const allHandles = new Set<string>(registeredHandles);
   for (const h of extractHandles(primaryKeys, "stats:v2:")) allHandles.add(h);
   for (const h of extractHandles(staleKeys, "stats:stale:")) allHandles.add(h);
   for (const h of extractHandles(verifyKeys, "verify-handle:")) allHandles.add(h);
   for (const h of extractHandles(notifiedKeys, "badge:notified:")) allHandles.add(h);
+
+  // Backfill: register any users found via legacy keys but not yet in registry
+  for (const h of allHandles) {
+    if (!registeredHandles.has(h)) {
+      void registerUser(h);
+    }
+  }
 
   if (allHandles.size === 0) {
     return NextResponse.json(
