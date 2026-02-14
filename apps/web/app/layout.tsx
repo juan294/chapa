@@ -46,10 +46,10 @@ export const metadata: Metadata = {
     url: BASE_URL,
     images: [
       {
-        url: "/logo-512.png",
-        width: 512,
-        height: 512,
-        alt: "Chapa logo",
+        url: "/og-image",
+        width: 1200,
+        height: 630,
+        alt: "Chapa — Developer Impact, Decoded",
       },
     ],
   },
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     title: "Chapa — Developer Impact, Decoded",
     description:
       "Your developer impact, decoded into four dimensions. Live, embeddable SVG badge.",
-    images: ["/logo-512.png"],
+    images: ["/og-image"],
   },
   alternates: {
     canonical: BASE_URL,
