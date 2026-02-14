@@ -25,24 +25,24 @@ describe("GET /api/health", () => {
     expect(body.version).toBeUndefined();
   });
 
-  it("returns 200 with status 'degraded' when Redis ping fails", async () => {
+  it("returns 503 with status 'degraded' when Redis ping fails", async () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("error");
 
     const response = await GET();
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(body.status).toBe("degraded");
     expect(body.dependencies.redis).toBe("error");
   });
 
-  it("returns 200 with status 'degraded' when Redis client is null (missing env vars)", async () => {
+  it("returns 503 with status 'degraded' when Redis client is null (missing env vars)", async () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("unavailable");
 
     const response = await GET();
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(body.status).toBe("degraded");
     expect(body.dependencies.redis).toBe("unavailable");
   });
