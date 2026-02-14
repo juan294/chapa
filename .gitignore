@@ -51,6 +51,7 @@ playwright/.cache/
 
 # claude code
 .claude/settings.local.json
+CLAUDE.local.md
 
 # misc
 *.tsbuildinfo
