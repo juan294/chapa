@@ -31,7 +31,7 @@ function getRedis(): Redis | null {
     return null;
   }
 
-  _redis = new Redis({ url, token });
+  _redis = new Redis({ url, token, retry: { retries: 0, backoff: () => 0 } });
   return _redis;
 }
 
