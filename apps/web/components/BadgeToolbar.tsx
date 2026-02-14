@@ -79,25 +79,28 @@ export function BadgeToolbar({
     try {
       const res = await fetch(`/u/${encodeURIComponent(handle)}/badge.svg`);
       if (!res.ok) throw new Error("fetch failed");
-      const svgText = await res.text();
+      let svgText = await res.text();
 
-      // Render SVG to high-res PNG via canvas
-      const scale = 2; // 2x for crisp output
-      const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
-      const svgUrl = URL.createObjectURL(svgBlob);
+      // Strip CSS animations — they can break canvas rendering in some browsers
+      svgText = svgText.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
+      svgText = svgText.replace(/animation[^;"]*/g, "");
+
+      // Use data URI (more reliable than blob URL for SVG→canvas)
+      const scale = 2;
+      const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
       const img = new Image();
-      img.crossOrigin = "anonymous";
+      img.width = 1200;
+      img.height = 630;
 
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth * scale;
-          canvas.height = img.naturalHeight * scale;
+          canvas.width = 1200 * scale;
+          canvas.height = 630 * scale;
           const ctx = canvas.getContext("2d");
           if (!ctx) { reject(new Error("no canvas context")); return; }
           ctx.scale(scale, scale);
-          ctx.drawImage(img, 0, 0);
-          URL.revokeObjectURL(svgUrl);
+          ctx.drawImage(img, 0, 0, 1200, 630);
 
           canvas.toBlob((blob) => {
             if (!blob) { reject(new Error("toBlob failed")); return; }
@@ -105,16 +108,24 @@ export function BadgeToolbar({
             const a = document.createElement("a");
             a.href = pngUrl;
             a.download = `chapa-${handle}.png`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(pngUrl);
             resolve();
           }, "image/png");
         };
-        img.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error("img load failed")); };
-        img.src = svgUrl;
+        img.onerror = () => reject(new Error("img load failed"));
+        img.src = dataUri;
       });
     } catch {
-      /* silently fail */
+      // Fallback: download SVG directly if PNG conversion fails
+      const a = document.createElement("a");
+      a.href = `/u/${encodeURIComponent(handle)}/badge.svg`;
+      a.download = `chapa-${handle}.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } finally {
       setDownloadStatus("idle");
     }
