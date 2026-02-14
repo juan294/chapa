@@ -70,27 +70,37 @@ describe("getStats", () => {
 
   it("fetches from GitHub on cache miss and caches result", async () => {
     const fresh = makeStats();
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheGet
+      .mockResolvedValueOnce(null) // stats:v2:test-user (primary)
+      .mockResolvedValueOnce(null) // stats:stale:test-user (stale fallback)
+      .mockResolvedValueOnce(null); // supplemental:test-user
     mockFetchStatsData.mockResolvedValue(fresh);
 
     const result = await getStats("test-user");
     expect(result).toEqual(fresh);
     expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:test-user", fresh, 21600);
+    expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", fresh, 604800);
   });
 
   it("normalizes handle to lowercase for cache keys", async () => {
     const fresh = makeStats();
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheGet
+      .mockResolvedValueOnce(null) // primary
+      .mockResolvedValueOnce(null) // stale
+      .mockResolvedValueOnce(null); // supplemental
     mockFetchStatsData.mockResolvedValue(fresh);
 
     await getStats("Test-User");
-    // Cache key should use lowercase handle
     expect(mockCacheGet).toHaveBeenCalledWith("stats:v2:test-user");
+    expect(mockCacheGet).toHaveBeenCalledWith("stats:stale:test-user");
     expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:test-user", fresh, 21600);
+    expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", fresh, 604800);
   });
 
-  it("returns null when GitHub returns null", async () => {
-    mockCacheGet.mockResolvedValue(null);
+  it("returns null when GitHub returns null and no stale cache", async () => {
+    mockCacheGet
+      .mockResolvedValueOnce(null) // primary
+      .mockResolvedValueOnce(null); // stale
     mockFetchStatsData.mockResolvedValue(null);
 
     const result = await getStats("test-user");
@@ -111,9 +121,10 @@ describe("getStats", () => {
       uploadedAt: new Date().toISOString(),
     };
 
-    // First call: stats cache miss; second call: supplemental hit
+    // primary miss, stale miss, fetch succeeds, supplemental hit
     mockCacheGet
-      .mockResolvedValueOnce(null) // stats:test-user
+      .mockResolvedValueOnce(null) // stats:v2:test-user
+      .mockResolvedValueOnce(null) // stats:stale:test-user
       .mockResolvedValueOnce(supplemental); // supplemental:test-user
     mockFetchStatsData.mockResolvedValue(primary);
 
@@ -129,7 +140,8 @@ describe("getStats", () => {
     const primary = makeStats({ commitsTotal: 50 });
 
     mockCacheGet
-      .mockResolvedValueOnce(null) // stats cache miss
+      .mockResolvedValueOnce(null) // primary miss
+      .mockResolvedValueOnce(null) // stale miss
       .mockResolvedValueOnce(null); // no supplemental
     mockFetchStatsData.mockResolvedValue(primary);
 
@@ -149,26 +161,131 @@ describe("getStats", () => {
     };
 
     mockCacheGet
-      .mockResolvedValueOnce(null) // stats cache miss
+      .mockResolvedValueOnce(null) // primary miss
+      .mockResolvedValueOnce(null) // stale miss
       .mockResolvedValueOnce(supplemental);
     mockFetchStatsData.mockResolvedValue(primary);
 
     await getStats("test-user");
 
-    // The cached value should be the merged stats
+    // The cached value should be the merged stats (both primary and stale)
     expect(mockCacheSet).toHaveBeenCalledWith(
       "stats:v2:test-user",
       expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
       21600,
     );
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "stats:stale:test-user",
+      expect.objectContaining({ commitsTotal: 80, hasSupplementalData: true }),
+      604800,
+    );
   });
 
   it("passes token argument through to fetchStats", async () => {
-    mockCacheGet.mockResolvedValue(null);
+    mockCacheGet
+      .mockResolvedValueOnce(null) // primary
+      .mockResolvedValueOnce(null) // stale
+      .mockResolvedValueOnce(null); // supplemental
     mockFetchStatsData.mockResolvedValue(makeStats());
 
     await getStats("test-user", "abc");
 
     expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", "abc");
+  });
+
+  // -----------------------------------------------------------------------
+  // Stale cache fallback on API failure (#273)
+  // -----------------------------------------------------------------------
+
+  describe("stale cache fallback on API failure", () => {
+    it("returns stale data when API fails and stale cache exists", async () => {
+      const stale = makeStats({ commitsTotal: 42 });
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(stale); // stale hit
+      mockFetchStatsData.mockResolvedValue(null); // API failure
+
+      const result = await getStats("test-user");
+      expect(result).toEqual(stale);
+    });
+
+    it("returns null when API fails and no stale cache exists", async () => {
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(null); // stale miss
+      mockFetchStatsData.mockResolvedValue(null);
+
+      const result = await getStats("test-user");
+      expect(result).toBeNull();
+    });
+
+    it("writes both primary and stale cache on successful fetch", async () => {
+      const fresh = makeStats();
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(null) // stale miss
+        .mockResolvedValueOnce(null); // no supplemental
+      mockFetchStatsData.mockResolvedValue(fresh);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:test-user", fresh, 21600);
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", fresh, 604800);
+    });
+
+    it("does NOT re-cache stale data with a fresh TTL", async () => {
+      const stale = makeStats({ commitsTotal: 42 });
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(stale); // stale hit
+      mockFetchStatsData.mockResolvedValue(null); // API failure
+
+      await getStats("test-user");
+
+      // cacheSet should NOT have been called — stale data stays as-is
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("prefers fresh API data over stale cache", async () => {
+      const stale = makeStats({ commitsTotal: 42 });
+      const fresh = makeStats({ commitsTotal: 99 });
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(stale) // stale exists
+        .mockResolvedValueOnce(null); // no supplemental
+      mockFetchStatsData.mockResolvedValue(fresh); // API succeeds
+
+      const result = await getStats("test-user");
+      expect(result).toEqual(fresh);
+      expect(result!.commitsTotal).toBe(99);
+    });
+
+    it("uses lowercase handle for stale cache key", async () => {
+      const stale = makeStats();
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(stale); // stale hit
+      mockFetchStatsData.mockResolvedValue(null);
+
+      await getStats("Test-User");
+
+      expect(mockCacheGet).toHaveBeenCalledWith("stats:stale:test-user");
+    });
+
+    it("logs when serving stale data", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const stale = makeStats();
+      mockCacheGet
+        .mockResolvedValueOnce(null) // primary miss
+        .mockResolvedValueOnce(stale); // stale hit
+      mockFetchStatsData.mockResolvedValue(null);
+
+      await getStats("test-user");
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[cache] serving stale data for test-user"),
+      );
+      warnSpy.mockRestore();
+    });
   });
 });
