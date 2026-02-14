@@ -83,4 +83,47 @@ describe("BadgeToolbar", () => {
       expect(SOURCE).toContain("mousedown");
     });
   });
+
+  describe("aria-busy loading states (#232)", () => {
+    it("adds aria-busy to refresh button when loading", () => {
+      expect(SOURCE).toContain("aria-busy");
+      // aria-busy should be tied to loading states
+      expect(SOURCE).toMatch(/aria-busy[\s\S]*refreshStatus\s*===\s*["']loading["']/);
+    });
+
+    it("adds aria-busy to download button when loading", () => {
+      expect(SOURCE).toMatch(/aria-busy[\s\S]*downloadStatus\s*===\s*["']loading["']/);
+    });
+  });
+
+  describe("arrow key navigation for share dropdown (#236)", () => {
+    it("handles ArrowDown key in share dropdown", () => {
+      expect(SOURCE).toContain("ArrowDown");
+    });
+
+    it("handles ArrowUp key in share dropdown", () => {
+      expect(SOURCE).toContain("ArrowUp");
+    });
+
+    it("handles Home key in share dropdown", () => {
+      expect(SOURCE).toContain('"Home"');
+    });
+
+    it("handles End key in share dropdown", () => {
+      expect(SOURCE).toContain('"End"');
+    });
+
+    it("handles Escape key to close share dropdown", () => {
+      expect(SOURCE).toContain('"Escape"');
+    });
+
+    it("queries menuitem elements for arrow key navigation", () => {
+      expect(SOURCE).toContain('role="menuitem"');
+      expect(SOURCE).toContain("querySelectorAll");
+    });
+
+    it("focuses menu items on arrow key navigation", () => {
+      expect(SOURCE).toContain(".focus()");
+    });
+  });
 });

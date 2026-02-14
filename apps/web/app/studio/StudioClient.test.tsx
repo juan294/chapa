@@ -130,6 +130,34 @@ describe("StudioClient", () => {
     it("shows reduced motion notice when detected", () => {
       expect(SOURCE).toContain("Reduced motion detected");
     });
+
+    it("avoids SSR hydration mismatch by using useSyncExternalStore with server snapshot returning false", () => {
+      // Must use useSyncExternalStore — no useState initializer accessing window
+      expect(SOURCE).toContain("useSyncExternalStore");
+      // Server snapshot must always return false
+      expect(SOURCE).toContain("getReducedMotionServerSnapshot");
+      // Must NOT have window check inside a useState initializer
+      expect(SOURCE).not.toMatch(
+        /useState\(\s*\(\)\s*=>\s*\{[\s\S]*?window/,
+      );
+      expect(SOURCE).not.toMatch(
+        /useState\(\(\)\s*=>\s*typeof window/,
+      );
+    });
+
+    it("subscribes to matchMedia changes via useSyncExternalStore", () => {
+      // Subscribe function listens for changes to the media query
+      expect(SOURCE).toContain("subscribeReducedMotion");
+      expect(SOURCE).toContain("getReducedMotionSnapshot");
+      // The snapshot reads from matchMedia
+      expect(SOURCE).toContain("matchMedia");
+    });
+  });
+
+  describe("aria-busy on saving state", () => {
+    it("applies aria-busy to the preview area when saving", () => {
+      expect(SOURCE).toContain("aria-busy");
+    });
   });
 
   describe("preview animation replay", () => {

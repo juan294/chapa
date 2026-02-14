@@ -32,6 +32,48 @@ export function BadgeToolbar({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [shareOpen]);
 
+  // Close on Escape
+  useEffect(() => {
+    if (!shareOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setShareOpen(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [shareOpen]);
+
+  // Arrow key navigation for share menu items
+  useEffect(() => {
+    if (!shareOpen || !shareRef.current) return;
+    function handleMenuKeyDown(e: KeyboardEvent) {
+      const items = Array.from(
+        shareRef.current?.querySelectorAll('[role="menuitem"]') ?? [],
+      ) as HTMLElement[];
+      if (items.length === 0) return;
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+
+      let nextIndex = -1;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        nextIndex = (currentIndex + 1) % items.length;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        nextIndex = (currentIndex - 1 + items.length) % items.length;
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        nextIndex = 0;
+      } else if (e.key === "End") {
+        e.preventDefault();
+        nextIndex = items.length - 1;
+      }
+      if (nextIndex >= 0) {
+        items[nextIndex].focus();
+      }
+    }
+    document.addEventListener("keydown", handleMenuKeyDown);
+    return () => document.removeEventListener("keydown", handleMenuKeyDown);
+  }, [shareOpen]);
+
   async function handleRefresh() {
     setRefreshStatus("loading");
     try {
@@ -148,6 +190,7 @@ export function BadgeToolbar({
         <button
           onClick={handleRefresh}
           disabled={refreshStatus === "loading" || refreshStatus === "success"}
+          aria-busy={refreshStatus === "loading"}
           title={
             refreshStatus === "idle"
               ? "Refresh badge data"
@@ -267,6 +310,7 @@ export function BadgeToolbar({
       <button
         onClick={handleDownload}
         disabled={downloadStatus === "loading"}
+        aria-busy={downloadStatus === "loading"}
         aria-label="Download badge as PNG"
         className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
       >
