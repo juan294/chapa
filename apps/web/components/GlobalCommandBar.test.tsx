@@ -22,4 +22,10 @@ describe("GlobalCommandBar", () => {
       expect(SOURCE).not.toMatch(/\bautoFocus\b(?!\s*=\s*\{false\})/);
     });
   });
+
+  describe("mobile responsiveness (#240)", () => {
+    it("output popup uses max-h-48 sm:max-h-64 for responsive height", () => {
+      expect(SOURCE).toContain("max-h-48 sm:max-h-64");
+    });
+  });
 });

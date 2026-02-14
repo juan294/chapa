@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { ThemeToggle } from "./ThemeToggle";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 afterEach(cleanup);
 
@@ -66,5 +68,26 @@ describe("ThemeToggle", () => {
     const button = screen.getByRole("button");
     const svg = button.querySelector("svg");
     expect(svg?.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+const THEME_TOGGLE_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "ThemeToggle.tsx"),
+  "utf-8",
+);
+
+describe("ThemeToggle — mobile responsiveness (#240)", () => {
+  it("button uses h-10 w-10 for 40px touch target", () => {
+    expect(THEME_TOGGLE_SOURCE).toContain("h-10 w-10");
+    // Ensure the old smaller size is not used
+    expect(THEME_TOGGLE_SOURCE).not.toContain("h-8 w-8");
+  });
+
+  it("hydration placeholder also uses h-10 w-10", () => {
+    // The placeholder div should match the button size to prevent layout shift
+    const placeholderMatch = THEME_TOGGLE_SOURCE.match(
+      /className="h-10 w-10"[\s\S]*?aria-hidden="true"/,
+    );
+    expect(placeholderMatch).not.toBeNull();
   });
 });
