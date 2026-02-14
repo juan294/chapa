@@ -1,0 +1,61 @@
+NOTICES — License Exceptions
+=============================
+
+Chapa's approved dependency licenses are: MIT, Apache-2.0, BSD, ISC.
+
+The following dependencies use licenses outside that approved list. Each has
+been reviewed and accepted for the reasons documented below.
+
+
+PRODUCTION DEPENDENCIES
+-----------------------
+
+### @img/sharp-libvips-darwin-arm64
+License: LGPL-3.0-or-later
+Purpose: Native image processing library (libvips), used by `sharp` for
+         image resizing and format conversion.
+Rationale: libvips is a pre-built native binary that is dynamically linked
+           at runtime — it is NOT compiled into or statically linked with
+           the project's JavaScript/TypeScript code. LGPL-3.0 permits
+           dynamic linking without requiring the consuming project to adopt
+           the LGPL. No modifications are made to the library. This is
+           consistent with standard Node.js usage of sharp/libvips.
+
+### @resvg/resvg-js / @resvg/resvg-js-darwin-arm64
+License: MPL-2.0
+Purpose: High-fidelity SVG-to-PNG rendering used for OG image and badge
+         PNG generation.
+Rationale: MPL-2.0 is a file-level copyleft license. It only requires
+           source disclosure for modifications to MPL-licensed files
+           themselves. Chapa uses these packages as unmodified dependencies
+           — no MPL-licensed source files are changed. The project's own
+           source code is not affected by the MPL.
+
+### @vercel/analytics
+License: MPL-2.0
+Purpose: Vercel Web Analytics integration for page-view tracking.
+Rationale: Same as @resvg/resvg-js above — used as an unmodified
+           dependency. MPL-2.0 file-level copyleft does not extend to
+           the consuming project's code.
+
+
+DEVELOPMENT-ONLY DEPENDENCIES
+------------------------------
+
+These packages are used only during development and testing. They are never
+included in the production bundle or deployed to end users.
+
+### axe-core
+License: MPL-2.0
+Purpose: Accessibility testing engine used in automated tests.
+Rationale: Dev-only dependency, not shipped to production. MPL-2.0
+           file-level copyleft does not apply to the project's own code,
+           and the package is used unmodified.
+
+### lightningcss
+License: MPL-2.0
+Purpose: CSS parsing, transformation, and minification used by the build
+         toolchain.
+Rationale: Dev-only build tool dependency, not shipped to production.
+           MPL-2.0 file-level copyleft does not apply to the project's
+           own code, and the package is used unmodified.
