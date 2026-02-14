@@ -77,15 +77,42 @@ export function BadgeToolbar({
     setDownloadStatus("loading");
     trackEvent("badge_downloaded", { handle });
     try {
-      const res = await fetch(`/u/${encodeURIComponent(handle)}/opengraph-image`);
+      const res = await fetch(`/u/${encodeURIComponent(handle)}/badge.svg`);
       if (!res.ok) throw new Error("fetch failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `chapa-${handle}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const svgText = await res.text();
+
+      // Render SVG to high-res PNG via canvas
+      const scale = 2; // 2x for crisp output
+      const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth * scale;
+          canvas.height = img.naturalHeight * scale;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { reject(new Error("no canvas context")); return; }
+          ctx.scale(scale, scale);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(svgUrl);
+
+          canvas.toBlob((blob) => {
+            if (!blob) { reject(new Error("toBlob failed")); return; }
+            const pngUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = pngUrl;
+            a.download = `chapa-${handle}.png`;
+            a.click();
+            URL.revokeObjectURL(pngUrl);
+            resolve();
+          }, "image/png");
+        };
+        img.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error("img load failed")); };
+        img.src = svgUrl;
+      });
     } catch {
       /* silently fail */
     } finally {
