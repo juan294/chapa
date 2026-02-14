@@ -9,8 +9,9 @@ export function useInView(ref: RefObject<HTMLElement | null>, threshold = 0.5) {
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
           setInView(true);
           obs.disconnect();
         }

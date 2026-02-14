@@ -301,7 +301,7 @@ describe("forwardEmail", () => {
       text: "Original message",
     });
 
-    const call = mockSend.mock.calls[0][0];
+    const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain("alice@example.com");
     expect(call.html).toContain("Question");
     expect(call.html).toContain("<p>Original message</p>");

@@ -125,7 +125,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
         messageIndex = (messageIndex + 1) % MESSAGES.length;
         if (messageIndex === 0) messageIndex = 1;
 
-        const nextMsg = MESSAGES[messageIndex];
+        const nextMsg = MESSAGES[messageIndex]!;
 
         await eraseText(HOME_TEXT);
         if (cancelled) return;

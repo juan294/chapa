@@ -67,7 +67,7 @@ describe("exchangeCodeForToken", () => {
     expect(token).toBe("gho_abc123");
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    const [url, opts] = mockFetch.mock.calls[0];
+    const [url, opts] = mockFetch.mock.calls[0]!;
     expect(url).toBe("https://github.com/login/oauth/access_token");
     expect(opts.method).toBe("POST");
     expect(opts.headers["Accept"]).toBe("application/json");
@@ -169,13 +169,13 @@ describe("validateState", () => {
   it("returns true when cookie state matches query state", () => {
     const { state, cookie } = createStateCookie();
     // Extract just the cookie key=value part (before the flags)
-    const cookieHeader = cookie.split(";")[0];
+    const cookieHeader = cookie.split(";")[0]!;
     expect(validateState(cookieHeader, state)).toBe(true);
   });
 
   it("returns false when state values do not match", () => {
     const { cookie } = createStateCookie();
-    const cookieHeader = cookie.split(";")[0];
+    const cookieHeader = cookie.split(";")[0]!;
     expect(validateState(cookieHeader, "wrong-state-value")).toBe(false);
   });
 
@@ -185,7 +185,7 @@ describe("validateState", () => {
 
   it("returns false when state param is null", () => {
     const { cookie } = createStateCookie();
-    const cookieHeader = cookie.split(";")[0];
+    const cookieHeader = cookie.split(";")[0]!;
     expect(validateState(cookieHeader, null)).toBe(false);
   });
 });
@@ -244,7 +244,7 @@ describe("cookie Secure flag", () => {
     const secret = "secret-key-for-test-32-chars!!!!";
     const payload = { token: "gho_abc", login: "juan294", name: "Juan", avatar_url: "https://img" };
     const cookie = createSessionCookie(payload, secret);
-    const cookieHeader = cookie.split(";")[0]; // just the name=value part
+    const cookieHeader = cookie.split(";")[0]!; // just the name=value part
     const result = readSessionCookie(cookieHeader, secret);
     expect(result).toEqual(payload);
   });
@@ -327,7 +327,7 @@ describe("readSessionCookie — shape validation", () => {
   it("returns a valid payload when shape is correct", () => {
     const goodPayload = { token: "gho_abc", login: "juan294", name: "Juan", avatar_url: "https://img" };
     const cookie = createSessionCookie(goodPayload, secret);
-    const cookieHeader = cookie.split(";")[0];
+    const cookieHeader = cookie.split(";")[0]!;
     const result = readSessionCookie(cookieHeader, secret);
     expect(result).toEqual(goodPayload);
   });

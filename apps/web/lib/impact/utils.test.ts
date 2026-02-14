@@ -133,8 +133,8 @@ describe("computeConfidence", () => {
       );
       expect(confidence).toBe(85);
       expect(penalties).toHaveLength(1);
-      expect(penalties[0].flag).toBe("burst_activity");
-      expect(penalties[0].penalty).toBe(15);
+      expect(penalties[0]!.flag).toBe("burst_activity");
+      expect(penalties[0]!.penalty).toBe(15);
     });
 
     it("does NOT apply when maxCommitsIn10Min is 19", () => {
@@ -154,8 +154,8 @@ describe("computeConfidence", () => {
       );
       expect(confidence).toBe(90);
       expect(penalties).toHaveLength(1);
-      expect(penalties[0].flag).toBe("micro_commit_pattern");
-      expect(penalties[0].penalty).toBe(10);
+      expect(penalties[0]!.flag).toBe("micro_commit_pattern");
+      expect(penalties[0]!.penalty).toBe(10);
     });
 
     it("does NOT apply when microCommitRatio is 0.59", () => {
@@ -191,8 +191,8 @@ describe("computeConfidence", () => {
       );
       expect(confidence).toBe(85);
       expect(penalties).toHaveLength(1);
-      expect(penalties[0].flag).toBe("generated_change_pattern");
-      expect(penalties[0].penalty).toBe(15);
+      expect(penalties[0]!.flag).toBe("generated_change_pattern");
+      expect(penalties[0]!.penalty).toBe(15);
     });
 
     it("does NOT apply when total lines < 20000", () => {
@@ -229,8 +229,8 @@ describe("computeConfidence", () => {
       );
       expect(confidence).toBe(90);
       expect(penalties).toHaveLength(1);
-      expect(penalties[0].flag).toBe("low_collaboration_signal");
-      expect(penalties[0].penalty).toBe(10);
+      expect(penalties[0]!.flag).toBe("low_collaboration_signal");
+      expect(penalties[0]!.penalty).toBe(10);
     });
 
     it("does NOT apply when PRs < 10", () => {
@@ -260,8 +260,8 @@ describe("computeConfidence", () => {
       );
       expect(confidence).toBe(95);
       expect(penalties).toHaveLength(1);
-      expect(penalties[0].flag).toBe("single_repo_concentration");
-      expect(penalties[0].penalty).toBe(5);
+      expect(penalties[0]!.flag).toBe("single_repo_concentration");
+      expect(penalties[0]!.penalty).toBe(5);
     });
 
     it("does NOT apply when topRepoShare < 0.95", () => {
@@ -291,8 +291,8 @@ describe("computeConfidence", () => {
       );
       expect(confidence).toBe(95);
       expect(penalties).toHaveLength(1);
-      expect(penalties[0].flag).toBe("supplemental_unverified");
-      expect(penalties[0].penalty).toBe(5);
+      expect(penalties[0]!.flag).toBe("supplemental_unverified");
+      expect(penalties[0]!.penalty).toBe(5);
     });
 
     it("does NOT apply when hasSupplementalData is false", () => {

@@ -136,7 +136,7 @@ export function createNavigationCommands(): CommandDef[] {
             lines: [makeLine("error", "Usage: /badge <handle>")],
           };
         }
-        const handle = args[0].replace(/^@/, "");
+        const handle = args[0]!.replace(/^@/, "");
         return {
           lines: [makeLine("system", `Opening badge for @${handle}...`)],
           action: { type: "navigate", path: `/u/${handle}` },
@@ -225,7 +225,7 @@ export function parseCommand(input: string): { name: string; args: string[] } | 
   if (!trimmed.startsWith("/")) return null;
 
   const parts = trimmed.split(/\s+/);
-  const name = parts[0].toLowerCase();
+  const name = parts[0]!.toLowerCase();
   const args = parts.slice(1);
 
   return { name, args };

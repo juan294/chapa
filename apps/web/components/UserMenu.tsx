@@ -63,7 +63,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
         nextIndex = items.length - 1;
       }
       if (nextIndex >= 0) {
-        items[nextIndex].focus();
+        items[nextIndex]!.focus();
       }
     }
     document.addEventListener("keydown", handleMenuKeyDown);

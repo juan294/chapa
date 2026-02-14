@@ -227,7 +227,7 @@ export function groupByScope(
   const groups: Record<string, Shortcut[]> = {};
   for (const s of shortcuts) {
     if (!groups[s.scope]) groups[s.scope] = [];
-    groups[s.scope].push(s);
+    groups[s.scope]!.push(s);
   }
   return groups;
 }

@@ -49,7 +49,7 @@ export function useAnimatedCounter(
       setIsAnimating(true);
       setValue(0);
       const start = performance.now();
-      const easeFn = easings[ease] || easings.easeOut;
+      const easeFn = easings[ease] ?? easings["easeOut"]!;
 
       const frame = (now: number) => {
         const elapsed = now - start;

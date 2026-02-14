@@ -62,7 +62,7 @@ describe("executeCommand", () => {
   it("executes /help", () => {
     const result = executeCommand("/help", commands);
     expect(result.lines.length).toBeGreaterThan(0);
-    expect(result.lines[0].type).toBe("system");
+    expect(result.lines[0]!.type).toBe("system");
   });
 
   it("executes /login with navigate action", () => {
@@ -85,18 +85,18 @@ describe("executeCommand", () => {
 
   it("errors on /badge without handle", () => {
     const result = executeCommand("/badge", commands);
-    expect(result.lines[0].type).toBe("error");
+    expect(result.lines[0]!.type).toBe("error");
     expect(result.action).toBeUndefined();
   });
 
   it("returns error for unknown command", () => {
     const result = executeCommand("/foobar", commands);
-    expect(result.lines[0].type).toBe("error");
+    expect(result.lines[0]!.type).toBe("error");
   });
 
   it("returns error for non-slash input", () => {
     const result = executeCommand("hello world", commands);
-    expect(result.lines[0].type).toBe("error");
+    expect(result.lines[0]!.type).toBe("error");
   });
 });
 
@@ -149,7 +149,7 @@ describe("createNavigationCommands (studio disabled)", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
     const result = executeCommand("/studio", commands);
-    expect(result.lines[0].type).toBe("error");
+    expect(result.lines[0]!.type).toBe("error");
   });
 
   it("getMatchingCommands returns 13 for / when disabled", () => {
@@ -262,7 +262,7 @@ describe("createNavigationCommands (studio enabled)", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
     const result = executeCommand("/badge", commands);
-    expect(result.lines[0].type).toBe("error");
+    expect(result.lines[0]!.type).toBe("error");
     expect(result.action).toBeUndefined();
   });
 

@@ -29,7 +29,7 @@ export function buildHeatmapCells(
   for (let week = 0; week < WEEKS; week++) {
     for (let day = 0; day < DAYS; day++) {
       const idx = week * DAYS + day;
-      const count = idx < sliced.length ? sliced[idx].count : 0;
+      const count = idx < sliced.length ? sliced[idx]!.count : 0;
       cells.push({
         x: offsetX + week * (CELL_SIZE + CELL_GAP),
         y: offsetY + day * (CELL_SIZE + CELL_GAP),

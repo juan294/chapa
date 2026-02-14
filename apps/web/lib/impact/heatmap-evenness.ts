@@ -20,7 +20,7 @@ export function computeHeatmapEvenness(heatmapData: HeatmapDay[]): number {
 
   for (let i = 0; i < heatmapData.length; i++) {
     const week = Math.floor(i / 7);
-    weeklyTotals[week] += heatmapData[i].count;
+    weeklyTotals[week] = (weeklyTotals[week] ?? 0) + heatmapData[i]!.count;
   }
 
   // If total activity is zero, evenness is 0

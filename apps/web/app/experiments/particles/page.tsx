@@ -45,9 +45,9 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) return { r: 124, g: 106, b: 239 }; // fallback to amber
   return {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16),
+    r: parseInt(result[1]!, 16),
+    g: parseInt(result[2]!, 16),
+    b: parseInt(result[3]!, 16),
   };
 }
 
@@ -98,7 +98,7 @@ function useParticles(
           Math.random() * (config.maxRadius - config.minRadius),
         opacity: baseOpacity,
         baseOpacity,
-        color: config.colors[Math.floor(Math.random() * config.colors.length)],
+        color: config.colors[Math.floor(Math.random() * config.colors.length)]!,
         phase: Math.random() * Math.PI * 2,
       };
     });
@@ -189,15 +189,15 @@ function useParticles(
       if (config.connections) {
         for (let i = 0; i < particles.length; i++) {
           for (let j = i + 1; j < particles.length; j++) {
-            const dx = particles[i].x - particles[j].x;
-            const dy = particles[i].y - particles[j].y;
+            const dx = particles[i]!.x - particles[j]!.x;
+            const dy = particles[i]!.y - particles[j]!.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < config.connectionDistance) {
               const opacity =
                 (1 - dist / config.connectionDistance) * 0.15;
               ctx.beginPath();
-              ctx.moveTo(particles[i].x, particles[i].y);
-              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.moveTo(particles[i]!.x, particles[i]!.y);
+              ctx.lineTo(particles[j]!.x, particles[j]!.y);
               ctx.strokeStyle = `rgba(124, 106, 239, ${opacity})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
