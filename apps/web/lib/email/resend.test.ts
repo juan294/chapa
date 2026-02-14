@@ -30,6 +30,7 @@ import {
   verifyWebhookSignature,
   fetchReceivedEmail,
   forwardEmail,
+  escapeHtml,
   _resetClient,
 } from "./resend";
 
@@ -208,6 +209,42 @@ describe("fetchReceivedEmail", () => {
 });
 
 // ---------------------------------------------------------------------------
+// escapeHtml
+// ---------------------------------------------------------------------------
+
+describe("escapeHtml", () => {
+  it("escapes ampersands", () => {
+    expect(escapeHtml("A & B")).toBe("A &amp; B");
+  });
+
+  it("escapes angle brackets", () => {
+    expect(escapeHtml("<script>")).toBe("&lt;script&gt;");
+  });
+
+  it("escapes double quotes", () => {
+    expect(escapeHtml('"hello"')).toBe("&quot;hello&quot;");
+  });
+
+  it("escapes single quotes", () => {
+    expect(escapeHtml("it's")).toBe("it&#39;s");
+  });
+
+  it("escapes all entities in a single string", () => {
+    expect(escapeHtml('<a href="x" & \'y\'>')).toBe(
+      "&lt;a href=&quot;x&quot; &amp; &#39;y&#39;&gt;",
+    );
+  });
+
+  it("returns empty string unchanged", () => {
+    expect(escapeHtml("")).toBe("");
+  });
+
+  it("returns safe string unchanged", () => {
+    expect(escapeHtml("hello world")).toBe("hello world");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // forwardEmail
 // ---------------------------------------------------------------------------
 
@@ -305,5 +342,28 @@ describe("forwardEmail", () => {
     expect(call.html).toContain("alice@example.com");
     expect(call.html).toContain("Question");
     expect(call.html).toContain("<p>Original message</p>");
+  });
+
+  it("escapes HTML entities in from and subject fields", async () => {
+    mockSend.mockResolvedValueOnce({ data: { id: "fwd_789" }, error: null });
+
+    await forwardEmail({
+      from: '<script>alert("xss")</script>',
+      subject: 'Test <img src=x onerror=alert(1)> & "quotes"',
+      html: "<p>Body</p>",
+      text: "Body",
+    });
+
+    const call = mockSend.mock.calls[0]![0];
+    // The from field in the HTML header should be escaped
+    expect(call.html).not.toContain("<script>");
+    expect(call.html).toContain("&lt;script&gt;");
+    // The subject in the HTML header should be escaped
+    expect(call.html).not.toContain("<img");
+    expect(call.html).toContain("&lt;img");
+    expect(call.html).toContain("&amp;");
+    expect(call.html).toContain("&quot;quotes&quot;");
+    // The original HTML body should NOT be escaped (it's intentionally raw HTML)
+    expect(call.html).toContain("<p>Body</p>");
   });
 });
