@@ -146,6 +146,46 @@ describe("email content", () => {
       "https://chapa.thecreativetoken.com/u/testuser",
     );
   });
+
+  it("includes dimension scores in body", async () => {
+    await notifyFirstBadge("testuser", sampleImpact);
+
+    const call = mockSend.mock.calls[0][0];
+    // HTML should contain all four dimension values
+    expect(call.html).toContain("80"); // building
+    expect(call.html).toContain("60"); // guarding
+    expect(call.html).toContain("70"); // consistency
+    expect(call.html).toContain("50"); // breadth
+    // Plain text too
+    expect(call.text).toContain("Building:");
+    expect(call.text).toContain("80");
+    expect(call.text).toContain("Guarding:");
+    expect(call.text).toContain("60");
+    expect(call.text).toContain("Consistency:");
+    expect(call.text).toContain("70");
+    expect(call.text).toContain("Breadth:");
+    expect(call.text).toContain("50");
+  });
+
+  it("includes badge SVG link in body", async () => {
+    await notifyFirstBadge("testuser", sampleImpact);
+
+    const call = mockSend.mock.calls[0][0];
+    expect(call.html).toContain(
+      "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
+    );
+    expect(call.text).toContain(
+      "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
+    );
+  });
+
+  it("includes Chapa branding in HTML", async () => {
+    await notifyFirstBadge("testuser", sampleImpact);
+
+    const call = mockSend.mock.calls[0][0];
+    expect(call.html).toContain("#7C6AEF"); // brand purple
+    expect(call.html).toContain("CHAPA");
+  });
 });
 
 // ---------------------------------------------------------------------------
