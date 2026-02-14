@@ -21,7 +21,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.CI ? "pnpm run start -- --port 3001" : "pnpm run dev",
+    command: process.env.CI ? "npx next start --port 3001" : "pnpm run dev",
     port: 3001,
     reuseExistingServer: !process.env.CI,
     cwd: __dirname,
