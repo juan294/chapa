@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
 import { ThemeToggle } from "./ThemeToggle";
@@ -69,6 +70,7 @@ export async function Navbar({ navLinks }: NavbarProps) {
               login={session.login}
               name={session.name}
               avatarUrl={session.avatar_url}
+              isAdmin={isAdminHandle(session.login)}
             />
           ) : (
             <a
