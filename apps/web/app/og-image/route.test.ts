@@ -44,40 +44,27 @@ describe("GET /og-image", () => {
     expect(mockSvgToPng).toHaveBeenCalledWith(expect.any(String), 1200);
   });
 
-  it("passes valid SVG markup to svgToPng", async () => {
+  it("passes valid SVG with Chapa branding", async () => {
     await GET();
     const svgArg = mockSvgToPng.mock.calls[0]![0] as string;
     expect(svgArg).toContain("<svg");
-    expect(svgArg).toContain("viewBox=\"0 0 1200 630\"");
+    expect(svgArg).toContain('viewBox="0 0 1200 630"');
     expect(svgArg).toContain("Chapa");
     expect(svgArg).toContain("Developer Impact, Decoded");
   });
 
-  it("includes heatmap cells in the SVG", async () => {
+  it("includes full-year heatmap grid (52 cols x 7 rows)", async () => {
     await GET();
     const svgArg = mockSvgToPng.mock.calls[0]![0] as string;
-    // Heatmap grid has many rect elements
+    // 7 x 52 = 364 heatmap cells + 1 background rect = 365
     const rectCount = (svgArg.match(/<rect /g) ?? []).length;
-    expect(rectCount).toBeGreaterThan(50); // 7x15 = 105 heatmap cells + card + bg
+    expect(rectCount).toBe(365);
   });
 
-  it("includes radar chart polygon in the SVG", async () => {
+  it("includes site URL in the SVG", async () => {
     await GET();
     const svgArg = mockSvgToPng.mock.calls[0]![0] as string;
-    expect(svgArg).toContain("<polygon");
-    expect(svgArg).toContain("Building");
-    expect(svgArg).toContain("Guarding");
-    expect(svgArg).toContain("Consistency");
-    expect(svgArg).toContain("Breadth");
-  });
-
-  it("includes dimension pills in the SVG", async () => {
-    await GET();
-    const svgArg = mockSvgToPng.mock.calls[0]![0] as string;
-    expect(svgArg).toContain("Building");
-    expect(svgArg).toContain("Guarding");
-    expect(svgArg).toContain("Consistency");
-    expect(svgArg).toContain("Breadth");
+    expect(svgArg).toContain("chapa.thecreativetoken.com");
   });
 
   it("returns 500 when svgToPng throws", async () => {
