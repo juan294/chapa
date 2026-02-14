@@ -7,6 +7,7 @@ import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
+import Link from "next/link";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -34,7 +35,9 @@ export async function generateMetadata({
   }
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
-  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image`;
+  // Daily cache buster forces social platforms to re-fetch the OG image
+  const today = new Date().toISOString().slice(0, 10);
+  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${today}`;
   return {
     title: `@${handle} — Developer Impact, Decoded`,
     description: `View ${handle}'s developer impact score and badge on Chapa.`,
@@ -48,7 +51,7 @@ export async function generateMetadata({
     twitter: {
       card: "summary_large_image",
       title: `@${handle} — Chapa Developer Impact, Decoded`,
-      description: `View ${handle}'s developer impact and badge on Chapa.`,
+      description: `What does your developer DNA look like? Discover your impact score, archetype, and coding patterns.`,
       images: [ogImageUrl],
     },
     alternates: {
@@ -181,6 +184,29 @@ export default async function SharePage({ params }: SharePageProps) {
             studioEnabled={isStudioEnabled()}
           />
         </div>
+
+        {/* ── Visitor CTA (non-owners) ───────────────────────── */}
+        {!isOwner && (
+          <section className="mb-10 animate-fade-in-up [animation-delay:300ms]">
+            <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
+              <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2">
+                Curious what your developer impact looks like?
+              </h2>
+              <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto">
+                Decode your coding DNA in seconds. See your archetype, impact score, and how you compare.
+              </p>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+              >
+                Discover your impact
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* ── Impact Breakdown (owner only) ─────────────────── */}
         {isOwner && (

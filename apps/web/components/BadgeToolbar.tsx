@@ -98,7 +98,7 @@ export function BadgeToolbar({
 
   const shareUrl = `https://chapa.thecreativetoken.com/u/${handle}`;
   const tweetText = encodeURIComponent(
-    `Check out my developer impact badge on Chapa! ${shareUrl}`,
+    `Just decoded my developer impact on Chapa. Curious what yours looks like?\n\nDiscover your coding DNA \u2192 ${shareUrl}`,
   );
 
   const handleCopyLink = useCallback(async () => {

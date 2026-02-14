@@ -16,7 +16,7 @@ vi.mock("@resvg/resvg-js", () => ({
   }),
 }));
 
-import { svgToPng, stripSvgAnimations } from "./svg-to-png";
+import { svgToPng, stripSvgAnimations, getFontPaths } from "./svg-to-png";
 import { Resvg } from "@resvg/resvg-js";
 
 const MockResvg = vi.mocked(Resvg);
@@ -29,6 +29,30 @@ const MINIMAL_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect fill="red" width="100" height="50"/></svg>';
 
 const FAKE_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+
+// ---------------------------------------------------------------------------
+// Tests: getFontPaths
+// ---------------------------------------------------------------------------
+
+describe("getFontPaths", () => {
+  it("returns 4 TTF font file paths", () => {
+    const paths = getFontPaths();
+    expect(paths).toHaveLength(4);
+    for (const p of paths) {
+      expect(p).toMatch(/\.ttf$/);
+      expect(p).toContain("public/fonts/");
+    }
+  });
+
+  it("includes both Plus Jakarta Sans and JetBrains Mono", () => {
+    const paths = getFontPaths();
+    const names = paths.map((p) => p.split("/").pop());
+    expect(names).toContain("PlusJakartaSans-Regular.ttf");
+    expect(names).toContain("PlusJakartaSans-SemiBold.ttf");
+    expect(names).toContain("JetBrainsMono-Regular.ttf");
+    expect(names).toContain("JetBrainsMono-Bold.ttf");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Tests: stripSvgAnimations (pure function — no mocks needed)
@@ -116,7 +140,7 @@ describe("svgToPng", () => {
     svgToPng(MINIMAL_SVG, 800);
     expect(MockResvg).toHaveBeenCalledWith(
       expect.any(String),
-      { fitTo: { mode: "width", value: 800 } },
+      expect.objectContaining({ fitTo: { mode: "width", value: 800 } }),
     );
   });
 
@@ -124,8 +148,21 @@ describe("svgToPng", () => {
     svgToPng(MINIMAL_SVG);
     expect(MockResvg).toHaveBeenCalledWith(
       expect.any(String),
-      { fitTo: { mode: "width", value: 1200 } },
+      expect.objectContaining({ fitTo: { mode: "width", value: 1200 } }),
     );
+  });
+
+  it("passes font configuration with TTF font file paths to Resvg", () => {
+    svgToPng(MINIMAL_SVG);
+    const opts = MockResvg.mock.calls[0]![1] as Record<string, unknown>;
+    const font = opts.font as { loadSystemFonts: boolean; fontFiles: string[] };
+    expect(font).toBeDefined();
+    expect(font.loadSystemFonts).toBe(false);
+    expect(font.fontFiles).toBeInstanceOf(Array);
+    expect(font.fontFiles.length).toBe(4);
+    for (const f of font.fontFiles) {
+      expect(f).toMatch(/\.ttf$/);
+    }
   });
 
   it("strips animations before passing SVG to Resvg", () => {

@@ -53,6 +53,13 @@ describe("BadgeToolbar", () => {
       expect(SOURCE).toContain("x.com/intent/tweet");
     });
 
+    it("uses curiosity-driven tweet text that invites readers to discover their own impact", () => {
+      expect(SOURCE).toContain("Curious what yours looks like");
+      expect(SOURCE).toContain("Discover your coding DNA");
+      // Should NOT contain the old self-promotional text
+      expect(SOURCE).not.toContain("Check out my developer impact badge");
+    });
+
     it("tracks share event with PostHog", () => {
       expect(SOURCE).toContain("trackEvent");
       expect(SOURCE).toContain("share_clicked");

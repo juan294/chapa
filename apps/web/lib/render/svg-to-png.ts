@@ -6,6 +6,25 @@
  */
 
 import { Resvg } from "@resvg/resvg-js";
+import { join } from "path";
+
+/** Font files bundled in public/fonts/ for server-side SVG rendering. */
+const FONT_FILES = [
+  "PlusJakartaSans-Regular.ttf",
+  "PlusJakartaSans-SemiBold.ttf",
+  "JetBrainsMono-Regular.ttf",
+  "JetBrainsMono-Bold.ttf",
+];
+
+/**
+ * Resolve absolute paths to the bundled TTF font files.
+ *
+ * Uses `process.cwd()` which points to the Next.js app root both locally
+ * and on Vercel serverless functions.
+ */
+export function getFontPaths(): string[] {
+  return FONT_FILES.map((f) => join(process.cwd(), "public", "fonts", f));
+}
 
 /**
  * Strip all animations from an SVG string so it renders as a static image.
@@ -33,6 +52,10 @@ export function stripSvgAnimations(svg: string): string {
 /**
  * Convert an SVG string to a PNG buffer at the given dimensions.
  *
+ * Loads bundled TTF fonts (Plus Jakarta Sans, JetBrains Mono) so text
+ * renders correctly in serverless environments where these fonts are
+ * not installed (e.g. Vercel).
+ *
  * @param svg - Complete SVG markup string
  * @param width - Target PNG width in pixels (default: 1200)
  * @returns PNG image as a Uint8Array buffer
@@ -41,6 +64,10 @@ export function svgToPng(svg: string, width = 1200): Uint8Array {
   const staticSvg = stripSvgAnimations(svg);
   const resvg = new Resvg(staticSvg, {
     fitTo: { mode: "width", value: width },
+    font: {
+      loadSystemFonts: false,
+      fontFiles: getFontPaths(),
+    },
   });
   const rendered = resvg.render();
   return rendered.asPng();
