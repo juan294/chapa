@@ -56,6 +56,13 @@ jobs:
       - run: pnpm run build
       - run: pnpm --filter @chapa/cli build
 
+      - name: Upload Next.js build
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build
+          path: apps/web/.next/
+          retention-days: 1
+
   e2e:
     name: E2E Tests
     needs: [build]
@@ -94,8 +101,11 @@ jobs:
         run: npx playwright install-deps chromium
         working-directory: apps/web
 
-      - name: Build Next.js app
-        run: pnpm run build
+      - name: Download Next.js build
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build
+          path: apps/web/.next/
 
       - name: Run E2E tests
         run: pnpm run test:e2e
