@@ -3,6 +3,9 @@ import { timingSafeEqual } from "node:crypto";
 import { scanKeys } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 
+/** Vercel Pro allows up to 300s for serverless functions. */
+export const maxDuration = 300;
+
 /** Maximum handles to warm per cron invocation (stay within GitHub rate limits). */
 const MAX_HANDLES = 50;
 
