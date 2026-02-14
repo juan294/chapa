@@ -32,10 +32,10 @@ export default function GuardianPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-[#F472B6]">Guardian</span>
+                The <span className="text-archetype-guardian">Guardian</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-[#F472B6]">Guarding</span>
+                Dominant dimension: <span className="text-archetype-guardian">Guarding</span>
               </p>
             </div>
 
