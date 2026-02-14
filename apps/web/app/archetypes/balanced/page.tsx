@@ -42,6 +42,8 @@ export default function BalancedPage() {
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Balanced archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 

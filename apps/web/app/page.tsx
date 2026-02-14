@@ -167,6 +167,8 @@ export default async function Home({
             <div className="pl-4 border-l border-stroke">
               <div
                 className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+                role="img"
+                aria-label="Example Chapa developer impact badge"
                 dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
               />
             </div>

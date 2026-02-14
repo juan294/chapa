@@ -35,6 +35,10 @@
   --color-dimension-guarding: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
+  --color-dimension-building-light: #86efac;
+  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-consistency-light: #67e8f9;
+  --color-dimension-breadth-light: #f9a8d4;
 
   /* Archetype colors — accent color per developer archetype */
   --color-archetype-builder: #7C6AEF;
@@ -80,6 +84,10 @@
   --color-dimension-guarding: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
+  --color-dimension-building-light: #86efac;
+  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-consistency-light: #67e8f9;
+  --color-dimension-breadth-light: #f9a8d4;
 
   --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
@@ -116,6 +124,10 @@
   --color-dimension-guarding: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
+  --color-dimension-building-light: #86efac;
+  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-consistency-light: #67e8f9;
+  --color-dimension-breadth-light: #f9a8d4;
 
   --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
