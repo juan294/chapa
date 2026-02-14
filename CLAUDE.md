@@ -32,9 +32,11 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 ## Key routes
 - GET `/` Landing + GitHub login (terminal-first UI)
 - GET `/studio` Creator Studio (badge customization, requires auth)
+- GET `/admin` Admin dashboard (requires auth + admin handle, see `ADMIN_HANDLES`)
 - GET `/u/:handle` Share page (badge preview, breakdown, embed snippet, share CTA)
 - GET `/u/:handle/badge.svg` Embeddable badge SVG (cacheable)
 - GET `/api/verify/:hash` Badge verification endpoint
+- GET `/api/admin/users` Admin user list (session auth + admin check)
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
 - POST `/api/studio/config` Save/load badge customization config
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
@@ -180,6 +182,8 @@ COMING_SOON=               # When set to any truthy value, enables coming-soon g
 CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
 NEXT_PUBLIC_SCORING_PAGE_ENABLED= # Set to "true" to enable the scoring methodology page (optional)
+
+ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ```
 
 ### Environment Variable Safety
