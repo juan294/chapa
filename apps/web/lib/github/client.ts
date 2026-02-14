@@ -1,6 +1,6 @@
 import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
-import { cacheGet, cacheSet } from "../cache/redis";
+import { cacheGet, cacheSet, registerUser } from "../cache/redis";
 import type { StatsData, SupplementalStats } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
@@ -82,5 +82,9 @@ async function _fetchAndCache(
   // Cache the (possibly merged) result — both primary and stale fallback
   await cacheSet(cacheKey, stats, CACHE_TTL);
   await cacheSet(staleKey, stats, STALE_TTL);
+
+  // Record in permanent registry (fire-and-forget, no TTL)
+  void registerUser(handle);
+
   return stats;
 }

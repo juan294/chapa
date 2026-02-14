@@ -9,9 +9,10 @@ interface UserMenuProps {
   login: string;
   name: string | null;
   avatarUrl: string;
+  isAdmin?: boolean;
 }
 
-export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
+export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -185,6 +186,28 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
                   <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
                 </svg>
                 Creator Studio
+              </Link>
+            )}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+              >
+                <svg
+                  className="h-4 w-4 text-text-secondary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Admin Panel
               </Link>
             )}
           </div>
