@@ -76,6 +76,15 @@ vi.mock("@/lib/http/client-ip", () => ({
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
+// Mock next/server's after() to execute callbacks synchronously in tests
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => { void cb(); },
+  };
+});
+
 // escapeXml is used in fallbackSvg — provide real implementation
 vi.mock("@/lib/render/escape", () => ({
   escapeXml: (s: string) =>

@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
@@ -101,30 +101,29 @@ export async function GET(
   // Generate verification code (returns null if secret is unset)
   const verification = generateVerificationCode(stats, impact);
 
-  // Store verification record (fire-and-forget — don't block render)
-  if (verification) {
-    const record: VerificationRecord = {
-      handle: stats.handle.toLowerCase(),
-      displayName: stats.displayName,
-      adjustedComposite: impact.adjustedComposite,
-      confidence: impact.confidence,
-      tier: impact.tier,
-      archetype: impact.archetype,
-      dimensions: impact.dimensions,
-      commitsTotal: stats.commitsTotal,
-      prsMergedCount: stats.prsMergedCount,
-      reviewsSubmittedCount: stats.reviewsSubmittedCount,
-      generatedAt: verification.date,
-      profileType: impact.profileType,
-    };
-    void storeVerificationRecord(verification.hash, record);
-  }
-
-  // Track badge generation (fire-and-forget — don't block render)
-  void trackBadgeGenerated(handle);
-
-  // Notify on first badge creation (fire-and-forget — don't block render)
-  void notifyFirstBadge(handle, impact);
+  // Post-response work: use after() to guarantee completion on Vercel
+  // (void promises may be killed when the serverless function freezes)
+  after(async () => {
+    if (verification) {
+      const record: VerificationRecord = {
+        handle: stats.handle.toLowerCase(),
+        displayName: stats.displayName,
+        adjustedComposite: impact.adjustedComposite,
+        confidence: impact.confidence,
+        tier: impact.tier,
+        archetype: impact.archetype,
+        dimensions: impact.dimensions,
+        commitsTotal: stats.commitsTotal,
+        prsMergedCount: stats.prsMergedCount,
+        reviewsSubmittedCount: stats.reviewsSubmittedCount,
+        generatedAt: verification.date,
+        profileType: impact.profileType,
+      };
+      await storeVerificationRecord(verification.hash, record);
+    }
+    await trackBadgeGenerated(handle);
+    await notifyFirstBadge(handle, impact);
+  });
 
   // Render full badge
   const svg = renderBadgeSvg(stats, impact, {
