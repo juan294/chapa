@@ -99,6 +99,34 @@ describe("SharePage", () => {
     });
   });
 
+  describe("visitor CTA for non-owners", () => {
+    it("shows a 'Discover your impact' CTA for non-owners", () => {
+      expect(SOURCE).toContain("!isOwner");
+      expect(SOURCE).toContain("Discover your impact");
+    });
+
+    it("CTA links to the homepage using Next.js Link", () => {
+      expect(SOURCE).toContain('import Link from "next/link"');
+      expect(SOURCE).toMatch(/href="\/"/);
+    });
+
+    it("uses curiosity-driven copy that focuses on the reader", () => {
+      expect(SOURCE).toContain("Curious what your developer impact looks like");
+    });
+  });
+
+  describe("OG image cache busting", () => {
+    it("appends a daily version parameter to og-image URL", () => {
+      expect(SOURCE).toContain("og-image?v=");
+    });
+  });
+
+  describe("Twitter meta description", () => {
+    it("uses curiosity-driven description for Twitter cards", () => {
+      expect(SOURCE).toContain("What does your developer DNA look like");
+    });
+  });
+
   // #120 — JSON-LD script injection prevention
   describe("JSON-LD security", () => {
     it("escapes < characters in JSON-LD to prevent script injection", () => {
