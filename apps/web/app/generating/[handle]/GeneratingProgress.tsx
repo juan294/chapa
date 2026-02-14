@@ -187,7 +187,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
         {/* Error message */}
         {error && (
-          <div className="mt-6 animate-terminal-fade-in rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
+          <div role="alert" className="mt-6 animate-terminal-fade-in rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
             <p className="font-heading text-sm text-terminal-red">{error}</p>
             <a
               href={`/generating/${encodeURIComponent(handle)}`}

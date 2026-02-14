@@ -59,3 +59,10 @@ Purpose: CSS parsing, transformation, and minification used by the build
 Rationale: Dev-only build tool dependency, not shipped to production.
            MPL-2.0 file-level copyleft does not apply to the project's
            own code, and the package is used unmodified.
+
+### lightningcss-darwin-arm64
+License: MPL-2.0
+Purpose: Platform-specific native binary for lightningcss (macOS ARM64).
+Rationale: Dev-only build tool dependency, not shipped to production.
+           Same rationale as lightningcss above — used unmodified, MPL-2.0
+           file-level copyleft does not apply to the project's own code.
