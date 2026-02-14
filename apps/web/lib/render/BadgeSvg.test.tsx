@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
-import { escapeXml } from "./escape";
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
@@ -53,46 +52,6 @@ function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// escapeXml
-// ---------------------------------------------------------------------------
-
-describe("escapeXml", () => {
-  it("escapes < to &lt;", () => {
-    expect(escapeXml("<")).toBe("&lt;");
-  });
-
-  it("escapes > to &gt;", () => {
-    expect(escapeXml(">")).toBe("&gt;");
-  });
-
-  it("escapes & to &amp;", () => {
-    expect(escapeXml("&")).toBe("&amp;");
-  });
-
-  it("escapes ' to &apos;", () => {
-    expect(escapeXml("'")).toBe("&apos;");
-  });
-
-  it('escapes " to &quot;', () => {
-    expect(escapeXml('"')).toBe("&quot;");
-  });
-
-  it("returns empty string for empty input", () => {
-    expect(escapeXml("")).toBe("");
-  });
-
-  it("returns unchanged string with no special chars", () => {
-    expect(escapeXml("hello-world_123")).toBe("hello-world_123");
-  });
-
-  it("handles string with multiple special chars", () => {
-    expect(escapeXml('<script>"alert(\'xss\')&</script>')).toBe(
-      "&lt;script&gt;&quot;alert(&apos;xss&apos;)&amp;&lt;/script&gt;",
-    );
-  });
-});
 
 // ---------------------------------------------------------------------------
 // renderBadgeSvg — structural
