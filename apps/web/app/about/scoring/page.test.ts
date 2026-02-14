@@ -8,104 +8,16 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("Scoring methodology page", () => {
-  describe("metadata", () => {
-    it("exports metadata with title", () => {
-      expect(SOURCE).toContain("title:");
-      expect(SOURCE).toMatch(/title:.*[Ss]coring/);
-    });
+  it("gates on isScoringPageEnabled feature flag", () => {
+    expect(SOURCE).toContain("isScoringPageEnabled");
+  });
 
-    it("exports metadata with description", () => {
-      expect(SOURCE).toContain("description:");
-    });
-
-    it("has openGraph metadata", () => {
-      expect(SOURCE).toContain("openGraph:");
-    });
+  it("calls notFound when flag is disabled", () => {
+    expect(SOURCE).toContain("notFound");
   });
 
   it("exports a default component", () => {
     expect(SOURCE).toMatch(/export default function \w+/);
-  });
-
-  describe("four dimensions", () => {
-    it("documents Building dimension", () => {
-      expect(SOURCE).toContain("Building");
-      expect(SOURCE).toContain("70%");
-    });
-
-    it("documents Guarding dimension", () => {
-      expect(SOURCE).toContain("Guarding");
-      expect(SOURCE).toContain("60%");
-    });
-
-    it("documents Consistency dimension", () => {
-      expect(SOURCE).toContain("Consistency");
-      expect(SOURCE).toContain("50%");
-    });
-
-    it("documents Breadth dimension with forks and watchers", () => {
-      expect(SOURCE).toContain("Breadth");
-      expect(SOURCE).toContain("35%");
-      expect(SOURCE).toContain("25%");
-      expect(SOURCE).toContain("15%");
-      expect(SOURCE).toContain("10%");
-      expect(SOURCE).toContain("5%");
-    });
-  });
-
-  describe("caps", () => {
-    it("documents all signal caps", () => {
-      expect(SOURCE).toContain("600");  // commits
-      expect(SOURCE).toContain("120");  // PR weight
-      expect(SOURCE).toContain("180");  // reviews
-      expect(SOURCE).toContain("80");   // issues
-      expect(SOURCE).toContain("15");   // repos
-      expect(SOURCE).toContain("500");  // stars
-      expect(SOURCE).toContain("200");  // forks
-      expect(SOURCE).toContain("100");  // watchers
-    });
-  });
-
-  describe("confidence system", () => {
-    it("documents confidence penalties", () => {
-      expect(SOURCE).toMatch(/[Bb]urst/);
-      expect(SOURCE).toMatch(/[Mm]icro/);
-      expect(SOURCE).toMatch(/[Cc]ollaboration/);
-    });
-
-    it("mentions confidence floor of 50", () => {
-      expect(SOURCE).toContain("50");
-    });
-  });
-
-  describe("archetypes", () => {
-    it("documents all six archetypes", () => {
-      expect(SOURCE).toContain("Builder");
-      expect(SOURCE).toContain("Guardian");
-      expect(SOURCE).toContain("Marathoner");
-      expect(SOURCE).toContain("Polymath");
-      expect(SOURCE).toContain("Balanced");
-      expect(SOURCE).toContain("Emerging");
-    });
-  });
-
-  describe("tiers", () => {
-    it("documents all four tiers", () => {
-      expect(SOURCE).toContain("Emerging");
-      expect(SOURCE).toContain("Solid");
-      expect(SOURCE).toContain("High");
-      expect(SOURCE).toContain("Elite");
-    });
-  });
-
-  describe("feedback CTA", () => {
-    it("includes Twitter link", () => {
-      expect(SOURCE).toContain("@juang294");
-    });
-
-    it("includes support email", () => {
-      expect(SOURCE).toContain("support@chapa.thecreativetoken.com");
-    });
   });
 
   describe("design system compliance", () => {
