@@ -44,3 +44,23 @@ describe("Landing page — Enterprise EMU section", () => {
     expect(enterpriseIndex).toBeLessThan(statsIndex);
   });
 });
+
+describe("Landing page — design system tokens (#233)", () => {
+  it("does not hardcode archetype hex colors in Tailwind classes", () => {
+    expect(SOURCE).not.toContain("text-[#F472B6]");
+    expect(SOURCE).not.toContain("hover:text-[#F9A8D4]");
+    expect(SOURCE).not.toContain("hover:text-[#6EE7A0]");
+    expect(SOURCE).not.toContain("hover:text-[#FCD34D]");
+    expect(SOURCE).not.toContain("text-[#9AA4B2]");
+    expect(SOURCE).not.toContain("hover:text-[#C0C7D0]");
+  });
+
+  it("does not hardcode verify button hover color", () => {
+    expect(SOURCE).not.toContain("hover:bg-[#34D399]");
+  });
+
+  it("uses archetype design tokens for archetype links", () => {
+    expect(SOURCE).toContain("text-archetype-guardian");
+    expect(SOURCE).toContain("text-archetype-emerging");
+  });
+});

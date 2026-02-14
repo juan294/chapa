@@ -94,4 +94,20 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain("linear-gradient");
     });
   });
+
+  describe("design system tokens (#233)", () => {
+    it("uses CSS variables for dimension colors, not hardcoded hex", () => {
+      expect(SOURCE).toContain("var(--color-dimension-building)");
+      expect(SOURCE).toContain("var(--color-dimension-guarding)");
+      expect(SOURCE).toContain("var(--color-dimension-consistency)");
+      expect(SOURCE).toContain("var(--color-dimension-breadth)");
+    });
+
+    it("does not contain hardcoded dimension hex colors", () => {
+      expect(SOURCE).not.toContain('"#22c55e"');
+      expect(SOURCE).not.toContain('"#f97316"');
+      expect(SOURCE).not.toContain('"#06b6d4"');
+      expect(SOURCE).not.toContain('"#ec4899"');
+    });
+  });
 });

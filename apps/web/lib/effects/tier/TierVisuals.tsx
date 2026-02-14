@@ -70,17 +70,17 @@ export function SparkleDots() {
   return (
     <>
       <div
-        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#9D8FFF]"
+        className="sparkle-dot absolute w-1 h-1 rounded-full bg-amber-light"
         style={{ top: "12%", right: "8%", animationDelay: "0s" }}
         aria-hidden="true"
       />
       <div
-        className="sparkle-dot absolute w-[3px] h-[3px] rounded-full bg-[#7C6AEF]"
+        className="sparkle-dot absolute w-[3px] h-[3px] rounded-full bg-amber"
         style={{ bottom: "18%", left: "6%", animationDelay: "0.7s" }}
         aria-hidden="true"
       />
       <div
-        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#9D8FFF]"
+        className="sparkle-dot absolute w-1 h-1 rounded-full bg-amber-light"
         style={{ top: "45%", right: "3%", animationDelay: "1.4s" }}
         aria-hidden="true"
       />

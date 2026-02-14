@@ -16,10 +16,10 @@ const DIMENSION_SUBTITLES: Record<string, string> = {
 };
 
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
-  building: { from: "#22c55e", to: "#86efac" },
-  guarding: { from: "#f97316", to: "#fdba74" },
-  consistency: { from: "#06b6d4", to: "#67e8f9" },
-  breadth: { from: "#ec4899", to: "#f9a8d4" },
+  building: { from: "var(--color-dimension-building)", to: "#86efac" },
+  guarding: { from: "var(--color-dimension-guarding)", to: "#fdba74" },
+  consistency: { from: "var(--color-dimension-consistency)", to: "#67e8f9" },
+  breadth: { from: "var(--color-dimension-breadth)", to: "#f9a8d4" },
 };
 
 

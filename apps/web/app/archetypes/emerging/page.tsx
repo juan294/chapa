@@ -32,10 +32,10 @@ export default function EmergingPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-[#9AA4B2]">Emerging</span>
+                The <span className="text-archetype-emerging">Emerging</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-[#9AA4B2]">None yet &mdash; profile still forming</span>
+                Dominant dimension: <span className="text-archetype-emerging">None yet &mdash; profile still forming</span>
               </p>
             </div>
 
