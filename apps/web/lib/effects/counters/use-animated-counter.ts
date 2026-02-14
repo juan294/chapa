@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 type EasingFn = (t: number) => number;
 
-export const easings: Record<string, EasingFn> = {
+export const easings: { linear: EasingFn; easeOut: EasingFn; easeInOut: EasingFn; spring: EasingFn; [key: string]: EasingFn } = {
   linear: (t) => t,
   easeOut: (t) => 1 - Math.pow(1 - t, 3),
   easeInOut: (t) =>
