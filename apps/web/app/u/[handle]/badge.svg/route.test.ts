@@ -162,6 +162,21 @@ describe("GET /u/[handle]/badge.svg", () => {
         "public, s-maxage=21600, stale-while-revalidate=604800",
       );
     });
+
+    it("returns Content-Security-Policy with frame-ancestors * for embeddability", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      const csp = res.headers.get("Content-Security-Policy");
+      expect(csp).toContain("frame-ancestors *");
+    });
+
+    it("does not include X-Frame-Options DENY (badge must be embeddable)", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      const xfo = res.headers.get("X-Frame-Options");
+      // X-Frame-Options should either be absent or not DENY
+      expect(xfo).not.toBe("DENY");
+    });
   });
 
   // -------------------------------------------------------------------------
