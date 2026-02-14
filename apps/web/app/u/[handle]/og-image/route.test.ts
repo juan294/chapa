@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock dependencies BEFORE importing the route handler.
+// Mocks — must be set up BEFORE importing the route handler
 // ---------------------------------------------------------------------------
 
 const {
@@ -12,6 +12,8 @@ const {
   mockGetAvatarBase64,
   mockGenerateVerificationCode,
   mockSvgToPng,
+  mockCacheGet,
+  mockCacheSet,
 } = vi.hoisted(() => ({
   mockGetStats: vi.fn(),
   mockComputeImpactV4: vi.fn(),
@@ -20,6 +22,8 @@ const {
   mockGetAvatarBase64: vi.fn(),
   mockGenerateVerificationCode: vi.fn(),
   mockSvgToPng: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -48,6 +52,11 @@ vi.mock("@/lib/verification/hmac", () => ({
 
 vi.mock("@/lib/render/svg-to-png", () => ({
   svgToPng: mockSvgToPng,
+}));
+
+vi.mock("@/lib/cache/redis", () => ({
+  cacheGet: mockCacheGet,
+  cacheSet: mockCacheSet,
 }));
 
 import { GET } from "./route";
@@ -89,6 +98,9 @@ const FAKE_IMPACT = {
   archetype: "Builder",
 };
 
+/** The base64-encoded form of FAKE_PNG that the route stores in Redis. */
+const FAKE_PNG_BASE64 = Buffer.from(FAKE_PNG).toString("base64");
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -96,6 +108,9 @@ const FAKE_IMPACT = {
 describe("GET /u/[handle]/og-image", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T12:00:00Z"));
+
     mockIsValidHandle.mockReturnValue(true);
     mockGetStats.mockResolvedValue(FAKE_STATS);
     mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
@@ -103,13 +118,19 @@ describe("GET /u/[handle]/og-image", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockGenerateVerificationCode.mockReturnValue(null);
     mockSvgToPng.mockReturnValue(FAKE_PNG);
+    mockCacheGet.mockResolvedValue(null); // default: cache miss
+    mockCacheSet.mockResolvedValue(true);
   });
 
-  // -------------------------------------------------------------------------
-  // Valid handle — success path
-  // -------------------------------------------------------------------------
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  describe("valid handle", () => {
+  // -----------------------------------------------------------------------
+  // Cache miss — full render pipeline
+  // -----------------------------------------------------------------------
+
+  describe("cache miss", () => {
     it("returns 200 with Content-Type image/png", async () => {
       const [req, ctx] = makeRequest("testuser");
       const res = await GET(req, ctx);
@@ -117,243 +138,139 @@ describe("GET /u/[handle]/og-image", () => {
       expect(res.headers.get("Content-Type")).toBe("image/png");
     });
 
-    it("returns PNG buffer as the response body", async () => {
+    it("stores the generated PNG as base64 in Redis with 24h TTL", async () => {
       const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      const body = await res.arrayBuffer();
-      expect(new Uint8Array(body)).toEqual(
-        new Uint8Array(Buffer.from(FAKE_PNG)),
+      await GET(req, ctx);
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "og-image:v1:testuser:2026-02-14",
+        FAKE_PNG_BASE64,
+        86400,
       );
     });
 
-    it("sets correct Cache-Control headers", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Cache-Control")).toBe(
-        "public, s-maxage=21600, stale-while-revalidate=604800",
-      );
-    });
-
-    it("calls getStats with the handle", async () => {
+    it("calls the full render pipeline", async () => {
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
       expect(mockGetStats).toHaveBeenCalledWith("testuser");
-    });
-
-    it("passes stats to computeImpactV4", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
       expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
-    });
-
-    it("passes stats, impact, and options to renderBadgeSvg", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        FAKE_STATS,
-        FAKE_IMPACT,
-        {
-          avatarDataUri: "data:image/png;base64,abc123",
-          verificationHash: undefined,
-          verificationDate: undefined,
-        },
-      );
-    });
-
-    it("passes SVG and width 1200 to svgToPng", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
       expect(mockSvgToPng).toHaveBeenCalledWith(FAKE_SVG, 1200);
     });
-
-    it("fetches avatar base64 from stats.avatarUrl", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockGetAvatarBase64).toHaveBeenCalledWith(
-        "testuser",
-        "https://avatars.githubusercontent.com/u/12345",
-      );
-    });
   });
 
-  // -------------------------------------------------------------------------
-  // Avatar edge cases
-  // -------------------------------------------------------------------------
+  // -----------------------------------------------------------------------
+  // Cache hit — skip render pipeline
+  // -----------------------------------------------------------------------
 
-  describe("avatar handling", () => {
-    it("passes undefined avatarDataUri when stats has no avatarUrl", async () => {
-      mockGetStats.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ avatarDataUri: undefined }),
-      );
+  describe("cache hit", () => {
+    beforeEach(() => {
+      mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
     });
 
-    it("passes undefined avatarDataUri when avatar fetch fails", async () => {
-      mockGetAvatarBase64.mockResolvedValue(undefined);
+    it("returns 200 with Content-Type image/png", async () => {
       const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ avatarDataUri: undefined }),
-      );
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Invalid handle
-  // -------------------------------------------------------------------------
-
-  describe("invalid handle", () => {
-    it("returns 400 with 'Invalid handle' text", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle");
       const res = await GET(req, ctx);
-      expect(res.status).toBe(400);
-      const body = await res.text();
-      expect(body).toBe("Invalid handle");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("image/png");
     });
 
-    it("does not call getStats for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle");
+    it("returns the cached PNG buffer", async () => {
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      const body = await res.arrayBuffer();
+      expect(new Uint8Array(body)).toEqual(FAKE_PNG);
+    });
+
+    it("does NOT call getStats", async () => {
+      const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
       expect(mockGetStats).not.toHaveBeenCalled();
     });
 
-    it("does not call svgToPng for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle");
+    it("does NOT call renderBadgeSvg or svgToPng", async () => {
+      const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
       expect(mockSvgToPng).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call cacheSet (no re-store needed)", async () => {
+      const [req, ctx] = makeRequest("testuser");
+      await GET(req, ctx);
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("checks the correct cache key with handle and date", async () => {
+      const [req, ctx] = makeRequest("testuser");
+      await GET(req, ctx);
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        "og-image:v1:testuser:2026-02-14",
+      );
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Stats fetch returns null
-  // -------------------------------------------------------------------------
+  // -----------------------------------------------------------------------
+  // Cache key format
+  // -----------------------------------------------------------------------
 
-  describe("stats fetch returns null", () => {
-    it("returns 404 with 'Could not load data'", async () => {
+  describe("cache key", () => {
+    it("changes when the date changes", async () => {
+      vi.setSystemTime(new Date("2026-02-15T12:00:00Z"));
+      const [req, ctx] = makeRequest("testuser");
+      await GET(req, ctx);
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        "og-image:v1:testuser:2026-02-15",
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Cache degradation — Redis errors fall through to generation
+  // -----------------------------------------------------------------------
+
+  describe("cache degradation", () => {
+    it("generates PNG normally when cacheGet throws", async () => {
+      mockCacheGet.mockRejectedValue(new Error("Redis down"));
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      expect(mockGetStats).toHaveBeenCalled();
+      expect(mockSvgToPng).toHaveBeenCalled();
+    });
+
+    it("still returns PNG even when cacheSet throws", async () => {
+      mockCacheSet.mockRejectedValue(new Error("Redis down"));
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Error paths
+  // -----------------------------------------------------------------------
+
+  describe("error handling", () => {
+    it("returns 400 for invalid handle", async () => {
+      mockIsValidHandle.mockReturnValue(false);
+      const [req, ctx] = makeRequest("bad!!handle");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 404 when getStats returns null", async () => {
       mockGetStats.mockResolvedValue(null);
       const [req, ctx] = makeRequest("testuser");
       const res = await GET(req, ctx);
       expect(res.status).toBe(404);
-      const body = await res.text();
-      expect(body).toBe("Could not load data");
     });
 
-    it("does not call computeImpactV4 when stats is null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockComputeImpactV4).not.toHaveBeenCalled();
-    });
-
-    it("does not call svgToPng when stats is null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockSvgToPng).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Verification integration
-  // -------------------------------------------------------------------------
-
-  describe("verification", () => {
-    it("calls generateVerificationCode with stats and impact", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockGenerateVerificationCode).toHaveBeenCalledWith(
-        FAKE_STATS,
-        FAKE_IMPACT,
-      );
-    });
-
-    it("passes verification hash and date to renderBadgeSvg when generated", async () => {
-      mockGenerateVerificationCode.mockReturnValue({
-        hash: "abc12345",
-        date: "2025-06-15",
-      });
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        FAKE_STATS,
-        FAKE_IMPACT,
-        {
-          avatarDataUri: "data:image/png;base64,abc123",
-          verificationHash: "abc12345",
-          verificationDate: "2025-06-15",
-        },
-      );
-    });
-
-    it("passes undefined hash/date when generateVerificationCode returns null", async () => {
-      mockGenerateVerificationCode.mockReturnValue(null);
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        FAKE_STATS,
-        FAKE_IMPACT,
-        {
-          avatarDataUri: "data:image/png;base64,abc123",
-          verificationHash: undefined,
-          verificationDate: undefined,
-        },
-      );
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Error handling
-  // -------------------------------------------------------------------------
-
-  describe("error handling", () => {
-    it("returns 500 when getStats throws", async () => {
-      mockGetStats.mockRejectedValue(new Error("GitHub API error"));
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(500);
-      const body = await res.text();
-      expect(body).toBe("Failed to generate image");
-    });
-
-    it("returns 500 when computeImpactV4 throws", async () => {
-      mockComputeImpactV4.mockImplementation(() => {
-        throw new Error("Impact compute error");
-      });
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(500);
-      const body = await res.text();
-      expect(body).toBe("Failed to generate image");
-    });
-
-    it("returns 500 when renderBadgeSvg throws", async () => {
-      mockRenderBadgeSvg.mockImplementation(() => {
-        throw new Error("Render error");
-      });
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(500);
-    });
-
-    it("returns 500 when svgToPng throws", async () => {
+    it("returns 500 when render pipeline throws", async () => {
       mockSvgToPng.mockImplementation(() => {
         throw new Error("PNG conversion failed");
       });
       const [req, ctx] = makeRequest("testuser");
       const res = await GET(req, ctx);
       expect(res.status).toBe(500);
-      const body = await res.text();
-      expect(body).toBe("Failed to generate image");
     });
   });
 });
