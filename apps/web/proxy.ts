@@ -1,3 +1,8 @@
+// Next.js 16 proxy convention — replaces the legacy middleware.ts file.
+// The exported `proxy` function runs on every matched request as edge middleware.
+// Build output shows this as "Proxy (Middleware)" which confirms the convention.
+// See: https://nextjs.org/docs/app/building-your-application/routing/middleware
+
 import { NextResponse, type NextRequest } from "next/server";
 
 /**

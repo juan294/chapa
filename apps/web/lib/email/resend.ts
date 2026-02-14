@@ -13,6 +13,20 @@ import { Resend } from "resend";
 import { Webhook } from "svix";
 
 // ---------------------------------------------------------------------------
+// HTML escaping for email templates
+// ---------------------------------------------------------------------------
+
+/** Escape HTML entities in user-controlled strings before embedding in HTML. */
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/'/g, "&#39;")
+    .replace(/"/g, "&quot;");
+}
+
+// ---------------------------------------------------------------------------
 // Lazy singleton
 // ---------------------------------------------------------------------------
 
@@ -154,11 +168,15 @@ export async function forwardEmail(
     return null;
   }
 
+  // Escape user-controlled metadata fields to prevent XSS in HTML email
+  const safeFrom = escapeHtml(params.from);
+  const safeSubject = escapeHtml(params.subject);
+
   const forwardedHtml = [
     `<div style="padding:12px 0;margin-bottom:16px;border-bottom:1px solid #ccc;color:#666;font-size:13px;">`,
     `<strong>--- Forwarded message ---</strong><br/>`,
-    `From: ${params.from}<br/>`,
-    `Subject: ${params.subject}`,
+    `From: ${safeFrom}<br/>`,
+    `Subject: ${safeSubject}`,
     `</div>`,
     params.html,
   ].join("\n");
