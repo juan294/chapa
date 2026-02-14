@@ -98,6 +98,56 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Bulk read: SCAN + MGET
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan Redis for keys matching a glob pattern.
+ * Iterates SCAN until cursor returns to 0. Returns all matching keys.
+ * Returns `[]` if Redis is unavailable or on error.
+ */
+export async function scanKeys(pattern: string): Promise<string[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+
+  try {
+    const keys: string[] = [];
+    let cursor = 0;
+    do {
+      const [nextCursor, batch] = await redis.scan(cursor, {
+        match: pattern,
+        count: 100,
+      });
+      keys.push(...batch);
+      cursor = typeof nextCursor === "string" ? parseInt(nextCursor, 10) : nextCursor;
+    } while (cursor !== 0);
+    return keys;
+  } catch (error) {
+    console.error("[cache] scanKeys failed:", (error as Error).message);
+    return [];
+  }
+}
+
+/**
+ * Get multiple cached values by key in a single MGET call.
+ * Returns an array of values (may include `null` for missing keys).
+ * Returns `[]` if Redis is unavailable, on error, or when given no keys.
+ */
+export async function cacheMGet<T>(keys: string[]): Promise<(T | null)[]> {
+  if (keys.length === 0) return [];
+  const redis = getRedis();
+  if (!redis) return [];
+
+  try {
+    const values = await redis.mget<(T | null)[]>(...keys);
+    return values;
+  } catch (error) {
+    console.error("[cache] cacheMGet failed:", (error as Error).message);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rate limiting (sliding window counter via INCR + EXPIRE)
 // ---------------------------------------------------------------------------
 
