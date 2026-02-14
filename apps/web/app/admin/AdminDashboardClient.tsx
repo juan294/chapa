@@ -12,17 +12,18 @@ interface AdminUser {
   handle: string;
   displayName: string | null;
   avatarUrl: string | null;
-  fetchedAt: string;
-  commitsTotal: number;
-  prsMergedCount: number;
-  reviewsSubmittedCount: number;
-  activeDays: number;
-  reposContributed: number;
-  totalStars: number;
-  archetype: string;
-  tier: string;
-  adjustedComposite: number;
-  confidence: number;
+  fetchedAt: string | null;
+  commitsTotal: number | null;
+  prsMergedCount: number | null;
+  reviewsSubmittedCount: number | null;
+  activeDays: number | null;
+  reposContributed: number | null;
+  totalStars: number | null;
+  archetype: string | null;
+  tier: string | null;
+  adjustedComposite: number | null;
+  confidence: number | null;
+  statsExpired: boolean;
 }
 
 type SortField =
@@ -99,17 +100,20 @@ function sortUsers(
   dir: SortDir,
 ): AdminUser[] {
   return [...users].sort((a, b) => {
+    // Expired users always sort to the bottom
+    if (a.statsExpired !== b.statsExpired) return a.statsExpired ? 1 : -1;
+
     let cmp = 0;
     if (field === "handle") {
       cmp = a.handle.localeCompare(b.handle);
     } else if (field === "tier") {
-      cmp = (TIER_ORDER[a.tier] ?? 0) - (TIER_ORDER[b.tier] ?? 0);
+      cmp = (TIER_ORDER[a.tier ?? ""] ?? 0) - (TIER_ORDER[b.tier ?? ""] ?? 0);
     } else if (field === "archetype") {
-      cmp = a.archetype.localeCompare(b.archetype);
+      cmp = (a.archetype ?? "").localeCompare(b.archetype ?? "");
     } else if (field === "fetchedAt") {
-      cmp = new Date(a.fetchedAt).getTime() - new Date(b.fetchedAt).getTime();
+      cmp = new Date(a.fetchedAt ?? 0).getTime() - new Date(b.fetchedAt ?? 0).getTime();
     } else {
-      cmp = (a[field] as number) - (b[field] as number);
+      cmp = ((a[field] as number) ?? 0) - ((b[field] as number) ?? 0);
     }
     return dir === "asc" ? cmp : -cmp;
   });
@@ -232,7 +236,7 @@ export function AdminDashboardClient() {
   const tierCounts = useMemo(() => {
     const counts: Record<string, number> = { Elite: 0, High: 0, Solid: 0, Emerging: 0 };
     for (const u of users) {
-      counts[u.tier] = (counts[u.tier] ?? 0) + 1;
+      if (u.tier) counts[u.tier] = (counts[u.tier] ?? 0) + 1;
     }
     return counts;
   }, [users]);
@@ -419,7 +423,7 @@ export function AdminDashboardClient() {
                 sorted.map((user) => (
                   <tr
                     key={user.handle}
-                    className="transition-colors hover:bg-amber/[0.03]"
+                    className={`transition-colors hover:bg-amber/[0.03] ${user.statsExpired ? "opacity-60" : ""}`}
                   >
                     {/* Developer */}
                     <td className="px-3 py-2.5">
@@ -445,71 +449,89 @@ export function AdminDashboardClient() {
                           <p className="truncate font-heading text-sm text-text-primary group-hover:text-amber transition-colors">
                             {user.handle}
                           </p>
-                          {user.displayName && (
+                          {user.statsExpired ? (
+                            <p className="text-xs text-terminal-yellow">data expired</p>
+                          ) : user.displayName ? (
                             <p className="truncate text-xs text-text-secondary">
                               {user.displayName}
                             </p>
-                          )}
+                          ) : null}
                         </div>
                       </Link>
                     </td>
 
                     {/* Archetype */}
                     <td className="hidden sm:table-cell px-3 py-2.5">
-                      <span className={`font-heading text-xs font-medium ${ARCHETYPE_COLOR[user.archetype] ?? "text-text-secondary"}`}>
-                        {user.archetype}
-                      </span>
+                      {user.archetype ? (
+                        <span className={`font-heading text-xs font-medium ${ARCHETYPE_COLOR[user.archetype] ?? "text-text-secondary"}`}>
+                          {user.archetype}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-text-secondary/50">&mdash;</span>
+                      )}
                     </td>
 
                     {/* Tier */}
                     <td className="px-3 py-2.5">
-                      <span className={tierBadgeClasses(user.tier)}>
-                        {user.tier}
-                      </span>
+                      {user.tier ? (
+                        <span className={tierBadgeClasses(user.tier)}>
+                          {user.tier}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-text-secondary/50">&mdash;</span>
+                      )}
                     </td>
 
                     {/* Score */}
                     <td className="px-3 py-2.5">
-                      <span className={`font-heading text-sm tabular-nums ${TIER_COLOR[user.tier] ?? "text-text-secondary"}`}>
-                        {user.adjustedComposite}
-                      </span>
+                      {user.adjustedComposite != null ? (
+                        <span className={`font-heading text-sm tabular-nums ${TIER_COLOR[user.tier ?? ""] ?? "text-text-secondary"}`}>
+                          {user.adjustedComposite}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-text-secondary/50">&mdash;</span>
+                      )}
                     </td>
 
                     {/* Confidence */}
                     <td className="hidden md:table-cell px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1 w-10 rounded-full bg-stroke overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-amber/60"
-                            style={{ width: `${user.confidence}%` }}
-                          />
+                      {user.confidence != null ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1 w-10 rounded-full bg-stroke overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-amber/60"
+                              style={{ width: `${user.confidence}%` }}
+                            />
+                          </div>
+                          <span className="font-heading text-xs text-text-secondary tabular-nums">
+                            {user.confidence}
+                          </span>
                         </div>
-                        <span className="font-heading text-xs text-text-secondary tabular-nums">
-                          {user.confidence}
-                        </span>
-                      </div>
+                      ) : (
+                        <span className="text-xs text-text-secondary/50">&mdash;</span>
+                      )}
                     </td>
 
                     {/* Stats columns */}
                     <td className="hidden lg:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-                      {user.commitsTotal.toLocaleString()}
+                      {user.commitsTotal != null ? user.commitsTotal.toLocaleString() : "\u2014"}
                     </td>
                     <td className="hidden lg:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-                      {user.prsMergedCount}
+                      {user.prsMergedCount ?? "\u2014"}
                     </td>
                     <td className="hidden xl:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-                      {user.reviewsSubmittedCount}
+                      {user.reviewsSubmittedCount ?? "\u2014"}
                     </td>
                     <td className="hidden xl:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-                      {user.activeDays}
+                      {user.activeDays ?? "\u2014"}
                     </td>
                     <td className="hidden xl:table-cell px-3 py-2.5 font-heading text-xs text-text-secondary tabular-nums">
-                      {user.totalStars.toLocaleString()}
+                      {user.totalStars != null ? user.totalStars.toLocaleString() : "\u2014"}
                     </td>
 
                     {/* Updated */}
                     <td className="hidden md:table-cell px-3 py-2.5 text-xs text-text-secondary">
-                      {formatDate(user.fetchedAt)}
+                      {user.fetchedAt ? formatDate(user.fetchedAt) : "\u2014"}
                     </td>
 
                     {/* Badge link */}

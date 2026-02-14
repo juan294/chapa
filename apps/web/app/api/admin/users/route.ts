@@ -6,11 +6,39 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import type { StatsData } from "@chapa/shared";
 
+/** Fields returned per user. Users without stats have `statsExpired: true`. */
+interface AdminUserEntry {
+  handle: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  fetchedAt: string | null;
+  commitsTotal: number | null;
+  prsMergedCount: number | null;
+  reviewsSubmittedCount: number | null;
+  activeDays: number | null;
+  reposContributed: number | null;
+  totalStars: number | null;
+  archetype: string | null;
+  tier: string | null;
+  adjustedComposite: number | null;
+  confidence: number | null;
+  statsExpired: boolean;
+}
+
+/**
+ * Extract unique handles from a set of Redis keys by stripping the prefix.
+ * E.g. "stats:v2:juan294" with prefix "stats:v2:" yields "juan294".
+ */
+function extractHandles(keys: string[], prefix: string): string[] {
+  return keys.map((k) => k.slice(prefix.length));
+}
+
 /**
  * GET /api/admin/users
  *
- * Returns a list of all users with cached stats in Redis, plus their
- * computed Impact v4 results. Session auth + admin handle check.
+ * Discovers ALL users who have ever interacted with Chapa by scanning
+ * multiple Redis key patterns (stats, stale, verify-handle, badge:notified).
+ * Returns stats + impact where available; marks users with expired stats.
  */
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 60 seconds
@@ -40,57 +68,83 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Scan both primary (6h TTL) and stale (7d TTL) keys to find all users.
-  // A user whose primary cache expired still has stale data for up to 7 days.
-  const [primaryKeys, staleKeys] = await Promise.all([
+  // Discover all user handles from multiple key patterns.
+  // Some keys outlive stats caches (verify-handle has 29d TTL).
+  const [primaryKeys, staleKeys, verifyKeys, notifiedKeys] = await Promise.all([
     scanKeys("stats:v2:*"),
     scanKeys("stats:stale:*"),
+    scanKeys("verify-handle:*"),
+    scanKeys("badge:notified:*"),
   ]);
 
-  // Build a deduplicated set of handles, preferring primary keys
-  const handleToKey = new Map<string, string>();
-  for (const key of staleKeys) {
-    const handle = key.replace("stats:stale:", "");
-    handleToKey.set(handle, key);
-  }
-  for (const key of primaryKeys) {
-    const handle = key.replace("stats:v2:", "");
-    handleToKey.set(handle, key); // overwrite stale with primary (fresher)
-  }
+  // Collect all unique handles
+  const allHandles = new Set<string>();
+  for (const h of extractHandles(primaryKeys, "stats:v2:")) allHandles.add(h);
+  for (const h of extractHandles(staleKeys, "stats:stale:")) allHandles.add(h);
+  for (const h of extractHandles(verifyKeys, "verify-handle:")) allHandles.add(h);
+  for (const h of extractHandles(notifiedKeys, "badge:notified:")) allHandles.add(h);
 
-  const allKeys = [...handleToKey.values()];
-  if (allKeys.length === 0) {
+  if (allHandles.size === 0) {
     return NextResponse.json(
       { users: [] },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
 
-  // Bulk-fetch all stats
-  const statsValues = await cacheMGet<StatsData>(allKeys);
+  // For each handle, try to load stats (primary first, then stale fallback)
+  const handles = [...allHandles];
+  const primaryStatsKeys = handles.map((h) => `stats:v2:${h}`);
+  const staleStatsKeys = handles.map((h) => `stats:stale:${h}`);
 
-  // Build user list with cherry-picked fields + computed impact
-  const users = statsValues
-    .filter((s): s is StatsData => s != null)
-    .map((stats) => {
-      const impact = computeImpactV4(stats);
+  const [primaryValues, staleValues] = await Promise.all([
+    cacheMGet<StatsData>(primaryStatsKeys),
+    cacheMGet<StatsData>(staleStatsKeys),
+  ]);
+
+  // Build user list — use primary stats if available, stale as fallback
+  const users: AdminUserEntry[] = handles.map((handle, i) => {
+    const stats = primaryValues[i] ?? staleValues[i] ?? null;
+
+    if (!stats) {
+      // User exists (has verify/notified keys) but stats fully expired
       return {
-        handle: stats.handle,
-        displayName: stats.displayName ?? null,
-        avatarUrl: stats.avatarUrl ?? null,
-        fetchedAt: stats.fetchedAt,
-        commitsTotal: stats.commitsTotal,
-        prsMergedCount: stats.prsMergedCount,
-        reviewsSubmittedCount: stats.reviewsSubmittedCount,
-        activeDays: stats.activeDays,
-        reposContributed: stats.reposContributed,
-        totalStars: stats.totalStars,
-        archetype: impact.archetype,
-        tier: impact.tier,
-        adjustedComposite: impact.adjustedComposite,
-        confidence: impact.confidence,
+        handle,
+        displayName: null,
+        avatarUrl: null,
+        fetchedAt: null,
+        commitsTotal: null,
+        prsMergedCount: null,
+        reviewsSubmittedCount: null,
+        activeDays: null,
+        reposContributed: null,
+        totalStars: null,
+        archetype: null,
+        tier: null,
+        adjustedComposite: null,
+        confidence: null,
+        statsExpired: true,
       };
-    });
+    }
+
+    const impact = computeImpactV4(stats);
+    return {
+      handle: stats.handle,
+      displayName: stats.displayName ?? null,
+      avatarUrl: stats.avatarUrl ?? null,
+      fetchedAt: stats.fetchedAt,
+      commitsTotal: stats.commitsTotal,
+      prsMergedCount: stats.prsMergedCount,
+      reviewsSubmittedCount: stats.reviewsSubmittedCount,
+      activeDays: stats.activeDays,
+      reposContributed: stats.reposContributed,
+      totalStars: stats.totalStars,
+      archetype: impact.archetype,
+      tier: impact.tier,
+      adjustedComposite: impact.adjustedComposite,
+      confidence: impact.confidence,
+      statsExpired: false,
+    };
+  });
 
   return NextResponse.json(
     { users },
