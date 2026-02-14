@@ -77,24 +77,24 @@ describe("easings", () => {
   });
 
   it("linear returns input unchanged", () => {
-    expect(easings.linear(0)).toBe(0);
-    expect(easings.linear(0.5)).toBe(0.5);
-    expect(easings.linear(1)).toBe(1);
+    expect(easings.linear!(0)).toBe(0);
+    expect(easings.linear!(0.5)).toBe(0.5);
+    expect(easings.linear!(1)).toBe(1);
   });
 
   it("easeOut starts at 0 and ends at 1", () => {
-    expect(easings.easeOut(0)).toBe(0);
-    expect(easings.easeOut(1)).toBe(1);
+    expect(easings.easeOut!(0)).toBe(0);
+    expect(easings.easeOut!(1)).toBe(1);
   });
 
   it("easeInOut starts at 0 and ends at 1", () => {
-    expect(easings.easeInOut(0)).toBe(0);
-    expect(easings.easeInOut(1)).toBe(1);
+    expect(easings.easeInOut!(0)).toBe(0);
+    expect(easings.easeInOut!(1)).toBe(1);
   });
 
   it("spring starts at 0 and ends at 1", () => {
-    expect(easings.spring(0)).toBe(0);
-    expect(easings.spring(1)).toBe(1);
+    expect(easings.spring!(0)).toBe(0);
+    expect(easings.spring!(1)).toBe(1);
   });
 
   it("all easings return values between 0 and ~1 for midpoint", () => {

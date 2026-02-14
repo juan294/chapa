@@ -125,7 +125,7 @@ describe("email content", () => {
   it("includes handle, archetype, and tier in subject", async () => {
     await notifyFirstBadge("testuser", sampleImpact);
 
-    const call = mockSend.mock.calls[0][0];
+    const call = mockSend.mock.calls[0]![0];
     expect(call.subject).toContain("testuser");
     expect(call.subject).toContain("Builder");
     expect(call.subject).toContain("High");
@@ -134,7 +134,7 @@ describe("email content", () => {
   it("includes score, confidence, and share URL in body", async () => {
     await notifyFirstBadge("testuser", sampleImpact);
 
-    const call = mockSend.mock.calls[0][0];
+    const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain("61"); // adjustedComposite
     expect(call.html).toContain("85"); // confidence
     expect(call.html).toContain(
@@ -150,7 +150,7 @@ describe("email content", () => {
   it("includes dimension scores in body", async () => {
     await notifyFirstBadge("testuser", sampleImpact);
 
-    const call = mockSend.mock.calls[0][0];
+    const call = mockSend.mock.calls[0]![0];
     // HTML should contain all four dimension values
     expect(call.html).toContain("80"); // building
     expect(call.html).toContain("60"); // guarding
@@ -170,7 +170,7 @@ describe("email content", () => {
   it("includes badge SVG link in body", async () => {
     await notifyFirstBadge("testuser", sampleImpact);
 
-    const call = mockSend.mock.calls[0][0];
+    const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain(
       "https://chapa.thecreativetoken.com/u/testuser/badge.svg",
     );
@@ -182,7 +182,7 @@ describe("email content", () => {
   it("includes Chapa branding in HTML", async () => {
     await notifyFirstBadge("testuser", sampleImpact);
 
-    const call = mockSend.mock.calls[0][0];
+    const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain("#7C6AEF"); // brand purple
     expect(call.html).toContain("CHAPA");
   });
