@@ -11,6 +11,7 @@ import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getClientIp } from "@/lib/http/client-ip";
+import { notifyFirstBadge } from "@/lib/email/notifications";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -114,6 +115,9 @@ export async function GET(
 
   // Track badge generation (fire-and-forget — don't block render)
   void trackBadgeGenerated(handle);
+
+  // Notify on first badge creation (fire-and-forget — don't block render)
+  void notifyFirstBadge(handle, impact);
 
   // Render full badge
   const svg = renderBadgeSvg(stats, impact, {
