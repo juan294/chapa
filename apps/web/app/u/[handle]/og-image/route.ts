@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { fetchAvatarBase64 } from "@/lib/render/avatar";
+import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { svgToPng } from "@/lib/render/svg-to-png";
@@ -32,7 +32,7 @@ export async function GET(
     const impact = computeImpactV4(stats);
 
     const avatarDataUri = stats.avatarUrl
-      ? await fetchAvatarBase64(stats.avatarUrl)
+      ? await getAvatarBase64(handle, stats.avatarUrl)
       : undefined;
 
     const verification = generateVerificationCode(stats, impact);

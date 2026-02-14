@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { fetchAvatarBase64 } from "@/lib/render/avatar";
+import { getAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
@@ -86,9 +86,10 @@ export async function GET(
   // Compute impact
   const impact = computeImpactV4(stats);
 
-  // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image)
+  // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image).
+  // Uses Redis cache to avoid re-fetching on every badge render within the TTL window.
   const avatarDataUri = stats.avatarUrl
-    ? await fetchAvatarBase64(stats.avatarUrl)
+    ? await getAvatarBase64(handle, stats.avatarUrl)
     : undefined;
 
   // Generate verification code (returns null if secret is unset)

@@ -9,7 +9,7 @@ const {
   mockComputeImpactV4,
   mockRenderBadgeSvg,
   mockIsValidHandle,
-  mockFetchAvatarBase64,
+  mockGetAvatarBase64,
   mockGenerateVerificationCode,
   mockSvgToPng,
 } = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ const {
   mockComputeImpactV4: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockIsValidHandle: vi.fn(),
-  mockFetchAvatarBase64: vi.fn(),
+  mockGetAvatarBase64: vi.fn(),
   mockGenerateVerificationCode: vi.fn(),
   mockSvgToPng: vi.fn(),
 }));
@@ -39,7 +39,7 @@ vi.mock("@/lib/validation", () => ({
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
-  fetchAvatarBase64: mockFetchAvatarBase64,
+  getAvatarBase64: mockGetAvatarBase64,
 }));
 
 vi.mock("@/lib/verification/hmac", () => ({
@@ -100,7 +100,7 @@ describe("GET /u/[handle]/og-image", () => {
     mockGetStats.mockResolvedValue(FAKE_STATS);
     mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
-    mockFetchAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
+    mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockGenerateVerificationCode.mockReturnValue(null);
     mockSvgToPng.mockReturnValue(FAKE_PNG);
   });
@@ -169,7 +169,8 @@ describe("GET /u/[handle]/og-image", () => {
     it("fetches avatar base64 from stats.avatarUrl", async () => {
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
-      expect(mockFetchAvatarBase64).toHaveBeenCalledWith(
+      expect(mockGetAvatarBase64).toHaveBeenCalledWith(
+        "testuser",
         "https://avatars.githubusercontent.com/u/12345",
       );
     });
@@ -184,7 +185,7 @@ describe("GET /u/[handle]/og-image", () => {
       mockGetStats.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
-      expect(mockFetchAvatarBase64).not.toHaveBeenCalled();
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
@@ -193,7 +194,7 @@ describe("GET /u/[handle]/og-image", () => {
     });
 
     it("passes undefined avatarDataUri when avatar fetch fails", async () => {
-      mockFetchAvatarBase64.mockResolvedValue(undefined);
+      mockGetAvatarBase64.mockResolvedValue(undefined);
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
