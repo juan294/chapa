@@ -12,13 +12,13 @@ function buildHeatmap(grid: number[][]): HeatmapDay[] {
   const days: HeatmapDay[] = [];
   const baseDate = new Date("2025-01-01");
   for (let week = 0; week < grid.length; week++) {
-    for (let day = 0; day < grid[week].length; day++) {
+    for (let day = 0; day < grid[week]!.length; day++) {
       const idx = week * 7 + day;
       const d = new Date(baseDate);
       d.setDate(d.getDate() + idx);
       days.push({
         date: d.toISOString().slice(0, 10),
-        count: LEVEL_TO_COUNT[grid[week][day]],
+        count: LEVEL_TO_COUNT[grid[week]![day]!] ?? 0,
       });
     }
   }

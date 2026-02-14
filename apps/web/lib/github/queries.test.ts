@@ -38,7 +38,7 @@ describe("fetchContributionData", () => {
 
     await fetchContributionData("testuser", "gho_token123");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBe("Bearer gho_token123");
   });
 
@@ -52,7 +52,7 @@ describe("fetchContributionData", () => {
 
     await fetchContributionData("testuser");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBeUndefined();
   });
 
@@ -127,7 +127,7 @@ describe("fetchContributionData", () => {
 
     await fetchContributionData("testuser", "token");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     const body = JSON.parse(opts.body);
 
     // Query must declare GitTimestamp variables for Commit.history
@@ -183,8 +183,8 @@ describe("fetchContributionData", () => {
     expect(result).not.toBeNull();
     // Should have 2 nodes (the null one filtered out)
     expect(result!.pullRequests.nodes).toHaveLength(2);
-    expect(result!.pullRequests.nodes[0].additions).toBe(10);
-    expect(result!.pullRequests.nodes[1].additions).toBe(5);
+    expect(result!.pullRequests.nodes[0]!.additions).toBe(10);
+    expect(result!.pullRequests.nodes[1]!.additions).toBe(5);
   });
 
   it("logs network/fetch errors", async () => {

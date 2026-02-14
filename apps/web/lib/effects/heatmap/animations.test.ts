@@ -207,11 +207,11 @@ describe("INTENSITY_COLORS", () => {
   it("opacity increases with level", () => {
     // Extract alpha values
     const alphas = [0, 1, 2, 3, 4].map((level) => {
-      const match = INTENSITY_COLORS[level].match(/,([\d.]+)\)$/);
-      return parseFloat(match![1]);
+      const match = INTENSITY_COLORS[level]!.match(/,([\d.]+)\)$/);
+      return parseFloat(match![1]!);
     });
     for (let i = 1; i < alphas.length; i++) {
-      expect(alphas[i]).toBeGreaterThan(alphas[i - 1]);
+      expect(alphas[i]!).toBeGreaterThan(alphas[i - 1]!);
     }
   });
 });

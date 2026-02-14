@@ -162,14 +162,14 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       const match = svg.match(/font-size="(\d+)"[^>]*>Chapa/);
       expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(22);
+      expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(22);
     });
 
     it("Chapa_ logo opacity is at least 0.65 for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       const match = svg.match(/opacity="([0-9.]+)"[^>]*>Chapa/);
       expect(match).not.toBeNull();
-      expect(parseFloat(match![1])).toBeGreaterThanOrEqual(0.65);
+      expect(parseFloat(match![1]!)).toBeGreaterThanOrEqual(0.65);
     });
 
     it("contains a circular avatar with clip-path", () => {
@@ -358,7 +358,7 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       const match = svg.match(/font-size="(\d+)"[^>]*>58</);
       expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBe(52);
+      expect(parseInt(match![1]!, 10)).toBe(52);
     });
 
     it("always shows tier label below the score ring", () => {
@@ -400,7 +400,7 @@ describe("renderBadgeSvg", () => {
       // circumference = 2π × 46 ≈ 289.03, offset = 289.03 × (1 - 50/100) ≈ 144.51
       const match = svg.match(/stroke-dashoffset="([0-9.]+)"/);
       expect(match).not.toBeNull();
-      const offset = parseFloat(match![1]);
+      const offset = parseFloat(match![1]!);
       expect(offset).toBeCloseTo(289.03 * 0.5, 0);
     });
 
@@ -451,7 +451,7 @@ describe("renderBadgeSvg", () => {
       const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g);
       expect(brandingFontSizes).not.toBeNull();
       for (const match of brandingFontSizes!) {
-        const size = parseInt(match.match(/font-size="(\d+)"/)![1], 10);
+        const size = parseInt(match.match(/font-size="(\d+)"/)![1]!, 10);
         expect(size).toBeGreaterThanOrEqual(17);
       }
     });
@@ -461,7 +461,7 @@ describe("renderBadgeSvg", () => {
       const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g)];
       expect(opacityMatches.length).toBeGreaterThanOrEqual(1);
       for (const match of opacityMatches) {
-        expect(parseFloat(match[1])).toBeGreaterThanOrEqual(0.75);
+        expect(parseFloat(match[1]!)).toBeGreaterThanOrEqual(0.75);
       }
     });
 
@@ -480,14 +480,14 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       const match = svg.match(/font-size="(\d+)"[^>]*>Verified metrics/);
       expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(19);
+      expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(19);
     });
 
     it("archetype pill text font-size is at least 17", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
       const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*>Builder</);
       expect(match).not.toBeNull();
-      expect(parseInt(match![1], 10)).toBeGreaterThanOrEqual(17);
+      expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(17);
     });
   });
 

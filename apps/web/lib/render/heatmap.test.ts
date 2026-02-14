@@ -48,7 +48,7 @@ describe("buildHeatmapCells", () => {
     // Should still produce 91 cells (grid is always 13x7), all with count 0 colors
     expect(cells).toHaveLength(91);
     // All cells should have the same fill (0-count color)
-    const firstFill = cells[0].fill;
+    const firstFill = cells[0]!.fill;
     for (const cell of cells) {
       expect(cell.fill).toBe(firstFill);
     }
@@ -59,8 +59,8 @@ describe("buildHeatmapCells", () => {
     const offsetY = 200;
     const cells = buildHeatmapCells(makeHeatmapData(), offsetX, offsetY);
     // First cell (week 0, day 0) should be at the offset position
-    expect(cells[0].x).toBe(offsetX);
-    expect(cells[0].y).toBe(offsetY);
+    expect(cells[0]!.x).toBe(offsetX);
+    expect(cells[0]!.y).toBe(offsetY);
   });
 
   it("spaces cells correctly across weeks and days", () => {
@@ -68,21 +68,21 @@ describe("buildHeatmapCells", () => {
     // Cell at week 1, day 0 (index 7)
     const cellSize = 44;
     const cellGap = 5;
-    expect(cells[7].x).toBe(1 * (cellSize + cellGap));
-    expect(cells[7].y).toBe(0);
+    expect(cells[7]!.x).toBe(1 * (cellSize + cellGap));
+    expect(cells[7]!.y).toBe(0);
     // Cell at week 0, day 1 (index 1)
-    expect(cells[1].x).toBe(0);
-    expect(cells[1].y).toBe(1 * (cellSize + cellGap));
+    expect(cells[1]!.x).toBe(0);
+    expect(cells[1]!.y).toBe(1 * (cellSize + cellGap));
   });
 
   it("assigns delay based on week index", () => {
     const cells = buildHeatmapCells(makeHeatmapData(), 0, 0);
     // Week 0 cells should have delay 0
-    expect(cells[0].delay).toBe(0);
+    expect(cells[0]!.delay).toBe(0);
     // Week 1 cells should have delay 60
-    expect(cells[7].delay).toBe(60);
+    expect(cells[7]!.delay).toBe(60);
     // Week 12 cells should have delay 720
-    expect(cells[84].delay).toBe(12 * 60);
+    expect(cells[84]!.delay).toBe(12 * 60);
   });
 });
 

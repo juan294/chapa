@@ -33,13 +33,13 @@ function buildDemoHeatmap(): HeatmapDay[] {
   // Start 90 days before a fixed reference date so dates are stable
   const baseDate = new Date("2025-01-01");
   for (let week = 0; week < LEVEL_GRID.length; week++) {
-    for (let day = 0; day < LEVEL_GRID[week].length; day++) {
+    for (let day = 0; day < LEVEL_GRID[week]!.length; day++) {
       const idx = week * 7 + day;
       const d = new Date(baseDate);
       d.setDate(d.getDate() + idx);
       days.push({
         date: d.toISOString().slice(0, 10),
-        count: LEVEL_TO_COUNT[LEVEL_GRID[week][day]],
+        count: LEVEL_TO_COUNT[LEVEL_GRID[week]![day]!] ?? 0,
       });
     }
   }

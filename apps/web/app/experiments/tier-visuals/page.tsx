@@ -87,7 +87,7 @@ function heatmapColor(level: number, tier: TierName): string {
       "rgba(154,164,178,0.50)",
       "rgba(154,164,178,0.75)",
     ];
-    return colors[level] ?? colors[0];
+    return colors[level] ?? colors[0]!;
   }
   if (tier === "Solid") {
     const colors = [
@@ -97,7 +97,7 @@ function heatmapColor(level: number, tier: TierName): string {
       "rgba(230,237,243,0.50)",
       "rgba(230,237,243,0.75)",
     ];
-    return colors[level] ?? colors[0];
+    return colors[level] ?? colors[0]!;
   }
   // High and Elite use amber
   const colors = [
@@ -107,7 +107,7 @@ function heatmapColor(level: number, tier: TierName): string {
     "rgba(124,106,239,0.60)",
     "rgba(124,106,239,0.90)",
   ];
-  return colors[level] ?? colors[0];
+  return colors[level] ?? colors[0]!;
 }
 
 /* ── Tier visual config ───────────────────────────────────── */
@@ -285,12 +285,12 @@ function BadgeCard({ data, scoreOverride, tierOverride }: BadgeCardProps) {
 
 function TierTransitionDemo() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [displayScore, setDisplayScore] = useState(TIERS[0].score);
+  const [displayScore, setDisplayScore] = useState(TIERS[0]!.score);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  const currentTier = TIERS[currentIndex];
+  const currentTier = TIERS[currentIndex]!;
 
   // Animate score counting
   const animateScore = useCallback((from: number, to: number) => {
@@ -314,9 +314,9 @@ function TierTransitionDemo() {
 
   const goToTier = useCallback(
     (index: number) => {
-      const prevScore = TIERS[currentIndex].score;
+      const prevScore = TIERS[currentIndex]!.score;
       setCurrentIndex(index);
-      animateScore(prevScore, TIERS[index].score);
+      animateScore(prevScore, TIERS[index]!.score);
     },
     [currentIndex, animateScore],
   );
@@ -331,7 +331,7 @@ function TierTransitionDemo() {
     intervalRef.current = setInterval(() => {
       setCurrentIndex((prev) => {
         const next = (prev + 1) % TIERS.length;
-        animateScore(TIERS[prev].score, TIERS[next].score);
+        animateScore(TIERS[prev]!.score, TIERS[next]!.score);
         return next;
       });
     }, 3000);

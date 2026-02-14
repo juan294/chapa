@@ -49,7 +49,7 @@ export function HeatmapGrid({ data, animation, maxValue }: HeatmapGridProps) {
         const week = Math.floor(i / DAYS);
         const day = i % DAYS;
         const idx = week * DAYS + day;
-        const count = idx < sliced.length ? sliced[idx].count : 0;
+        const count = idx < sliced.length ? sliced[idx]!.count : 0;
         const level = getIntensityLevel(count, max);
         const delay = delayFn(week, day);
 

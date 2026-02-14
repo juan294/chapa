@@ -48,8 +48,8 @@ export function useStudioCommands({
             };
           }
 
-          const catInput = args[0];
-          const value = args[1];
+          const catInput = args[0]!;
+          const value = args[1]!;
           const resolved = resolveCategory(catInput);
 
           if (!resolved) {
@@ -93,7 +93,7 @@ export function useStudioCommands({
               ],
             };
           }
-          const name = args[0].toLowerCase();
+          const name = args[0]!.toLowerCase();
           const preset = STUDIO_PRESETS.find((p) => p.id === name);
           if (!preset) {
             return {

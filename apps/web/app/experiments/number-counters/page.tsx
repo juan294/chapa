@@ -71,7 +71,7 @@ function useAnimatedCounter(
       setIsAnimating(true);
       setValue(0);
       const start = performance.now();
-      const easeFn = easings[ease] || easings.easeOut;
+      const easeFn = easings[ease] ?? easings["easeOut"]!;
 
       const frame = (now: number) => {
         const elapsed = now - start;
@@ -122,8 +122,9 @@ function useInView(ref: RefObject<HTMLElement | null>, threshold = 0.5) {
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
           setInView(true);
           obs.disconnect();
         }

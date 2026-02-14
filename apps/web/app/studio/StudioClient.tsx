@@ -227,7 +227,7 @@ export function StudioClient({
             (p) => p.config.background === config.background,
           );
           const nextIdx = (currentIdx + 1) % STUDIO_PRESETS.length;
-          const preset = STUDIO_PRESETS[nextIdx];
+          const preset = STUDIO_PRESETS[nextIdx]!;
           trackEvent("preset_selected", { preset: preset.id });
           handleConfigChange(preset.config);
           break;

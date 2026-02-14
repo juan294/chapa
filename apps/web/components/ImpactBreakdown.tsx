@@ -106,7 +106,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                     aria-label={`${DIMENSION_LABELS[key]} score`}
                     style={{
                       width: `${dims[key]}%`,
-                      background: `linear-gradient(to right, ${DIMENSION_COLORS[key].from}, ${DIMENSION_COLORS[key].to})`,
+                      background: `linear-gradient(to right, ${DIMENSION_COLORS[key]!.from}, ${DIMENSION_COLORS[key]!.to})`,
                       animationDelay: `${600 + i * 100}ms`,
                     }}
                   />

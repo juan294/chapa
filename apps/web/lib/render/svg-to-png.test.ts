@@ -132,7 +132,7 @@ describe("svgToPng", () => {
     const animatedSvg = `<svg><rect opacity="0"/><animate attributeName="x" from="0" to="100" dur="1s"/></svg>`;
     svgToPng(animatedSvg, 600);
 
-    const passedSvg = MockResvg.mock.calls[0][0] as string;
+    const passedSvg = MockResvg.mock.calls[0]![0] as string;
     expect(passedSvg).not.toContain("<animate");
     expect(passedSvg).not.toContain('opacity="0"');
     expect(passedSvg).toContain('opacity="1"');
