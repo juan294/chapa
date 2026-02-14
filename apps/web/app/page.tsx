@@ -26,7 +26,7 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<><Link href="/archetypes/builder" className="text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
+    description: (<><Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
   },
   {
     title: "CONFIDENCE RATING",
@@ -402,10 +402,15 @@ export default async function Home({
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-text-secondary">
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
+            >
               <GitHubIcon className="w-3 h-3" />
               <span>Powered by GitHub</span>
-            </div>
+            </a>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <a href="/about" className="hover:text-amber transition-colors">About</a>

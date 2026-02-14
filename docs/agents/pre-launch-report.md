@@ -1,117 +1,139 @@
-# Pre-Launch Audit Report (v11 — Final Pre-Launch)
-> Generated on 2026-02-13 | Branch: `develop` | Commit: `5f5de29` | 6 parallel specialists
+# Pre-Launch Audit Report (v13)
+> Generated on 2026-02-14 | Branch: `develop` | Commit: `407fc2a` | 6 parallel specialists
 
-## Verdict: READY — 0 blockers, 6 low-severity warnings
+## Verdict: CONDITIONAL
 
-All core systems are production-ready. Tests, security, performance, infrastructure, architecture, and accessibility all pass.
+No blockers. 4 items fixed since v12 (NOTICES file, OG image tests, AuthorTypewriter a11y, .env.example). Three specialists remain YELLOW — accepted security risks, minor performance optimizations, and accessibility gaps. E2E testing infrastructure is fully operational.
+
+| Specialist | Rating | Blockers | Warnings |
+|------------|--------|----------|----------|
+| Architecture | GREEN | 0 | 3 |
+| Quality Assurance | GREEN | 0 | 6 |
+| Security | YELLOW | 0 | 4 |
+| Performance | YELLOW | 0 | 5 |
+| UX/Accessibility | YELLOW | 0 | 10 |
+| Infrastructure | GREEN | 0 | 5 |
+
+**Total: 0 blockers, 33 warnings (19 actionable, 8 accepted risks, 6 low/cosmetic)**
 
 ---
 
-## Blockers
+## Fixed Since v12
 
-None.
+| Item | Fix | Issue |
+|------|-----|-------|
+| License exceptions undocumented | Created NOTICES file | #217 |
+| OG image route + svg-to-png untested | Added 32 tests | #218 |
+| AuthorTypewriter hover-only social links | Added group-focus-within + tabIndex | #219 |
+| .env.example missing CHAPA_VERIFICATION_SECRET | Added to .env.example | #220 |
 
-## Warnings
+---
 
-| # | Issue | Severity | Found by | Risk |
-|---|-------|----------|----------|------|
-| W1 | `CHAPA_VERIFICATION_SECRET` missing from `.env.example` | Low | devops | Developer onboarding gap; code degrades gracefully |
-| W2 | `sharp-libvips` dependency is LGPL-3.0 | Informational | security | Acceptable for dynamic linking; no copyleft risk |
-| W3 | No root `loading.tsx` for route transitions | Low | ux-reviewer | No skeleton during SSR; pages still render fine |
-| W4 | Hardcoded hex colors in archetype links and dimension bars | Low | ux-reviewer | Theme-independent visualization colors; cosmetic |
-| W5 | Inline SVG badges lack `role="img"` / `aria-label` | Low | ux-reviewer | Screen reader gap on demo badges; not core functionality |
-| W6 | AuthorTypewriter popover not keyboard-accessible | Low | ux-reviewer | Supplementary author credits; hover-only |
+## Accepted Risks (no action needed)
+
+| ID | Issue | Rationale |
+|----|-------|-----------|
+| S1 | Rate limiting fails open when Redis unavailable | Deliberate availability-over-safety tradeoff for non-financial app |
+| S2 | CORS wildcard on /api/verify/[hash] | Intentional — public read-only verification API |
+| S3 | CSP unsafe-inline for script-src | Required by Next.js App Router |
+| P1 | BadgeContent.tsx use client pulls effects library | Necessary for interactive badge features |
+| A1 | @types/node v22 vs v25 | Intentional pin — matches Node 20 runtime |
+| D3 | No vercel.json | Acceptable — Vercel auto-detection works |
+| U9 | AuthorTypewriter stopPropagation on div | Low severity — popover is accessible via focus-within |
+| Q5 | No direct GitHub rate-limit 403/429 test | Covered indirectly — client returns null, badge route handles gracefully |
+
+---
+
+## Actionable Warnings (GitHub issues created)
+
+See individual issues for details and acceptance criteria.
+
+### Architecture
+- A3: Add `noUncheckedIndexedAccess` to tsconfig
+
+### Quality Assurance
+- Q1-Q4: Untested UI/effects components (low risk)
+- Q6: No automated non-accusatory messaging test
+
+### Security
+- S4: lightningcss-darwin-arm64 missing from NOTICES
+
+### Performance
+- P2: useReducedMotion SSR/client mismatch
+- P3: GlobalCommandBar autoFocus steals focus on every page
+- P4: 12 experiment pages in production build
+- P5: Badge img missing fetchpriority="high"
+
+### UX/Accessibility
+- U1: TerminalInput wrapper div onClick without keyboard support
+- U3: No aria-busy on loading states
+- U4+U5: Hardcoded hex colors outside design system
+- U6: Share page heading hierarchy (archetype h2 → h3)
+- U7+U10: Error messages missing role="alert"
+- U8: BadgeToolbar share dropdown lacks arrow key navigation
+
+### Infrastructure
+- D1: CLAUDE.md missing NEXT_PUBLIC_STUDIO_ENABLED documentation
+- D2: No root loading.tsx
+- D4+D5: E2E CI optimization (double build + npx vs pnpm)
 
 ---
 
 ## Detailed Findings
 
-### 1. Quality Assurance (qa-lead) — GREEN
+### 1. Architecture (architect) — GREEN
 
-- **85 test files, 1,396 tests, 100% pass rate** (2.56s)
-- Typecheck: 0 errors across 3 workspace packages
-- Lint: 0 errors, 2 warnings (unused vars in test file)
-- **Critical path coverage:**
-  - Scoring pipeline: ~158 tests across 3 files
-  - SVG rendering: 8/11 files with dedicated tests; escape.ts has 8 XSS-specific tests
-  - OAuth: all 4 routes tested (callback has 19 tests)
-  - Badge endpoint: 30 tests
-  - Share page: 12 + 14 + 6 tests across 3 files
-  - Cache layer: 32 tests
-  - API routes: 13/13 routes tested (100%)
-- All acceptance criteria from CLAUDE.md verified
+**Summary:** Clean monorepo, zero circular deps, zero type errors, zero vulnerabilities. Playwright E2E setup is well-configured.
 
-### 2. Security (security-reviewer) — GREEN
+- 234 files scanned: zero circular dependencies
+- 3 workspace packages: all pass typecheck
+- pnpm audit: zero vulnerabilities
+- knip: 1 unused file (Claude skill asset)
+- E2E: 7 spec files, properly integrated into CI
 
-- `pnpm audit`: 0 known vulnerabilities
-- No hardcoded secrets in source; `.env.local` not tracked
-- OAuth: CSRF via `crypto.randomBytes(16)` + `timingSafeEqual`, AES-256-GCM encryption, rate-limited, minimal scope (`read:user`), redirect validation
-- SVG XSS: all user input escaped via `escapeXml()`, 8 dedicated tests + XSS tests in BadgeSvg
-- No secrets in `NEXT_PUBLIC_*` vars
-- CORS only on public `/api/verify/[hash]` (correct)
-- Cache keys use validated inputs (handle regex, hex-only hash, UUIDs)
-- Headers: CSP, HSTS (2yr + preload), X-Frame-Options, Permissions-Policy, nosniff
-- `dangerouslySetInnerHTML` — all 14 usages reviewed, all safe
-- Rate limiting on all auth and mutation endpoints
+### 2. Quality Assurance (qa-lead) — GREEN
 
-### 3. Infrastructure (devops) — GREEN
+**Summary:** 1,436 unit tests + 7 E2E spec files — all passing. All critical paths covered. All 7 acceptance criteria verified.
 
-- All 6 CI workflows passing
-- Badge headers match spec: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
-- Error pages: `not-found.tsx`, `error.tsx`, `global-error.tsx` all present
-- Health endpoint: JSON with Redis check, degrades gracefully
-- Git state: clean tree, no stale worktrees/branches
-- Coming-soon gate: correctly passes all traffic when `COMING_SOON` is unset
+- Unit: 87 files, 1,436 tests, 0 failures (3.93s)
+- E2E: 39 scenarios across smoke, badge, landing, nav, share, static pages, theme
+- TypeScript: clean. ESLint: clean.
+- Graceful degradation: all 4 failure scenarios tested
 
-### 4. Architecture (architect) — GREEN
+### 3. Security (security-reviewer) — YELLOW
 
-- 0 outdated dependencies
-- `strict: true` in all 4 tsconfig.json files; 0 type errors
-- 0 circular dependencies
-- Knip: 1 unused file (Claude skill template, not app code)
-- Clean monorepo with proper workspace linking
-- No duplicate utilities across packages
+**Summary:** Strong posture. No vulnerabilities. Solid OAuth, XSS prevention, security headers. 3 accepted risks carry over. 1 minor NOTICES gap.
 
-### 5. Performance (performance-eng) — GREEN
+- pnpm audit: zero vulnerabilities
+- OAuth: CSRF + timingSafeEqual + AES-256-GCM + minimal scope
+- SVG: escapeXml() on all user input + regex validation
+- Rate limiting on all API routes
+- SSRF: avatar fetcher uses allowlist
 
-- Build succeeds with 0 errors (Next.js 16 + Turbopack)
-- No JS chunk exceeds 224 KB; well under 500 KB threshold
-- CSS: 76.6 KB single file
-- `"use client"` at correct level (leaf components only)
-- Dynamic imports for heavy libs: posthog-js, canvas-confetti, ShortcutCheatSheet, ShareBadgePreview
-- Fonts: `display: "swap"` via `next/font/google`
-- Images: explicit dimensions everywhere
-- CLS risk: low
-- No render-blocking third-party scripts
-- Static assets: 4 files, largest 13.3 KB
+### 4. Performance (performance-eng) — YELLOW
 
-### 6. UX/Accessibility (ux-reviewer) — GREEN
+**Summary:** No chunk exceeds 219KB (well under 500KB). Good code splitting. 5 minor optimization opportunities.
 
-- Heading hierarchy: proper h1→h2→h3 on all pages; sr-only h2s for terminal sections
-- ARIA: comprehensive — all buttons, menus, dialogs, live regions, progress bars labeled
-- Skip-to-content link targeting `#main-content`
-- Focus indicators: global `*:focus-visible` with 2px amber outline
-- Keyboard: focus traps, arrow key nav, Escape handlers everywhere
-- `prefers-reduced-motion`: global CSS + JS-level checks
-- All interactive elements natively focusable
-- `<html lang="en">` set
-- Font system and semantic color tokens consistent
+- Largest JS chunk: 170KB. CSS: 77KB.
+- Dynamic imports: posthog-js, canvas-confetti, ShareBadgePreview, ShortcutCheatSheet
+- Playwright has zero production bundle impact
+- CLS: low risk. LCP: badge img needs fetchpriority. INP: autoFocus concern.
 
----
+### 5. UX/Accessibility (ux-reviewer) — YELLOW
 
-## Comparison with v10 Audit
+**Summary:** Strong foundations. AuthorTypewriter fix verified correct. 9 carry-over + 1 new warning.
 
-Previous high-priority items from v10 audit remain as accepted post-launch improvements:
+- Skip link, focus-visible, reduced-motion all excellent
+- Focus traps in UserMenu, MobileNav, ShortcutCheatSheet
+- All decorative icons have aria-hidden
+- AuthorTypewriter fix: group-focus-within + tabIndex confirmed working
 
-| v10 Item | Status | Notes |
-|----------|--------|-------|
-| H1: Open redirect in OAuth callback | Accepted risk | Cookie is HttpOnly/SameSite=Lax, set only by validated login |
-| H2: Rate limiting fails open | Accepted risk | Intentional availability design on Vercel + Upstash |
-| H3: CLI poll lacks rate limiting | Accepted risk | UUID v4 sessions, 5-min TTL, one-time use |
-| M1–M8: Medium hardening items | Backlog | All have mitigating factors; none exploitable |
+### 6. Infrastructure (devops) — GREEN
 
----
+**Summary:** Build succeeds. All 5 CI workflows green. E2E pipeline well-structured. 2 carry-over + 2 new warnings.
 
-## Recommendation
-
-**Ship it.** All 6 specialists report GREEN. 1,396 tests passing, 0 vulnerabilities, 0 type errors, clean build under 224 KB per chunk, comprehensive a11y, all CI green. The 6 warnings are low-severity cosmetic/documentation items suitable for post-launch cleanup.
+- CI: 5/5 workflows passing on 407fc2a
+- Badge headers: match spec exactly
+- Health endpoint: degrades gracefully
+- E2E: browser caching, artifact upload on failure, proper job dependencies
+- Git: clean tree, no stale worktrees
