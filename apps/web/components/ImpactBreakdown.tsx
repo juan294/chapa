@@ -80,7 +80,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
         <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4">
           Performance Dimensions
         </h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(["building", "guarding", "consistency", "breadth"] as const).map(
             (key, i) => (
               <div

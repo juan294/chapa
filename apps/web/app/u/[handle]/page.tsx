@@ -140,7 +140,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
       <Navbar />
 
-      <div className="relative mx-auto max-w-4xl px-6 pt-24 pb-24">
+      <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <h1 className="sr-only">
           @{handle} — Developer Impact, Decoded
         </h1>
@@ -244,7 +244,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <CopyButton text={embedMarkdown} />
               </div>
             </div>
-            <div className="p-4 font-heading text-sm leading-relaxed overflow-x-auto">
+            <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
               <p className="text-text-primary/80 whitespace-nowrap">
                 <span className="text-amber">{"![Chapa Badge]("}</span>
                 <span className="text-text-secondary">
@@ -268,7 +268,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <CopyButton text={embedHtml} />
               </div>
             </div>
-            <div className="p-4 font-heading text-sm leading-relaxed overflow-x-auto">
+            <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
               <p className="text-text-primary/80 whitespace-nowrap">
                 <span className="text-amber">{"<img "}</span>
                 <span className="text-text-secondary">{"src="}</span>

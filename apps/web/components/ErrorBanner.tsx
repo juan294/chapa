@@ -20,7 +20,7 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <div
       role="alert"
-      className="fixed top-[73px] left-0 right-0 z-40 flex items-center justify-center gap-3 border-b border-amber/30 bg-amber/10 px-6 py-3 text-sm text-amber backdrop-blur-sm"
+      className="fixed top-[73px] left-0 right-0 z-40 flex items-center justify-center gap-2 sm:gap-3 border-b border-amber/30 bg-amber/10 px-4 sm:px-6 py-3 text-xs sm:text-sm text-amber backdrop-blur-sm"
     >
       {/* Warning icon */}
       <svg

@@ -254,7 +254,7 @@ export function StudioClient({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-[calc(100vh-3.5rem)]">
       <h1 className="sr-only">Creator Studio</h1>
       {/* Preview pane (left, sticky) */}
-      <div className="flex items-start justify-center lg:items-center px-4 py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke" aria-busy={saving}>
+      <div className="flex items-start justify-center lg:items-center px-3 sm:px-4 py-4 sm:py-6 lg:px-8 lg:py-0 border-b lg:border-b-0 lg:border-r border-stroke" aria-busy={saving}>
         <div className="w-full max-w-xl sticky top-20">
           <BadgePreviewCard
             key={previewKey}
@@ -279,7 +279,7 @@ export function StudioClient({
       </div>
 
       {/* Terminal pane (right) */}
-      <div className="flex flex-col lg:h-[calc(100vh-3.5rem)] bg-bg">
+      <div className="flex flex-col min-h-[50vh] lg:h-[calc(100vh-3.5rem)] bg-bg">
         {/* Quick Controls toggle */}
         <QuickControls
           config={config}

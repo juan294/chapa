@@ -94,7 +94,7 @@ export function AutocompleteDropdown({
       ref={containerRef}
       role="listbox"
       aria-label="Command suggestions"
-      className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl"
+      className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl"
     >
       {matching.map((cmd, i) => (
         <button
@@ -115,7 +115,7 @@ export function AutocompleteDropdown({
             {cmd.description}
           </span>
           {cmd.usage && (
-            <span className="ml-auto pl-3 text-terminal-dim shrink-0">
+            <span className="ml-auto pl-3 text-terminal-dim shrink-0 hidden sm:inline">
               {cmd.usage.replace(cmd.name + " ", "")}
             </span>
           )}

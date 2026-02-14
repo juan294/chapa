@@ -117,7 +117,7 @@ export default async function Home({
 
       <main id="main-content">
         {/* ── Terminal session ─────────────────────────────── */}
-        <div className="mx-auto max-w-4xl px-6 pt-28 pb-32 space-y-24">
+        <div className="mx-auto max-w-4xl px-6 pt-24 pb-20 md:pt-28 md:pb-32 space-y-16 md:space-y-24">
 
           {/* ── Hero: $ chapa ──────────────────────────────── */}
           <section className="animate-fade-in-up">
@@ -126,7 +126,7 @@ export default async function Home({
               <span className="text-text-secondary">chapa</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
-              <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[0.95]">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95]">
                 Developer Impact,
                 <br />
                 <span className="text-amber">Decoded</span>
@@ -219,8 +219,8 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
               {FEATURES.map((feature) => (
-                <div key={feature.title} className="flex gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div key={feature.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     {feature.title}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -306,16 +306,16 @@ export default async function Home({
               </div>
 
               <div className="space-y-2">
-                <div className="flex gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     WHAT IT DOES
                   </span>
                   <span className="text-text-secondary text-sm">
                     Links your EMU stats with your personal GitHub — one unified badge.
                   </span>
                 </div>
-                <div className="flex gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     HOW TO USE
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -326,8 +326,8 @@ export default async function Home({
                     and follow the prompts. Takes under a minute.
                   </span>
                 </div>
-                <div className="flex gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     NO EMU?
                   </span>
                   <span className="text-text-secondary text-sm">

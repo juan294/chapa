@@ -181,10 +181,10 @@ export function BadgeToolbar({
   }, [handle]);
 
   const btnClass =
-    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
+    "inline-flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {/* Refresh (owner only) */}
       {isOwner && (
         <button
@@ -252,7 +252,7 @@ export function BadgeToolbar({
 
         {shareOpen && (
           <div
-            className="absolute top-full left-0 mt-2 min-w-[140px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 p-1.5 z-20 animate-terminal-fade-in"
+            className="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 p-1.5 z-20 animate-terminal-fade-in"
             role="menu"
           >
             <a
