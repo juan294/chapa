@@ -71,6 +71,28 @@ export function BadgeToolbar({
     }
   }, [shareUrl]);
 
+  const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
+
+  const handleDownload = useCallback(async () => {
+    setDownloadStatus("loading");
+    trackEvent("badge_downloaded", { handle });
+    try {
+      const res = await fetch(`/u/${encodeURIComponent(handle)}/opengraph-image`);
+      if (!res.ok) throw new Error("fetch failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chapa-${handle}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      /* silently fail */
+    } finally {
+      setDownloadStatus("idle");
+    }
+  }, [handle]);
+
   const btnClass =
     "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
 
@@ -195,6 +217,30 @@ export function BadgeToolbar({
           </div>
         )}
       </div>
+
+      {/* Download PNG */}
+      <button
+        onClick={handleDownload}
+        disabled={downloadStatus === "loading"}
+        aria-label="Download badge as PNG"
+        className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        <svg
+          className="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        {downloadStatus === "loading" ? "Downloading\u2026" : "Download"}
+      </button>
 
       {/* Customize (owner + studio enabled) */}
       {isOwner && studioEnabled && (
