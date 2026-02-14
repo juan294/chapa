@@ -16,7 +16,7 @@ export function ThemeToggle() {
   const hydrated = useHydrated();
 
   if (!hydrated) {
-    return <div className="h-8 w-8" aria-hidden="true" />;
+    return <div className="h-10 w-10" aria-hidden="true" />;
   }
 
   const isDark = theme === "dark";
@@ -24,7 +24,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="flex h-8 w-8 items-center justify-center rounded-lg text-terminal-dim transition-colors hover:text-amber"
+      className="flex h-10 w-10 items-center justify-center rounded-lg text-terminal-dim transition-colors hover:text-amber"
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
     >
       {isDark ? (

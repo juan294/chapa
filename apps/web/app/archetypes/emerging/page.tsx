@@ -32,16 +32,18 @@ export default function EmergingPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-[#9AA4B2]">Emerging</span>
+                The <span className="text-archetype-emerging">Emerging</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-[#9AA4B2]">None yet &mdash; profile still forming</span>
+                Dominant dimension: <span className="text-archetype-emerging">None yet &mdash; profile still forming</span>
               </p>
             </div>
 
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Emerging archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -57,10 +59,10 @@ export default function EmergingPage() {
               </p>
 
               <p>
-                Chapa assigns Emerging when the average dimension score is below 40 or when no
-                single dimension reaches 50. At that point, the data is too sparse for any
-                archetype label to be meaningful. Rather than guess, the system acknowledges
-                that your profile is still taking shape.
+                Chapa assigns Emerging when overall activity is low and no clear pattern has
+                formed. At that point, the data is too sparse for any archetype label to be
+                meaningful. Rather than guess, the system acknowledges that your profile is
+                still taking shape.
               </p>
 
               <p>
@@ -77,17 +79,17 @@ export default function EmergingPage() {
 
               <p>
                 Emerging is evaluated <em>first</em> in the archetype pipeline, before any
-                specific archetype check. If your dimension average is below 40, the algorithm
+                specific archetype check. If overall activity is too low, the algorithm
                 short-circuits and assigns Emerging immediately. This prevents low-confidence
                 data from producing misleading archetype labels. Better to say &ldquo;we don&apos;t
                 know yet&rdquo; than to say something wrong.
               </p>
 
               <p>
-                The confidence score for Emerging profiles is typically low (55&ndash;65), and the
-                system may flag reasons like &ldquo;limited contribution history&rdquo; or
-                &ldquo;insufficient data for reliable scoring.&rdquo; These are informational,
-                never accusatory &mdash; Chapa is designed to explain, not to blame.
+                The confidence score for Emerging profiles is typically low, and the system may
+                flag reasons like &ldquo;limited contribution history&rdquo; or &ldquo;insufficient
+                data for reliable scoring.&rdquo; These are informational, never accusatory &mdash;
+                Chapa is designed to explain, not to blame.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

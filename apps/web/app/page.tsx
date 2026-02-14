@@ -26,7 +26,7 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<><Link href="/archetypes/builder" className="text-amber hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="text-[#F472B6] hover:text-[#F9A8D4] transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="text-terminal-green hover:text-[#6EE7A0] transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="text-terminal-yellow hover:text-[#FCD34D] transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="text-text-primary hover:text-white transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="text-[#9AA4B2] hover:text-[#C0C7D0] transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
+    description: (<><Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
   },
   {
     title: "CONFIDENCE RATING",
@@ -117,7 +117,7 @@ export default async function Home({
 
       <main id="main-content">
         {/* ── Terminal session ─────────────────────────────── */}
-        <div className="mx-auto max-w-4xl px-6 pt-28 pb-32 space-y-24">
+        <div className="mx-auto max-w-4xl px-6 pt-24 pb-20 md:pt-28 md:pb-32 space-y-16 md:space-y-24">
 
           {/* ── Hero: $ chapa ──────────────────────────────── */}
           <section className="animate-fade-in-up">
@@ -126,7 +126,7 @@ export default async function Home({
               <span className="text-text-secondary">chapa</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
-              <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[0.95]">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95]">
                 Developer Impact,
                 <br />
                 <span className="text-amber">Decoded</span>
@@ -148,7 +148,7 @@ export default async function Home({
                 </a>
                 <Link
                   href="/verify"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#34D399] hover:shadow-xl hover:shadow-complement/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
                 >
                   <ShieldCheckIcon className="w-4 h-4" />
                   Verify a Badge
@@ -167,6 +167,8 @@ export default async function Home({
             <div className="pl-4 border-l border-stroke">
               <div
                 className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+                role="img"
+                aria-label="Example Chapa developer impact badge"
                 dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
               />
             </div>
@@ -219,8 +221,8 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
               {FEATURES.map((feature) => (
-                <div key={feature.title} className="flex gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div key={feature.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     {feature.title}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -306,16 +308,16 @@ export default async function Home({
               </div>
 
               <div className="space-y-2">
-                <div className="flex gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     WHAT IT DOES
                   </span>
                   <span className="text-text-secondary text-sm">
                     Links your EMU stats with your personal GitHub — one unified badge.
                   </span>
                 </div>
-                <div className="flex gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     HOW TO USE
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -326,8 +328,8 @@ export default async function Home({
                     and follow the prompts. Takes under a minute.
                   </span>
                 </div>
-                <div className="flex gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 w-44 sm:w-48">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     NO EMU?
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -402,10 +404,15 @@ export default async function Home({
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-text-secondary">
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
+            >
               <GitHubIcon className="w-3 h-3" />
               <span>Powered by GitHub</span>
-            </div>
+            </a>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <a href="/about" className="hover:text-amber transition-colors">About</a>

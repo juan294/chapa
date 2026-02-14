@@ -32,4 +32,60 @@ describe("globals.css", () => {
       expect(SOURCE).toContain("--color-amber");
     });
   });
+
+  describe("dimension color tokens (#233)", () => {
+    const DIMENSION_TOKENS = [
+      "--color-dimension-building",
+      "--color-dimension-guarding",
+      "--color-dimension-consistency",
+      "--color-dimension-breadth",
+    ];
+
+    for (const token of DIMENSION_TOKENS) {
+      it(`defines ${token} in @theme block`, () => {
+        const themeBlock = SOURCE.match(/@theme\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+        expect(themeBlock).toContain(token);
+      });
+
+      it(`defines ${token} in :root block`, () => {
+        const rootBlock = SOURCE.match(/:root\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+        expect(rootBlock).toContain(token);
+      });
+
+      it(`defines ${token} in [data-theme="dark"] block`, () => {
+        const darkBlock =
+          SOURCE.match(/\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+        expect(darkBlock).toContain(token);
+      });
+    }
+  });
+
+  describe("archetype color tokens (#233)", () => {
+    const ARCHETYPE_TOKENS = [
+      "--color-archetype-builder",
+      "--color-archetype-guardian",
+      "--color-archetype-marathoner",
+      "--color-archetype-polymath",
+      "--color-archetype-balanced",
+      "--color-archetype-emerging",
+    ];
+
+    for (const token of ARCHETYPE_TOKENS) {
+      it(`defines ${token} in @theme block`, () => {
+        const themeBlock = SOURCE.match(/@theme\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+        expect(themeBlock).toContain(token);
+      });
+
+      it(`defines ${token} in :root block`, () => {
+        const rootBlock = SOURCE.match(/:root\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+        expect(rootBlock).toContain(token);
+      });
+
+      it(`defines ${token} in [data-theme="dark"] block`, () => {
+        const darkBlock =
+          SOURCE.match(/\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+        expect(darkBlock).toContain(token);
+      });
+    }
+  });
 });

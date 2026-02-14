@@ -35,4 +35,15 @@ describe("About page", () => {
       expect(SOURCE).not.toMatch(/>About Chapa<span[^>]*>\.<\/span>/);
     });
   });
+
+  describe("scoring methodology link", () => {
+    it("does NOT link to the scoring methodology page", () => {
+      expect(SOURCE).not.toContain('href="/about/scoring"');
+      expect(SOURCE).not.toContain("full scoring methodology");
+    });
+
+    it("does NOT mention publishing weights or caps", () => {
+      expect(SOURCE).not.toContain("Every weight, cap, and decision");
+    });
+  });
 });

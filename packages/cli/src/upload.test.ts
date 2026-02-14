@@ -62,7 +62,7 @@ describe("uploadSupplementalStats", () => {
       }),
     );
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body);
     expect(body.targetHandle).toBe("juan294");
     expect(body.sourceHandle).toBe("corp_user");
     expect(body.stats).toEqual(expect.objectContaining({ handle: "corp_user", commitsTotal: 30 }));

@@ -32,6 +32,48 @@ export function BadgeToolbar({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [shareOpen]);
 
+  // Close on Escape
+  useEffect(() => {
+    if (!shareOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setShareOpen(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [shareOpen]);
+
+  // Arrow key navigation for share menu items
+  useEffect(() => {
+    if (!shareOpen || !shareRef.current) return;
+    function handleMenuKeyDown(e: KeyboardEvent) {
+      const items = Array.from(
+        shareRef.current?.querySelectorAll('[role="menuitem"]') ?? [],
+      ) as HTMLElement[];
+      if (items.length === 0) return;
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+
+      let nextIndex = -1;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        nextIndex = (currentIndex + 1) % items.length;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        nextIndex = (currentIndex - 1 + items.length) % items.length;
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        nextIndex = 0;
+      } else if (e.key === "End") {
+        e.preventDefault();
+        nextIndex = items.length - 1;
+      }
+      if (nextIndex >= 0) {
+        items[nextIndex]?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleMenuKeyDown);
+    return () => document.removeEventListener("keydown", handleMenuKeyDown);
+  }, [shareOpen]);
+
   async function handleRefresh() {
     setRefreshStatus("loading");
     try {
@@ -139,15 +181,16 @@ export function BadgeToolbar({
   }, [handle]);
 
   const btnClass =
-    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
+    "inline-flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {/* Refresh (owner only) */}
       {isOwner && (
         <button
           onClick={handleRefresh}
           disabled={refreshStatus === "loading" || refreshStatus === "success"}
+          aria-busy={refreshStatus === "loading"}
           title={
             refreshStatus === "idle"
               ? "Refresh badge data"
@@ -209,7 +252,7 @@ export function BadgeToolbar({
 
         {shareOpen && (
           <div
-            className="absolute top-full left-0 mt-2 min-w-[140px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 p-1.5 z-20 animate-terminal-fade-in"
+            className="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 p-1.5 z-20 animate-terminal-fade-in"
             role="menu"
           >
             <a
@@ -228,7 +271,7 @@ export function BadgeToolbar({
                 className="w-3.5 h-3.5"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                aria-label="X"
+                aria-hidden="true"
               >
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
@@ -267,6 +310,7 @@ export function BadgeToolbar({
       <button
         onClick={handleDownload}
         disabled={downloadStatus === "loading"}
+        aria-busy={downloadStatus === "loading"}
         aria-label="Download badge as PNG"
         className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
       >

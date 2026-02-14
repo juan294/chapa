@@ -63,7 +63,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
         nextIndex = items.length - 1;
       }
       if (nextIndex >= 0) {
-        items[nextIndex].focus();
+        items[nextIndex]!.focus();
       }
     }
     document.addEventListener("keydown", handleMenuKeyDown);
@@ -117,7 +117,7 @@ export function UserMenu({ login, name, avatarUrl }: UserMenuProps) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-stroke bg-card shadow-xl shadow-stroke animate-scale-in"
+          className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-stroke bg-card shadow-xl shadow-stroke animate-scale-in"
         >
           {/* Header */}
           <div className="border-b border-stroke px-4 py-3">

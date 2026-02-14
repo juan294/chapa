@@ -37,12 +37,12 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     const svg = renderRadarChart(makeDimensions({ building: 100, guarding: 100, consistency: 100, breadth: 100 }), cx, cy, r);
     const pointsMatch = svg.match(/points="([^"]+)"/);
     expect(pointsMatch).not.toBeNull();
-    const points = pointsMatch![1].split(" ").map(p => p.split(",").map(Number));
-    for (const [x, y] of points) {
-      expect(x).toBeGreaterThanOrEqual(cx - r - 1);
-      expect(x).toBeLessThanOrEqual(cx + r + 1);
-      expect(y).toBeGreaterThanOrEqual(cy - r - 1);
-      expect(y).toBeLessThanOrEqual(cy + r + 1);
+    const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
+    for (const pt of points) {
+      expect(pt![0]!).toBeGreaterThanOrEqual(cx - r - 1);
+      expect(pt![0]!).toBeLessThanOrEqual(cx + r + 1);
+      expect(pt![1]!).toBeGreaterThanOrEqual(cy - r - 1);
+      expect(pt![1]!).toBeLessThanOrEqual(cy + r + 1);
     }
   });
 
@@ -63,11 +63,11 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     // Match the data polygon (fill-opacity, not fill="none")
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
-    const points = pointsMatch![1].split(" ").map(p => p.split(",").map(Number));
+    const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
     // All points should be at or very near center
-    for (const [x, y] of points) {
-      expect(Math.abs(x - 200)).toBeLessThan(2);
-      expect(Math.abs(y - 200)).toBeLessThan(2);
+    for (const pt of points) {
+      expect(Math.abs(pt![0]! - 200)).toBeLessThan(2);
+      expect(Math.abs(pt![1]! - 200)).toBeLessThan(2);
     }
   });
 
@@ -75,9 +75,9 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     const svg = renderRadarChart(makeDimensions({ building: 70, guarding: 70, consistency: 70, breadth: 70 }), 200, 200, 100);
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
-    const points = pointsMatch![1].split(" ").map(p => p.split(",").map(Number));
+    const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
     // All points should be equidistant from center
-    const distances = points.map(([x, y]) => Math.sqrt((x - 200) ** 2 + (y - 200) ** 2));
+    const distances = points.map((pt) => Math.sqrt((pt![0]! - 200) ** 2 + (pt![1]! - 200) ** 2));
     const maxDiff = Math.max(...distances) - Math.min(...distances);
     expect(maxDiff).toBeLessThan(2);
   });
@@ -88,12 +88,12 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     // Extract the building point (top) from both
     const extractFirstPoint = (svg: string) => {
       const match = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
-      return match![1].split(" ")[0].split(",").map(Number);
+      return match![1]!.split(" ")[0]!.split(",").map(Number);
     };
-    const [, lowY] = extractFirstPoint(lowSvg);
-    const [, highY] = extractFirstPoint(highSvg);
+    const lowPt = extractFirstPoint(lowSvg);
+    const highPt = extractFirstPoint(highSvg);
     // Building is at top → higher score = smaller y value (further up)
-    expect(highY).toBeLessThan(lowY);
+    expect(highPt[1]!).toBeLessThan(lowPt[1]!);
   });
 
   it("uses accent color for the data shape fill", () => {
@@ -117,9 +117,9 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     // cos(-π/2) = 0 → x = cx, sin(-π/2) = -1 → y = cy - r
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
-    const [bx, by] = pointsMatch![1].split(" ")[0].split(",").map(Number);
+    const bPt = pointsMatch![1]!.split(" ")[0]!.split(",").map(Number);
     // Building should be directly above center (x ≈ cx, y = cy - r)
-    expect(Math.abs(bx - cx)).toBeLessThan(2);
-    expect(by).toBe(cy - r);
+    expect(Math.abs(bPt[0]! - cx)).toBeLessThan(2);
+    expect(bPt[1]!).toBe(cy - r);
   });
 });

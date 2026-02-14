@@ -115,8 +115,8 @@ describe("mergeStats", () => {
       });
 
       const merged = mergeStats(primary, supplemental);
-      expect(merged.heatmapData[0].date).toBe("2025-01-01");
-      expect(merged.heatmapData[1].date).toBe("2025-01-03");
+      expect(merged.heatmapData[0]!.date).toBe("2025-01-01");
+      expect(merged.heatmapData[1]!.date).toBe("2025-01-03");
     });
   });
 

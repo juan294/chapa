@@ -16,10 +16,10 @@ const DIMENSION_SUBTITLES: Record<string, string> = {
 };
 
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
-  building: { from: "#22c55e", to: "#86efac" },
-  guarding: { from: "#f97316", to: "#fdba74" },
-  consistency: { from: "#06b6d4", to: "#67e8f9" },
-  breadth: { from: "#ec4899", to: "#f9a8d4" },
+  building: { from: "var(--color-dimension-building)", to: "var(--color-dimension-building-light)" },
+  guarding: { from: "var(--color-dimension-guarding)", to: "var(--color-dimension-guarding-light)" },
+  consistency: { from: "var(--color-dimension-consistency)", to: "var(--color-dimension-consistency-light)" },
+  breadth: { from: "var(--color-dimension-breadth)", to: "var(--color-dimension-breadth-light)" },
 };
 
 
@@ -80,7 +80,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
         <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4">
           Performance Dimensions
         </h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(["building", "guarding", "consistency", "breadth"] as const).map(
             (key, i) => (
               <div
@@ -106,7 +106,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                     aria-label={`${DIMENSION_LABELS[key]} score`}
                     style={{
                       width: `${dims[key]}%`,
-                      background: `linear-gradient(to right, ${DIMENSION_COLORS[key].from}, ${DIMENSION_COLORS[key].to})`,
+                      background: `linear-gradient(to right, ${DIMENSION_COLORS[key]!.from}, ${DIMENSION_COLORS[key]!.to})`,
                       animationDelay: `${600 + i * 100}ms`,
                     }}
                   />

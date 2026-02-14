@@ -40,6 +40,18 @@ describe("robots.ts", () => {
     expect(wildcardRule!.disallow).toContain("/api/");
   });
 
+  it("disallows /experiments/ paths", () => {
+    const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const wildcardRule = rules.find(
+      (r) => r.userAgent === "*" || (Array.isArray(r.userAgent) && r.userAgent.includes("*")),
+    );
+    const disallows = Array.isArray(wildcardRule!.disallow)
+      ? wildcardRule!.disallow
+      : [wildcardRule!.disallow];
+    expect(disallows).toContain("/experiments/");
+  });
+
   it("explicitly allows AI/LLM crawlers", () => {
     const result = robots();
     const rules = Array.isArray(result.rules) ? result.rules : [result.rules];

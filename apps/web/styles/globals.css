@@ -30,6 +30,24 @@
 
   --color-track: #0000000F;
 
+  /* Dimension colors — data visualization accents for the 4 impact dimensions */
+  --color-dimension-building: #22c55e;
+  --color-dimension-guarding: #f97316;
+  --color-dimension-consistency: #06b6d4;
+  --color-dimension-breadth: #ec4899;
+  --color-dimension-building-light: #86efac;
+  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-consistency-light: #67e8f9;
+  --color-dimension-breadth-light: #f9a8d4;
+
+  /* Archetype colors — accent color per developer archetype */
+  --color-archetype-builder: #7C6AEF;
+  --color-archetype-guardian: #F472B6;
+  --color-archetype-marathoner: #16A34A;
+  --color-archetype-polymath: #FCD34D;
+  --color-archetype-balanced: #64748B;
+  --color-archetype-emerging: #F97316;
+
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
   --font-body: var(--font-plus-jakarta), system-ui, sans-serif;
@@ -61,6 +79,22 @@
   --color-terminal-dim: #9CA3AF;
 
   --color-track: rgba(0, 0, 0, 0.06);
+
+  --color-dimension-building: #22c55e;
+  --color-dimension-guarding: #f97316;
+  --color-dimension-consistency: #06b6d4;
+  --color-dimension-breadth: #ec4899;
+  --color-dimension-building-light: #86efac;
+  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-consistency-light: #67e8f9;
+  --color-dimension-breadth-light: #f9a8d4;
+
+  --color-archetype-builder: #7C6AEF;
+  --color-archetype-guardian: #F472B6;
+  --color-archetype-marathoner: #16A34A;
+  --color-archetype-polymath: #FCD34D;
+  --color-archetype-balanced: #64748B;
+  --color-archetype-emerging: #F97316;
 }
 
 [data-theme="dark"] {
@@ -85,6 +119,22 @@
   --color-terminal-dim: #3A3A4A;
 
   --color-track: rgba(255, 255, 255, 0.06);
+
+  --color-dimension-building: #22c55e;
+  --color-dimension-guarding: #f97316;
+  --color-dimension-consistency: #06b6d4;
+  --color-dimension-breadth: #ec4899;
+  --color-dimension-building-light: #86efac;
+  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-consistency-light: #67e8f9;
+  --color-dimension-breadth-light: #f9a8d4;
+
+  --color-archetype-builder: #7C6AEF;
+  --color-archetype-guardian: #F472B6;
+  --color-archetype-marathoner: #16A34A;
+  --color-archetype-polymath: #FCD34D;
+  --color-archetype-balanced: #64748B;
+  --color-archetype-emerging: #F97316;
 }
 
 html {

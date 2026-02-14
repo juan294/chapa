@@ -105,7 +105,7 @@ export function GlobalCommandBar() {
       </div>
       <div className="relative mx-auto max-w-4xl">
         {outputLines.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 mb-1 max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl">
+          <div className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl">
             <TerminalOutput lines={outputLines} />
           </div>
         )}
@@ -121,7 +121,6 @@ export function GlobalCommandBar() {
           onSubmit={handleSubmit}
           onPartialChange={handlePartialChange}
           prompt="chapa"
-          autoFocus
         />
       </div>
     </div>

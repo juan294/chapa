@@ -125,7 +125,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
         messageIndex = (messageIndex + 1) % MESSAGES.length;
         if (messageIndex === 0) messageIndex = 1;
 
-        const nextMsg = MESSAGES[messageIndex];
+        const nextMsg = MESSAGES[messageIndex]!;
 
         await eraseText(HOME_TEXT);
         if (cancelled) return;
@@ -160,7 +160,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
     >
       {/* Popover card — appears above the pill on hover */}
       {SOCIAL_LINKS.length > 0 && (
-        <div className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]">
+        <div className="absolute bottom-full right-0 pb-2 opacity-0 translate-y-2 scale-95 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:pointer-events-auto transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)]">
           <div className="p-3 rounded-xl bg-card/90 backdrop-blur-xl border border-stroke">
             <p className="text-[11px] text-text-secondary font-medium whitespace-nowrap mb-2 select-none">
               {AUTHOR_NAME}
@@ -195,6 +195,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
       <div
         className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-full bg-amber/10 hover:bg-amber/15 backdrop-blur-sm cursor-default transition-all duration-150 border border-stroke"
         aria-label={`Made by ${AUTHOR_NAME}`}
+        tabIndex={0}
       >
         <span className="text-[10px] font-heading text-text-secondary group-hover:text-text-primary transition-colors duration-300 select-none whitespace-nowrap">
           <span ref={textRef}>{HOME_TEXT}</span>

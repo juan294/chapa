@@ -41,12 +41,12 @@ export function MobileNav({ links }: MobileNavProps) {
     if (e.shiftKey) {
       if (document.activeElement === first) {
         e.preventDefault();
-        last.focus();
+        last?.focus();
       }
     } else {
       if (document.activeElement === last) {
         e.preventDefault();
-        first.focus();
+        first?.focus();
       }
     }
   }, []);
@@ -60,7 +60,7 @@ export function MobileNav({ links }: MobileNavProps) {
       ),
     ) as HTMLElement[];
     if (focusable.length > 0) {
-      focusable[0].focus();
+      focusable[0]!.focus();
     }
     document.addEventListener("keydown", handleFocusTrap);
     return () => document.removeEventListener("keydown", handleFocusTrap);

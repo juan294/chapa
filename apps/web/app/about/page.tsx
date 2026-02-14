@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import type { Metadata } from "next";
@@ -33,7 +34,7 @@ export default function AboutPage() {
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
             <p>
               When AI writes most code, traditional volume metrics — commits,
-              LOC, PR counts — become meaningless. What matters is <em>how</em>{" "}
+              lines of code (LOC), PR counts — become meaningless. What matters is <em>how</em>{" "}
               you contribute, not <em>how much</em> code you produce.
             </p>
 
@@ -62,34 +63,41 @@ export default function AboutPage() {
               Developer archetypes
             </h2>
             <p>
-              Your dimension profile shape determines your archetype: Builder,
-              Guardian, Marathoner, Polymath, Balanced, or Emerging. The
+              Your dimension profile shape determines your archetype:{" "}
+              <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
+              <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>,{" "}
+              <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
+              <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
+              <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
+              <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>. The
               archetype is shown as the primary label on your badge, with a
               composite score and tier as secondary context.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              Open and transparent
+              Privacy and fairness
             </h2>
             <p>
               Chapa only requests access to public GitHub data. Confidence
               messaging is designed to surface patterns without making
-              accusations. Every weight, cap, and decision behind the scoring is
-              published in our{" "}
-              <a
-                href="/about/scoring"
+              accusations. The scoring model is built to reward genuine
+              contribution and resist gaming — volume alone does not
+              determine your score. Every badge also carries a cryptographic
+              verification hash — learn how it works on our{" "}
+              <Link
+                href="/about/verification"
                 className="text-amber hover:text-amber-light transition-colors"
               >
-                full scoring methodology
-              </a>
-              .
+                badge verification
+              </Link>{" "}
+              page.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
               Contact
             </h2>
             <p>
-              Questions or feedback? Reach us at{" "}
+              Questions or feedback? Reach me at{" "}
               <a
                 href="mailto:support@chapa.thecreativetoken.com"
                 className="text-amber hover:text-amber-light transition-colors"

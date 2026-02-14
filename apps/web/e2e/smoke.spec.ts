@@ -34,7 +34,11 @@ test.describe("Smoke tests — core routes", () => {
   });
 
   test("share page renders", async ({ page }) => {
-    const response = await page.goto("/u/torvalds");
+    // Use domcontentloaded — the badge <img> triggers a second API call that
+    // can push "load" past 30s in CI (SSR 15s + badge image 15s).
+    const response = await page.goto("/u/torvalds", {
+      waitUntil: "domcontentloaded",
+    });
     // Should not crash — 200 or graceful error page
     expect(response).not.toBeNull();
     expect(response!.status()).toBeLessThan(500);

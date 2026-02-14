@@ -24,7 +24,7 @@ export default function VerifyInputPage() {
           <div className="pl-4 border-l border-stroke space-y-6">
             <div>
               <h1 className="font-heading text-2xl tracking-tight">
-                Verify a <span className="text-amber">Badge</span>
+                Verify a <span className="text-complement">Badge</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2">
                 Enter the 8 or 16 character verification hash from any Chapa badge

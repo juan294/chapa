@@ -1,5 +1,7 @@
+import { notFound } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
+import { isScoringPageEnabled } from "@/lib/feature-flags";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -85,6 +87,10 @@ function Table({
 /* ---------------------------------------------------------------------- */
 
 export default function ScoringMethodologyPage() {
+  if (!isScoringPageEnabled()) {
+    notFound();
+  }
+
   return (
     <div className="min-h-screen bg-bg">
       <Navbar />

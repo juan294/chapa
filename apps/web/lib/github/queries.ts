@@ -8,6 +8,8 @@ export type { RawContributionData };
 // Fetch function
 // ---------------------------------------------------------------------------
 
+const FETCH_TIMEOUT_MS = 15_000; // 15 seconds — prevents SSR from hanging in CI
+
 export async function fetchContributionData(
   login: string,
   token?: string,
@@ -16,18 +18,23 @@ export async function fetchContributionData(
   const since = new Date(now);
   since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
+  // Use session token if available, otherwise fall back to server-side
+  // GITHUB_TOKEN (provided automatically by GitHub Actions in CI).
+  const effectiveToken = token ?? process.env.GITHUB_TOKEN?.trim();
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  if (effectiveToken) {
+    headers["Authorization"] = `Bearer ${effectiveToken}`;
   }
 
   try {
     const res = await fetch("https://api.github.com/graphql", {
       method: "POST",
       headers,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       body: JSON.stringify({
         query: CONTRIBUTION_QUERY,
         variables: {

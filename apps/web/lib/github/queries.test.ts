@@ -38,11 +38,14 @@ describe("fetchContributionData", () => {
 
     await fetchContributionData("testuser", "gho_token123");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBe("Bearer gho_token123");
   });
 
-  it("omits Authorization header when token is undefined", async () => {
+  it("omits Authorization header when no token and no GITHUB_TOKEN", async () => {
+    const original = process.env.GITHUB_TOKEN;
+    delete process.env.GITHUB_TOKEN;
+
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
@@ -52,8 +55,86 @@ describe("fetchContributionData", () => {
 
     await fetchContributionData("testuser");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBeUndefined();
+
+    if (original !== undefined) process.env.GITHUB_TOKEN = original;
+  });
+
+  it("falls back to GITHUB_TOKEN env var when no session token is provided", async () => {
+    const original = process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN = "ghp_ci_token_123";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: { totalContributions: 0, weeks: [] },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.headers["Authorization"]).toBe("Bearer ghp_ci_token_123");
+
+    if (original !== undefined) {
+      process.env.GITHUB_TOKEN = original;
+    } else {
+      delete process.env.GITHUB_TOKEN;
+    }
+  });
+
+  it("prefers explicit token over GITHUB_TOKEN env var", async () => {
+    const original = process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN = "ghp_ci_fallback";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: { totalContributions: 0, weeks: [] },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser", "gho_session_token");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.headers["Authorization"]).toBe("Bearer gho_session_token");
+
+    if (original !== undefined) {
+      process.env.GITHUB_TOKEN = original;
+    } else {
+      delete process.env.GITHUB_TOKEN;
+    }
   });
 
   it("logs HTTP errors with status code", async () => {
@@ -127,7 +208,7 @@ describe("fetchContributionData", () => {
 
     await fetchContributionData("testuser", "token");
 
-    const [, opts] = mockFetch.mock.calls[0];
+    const [, opts] = mockFetch.mock.calls[0]!;
     const body = JSON.parse(opts.body);
 
     // Query must declare GitTimestamp variables for Commit.history
@@ -183,8 +264,56 @@ describe("fetchContributionData", () => {
     expect(result).not.toBeNull();
     // Should have 2 nodes (the null one filtered out)
     expect(result!.pullRequests.nodes).toHaveLength(2);
-    expect(result!.pullRequests.nodes[0].additions).toBe(10);
-    expect(result!.pullRequests.nodes[1].additions).toBe(5);
+    expect(result!.pullRequests.nodes[0]!.additions).toBe(10);
+    expect(result!.pullRequests.nodes[1]!.additions).toBe(5);
+  });
+
+  it("passes an AbortSignal with timeout to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: { totalContributions: 0, weeks: [] },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser", "token");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeDefined();
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null when fetch is aborted (timeout)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(abortError),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[github] fetch error for testuser:"),
+      expect.any(DOMException),
+    );
+    consoleSpy.mockRestore();
   });
 
   it("logs network/fetch errors", async () => {

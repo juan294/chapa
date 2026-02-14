@@ -152,7 +152,7 @@ export function decryptToken(
   try {
     const parts = encrypted.split(":");
     if (parts.length !== 3) return null;
-    const [ivHex, authTagHex, ciphertextHex] = parts;
+    const [ivHex, authTagHex, ciphertextHex] = parts as [string, string, string];
     const key = deriveKey(secret);
     const iv = Buffer.from(ivHex, "hex");
     const authTag = Buffer.from(authTagHex, "hex");

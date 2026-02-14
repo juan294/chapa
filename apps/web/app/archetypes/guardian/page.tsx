@@ -32,16 +32,18 @@ export default function GuardianPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-[#F472B6]">Guardian</span>
+                The <span className="text-archetype-guardian">Guardian</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-[#F472B6]">Guarding</span>
+                Dominant dimension: <span className="text-archetype-guardian">Guarding</span>
               </p>
             </div>
 
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Guardian archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -57,10 +59,9 @@ export default function GuardianPage() {
 
               <p>
                 The Guarding dimension in Chapa measures review behavior, not just review count.
-                It weighs reviews submitted (60%), the ratio of reviews to your own PRs (25%), and
-                code hygiene through an inverse micro-commit metric (15%). A developer who reviews
-                three PRs for every one they open scores higher than someone who rubber-stamps
-                approvals to unblock the pipeline.
+                It considers how many reviews you submit, the ratio of reviews to your own PRs,
+                and code hygiene signals. A developer who reviews multiple PRs for every one they
+                open scores higher than someone who rubber-stamps approvals to unblock the pipeline.
               </p>
 
               <p>
@@ -76,18 +77,17 @@ export default function GuardianPage() {
               </h2>
 
               <p>
-                To earn the Guardian archetype, your Guarding dimension must score 70 or higher
-                and be your strongest dimension. There&apos;s an important constraint: the Guardian
-                archetype is only available to collaborative profiles. If you work solo and have
-                zero code reviews, Chapa won&apos;t assign you as a Guardian &mdash; because
-                guarding is fundamentally a team activity.
+                To earn the Guardian archetype, your Guarding dimension must be strong and your
+                most dominant trait. There&apos;s an important constraint: the Guardian archetype
+                is only available to collaborative profiles. If you work solo and have zero code
+                reviews, Chapa won&apos;t assign you as a Guardian &mdash; because guarding is
+                fundamentally a team activity.
               </p>
 
               <p>
-                The review-to-PR ratio is capped at 5:1 for normalization, meaning a pure reviewer
-                with no PRs of their own scores a perfect ratio. This acknowledges the reality that
-                some senior engineers spend most of their time in review, and that contribution is
-                immensely valuable even if it produces no commits of its own.
+                Pure reviewers who rarely open their own PRs aren&apos;t penalized. The algorithm
+                recognizes that some senior engineers spend most of their time in review, and that
+                contribution is immensely valuable even if it produces no commits of its own.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

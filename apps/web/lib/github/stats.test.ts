@@ -169,7 +169,7 @@ describe("fetchStats", () => {
     }));
     // Set exactly 10 days as active
     for (let i = 0; i < 10; i++) {
-      weeks[Math.floor(i / 7)].contributionDays[i % 7].contributionCount = 3;
+      weeks[Math.floor(i / 7)]!.contributionDays[i % 7]!.contributionCount = 3;
     }
     const data = makeContribData({
       contributionCalendar: { totalContributions: 30, weeks },

@@ -42,6 +42,8 @@ export default function BuilderPage() {
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Builder archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -60,16 +62,16 @@ export default function BuilderPage() {
                 What distinguishes a Builder from someone who simply writes a lot of code is
                 <em> intent</em>. Builders don&apos;t just commit. They ship. Their pull requests get
                 merged because they solve real problems. Their issues get closed because they
-                follow through. The Building dimension in Chapa weighs merged PRs most heavily
-                (70%), followed by closed issues (20%) and total commits (10%) &mdash; deliberately
-                prioritizing outcomes over activity.
+                follow through. The Building dimension in Chapa deliberately prioritizes outcomes
+                over activity &mdash; merged PRs matter most, followed by closed issues, with
+                raw commit volume weighted least.
               </p>
 
               <p>
-                This means a developer who merges 40 thoughtful pull requests will outscore one who
-                pushes 400 micro-commits that never leave a feature branch. Builders understand that
-                code has no value sitting in a branch. The goal is always the merge, the deploy, the
-                user seeing the change.
+                This means a developer who merges thoughtful pull requests will outscore one who
+                pushes hundreds of micro-commits that never leave a feature branch. Builders understand
+                that code has no value sitting in a branch. The goal is always the merge, the deploy,
+                the user seeing the change.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
@@ -77,11 +79,11 @@ export default function BuilderPage() {
               </h2>
 
               <p>
-                To earn the Builder archetype, your Building dimension must score 70 or higher
-                and be your strongest dimension. The algorithm looks at your last 12 months of
-                GitHub activity and evaluates the weight and frequency of your merged PRs, your
-                issue closure rate, and your commit volume &mdash; all normalized logarithmically so
-                that early contributions count more and diminishing returns kick in naturally.
+                To earn the Builder archetype, your Building dimension must be strong and your
+                most dominant trait. The algorithm looks at your last 12 months of GitHub activity
+                and evaluates the weight and frequency of your merged PRs, your issue closure rate,
+                and your commit volume &mdash; all normalized so that early contributions count
+                more and diminishing returns kick in naturally.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

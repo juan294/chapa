@@ -42,6 +42,8 @@ export default function MarathonerPage() {
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Marathoner archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -57,19 +59,19 @@ export default function MarathonerPage() {
               </p>
 
               <p>
-                The Consistency dimension in Chapa measures exactly this. It looks at the ratio of
-                active days to total days (50%), how evenly your contributions are spread across
-                weeks (35%), and whether your work arrives in measured cadence or frantic bursts
-                (15%). A developer who contributes 200 days out of 365 with even weekly distribution
-                will score far higher than one who crams 200 commits into a single month.
+                The Consistency dimension in Chapa measures exactly this. It looks at how often
+                you show up, how evenly your contributions are spread across weeks, and whether
+                your work arrives in a measured cadence or frantic bursts. A developer who
+                contributes steadily across the year with even weekly distribution will score far
+                higher than one who crams all their work into a single month.
               </p>
 
               <p>
-                The heatmap evenness metric is particularly revealing. Chapa divides your year into
-                weekly chunks and measures the coefficient of variation across them. A perfectly
-                uniform contribution pattern scores 1.0. A single burst followed by silence scores
-                around 0.2. This isn&apos;t about punishing time off &mdash; it&apos;s about
-                recognizing that sustainable pace is itself a skill.
+                Heatmap evenness is particularly revealing. Chapa looks at your year and evaluates
+                how uniformly your contributions are distributed. A steady, even contribution
+                pattern scores well. A single burst followed by silence does not. This isn&apos;t
+                about punishing time off &mdash; it&apos;s about recognizing that sustainable
+                pace is itself a skill.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
@@ -77,12 +79,11 @@ export default function MarathonerPage() {
               </h2>
 
               <p>
-                To earn the Marathoner archetype, your Consistency dimension must score 70 or higher
-                and be your strongest dimension. The algorithm rewards developers who maintain a
-                regular cadence of contributions without relying on burst activity. The inverse burst
-                metric specifically penalizes patterns like 30+ commits in a 10-minute window,
-                which typically indicates automated or batch activity rather than genuine sustained
-                work.
+                To earn the Marathoner archetype, your Consistency dimension must be strong and
+                your most dominant trait. The algorithm rewards developers who maintain a regular
+                cadence of contributions without relying on burst activity. It specifically
+                distinguishes between genuine sustained work and automated or batch activity
+                patterns that inflate contribution counts artificially.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

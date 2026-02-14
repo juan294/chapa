@@ -69,6 +69,10 @@ describe("GeneratingProgress", () => {
     it("uses role=status for progress area", () => {
       expect(SOURCE).toContain('role="status"');
     });
+
+    it("has role='alert' on the error message container", () => {
+      expect(SOURCE).toContain('role="alert"');
+    });
   });
 
   describe("design system compliance", () => {

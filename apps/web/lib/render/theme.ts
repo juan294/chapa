@@ -50,8 +50,8 @@ const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
   Guardian: "#F472B6",  // pink
   Marathoner: "#4ADE80", // green
   Polymath: "#FBBF24",  // amber/gold
-  Balanced: "#E6EDF3",  // light gray
-  Emerging: "#9AA4B2",  // muted gray
+  Balanced: "#94A3B8",  // steel blue (lighter for dark badge bg)
+  Emerging: "#FB923C",  // warm orange (lighter for dark badge bg)
 };
 
 export function getArchetypeColor(archetype: DeveloperArchetype): string {

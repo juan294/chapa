@@ -127,7 +127,7 @@ describe("buildStatsFromRaw", () => {
     }));
     // Set exactly 10 days as active
     for (let i = 0; i < 10; i++) {
-      weeks[Math.floor(i / 7)].contributionDays[i % 7].contributionCount = 3;
+      weeks[Math.floor(i / 7)]!.contributionDays[i % 7]!.contributionCount = 3;
     }
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 30, weeks },
@@ -304,7 +304,7 @@ describe("buildStatsFromRaw", () => {
         contributionCount: 1,
       })),
     }));
-    weeks[0].contributionDays[0].contributionCount = 35;
+    weeks[0]!.contributionDays[0]!.contributionCount = 35;
     const raw = makeRaw({
       contributionCalendar: { totalContributions: 100, weeks },
     });

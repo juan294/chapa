@@ -25,4 +25,12 @@ describe("CopyButton", () => {
   it("tracks embed_copied event on copy", () => {
     expect(SOURCE).toContain('trackEvent("embed_copied"');
   });
+
+  describe("mobile responsiveness (#240)", () => {
+    it("uses p-2.5 for touch-friendly padding", () => {
+      expect(SOURCE).toContain("p-2.5");
+      // Ensure the old smaller padding is not used
+      expect(SOURCE).not.toContain("p-1.5");
+    });
+  });
 });

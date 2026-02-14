@@ -35,13 +35,15 @@ export default function BalancedPage() {
                 The <span className="text-text-primary">Balanced</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-text-primary">None &mdash; all dimensions within 15 points</span>
+                Dominant dimension: <span className="text-text-primary">None &mdash; all dimensions closely matched</span>
               </p>
             </div>
 
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Balanced archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -56,11 +58,11 @@ export default function BalancedPage() {
 
               <p>
                 The Balanced archetype triggers when all four dimensions (Building, Guarding,
-                Consistency, Breadth) score within 15 points of each other and the average is 60
-                or higher. This is harder than it sounds. Most developers naturally gravitate toward
-                one style of contribution. Maintaining high scores in shipping, reviewing,
-                showing up consistently, <em>and</em> working across multiple projects requires
-                a rare kind of discipline.
+                Consistency, Breadth) are closely matched and collectively strong. This is harder
+                than it sounds. Most developers naturally gravitate toward one style of
+                contribution. Maintaining high scores in shipping, reviewing, showing up
+                consistently, <em>and</em> working across multiple projects requires a rare kind
+                of discipline.
               </p>
 
               <p>
@@ -75,11 +77,10 @@ export default function BalancedPage() {
 
               <p>
                 The algorithm evaluates Balanced <em>before</em> checking for specific archetypes.
-                If the spread between your highest and lowest dimension is 15 points or less and
-                your average dimension score is at least 60, you&apos;re classified as Balanced
-                regardless of which individual dimension is technically highest. This prevents
-                the system from forcing a specialization label onto someone whose strength is
-                precisely their lack of specialization.
+                If your dimensions are tightly clustered and collectively strong, you&apos;re
+                classified as Balanced regardless of which individual dimension is technically
+                highest. This prevents the system from forcing a specialization label onto someone
+                whose strength is precisely their lack of specialization.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

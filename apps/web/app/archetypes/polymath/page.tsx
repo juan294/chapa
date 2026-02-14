@@ -42,6 +42,8 @@ export default function PolymathPage() {
             {/* Badge */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+              role="img"
+              aria-label="Example Chapa badge for The Polymath archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -56,13 +58,12 @@ export default function PolymathPage() {
               </p>
 
               <p>
-                The Breadth dimension in Chapa captures this cross-project influence through six
-                signals: repositories contributed to (35%), how evenly work is distributed across
-                those repos (25%), total stars (15%), total forks (10%), total watchers (5%), and
-                documentation PR ratio (10%). The weighting is deliberate &mdash; raw repo count
-                matters most, but concentration matters too. Contributing to 12 repos with no single
-                repo dominating scores higher than contributing to 12 repos where 90% of the work
-                is in one.
+                The Breadth dimension in Chapa captures this cross-project influence through
+                multiple signals: how many repositories you contribute to, how evenly your work
+                is distributed across them, your community reach through stars and forks, and
+                whether you write documentation. Raw repo count matters, but concentration matters
+                too. Contributing to many repos with no single repo dominating scores higher than
+                contributing to the same number of repos where most of the work is in one.
               </p>
 
               <p>
@@ -78,18 +79,15 @@ export default function PolymathPage() {
               </h2>
 
               <p>
-                To earn the Polymath archetype, your Breadth dimension must score 70 or higher and
-                be your strongest dimension. The Polymath has the highest tie-breaking priority of
-                all archetypes &mdash; if your Breadth and Building dimensions both score 85, you&apos;re
-                classified as a Polymath. This reflects a design decision: cross-project influence
-                is rare and valuable enough that it wins ties.
+                To earn the Polymath archetype, your Breadth dimension must be strong and your
+                most dominant trait. Cross-project influence is rare and valuable, so the
+                algorithm gives it special consideration when multiple dimensions are close.
               </p>
 
               <p>
-                Repository count is capped at 15 for normalization. Beyond that threshold, the
-                algorithm considers you maximally broad. Star counts are capped at 500, forks at
-                200, and watchers at 100 &mdash; all using logarithmic normalization to prevent
-                viral repos from overwhelming the signal.
+                All breadth signals are normalized with diminishing returns &mdash; having one
+                viral repository won&apos;t automatically make you a Polymath. The algorithm
+                values genuine diversity of contribution over raw popularity metrics.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

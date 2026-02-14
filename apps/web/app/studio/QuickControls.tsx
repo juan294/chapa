@@ -78,7 +78,7 @@ export function QuickControls({
       </div>
 
       {/* Categories */}
-      <div className="max-h-64 overflow-y-auto">
+      <div className="max-h-48 sm:max-h-64 overflow-y-auto">
         {STUDIO_CATEGORIES.map((category) => {
           const alias = CATEGORY_ALIAS[category.key] ?? category.key;
           const isExpanded = expandedKey === category.key;
