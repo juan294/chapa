@@ -34,6 +34,7 @@ export async function generateMetadata({
   }
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
+  const ogImageUrl = `${BASE_URL}/u/${handle}/og-image`;
   return {
     title: `@${handle} — Developer Impact, Decoded`,
     description: `View ${handle}'s developer impact score and badge on Chapa.`,
@@ -42,11 +43,13 @@ export async function generateMetadata({
       title: `@${handle} — Chapa Developer Impact, Decoded`,
       description: `View ${handle}'s developer impact and badge on Chapa.`,
       url: pageUrl,
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: `Chapa badge for ${handle}` }],
     },
     twitter: {
       card: "summary_large_image",
       title: `@${handle} — Chapa Developer Impact, Decoded`,
       description: `View ${handle}'s developer impact and badge on Chapa.`,
+      images: [ogImageUrl],
     },
     alternates: {
       canonical: pageUrl,

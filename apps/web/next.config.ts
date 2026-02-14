@@ -81,6 +81,7 @@ const defaultHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["@resvg/resvg-js"],
   transpilePackages: ["@chapa/shared"],
   images: {
     remotePatterns: [

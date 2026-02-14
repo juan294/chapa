@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@chapa/shared": "workspace:*",
+    "@resvg/resvg-js": "^2.6.2",
     "@upstash/redis": "^1.36.2",
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
