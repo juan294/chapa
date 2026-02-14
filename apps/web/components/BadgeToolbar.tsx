@@ -81,9 +81,16 @@ export function BadgeToolbar({
       if (!res.ok) throw new Error("fetch failed");
       let svgText = await res.text();
 
-      // Strip CSS animations — they can break canvas rendering in some browsers
+      // Strip all animations for static PNG rendering:
+      // 1. CSS @keyframes blocks
       svgText = svgText.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
+      // 2. CSS animation properties in style attributes
       svgText = svgText.replace(/animation[^;"]*/g, "");
+      // 3. SMIL <animate> elements (heatmap fade-in uses these)
+      svgText = svgText.replace(/<animate [^>]*\/>/g, "");
+      svgText = svgText.replace(/<animate [^>]*>[^<]*<\/animate>/g, "");
+      // 4. Set heatmap rects to fully visible (they start at opacity="0")
+      svgText = svgText.replace(/opacity="0"/g, 'opacity="1"');
 
       // Use data URI (more reliable than blob URL for SVG→canvas)
       const scale = 2;
