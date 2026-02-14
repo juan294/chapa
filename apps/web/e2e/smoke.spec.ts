@@ -14,8 +14,8 @@ test.describe("Smoke tests — core routes", () => {
 
   test("health API returns JSON with status field", async ({ request }) => {
     const response = await request.get("/api/health");
-    // Health endpoint should always respond, even if degraded
-    expect(response.status()).toBeLessThan(500);
+    // Health endpoint returns 200 when healthy, 503 when degraded (e.g. Redis unreachable in CI)
+    expect([200, 503]).toContain(response.status());
     const body = await response.json();
     expect(body).toHaveProperty("status");
   });

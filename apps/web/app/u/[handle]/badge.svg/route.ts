@@ -102,8 +102,12 @@ export async function GET(
   const verification = generateVerificationCode(stats, impact);
 
   // Post-response work: use after() to guarantee completion on Vercel
-  // (void promises may be killed when the serverless function freezes)
-  after(async () => {
+  // (void promises may be killed when the serverless function freezes).
+  // Operations run in parallel via allSettled — each has its own try/catch
+  // so individual failures don't block others.
+  after(() => {
+    const ops: Promise<void>[] = [];
+
     if (verification) {
       const record: VerificationRecord = {
         handle: stats.handle.toLowerCase(),
@@ -119,10 +123,13 @@ export async function GET(
         generatedAt: verification.date,
         profileType: impact.profileType,
       };
-      await storeVerificationRecord(verification.hash, record);
+      ops.push(storeVerificationRecord(verification.hash, record));
     }
-    await trackBadgeGenerated(handle);
-    await notifyFirstBadge(handle, impact);
+
+    ops.push(trackBadgeGenerated(handle));
+    ops.push(notifyFirstBadge(handle, impact));
+
+    return Promise.allSettled(ops);
   });
 
   // Render full badge
