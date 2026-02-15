@@ -8,32 +8,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
-        disallow: ["/api/", "/experiments/"],
-      },
-      {
-        userAgent: "GPTBot",
-        allow: "/",
-      },
-      {
-        userAgent: "ChatGPT-User",
-        allow: "/",
-      },
-      {
-        userAgent: "ClaudeBot",
-        allow: "/",
-      },
-      {
-        userAgent: "Claude-Web",
-        allow: "/",
-      },
-      {
-        userAgent: "Applebot",
-        allow: "/",
-      },
-      {
-        userAgent: "Bytespider",
-        allow: "/",
+        allow: ["/", "/u/*/badge.svg"],
+        disallow: ["/api/", "/admin/", "/experiments/", "/generating/", "/cli/"],
       },
     ],
     sitemap: `${BASE_URL}/sitemap.xml`,
