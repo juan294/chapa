@@ -44,6 +44,7 @@ jobs:
 
       - name: Analyze bundle
         id: bundle
+        working-directory: apps/web
         run: |
           echo "## Bundle Size Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
