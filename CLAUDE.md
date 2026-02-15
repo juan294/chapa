@@ -18,7 +18,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 8. Minimal analytics (PostHog) for key events.
 
 ## Non-goals (current scope)
-- No long-term history charts
+- No long-term history charts (lifetime metric snapshots are stored but no UI yet)
 - No leaderboard
 - No paid tiers
 
@@ -48,6 +48,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
+- `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Redis sorted sets)
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
@@ -72,6 +73,7 @@ Must be easy to swap/remove:
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)
 - Cache SVG output per user/day + theme (TTL 24h)
+- **Lifetime metrics**: `MetricsSnapshot` records stored in Redis sorted sets (`history:<handle>`) with **no TTL** — permanent history. Max 1 snapshot per user per day (date-based dedup). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
 
@@ -81,16 +83,23 @@ Must be easy to swap/remove:
 - Impact scoring: `apps/web/lib/impact/*`, types in `packages/shared`
 - SVG rendering: `apps/web/lib/render/*`, `apps/web/app/u/[handle]/badge.svg/route.ts`
 - Share page: `apps/web/app/u/[handle]/page.tsx`, `apps/web/components/*`
+- Lifetime history: `apps/web/lib/history/*`
+- Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
+- Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
+- Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx`
 
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
 - Badge shows: heatmap, radar chart (4 dimensions), archetype label, stars/forks/watchers, Impact tier, adjusted score.
-- `/u/:handle` shows badge + breakdown + confidence reasons + embed snippet.
+- `/u/:handle` shows badge + breakdown + embed snippet. Confidence is computed internally but not shown to users.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
 - Repo contains `docs/impact-v4.md` and `docs/svg-design.md` as spec truth.
 - Creator Studio at `/studio` allows badge visual customization (9 categories).
+- Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
+- Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
+- Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).
 
 ## Engineering rules
 - Prefer pure functions for scoring & rendering.

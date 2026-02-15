@@ -19,7 +19,7 @@ This document explains Chapa's Impact v4 Profile calculation, security model, ve
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a **multi-dimensional Impact v4 Profile** — four independent dimension scores (0-100 each), a developer archetype label, a composite score (0-100), and a **Confidence** rating (50-100). The profile reflects the quality and breadth of contributions, not just volume.
+Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a **multi-dimensional Impact v4 Profile** — four independent dimension scores (0-100 each), a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
 
 ### Signals we track
 
@@ -155,12 +155,11 @@ The adjustment is deliberately gentle. Confidence provides transparency, not pun
 
 ### Why this matters
 
-Every badge displays both the score and confidence. Users and viewers can see:
-- A high score with high confidence = strong, clear signal
-- A high score with lower confidence = strong activity, but some patterns worth noting
-- The specific confidence reasons are shown on the share page
+Confidence is used **internally** to produce the adjusted score (which determines the tier), but it is **not displayed** on the badge or share page. Developers see their tier and adjusted score — the confidence calculation happens behind the scenes to ensure fair scoring without exposing a number that could be misinterpreted.
 
-**All confidence messaging is non-accusatory.** We never say "you gamed the system" -- we say "some activity appears in short bursts, which reduces timing confidence."
+The admin dashboard retains full visibility into confidence values for diagnostic purposes.
+
+**All confidence messaging is non-accusatory.** We never say "you gamed the system" -- we describe patterns like "some activity appears in short bursts, which reduces timing confidence."
 
 ---
 
@@ -384,7 +383,7 @@ Since badges are embeddable SVGs, all user-controlled text (handles, display nam
 3. **Your EMU token stays on your machine.** The CLI tool uses it locally and uploads only the extracted statistics.
 4. **Private repo names are never exposed.** We track "repos contributed to" as a count, not a list.
 5. **All data is cached for 24 hours maximum.** Supplemental data, stats, and badge renders all expire after one day.
-6. **Confidence is transparent, not punitive.** Every confidence adjustment is shown with a clear, non-accusatory explanation.
+6. **Confidence is fair, not punitive.** Confidence adjustments affect the final score gently (max 7.5% reduction) and are never accusatory. Confidence values are visible to admins for diagnostics but are not shown on developer-facing pages.
 
 ---
 
