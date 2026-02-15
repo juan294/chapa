@@ -179,31 +179,32 @@ export function AdminDashboardClient() {
   const [sortField, setSortField] = useState<SortField>("adjustedComposite");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const fetchUsers = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setUsers(data.users ?? []);
+      setError(null);
+      setLastRefreshed(new Date());
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchUsers() {
-      try {
-        const res = await fetch("/api/admin/users");
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          throw new Error(body?.error ?? `HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        if (!cancelled) {
-          setUsers(data.users ?? []);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError((err as Error).message);
-          setLoading(false);
-        }
-      }
-    }
     fetchUsers();
-    return () => { cancelled = true; };
-  }, []);
+  }, [fetchUsers]);
 
   const handleSort = useCallback(
     (field: SortField) => {
@@ -272,7 +273,7 @@ export function AdminDashboardClient() {
             <span className="text-terminal-red/50">ERR</span> {error}
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => { setError(null); setLoading(true); fetchUsers(); }}
             className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
           >
             Retry
@@ -292,13 +293,41 @@ export function AdminDashboardClient() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="animate-fade-in-up">
-        <h1 className="font-heading text-2xl tracking-tight text-text-primary">
-          <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-        </h1>
-        <p className="mt-1 text-sm text-text-secondary">
-          {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
-        </p>
+      <div className="animate-fade-in-up flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+          </h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
+            {lastRefreshed && (
+              <span className="ml-2 text-text-secondary/60">
+                &middot; updated {formatDate(lastRefreshed.toISOString())}
+              </span>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={() => fetchUsers(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Refresh data"
+        >
+          <svg
+            className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
       {/* Summary cards */}
