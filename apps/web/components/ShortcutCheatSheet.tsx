@@ -81,6 +81,7 @@ export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
+      role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

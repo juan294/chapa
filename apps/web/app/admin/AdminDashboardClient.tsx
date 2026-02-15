@@ -344,7 +344,7 @@ export function AdminDashboardClient() {
           onClick={() => fetchUsers(true)}
           disabled={refreshing}
           className="flex items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Refresh data"
+          aria-label="Refresh data"
         >
           <svg
             className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}

@@ -20,6 +20,16 @@ describe("Scoring methodology page", () => {
     expect(SOURCE).toMatch(/export default function \w+/);
   });
 
+  describe("a11y: table headers (#304)", () => {
+    it("all <th> elements have scope='col'", () => {
+      const thMatches = SOURCE.match(/<th\b[^>]*>/g) ?? [];
+      expect(thMatches.length).toBeGreaterThan(0);
+      for (const th of thMatches) {
+        expect(th).toContain('scope="col"');
+      }
+    });
+  });
+
   describe("design system compliance", () => {
     it("uses font-heading for headings", () => {
       expect(SOURCE).toContain("font-heading");
