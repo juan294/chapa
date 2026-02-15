@@ -30,10 +30,6 @@ const FEATURES = [
     description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
   },
   {
-    title: "CONFIDENCE RATING",
-    description: "A score without context is just a number. Every badge includes a confidence rating (50\u2013100) so you know how much data actually backs the result.",
-  },
-  {
     title: "VERIFIED METRICS",
     description: "Anyone can fake a screenshot. Chapa badges carry an HMAC seal \u2014 click it to cryptographically prove the scores are real.",
   },

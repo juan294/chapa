@@ -30,9 +30,6 @@ test.describe("Landing page — sections and content", () => {
       page.getByText("DEVELOPER ARCHETYPE", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByText("CONFIDENCE RATING", { exact: true })
-    ).toBeVisible();
-    await expect(
       page.getByText("VERIFIED METRICS", { exact: true })
     ).toBeVisible();
     await expect(
