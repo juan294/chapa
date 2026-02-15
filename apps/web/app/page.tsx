@@ -170,6 +170,7 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke">
               <div className="relative">
+                {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
                 <div
                   className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
                   role="img"

@@ -133,6 +133,7 @@ export default async function SharePage({ params }: SharePageProps) {
         handle={handle}
         isOwner={isOwner}
       />
+      {/* SAFETY: JSON-LD uses JSON.stringify (auto-escapes quotes/special chars) + explicit < escape to prevent </script> injection. User handle is a URL param but only appears as a JSON string value, never raw HTML. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

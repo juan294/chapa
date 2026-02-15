@@ -560,6 +560,7 @@ export default function TierVisualsExperimentPage() {
   return (
     <>
       {/* Inline styles for tier-specific effects */}
+      {/* SAFETY: CSS-only string literal with no user input — used for @keyframes and tier-specific styles that cannot be expressed in Tailwind. */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
