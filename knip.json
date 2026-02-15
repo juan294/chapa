@@ -12,7 +12,6 @@
       ],
       "ignore": [
         "lib/analytics/posthog.ts",
-        "components/BadgePreview.tsx",
         "app/experiments/**",
         "lib/history/history.ts",
         "lib/history/diff.ts"
