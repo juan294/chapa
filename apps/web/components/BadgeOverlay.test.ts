@@ -90,6 +90,53 @@ describe("BadgeOverlay leader lines", () => {
   });
 });
 
+describe("BadgeOverlay lazy rendering (#323)", () => {
+  it("does NOT pre-render all hotspot paths via HOTSPOTS.map inside SVG", () => {
+    // The SVG layer should NOT iterate all hotspots — only the active one renders.
+    // Old pattern: HOTSPOTS.map((h) => { ... <path ... }) inside the SVG.
+    // New pattern: activeHotspot && (() => { ... <path ... })()
+    // The source should NOT contain a .map() call between leader-lines-svg and </svg>.
+    const svgSection = SRC.match(
+      /id="leader-lines-svg"[\s\S]*?<\/svg>/,
+    )?.[0];
+    expect(svgSection).toBeDefined();
+    expect(svgSection).not.toMatch(/HOTSPOTS\.map/);
+  });
+
+  it("does NOT pre-render all annotation panels via HOTSPOTS.map", () => {
+    // The panel layer should NOT iterate all hotspots — only the active one renders.
+    // Match the section between "hidden md:contents" and "Hotspot regions".
+    const panelSection = SRC.match(
+      /hidden md:contents[\s\S]*?Hotspot regions/,
+    )?.[0];
+    expect(panelSection).toBeDefined();
+    expect(panelSection).not.toMatch(/HOTSPOTS\.map/);
+  });
+
+  it("uses activeHotspot for conditional rendering", () => {
+    expect(SRC).toContain("activeHotspot");
+    // Should find the hotspot from the array based on activeLeaderLine state
+    expect(SRC).toMatch(/HOTSPOTS\.find/);
+  });
+});
+
+describe("BadgeOverlay CSS variable colors (#331)", () => {
+  it("does NOT use hardcoded #7C6AEF in SVG elements", () => {
+    // The accent color should come from CSS variables, not hardcoded hex.
+    // Check the SVG rendering section specifically (not the HOTSPOTS data).
+    const svgSection = SRC.match(
+      /id="leader-lines-svg"[\s\S]*?<\/svg>/,
+    )?.[0];
+    expect(svgSection).toBeDefined();
+    expect(svgSection).not.toContain("#7C6AEF");
+  });
+
+  it("uses var(--color-amber) for stroke and fill", () => {
+    expect(SRC).toContain('stroke="var(--color-amber)"');
+    expect(SRC).toContain('fill="var(--color-amber)"');
+  });
+});
+
 describe("BadgeOverlay mobile fallback", () => {
   it("leader line SVG and panels are hidden on small screens (md breakpoint)", () => {
     // Leader line visuals should be desktop-only
