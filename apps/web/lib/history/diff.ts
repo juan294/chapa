@@ -161,6 +161,12 @@ const DIMENSION_LABELS: Record<string, string> = {
 
 const SIGNIFICANT_DIMENSION_CHANGE = 5;
 
+/**
+ * Produce human-readable explanation lines for a snapshot diff.
+ *
+ * @prebuilt Part of the pre-built history API surface — intended for
+ * future consumers (share page, admin dashboard). Not yet imported.
+ */
 export function explainDiff(diff: SnapshotDiff): string[] {
   const lines: string[] = [];
 

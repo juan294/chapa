@@ -83,6 +83,9 @@ export async function getSnapshots(
 /**
  * Get the most recent snapshot for a user.
  * Returns `null` if no snapshots exist or on error.
+ *
+ * @prebuilt Part of the pre-built history API surface — intended for
+ * future consumers (share page, admin dashboard). Not yet imported.
  */
 export async function getLatestSnapshot(
   handle: string,
@@ -114,6 +117,9 @@ export async function getLatestSnapshot(
 /**
  * Get the total number of snapshots stored for a user.
  * Returns 0 on error or if Redis is unavailable.
+ *
+ * @prebuilt Part of the pre-built history API surface — intended for
+ * future consumers (share page, admin dashboard). Not yet imported.
  */
 export async function getSnapshotCount(handle: string): Promise<number> {
   const redis = getRawRedis();
