@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
+
+export interface TerminalInputHandle {
+  clear: () => void;
+  focus: () => void;
+}
 
 interface TerminalInputProps {
   onSubmit: (command: string) => void;
@@ -10,16 +15,26 @@ interface TerminalInputProps {
   autoFocus?: boolean;
 }
 
-export function TerminalInput({
+export const TerminalInput = forwardRef<TerminalInputHandle, TerminalInputProps>(function TerminalInput({
   onSubmit,
   onPartialChange,
   history = [],
   prompt = "chapa",
   autoFocus = false,
-}: TerminalInputProps) {
+}, ref) {
   const [value, setValue] = useState("");
   const [historyIndex, setHistoryIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    clear() {
+      setValue("");
+      setHistoryIndex(-1);
+    },
+    focus() {
+      inputRef.current?.focus();
+    },
+  }));
 
   useEffect(() => {
     if (autoFocus) {
@@ -113,5 +128,5 @@ export function TerminalInput({
       </div>
     </div>
   );
-}
+});
 

@@ -133,4 +133,22 @@ describe("TerminalInput", () => {
       expect(SOURCE).toContain("aria-label=");
     });
   });
+
+  describe("imperative handle (#283)", () => {
+    it("exports TerminalInputHandle type", () => {
+      // Parent components need the handle type to create typed refs
+      expect(SOURCE).toMatch(/export\s+(interface|type)\s+TerminalInputHandle/);
+    });
+
+    it("uses forwardRef to expose imperative handle", () => {
+      expect(SOURCE).toContain("forwardRef");
+      expect(SOURCE).toContain("useImperativeHandle");
+    });
+
+    it("exposes clear() and focus() methods via ref", () => {
+      // The imperative handle must expose clear() and focus()
+      expect(SOURCE).toMatch(/clear\s*\(\)/);
+      expect(SOURCE).toMatch(/focus\s*\(\)/);
+    });
+  });
 });
