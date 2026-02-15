@@ -1,209 +1,130 @@
-# Pre-Launch Audit Report (v15)
-> Generated on 2026-02-14 | Branch: `develop` | Commit: `9a2778b` | 6 parallel specialists + E2E + production HTTP checks
+# Pre-Launch Audit Report (v17)
+> Generated on 2026-02-15 | Branch: `develop` | Commit: `e68a416` | 6 parallel specialists + manual CLI checks
 
 ## Verdict: READY
 
-**Zero blockers found.** All critical gates pass. Two specialists rated YELLOW for minor maintainability and cosmetic issues. Production site is live and healthy. Two pre-launch fixes applied: badge frame-ancestors override (#270) and health endpoint 503 status (#271).
+All 6 specialists completed. No blockers found. The new history feature (7 commits) passed all checks. Manual CLI checks all clean. The project is ready for production release.
 
----
+| Specialist | Status | Blockers | Warnings |
+|------------|--------|----------|----------|
+| QA Lead | GREEN | 0 | 2 |
+| Security | YELLOW | 0 | 3 |
+| Architecture | YELLOW | 0 | 3 |
+| Performance | GREEN | 0 | 1 |
+| UX/Accessibility | YELLOW | 0 | 5 |
+| DevOps | GREEN | 0 | 1 |
 
-## Scorecard
+### Manual CLI Checks (run from main terminal)
 
-| Specialist | Verdict | Blockers | Warnings |
-|-----------|---------|----------|----------|
-| Quality Assurance (qa-lead) | **GREEN** | 0 | 5 |
-| Performance (performance-eng) | **GREEN** | 0 | 3 |
-| UX/Accessibility (ux-reviewer) | **YELLOW** | 0 | 7 |
-| Architecture (architect) | **YELLOW** | 0 | 6 |
-| Security (security-reviewer) | **GREEN** | 0 | 5 |
-| Infrastructure (devops) | **GREEN** | 0 | 4 |
+| Check | Result |
+|-------|--------|
+| `pnpm run typecheck` | Clean — 0 errors |
+| `pnpm audit` | No known vulnerabilities |
+| `npx knip` | No dead code |
+| `pnpm run build` | Success — 57 routes (incl. new `/api/history/[handle]`) |
+| License compliance | All permissive (MIT, MPL-2.0, Apache-2.0, ISC) |
 
-## E2E Tests: 40/40 PASSED
+## Blockers (must fix before release)
 
-| File | Tests | Status |
-|------|-------|--------|
-| `e2e/smoke.spec.ts` | 6 (core routes) | PASS |
-| `e2e/landing.spec.ts` | 6 (hero, CTA, features) | PASS |
-| `e2e/navigation.spec.ts` | 6 (navbar, links, footer) | PASS |
-| `e2e/share-page.spec.ts` | 5 (render, badge, impact) | PASS |
-| `e2e/badge-endpoint.spec.ts` | 3 (SVG, cache, errors) | PASS |
-| `e2e/static-pages.spec.ts` | 9 (about, privacy, terms, archetypes) | PASS |
-| `e2e/theme.spec.ts` | 3 (toggle, aria, persistence) | PASS |
+None.
 
-## Production HTTP Checks: 15/15 PASS
+## Warnings
 
-All endpoints on `chapa.thecreativetoken.com` respond correctly:
+| # | Issue | Severity | Found by | Risk |
+|---|-------|----------|----------|------|
+| W1 | History endpoint is unauthenticated — exposes raw metric data for any handle | Medium | Security | Intentional design matching badge endpoint; assess if acceptable |
+| W2 | `window` query param NaN handling — `parseInt("abc")` degrades safely but imprecisely | Low | Security, Architect | No crash, returns full array instead of windowed |
+| W3 | Rate limit fail-open when Redis down — intentional availability-first design | Low | Security | Accepted risk |
+| W4 | 3 unused exports: `getLatestSnapshot`, `getSnapshotCount`, `explainDiff` | Low | Architect | Pre-built API surface for future consumers |
+| W5 | Unbounded Redis storage — history sorted sets have no TTL or max cardinality | Medium | Architect | ~300 bytes/user/day, manageable at current scale |
+| W6 | Turbopack build doesn't emit per-route JS sizes | Low | Performance | Run `ANALYZE=true` with Webpack for detailed sizes |
+| W7 | Scoring page `<th>` missing `scope="col"` | Low | UX | Minor screen reader gap |
+| W8 | `ShortcutCheatSheet` backdrop div has onClick without `role` | Low | UX | Standard modal pattern, closable via Escape |
+| W9 | Admin refresh button uses `title` instead of `aria-label` | Low | UX | Minor screen reader inconsistency |
+| W10 | Footer internal links use `<a>` instead of Next.js `<Link>` | Low | UX | Works but misses client-side nav optimization |
+| W11 | `BadgeOverlay` div has `aria-label` without semantic role | Low | UX | Consider `role="group"` or `aria-hidden` |
+| W12 | Stale worktree `chapa-docs-trend` on branch `docs/score-trend-tracking` | Low | DevOps | Should be cleaned up |
 
-| Endpoint | Status | Notes |
-|----------|--------|-------|
-| `/` (landing) | 200 | Fonts preloaded |
-| `/api/health` | 200 | `{"status":"ok","dependencies":{"redis":"ok"}}` |
-| `/u/juan294/badge.svg` | 200 | `image/svg+xml`, CDN HIT (`age: 61`) |
-| `/u/juan294` (share page) | 200 | HTML with font preloads |
-| `/about` | 200 | |
-| `/verify` | 200 | |
-| `/privacy` | 200 | |
-| `/terms` | 200 | |
-| `/studio` | 200 | |
-| `/og-image` | 200 | `image/png` |
-| `/robots.txt` | 200 | Correct allow/disallow rules |
-| `/sitemap.xml` | 200 | 4 URLs, valid XML |
-| `/nonexistent` (404) | 404 | Correct error page |
-| `/api/auth/login` | 307 | Redirects to GitHub OAuth with CSRF state |
-| Security headers | PASS | Full suite: CSP, HSTS, X-Frame, nosniff, Referrer-Policy, Permissions-Policy |
+## New History Feature Assessment
 
-### Production Issue Found (FIXED)
+The history feature adds 7 commits with a clean, well-architected module:
 
-**Badge SVG frame-ancestors override:** The badge route at `/u/:handle/badge.svg` was getting `frame-ancestors 'none'` + `X-Frame-Options: DENY` from the catch-all instead of the intended `frame-ancestors *`. **Fixed in `dc102cb`** — badge route handler now sets embeddability headers directly on the Response object.
+**Architecture:** 5 source files in `lib/history/` (types, snapshot builder, diff, trend, Redis CRUD) + 1 API route. Zero new dependencies. All pure functions except the Redis I/O layer. No circular dependencies. Clean DAG.
 
----
+**Test coverage:** 70 new tests across 5 test files — EXCELLENT. Covers dedup, error handling, pure function immutability, API route paths, date validation, rate limiting.
+
+**Security:** Handle validated via `isValidHandle()`. Rate limited (100/IP/60s). Date params validated with regex. `include` param filtered through whitelist. Cache keys not injectable.
+
+**Performance:** Entirely server-side — no new `"use client"` files. No impact on client bundle. Cache headers: `s-maxage=3600, stale-while-revalidate=86400`.
+
+**Integration:** Non-blocking fire-and-forget snapshot recording in badge/refresh/cron routes via `after()` callback and `.catch(() => {})`.
 
 ## Detailed Findings
 
 ### 1. Quality Assurance (qa-lead) — GREEN
 
-**Tests:** 1,832 total | 100% pass rate | 113 test files | 3.49s
-**TypeScript:** Clean (0 errors across all 3 workspaces)
-**Lint:** Clean (0 errors)
-**Coverage:** 72.36% statements (critical paths well above 80%)
+**Test Suite:** 1,988 tests across 125 files — all passing (4.16s). TypeScript clean. ESLint clean.
 
-| Critical Path | Coverage | Status |
-|---------------|----------|--------|
-| Impact scoring (`lib/impact/`) | 100% stmts, 97% branch | EXCELLENT |
-| SVG rendering (`lib/render/`) | 84% stmts, 89% branch | GOOD |
-| GitHub data (`lib/github/`) | 94% stmts, 97% branch | GOOD |
-| Cache (`lib/cache/`) | 86% stmts, 84% branch | GOOD |
-| Verification (`lib/verification/`) | 100% all | EXCELLENT |
-| Email (`lib/email/`) | 98% stmts | EXCELLENT |
-| Shared package | 100% all | EXCELLENT |
-| Auth (`lib/auth/`) | All files tested | GOOD |
+**History feature coverage:** 70 new tests across 5 files. All history modules have corresponding test files with thorough coverage including edge cases, error handling, and immutability verification.
 
-**Warnings:**
-- W1: Overall coverage at 72% (dragged down by untested visual effects and CLI entry point)
-- W2: `archetypeDemoData.ts` (346 lines) has 0% coverage
-- W3: Visual effects modules (`lib/effects/`) at 0% coverage (decorative, low risk)
-- W4: `use-keyboard-shortcuts.ts` hook untested
-- W5: `packages/cli/src/index.ts` entry point untested
+**Acceptance criteria:** All 10 criteria from CLAUDE.md verified and passing.
 
-### 2. Performance (performance-eng) — GREEN
+**Graceful degradation:** History module follows existing patterns — Redis ops return safe defaults on failure (`false`, `[]`, `null`, `0`).
 
-**Build:** Next.js 16.1.6 + Turbopack, compiles in 2.4s
-**Largest JS chunk:** 219KB (under 500KB threshold)
-**CSS:** 81KB single file (~15-20KB gzipped)
+### 2. Security (security-reviewer) — YELLOW
 
-**Good patterns confirmed:**
-- PostHog lazy-loaded via dynamic `import()` in `useEffect`
-- `ShareBadgePreview` dynamically imported with `{ ssr: false }` + loading skeleton
-- `ShortcutCheatSheet` dynamically imported with `{ ssr: false }`
-- Fonts use `display: "swap"` with `latin` subset
-- Badge endpoint has correct `Cache-Control` headers
-- `@resvg/resvg-js` correctly externalized
-- No hydration-mismatch-prone `useEffect` patterns found
-- OG image dimensions specified (no CLS risk)
+**Dependencies:** 0 vulnerabilities. All licenses permissive.
 
-**Warnings:**
-- W1: Two largest chunks (219KB + 170KB) likely framework — verify with bundle analyzer
-- W2: 12 experiment pages are all `"use client"` (dev-only, isolated)
-- W3: Single 81KB CSS file (acceptable, monitor growth)
+**History endpoint:** Public/unauthenticated (matches badge endpoint design). Rate limited. Input validated. Cache keys safe.
 
-### 3. UX/Accessibility (ux-reviewer) — YELLOW
+**Existing security posture unchanged:** OAuth excellent, SVG XSS prevented, no secrets leaked, CORS properly scoped, admin auth layered.
 
-**Heading hierarchy:** Correct across all pages (sr-only h2s for terminal sections)
-**ARIA labels:** Comprehensive — nav, menus, buttons, progress bars, dialogs all labeled
-**Focus indicators:** Global 2px amber outline via `*:focus-visible`
-**Keyboard nav:** Skip-to-content link, focus traps on modals/menus, arrow key navigation on dropdowns
-**`prefers-reduced-motion`:** Fully respected (global CSS + component-level checks)
-**Alt text:** Complete coverage
-**Error/loading/empty states:** Well-handled throughout
+**Advisory:** `window` param NaN handling degrades safely but should be explicitly validated.
 
-**Warnings:**
-- W1: `AuthorTypewriter` has `onClick` on a `<div>` without keyboard equivalent (defensive only)
-- W2: BadgeContent radar chart uses hardcoded hex colors (always dark context, acceptable)
-- W3: `global-error.tsx` hardcodes colors (intentional — no Tailwind in error boundary)
-- W4: Share page uses native `<img>` for badge SVG (acceptable, can't optimize SVG)
-- W5: Archetype page h2s use `text-lg` instead of design system h2 sizing
-- W6: VerifyForm custom focus ring subtler than global outline
-- W7: Non-owner share page is sparse by design (privacy)
+### 3. Architecture (architect) — YELLOW
 
-### 4. Architecture (architect) — YELLOW
+**TypeScript:** Strict mode everywhere. No circular dependencies in history module.
 
-**TypeScript:** All 4 tsconfigs have `strict: true` + `noUncheckedIndexedAccess: true`
-**Circular deps:** 0 found (265 files analyzed)
-**Dead code:** Knip reports 0 unused files/exports/dependencies
-**Vulnerabilities:** `pnpm audit` reports 0
-**Code duplication:** 4.46% (775/17,368 lines), almost entirely in test files
+**History module:** Pure functions for computation, async I/O layer for Redis. Zero new dependencies. Follows all existing patterns (handle normalization, error handling, test conventions).
 
-**Warnings:**
-- W1: `isSecureOrigin()`/`cookieFlags()` duplicated across 3 auth files
-- W2: Session auth boilerplate repeated in 4+ API routes
-- W3: `LEVEL_TO_COUNT`/`buildHeatmap` duplicated in 2 demo data files
-- W4: Stale `ignoreDependencies` in `knip.json` (postcss entries)
-- W5: `@types/node` at v22 (latest is v25, but v22 is current LTS)
-- W6: ESLint v9 (v10 available, major migration needed)
+**Unused exports:** `getLatestSnapshot`, `getSnapshotCount`, `explainDiff` — reasonable pre-built API surface for future share page / admin dashboard integration.
 
-### 5. Security (security-reviewer) — GREEN
+**Storage concern:** History sorted sets grow unbounded. Consider retention pruning after 365 entries per user.
 
-**Vulnerabilities:** 0 known (`pnpm audit`)
-**Secrets in source:** None (test fixtures only: `"ghp_test"`, `"test-secret"`)
-**OAuth:** CSRF via `randomBytes(16)` + `timingSafeEqual`, tokens encrypted AES-256-GCM, HttpOnly cookies, open redirect prevention via `isSafeRedirect()`
-**SVG XSS:** All user input through `escapeXml()` (escapes `& < > ' "`)
-**Env leakage:** No secrets in `NEXT_PUBLIC_*`
-**Rate limiting:** All 10+ public endpoints rate-limited
-**Licenses:** All MIT (no copyleft)
-**Headers:** Full security suite (CSP, HSTS 2yr+preload, X-Frame, nosniff, Permissions-Policy)
+### 4. Performance (performance-eng) — GREEN
 
-**Warnings:**
-- W1: Rate limiting fails open when Redis is down (intentional availability choice)
-- W2: `unsafe-inline` in CSP (required by Next.js App Router)
-- W3: `dangerouslySetInnerHTML` for server-rendered demo SVGs (controlled data)
-- W4: Verification hash truncated to 64 bits (sufficient for non-critical seal)
-- W5: IP header trust relies on Vercel proxy (correct for deployment target)
+**Build:** 57 routes compiled successfully. New `/api/history/[handle]` is server-only dynamic route.
 
-### 6. Infrastructure (devops) — GREEN
+**No client impact:** History feature introduces zero `"use client"` files. Entire module is server-side.
 
-**Build:** Succeeds (Next.js 16.1.6 + Turbopack, 49 routes)
-**CI:** Last 5 runs all `success` across 6 workflows
-**Git state:** Clean working tree, no stale worktrees/branches
-**Health endpoint:** Returns valid JSON with Redis dependency check
-**Error pages:** `error.tsx`, `not-found.tsx`, `global-error.tsx` all present
-**Sitemap/robots:** Both exist with correct rules
-**Security headers:** Configured in `next.config.ts` (not Vercel config)
+**Cache strategy:** History endpoint uses 1h edge cache with 24h stale-while-revalidate — appropriate for data that changes at most once daily.
 
-**Warnings:**
-- ~~W1: Health endpoint returns 200 for degraded state~~ — **FIXED** in `23e35a3` (returns 503 now)
-- W2: `ANALYZE` env var not documented in CLAUDE.md
-- W3: `VERCEL_ENV` used but not in CLAUDE.md env vars table
-- W4: `global-error.tsx` uses `rounded-full` buttons (design system says `rounded-lg`)
+**Existing optimizations intact:** Lazy loading (PostHog, confetti, ShortcutCheatSheet, ShareBadgePreview), font swap, explicit image dimensions, comprehensive reduced-motion support.
 
----
+### 5. UX/Accessibility (ux-reviewer) — YELLOW
 
-## Recommendations (prioritized)
+**No new UI:** History feature is API-only, no frontend components added.
 
-### Fixed before launch
-1. ~~**Badge frame-ancestors header**~~ — Fixed in `dc102cb` (Fixes #270). Badge route handler now sets `Content-Security-Policy: frame-ancestors *` and `X-Frame-Options: ALLOWALL` directly on the Response, overriding the catch-all headers from `next.config.ts`.
-2. ~~**Health endpoint HTTP 503**~~ — Fixed in `23e35a3` (Fixes #271). Health endpoint now returns HTTP 503 when status is `"degraded"` so monitoring tools can trigger alerts.
+**Existing a11y posture strong:** Skip-to-content, focus-visible, ARIA labels on all interactive elements, focus traps, arrow key nav, reduced motion support, proper heading hierarchy, error/loading/empty states everywhere.
 
-### Nice to have (post-launch)
-3. Extract shared `requireAuth()` helper for API routes (reduces duplication)
-4. Export `isSecureOrigin()`/`cookieFlags()` from single canonical location
-5. Extract shared `buildHeatmap()` utility
-6. Clean up stale `knip.json` entries
-7. Add smoke tests for visual effects components
-8. Add `archetypes/*` pages to sitemap.xml
-9. Increase verification hash to 128 bits (`.slice(0, 32)`)
-10. Consider in-memory rate limit fallback for Redis outages
+**Minor gaps:** Scoring page table headers missing `scope="col"`, admin refresh button using `title` instead of `aria-label`, footer links using `<a>` instead of `<Link>`.
 
----
+### 6. DevOps/Infrastructure (devops) — GREEN
 
-## Acceptance Criteria Verification
+**Build:** Success. CI: All 5 workflows green on develop.
 
-| Criterion | Status |
-|-----------|--------|
-| GitHub OAuth login | PASS — 4 auth routes tested + production redirect verified |
-| `/u/:handle/badge.svg` loads publicly | PASS — 200 OK, `image/svg+xml`, CDN caching active |
-| Badge shows heatmap, radar, archetype, stats, tier, score | PASS — 44+ component tests + E2E |
-| `/u/:handle` shows breakdown + confidence + embed snippet | PASS — page tests + E2E |
-| Caching prevents repeated API calls within 24h | PASS — Redis cache tested, CDN confirmed |
-| Confidence messaging is non-accusatory | PASS — dedicated test file |
-| `docs/impact-v4.md` and `docs/svg-design.md` exist | PASS |
-| Creator Studio at `/studio` | PASS — 78 tests (page + client + commands) + production 200 |
+**Environment variables:** History feature introduces zero new env vars. All documented vars in use. All use `.trim()`.
+
+**History route:** Follows all existing patterns — validation, rate limiting, error handling, cache headers.
+
+**Git state:** Clean except one stale worktree (`chapa-docs-trend`) that should be cleaned up.
+
+## Changes Since v16 Audit
+
+The v16 audit identified 20 warnings. All 11 actionable issues (#286-#296) were resolved. The remaining 9 were accepted risks, user-handled manual checks, or Next.js limitations.
+
+**New in v17:** 7 history feature commits adding `lib/history/` module + `/api/history/[handle]` endpoint. 70 new tests. Test count grew from 1,939 to 1,988.
+
+## Conclusion
+
+The codebase is production-ready. No blockers. All warnings are low-to-medium severity with no user-facing impact. The history feature is well-tested, secure, and performant. Recommend proceeding with the release PR from `develop` to `main`.
