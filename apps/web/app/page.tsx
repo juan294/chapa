@@ -423,9 +423,9 @@ export default async function Home({
             </a>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
-              <a href="/about" className="hover:text-amber transition-colors">About</a>
-              <a href="/terms" className="hover:text-amber transition-colors">Terms</a>
-              <a href="/privacy" className="hover:text-amber transition-colors">Privacy</a>
+              <Link href="/about" className="hover:text-amber transition-colors">About</Link>
+              <Link href="/terms" className="hover:text-amber transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-amber transition-colors">Privacy</Link>
             </div>
           </div>
 
