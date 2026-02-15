@@ -246,4 +246,72 @@ describe("GET /api/history/[handle]", () => {
     const body = await res.json();
     expect(body.diff).toBeNull();
   });
+
+  it("returns 400 when window param is not a valid number", async () => {
+    const res = await GET(
+      makeRequest("testuser", { window: "abc" }),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/window/i);
+  });
+
+  it("returns 400 when window param is a float", async () => {
+    const res = await GET(
+      makeRequest("testuser", { window: "3.5" }),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/window/i);
+  });
+
+  it("returns 400 when window param is negative", async () => {
+    const res = await GET(
+      makeRequest("testuser", { window: "-5" }),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/window/i);
+  });
+
+  it("returns 400 when window param is zero", async () => {
+    const res = await GET(
+      makeRequest("testuser", { window: "0" }),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/window/i);
+  });
+
+  it("accepts valid integer window param", async () => {
+    const snapshots = Array.from({ length: 10 }, (_, i) =>
+      makeSnapshot({
+        date: `2025-06-${String(i + 1).padStart(2, "0")}`,
+        adjustedComposite: 50 + i,
+      }),
+    );
+    mockGetSnapshots.mockResolvedValue(snapshots);
+    mockComputeTrend.mockReturnValue({
+      direction: "improving",
+      avgDelta: 1,
+      compositeValues: [],
+      dimensions: {},
+    });
+
+    const res = await GET(
+      makeRequest("testuser", { window: "7" }),
+      { params: Promise.resolve({ handle: "testuser" }) },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockComputeTrend).toHaveBeenCalledWith(snapshots, 7);
+  });
 });

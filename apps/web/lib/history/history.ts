@@ -4,6 +4,9 @@ import type { MetricsSnapshot } from "./types";
 /** Redis key prefix for history sorted sets. */
 const KEY_PREFIX = "history:";
 
+/** Maximum snapshots to retain per user (one per day, ~1 year). */
+const MAX_SNAPSHOTS = 365;
+
 /** Build the Redis key for a user's history. */
 function historyKey(handle: string): string {
   return `${KEY_PREFIX}${handle.toLowerCase()}`;
@@ -43,6 +46,10 @@ export async function recordSnapshot(
     if (existing && existing.length > 0) return false;
 
     await redis.zadd(key, { score, member: JSON.stringify(snapshot) });
+
+    // Fire-and-forget: prune old entries to prevent unbounded growth
+    pruneSnapshots(handle, MAX_SNAPSHOTS).catch(() => {});
+
     return true;
   } catch (error) {
     console.error("[history] recordSnapshot failed:", (error as Error).message);
@@ -127,5 +134,36 @@ export async function getSnapshotCount(handle: string): Promise<number> {
       (error as Error).message,
     );
     return 0;
+  }
+}
+
+/**
+ * Prune oldest snapshots from a user's history sorted set.
+ *
+ * Uses ZREMRANGEBYRANK to remove entries from the low end (oldest scores)
+ * when the total count exceeds `maxEntries`. This prevents unbounded growth
+ * of history sorted sets over time.
+ *
+ * Designed to be called fire-and-forget after `recordSnapshot` writes.
+ * Silently no-ops if Redis is unavailable or on error.
+ */
+export async function pruneSnapshots(
+  handle: string,
+  maxEntries: number,
+): Promise<void> {
+  const redis = getRawRedis();
+  if (!redis) return;
+
+  const key = historyKey(handle);
+
+  try {
+    const count = await redis.zcard(key);
+    if (count <= maxEntries) return;
+
+    // Remove oldest entries: ranks 0 through (count - maxEntries - 1)
+    const removeCount = count - maxEntries;
+    await redis.zremrangebyrank(key, 0, removeCount - 1);
+  } catch (error) {
+    console.error("[history] pruneSnapshots failed:", (error as Error).message);
   }
 }

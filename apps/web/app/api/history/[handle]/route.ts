@@ -11,6 +11,16 @@ type Params = { params: Promise<{ handle: string }> };
 const VALID_INCLUDES = new Set(["snapshots", "trend", "diff"]);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Public (unauthenticated) history endpoint.
+ *
+ * This is intentionally public — it follows the same pattern as the badge
+ * endpoint (`/u/:handle/badge.svg`). Both serve publicly-visible metric
+ * data derived from a user's GitHub activity. Requiring auth here would
+ * break embeddable use-cases and third-party integrations that consume
+ * historical trend data. Rate limiting (100 req/IP/60s) provides abuse
+ * protection instead of authentication.
+ */
 export async function GET(request: NextRequest, context: Params) {
   const { handle } = await context.params;
 
@@ -50,7 +60,18 @@ export async function GET(request: NextRequest, context: Params) {
       .filter((s) => VALID_INCLUDES.has(s)),
   );
 
-  const window = windowParam ? parseInt(windowParam, 10) : undefined;
+  // Validate window param: must be a positive integer when provided
+  let window: number | undefined;
+  if (windowParam) {
+    const parsed = parseInt(windowParam, 10);
+    if (isNaN(parsed) || parsed <= 0 || String(parsed) !== windowParam) {
+      return NextResponse.json(
+        { error: "Invalid 'window' param — must be a positive integer" },
+        { status: 400 },
+      );
+    }
+    window = parsed;
+  }
 
   // Fetch snapshots
   const snapshots = await getSnapshots(handle, from, to);
