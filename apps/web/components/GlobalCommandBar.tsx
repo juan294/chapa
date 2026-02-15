@@ -62,7 +62,9 @@ export function GlobalCommandBar({
           router.push(action.path);
         }
       } else if (action?.type === "custom") {
-        window.dispatchEvent(new CustomEvent(action.event));
+        window.dispatchEvent(
+          new CustomEvent(action.event, action.detail ? { detail: action.detail } : undefined),
+        );
       }
     },
     [commands, router],

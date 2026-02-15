@@ -27,7 +27,7 @@ export type CommandAction =
   | { type: "preset"; name: string }
   | { type: "save" }
   | { type: "reset" }
-  | { type: "custom"; event: string };
+  | { type: "custom"; event: string; detail?: Record<string, unknown> };
 
 export interface CommandDef {
   name: string;
@@ -66,6 +66,23 @@ export function resolveCategory(input: string): string | null {
   return null;
 }
 
+/** Sort field aliases for /sort command (alias → SortField) */
+const SORT_FIELD_ALIASES: Record<string, string> = {
+  handle: "handle",
+  name: "handle",
+  archetype: "archetype",
+  tier: "tier",
+  score: "adjustedComposite",
+  confidence: "confidence",
+  conf: "confidence",
+  commits: "commitsTotal",
+  prs: "prsMergedCount",
+  reviews: "reviewsSubmittedCount",
+  days: "activeDays",
+  stars: "totalStars",
+  updated: "fetchedAt",
+};
+
 /** Admin-only commands for the admin dashboard. */
 export function createAdminCommands(): CommandDef[] {
   return [
@@ -84,6 +101,37 @@ export function createAdminCommands(): CommandDef[] {
         lines: [makeLine("system", "Refreshing dashboard data...")],
         action: { type: "custom", event: "chapa:admin-refresh" },
       }),
+    },
+    {
+      name: "/sort",
+      description: "Sort table by field",
+      usage: "/sort <field>",
+      execute: (args) => {
+        if (args.length === 0) {
+          const fields = Object.keys(SORT_FIELD_ALIASES).join(", ");
+          return {
+            lines: [
+              makeLine("error", `Usage: /sort <field>`),
+              makeLine("info", `Available fields: ${fields}`),
+            ],
+          };
+        }
+        const alias = args[0]!.toLowerCase();
+        const field = SORT_FIELD_ALIASES[alias];
+        if (!field) {
+          const fields = Object.keys(SORT_FIELD_ALIASES).join(", ");
+          return {
+            lines: [
+              makeLine("error", `Unknown sort field: ${alias}`),
+              makeLine("info", `Available fields: ${fields}`),
+            ],
+          };
+        }
+        return {
+          lines: [makeLine("system", `Sorting by ${alias}...`)],
+          action: { type: "custom", event: "chapa:admin-sort", detail: { field } },
+        };
+      },
     },
   ];
 }
@@ -121,6 +169,7 @@ export function createNavigationCommands(options?: {
           makeLine("system", "Admin:"),
           makeLine("info", "  /admin             Navigate to admin dashboard"),
           makeLine("info", "  /refresh           Refresh dashboard data"),
+          makeLine("info", "  /sort <field>      Sort table by field"),
         ]
       : []),
   ];

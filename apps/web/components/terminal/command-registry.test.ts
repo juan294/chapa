@@ -292,15 +292,16 @@ describe("createNavigationCommands (studio enabled)", () => {
 });
 
 describe("createAdminCommands", () => {
-  it("returns 2 admin commands", () => {
+  it("returns 3 admin commands", () => {
     const cmds = createAdminCommands();
-    expect(cmds).toHaveLength(2);
+    expect(cmds).toHaveLength(3);
   });
 
-  it("includes /admin and /refresh", () => {
+  it("includes /admin, /refresh, and /sort", () => {
     const names = createAdminCommands().map((c) => c.name);
     expect(names).toContain("/admin");
     expect(names).toContain("/refresh");
+    expect(names).toContain("/sort");
   });
 
   it("/admin has navigate action to /admin", () => {
@@ -316,6 +317,67 @@ describe("createAdminCommands", () => {
       type: "custom",
       event: "chapa:admin-refresh",
     });
+  });
+
+  it("/sort without args returns error with available fields", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute([]);
+    expect(result.lines[0]!.type).toBe("error");
+    expect(result.lines[0]!.text).toContain("Usage:");
+    expect(result.action).toBeUndefined();
+    // Should list available field aliases
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("score");
+    expect(allText).toContain("tier");
+    expect(allText).toContain("handle");
+  });
+
+  it("/sort score returns custom event with detail { field: 'adjustedComposite' }", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["score"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "adjustedComposite" },
+    });
+    expect(result.lines[0]!.type).toBe("system");
+  });
+
+  it("/sort conf resolves alias to confidence", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["conf"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "confidence" },
+    });
+  });
+
+  it("/sort name resolves alias to handle", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["name"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "handle" },
+    });
+  });
+
+  it("/sort handle works", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["handle"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "handle" },
+    });
+  });
+
+  it("/sort unknown returns error", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["unknown"]);
+    expect(result.lines[0]!.type).toBe("error");
+    expect(result.action).toBeUndefined();
   });
 });
 
@@ -345,16 +407,16 @@ describe("createNavigationCommands (isAdmin)", () => {
     expect(names).not.toContain("/refresh");
   });
 
-  it("returns 15 commands when isAdmin + studio disabled", () => {
+  it("returns 16 commands when isAdmin + studio disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(15);
+    expect(commands).toHaveLength(16);
   });
 
-  it("returns 16 commands when isAdmin + studio enabled", () => {
+  it("returns 17 commands when isAdmin + studio enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(16);
+    expect(commands).toHaveLength(17);
   });
 
   it("/help includes Admin section when isAdmin", () => {
@@ -364,6 +426,7 @@ describe("createNavigationCommands (isAdmin)", () => {
     expect(allText).toContain("Admin:");
     expect(allText).toContain("/admin");
     expect(allText).toContain("/refresh");
+    expect(allText).toContain("/sort");
   });
 
   it("/help does NOT include Admin section when not admin", () => {
