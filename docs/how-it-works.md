@@ -31,7 +31,7 @@ Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity an
 | **Code Reviews** | Reviews submitted on others' PRs | Collaboration and mentorship |
 | **Issues Closed** | Issues resolved | Problem-solving activity |
 | **Active Days** | Days with at least one contribution | Consistency over time |
-| **Repos Contributed To** | Distinct repositories with commits | Cross-project breadth |
+| **Repos Contributed To** | Distinct repositories with 3+ commits | Cross-project breadth (shallow drive-bys excluded) |
 | **Stars** | Total stars across owned repositories | Community recognition signal (used in Breadth dimension) |
 | **Forks** | Total forks across owned repositories | Displayed on badge as a community metric |
 | **Watchers** | Total watchers across owned repositories | Displayed on badge as a community metric |
@@ -114,10 +114,14 @@ The composite is then adjusted by confidence (see below) and mapped to a tier.
 Not all PRs are equal. Each merged PR's weight is calculated as:
 
 ```
-w = 0.5 + 0.25 * ln(1 + filesChanged) + 0.25 * ln(1 + additions + deletions)
+rawWeight = 0.5 + 0.25 * ln(1 + filesChanged) + 0.25 * ln(1 + additions + deletions)
+totalChanges = changedFiles + additions + deletions
+sizeMultiplier = min(1, totalChanges / 10)
+weight = rawWeight * sizeMultiplier
 ```
 
-- Minimum weight: 0.5 (even a tiny PR counts for something)
+- Empty PRs (0 files, 0 lines changed) get weight 0 — prevents inflating scores with trivial PRs
+- Normal PRs (10+ total changes across files and lines) are unaffected (multiplier = 1.0)
 - Maximum weight per PR: 3.0 (prevents a single massive PR from dominating)
 - Total PR weight is capped at 120 across all PRs
 
@@ -139,8 +143,10 @@ Confidence starts at 100 and can be reduced by detected patterns:
 | Low collaboration | -10 | 10+ PRs merged AND 1 or fewer reviews given | Significant output without peer interaction |
 | Single repo focus | -5 | 95%+ of activity in one repo AND only 1 repo | Less cross-project signal (not bad, just less diverse data) |
 | Supplemental data | -5 | Includes merged EMU account data | Data from a linked account that cannot be independently verified |
+| Low activity signal | -10 | Fewer than 30 active days AND fewer than 50 commits | Very limited activity reduces the signal available for scoring |
+| Review volume imbalance | -10 | 50+ reviews AND fewer than 3 merged PRs | High review volume with very few merged changes reduces confidence in the activity mix |
 
-**Confidence floor:** 50. No combination of penalties can push confidence below 50.
+**Confidence floor:** 50. No combination of penalties can push confidence below 50. Note: "Low collaboration" and "Review volume imbalance" are mutually exclusive (one requires ≤ 1 reviews, the other ≥ 50), so the maximum simultaneous penalties is 7.
 
 ### How confidence affects the final score
 
@@ -461,6 +467,9 @@ A: The supplemental data expires after 24 hours. Your badge will revert to showi
 
 **Q: Why log normalization instead of linear?**
 A: Linear scoring rewards volume -- 200 commits would score 2x higher than 100. Logarithmic normalization means the first 50 commits contribute more marginal value than the next 50. This makes gaming impractical: you can't just "commit more" to get a better score. You need genuine breadth across PRs, reviews, issues, and multiple repos.
+
+**Q: What prevents someone from gaming the score?**
+A: Multiple layers. (1) **Log normalization** makes volume-based gaming impractical. (2) **PR size multiplier** means empty/trivial PRs contribute zero weight. (3) **Repo depth threshold** requires 3+ commits per repo to count toward Breadth. (4) **Confidence penalties** detect patterns like review spam, burst commits, and thin activity profiles. (5) **Caps** on every metric mean there's a ceiling — you can't just do more of one thing to inflate your score.
 
 **Q: What are the four dimensions?**
 A: Building (shipping code), Guarding (reviewing others), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Builder, Guardian, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.
