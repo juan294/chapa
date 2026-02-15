@@ -18,14 +18,18 @@ const OUTPUT_TIMEOUT_MS = 5000;
  * Fixed bottom command bar with navigation commands + AuthorTypewriter pill.
  * Use on any page that doesn't have its own terminal interface.
  */
-export function GlobalCommandBar() {
+export function GlobalCommandBar({
+  isAdmin,
+}: {
+  isAdmin?: boolean;
+} = {}) {
   const router = useRouter();
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const commands = useMemo(() => createNavigationCommands(), []);
+  const commands = useMemo(() => createNavigationCommands({ isAdmin }), [isAdmin]);
 
   // Auto-clear output after timeout
   useEffect(() => {
@@ -57,6 +61,8 @@ export function GlobalCommandBar() {
         } else {
           router.push(action.path);
         }
+      } else if (action?.type === "custom") {
+        window.dispatchEvent(new CustomEvent(action.event));
       }
     },
     [commands, router],
