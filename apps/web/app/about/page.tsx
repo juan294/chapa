@@ -82,7 +82,14 @@ export default function AboutPage() {
               messaging is designed to surface patterns without making
               accusations. The scoring model is built to reward genuine
               contribution and resist gaming — volume alone does not
-              determine your score. Every badge also carries a cryptographic
+              determine your score. Read the full details on our{" "}
+              <Link
+                href="/about/scoring"
+                className="text-amber hover:text-amber-light transition-colors"
+              >
+                scoring methodology
+              </Link>{" "}
+              page. Every badge also carries a cryptographic
               verification hash — learn how it works on our{" "}
               <Link
                 href="/about/verification"

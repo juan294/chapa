@@ -37,13 +37,8 @@ describe("About page", () => {
   });
 
   describe("scoring methodology link", () => {
-    it("does NOT link to the scoring methodology page", () => {
-      expect(SOURCE).not.toContain('href="/about/scoring"');
-      expect(SOURCE).not.toContain("full scoring methodology");
-    });
-
-    it("does NOT mention publishing weights or caps", () => {
-      expect(SOURCE).not.toContain("Every weight, cap, and decision");
+    it("links to the scoring methodology page", () => {
+      expect(SOURCE).toContain('href="/about/scoring"');
     });
   });
 });

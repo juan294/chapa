@@ -8,12 +8,9 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("Scoring methodology page", () => {
-  it("gates on isScoringPageEnabled feature flag", () => {
-    expect(SOURCE).toContain("isScoringPageEnabled");
-  });
-
-  it("calls notFound when flag is disabled", () => {
-    expect(SOURCE).toContain("notFound");
+  it("is always rendered (no feature flag)", () => {
+    expect(SOURCE).not.toContain("isScoringPageEnabled");
+    expect(SOURCE).not.toContain("notFound");
   });
 
   it("exports a default component", () => {

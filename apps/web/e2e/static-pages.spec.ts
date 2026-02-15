@@ -8,13 +8,11 @@ test.describe("Static pages — load and render", () => {
     await expect(h1).toContainText("About");
   });
 
-  test("/about/scoring is behind feature flag (404 when disabled)", async ({ page }) => {
-    const response = await page.goto("/about/scoring");
-    // Scoring page is behind isScoringPageEnabled() feature flag.
-    // In CI (flag not set), it returns 404. When enabled, it shows content.
-    expect(response).not.toBeNull();
-    const status = response!.status();
-    expect([200, 404]).toContain(status);
+  test("/about/scoring loads with heading", async ({ page }) => {
+    await page.goto("/about/scoring");
+    const h1 = page.locator("h1");
+    await expect(h1).toBeVisible();
+    await expect(h1).toContainText("Scoring Methodology");
   });
 
   test("/privacy loads with heading", async ({ page }) => {
