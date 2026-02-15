@@ -1,9 +1,17 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
 import { buildSnapshot } from "./snapshot";
+import {
+  makeStats as _makeStats,
+  makeImpact as _makeImpact,
+} from "../test-helpers/fixtures";
+
+// ---------------------------------------------------------------------------
+// Local wrappers — snapshot tests need specific field values for assertions
+// ---------------------------------------------------------------------------
 
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
+  return _makeStats({
     handle: "TestUser",
     displayName: "Test User",
     avatarUrl: "https://avatars.githubusercontent.com/u/12345",
@@ -16,7 +24,6 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     linesAdded: 5000,
     linesDeleted: 2000,
     reposContributed: 8,
-    topRepoShare: 0.4,
     maxCommitsIn10Min: 3,
     microCommitRatio: 0.05,
     docsOnlyPrRatio: 0.1,
@@ -26,28 +33,25 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     heatmapData: [{ date: "2025-01-01", count: 5 }],
     fetchedAt: "2025-06-15T12:00:00.000Z",
     ...overrides,
-  };
+  });
 }
 
 function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
-  return {
+  return _makeImpact({
     handle: "TestUser",
-    profileType: "collaborative",
     dimensions: {
       building: 75,
       guarding: 60,
       consistency: 80,
       breadth: 55,
     },
-    archetype: "Builder",
     compositeScore: 67.5,
     confidence: 90,
-    confidencePenalties: [],
     adjustedComposite: 60.75,
     tier: "High",
     computedAt: "2025-06-15T12:00:00.000Z",
     ...overrides,
-  };
+  });
 }
 
 describe("buildSnapshot", () => {

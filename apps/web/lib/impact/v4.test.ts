@@ -10,14 +10,15 @@ import {
   computeImpactV4,
 } from "./v4";
 import type { StatsData, DimensionScores } from "@chapa/shared";
+import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a StatsData with sensible defaults — override only what you need. */
+/** Zero-based StatsData — dimension tests need a blank slate to test signals in isolation. */
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
+  return _makeStats({
     handle: "test-user",
     commitsTotal: 0,
     activeDays: 0,
@@ -34,9 +35,8 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     totalForks: 0,
     totalWatchers: 0,
     heatmapData: [],
-    fetchedAt: new Date().toISOString(),
     ...overrides,
-  };
+  });
 }
 
 /** Build a uniform 13-week heatmap with a given weekly total. */

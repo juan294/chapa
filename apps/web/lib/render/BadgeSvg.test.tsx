@@ -1,14 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import {
+  makeStats as _makeStats,
+  makeImpact,
+} from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
-// Helpers — reusable test fixtures
+// Local wrapper — badge tests need a populated heatmap to test animations
 // ---------------------------------------------------------------------------
 
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
-    handle: "testuser",
+  return _makeStats({
     commitsTotal: 142,
     activeDays: 45,
     prsMergedCount: 18,
@@ -19,38 +22,12 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     linesDeleted: 1100,
     reposContributed: 4,
     topRepoShare: 0.6,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
     heatmapData: Array.from({ length: 91 }, (_, i) => ({
       date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
       count: i % 5,
     })),
-    fetchedAt: new Date().toISOString(),
     ...overrides,
-  };
-}
-
-function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
-  return {
-    handle: "testuser",
-    profileType: "collaborative",
-    dimensions: {
-      building: 72,
-      guarding: 55,
-      consistency: 68,
-      breadth: 48,
-    },
-    archetype: "Builder",
-    compositeScore: 61,
-    confidence: 85,
-    confidencePenalties: [],
-    adjustedComposite: 58,
-    tier: "Solid",
-    computedAt: new Date().toISOString(),
-    ...overrides,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

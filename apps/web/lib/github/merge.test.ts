@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { mergeStats } from "./merge";
 import type { StatsData } from "@chapa/shared";
+import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
+/** Zero-based StatsData — merge tests need a blank slate to verify addition. */
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
+  return _makeStats({
     handle: "primary-user",
     displayName: "Primary User",
     avatarUrl: "https://avatars.githubusercontent.com/u/1",
@@ -22,9 +24,8 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     totalForks: 0,
     totalWatchers: 0,
     heatmapData: [],
-    fetchedAt: new Date().toISOString(),
     ...overrides,
-  };
+  });
 }
 
 describe("mergeStats", () => {
