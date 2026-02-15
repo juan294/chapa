@@ -224,6 +224,11 @@ function parsePathStart(d: string): { cx: string; cy: string } {
 export function BadgeOverlay() {
   const [activeLeaderLine, setActiveLeaderLine] = useState<string | null>(null);
 
+  // Lazy lookup: only resolve the active hotspot's data when needed (#323)
+  const activeHotspot = activeLeaderLine
+    ? HOTSPOTS.find((h) => h.id === activeLeaderLine)
+    : null;
+
   return (
     <div
       className="absolute inset-0 z-10 group/badge"
@@ -232,6 +237,7 @@ export function BadgeOverlay() {
       aria-label="Badge element tooltips"
     >
       {/* ── Desktop: animated leader line paths (hidden on mobile) ── */}
+      {/* Only the active hotspot's line + dot renders (#323 — lazy render) */}
       <svg
         id="leader-lines-svg"
         className="hidden md:block absolute inset-0 w-full h-full pointer-events-none"
@@ -239,75 +245,65 @@ export function BadgeOverlay() {
         style={{ overflow: "visible" }}
         aria-hidden="true"
       >
-        {HOTSPOTS.map((h) => {
-          const active = activeLeaderLine === h.id;
-          const { cx, cy } = parsePathStart(h.leaderLine.path);
+        {activeHotspot && (() => {
+          const { cx, cy } = parsePathStart(activeHotspot.leaderLine.path);
           return (
-            <g key={h.id}>
+            <g key={activeHotspot.id}>
               <path
-                d={h.leaderLine.path}
+                d={activeHotspot.leaderLine.path}
                 fill="none"
-                stroke="#7C6AEF"
+                stroke="var(--color-amber)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 pathLength={1}
                 strokeDasharray={1}
-                strokeDashoffset={active ? 0 : 1}
-                opacity={active ? 0.8 : 0}
+                strokeDashoffset={0}
+                opacity={0.8}
                 style={{
-                  transition: active
-                    ? "stroke-dashoffset 0.5s ease-out, opacity 0.15s ease-out"
-                    : "stroke-dashoffset 0.3s ease-in, opacity 0.3s ease-in 0.1s",
+                  transition:
+                    "stroke-dashoffset 0.5s ease-out, opacity 0.15s ease-out",
                 }}
               />
               <circle
                 cx={cx}
                 cy={cy}
                 r="4"
-                fill="#7C6AEF"
-                opacity={active ? 0.9 : 0}
-                style={{
-                  transition: active
-                    ? "opacity 0.15s ease-out"
-                    : "opacity 0.2s ease-in",
-                }}
+                fill="var(--color-amber)"
+                opacity={0.9}
+                style={{ transition: "opacity 0.15s ease-out" }}
               />
             </g>
           );
-        })}
+        })()}
       </svg>
 
-      {/* ── Desktop: leader line annotation panels (hidden on mobile) ── */}
+      {/* ── Desktop: leader line annotation panel (hidden on mobile) ── */}
+      {/* Only the active hotspot's panel renders (#323 — lazy render) */}
       <div className="hidden md:contents" aria-hidden="true">
-        {HOTSPOTS.map((h) => {
-          const active = activeLeaderLine === h.id;
-          const isAbove = h.leaderLine.panelAnchor === "above";
+        {activeHotspot && (() => {
+          const isAbove = activeHotspot.leaderLine.panelAnchor === "above";
           return (
             <div
-              key={`panel-${h.id}`}
+              key={`panel-${activeHotspot.id}`}
               role="tooltip"
-              id={`${h.id}-panel`}
-              className={`absolute z-20 max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out ${
-                active
-                  ? "opacity-100 translate-y-0"
-                  : `opacity-0 ${isAbove ? "translate-y-2" : "-translate-y-2"}`
-              }`}
+              id={`${activeHotspot.id}-panel`}
+              className="absolute z-20 max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out opacity-100 translate-y-0"
               style={{
-                top: h.leaderLine.panelTop,
-                left: h.leaderLine.panelLeft,
+                top: activeHotspot.leaderLine.panelTop,
+                left: activeHotspot.leaderLine.panelLeft,
                 transform: isAbove
                   ? "translate(-50%, -100%)"
                   : "translate(-50%, 0%)",
-                transitionDelay: active ? "0.35s" : "0s",
+                transitionDelay: "0.35s",
               }}
             >
               <span className="text-amber font-heading text-[10px] uppercase tracking-wider block mb-1">
-                {h.id.replace("badge-", "")}
+                {activeHotspot.id.replace("badge-", "")}
               </span>
-              {h.tooltip}
+              {activeHotspot.tooltip}
             </div>
           );
-        })}
+        })()}
       </div>
 
       {/* ── Hotspot regions ── */}
