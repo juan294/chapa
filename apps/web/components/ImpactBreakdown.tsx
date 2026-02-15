@@ -116,7 +116,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
             (key, i) => (
               <div
                 key={key}
-                className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+                className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up relative hover:z-10 focus-within:z-10"
                 style={{ animationDelay: `${400 + i * 100}ms` }}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -173,7 +173,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           ].map((stat, i) => (
             <div
               key={stat.label}
-              className="rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up"
+              className="rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up relative hover:z-10 focus-within:z-10"
               style={{ animationDelay: `${700 + i * 60}ms` }}
             >
               <div className="font-heading text-2xl font-extrabold text-text-primary leading-none">

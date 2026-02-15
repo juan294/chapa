@@ -119,6 +119,29 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  describe("tooltip z-index elevation (#285)", () => {
+    it("dimension cards elevate z-index on hover and focus-within", () => {
+      // Cards with animate-fade-in-up create stacking contexts that trap
+      // tooltip z-index. Cards must elevate on interaction so the active
+      // tooltip renders above adjacent cards.
+      const dimCardMatch = SOURCE.match(
+        /className="[^"]*rounded-xl border border-stroke bg-card p-4 animate-fade-in-up[^"]*"/,
+      );
+      expect(dimCardMatch).not.toBeNull();
+      expect(dimCardMatch![0]).toContain("hover:z-10");
+      expect(dimCardMatch![0]).toContain("focus-within:z-10");
+    });
+
+    it("stat cards elevate z-index on hover and focus-within", () => {
+      const statCardMatch = SOURCE.match(
+        /className="[^"]*rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up[^"]*"/,
+      );
+      expect(statCardMatch).not.toBeNull();
+      expect(statCardMatch![0]).toContain("hover:z-10");
+      expect(statCardMatch![0]).toContain("focus-within:z-10");
+    });
+  });
+
   describe("design system tokens (#233)", () => {
     it("uses CSS variables for dimension colors, not hardcoded hex", () => {
       expect(SOURCE).toContain("var(--color-dimension-building)");
