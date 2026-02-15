@@ -225,6 +225,16 @@ export function AdminDashboardClient() {
     [sortField],
   );
 
+  // Listen for /sort command from GlobalCommandBar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const field = (e as CustomEvent).detail?.field as SortField | undefined;
+      if (field) handleSort(field);
+    };
+    window.addEventListener("chapa:admin-sort", handler);
+    return () => window.removeEventListener("chapa:admin-sort", handler);
+  }, [handleSort]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return users;
