@@ -378,7 +378,7 @@ Wait ~10 seconds after creating the IAM role for it to propagate, then:
 ```bash
 aws lambda create-function \
   --function-name <PROJECT>-email-forwarder \
-  --runtime nodejs20.x \
+  --runtime nodejs22.x \
   --handler index.handler \
   --role arn:aws:iam::<AWS_ACCOUNT_ID>:role/<PROJECT>-email-forwarder-role \
   --zip-file fileb:///tmp/<PROJECT>-email-lambda.zip \
