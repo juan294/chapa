@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
+import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import Link from "next/link";
 
 interface BadgeToolbarProps {
@@ -18,61 +19,8 @@ export function BadgeToolbar({
   const [refreshStatus, setRefreshStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
-  const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!shareOpen) return;
-    function onClickOutside(e: MouseEvent) {
-      if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
-        setShareOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [shareOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!shareOpen) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setShareOpen(false);
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [shareOpen]);
-
-  // Arrow key navigation for share menu items
-  useEffect(() => {
-    if (!shareOpen || !shareRef.current) return;
-    function handleMenuKeyDown(e: KeyboardEvent) {
-      const items = Array.from(
-        shareRef.current?.querySelectorAll('[role="menuitem"]') ?? [],
-      ) as HTMLElement[];
-      if (items.length === 0) return;
-      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
-
-      let nextIndex = -1;
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        nextIndex = (currentIndex + 1) % items.length;
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        nextIndex = (currentIndex - 1 + items.length) % items.length;
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        nextIndex = 0;
-      } else if (e.key === "End") {
-        e.preventDefault();
-        nextIndex = items.length - 1;
-      }
-      if (nextIndex >= 0) {
-        items[nextIndex]?.focus();
-      }
-    }
-    document.addEventListener("keydown", handleMenuKeyDown);
-    return () => document.removeEventListener("keydown", handleMenuKeyDown);
-  }, [shareOpen]);
+  const { isOpen: shareOpen, setIsOpen: setShareOpen } = useDropdownMenu(shareRef);
 
   async function handleRefresh() {
     setRefreshStatus("loading");
