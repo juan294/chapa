@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { scanKeys } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
+import { computeImpactV4 } from "@/lib/impact/v4";
+import { buildSnapshot } from "@/lib/history/snapshot";
+import { recordSnapshot } from "@/lib/history/history";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -58,12 +61,22 @@ export async function GET(request: NextRequest) {
   // Warm caches sequentially to be gentle on GitHub rate limits
   let warmed = 0;
   let failed = 0;
+  let snapshots = 0;
 
   for (const handle of toWarm) {
     try {
       const stats = await getStats(handle, githubToken);
       if (stats) {
         warmed++;
+        // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
+        try {
+          const impact = computeImpactV4(stats);
+          const snapshot = buildSnapshot(stats, impact);
+          const recorded = await recordSnapshot(handle, snapshot);
+          if (recorded) snapshots++;
+        } catch {
+          // Snapshot recording is non-critical — don't fail the warm
+        }
       } else {
         failed++;
       }
@@ -76,6 +89,7 @@ export async function GET(request: NextRequest) {
     {
       warmed,
       failed,
+      snapshots,
       total: toWarm.length,
       handles: toWarm,
       durationMs: Date.now() - start,

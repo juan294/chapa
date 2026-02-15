@@ -71,6 +71,14 @@ vi.mock("@/lib/email/notifications", () => ({
   notifyFirstBadge: mockNotifyFirstBadge,
 }));
 
+vi.mock("@/lib/history/snapshot", () => ({
+  buildSnapshot: vi.fn(() => ({ date: "2025-01-01" })),
+}));
+
+vi.mock("@/lib/history/history", () => ({
+  recordSnapshot: vi.fn(() => Promise.resolve(true)),
+}));
+
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: (req: Request) =>
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
