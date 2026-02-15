@@ -47,4 +47,17 @@ describe("AdminDashboardClient", () => {
       expect(SOURCE).toMatch(/aria-sort/);
     });
   });
+
+  describe("a11y: refresh button (#306)", () => {
+    it("uses aria-label instead of title on the refresh button", () => {
+      // The refresh button should use aria-label for screen reader text,
+      // not title which is inconsistently read by screen readers.
+      // Find the refresh button block (the one that calls fetchUsers(true))
+      const refreshBtnMatch = SOURCE.match(/<button[\s\S]*?fetchUsers\(true\)[\s\S]*?>/);
+      expect(refreshBtnMatch).not.toBeNull();
+      const refreshBtn = refreshBtnMatch![0];
+      expect(refreshBtn).toContain('aria-label=');
+      expect(refreshBtn).not.toContain('title=');
+    });
+  });
 });

@@ -56,6 +56,7 @@ function Table({
             {headers.map((h) => (
               <th
                 key={h}
+                scope="col"
                 className="text-left py-2 px-3 font-heading text-text-primary font-medium"
               >
                 {h}
