@@ -23,27 +23,27 @@ const NAV_LINKS = [
 const FEATURES = [
   {
     title: "FOUR DIMENSIONS",
-    description: "Building, Guarding, Consistency, Breadth — what kind of developer you are, not just how much code you write.",
+    description: "Commit counts reward volume, not impact. Chapa scores four dimensions — Building, Guarding, Consistency, Breadth — to show what kind of engineer you actually are.",
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<><Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
+    description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
   },
   {
     title: "CONFIDENCE RATING",
-    description: "Every badge includes a confidence score (50\u2013100) that reflects how much data backs the profile. Less activity means lower confidence \u2014 no false positives.",
+    description: "A score without context is just a number. Every badge includes a confidence rating (50\u2013100) so you know how much data actually backs the result.",
   },
   {
     title: "VERIFIED METRICS",
-    description: "Every badge carries an HMAC hash seal. Click it to cryptographically verify the scores haven\u2019t been tampered with.",
+    description: "Anyone can fake a screenshot. Chapa badges carry an HMAC seal \u2014 click it to cryptographically prove the scores are real.",
   },
   {
     title: "LIVING DOCUMENT",
-    description: "Your badge is a live image that re-renders from fresh GitHub data daily — embed it once and it keeps itself up to date.",
+    description: "Static badges go stale the day you make them. Your Chapa badge re-renders from fresh GitHub data daily \u2014 embed it once, it stays current.",
   },
   {
     title: "ONE-CLICK EMBED",
-    description: "Markdown or HTML, paste anywhere that renders images.",
+    description: "No build steps, no API keys. One line of Markdown or HTML, anywhere that renders images.",
   },
 ];
 
@@ -137,10 +137,9 @@ export default async function Home({
                 <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> AI writes the code. What matters is how you drive impact.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Building, Guarding, Breadth, Consistency — four dimensions beyond commits and lines of code.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Every score is cryptographically sealed. Verifiable, not just trusted.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the real story.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Four dimensions. Cryptographically verified.</p>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
