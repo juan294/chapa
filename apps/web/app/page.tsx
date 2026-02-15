@@ -272,6 +272,15 @@ export default async function Home({
                 <h3 className="font-heading text-sm text-text-primary font-medium">
                   What we measure
                 </h3>
+                <p className="text-text-secondary text-sm">
+                  Chapa scores four independent dimensions of your GitHub activity from the last 12 months. Your unique combination across these dimensions determines your developer archetype:{" "}
+                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
+                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>,{" "}
+                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
+                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
+                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>.
+                </p>
                 {DIMENSIONS.map((dim) => (
                   <div key={dim.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                     <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
@@ -282,15 +291,6 @@ export default async function Home({
                     </span>
                   </div>
                 ))}
-                <p className="text-text-secondary text-sm">
-                  Your dimension profile determines your archetype:{" "}
-                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
-                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>,{" "}
-                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
-                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
-                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
-                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>.
-                </p>
                 <Link
                   href="/about/scoring"
                   className="inline-flex items-center gap-1 text-sm text-amber hover:text-amber-light transition-colors font-heading"
