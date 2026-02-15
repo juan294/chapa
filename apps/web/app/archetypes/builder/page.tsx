@@ -136,7 +136,7 @@ export default function BuilderPage() {
             </div>
 
             {/* Links */}
-            <div className="pt-4 flex flex-wrap items-center gap-4">
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-4">
               <Link
                 href="/#features"
                 className="font-heading text-sm text-amber hover:text-amber-light transition-colors"
