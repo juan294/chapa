@@ -10,6 +10,8 @@ export type {
   DeveloperArchetype,
   ImpactV4Result,
   SupplementalStats,
+  SnapshotPenalty,
+  MetricsSnapshot,
   BadgeBackground,
   BadgeCardStyle,
   BadgeBorder,
