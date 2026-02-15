@@ -139,12 +139,6 @@ function VerifiedCard({
           </span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Confidence</span>
-          <span className="text-sm text-text-primary">
-            {record.confidence}%
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between">
           <span className="text-sm text-text-secondary">Tier</span>
           <span className="text-sm text-text-primary">{record.tier}</span>
         </div>

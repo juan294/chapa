@@ -167,10 +167,13 @@ describe("BadgeContent", () => {
     it("uses tierPillClasses", () => {
       expect(SOURCE).toContain("tierPillClasses");
     });
+  });
 
-    it("shows confidence percentage", () => {
-      expect(SOURCE).toContain("impact.confidence");
-      expect(SOURCE).toContain("Confidence");
+  // Issue #279 — confidence is internal-only, hidden from developer-facing UI
+  describe("confidence hidden (#279)", () => {
+    it("does not show confidence percentage", () => {
+      expect(SOURCE).not.toContain("impact.confidence");
+      expect(SOURCE).not.toMatch(/Confidence/);
     });
   });
 

@@ -26,29 +26,24 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // Issue #279 — confidence is internal-only, hidden from developer-facing UI
+  describe("confidence hidden (#279)", () => {
+    it("does not render confidence score or label", () => {
+      expect(SOURCE).not.toContain("impact.confidence");
+      expect(SOURCE).not.toContain("Confidence");
+    });
+
+    it("does not render confidence penalties", () => {
+      expect(SOURCE).not.toContain("confidencePenalties");
+    });
+  });
+
   // Issue #20 — progress bars need ARIA attributes
   describe("accessibility (#20)", () => {
-    it("confidence bar has role=progressbar", () => {
-      expect(SOURCE).toContain('role="progressbar"');
-    });
-
-    it("confidence bar has aria-valuenow for confidence", () => {
-      expect(SOURCE).toMatch(/aria-valuenow=\{impact\.confidence\}/);
-    });
-
-    it("confidence bar has aria-valuemin and aria-valuemax", () => {
-      expect(SOURCE).toContain("aria-valuemin={0}");
-      expect(SOURCE).toContain("aria-valuemax={100}");
-    });
-
-    it("confidence bar has aria-label", () => {
-      expect(SOURCE).toContain('aria-label="Confidence score"');
-    });
-
-    it("breakdown bars have role=progressbar", () => {
+    it("dimension bars have role=progressbar", () => {
       const matches = SOURCE.match(/role="progressbar"/g);
       expect(matches).not.toBeNull();
-      expect(matches!.length).toBeGreaterThanOrEqual(2);
+      expect(matches!.length).toBeGreaterThanOrEqual(1);
     });
 
     it("dimension bars have aria-valuenow with the dimension score", () => {

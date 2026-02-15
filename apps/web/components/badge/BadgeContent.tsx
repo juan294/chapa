@@ -210,7 +210,7 @@ export function BadgeContent({
             </div>
           </div>
 
-          {/* Composite score + tier + confidence */}
+          {/* Composite score + tier */}
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-baseline gap-2">
               <div data-score-effect={scoreEffect}>
@@ -226,9 +226,6 @@ export function BadgeContent({
               >
                 <span>{impact.tier}</span>
               </div>
-            </div>
-            <div className="text-xs text-text-secondary">
-              {impact.confidence}% Confidence
             </div>
           </div>
         </div>

@@ -152,43 +152,6 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
         </div>
       </div>
 
-      {/* ── Confidence ─────────────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary">
-            Confidence
-          </h3>
-          <span className="font-heading text-sm font-bold text-text-primary">
-            {impact.confidence}%
-          </span>
-        </div>
-        <div className="h-1.5 rounded-full bg-track">
-          <div
-            className="h-1.5 rounded-full bg-amber animate-bar-fill"
-            role="progressbar"
-            aria-valuenow={impact.confidence}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Confidence score"
-            style={{
-              width: `${impact.confidence}%`,
-              animationDelay: "1200ms",
-            }}
-          />
-        </div>
-        {impact.confidencePenalties.length > 0 && (
-          <div className="space-y-2 pt-1">
-            {impact.confidencePenalties.map((p) => (
-              <p
-                key={p.flag}
-                className="text-xs text-text-secondary leading-relaxed pl-3 border-l border-amber/20"
-              >
-                {p.reason}
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
