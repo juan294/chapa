@@ -241,7 +241,10 @@ export default function ScoringMethodologyPage() {
             <p>
               PR weight is not a simple count. Each merged PR is weighted by its
               size and complexity, capped at 3.0 per PR to prevent a single
-              massive PR from dominating.
+              massive PR from dominating. A size multiplier scales the weight
+              from 0 to 1 as total changes (files + additions + deletions) grow
+              from 0 to 10, so trivial or empty PRs contribute zero weight while
+              normal PRs are unaffected.
             </p>
 
             {/* Guarding */}
@@ -312,7 +315,7 @@ export default function ScoringMethodologyPage() {
                 [
                   "Repos Contributed",
                   "35%",
-                  "The most direct measure of cross-project work — how many different repos you actively contributed to",
+                  "How many repos you contributed 3+ commits to. Single-commit drive-by contributions are excluded to ensure depth",
                 ],
                 [
                   "Inverse Top-repo Share",
@@ -498,6 +501,18 @@ export default function ScoringMethodologyPage() {
                   "Includes merged EMU account data",
                   "Data from a linked account that cannot be independently verified",
                 ],
+                [
+                  "Low activity signal",
+                  "-10",
+                  "Fewer than 30 active days AND fewer than 50 commits",
+                  "Very limited activity reduces the signal available for scoring",
+                ],
+                [
+                  "Review volume imbalance",
+                  "-10",
+                  "50+ reviews submitted AND fewer than 3 PRs merged",
+                  "High review volume with very few merged changes reduces confidence in the activity mix",
+                ],
               ]}
             />
             <p>
@@ -505,6 +520,12 @@ export default function ScoringMethodologyPage() {
               <strong className="text-text-primary">50</strong>. No combination
               of penalties can push confidence below 50. All messaging is
               non-accusatory — we describe patterns, not intent.
+            </p>
+            <p>
+              Review volume imbalance and low collaboration are{" "}
+              <strong className="text-text-primary">mutually exclusive</strong>
+              {" "} — only one can apply at a time, so the maximum of 7
+              simultaneous penalties cannot be exceeded.
             </p>
 
             {/* ---------------------------------------------------------- */}

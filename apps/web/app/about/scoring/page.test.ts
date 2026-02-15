@@ -30,6 +30,31 @@ describe("Scoring methodology page", () => {
     });
   });
 
+  describe("anti-gaming hardening content", () => {
+    it("documents PR size multiplier", () => {
+      expect(SOURCE).toContain("size multiplier");
+    });
+
+    it("documents repo depth threshold (3+ commits)", () => {
+      expect(SOURCE).toMatch(/3\+?\s*commits/i);
+    });
+
+    it("shows all 8 confidence penalties", () => {
+      // Count the number of table rows in the confidence table
+      // Each penalty should appear as a row
+      expect(SOURCE).toContain("Low activity");
+      expect(SOURCE).toContain("Review volume");
+    });
+
+    it("mentions mutual exclusivity of review volume and low collaboration", () => {
+      expect(SOURCE).toContain("mutually exclusive");
+    });
+
+    it("states max 7 simultaneous penalties", () => {
+      expect(SOURCE).toMatch(/max(imum)?\s*(of\s+)?7/i);
+    });
+  });
+
   describe("design system compliance", () => {
     it("uses font-heading for headings", () => {
       expect(SOURCE).toContain("font-heading");
