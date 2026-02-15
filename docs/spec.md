@@ -34,6 +34,8 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
   - Upload EMU supplemental stats (CLI tool)
 - POST `/api/studio/config`
   - Save/load Creator Studio badge customization
+- GET `/api/history/:handle`
+  - Score history, trend analysis, and snapshot diffs (public, rate-limited)
 
 ## Data refresh
 - Default refresh schedule: once per day per handle.
@@ -83,4 +85,4 @@ Full scoring spec: `docs/impact-v4.md`
 - No leaderboard
 - No org/team pages
 - No pricing
-- No long-term history timeline
+- No history UI (score trend data is captured and queryable via API, but no charts or timeline yet)

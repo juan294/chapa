@@ -501,6 +501,110 @@ Tooltips are accessible via keyboard (Tab + focus) and auto-position to stay wit
 
 ---
 
+## Score History API
+
+Chapa stores daily snapshots of your metrics and provides a public API to query your score history, trends, and changes over time.
+
+### Endpoint
+
+```
+GET /api/history/:handle
+```
+
+No authentication required — the data is derived from public GitHub activity.
+
+### Query Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `from` | (none) | Start date filter (YYYY-MM-DD) |
+| `to` | (none) | End date filter (YYYY-MM-DD) |
+| `window` | `7` | Number of recent snapshots for trend analysis (2-30) |
+| `include` | `snapshots,trend` | Comma-separated: `snapshots`, `trend`, `diff` |
+
+### Examples
+
+```bash
+# Get all snapshots + trend for a user
+curl https://chapa.thecreativetoken.com/api/history/juan294
+
+# Get snapshots from a date range
+curl "https://chapa.thecreativetoken.com/api/history/juan294?from=2026-01-01&to=2026-02-01"
+
+# Get only trend and diff (no raw snapshots)
+curl "https://chapa.thecreativetoken.com/api/history/juan294?include=trend,diff"
+
+# Use a 14-day trend window
+curl "https://chapa.thecreativetoken.com/api/history/juan294?window=14"
+```
+
+### Response Shape
+
+```json
+{
+  "handle": "juan294",
+  "snapshots": [
+    {
+      "date": "2026-02-14",
+      "capturedAt": "2026-02-14T08:30:00Z",
+      "commitsTotal": 342,
+      "building": 72,
+      "guarding": 45,
+      "consistency": 68,
+      "breadth": 55,
+      "archetype": "Builder",
+      "compositeScore": 60,
+      "adjustedComposite": 58,
+      "confidence": 85,
+      "tier": "Solid"
+    }
+  ],
+  "trend": {
+    "direction": "improving",
+    "windowSize": 7,
+    "snapshotCount": 7,
+    "compositeAvgDelta": 1.5,
+    "compositeValues": [55, 56, 57, 57, 58, 58, 58],
+    "dimensions": {
+      "building": { "direction": "improving", "avgDelta": 2.0 },
+      "guarding": { "direction": "stable", "avgDelta": 0.3 },
+      "consistency": { "direction": "improving", "avgDelta": 1.2 },
+      "breadth": { "direction": "stable", "avgDelta": -0.1 }
+    }
+  },
+  "diff": {
+    "direction": "improving",
+    "daysBetween": 1,
+    "compositeScore": 2,
+    "adjustedComposite": 1,
+    "dimensions": {
+      "building": 3,
+      "guarding": 0,
+      "consistency": 2,
+      "breadth": 1
+    },
+    "explanations": [
+      "Adjusted composite improved by 1 (57 → 58)",
+      "Building improved by 3 (69 → 72)"
+    ]
+  }
+}
+```
+
+### Trend Directions
+
+| Direction | Meaning |
+|-----------|---------|
+| `improving` | Average delta > +1.0 per snapshot |
+| `declining` | Average delta < -1.0 per snapshot |
+| `stable` | Within ±1.0 per snapshot |
+
+### Rate Limiting
+
+100 requests per IP per 60 seconds. Returns `429 Too Many Requests` with a `Retry-After: 60` header when exceeded.
+
+---
+
 ## Testing Walkthrough
 
 Use this checklist to verify every feature works.
