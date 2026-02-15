@@ -158,6 +158,30 @@ export async function cacheMGet<T>(keys: string[]): Promise<(T | null)[]> {
 
 // ---------------------------------------------------------------------------
 // Rate limiting (sliding window counter via INCR + EXPIRE)
+//
+// DESIGN DECISION: Fail-open rate limiting
+//
+// When Redis is unavailable (connection error, timeout, missing credentials),
+// the rate limiter allows all requests through (fail-open) rather than
+// rejecting them (fail-closed). This is an intentional availability-first
+// design choice:
+//
+//   - Chapa is a public badge service. Blocking all badge requests because
+//     Redis is temporarily down would break every embedded badge across the
+//     internet. Availability is more important than strict rate enforcement.
+//
+//   - Rate limiting is a secondary defense. The primary protection against
+//     abuse is GitHub's own API rate limits (5,000/hr authenticated). Our
+//     rate limiter adds a courtesy layer on top, not a critical gate.
+//
+//   - Redis outages are transient. Upstash has high availability, so
+//     fail-open windows are expected to be short (seconds to minutes).
+//
+// Accepted risk: During a Redis outage, an attacker could bypass our rate
+// limits. This is mitigated by GitHub's upstream limits and CDN-level
+// caching (s-maxage=21600 on badge responses).
+//
+// See also: GitHub issue #300
 // ---------------------------------------------------------------------------
 
 export interface RateLimitResult {
@@ -169,6 +193,9 @@ export interface RateLimitResult {
 /**
  * Check and increment a rate limit counter.
  * Uses Redis INCR + EXPIRE for a fixed-window counter.
+ *
+ * **Fail-open by design**: returns `{ allowed: true }` when Redis is
+ * unavailable. See the design decision comment above for rationale.
  *
  * @param key - Rate limit key (e.g. "ratelimit:login:1.2.3.4")
  * @param limit - Maximum allowed requests in the window
