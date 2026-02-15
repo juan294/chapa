@@ -15,3 +15,27 @@ describe("BadgeOverlay (source-reading a11y)", () => {
     expect(SRC).toContain("aria-label");
   });
 });
+
+describe("BadgeOverlay hover-reveal behavior", () => {
+  it("uses group/badge on the container for hover-reveal", () => {
+    // The parent container needs group/badge so child info icons
+    // can respond to parent hover via group-hover/badge:*
+    expect(SRC).toContain("group/badge");
+  });
+
+  it("InfoTooltip icons are hidden by default (opacity-0)", () => {
+    // Info icons should be invisible until the badge is hovered
+    expect(SRC).toContain("opacity-0");
+    expect(SRC).toContain("group-hover/badge:opacity-100");
+  });
+});
+
+describe("BadgeOverlay GitHub disclaimer hotspot", () => {
+  it("includes a hotspot for the Powered by GitHub area", () => {
+    expect(SRC).toContain("badge-github");
+  });
+
+  it("has a disclaimer that GitHub is not affiliated", () => {
+    expect(SRC).toMatch(/github.*not affiliated/i);
+  });
+});

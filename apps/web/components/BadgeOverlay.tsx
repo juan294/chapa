@@ -104,19 +104,29 @@ const HOTSPOTS: {
     width: "14%",
     height: "65%",
   },
+  {
+    id: "badge-github",
+    tooltip:
+      "Chapa uses public GitHub metrics. GitHub is not affiliated with or endorsing this project.",
+    position: "top",
+    top: "90%",
+    left: "2%",
+    width: "22%",
+    height: "8%",
+  },
 ];
 
 export function BadgeOverlay() {
   return (
     <div
-      className="absolute inset-0 z-10"
+      className="absolute inset-0 z-10 group/badge"
       role="group"
       aria-label="Badge element tooltips"
     >
       {HOTSPOTS.map((hotspot) => (
         <div
           key={hotspot.id}
-          className="absolute flex items-center justify-center cursor-help rounded hover:bg-amber/5 transition-colors duration-150"
+          className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150"
           style={{
             top: hotspot.top,
             left: hotspot.left,
@@ -128,6 +138,7 @@ export function BadgeOverlay() {
             id={hotspot.id}
             content={hotspot.tooltip}
             position={hotspot.position}
+            className="opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300"
           />
         </div>
       ))}
