@@ -87,6 +87,24 @@ export default function MarathonerPage() {
                 patterns that inflate contribution counts artificially.
               </p>
 
+              <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
+                Key signals
+              </h3>
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">PRIMARY</span>
+                  <span className="text-text-secondary text-sm">Active days relative to total days &mdash; how often you show up.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SECONDARY</span>
+                  <span className="text-text-secondary text-sm">Heatmap evenness &mdash; how uniformly contributions spread across weeks.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
+                  <span className="text-text-secondary text-sm">Burst detection (inverse) &mdash; penalizes artificial commit floods.</span>
+                </div>
+              </div>
+
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 What a Marathoner looks like in practice
               </h2>
@@ -125,13 +143,19 @@ export default function MarathonerPage() {
               </p>
             </div>
 
-            {/* Back link */}
-            <div className="pt-4">
+            {/* Links */}
+            <div className="pt-4 flex flex-wrap items-center gap-4">
               <Link
                 href="/#features"
                 className="font-heading text-sm text-amber hover:text-amber-light transition-colors"
               >
                 &larr; Back to features
+              </Link>
+              <Link
+                href="/about/scoring"
+                className="font-heading text-sm text-text-secondary hover:text-amber transition-colors"
+              >
+                Full scoring methodology &rarr;
               </Link>
             </div>
           </div>
