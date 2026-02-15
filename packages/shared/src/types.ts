@@ -37,7 +37,9 @@ export type ConfidenceFlag =
   | "generated_change_pattern"
   | "low_collaboration_signal"
   | "single_repo_concentration"
-  | "supplemental_unverified";
+  | "supplemental_unverified"
+  | "low_activity_signal"
+  | "review_volume_imbalance";
 
 /** A single confidence penalty with reason */
 export interface ConfidencePenalty {

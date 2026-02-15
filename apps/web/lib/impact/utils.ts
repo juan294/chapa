@@ -41,6 +41,10 @@ export const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
     "Most activity is concentrated in one repo (not bad\u2014just less cross-repo signal).",
   supplemental_unverified:
     "Includes activity from a linked account that cannot be independently verified.",
+  low_activity_signal:
+    "Very limited activity in this period reduces the signal available for scoring.",
+  review_volume_imbalance:
+    "High review volume with very few merged changes reduces confidence in the activity mix.",
 };
 
 export function computeConfidence(
@@ -110,6 +114,24 @@ export function computeConfidence(
       reason: CONFIDENCE_REASONS.supplemental_unverified,
     });
     score -= 5;
+  }
+
+  if (stats.activeDays < 30 && stats.commitsTotal < 50) {
+    penalties.push({
+      flag: "low_activity_signal",
+      penalty: 10,
+      reason: CONFIDENCE_REASONS.low_activity_signal,
+    });
+    score -= 10;
+  }
+
+  if (stats.reviewsSubmittedCount >= 50 && stats.prsMergedCount < 3) {
+    penalties.push({
+      flag: "review_volume_imbalance",
+      penalty: 10,
+      reason: CONFIDENCE_REASONS.review_volume_imbalance,
+    });
+    score -= 10;
   }
 
   return { confidence: Math.max(50, score), penalties };

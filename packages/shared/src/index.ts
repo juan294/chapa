@@ -32,4 +32,5 @@ export {
   BADGE_HEATMAP_WEEKS,
   PR_WEIGHT_AGG_CAP,
   SCORING_CAPS,
+  REPO_DEPTH_THRESHOLD,
 } from "./constants";
