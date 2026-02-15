@@ -40,6 +40,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
 - POST `/api/studio/config` Save/load badge customization config
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
+- GET `/api/history/:handle` Score history, trend, and diff (public, rate-limited)
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`

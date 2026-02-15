@@ -5,15 +5,15 @@ import type { MetricsSnapshot } from "./types";
  * Build a compact MetricsSnapshot from stats + impact data.
  *
  * Pure function — deterministic output for a given input + current time.
- * Excludes bulky/mutable fields (heatmapData, confidencePenalties,
- * displayName, avatarUrl, derived ratios).
+ * Excludes bulky/mutable fields (heatmapData, displayName, avatarUrl).
+ * Includes explanatory stats and confidence penalties for score change analysis.
  */
 export function buildSnapshot(
   stats: StatsData,
   impact: ImpactV4Result,
 ): MetricsSnapshot {
   const now = new Date();
-  return {
+  const snapshot: MetricsSnapshot = {
     date: now.toISOString().slice(0, 10),
     capturedAt: now.toISOString(),
 
@@ -31,6 +31,10 @@ export function buildSnapshot(
     totalWatchers: stats.totalWatchers,
     topRepoShare: stats.topRepoShare,
 
+    maxCommitsIn10Min: stats.maxCommitsIn10Min,
+    ...(stats.microCommitRatio !== undefined && { microCommitRatio: stats.microCommitRatio }),
+    ...(stats.docsOnlyPrRatio !== undefined && { docsOnlyPrRatio: stats.docsOnlyPrRatio }),
+
     building: impact.dimensions.building,
     guarding: impact.dimensions.guarding,
     consistency: impact.dimensions.consistency,
@@ -42,4 +46,14 @@ export function buildSnapshot(
     confidence: impact.confidence,
     tier: impact.tier,
   };
+
+  // Only include penalties when non-empty (saves bytes in Redis)
+  if (impact.confidencePenalties.length > 0) {
+    snapshot.confidencePenalties = impact.confidencePenalties.map((p) => ({
+      flag: p.flag,
+      penalty: p.penalty,
+    }));
+  }
+
+  return snapshot;
 }
