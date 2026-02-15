@@ -119,11 +119,11 @@ const HOTSPOTS: Hotspot[] = [
     width: "52%",
     height: "52%",
     leaderLine: {
-      // Start from bottom edge center of heatmap
-      path: "M 372 517 C 350 570 300 630 264 688",
-      panelTop: "109%",
-      panelLeft: "22%",
-      panelAnchor: "below",
+      // Curve up from top edge center to avoid overlapping embed section below
+      path: "M 372 189 C 365 100 348 0 336 -88",
+      panelTop: "-14%",
+      panelLeft: "28%",
+      panelAnchor: "above",
     },
   },
   {
