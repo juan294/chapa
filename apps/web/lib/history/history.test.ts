@@ -45,6 +45,7 @@ function makeSnapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot
     totalForks: 25,
     totalWatchers: 50,
     topRepoShare: 0.4,
+    maxCommitsIn10Min: 3,
     building: 75,
     guarding: 60,
     consistency: 80,

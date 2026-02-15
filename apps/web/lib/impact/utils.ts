@@ -28,7 +28,7 @@ export function normalize(x: number, cap: number): number {
 // Confidence (50–100)
 // ---------------------------------------------------------------------------
 
-const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
+export const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
   burst_activity:
     "Some activity appears in short bursts, which reduces timing confidence.",
   micro_commit_pattern:
