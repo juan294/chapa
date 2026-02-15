@@ -21,3 +21,10 @@ export const SCORING_CAPS = {
   forks: 200,
   watchers: 100,
 } as const;
+
+/**
+ * Minimum commits in a repo for it to count toward `reposContributed`.
+ * Prevents gaming Breadth by making trivial single-commit contributions
+ * to many repos. `topRepoShare` still uses ALL active repos (1+ commits).
+ */
+export const REPO_DEPTH_THRESHOLD = 3;

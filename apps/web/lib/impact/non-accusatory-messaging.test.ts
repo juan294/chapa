@@ -127,6 +127,14 @@ const PENALTY_TRIGGERS: Record<ConfidenceFlag, Partial<StatsData>> = {
   supplemental_unverified: {
     hasSupplementalData: true,
   },
+  low_activity_signal: {
+    activeDays: 10,
+    commitsTotal: 20,
+  },
+  review_volume_imbalance: {
+    reviewsSubmittedCount: 60,
+    prsMergedCount: 1,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -171,8 +179,8 @@ describe("Non-accusatory confidence messaging", () => {
     }
   });
 
-  it("all 6 confidence flags are covered by this test", () => {
-    expect(allFlags).toHaveLength(6);
+  it("all 8 confidence flags are covered by this test", () => {
+    expect(allFlags).toHaveLength(8);
     expect(allFlags).toEqual(
       expect.arrayContaining([
         "burst_activity",
@@ -181,6 +189,8 @@ describe("Non-accusatory confidence messaging", () => {
         "low_collaboration_signal",
         "single_repo_concentration",
         "supplemental_unverified",
+        "low_activity_signal",
+        "review_volume_imbalance",
       ]),
     );
   });

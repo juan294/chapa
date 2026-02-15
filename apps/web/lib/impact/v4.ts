@@ -51,7 +51,8 @@ export function computeGuarding(stats: StatsData): number {
   }
 
   // Inverse micro-commit ratio: low micro-commit ratio → high quality
-  const microRatio = stats.microCommitRatio ?? 0;
+  // Default 0.3 when unknown (no free points — assumes moderate micro-commit activity)
+  const microRatio = stats.microCommitRatio ?? 0.3;
   const inverseMicro = 1 - microRatio;
 
   const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * inverseMicro);
