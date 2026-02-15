@@ -132,10 +132,10 @@ describe("createNavigationCommands (studio disabled)", () => {
     expect(names).not.toContain("/studio");
   });
 
-  it("returns 13 commands when studio is disabled", () => {
+  it("returns 14 commands when studio is disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
-    expect(commands).toHaveLength(13);
+    expect(commands).toHaveLength(14);
   });
 
   it("/help does not mention /studio when disabled", () => {
@@ -153,11 +153,11 @@ describe("createNavigationCommands (studio disabled)", () => {
     expect(result.lines[0]!.type).toBe("error");
   });
 
-  it("getMatchingCommands returns 13 for / when disabled", () => {
+  it("getMatchingCommands returns 14 for / when disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(13);
+    expect(matches).toHaveLength(14);
   });
 
   it("/s does not match /studio when disabled", () => {
@@ -181,10 +181,10 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(names).toContain("/studio");
   });
 
-  it("returns 14 commands when studio is enabled", () => {
+  it("returns 15 commands when studio is enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
-    expect(commands).toHaveLength(14);
+    expect(commands).toHaveLength(15);
   });
 
   it("/studio navigates to /studio when enabled", () => {
@@ -220,6 +220,22 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(names).toContain("/polymath");
     expect(names).toContain("/balanced");
     expect(names).toContain("/emerging");
+    expect(names).toContain("/scoring");
+  });
+
+  it("/scoring navigates to /about/scoring", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
+    const result = executeCommand("/scoring", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/about/scoring" });
+  });
+
+  it("/help lists /scoring", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands();
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("/scoring");
   });
 
   it("/help output does NOT mention studio-only commands", () => {
@@ -274,11 +290,11 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(result.action).toEqual({ type: "navigate", path: "/u/juan294" });
   });
 
-  it("getMatchingCommands returns all 14 for /", () => {
+  it("getMatchingCommands returns all 15 for /", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
     const matches = getMatchingCommands("/", commands);
-    expect(matches).toHaveLength(14);
+    expect(matches).toHaveLength(15);
   });
 
   it("getMatchingCommands filters correctly", () => {
@@ -449,16 +465,16 @@ describe("createNavigationCommands (isAdmin)", () => {
     expect(names).not.toContain("/refresh");
   });
 
-  it("returns 16 commands when isAdmin + studio disabled", () => {
+  it("returns 17 commands when isAdmin + studio disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(16);
+    expect(commands).toHaveLength(17);
   });
 
-  it("returns 17 commands when isAdmin + studio enabled", () => {
+  it("returns 18 commands when isAdmin + studio enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(17);
+    expect(commands).toHaveLength(18);
   });
 
   it("/help includes Admin section when isAdmin", () => {

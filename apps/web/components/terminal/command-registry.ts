@@ -165,6 +165,7 @@ export function createNavigationCommands(options?: {
     makeLine("info", "  /login             Sign in with GitHub"),
     makeLine("info", "  /badge <handle>    View a developer badge"),
     makeLine("info", "  /about             About Chapa"),
+    makeLine("info", "  /scoring           Scoring methodology"),
     makeLine("info", "  /terms             Terms of Service"),
     makeLine("info", "  /privacy           Privacy Policy"),
     makeLine("dim", ""),
@@ -244,6 +245,14 @@ export function createNavigationCommands(options?: {
       execute: () => ({
         lines: [makeLine("system", "Opening about page...")],
         action: { type: "navigate", path: "/about" },
+      }),
+    },
+    {
+      name: "/scoring",
+      description: "Scoring methodology",
+      execute: () => ({
+        lines: [makeLine("system", "Opening scoring methodology...")],
+        action: { type: "navigate", path: "/about/scoring" },
       }),
     },
     {
