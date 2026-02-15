@@ -87,4 +87,13 @@ describe("InfoTooltip", () => {
       expect(SOURCE).toMatch(/Escape/);
     });
   });
+
+  describe("text casing (#285)", () => {
+    it("tooltip panel uses normal-case to override inherited uppercase", () => {
+      // Parent containers (stat labels, dimension labels) use CSS uppercase.
+      // The tooltip panel must reset with normal-case so tooltip text renders
+      // as sentence case regardless of parent text-transform.
+      expect(SOURCE).toContain("normal-case");
+    });
+  });
 });

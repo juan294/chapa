@@ -60,6 +60,20 @@ describe("globals.css", () => {
     }
   });
 
+  describe("fade-in-up animation (#285)", () => {
+    it("ends with transform: none to avoid creating stacking contexts", () => {
+      // The animation must end with `transform: none` (not `translateY(0)`)
+      // so that animated cards don't create permanent stacking contexts
+      // that trap child z-index values (e.g., tooltips with z-50).
+      const keyframeBlock = SOURCE.match(
+        /@keyframes\s+fade-in-up\s*\{([\s\S]*?)\n\}/,
+      );
+      expect(keyframeBlock).not.toBeNull();
+      const body = keyframeBlock![1]!;
+      expect(body).toMatch(/to\s*\{[^}]*transform:\s*none/);
+    });
+  });
+
   describe("archetype color tokens (#233)", () => {
     const ARCHETYPE_TOKENS = [
       "--color-archetype-builder",

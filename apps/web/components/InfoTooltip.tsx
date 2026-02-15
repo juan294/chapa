@@ -86,7 +86,7 @@ export function InfoTooltip({
       <span
         id={id}
         role="tooltip"
-        className={`absolute ${panelPosition} left-1/2 -translate-x-1/2 z-50 w-max max-w-[240px] rounded-lg bg-card/90 backdrop-blur-xl border border-stroke shadow-lg p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none opacity-0 translate-y-1 scale-95 transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)] group-hover/tip:opacity-100 group-hover/tip:translate-y-0 group-hover/tip:scale-100 group-focus-within/tip:opacity-100 group-focus-within/tip:translate-y-0 group-focus-within/tip:scale-100 ${open ? "!opacity-100 !translate-y-0 !scale-100 pointer-events-auto" : ""}`}
+        className={`absolute ${panelPosition} left-1/2 -translate-x-1/2 z-50 w-max max-w-[240px] rounded-lg bg-card/90 backdrop-blur-xl border border-stroke shadow-lg p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none opacity-0 translate-y-1 scale-95 transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)] group-hover/tip:opacity-100 group-hover/tip:translate-y-0 group-hover/tip:scale-100 group-focus-within/tip:opacity-100 group-focus-within/tip:translate-y-0 group-focus-within/tip:scale-100 ${open ? "!opacity-100 !translate-y-0 !scale-100 pointer-events-auto" : ""}`}
       >
         {content}
       </span>
