@@ -206,6 +206,13 @@ export function AdminDashboardClient() {
     fetchUsers();
   }, [fetchUsers]);
 
+  // Listen for /refresh command from GlobalCommandBar
+  useEffect(() => {
+    const handler = () => fetchUsers(true);
+    window.addEventListener("chapa:admin-refresh", handler);
+    return () => window.removeEventListener("chapa:admin-refresh", handler);
+  }, [fetchUsers]);
+
   const handleSort = useCallback(
     (field: SortField) => {
       if (sortField === field) {

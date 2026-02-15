@@ -26,7 +26,8 @@ export type CommandAction =
   | { type: "set"; category: string; value: string }
   | { type: "preset"; name: string }
   | { type: "save" }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { type: "custom"; event: string };
 
 export interface CommandDef {
   name: string;
@@ -65,9 +66,34 @@ export function resolveCategory(input: string): string | null {
   return null;
 }
 
+/** Admin-only commands for the admin dashboard. */
+export function createAdminCommands(): CommandDef[] {
+  return [
+    {
+      name: "/admin",
+      description: "Navigate to admin dashboard",
+      execute: () => ({
+        lines: [makeLine("system", "Opening admin dashboard...")],
+        action: { type: "navigate", path: "/admin" },
+      }),
+    },
+    {
+      name: "/refresh",
+      description: "Refresh dashboard data",
+      execute: () => ({
+        lines: [makeLine("system", "Refreshing dashboard data...")],
+        action: { type: "custom", event: "chapa:admin-refresh" },
+      }),
+    },
+  ];
+}
+
 /** Navigation commands available on all pages (global command bar). */
-export function createNavigationCommands(): CommandDef[] {
+export function createNavigationCommands(options?: {
+  isAdmin?: boolean;
+}): CommandDef[] {
   const studioEnabled = isStudioEnabled();
+  const isAdmin = options?.isAdmin ?? false;
 
   const helpLines: OutputLine[] = [
     makeLine("system", "Available commands:"),
@@ -89,6 +115,14 @@ export function createNavigationCommands(): CommandDef[] {
     makeLine("info", "  /polymath          The Polymath archetype"),
     makeLine("info", "  /balanced          The Balanced archetype"),
     makeLine("info", "  /emerging          The Emerging archetype"),
+    ...(isAdmin
+      ? [
+          makeLine("dim", ""),
+          makeLine("system", "Admin:"),
+          makeLine("info", "  /admin             Navigate to admin dashboard"),
+          makeLine("info", "  /refresh           Refresh dashboard data"),
+        ]
+      : []),
   ];
 
   const commands: CommandDef[] = [
@@ -215,6 +249,7 @@ export function createNavigationCommands(): CommandDef[] {
         action: { type: "navigate", path: "/archetypes/emerging" },
       }),
     },
+    ...(isAdmin ? createAdminCommands() : []),
   ];
 
   return commands;

@@ -3,6 +3,7 @@ import {
   parseCommand,
   executeCommand,
   createNavigationCommands,
+  createAdminCommands,
   getMatchingCommands,
   resolveCategory,
   makeLine,
@@ -287,6 +288,106 @@ describe("createNavigationCommands (studio enabled)", () => {
     const names = matches.map((m) => m.name);
     expect(names).toContain("/badge");
     expect(names).not.toContain("/studio");
+  });
+});
+
+describe("createAdminCommands", () => {
+  it("returns 2 admin commands", () => {
+    const cmds = createAdminCommands();
+    expect(cmds).toHaveLength(2);
+  });
+
+  it("includes /admin and /refresh", () => {
+    const names = createAdminCommands().map((c) => c.name);
+    expect(names).toContain("/admin");
+    expect(names).toContain("/refresh");
+  });
+
+  it("/admin has navigate action to /admin", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/admin")!;
+    const result = cmd.execute([]);
+    expect(result.action).toEqual({ type: "navigate", path: "/admin" });
+  });
+
+  it("/refresh has custom event action", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/refresh")!;
+    const result = cmd.execute([]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-refresh",
+    });
+  });
+});
+
+describe("createNavigationCommands (isAdmin)", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+  });
+
+  it("includes admin commands when isAdmin is true", () => {
+    const commands = createNavigationCommands({ isAdmin: true });
+    const names = commands.map((c) => c.name);
+    expect(names).toContain("/admin");
+    expect(names).toContain("/refresh");
+  });
+
+  it("excludes admin commands when isAdmin is false", () => {
+    const commands = createNavigationCommands({ isAdmin: false });
+    const names = commands.map((c) => c.name);
+    expect(names).not.toContain("/admin");
+    expect(names).not.toContain("/refresh");
+  });
+
+  it("excludes admin commands when isAdmin is not provided", () => {
+    const commands = createNavigationCommands();
+    const names = commands.map((c) => c.name);
+    expect(names).not.toContain("/admin");
+    expect(names).not.toContain("/refresh");
+  });
+
+  it("returns 15 commands when isAdmin + studio disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands({ isAdmin: true });
+    expect(commands).toHaveLength(15);
+  });
+
+  it("returns 16 commands when isAdmin + studio enabled", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands({ isAdmin: true });
+    expect(commands).toHaveLength(16);
+  });
+
+  it("/help includes Admin section when isAdmin", () => {
+    const commands = createNavigationCommands({ isAdmin: true });
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("Admin:");
+    expect(allText).toContain("/admin");
+    expect(allText).toContain("/refresh");
+  });
+
+  it("/help does NOT include Admin section when not admin", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).not.toContain("Admin:");
+    expect(allText).not.toContain("/refresh");
+  });
+
+  it("/admin matches in autocomplete when isAdmin", () => {
+    const commands = createNavigationCommands({ isAdmin: true });
+    const matches = getMatchingCommands("/a", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).toContain("/admin");
+    expect(names).toContain("/about");
+  });
+
+  it("/admin does NOT match in autocomplete when not admin", () => {
+    const commands = createNavigationCommands();
+    const matches = getMatchingCommands("/a", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).not.toContain("/admin");
+    expect(names).toContain("/about");
   });
 });
 

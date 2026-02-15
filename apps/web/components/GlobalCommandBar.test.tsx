@@ -28,4 +28,22 @@ describe("GlobalCommandBar", () => {
       expect(SOURCE).toContain("max-h-48 sm:max-h-64");
     });
   });
+
+  describe("isAdmin prop", () => {
+    it("accepts isAdmin prop in the function signature", () => {
+      // Component should accept an optional isAdmin prop
+      expect(SOURCE).toMatch(/isAdmin\??:\s*boolean/);
+    });
+
+    it("passes isAdmin to createNavigationCommands", () => {
+      // Must call createNavigationCommands with { isAdmin }
+      expect(SOURCE).toMatch(/createNavigationCommands\(\s*\{\s*isAdmin\s*\}\s*\)/);
+    });
+
+    it("handles custom event action type", () => {
+      // Must handle action?.type === "custom" by dispatching a CustomEvent
+      expect(SOURCE).toContain('action?.type === "custom"');
+      expect(SOURCE).toContain("CustomEvent");
+    });
+  });
 });
