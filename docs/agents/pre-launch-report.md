@@ -1,66 +1,47 @@
-# Pre-Launch Audit Report (v18)
-> Generated on 2026-02-15 | Branch: `develop` | Commit: `71073f9` | 6 parallel specialists
+# Pre-Launch Audit Report (v19)
+> Generated on 2026-02-15 | Branch: `develop` | Commit: `8d6dd2b` | 6 parallel specialists
 
-## Verdict: CONDITIONAL
+## Verdict: READY
 
-All 6 specialists completed. **No blockers found.** 28 warnings total across all specialists. The project is in strong shape — warnings are cleanup items and minor improvements that can be addressed post-launch or accepted as known trade-offs. One recommended pre-release action: run `pnpm audit` and verify CI green.
+All 6 specialists report GREEN or YELLOW. No blockers. Both prior conditions resolved:
 
-| Specialist | Status | Blockers | Warnings |
-|------------|--------|----------|----------|
-| QA Lead | GREEN | 0 | 7 |
-| Security | GREEN | 0 | 5 |
-| Architecture | YELLOW | 0 | 6 |
-| Performance | YELLOW | 0 | 6 |
-| UX/Accessibility | YELLOW | 0 | 5 |
-| DevOps | YELLOW | 0 | 6 |
+1. ~~Push 4 unpushed commits~~ — Pushed to `origin/develop` (commit `8671eb3`)
+2. ~~Document 2 missing env vars~~ — Added to CLAUDE.md in same push
 
 ---
 
-## Blockers (must fix before release)
+## Summary
 
-None.
+| Specialist | Status | Key Finding |
+|------------|--------|-------------|
+| QA Lead | **GREEN** | 2,141 tests pass, clean typecheck + lint |
+| Security Reviewer | **GREEN** | 0 vulns, strong OAuth (AES-256-GCM), comprehensive XSS protection |
+| Architect | **GREEN** | Strict TS, no circular deps, clean module boundaries |
+| Performance Engineer | **GREEN** | Fast build (3.0s), no heavy client deps, excellent caching |
+| UX Reviewer | **GREEN** | Full ARIA coverage, reduced-motion support, correct heading hierarchy |
+| DevOps | **YELLOW** | 4 unpushed commits, 2 undocumented env vars, 10 stale remote branches |
 
-## Pre-Release Checklist (Recommended)
-
-Before creating the release PR:
-
-1. **Run `pnpm audit`** — Security dep scan was not executed during audit
-2. **Verify CI is green** — `gh run list --branch develop --limit 5`
-3. **Run production build locally** — `pnpm run build` to confirm route sizes under 500KB
-4. **Remove `packages/cli/`** — Dead directory wastes CI time (also remove from `ci.yml` line 57)
+---
 
 ## Warnings
 
-| # | Issue | Severity | Found by | Risk |
+| # | Issue | Severity | Found By | Risk |
 |---|-------|----------|----------|------|
-| W1 | Dead `packages/cli/` directory with build artifacts | Medium | architect, devops | Wastes CI time, confuses contributors |
-| W2 | `formatCompact()` identical ternary branches (dead logic) | Low | architect | No functional impact |
-| W3 | Duplicate `escapeXml()` / `escapeHtml()` functions | Low | architect | Maintenance burden |
-| W4 | Duplicate test helpers `makeSnapshot()` (4 files), `makeStats()` (6 files) | Low | architect | Maintenance burden |
-| W5 | `MetricsSnapshot` type in `apps/web/` instead of `@chapa/shared` | Low | architect | Inconsistent architecture |
-| W6 | Stale knip ignore entry for deleted `BadgePreview.tsx` | Low | architect | No impact |
-| W7 | 11 experiment pages ship in production build | Low | performance, architect | Dead weight, extra build time |
-| W8 | `canvas-confetti` in production deps (only used in studio) | Low | performance | ~7KB gzipped, lazy-loaded |
-| W9 | Duplicated dropdown keyboard nav in `BadgeToolbar` + `UserMenu` | Low | performance | Code duplication |
-| W10 | `BadgeOverlay` pre-renders 30 DOM elements (hover-only) | Low | performance | Could be lazy-loaded |
-| W11 | `posthog-js` ~45KB loads on every navigation | Low | performance | Properly lazy-loaded |
-| W12 | Studio effects pipeline creates large client chunk | Medium | performance | Mitigated by `dynamic()` + `ssr: false` |
-| W13 | Email forwarding includes raw HTML body without sanitization | Low | security | Admin inbox only |
-| W14 | `dangerouslySetInnerHTML` with server-rendered SVG | Low | security | Safe (controlled data) |
-| W15 | `unsafe-inline` in CSP script-src | Low | security | Known Next.js App Router limitation |
-| W16 | `pnpm audit` not run during audit | Medium | security | Run manually before release |
-| W17 | License audit not run during audit | Low | security | Manual check shows all MIT/permissive |
-| W18 | Hardcoded hex `#7C6AEF` in BadgeOverlay leader line SVGs | Low | ux | Decorative, aria-hidden |
-| W19 | Hardcoded hex in `global-error.tsx` inline styles | Low | ux | Acceptable — root layout unavailable |
-| W20 | Missing `scope="col"` on `<th>` in verification page table | Low | ux | Screen reader association |
-| W21 | Admin badge link uses `title` instead of `aria-label` | Low | ux | `title` not reliably announced |
-| W22 | Share dropdown button could use explicit `aria-label` | Low | ux | Has visible text already |
-| W23 | Build not independently verified by some agents | Medium | devops | CI covers this |
-| W24 | CI status unverified for latest commit | Medium | devops | Check before release |
-| W25 | `packages/cli/` still built in CI (`pnpm --filter @chapa/cli build`) | Medium | devops | Wasted CI time |
-| W26 | `VERCEL_ENV` and `ANALYZE` env vars undocumented | Low | devops | Auto-injected / dev-only |
-| W27 | No `robots.txt` route handler | Low | devops | Next.js may serve default |
-| W28 | `global-error.tsx` uses `rounded-full` instead of `rounded-lg` | Low | devops | Design system inconsistency |
+| W1 | Local `develop` is 4 commits ahead of `origin/develop` — CI has not validated them | Medium | DevOps | Release could fail if CI finds issues |
+| W2 | `NEXT_PUBLIC_SCORING_PAGE_ENABLED` and `NEXT_PUBLIC_EXPERIMENTS_ENABLED` undocumented in CLAUDE.md | Low | DevOps | Documentation gap only; both are optional feature flags |
+| W3 | 10 stale remote feature branches (merged but not deleted) | Low | DevOps | Clutter only, no functional risk |
+| W4 | `packages/cli/` contains stale `dist/` and `node_modules/` artifacts (CLI decoupled to separate repo) | Low | Architect | Confusing for new contributors; no functional risk |
+| W5 | Root `package.json` declares `vitest ^4.0.0` but installed version is `3.2.4` | Low | Architect | Fresh `pnpm install` might pull vitest 4.x with breaking changes |
+| W6 | Two `postcss` versions in `node_modules` (8.5.6 and 8.4.31) | Low | Architect | Common with Next.js; unlikely to cause issues |
+| W7 | MPL-2.0 dependencies (`@resvg/resvg-js`, `@vercel/analytics`) outside CLAUDE.md allowed license list | Low | Security | MPL-2.0 is weak copyleft (file-level only), commercially compatible |
+| W8 | CSP uses `'unsafe-inline'` for `script-src` and `style-src` | Low | Security | Required by Next.js App Router + Tailwind v4; documented and accepted |
+| W9 | HMAC verification hash truncated to 16 hex chars (64 bits) | Low | Security | Acceptable for non-auth badge verification use case |
+| W10 | Rate limiter is fail-open by design | Low | Security | Documented intentional decision; mitigated by GitHub API limits + CDN |
+| W11 | Bundle size data unavailable (Turbopack doesn't emit route size tables) | Low | Performance | No indicators of bloat; run `ANALYZE=true` build to verify |
+| W12 | `AdminDashboardClient.tsx` is 646 lines (largest client component) | Low | Performance | Admin-only route; manageable but approaching extraction point |
+| W13 | Server-side TTF fonts (671KB) in `public/fonts/` are technically web-accessible | Low | Performance | Only used by server-side OG image generation; not loaded by clients |
+| W14 | Admin filter input has `outline-none` without explicit `focus-visible` replacement | Low | UX | Global `*:focus-visible` should still apply; admin-only page |
+| W15 | Lint warning: `useCallback` missing `setShareOpen` dependency in `BadgeToolbar.tsx` | Low | QA | Likely intentional to avoid re-renders |
 
 ---
 
@@ -68,114 +49,151 @@ Before creating the release PR:
 
 ### 1. Quality Assurance (qa-lead) — GREEN
 
-**Test Suite: 2,027 tests across 126 files — all passing (4.71s)**
+**Test Suite:** 2,141 tests across 130 files — all passing (4.40s)
 
-TypeScript: zero errors. ESLint: zero warnings.
+**Type Check:** PASS (both `packages/shared` and `apps/web`)
+
+**Lint:** PASS (0 errors, 1 warning in `BadgeToolbar.tsx`)
 
 **Critical Path Coverage:**
 
-| Path | Tests | Rating |
-|------|-------|--------|
-| Scoring pipeline (`lib/impact/`) | 174 | Excellent |
-| SVG rendering (`lib/render/`) | 145+ | Excellent |
-| OAuth/Auth (`lib/auth/`, `api/auth/`) | 74+ | Excellent |
-| Cache layer (`lib/cache/`) | 38 | Excellent |
-| History subsystem (`lib/history/`) | 68 | Excellent |
-| Badge SVG route | 31 | Excellent |
-| Validation (`lib/validation.ts`) | 66 | Excellent |
-| Email (`lib/email/`) | 39 | Excellent |
-| Verification (`lib/verification/`) | 40 | Excellent |
+| Area | Tests | Count |
+|------|-------|-------|
+| OAuth flow | `callback`, `login`, `logout`, `session` route tests + auth lib tests | 77 |
+| Impact scoring | `v4`, `utils`, `heatmap-evenness`, non-accusatory messaging | 187 |
+| SVG rendering | `BadgeSvg`, `heatmap`, `RadarChart`, `escape`, `theme`, `avatar`, etc. | 161 |
+| Badge route | Fallback SVG, error handling, cache headers, embeddability | 31 |
+| Cache layer | Graceful degradation, fail-open rate limiter, CRUD | 38 |
+| Share page | Page, responsive layout, OG image | 38 |
+| Admin | Dashboard, API routes | 31 |
+| History | History, snapshot, diff, trend | 68 |
+| Studio | Page, client, preview, options, commands, API | 132 |
+| Anti-gaming | Archetype scoring leak prevention | 130 |
+| Components | Tooltips, overlay, breakdown, navbar, badge content, etc. | 200+ |
 
-- **100% API route coverage** — all 17 routes have test files
-- **7 Playwright E2E specs** — badge, landing, nav, share, smoke, static, themes
-- **All 13 acceptance criteria verified** through automated tests
-- **102-test suite** verifying scoring internals don't leak to users
-- Only untested: decorative visual effects + thin provider wrappers (LOW risk)
+**All acceptance criteria met.** OAuth, badge SVG, share page, studio, admin, tooltips, lifetime snapshots — all verified.
+
+**Graceful degradation confirmed:** GitHub API failures serve stale cache (7-day TTL). Redis unavailability returns safe defaults. Rate limiter fails open. Email failures degrade gracefully.
+
+---
 
 ### 2. Security (security-reviewer) — GREEN
 
-**No vulnerabilities found in code review.**
+**Dependency Audit:** 0 vulnerabilities (critical: 0, high: 0, moderate: 0, low: 0)
 
-- **Secret scan: PASS** — Zero hardcoded secrets. `.env` files gitignored. No server secrets in `NEXT_PUBLIC_*`.
-- **OAuth: PASS** — CSRF state with `timingSafeEqual()`, AES-256-GCM encrypted cookies, open-redirect protection, minimal scope (`read:user`), 24h session TTL.
-- **SVG XSS: PASS** — All user input escaped via `escapeXml()` (5 XML chars, 8 tests). Handles validated via strict regex.
-- **Cache injection: PASS** — All cache keys use validated alphanumeric inputs.
-- **Security headers: PASS** — HSTS (2-year), CSP, X-Frame-Options, Permissions-Policy, nosniff, referrer policy.
-- **Rate limiting: PASS** — All endpoints rate-limited. Fail-open design documented.
-- **Timing-safe comparisons** on all secret comparisons (OAuth state, CLI tokens, admin secret, cron secret).
-- **Webhook verification** via Svix for Resend emails.
+**Hardcoded Secrets:** None found in source code. All test files use obviously fake values.
 
-### 3. Architecture (architect) — YELLOW
+**OAuth Security:**
+- Token storage: AES-256-GCM encrypted session cookie
+- CSRF: Cryptographic state parameter with `timingSafeEqual` validation
+- Callback: `isSafeRedirect()` prevents open-redirect attacks
+- Token scope: Minimal (`read:user` only)
+- Session endpoint strips token — never exposed to client
+- Rate limited: login (20/15min), callback (10/15min), session (60/60s)
 
-**Clean architecture with no circular dependencies.**
+**SVG XSS Protection:** All 5 user-controlled values escaped via `escapeXml()`. Handle validation restricts to `[a-zA-Z0-9-]`. All `dangerouslySetInnerHTML` instances use hardcoded/sanitized data.
 
-- **TypeScript strict**: All 3 tsconfigs have `strict: true`, `noUncheckedIndexedAccess: true`, `isolatedModules: true`
-- **Dependency flow**: Clean unidirectional `apps/web` → `@chapa/shared` (no reverse)
-- **No circular dependencies**: Verified by manual import tracing
-- **Monorepo structure**: Clean pnpm workspace with proper package boundaries
-- **Cleanup needed**: Dead `packages/cli/`, dead ternary in `formatCompact()`, duplicate escape functions, duplicate test helpers, stale knip entry
+**Environment Variables:** No secrets in `NEXT_PUBLIC_*` vars. All server secrets correctly isolated in server-only modules.
 
-### 4. Performance (performance-eng) — YELLOW
+**CORS:** Appropriately configured — verification API allows `*`, badge allows framing, all others same-origin.
 
-**Bundle strategy is solid. No routes expected to exceed 500KB.**
+**Cache Keys:** No injection possible — handle validated upstream, IP strings used as-is.
 
-- **Dynamic imports**: PostHog, canvas-confetti, ShortcutCheatSheet, ShareBadgePreview
-- **Server isolation**: `@resvg/resvg-js` (8MB) in `serverExternalPackages`; `resend`/`svix`/`@upstash/redis` server-only
-- **Font loading**: `display: "swap"` (no CLS)
-- **Images**: All use `next/image` with dimensions
-- **`"use client"` placement**: Correctly at leaf level, not page level
-- **Reduced motion**: Comprehensive (CSS + JS)
-- **Build output needs manual verification** — `pnpm run build` recommended
+**CSP Headers:** Comprehensive policy with separate badge policy (`frame-ancestors *`). HSTS with 2-year max-age + preload. All security headers present.
 
-### 5. UX/Accessibility (ux-reviewer) — YELLOW
-
-**Strong accessibility practices.**
-
-- **Heading hierarchy**: Correct on all pages, no skipped levels
-- **Skip-to-content**: Present in root layout
-- **ARIA**: Comprehensive — menus, tooltips, progress bars, alerts, dialogs, terminal output
-- **Focus indicators**: Global `focus-visible` ring (amber, 2px) on all elements
-- **Keyboard nav**: Arrow keys, Escape, click-outside on all dropdowns
-- **Reduced motion**: CSS `prefers-reduced-motion` + JS `matchMedia` checks
-- **Design tokens**: Consistent across all production components
-- **Error/empty/loading states**: Well-implemented everywhere
-- **Minor fixes**: `scope="col"` on verification table, `aria-label` on admin link, hardcoded hex in leader lines
-
-### 6. DevOps/Infrastructure (devops) — YELLOW
-
-**Excellent CI coverage — 6 GitHub Actions workflows.**
-
-| Workflow | Coverage |
-|----------|----------|
-| `ci.yml` | Lint, typecheck, test, build, E2E |
-| `security.yml` | `pnpm audit` + license compliance |
-| `gitleaks.yml` | Secret scanning (daily + push) |
-| `knip.yml` | Dead code detection |
-| `bundle-size.yml` | Bundle size with PR comments |
-| `claude-review.yml` | AI code review on PRs |
-
-- **Badge headers match spec**: `s-maxage=21600`, `stale-while-revalidate=604800`, `frame-ancestors *`
-- **Error boundaries**: All 3 exist (`not-found.tsx`, `error.tsx`, `global-error.tsx`)
-- **Health endpoint**: JSON with Redis status, 200/503 codes
-- **Vercel cron**: Daily 06:00 UTC, timing-safe `CRON_SECRET`
-- **Env vars**: All 19 documented vars match code, all `.trim()`-ed
-- **Cleanup needed**: Remove `packages/cli/`, add `robots.txt`, document `VERCEL_ENV`
+**Cookie Security:** `HttpOnly`, `SameSite=Lax`, conditional `Secure`, appropriate `Max-Age` values.
 
 ---
 
-## Key Strengths
+### 3. Architecture (architect) — GREEN
 
-1. **2,027 tests, 100% pass rate** — Exceptional coverage across all critical paths
-2. **Zero type errors, zero lint warnings** — Clean codebase
-3. **Defense-in-depth security** — Encrypted cookies, XSS escaping, timing-safe comparisons, rate limiting, CSP
-4. **6 CI workflows** — Automated quality gates for every push/PR
-5. **Comprehensive accessibility** — Skip-to-content, ARIA, focus indicators, reduced motion, proper heading hierarchy
-6. **Smart bundle optimization** — Dynamic imports, server isolation, leaf-level client boundaries
-7. **Fail-open rate limiting** — Well-documented availability-first design
-8. **All 13 acceptance criteria verified** through tests
+**TypeScript:** All three packages have `strict: true` + `noUncheckedIndexedAccess: true`. Path aliases consistent.
+
+**Circular Dependencies:** None found (manual trace of all critical import chains: impact, render, github, history, shared).
+
+**Module Boundaries:**
+- Scoring (`lib/impact/`): Pure functions only. Zero network calls, zero side effects.
+- Rendering (`lib/render/`): No imports from auth, cache, or server modules.
+- Client/server: No `"use client"` component imports server-only modules. Navbar correctly leverages server component for auth reads.
+
+**Code Organization:** Clean two-package monorepo. All shared types defined once in `packages/shared`, consumed correctly by 53 files in `apps/web`.
+
+**Dead Code:** `packages/cli/` directory is stale (CLI decoupled to separate repo). Should be removed.
 
 ---
 
-## Changes Since v17 Audit
+### 4. Performance (performance-eng) — GREEN
 
-v17 was generated earlier on the same day targeting commit `e68a416`. This v18 audit targets the latest commit `71073f9` (leader line and landing page copy changes merged since v17). New findings include duplicate dropdown logic (W9), BadgeOverlay pre-rendering (W10), and expanded UX review of leader line accessibility (W18).
+**Build:** Success in 3.0s (Turbopack). 53 static pages generated in 495ms.
+
+**Client Components:** 32 `"use client"` files — all leaf components or interactive widgets. No misplacements. Layouts and key pages are server components.
+
+**Dynamic Imports:** 2 found, both appropriate (`ShortcutCheatSheet` with `ssr: false`, `ShareBadgePreview` with `ssr: false` + loading skeleton).
+
+**Core Web Vitals:**
+- CLS: Low risk — all images have explicit dimensions, fonts use `display: "swap"`
+- LCP: Low risk — landing hero is server-rendered inline SVG, share page badge has `fetchPriority="high"`
+- FID/INP: Low risk — PostHog deferred to first interaction or 5s timeout, `@resvg/resvg-js` is server-only
+
+**useEffect:** ~45 calls, all appropriate with proper cleanup. No hydration mismatches (`useSyncExternalStore` used correctly).
+
+**Badge Pipeline:** Well-optimized — rate limit first, cache-first stats, avatar caching, `after()` for deferred non-critical work, pure SVG string rendering.
+
+**Cache Headers:** All correct. Badge: `s-maxage=21600, stale-while-revalidate=604800`. Error SVGs use shorter `s-maxage=300`.
+
+---
+
+### 5. UX/Accessibility (ux-reviewer) — GREEN
+
+**Heading Hierarchy:** Correct across all production pages. One h1 per page, no skipped levels. Landing page uses `sr-only` h2 elements for screen readers.
+
+**ARIA:** Excellent coverage:
+- All icon-only buttons have `aria-label`
+- All decorative icons have `aria-hidden="true"`
+- Landmarks: `<nav>`, `role="log"`, `role="listbox"`, `role="dialog"`, `role="tooltip"`, `role="progressbar"`, `role="alert"`, `role="menu"`
+- Skip-to-content link present
+- `aria-sort` on sortable admin table columns
+- `aria-expanded`, `aria-haspopup`, `aria-busy` on toolbar buttons
+
+**Focus:** Global `*:focus-visible` style with purple outline. All `outline-none` instances have replacement focus styles (except one minor admin input case).
+
+**Reduced Motion:** Global catch-all `@media (prefers-reduced-motion: reduce)` disables all animations. Additional component-level support in 10+ components. Tested.
+
+**Keyboard Navigation:** Zero `onClick` on non-interactive elements. All interactive elements use native HTML. Focus trapping in dialogs. Dropdown arrow-key navigation.
+
+**Design System Consistency:** Semantic color tokens used throughout (no hardcoded hex in production components, enforced by tests). Font usage matches spec. Spacing patterns correct.
+
+---
+
+### 6. Infrastructure (devops) — YELLOW
+
+**Production Build:** SUCCESS (no warnings)
+
+**CI/CD:** 6 workflows (CI, security, bundle-size, gitleaks, knip, claude-review). Tests, typecheck, lint, E2E all in CI. Last 5 runs on `develop`: all SUCCESS.
+
+**Environment Variables:** 2 undocumented feature flags (`NEXT_PUBLIC_SCORING_PAGE_ENABLED`, `NEXT_PUBLIC_EXPERIMENTS_ENABLED`). All documented vars confirmed in use.
+
+**Badge Headers:** Match spec exactly (`public, s-maxage=21600, stale-while-revalidate=604800`, `image/svg+xml`).
+
+**Error Pages:** `error.tsx`, `not-found.tsx`, `loading.tsx` all present. `global-error.tsx` for root-level errors.
+
+**Health Endpoint:** Returns `{ status, timestamp, dependencies: { redis } }`. 503 when degraded. No sensitive info exposed.
+
+**Git State:** Clean working tree, no stale worktrees. **4 commits ahead of origin** (not pushed). 10 stale remote branches.
+
+**Cron:** Daily warm-cache at 06:00 UTC, protected by `CRON_SECRET` with `timingSafeEqual`. Max 50 handles, sequential processing.
+
+**Middleware:** Uses Next.js 16 `proxy.ts` convention. Coming-soon gate correctly exempts badge SVG, API, CLI, and static assets.
+
+---
+
+## Recommendations (Non-Blocking)
+
+1. **Push unpushed commits** to `origin/develop` and verify CI passes
+2. **Document missing env vars** in CLAUDE.md env vars section
+3. **Remove `packages/cli/`** — stale directory from CLI decoupling
+4. **Clean up 10 stale remote branches** — `git push origin --delete <branch>`
+5. **Align vitest version** — update `package.json` range to `^3.2.0` or upgrade to 4.x
+6. **Add MPL-2.0 to allowed licenses** in CLAUDE.md (used by `@resvg/resvg-js` and `@vercel/analytics`)
+7. **Run `ANALYZE=true` build** periodically to verify no route exceeds 500KB
+8. **Consider splitting `AdminDashboardClient.tsx`** if it grows beyond ~700 lines
