@@ -21,4 +21,30 @@ describe("AdminDashboardClient", () => {
       expect(SOURCE).toMatch(/setSortDir\(dir\)/);
     });
   });
+
+  describe("table header keyboard accessibility (#286)", () => {
+    it("wraps sort text in <button> elements inside <th>", () => {
+      // Each sortable <th> should contain a <button> for keyboard access
+      expect(SOURCE).toMatch(/<th[^>]*>\s*<button/);
+    });
+
+    it("does not use onClick on <th> elements directly", () => {
+      // onClick should be on the <button> inside <th>, not on <th> itself
+      expect(SOURCE).not.toMatch(/<th[^>]*onClick/);
+    });
+
+    it("all <th> elements have scope='col'", () => {
+      // Every <th> in the table header must have scope="col"
+      const thMatches = SOURCE.match(/<th\b[^>]*>/g) ?? [];
+      expect(thMatches.length).toBeGreaterThan(0);
+      for (const th of thMatches) {
+        expect(th).toContain('scope="col"');
+      }
+    });
+
+    it("sorted column has aria-sort attribute", () => {
+      // The currently sorted column should declare aria-sort
+      expect(SOURCE).toMatch(/aria-sort/);
+    });
+  });
 });

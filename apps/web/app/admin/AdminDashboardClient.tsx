@@ -313,7 +313,15 @@ export function AdminDashboardClient() {
   // -------------------------------------------------------------------------
 
   const thClasses =
-    "px-3 py-2.5 text-left font-heading text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer select-none hover:text-text-primary transition-colors whitespace-nowrap";
+    "px-3 py-2.5 text-left font-heading text-xs font-medium text-text-secondary uppercase tracking-wider whitespace-nowrap";
+
+  const thBtnClasses =
+    "inline-flex items-center bg-transparent border-none p-0 font-heading text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer select-none hover:text-text-primary transition-colors whitespace-nowrap";
+
+  function ariaSortValue(field: SortField): "ascending" | "descending" | "none" {
+    if (sortField !== field) return "none";
+    return sortDir === "asc" ? "ascending" : "descending";
+  }
 
   return (
     <div className="space-y-6">
@@ -414,51 +422,73 @@ export function AdminDashboardClient() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stroke">
-                <th className={thClasses} onClick={() => handleSort("handle")}>
-                  Developer
-                  <SortIcon active={sortField === "handle"} dir={sortDir} />
+                <th scope="col" className={thClasses} aria-sort={ariaSortValue("handle")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("handle")}>
+                    Developer
+                    <SortIcon active={sortField === "handle"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden sm:table-cell`} onClick={() => handleSort("archetype")}>
-                  Archetype
-                  <SortIcon active={sortField === "archetype"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden sm:table-cell`} aria-sort={ariaSortValue("archetype")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("archetype")}>
+                    Archetype
+                    <SortIcon active={sortField === "archetype"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={thClasses} onClick={() => handleSort("tier")}>
-                  Tier
-                  <SortIcon active={sortField === "tier"} dir={sortDir} />
+                <th scope="col" className={thClasses} aria-sort={ariaSortValue("tier")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("tier")}>
+                    Tier
+                    <SortIcon active={sortField === "tier"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={thClasses} onClick={() => handleSort("adjustedComposite")}>
-                  Score
-                  <SortIcon active={sortField === "adjustedComposite"} dir={sortDir} />
+                <th scope="col" className={thClasses} aria-sort={ariaSortValue("adjustedComposite")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("adjustedComposite")}>
+                    Score
+                    <SortIcon active={sortField === "adjustedComposite"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden md:table-cell`} onClick={() => handleSort("confidence")}>
-                  Conf
-                  <SortIcon active={sortField === "confidence"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden md:table-cell`} aria-sort={ariaSortValue("confidence")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("confidence")}>
+                    Conf
+                    <SortIcon active={sortField === "confidence"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden lg:table-cell`} onClick={() => handleSort("commitsTotal")}>
-                  Commits
-                  <SortIcon active={sortField === "commitsTotal"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden lg:table-cell`} aria-sort={ariaSortValue("commitsTotal")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("commitsTotal")}>
+                    Commits
+                    <SortIcon active={sortField === "commitsTotal"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden lg:table-cell`} onClick={() => handleSort("prsMergedCount")}>
-                  PRs
-                  <SortIcon active={sortField === "prsMergedCount"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden lg:table-cell`} aria-sort={ariaSortValue("prsMergedCount")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("prsMergedCount")}>
+                    PRs
+                    <SortIcon active={sortField === "prsMergedCount"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden xl:table-cell`} onClick={() => handleSort("reviewsSubmittedCount")}>
-                  Reviews
-                  <SortIcon active={sortField === "reviewsSubmittedCount"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden xl:table-cell`} aria-sort={ariaSortValue("reviewsSubmittedCount")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("reviewsSubmittedCount")}>
+                    Reviews
+                    <SortIcon active={sortField === "reviewsSubmittedCount"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden xl:table-cell`} onClick={() => handleSort("activeDays")}>
-                  Days
-                  <SortIcon active={sortField === "activeDays"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden xl:table-cell`} aria-sort={ariaSortValue("activeDays")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("activeDays")}>
+                    Days
+                    <SortIcon active={sortField === "activeDays"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden xl:table-cell`} onClick={() => handleSort("totalStars")}>
-                  Stars
-                  <SortIcon active={sortField === "totalStars"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden xl:table-cell`} aria-sort={ariaSortValue("totalStars")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("totalStars")}>
+                    Stars
+                    <SortIcon active={sortField === "totalStars"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden md:table-cell`} onClick={() => handleSort("fetchedAt")}>
-                  Updated
-                  <SortIcon active={sortField === "fetchedAt"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden md:table-cell`} aria-sort={ariaSortValue("fetchedAt")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("fetchedAt")}>
+                    Updated
+                    <SortIcon active={sortField === "fetchedAt"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} w-10`}>
+                <th scope="col" className={`${thClasses} w-10`}>
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
