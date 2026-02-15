@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Mocks — hoisted before any imports that depend on them
 // ---------------------------------------------------------------------------
 
-const { mockReadSessionCookie, mockCacheGet, mockCacheSet, mockRateLimit } =
+const { mockReadSessionCookie, mockRequireSession, mockCacheGet, mockCacheSet, mockRateLimit } =
   vi.hoisted(() => ({
     mockReadSessionCookie: vi.fn(),
+    mockRequireSession: vi.fn(),
     mockCacheGet: vi.fn(),
     mockCacheSet: vi.fn(),
     mockRateLimit: vi.fn(),
@@ -16,6 +17,10 @@ const { mockReadSessionCookie, mockCacheGet, mockCacheSet, mockRateLimit } =
 
 vi.mock("@/lib/auth/github", () => ({
   readSessionCookie: mockReadSessionCookie,
+}));
+
+vi.mock("@/lib/auth/require-session", () => ({
+  requireSession: mockRequireSession,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -119,20 +124,23 @@ describe("GET /api/studio/config", () => {
 describe("PUT /api/studio/config", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    mockRequireSession.mockReturnValue({ session: SESSION });
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
   });
 
   it("returns 401 when no session", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockRequireSession.mockReturnValue({
+      error: NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      ),
+    });
 
     const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG));
     expect(res.status).toBe(401);
   });
 
   it("returns 400 for invalid config body", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
-
     const res = await PUT(makePutRequest({ background: "neon" }, "session=abc"));
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -140,8 +148,6 @@ describe("PUT /api/studio/config", () => {
   });
 
   it("returns 400 for non-JSON body", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
-
     const req = new NextRequest("https://chapa.thecreativetoken.com/api/studio/config", {
       method: "PUT",
       headers: { "Content-Type": "application/json", cookie: "session=abc" },
@@ -153,7 +159,6 @@ describe("PUT /api/studio/config", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
     mockRateLimit.mockResolvedValue({ allowed: false, current: 31, limit: 30 });
 
     const res = await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));
@@ -161,7 +166,6 @@ describe("PUT /api/studio/config", () => {
   });
 
   it("saves valid config to Redis with 365-day TTL", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
     mockCacheSet.mockResolvedValue(undefined);
 
     const config = { ...DEFAULT_BADGE_CONFIG, background: "aurora" as const };
@@ -173,7 +177,6 @@ describe("PUT /api/studio/config", () => {
   });
 
   it("rate limits by user login", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
     mockCacheSet.mockResolvedValue(undefined);
 
     await PUT(makePutRequest(DEFAULT_BADGE_CONFIG, "session=abc"));

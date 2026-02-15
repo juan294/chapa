@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // Mock dependencies before imports
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: vi.fn(),
+vi.mock("@/lib/auth/require-session", () => ({
+  requireSession: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -19,13 +19,13 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 import { POST } from "./route";
-import { readSessionCookie } from "@/lib/auth/github";
+import { requireSession } from "@/lib/auth/require-session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { rateLimit } from "@/lib/cache/redis";
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
 
-const mockReadSession = vi.mocked(readSessionCookie);
+const mockRequireSession = vi.mocked(requireSession);
 const mockGetStats = vi.mocked(getStats);
 const mockComputeImpact = vi.mocked(computeImpactV4);
 const mockRateLimit = vi.mocked(rateLimit);
@@ -38,15 +38,26 @@ function makeRequest(cookie?: string): NextRequest {
   return req;
 }
 
+const SESSION = {
+  token: "ghp_test",
+  login: "juan294",
+  name: "Juan",
+  avatar_url: "https://example.com/avatar.png",
+};
+
 describe("POST /api/generate", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env.NEXTAUTH_SECRET = "test-secret";
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   });
 
   it("returns 401 when no session cookie is present", async () => {
-    mockReadSession.mockReturnValue(null);
+    mockRequireSession.mockReturnValue({
+      error: NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      ),
+    });
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
     const body = await res.json();
@@ -54,7 +65,12 @@ describe("POST /api/generate", () => {
   });
 
   it("returns 500 when NEXTAUTH_SECRET is missing", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    mockRequireSession.mockReturnValue({
+      error: NextResponse.json(
+        { error: "Server misconfigured" },
+        { status: 500 },
+      ),
+    });
     const res = await POST(makeRequest("chapa_session=abc"));
     expect(res.status).toBe(500);
     const body = await res.json();
@@ -62,12 +78,7 @@ describe("POST /api/generate", () => {
   });
 
   it("returns 429 when rate-limited", async () => {
-    mockReadSession.mockReturnValue({
-      token: "ghp_test",
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/avatar.png",
-    });
+    mockRequireSession.mockReturnValue({ session: SESSION });
     mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
 
     const res = await POST(makeRequest("chapa_session=abc"));
@@ -75,12 +86,7 @@ describe("POST /api/generate", () => {
   });
 
   it("returns 200 with success when stats are generated", async () => {
-    mockReadSession.mockReturnValue({
-      token: "ghp_test",
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/avatar.png",
-    });
+    mockRequireSession.mockReturnValue({ session: SESSION });
     const fakeStats = { handle: "juan294", commitsTotal: 100 } as unknown as StatsData;
     const fakeImpact = { archetype: "Builder", adjustedComposite: 72 } as unknown as ImpactV4Result;
     mockGetStats.mockResolvedValue(fakeStats);
@@ -94,12 +100,7 @@ describe("POST /api/generate", () => {
   });
 
   it("calls getStats with the session handle and token", async () => {
-    mockReadSession.mockReturnValue({
-      token: "ghp_test",
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/avatar.png",
-    });
+    mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
     mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV4Result);
 
@@ -109,12 +110,7 @@ describe("POST /api/generate", () => {
   });
 
   it("returns 502 when GitHub API fails", async () => {
-    mockReadSession.mockReturnValue({
-      token: "ghp_test",
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/avatar.png",
-    });
+    mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue(null);
 
     const res = await POST(makeRequest("chapa_session=abc"));

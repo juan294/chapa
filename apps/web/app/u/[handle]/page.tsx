@@ -17,10 +17,9 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { isStudioEnabled } from "@/lib/feature-flags";
+import { getBaseUrl } from "@/lib/env";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
-  "https://chapa.thecreativetoken.com";
+const BASE_URL = getBaseUrl();
 
 interface SharePageProps {
   params: Promise<{ handle: string }>;
