@@ -192,12 +192,16 @@ GITHUB_TOKEN=              # GitHub personal access token (optional — fallback
 COMING_SOON=               # When set to any truthy value, enables coming-soon gate that blocks most routes (optional)
 CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
-NEXT_PUBLIC_SCORING_PAGE_ENABLED= # Set to "true" to enable the scoring methodology page (optional)
+NEXT_PUBLIC_SCORING_PAGE_ENABLED= # Set to "true" to enable /about/scoring page (optional, disabled by default)
+NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (optional, disabled by default)
 
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
+
+VERCEL_ENV=                    # Auto-injected by Vercel (production/preview/development — do not set manually)
+ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer in next.config.ts (dev-only)
 ```
 
 ### Environment Variable Safety

@@ -110,6 +110,7 @@ export default function GradientBorderExperiment() {
     <>
       <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Inline styles for the animated gradient border techniques */}
+      {/* SAFETY: CSS-only string literal with no user input — used for @property and @keyframes that cannot be expressed in Tailwind. */}
       <style
         dangerouslySetInnerHTML={{
           __html: `

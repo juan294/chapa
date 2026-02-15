@@ -1,6 +1,6 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
-import { PR_WEIGHT_AGG_CAP } from "./constants";
+import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
 
 /**
  * Transform raw GitHub GraphQL contribution data into a StatsData object.
@@ -42,20 +42,26 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   const reviewsSubmittedCount = raw.reviews.totalCount;
   const issuesClosedCount = raw.issues.totalCount;
 
-  // 7. Repos contributed to (with commits in the period)
-  const repoCommits = raw.repositories.nodes
+  // 7. Repos contributed to
+  // All repos with 1+ commits (used for topRepoShare — honest concentration)
+  const activeRepos = raw.repositories.nodes
     .map((r) => ({
       name: r.nameWithOwner,
       commits: r.defaultBranchRef?.target?.history?.totalCount ?? 0,
     }))
     .filter((r) => r.commits > 0);
-  const reposContributed = repoCommits.length;
 
-  // 8. Top repo share
-  const totalRepoCommits = repoCommits.reduce((s, r) => s + r.commits, 0);
+  // Only repos with >= REPO_DEPTH_THRESHOLD commits count toward reposContributed
+  // (anti-shallow-breadth: prevents gaming by single-commit drive-bys)
+  const reposContributed = activeRepos.filter(
+    (r) => r.commits >= REPO_DEPTH_THRESHOLD,
+  ).length;
+
+  // 8. Top repo share (uses ALL active repos for honest concentration measurement)
+  const totalRepoCommits = activeRepos.reduce((s, r) => s + r.commits, 0);
   const topRepoShare =
     totalRepoCommits > 0
-      ? Math.max(...repoCommits.map((r) => r.commits)) / totalRepoCommits
+      ? Math.max(...activeRepos.map((r) => r.commits)) / totalRepoCommits
       : 0;
 
   // 9. maxCommitsIn10Min approximation from daily spikes

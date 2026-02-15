@@ -23,32 +23,23 @@ vi.mock("../cache/redis", () => ({
 }));
 
 import { getStats, _resetInflight } from "./client";
+import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
+  return _makeStats({
     handle: "test-user",
-    commitsTotal: 50,
     activeDays: 20,
-    prsMergedCount: 5,
-    prsMergedWeight: 10,
     reviewsSubmittedCount: 8,
-    issuesClosedCount: 3,
     linesAdded: 1000,
-    linesDeleted: 500,
     reposContributed: 3,
     topRepoShare: 0.5,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
     heatmapData: [{ date: "2025-01-01", count: 5 }],
-    fetchedAt: new Date().toISOString(),
     ...overrides,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

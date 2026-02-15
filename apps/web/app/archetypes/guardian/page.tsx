@@ -40,6 +40,7 @@ export default function GuardianPage() {
             </div>
 
             {/* Badge */}
+            {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded archetype demo data — no user input reaches this point. See lib/render/escape.ts for escaping. */}
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
               role="img"
@@ -90,6 +91,24 @@ export default function GuardianPage() {
                 contribution is immensely valuable even if it produces no commits of its own.
               </p>
 
+              <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
+                Key signals
+              </h3>
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">PRIMARY</span>
+                  <span className="text-text-secondary text-sm">Code reviews submitted &mdash; time invested in others&apos; work.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SECONDARY</span>
+                  <span className="text-text-secondary text-sm">Review-to-PR ratio &mdash; how much review vs. own shipping.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
+                  <span className="text-text-secondary text-sm">Code hygiene &mdash; inverse of noisy micro-commit patterns.</span>
+                </div>
+              </div>
+
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 What a Guardian looks like in practice
               </h2>
@@ -120,13 +139,19 @@ export default function GuardianPage() {
               </p>
             </div>
 
-            {/* Back link */}
-            <div className="pt-4">
+            {/* Links */}
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-4">
               <Link
                 href="/#features"
                 className="font-heading text-sm text-amber hover:text-amber-light transition-colors"
               >
                 &larr; Back to features
+              </Link>
+              <Link
+                href="/about/scoring"
+                className="font-heading text-sm text-text-secondary hover:text-amber transition-colors"
+              >
+                Full scoring methodology &rarr;
               </Link>
             </div>
           </div>

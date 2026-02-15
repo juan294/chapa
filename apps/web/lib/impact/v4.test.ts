@@ -10,14 +10,15 @@ import {
   computeImpactV4,
 } from "./v4";
 import type { StatsData, DimensionScores } from "@chapa/shared";
+import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a StatsData with sensible defaults — override only what you need. */
+/** Zero-based StatsData — dimension tests need a blank slate to test signals in isolation. */
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
+  return _makeStats({
     handle: "test-user",
     commitsTotal: 0,
     activeDays: 0,
@@ -34,9 +35,8 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
     totalForks: 0,
     totalWatchers: 0,
     heatmapData: [],
-    fetchedAt: new Date().toISOString(),
     ...overrides,
-  };
+  });
 }
 
 /** Build a uniform 13-week heatmap with a given weekly total. */
@@ -154,8 +154,8 @@ describe("computeGuarding(stats)", () => {
   it("weights reviews at 60%", () => {
     const reviewOnly = makeStats({ reviewsSubmittedCount: 180 });
     const score = computeGuarding(reviewOnly);
-    // 60% from reviews, 0% from ratio (no PRs → ratio undefined → 0), 15% from inverse micro
-    // With no microCommitRatio data, inverse micro should give full points (no penalty)
+    // 60% from reviews, 25% from ratio (no PRs → pure reviewer → max ratio = 1),
+    // ~10.5% from inverse micro (default 0.3 → inverseMicro = 0.7 → 15% * 0.7)
     expect(score).toBeGreaterThanOrEqual(60);
   });
 
@@ -177,10 +177,25 @@ describe("computeGuarding(stats)", () => {
     expect(Number.isInteger(computeGuarding(stats))).toBe(true);
   });
 
-  it("handles missing microCommitRatio gracefully (treat as 0)", () => {
+  it("handles missing microCommitRatio with conservative default (0.3)", () => {
     const stats = makeStats({ reviewsSubmittedCount: 30 });
     const score = computeGuarding(stats);
     expect(score).toBeGreaterThan(0);
+
+    // With microCommitRatio=0.3, inverseMicro=0.7 → 15% * 0.7 = 10.5% contribution
+    // With microCommitRatio=0 (explicit), inverseMicro=1.0 → 15% * 1.0 = 15% contribution
+    const explicitZero = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0 });
+    expect(computeGuarding(explicitZero)).toBeGreaterThan(score);
+  });
+
+  it("scores lower with unknown microCommitRatio than with explicit 0", () => {
+    // This validates the anti-gaming default: unknown → 0.3 (no free points)
+    const unknown = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30 });
+    const clean = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30, microCommitRatio: 0 });
+    const scoreDiff = computeGuarding(clean) - computeGuarding(unknown);
+    // ~4.5 point difference (15% * 0.3 * 100)
+    expect(scoreDiff).toBeGreaterThanOrEqual(3);
+    expect(scoreDiff).toBeLessThanOrEqual(6);
   });
 
   it("is bounded 0-100", () => {

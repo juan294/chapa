@@ -120,6 +120,52 @@ describe("Landing page — footer internal links (#307)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// How It Works — Scoring overview
+// ---------------------------------------------------------------------------
+
+describe("Landing page — scoring overview in How It Works section", () => {
+  it("contains a DIMENSIONS data array with all four dimensions", () => {
+    expect(SOURCE).toContain('"BUILDING"');
+    expect(SOURCE).toContain('"GUARDING"');
+    expect(SOURCE).toContain('"CONSISTENCY"');
+    expect(SOURCE).toContain('"BREADTH"');
+  });
+
+  it("renders the DIMENSIONS array inside the How It Works section", () => {
+    const howItWorksIndex = SOURCE.indexOf('id="how-it-works"');
+    const enterpriseIndex = SOURCE.indexOf('id="enterprise"');
+    expect(howItWorksIndex).toBeGreaterThan(-1);
+
+    const section = SOURCE.slice(howItWorksIndex, enterpriseIndex);
+    expect(section).toContain("DIMENSIONS.map");
+    expect(section).toContain("What we measure");
+  });
+
+  it("includes a link to the full scoring methodology page", () => {
+    expect(SOURCE).toMatch(/href="\/about\/scoring"/);
+  });
+
+  it("mentions archetypes with links in the scoring overview", () => {
+    const howItWorksIndex = SOURCE.indexOf('id="how-it-works"');
+    const enterpriseIndex = SOURCE.indexOf('id="enterprise"');
+    const section = SOURCE.slice(howItWorksIndex, enterpriseIndex);
+    expect(section).toContain("/archetypes/builder");
+    expect(section).toContain("/archetypes/guardian");
+  });
+
+  it("has the scoring methodology link in the footer", () => {
+    const footerMatch = SOURCE.match(/<footer[\s\S]*?<\/footer>/);
+    expect(footerMatch).not.toBeNull();
+    const footer = footerMatch![0];
+    expect(footer).toMatch(/<Link\s[^>]*href="\/about\/scoring"/);
+  });
+
+  it("step 03 mentions the share page scoring breakdown", () => {
+    expect(SOURCE).toContain("scoring breakdown");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Issue #301 — History exports JSDoc documentation
 // ---------------------------------------------------------------------------
 

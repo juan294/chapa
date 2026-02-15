@@ -180,6 +180,7 @@ export default function HeatmapWavePage() {
       </div>
 
       {/* Global keyframes injected via style tag */}
+      {/* SAFETY: CSS-only string literal with no user input — used for @keyframes that cannot be expressed in Tailwind. */}
       <style
         dangerouslySetInnerHTML={{
           __html: `

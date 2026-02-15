@@ -55,7 +55,7 @@ Evaluation order: Emerging → Balanced → specific archetypes (by tie-breaking
 ## Composite Score & Tiers
 
 - `compositeScore = round(avg(building, guarding, consistency, breadth))`
-- Confidence system unchanged from v3 (same 6 penalty flags, same 50-100 range)
+- Confidence: 8 penalty flags, range 50-100 (see Anti-Gaming Hardening below)
 - `adjustedComposite = compositeScore × (0.85 + 0.15 × confidence/100)`
 - Tiers: Emerging (0-39), Solid (40-69), High (70-84), Elite (85-100)
 
@@ -64,3 +64,65 @@ Evaluation order: Emerging → Balanced → specific archetypes (by tie-breaking
 Reuses v3 log-normalization: `f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)`
 
 Applied to: commits, PRs, reviews, issues. Streak, repos, and other ratios use linear normalization.
+
+## Anti-Gaming Hardening
+
+Five surgical fixes to close the worst gaming vectors without redesigning the formula. All backward-compatible with cached `StatsData` objects.
+
+### 1. PR size multiplier (anti-trivial-PR spam)
+
+The PR weight formula now includes a size multiplier that ramps 0→1 as `totalChanges` grows from 0→10:
+
+```
+totalChanges = changedFiles + additions + deletions
+sizeMultiplier = min(1, totalChanges / 10)
+weight = rawWeight * sizeMultiplier
+```
+
+- Empty PRs (0 files, 0 lines) → weight 0 (was 0.5)
+- Normal PRs (10+ total changes) → unaffected (multiplier = 1.0)
+- Prevents inflating Building score by spamming trivial/empty PRs
+
+Implementation: `packages/shared/src/scoring.ts`
+
+### 2. Repo depth threshold (anti-shallow-breadth)
+
+Only repos with >= `REPO_DEPTH_THRESHOLD` (3) commits count toward `reposContributed`. This prevents gaming Breadth by making single-commit drive-by contributions across many repos.
+
+- `topRepoShare` still uses ALL active repos (1+ commits) for honest concentration measurement
+- Constant defined in `packages/shared/src/constants.ts`
+
+Implementation: `packages/shared/src/stats-aggregation.ts`
+
+### 3. Unknown microCommitRatio default (no free points)
+
+When `microCommitRatio` is `undefined` (the common case — data not available), the default is now `0.3` instead of `0`. This means `inverseMicro = 0.7` instead of `1.0`, costing ~4.5 Guarding points for profiles without this data. Profiles with an explicitly measured `microCommitRatio` of 0 still get full inverseMicro.
+
+Implementation: `apps/web/lib/impact/v4.ts` (line 54)
+
+### 4. Confidence penalty: low_activity_signal (-10)
+
+Triggers when `activeDays < 30 AND commitsTotal < 50`. Catches thin-signal profiles that somehow score high through concentration in a few metrics.
+
+Reason: "Very limited activity in this period reduces the signal available for scoring."
+
+### 5. Confidence penalty: review_volume_imbalance (-10)
+
+Triggers when `reviewsSubmittedCount >= 50 AND prsMergedCount < 3`. Catches the pattern of submitting many reviews (e.g. rubber-stamp LGTMs) without shipping any code. Mutually exclusive with `low_collaboration_signal` (which requires reviews ≤ 1).
+
+Reason: "High review volume with very few merged changes reduces confidence in the activity mix."
+
+### Updated confidence penalties (8 flags)
+
+| Flag | Penalty | Trigger |
+|------|---------|---------|
+| `burst_activity` | -15 | `maxCommitsIn10Min >= 20` |
+| `micro_commit_pattern` | -10 | `microCommitRatio >= 0.6` |
+| `generated_change_pattern` | -15 | `totalLines >= 20000 AND reviews <= 2` (collaborative only) |
+| `low_collaboration_signal` | -10 | `prsMergedCount >= 10 AND reviews <= 1` (collaborative only) |
+| `single_repo_concentration` | -5 | `topRepoShare >= 0.95 AND repos <= 1` |
+| `supplemental_unverified` | -5 | `hasSupplementalData === true` |
+| `low_activity_signal` | -10 | `activeDays < 30 AND commitsTotal < 50` |
+| `review_volume_imbalance` | -10 | `reviews >= 50 AND prsMergedCount < 3` |
+
+Maximum simultaneous penalties: 7 (review_volume_imbalance and low_collaboration_signal are mutually exclusive). Floor: 50.

@@ -23,34 +23,37 @@ const NAV_LINKS = [
 const FEATURES = [
   {
     title: "FOUR DIMENSIONS",
-    description: "Building, Guarding, Consistency, Breadth — what kind of developer you are, not just how much code you write.",
+    description: "Commit counts reward volume, not impact. Chapa scores four dimensions — Building, Guarding, Consistency, Breadth — to show what kind of engineer you actually are.",
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<><Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — your radar shape reveals your strongest dimension and assigns an archetype that captures how you contribute.</>),
-  },
-  {
-    title: "CONFIDENCE RATING",
-    description: "Every badge includes a confidence score (50\u2013100) that reflects how much data backs the profile. Less activity means lower confidence \u2014 no false positives.",
+    description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
   },
   {
     title: "VERIFIED METRICS",
-    description: "Every badge carries an HMAC hash seal. Click it to cryptographically verify the scores haven\u2019t been tampered with.",
+    description: "Anyone can fake a screenshot. Chapa badges carry an HMAC seal \u2014 click it to cryptographically prove the scores are real.",
   },
   {
     title: "LIVING DOCUMENT",
-    description: "Your badge is a live image that re-renders from fresh GitHub data daily — embed it once and it keeps itself up to date.",
+    description: "Static badges go stale the day you make them. Your Chapa badge re-renders from fresh GitHub data daily \u2014 embed it once, it stays current.",
   },
   {
     title: "ONE-CLICK EMBED",
-    description: "Markdown or HTML, paste anywhere that renders images.",
+    description: "No build steps, no API keys. One line of Markdown or HTML, anywhere that renders images.",
   },
 ];
 
 const STEPS = [
   { number: "01", title: "Sign in with GitHub", description: "Secure OAuth over HTTPS \u2014 we only request read access to public data. No passwords stored, no private repos accessed." },
-  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity \u2014 4 dimensions, archetype, and composite score. The badge heatmap shows the last 90 days at a glance." },
-  { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere." },
+  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Building, Guarding, Consistency, and Breadth \u2014 plus archetype and composite score. The badge heatmap shows the last 90 days at a glance." },
+  { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere \u2014 and explore the full scoring breakdown on your share page." },
+];
+
+const DIMENSIONS = [
+  { title: "BUILDING", description: "Shipping meaningful changes \u2014 PRs merged, issues closed, code shipped." },
+  { title: "GUARDING", description: "Reviewing and quality gatekeeping \u2014 how much time you spend on others\u2019 code." },
+  { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
+  { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
 ];
 
 const STATS = [
@@ -137,10 +140,9 @@ export default async function Home({
                 <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> AI writes the code. What matters is how you drive impact.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Building, Guarding, Breadth, Consistency — four dimensions beyond commits and lines of code.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Built for the age of AI-assisted engineering.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Every score is cryptographically sealed. Verifiable, not just trusted.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the real story.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
+                <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Four dimensions. Cryptographically verified.</p>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
@@ -171,6 +173,7 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke">
               <div className="relative">
+                {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded demo data (DEMO_STATS, DEMO_IMPACT) — no user input reaches this point. See lib/render/escape.ts for escaping. */}
                 <div
                   className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
                   role="img"
@@ -264,6 +267,38 @@ export default async function Home({
                   </div>
                 </div>
               ))}
+
+              <div className="pt-4 space-y-4">
+                <h3 className="font-heading text-sm text-text-primary font-medium">
+                  What we measure
+                </h3>
+                <p className="text-text-secondary text-sm">
+                  Chapa scores four independent dimensions of your GitHub activity from the last 12 months. Your unique combination across these dimensions determines your developer archetype:{" "}
+                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
+                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>,{" "}
+                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
+                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
+                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>.
+                </p>
+                {DIMENSIONS.map((dim) => (
+                  <div key={dim.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                    <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                      {dim.title}
+                    </span>
+                    <span className="text-text-secondary text-sm">
+                      {dim.description}
+                    </span>
+                  </div>
+                ))}
+                <Link
+                  href="/about/scoring"
+                  className="inline-flex items-center gap-1 text-sm text-amber hover:text-amber-light transition-colors font-heading"
+                >
+                  Read the full scoring methodology
+                  <ArrowRightIcon className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
           </section>
 
@@ -424,6 +459,7 @@ export default async function Home({
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <Link href="/about" className="hover:text-amber transition-colors">About</Link>
+              <Link href="/about/scoring" className="hover:text-amber transition-colors">Scoring</Link>
               <Link href="/terms" className="hover:text-amber transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-amber transition-colors">Privacy</Link>
             </div>

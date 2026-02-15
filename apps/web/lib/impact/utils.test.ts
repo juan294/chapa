@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import type { StatsData } from "@chapa/shared";
 import {
   normalize,
   clampScore,
@@ -7,33 +6,7 @@ import {
   computeAdjustedScore,
   getTier,
 } from "./utils";
-
-// ---------------------------------------------------------------------------
-// Helper: build a minimal StatsData with sane defaults (no penalties triggered)
-// ---------------------------------------------------------------------------
-
-function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
-    handle: "test-user",
-    commitsTotal: 50,
-    activeDays: 30,
-    prsMergedCount: 5,
-    prsMergedWeight: 10,
-    reviewsSubmittedCount: 10,
-    issuesClosedCount: 3,
-    linesAdded: 2000,
-    linesDeleted: 500,
-    reposContributed: 4,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
-    heatmapData: [],
-    fetchedAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
+import { makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // normalize(x, cap)
@@ -314,8 +287,95 @@ describe("computeConfidence", () => {
     });
   });
 
+  // --- low_activity_signal ---
+  describe("low_activity_signal flag", () => {
+    it("applies -10 when activeDays < 30 AND commitsTotal < 50", () => {
+      const { confidence, penalties } = computeConfidence(
+        makeStats({ activeDays: 20, commitsTotal: 30 }),
+      );
+      expect(confidence).toBe(90);
+      expect(penalties).toHaveLength(1);
+      expect(penalties[0]!.flag).toBe("low_activity_signal");
+      expect(penalties[0]!.penalty).toBe(10);
+    });
+
+    it("does NOT apply when activeDays >= 30", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ activeDays: 30, commitsTotal: 10 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_activity_signal"),
+      ).toBeUndefined();
+    });
+
+    it("does NOT apply when commitsTotal >= 50", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ activeDays: 10, commitsTotal: 50 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_activity_signal"),
+      ).toBeUndefined();
+    });
+
+    it("applies at boundary: activeDays=29, commitsTotal=49", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ activeDays: 29, commitsTotal: 49 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_activity_signal"),
+      ).toBeDefined();
+    });
+  });
+
+  // --- review_volume_imbalance ---
+  describe("review_volume_imbalance flag", () => {
+    it("applies -10 when reviews >= 50 AND prsMergedCount < 3", () => {
+      const { confidence, penalties } = computeConfidence(
+        makeStats({ reviewsSubmittedCount: 50, prsMergedCount: 2 }),
+      );
+      expect(confidence).toBe(90);
+      expect(penalties).toHaveLength(1);
+      expect(penalties[0]!.flag).toBe("review_volume_imbalance");
+      expect(penalties[0]!.penalty).toBe(10);
+    });
+
+    it("does NOT apply when reviews < 50", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ reviewsSubmittedCount: 49, prsMergedCount: 0 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "review_volume_imbalance"),
+      ).toBeUndefined();
+    });
+
+    it("does NOT apply when prsMergedCount >= 3", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 3 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "review_volume_imbalance"),
+      ).toBeUndefined();
+    });
+
+    it("is mutually exclusive with low_collaboration_signal", () => {
+      // review_volume_imbalance requires reviews >= 50
+      // low_collaboration_signal requires reviews <= 1
+      // These cannot both be true simultaneously
+      const { penalties } = computeConfidence(
+        makeStats({ reviewsSubmittedCount: 50, prsMergedCount: 0 }),
+      );
+      const hasReviewImbalance = penalties.some(
+        (p) => p.flag === "review_volume_imbalance",
+      );
+      const hasLowCollab = penalties.some(
+        (p) => p.flag === "low_collaboration_signal",
+      );
+      expect(hasReviewImbalance && hasLowCollab).toBe(false);
+    });
+  });
+
   // --- all penalties stacked -> clamp to 50 ---
-  it("clamps confidence to 50 when all penalties fire", () => {
+  it("clamps confidence to 50 when maximum penalties fire (7 simultaneous)", () => {
     const { confidence, penalties } = computeConfidence(
       makeStats({
         maxCommitsIn10Min: 30, // burst_activity: -15
@@ -327,12 +387,15 @@ describe("computeConfidence", () => {
         topRepoShare: 1.0, // single_repo_concentration: -5
         reposContributed: 1, //   (repos <= 1)
         hasSupplementalData: true, // supplemental_unverified: -5
+        activeDays: 10, // low_activity_signal: -10
+        commitsTotal: 20, //   (activeDays < 30 AND commits < 50)
       }),
     );
-    // Total penalties: 15 + 10 + 15 + 10 + 5 + 5 = 60
-    // 100 - 60 = 40, clamped to 50
+    // Total penalties: 15 + 10 + 15 + 10 + 5 + 5 + 10 = 70
+    // 100 - 70 = 30, clamped to 50
+    // Note: review_volume_imbalance cannot fire here (reviews=0 < 50)
     expect(confidence).toBe(50);
-    expect(penalties).toHaveLength(6);
+    expect(penalties).toHaveLength(7);
   });
 
   it("includes reason strings on all penalties", () => {

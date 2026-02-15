@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { isStudioEnabled } from "@/lib/feature-flags";
+import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 
 interface UserMenuProps {
   login: string;
@@ -13,63 +14,9 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
-  const [open, setOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close on click outside
-  useEffect(() => {
-    if (!open) return;
-    function handleMouseDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
-
-  // Arrow key navigation for menu items (W9)
-  useEffect(() => {
-    if (!open || !menuRef.current) return;
-    function handleMenuKeyDown(e: KeyboardEvent) {
-      const items = Array.from(
-        menuRef.current?.querySelectorAll('[role="menuitem"]') ?? [],
-      ) as HTMLElement[];
-      if (items.length === 0) return;
-      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
-
-      let nextIndex = -1;
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        nextIndex = (currentIndex + 1) % items.length;
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        nextIndex = (currentIndex - 1 + items.length) % items.length;
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        nextIndex = 0;
-      } else if (e.key === "End") {
-        e.preventDefault();
-        nextIndex = items.length - 1;
-      }
-      if (nextIndex >= 0) {
-        items[nextIndex]!.focus();
-      }
-    }
-    document.addEventListener("keydown", handleMenuKeyDown);
-    return () => document.removeEventListener("keydown", handleMenuKeyDown);
-  }, [open]);
+  const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
 
   const fallbackLetter = login.charAt(0).toUpperCase();
 

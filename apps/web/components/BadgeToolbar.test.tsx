@@ -81,13 +81,23 @@ describe("BadgeToolbar", () => {
     });
   });
 
-  describe("click-outside handling", () => {
-    it("uses useRef for dropdown", () => {
+  describe("dropdown behavior (via useDropdownMenu hook)", () => {
+    it("uses useRef for dropdown container", () => {
       expect(SOURCE).toContain("useRef");
     });
 
-    it("adds mousedown event listener", () => {
-      expect(SOURCE).toContain("mousedown");
+    it("uses the shared useDropdownMenu hook", () => {
+      expect(SOURCE).toContain("useDropdownMenu");
+    });
+
+    it("imports useDropdownMenu from hooks", () => {
+      expect(SOURCE).toContain('@/hooks/useDropdownMenu');
+    });
+  });
+
+  describe("a11y: share button aria-label (#335)", () => {
+    it("has aria-label on the share dropdown button", () => {
+      expect(SOURCE).toContain('aria-label="Share badge"');
     });
   });
 
@@ -104,33 +114,16 @@ describe("BadgeToolbar", () => {
   });
 
   describe("arrow key navigation for share dropdown (#236)", () => {
-    it("handles ArrowDown key in share dropdown", () => {
-      expect(SOURCE).toContain("ArrowDown");
+    it("delegates keyboard navigation to useDropdownMenu hook", () => {
+      // Arrow key, Escape, and click-outside behavior is now handled by
+      // the shared useDropdownMenu hook (tested in hooks/useDropdownMenu.test.ts).
+      // This test verifies the component uses the hook.
+      expect(SOURCE).toContain("useDropdownMenu");
+      expect(SOURCE).toContain("shareRef");
     });
 
-    it("handles ArrowUp key in share dropdown", () => {
-      expect(SOURCE).toContain("ArrowUp");
-    });
-
-    it("handles Home key in share dropdown", () => {
-      expect(SOURCE).toContain('"Home"');
-    });
-
-    it("handles End key in share dropdown", () => {
-      expect(SOURCE).toContain('"End"');
-    });
-
-    it("handles Escape key to close share dropdown", () => {
-      expect(SOURCE).toContain('"Escape"');
-    });
-
-    it("queries menuitem elements for arrow key navigation", () => {
+    it("menu items have role=menuitem for hook-based arrow navigation", () => {
       expect(SOURCE).toContain('role="menuitem"');
-      expect(SOURCE).toContain("querySelectorAll");
-    });
-
-    it("focuses menu items on arrow key navigation", () => {
-      expect(SOURCE).toContain(".focus()");
     });
   });
 });

@@ -5,3 +5,7 @@ export function isStudioEnabled(): boolean {
 export function isScoringPageEnabled(): boolean {
   return process.env.NEXT_PUBLIC_SCORING_PAGE_ENABLED?.trim() === "true";
 }
+
+export function isExperimentsEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED?.trim() === "true";
+}

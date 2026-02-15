@@ -31,6 +31,7 @@ import {
   fetchReceivedEmail,
   forwardEmail,
   escapeHtml,
+  sanitizeHtml,
   _resetClient,
 } from "./resend";
 
@@ -245,6 +246,78 @@ describe("escapeHtml", () => {
 });
 
 // ---------------------------------------------------------------------------
+// sanitizeHtml
+// ---------------------------------------------------------------------------
+
+describe("sanitizeHtml", () => {
+  it("strips script tags and their contents", () => {
+    const input = '<p>Hello</p><script>alert("xss")</script><p>World</p>';
+    expect(sanitizeHtml(input)).toBe("<p>Hello</p><p>World</p>");
+  });
+
+  it("strips script tags case-insensitively", () => {
+    const input = '<SCRIPT>alert(1)</SCRIPT>';
+    expect(sanitizeHtml(input)).toBe("");
+  });
+
+  it("strips multiline script blocks", () => {
+    const input = '<script>\nconsole.log("evil");\nalert(1);\n</script>';
+    expect(sanitizeHtml(input)).toBe("");
+  });
+
+  it("removes inline event handlers with double quotes", () => {
+    const input = '<img src="pic.jpg" onerror="alert(1)" />';
+    expect(sanitizeHtml(input)).toBe('<img src="pic.jpg" />');
+  });
+
+  it("removes inline event handlers with single quotes", () => {
+    const input = "<div onclick='steal()'>click</div>";
+    expect(sanitizeHtml(input)).toBe("<div>click</div>");
+  });
+
+  it("removes inline event handlers without quotes", () => {
+    const input = "<body onload=init()>";
+    expect(sanitizeHtml(input)).toBe("<body>");
+  });
+
+  it("removes various event handler types", () => {
+    const input = '<a onmouseover="track()" onfocus="hijack()">link</a>';
+    const result = sanitizeHtml(input);
+    expect(result).not.toContain("onmouseover");
+    expect(result).not.toContain("onfocus");
+    expect(result).toContain("link</a>");
+  });
+
+  it("neutralizes javascript: URLs in href", () => {
+    const input = '<a href="javascript:alert(1)">click</a>';
+    expect(sanitizeHtml(input)).toBe('<a href="#">click</a>');
+  });
+
+  it("neutralizes javascript: URLs with single quotes", () => {
+    const input = "<a href='javascript:void(0)'>link</a>";
+    expect(sanitizeHtml(input)).toBe('<a href="#">link</a>');
+  });
+
+  it("preserves safe HTML content", () => {
+    const input = '<p>Hello <strong>World</strong></p><a href="https://example.com">link</a>';
+    expect(sanitizeHtml(input)).toBe(input);
+  });
+
+  it("returns empty string unchanged", () => {
+    expect(sanitizeHtml("")).toBe("");
+  });
+
+  it("handles combined attack vectors", () => {
+    const input = '<div onclick="steal()"><script>exfiltrate()</script><a href="javascript:void(0)">click</a></div>';
+    const result = sanitizeHtml(input);
+    expect(result).not.toContain("script");
+    expect(result).not.toContain("onclick");
+    expect(result).not.toContain("javascript:");
+    expect(result).toContain("click</a>");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // forwardEmail
 // ---------------------------------------------------------------------------
 
@@ -342,6 +415,24 @@ describe("forwardEmail", () => {
     expect(call.html).toContain("alice@example.com");
     expect(call.html).toContain("Question");
     expect(call.html).toContain("<p>Original message</p>");
+  });
+
+  it("sanitizes HTML body to strip scripts and event handlers", async () => {
+    mockSend.mockResolvedValueOnce({ data: { id: "fwd_san" }, error: null });
+
+    await forwardEmail({
+      from: "attacker@example.com",
+      subject: "Innocent email",
+      html: '<p>Hello</p><script>steal()</script><img onerror="alert(1)" src="x"><a href="javascript:void(0)">link</a>',
+      text: "Hello",
+    });
+
+    const call = mockSend.mock.calls[0]![0];
+    expect(call.html).not.toContain("<script>");
+    expect(call.html).not.toContain("onerror");
+    expect(call.html).not.toContain("javascript:");
+    expect(call.html).toContain("<p>Hello</p>");
+    expect(call.html).toContain("link</a>");
   });
 
   it("escapes HTML entities in from and subject fields", async () => {

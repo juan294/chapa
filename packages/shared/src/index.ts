@@ -10,6 +10,8 @@ export type {
   DeveloperArchetype,
   ImpactV4Result,
   SupplementalStats,
+  SnapshotPenalty,
+  MetricsSnapshot,
   BadgeBackground,
   BadgeCardStyle,
   BadgeBorder,
@@ -32,4 +34,5 @@ export {
   BADGE_HEATMAP_WEEKS,
   PR_WEIGHT_AGG_CAP,
   SCORING_CAPS,
+  REPO_DEPTH_THRESHOLD,
 } from "./constants";

@@ -16,7 +16,17 @@ import { Webhook } from "svix";
 // HTML escaping for email templates
 // ---------------------------------------------------------------------------
 
-/** Escape HTML entities in user-controlled strings before embedding in HTML. */
+/**
+ * Escape HTML entities in user-controlled strings before embedding in HTML email.
+ *
+ * NOTE: This is intentionally separate from `escapeXml` in `lib/render/escape.ts`.
+ * The two functions differ in single-quote escaping:
+ *   - escapeHtml uses `&#39;`  — the numeric reference, universally safe in HTML
+ *     (including HTML4 email clients).
+ *   - escapeXml uses `&apos;` — the named entity correct for XML/SVG, but NOT
+ *     defined in HTML4 and potentially broken in older email renderers.
+ * Consolidating these would risk breaking email rendering or SVG validity.
+ */
 export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -24,6 +34,25 @@ export function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/'/g, "&#39;")
     .replace(/"/g, "&quot;");
+}
+
+// ---------------------------------------------------------------------------
+// HTML sanitization for forwarded email bodies
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip dangerous HTML constructs from an email body before forwarding.
+ * Removes `<script>` blocks, inline event handlers (onclick, onerror, ...),
+ * and `javascript:` URLs in href attributes.
+ *
+ * This is a defense-in-depth measure — the forwarded email is rendered in
+ * a mail client, but we still strip known XSS vectors to be safe.
+ */
+export function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"');
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +207,7 @@ export async function forwardEmail(
     `From: ${safeFrom}<br/>`,
     `Subject: ${safeSubject}`,
     `</div>`,
-    params.html,
+    sanitizeHtml(params.html),
   ].join("\n");
 
   const forwardedText = [

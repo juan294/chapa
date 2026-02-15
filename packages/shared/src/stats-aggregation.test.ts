@@ -243,22 +243,55 @@ describe("buildStatsFromRaw", () => {
 
   // --- Repositories ---
 
-  it("counts repos with commits > 0 as reposContributed", () => {
+  it("counts repos with >= 3 commits as reposContributed (depth threshold)", () => {
     const raw = makeRaw({
       repositories: {
-        totalCount: 3,
+        totalCount: 4,
         nodes: [
           { nameWithOwner: "u/a", defaultBranchRef: { target: { history: { totalCount: 10 } } } },
-          { nameWithOwner: "u/b", defaultBranchRef: { target: { history: { totalCount: 0 } } } },
-          { nameWithOwner: "u/c", defaultBranchRef: null },
+          { nameWithOwner: "u/b", defaultBranchRef: { target: { history: { totalCount: 2 } } } }, // below threshold
+          { nameWithOwner: "u/c", defaultBranchRef: { target: { history: { totalCount: 0 } } } },
+          { nameWithOwner: "u/d", defaultBranchRef: null },
         ],
       },
     });
     const result = buildStatsFromRaw(raw);
-    expect(result.reposContributed).toBe(1);
+    expect(result.reposContributed).toBe(1); // only u/a has >= 3 commits
   });
 
-  it("computes topRepoShare as proportion of top repo commits", () => {
+  it("counts repos at exactly the depth threshold boundary (3 commits)", () => {
+    const raw = makeRaw({
+      repositories: {
+        totalCount: 3,
+        nodes: [
+          { nameWithOwner: "u/a", defaultBranchRef: { target: { history: { totalCount: 3 } } } },
+          { nameWithOwner: "u/b", defaultBranchRef: { target: { history: { totalCount: 2 } } } },
+          { nameWithOwner: "u/c", defaultBranchRef: { target: { history: { totalCount: 1 } } } },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.reposContributed).toBe(1); // only u/a meets threshold
+  });
+
+  it("excludes shallow repos from reposContributed but includes them in topRepoShare", () => {
+    const raw = makeRaw({
+      repositories: {
+        totalCount: 3,
+        nodes: [
+          { nameWithOwner: "u/main", defaultBranchRef: { target: { history: { totalCount: 50 } } } },
+          { nameWithOwner: "u/shallow1", defaultBranchRef: { target: { history: { totalCount: 1 } } } },
+          { nameWithOwner: "u/shallow2", defaultBranchRef: { target: { history: { totalCount: 2 } } } },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.reposContributed).toBe(1); // only u/main meets threshold
+    // topRepoShare uses ALL active repos (1+ commits): 50/(50+1+2) = 50/53
+    expect(result.topRepoShare).toBeCloseTo(50 / 53, 2);
+  });
+
+  it("computes topRepoShare as proportion of top repo commits (all active repos)", () => {
     const raw = makeRaw({
       repositories: {
         totalCount: 2,

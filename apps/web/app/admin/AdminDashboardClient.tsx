@@ -625,6 +625,7 @@ export function AdminDashboardClient() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center rounded-md p-1 text-text-secondary hover:text-amber hover:bg-amber/[0.06] transition-colors"
+                        aria-label={`View badge SVG for ${user.handle}`}
                         title="View badge SVG"
                       >
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
