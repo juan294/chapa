@@ -1,3 +1,4 @@
+import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Navbar } from "@/components/Navbar";
@@ -169,12 +170,15 @@ export default async function Home({
               <span className="text-text-secondary">chapa preview @developer</span>
             </div>
             <div className="pl-4 border-l border-stroke">
-              <div
-                className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
-                role="img"
-                aria-label="Example Chapa developer impact badge"
-                dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
-              />
+              <div className="relative">
+                <div
+                  className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
+                  role="img"
+                  aria-label="Example Chapa developer impact badge"
+                  dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
+                />
+                <BadgeOverlay />
+              </div>
             </div>
           </section>
 

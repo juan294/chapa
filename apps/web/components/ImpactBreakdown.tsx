@@ -1,5 +1,6 @@
 import type { ImpactV4Result, DeveloperArchetype, StatsData } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
+import { InfoTooltip } from "./InfoTooltip";
 
 const DIMENSION_LABELS: Record<string, string> = {
   building: "Building",
@@ -22,6 +23,36 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   breadth: { from: "var(--color-dimension-breadth)", to: "var(--color-dimension-breadth-light)" },
 };
 
+
+const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
+  building: {
+    id: "dim-building",
+    tip: "Measures shipping output: PRs merged, issues closed, and commits. High score = consistently turning ideas into merged code.",
+  },
+  guarding: {
+    id: "dim-guarding",
+    tip: "Measures code review impact: reviews submitted and review quality. High score = actively protecting code quality.",
+  },
+  consistency: {
+    id: "dim-consistency",
+    tip: "Measures contribution steadiness: active days and even distribution across weeks. High score = reliable, sustained output.",
+  },
+  breadth: {
+    id: "dim-breadth",
+    tip: "Measures cross-project reach: repos contributed to, project diversity, and community metrics (stars, forks, watchers).",
+  },
+};
+
+const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
+  Stars: { id: "stat-stars", tip: "Stars received on your repos \u2014 not repos you\u2019ve starred yourself." },
+  Forks: { id: "stat-forks", tip: "Times other developers forked your repositories." },
+  Watchers: { id: "stat-watchers", tip: "People watching your repos for activity notifications." },
+  "Active Days": { id: "stat-active-days", tip: "Unique days with at least one contribution in the last 365 days." },
+  Commits: { id: "stat-commits", tip: "Commits pushed across all repos in the last 365 days." },
+  "PRs Merged": { id: "stat-prs-merged", tip: "Pull requests you authored that were merged in the last 365 days." },
+  Reviews: { id: "stat-reviews", tip: "Code reviews submitted on others\u2019 PRs in the last 365 days." },
+  Repos: { id: "stat-repos", tip: "Distinct repositories you contributed to in the last 365 days." },
+};
 
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
   Builder:
@@ -89,8 +120,12 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                 style={{ animationDelay: `${400 + i * 100}ms` }}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <span className="text-xs text-text-secondary uppercase tracking-wider">
+                  <span className="text-xs text-text-secondary uppercase tracking-wider flex items-center gap-1">
                     {DIMENSION_LABELS[key]}
+                    <InfoTooltip
+                      id={DIMENSION_TOOLTIPS[key]!.id}
+                      content={DIMENSION_TOOLTIPS[key]!.tip}
+                    />
                   </span>
                   <span className="font-heading text-3xl font-extrabold text-text-primary leading-none">
                     {dims[key]}
@@ -144,8 +179,14 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
               <div className="font-heading text-2xl font-extrabold text-text-primary leading-none">
                 {formatCompact(stat.value)}
               </div>
-              <div className="text-xs text-text-secondary uppercase tracking-wider mt-1.5">
+              <div className="text-xs text-text-secondary uppercase tracking-wider mt-1.5 flex items-center justify-center gap-1">
                 {stat.label}
+                {STAT_TOOLTIPS[stat.label] && (
+                  <InfoTooltip
+                    id={STAT_TOOLTIPS[stat.label]!.id}
+                    content={STAT_TOOLTIPS[stat.label]!.tip}
+                  />
+                )}
               </div>
             </div>
           ))}

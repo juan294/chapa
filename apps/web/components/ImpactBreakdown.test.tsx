@@ -90,6 +90,35 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // Issue #281 — explanatory tooltips for badge elements
+  describe("info tooltips (#281)", () => {
+    it("imports InfoTooltip component", () => {
+      expect(SOURCE).toContain("InfoTooltip");
+    });
+
+    it("has tooltip IDs for all four dimensions", () => {
+      expect(SOURCE).toContain('"dim-building"');
+      expect(SOURCE).toContain('"dim-guarding"');
+      expect(SOURCE).toContain('"dim-consistency"');
+      expect(SOURCE).toContain('"dim-breadth"');
+    });
+
+    it("has tooltip IDs for all stats", () => {
+      expect(SOURCE).toContain('"stat-stars"');
+      expect(SOURCE).toContain('"stat-forks"');
+      expect(SOURCE).toContain('"stat-watchers"');
+      expect(SOURCE).toContain('"stat-active-days"');
+      expect(SOURCE).toContain('"stat-commits"');
+      expect(SOURCE).toContain('"stat-prs-merged"');
+      expect(SOURCE).toContain('"stat-reviews"');
+      expect(SOURCE).toContain('"stat-repos"');
+    });
+
+    it("does not add 'use client' directive (server component preserved)", () => {
+      expect(SOURCE).not.toMatch(/^["']use client["']/m);
+    });
+  });
+
   describe("design system tokens (#233)", () => {
     it("uses CSS variables for dimension colors, not hardcoded hex", () => {
       expect(SOURCE).toContain("var(--color-dimension-building)");
