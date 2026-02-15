@@ -228,8 +228,16 @@ export function AdminDashboardClient() {
   // Listen for /sort command from GlobalCommandBar
   useEffect(() => {
     const handler = (e: Event) => {
-      const field = (e as CustomEvent).detail?.field as SortField | undefined;
-      if (field) handleSort(field);
+      const detail = (e as CustomEvent).detail;
+      const field = detail?.field as SortField | undefined;
+      const dir = detail?.dir as SortDir | undefined;
+      if (!field) return;
+      if (dir) {
+        setSortField(field);
+        setSortDir(dir);
+      } else {
+        handleSort(field);
+      }
     };
     window.addEventListener("chapa:admin-sort", handler);
     return () => window.removeEventListener("chapa:admin-sort", handler);

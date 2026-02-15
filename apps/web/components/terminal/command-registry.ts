@@ -105,13 +105,13 @@ export function createAdminCommands(): CommandDef[] {
     {
       name: "/sort",
       description: "Sort table by field",
-      usage: "/sort <field>",
+      usage: "/sort <field> [asc|desc]",
       execute: (args) => {
         if (args.length === 0) {
           const fields = Object.keys(SORT_FIELD_ALIASES).join(", ");
           return {
             lines: [
-              makeLine("error", `Usage: /sort <field>`),
+              makeLine("error", `Usage: /sort <field> [asc|desc]`),
               makeLine("info", `Available fields: ${fields}`),
             ],
           };
@@ -127,9 +127,21 @@ export function createAdminCommands(): CommandDef[] {
             ],
           };
         }
+        const dirArg = args[1]?.toLowerCase();
+        if (dirArg && dirArg !== "asc" && dirArg !== "desc") {
+          return {
+            lines: [
+              makeLine("error", `Invalid direction: ${dirArg}`),
+              makeLine("info", `Use "asc" or "desc"`),
+            ],
+          };
+        }
+        const detail: Record<string, string> = { field };
+        if (dirArg) detail.dir = dirArg;
+        const label = dirArg ? `${alias} ${dirArg}` : alias;
         return {
-          lines: [makeLine("system", `Sorting by ${alias}...`)],
-          action: { type: "custom", event: "chapa:admin-sort", detail: { field } },
+          lines: [makeLine("system", `Sorting by ${label}...`)],
+          action: { type: "custom", event: "chapa:admin-sort", detail },
         };
       },
     },
@@ -169,7 +181,7 @@ export function createNavigationCommands(options?: {
           makeLine("system", "Admin:"),
           makeLine("info", "  /admin             Navigate to admin dashboard"),
           makeLine("info", "  /refresh           Refresh dashboard data"),
-          makeLine("info", "  /sort <field>      Sort table by field"),
+          makeLine("info", "  /sort <field> [asc|desc]  Sort table by field"),
         ]
       : []),
   ];

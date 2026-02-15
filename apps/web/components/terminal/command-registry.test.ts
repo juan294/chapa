@@ -379,6 +379,48 @@ describe("createAdminCommands", () => {
     expect(result.lines[0]!.type).toBe("error");
     expect(result.action).toBeUndefined();
   });
+
+  it("/sort score desc passes dir 'desc' in detail", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["score", "desc"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "adjustedComposite", dir: "desc" },
+    });
+  });
+
+  it("/sort stars asc passes dir 'asc' in detail", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["stars", "asc"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "totalStars", dir: "asc" },
+    });
+  });
+
+  it("/sort field without dir omits dir from detail (backwards compatible)", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["tier"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "tier" },
+    });
+  });
+
+  it("/sort field with invalid dir returns error", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["score", "sideways"]);
+    expect(result.lines[0]!.type).toBe("error");
+    expect(result.action).toBeUndefined();
+  });
+
+  it("/sort usage text mentions direction parameter", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    expect(cmd.usage).toContain("asc");
+  });
 });
 
 describe("createNavigationCommands (isAdmin)", () => {
