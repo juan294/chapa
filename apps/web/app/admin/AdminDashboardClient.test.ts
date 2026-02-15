@@ -48,6 +48,16 @@ describe("AdminDashboardClient", () => {
     });
   });
 
+  describe("a11y: badge link aria-label (#334)", () => {
+    it("uses aria-label on the badge SVG link", () => {
+      expect(SOURCE).toContain("aria-label={`View badge SVG for ${user.handle}`}");
+    });
+
+    it("keeps title for tooltip", () => {
+      expect(SOURCE).toContain('title="View badge SVG"');
+    });
+  });
+
   describe("a11y: refresh button (#306)", () => {
     it("uses aria-label instead of title on the refresh button", () => {
       // The refresh button should use aria-label for screen reader text,

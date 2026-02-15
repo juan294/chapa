@@ -179,6 +179,7 @@ export function BadgeToolbar({
           onClick={() => setShareOpen(!shareOpen)}
           aria-expanded={shareOpen}
           aria-haspopup="true"
+          aria-label="Share badge"
           className={btnClass}
         >
           <svg

@@ -95,6 +95,12 @@ describe("BadgeToolbar", () => {
     });
   });
 
+  describe("a11y: share button aria-label (#335)", () => {
+    it("has aria-label on the share dropdown button", () => {
+      expect(SOURCE).toContain('aria-label="Share badge"');
+    });
+  });
+
   describe("aria-busy loading states (#232)", () => {
     it("adds aria-busy to refresh button when loading", () => {
       expect(SOURCE).toContain("aria-busy");
