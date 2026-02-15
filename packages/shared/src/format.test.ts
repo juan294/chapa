@@ -24,6 +24,14 @@ describe("formatCompact", () => {
     expect(formatCompact(50000)).toBe("50k");
   });
 
+  it("whole-number thousands never contain a decimal point", () => {
+    // Regression for #315: both ternary branches were identical (dead logic).
+    // Verify the whole-number branch produces a clean integer string with no ".".
+    const result = formatCompact(5000);
+    expect(result).toBe("5k");
+    expect(result).not.toContain(".");
+  });
+
   it("formats millions with one decimal", () => {
     expect(formatCompact(1000000)).toBe("1M");
     expect(formatCompact(1500000)).toBe("1.5M");
@@ -32,6 +40,13 @@ describe("formatCompact", () => {
 
   it("drops .0 for even millions", () => {
     expect(formatCompact(3000000)).toBe("3M");
+  });
+
+  it("whole-number millions never contain a decimal point", () => {
+    // Regression for #315: same dead-ternary issue in the millions branch.
+    const result = formatCompact(7000000);
+    expect(result).toBe("7M");
+    expect(result).not.toContain(".");
   });
 
   it("handles negative values as 0", () => {
