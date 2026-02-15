@@ -91,6 +91,24 @@ export default function PolymathPage() {
                 values genuine diversity of contribution over raw popularity metrics.
               </p>
 
+              <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
+                Key signals
+              </h3>
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">PRIMARY</span>
+                  <span className="text-text-secondary text-sm">Repositories contributed to &mdash; how many different projects you touch.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SECONDARY</span>
+                  <span className="text-text-secondary text-sm">Distribution evenness &mdash; spreading work across repos, not concentrating it.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
+                  <span className="text-text-secondary text-sm">Community signals (stars, forks) and documentation contributions.</span>
+                </div>
+              </div>
+
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 What a Polymath looks like in practice
               </h2>
@@ -131,13 +149,19 @@ export default function PolymathPage() {
               </p>
             </div>
 
-            {/* Back link */}
-            <div className="pt-4">
+            {/* Links */}
+            <div className="pt-4 flex flex-wrap items-center gap-4">
               <Link
                 href="/#features"
                 className="font-heading text-sm text-amber hover:text-amber-light transition-colors"
               >
                 &larr; Back to features
+              </Link>
+              <Link
+                href="/about/scoring"
+                className="font-heading text-sm text-text-secondary hover:text-amber transition-colors"
+              >
+                Full scoring methodology &rarr;
               </Link>
             </div>
           </div>

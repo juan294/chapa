@@ -84,6 +84,20 @@ export default function BalancedPage() {
                 whose strength is precisely their lack of specialization.
               </p>
 
+              <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
+                Key signals
+              </h3>
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">REQUIREMENT</span>
+                  <span className="text-text-secondary text-sm">All four dimensions closely matched &mdash; no single spike or valley.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">REQUIREMENT</span>
+                  <span className="text-text-secondary text-sm">Collectively strong &mdash; high average across Building, Guarding, Consistency, and Breadth.</span>
+                </div>
+              </div>
+
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 What a Balanced developer looks like in practice
               </h2>
@@ -121,13 +135,19 @@ export default function BalancedPage() {
               </p>
             </div>
 
-            {/* Back link */}
-            <div className="pt-4">
+            {/* Links */}
+            <div className="pt-4 flex flex-wrap items-center gap-4">
               <Link
                 href="/#features"
                 className="font-heading text-sm text-amber hover:text-amber-light transition-colors"
               >
                 &larr; Back to features
+              </Link>
+              <Link
+                href="/about/scoring"
+                className="font-heading text-sm text-text-secondary hover:text-amber transition-colors"
+              >
+                Full scoring methodology &rarr;
               </Link>
             </div>
           </div>
