@@ -35,6 +35,15 @@ function getRedis(): Redis | null {
   return _redis;
 }
 
+/**
+ * Expose the raw Upstash Redis client for operations not covered by the
+ * convenience helpers (e.g. sorted set commands used by history storage).
+ * Returns `null` when Redis credentials are missing.
+ */
+export function getRawRedis(): Redis | null {
+  return getRedis();
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------

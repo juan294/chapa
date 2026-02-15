@@ -13,6 +13,29 @@ vi.mock("@/lib/github/client", () => ({
   getStats: vi.fn(),
 }));
 
+vi.mock("@/lib/impact/v4", () => ({
+  computeImpactV4: vi.fn(() => ({
+    handle: "mock",
+    profileType: "collaborative",
+    dimensions: { building: 50, guarding: 50, consistency: 50, breadth: 50 },
+    archetype: "Balanced",
+    compositeScore: 50,
+    confidence: 80,
+    confidencePenalties: [],
+    adjustedComposite: 40,
+    tier: "Solid",
+    computedAt: "2025-01-01T00:00:00.000Z",
+  })),
+}));
+
+vi.mock("@/lib/history/snapshot", () => ({
+  buildSnapshot: vi.fn(() => ({ date: "2025-01-01" })),
+}));
+
+vi.mock("@/lib/history/history", () => ({
+  recordSnapshot: vi.fn(() => Promise.resolve(true)),
+}));
+
 import { scanKeys } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { GET } from "./route";

@@ -38,6 +38,14 @@ vi.mock("@/lib/impact/v4", () => ({
   }),
 }));
 
+vi.mock("@/lib/history/snapshot", () => ({
+  buildSnapshot: vi.fn(() => ({ date: "2025-01-01" })),
+}));
+
+vi.mock("@/lib/history/history", () => ({
+  recordSnapshot: vi.fn(() => Promise.resolve(true)),
+}));
+
 import { readSessionCookie } from "@/lib/auth/github";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
