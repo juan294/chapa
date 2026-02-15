@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import type { StatsData } from "@chapa/shared";
 import {
   normalize,
   clampScore,
@@ -7,33 +6,7 @@ import {
   computeAdjustedScore,
   getTier,
 } from "./utils";
-
-// ---------------------------------------------------------------------------
-// Helper: build a minimal StatsData with sane defaults (no penalties triggered)
-// ---------------------------------------------------------------------------
-
-function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
-    handle: "test-user",
-    commitsTotal: 50,
-    activeDays: 30,
-    prsMergedCount: 5,
-    prsMergedWeight: 10,
-    reviewsSubmittedCount: 10,
-    issuesClosedCount: 3,
-    linesAdded: 2000,
-    linesDeleted: 500,
-    reposContributed: 4,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
-    heatmapData: [],
-    fetchedAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
+import { makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // normalize(x, cap)

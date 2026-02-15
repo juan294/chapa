@@ -1,38 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MetricsSnapshot } from "./types";
 import { compareSnapshots, explainDiff } from "./diff";
-
-function makeSnapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot {
-  return {
-    date: "2025-06-15",
-    capturedAt: "2025-06-15T14:30:00.000Z",
-    commitsTotal: 150,
-    prsMergedCount: 30,
-    prsMergedWeight: 45,
-    reviewsSubmittedCount: 20,
-    issuesClosedCount: 10,
-    reposContributed: 8,
-    activeDays: 200,
-    linesAdded: 5000,
-    linesDeleted: 2000,
-    totalStars: 100,
-    totalForks: 25,
-    totalWatchers: 50,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    building: 75,
-    guarding: 60,
-    consistency: 80,
-    breadth: 55,
-    archetype: "Builder",
-    profileType: "collaborative",
-    compositeScore: 67.5,
-    adjustedComposite: 60.75,
-    confidence: 90,
-    tier: "High",
-    ...overrides,
-  };
-}
+import { makeSnapshot } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // compareSnapshots

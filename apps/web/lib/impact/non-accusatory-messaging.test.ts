@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { StatsData, ConfidenceFlag } from "@chapa/shared";
+import type { ConfidenceFlag, StatsData } from "@chapa/shared";
 import { computeConfidence } from "./utils";
+import { makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
 // Accusatory language blocklist — words that must NEVER appear in penalty
@@ -82,31 +83,8 @@ const NEUTRAL_WORDS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Helper: trigger each penalty flag individually
+// Penalty trigger map — one entry per ConfidenceFlag
 // ---------------------------------------------------------------------------
-
-function makeStats(overrides: Partial<StatsData> = {}): StatsData {
-  return {
-    handle: "test-user",
-    commitsTotal: 50,
-    activeDays: 30,
-    prsMergedCount: 5,
-    prsMergedWeight: 10,
-    reviewsSubmittedCount: 10,
-    issuesClosedCount: 3,
-    linesAdded: 2000,
-    linesDeleted: 500,
-    reposContributed: 4,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
-    heatmapData: [],
-    fetchedAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
 
 const PENALTY_TRIGGERS: Record<ConfidenceFlag, Partial<StatsData>> = {
   burst_activity: { maxCommitsIn10Min: 25 },
