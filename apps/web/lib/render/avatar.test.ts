@@ -89,7 +89,7 @@ describe("fetchAvatarBase64", () => {
     expect(result).toMatch(/^data:image\/jpeg;base64,/);
   });
 
-  it("allows image/svg+xml content-type", async () => {
+  it("rejects image/svg+xml content-type (falls back to image/png)", async () => {
     const fakeBytes = new Uint8Array([60, 115, 118, 103]); // <svg
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(fakeBytes, {
@@ -99,7 +99,10 @@ describe("fetchAvatarBase64", () => {
     );
 
     const result = await fetchAvatarBase64("https://avatars.githubusercontent.com/u/svg");
-    expect(result).toMatch(/^data:image\/svg\+xml;base64,/);
+    // SVG should NOT be allowed — GitHub avatars are always PNG/JPEG.
+    // SVG in data URIs can execute scripts, so it must fall back to image/png.
+    expect(result).not.toMatch(/svg/);
+    expect(result).toMatch(/^data:image\/png;base64,/);
   });
 });
 
