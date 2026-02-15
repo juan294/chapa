@@ -156,9 +156,9 @@ function VerifiedCard({
 
       {/* Dimensions */}
       <div className="mb-6">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-text-secondary">
+        <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
           Dimensions
-        </p>
+        </h2>
         <div className="grid grid-cols-2 gap-2">
           {(
             Object.entries(record.dimensions) as [string, number][]
@@ -178,9 +178,9 @@ function VerifiedCard({
 
       {/* Key metrics */}
       <div className="mb-6">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-text-secondary">
+        <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
           Key Metrics
-        </p>
+        </h2>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
