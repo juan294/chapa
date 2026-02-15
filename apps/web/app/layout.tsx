@@ -76,6 +76,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-bg text-text-primary font-body antialiased">
+        {/* SAFETY: JSON-LD structured data from hardcoded constants — no user input. JSON.stringify escapes special characters. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

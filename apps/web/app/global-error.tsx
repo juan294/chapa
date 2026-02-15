@@ -1,3 +1,7 @@
+// This error boundary replaces the root layout (including Tailwind CSS).
+// CSS custom properties and utility classes are NOT available here.
+// Hardcoded hex values are intentional — this is the only way to style
+// this page since it renders outside the normal component tree.
 "use client";
 
 export default function GlobalError({
@@ -59,7 +63,7 @@ export default function GlobalError({
             <button
               onClick={reset}
               style={{
-                borderRadius: "9999px",
+                borderRadius: "8px",
                 border: "1px solid rgba(124, 106, 239, 0.3)",
                 backgroundColor: "rgba(124, 106, 239, 0.08)",
                 padding: "0.625rem 1.5rem",
@@ -75,7 +79,7 @@ export default function GlobalError({
             <a
               href="/"
               style={{
-                borderRadius: "9999px",
+                borderRadius: "8px",
                 border: "1px solid rgba(124, 106, 239, 0.10)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",

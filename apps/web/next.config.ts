@@ -31,6 +31,10 @@ function buildCsp(frameAncestors: string): string {
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "worker-src 'self' blob:",
+    // style-src 'unsafe-inline' is required for Next.js (injects inline styles for
+    // layout shift prevention) and for Tailwind v4 runtime theme switching via CSS
+    // custom properties. Accepted risk: inline style injection is low-severity
+    // compared to inline script injection, and our CSP blocks script-based XSS.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://avatars.githubusercontent.com",
     "font-src 'self' https://fonts.gstatic.com",

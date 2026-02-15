@@ -198,6 +198,9 @@ ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to acces
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
+
+VERCEL_ENV=                    # Auto-injected by Vercel (production/preview/development — do not set manually)
+ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer in next.config.ts (dev-only)
 ```
 
 ### Environment Variable Safety
