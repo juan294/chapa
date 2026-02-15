@@ -14,6 +14,7 @@ import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter"
 import { useInView } from "@/lib/effects/counters/use-in-view";
 import { tierPillClasses, SparkleDots, TIER_VISUALS_CSS } from "@/lib/effects/tier/TierVisuals";
 import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid";
+import { WARM_AMBER } from "@/lib/render/theme";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -184,14 +185,14 @@ export function BadgeContent({
                 <polygon
                   points={`70,${70 - (impact.dimensions.building / 100) * 55} ${70 + (impact.dimensions.guarding / 100) * 55},70 70,${70 + (impact.dimensions.consistency / 100) * 55} ${70 - (impact.dimensions.breadth / 100) * 55},70`}
                   fill="rgba(124,106,239,0.20)"
-                  stroke="#7C6AEF"
+                  stroke={WARM_AMBER.accent}
                   strokeWidth="1.5"
                 />
                 {/* Vertex dots */}
-                <circle cx="70" cy={70 - (impact.dimensions.building / 100) * 55} r="3" fill="#7C6AEF" />
-                <circle cx={70 + (impact.dimensions.guarding / 100) * 55} cy="70" r="3" fill="#7C6AEF" />
-                <circle cx="70" cy={70 + (impact.dimensions.consistency / 100) * 55} r="3" fill="#7C6AEF" />
-                <circle cx={70 - (impact.dimensions.breadth / 100) * 55} cy="70" r="3" fill="#7C6AEF" />
+                <circle cx="70" cy={70 - (impact.dimensions.building / 100) * 55} r="3" fill={WARM_AMBER.accent} />
+                <circle cx={70 + (impact.dimensions.guarding / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
+                <circle cx="70" cy={70 + (impact.dimensions.consistency / 100) * 55} r="3" fill={WARM_AMBER.accent} />
+                <circle cx={70 - (impact.dimensions.breadth / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
               </svg>
               {/* Axis labels */}
               <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Build</span>

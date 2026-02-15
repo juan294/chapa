@@ -193,6 +193,7 @@ NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, 
 NEXT_PUBLIC_SCORING_PAGE_ENABLED= # Set to "true" to enable the scoring methodology page (optional)
 
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
+ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
 ```
