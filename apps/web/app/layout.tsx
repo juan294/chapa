@@ -6,6 +6,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import PostHogProvider from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
+import { getBaseUrl } from "@/lib/env";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -21,9 +22,7 @@ const plusJakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
-  "https://chapa.thecreativetoken.com";
+const BASE_URL = getBaseUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),

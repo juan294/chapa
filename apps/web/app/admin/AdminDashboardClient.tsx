@@ -179,31 +179,39 @@ export function AdminDashboardClient() {
   const [sortField, setSortField] = useState<SortField>("adjustedComposite");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const fetchUsers = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setUsers(data.users ?? []);
+      setError(null);
+      setLastRefreshed(new Date());
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchUsers() {
-      try {
-        const res = await fetch("/api/admin/users");
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          throw new Error(body?.error ?? `HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        if (!cancelled) {
-          setUsers(data.users ?? []);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError((err as Error).message);
-          setLoading(false);
-        }
-      }
-    }
     fetchUsers();
-    return () => { cancelled = true; };
-  }, []);
+  }, [fetchUsers]);
+
+  // Listen for /refresh command from GlobalCommandBar
+  useEffect(() => {
+    const handler = () => fetchUsers(true);
+    window.addEventListener("chapa:admin-refresh", handler);
+    return () => window.removeEventListener("chapa:admin-refresh", handler);
+  }, [fetchUsers]);
 
   const handleSort = useCallback(
     (field: SortField) => {
@@ -216,6 +224,24 @@ export function AdminDashboardClient() {
     },
     [sortField],
   );
+
+  // Listen for /sort command from GlobalCommandBar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const field = detail?.field as SortField | undefined;
+      const dir = detail?.dir as SortDir | undefined;
+      if (!field) return;
+      if (dir) {
+        setSortField(field);
+        setSortDir(dir);
+      } else {
+        handleSort(field);
+      }
+    };
+    window.addEventListener("chapa:admin-sort", handler);
+    return () => window.removeEventListener("chapa:admin-sort", handler);
+  }, [handleSort]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -272,7 +298,7 @@ export function AdminDashboardClient() {
             <span className="text-terminal-red/50">ERR</span> {error}
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => { setError(null); setLoading(true); fetchUsers(); }}
             className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
           >
             Retry
@@ -287,18 +313,54 @@ export function AdminDashboardClient() {
   // -------------------------------------------------------------------------
 
   const thClasses =
-    "px-3 py-2.5 text-left font-heading text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer select-none hover:text-text-primary transition-colors whitespace-nowrap";
+    "px-3 py-2.5 text-left font-heading text-xs font-medium text-text-secondary uppercase tracking-wider whitespace-nowrap";
+
+  const thBtnClasses =
+    "inline-flex items-center bg-transparent border-none p-0 font-heading text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer select-none hover:text-text-primary transition-colors whitespace-nowrap";
+
+  function ariaSortValue(field: SortField): "ascending" | "descending" | "none" {
+    if (sortField !== field) return "none";
+    return sortDir === "asc" ? "ascending" : "descending";
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="animate-fade-in-up">
-        <h1 className="font-heading text-2xl tracking-tight text-text-primary">
-          <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-        </h1>
-        <p className="mt-1 text-sm text-text-secondary">
-          {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
-        </p>
+      <div className="animate-fade-in-up flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+          </h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
+            {lastRefreshed && (
+              <span className="ml-2 text-text-secondary/60">
+                &middot; updated {formatDate(lastRefreshed.toISOString())}
+              </span>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={() => fetchUsers(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Refresh data"
+        >
+          <svg
+            className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
       {/* Summary cards */}
@@ -360,51 +422,73 @@ export function AdminDashboardClient() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stroke">
-                <th className={thClasses} onClick={() => handleSort("handle")}>
-                  Developer
-                  <SortIcon active={sortField === "handle"} dir={sortDir} />
+                <th scope="col" className={thClasses} aria-sort={ariaSortValue("handle")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("handle")}>
+                    Developer
+                    <SortIcon active={sortField === "handle"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden sm:table-cell`} onClick={() => handleSort("archetype")}>
-                  Archetype
-                  <SortIcon active={sortField === "archetype"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden sm:table-cell`} aria-sort={ariaSortValue("archetype")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("archetype")}>
+                    Archetype
+                    <SortIcon active={sortField === "archetype"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={thClasses} onClick={() => handleSort("tier")}>
-                  Tier
-                  <SortIcon active={sortField === "tier"} dir={sortDir} />
+                <th scope="col" className={thClasses} aria-sort={ariaSortValue("tier")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("tier")}>
+                    Tier
+                    <SortIcon active={sortField === "tier"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={thClasses} onClick={() => handleSort("adjustedComposite")}>
-                  Score
-                  <SortIcon active={sortField === "adjustedComposite"} dir={sortDir} />
+                <th scope="col" className={thClasses} aria-sort={ariaSortValue("adjustedComposite")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("adjustedComposite")}>
+                    Score
+                    <SortIcon active={sortField === "adjustedComposite"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden md:table-cell`} onClick={() => handleSort("confidence")}>
-                  Conf
-                  <SortIcon active={sortField === "confidence"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden md:table-cell`} aria-sort={ariaSortValue("confidence")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("confidence")}>
+                    Conf
+                    <SortIcon active={sortField === "confidence"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden lg:table-cell`} onClick={() => handleSort("commitsTotal")}>
-                  Commits
-                  <SortIcon active={sortField === "commitsTotal"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden lg:table-cell`} aria-sort={ariaSortValue("commitsTotal")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("commitsTotal")}>
+                    Commits
+                    <SortIcon active={sortField === "commitsTotal"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden lg:table-cell`} onClick={() => handleSort("prsMergedCount")}>
-                  PRs
-                  <SortIcon active={sortField === "prsMergedCount"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden lg:table-cell`} aria-sort={ariaSortValue("prsMergedCount")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("prsMergedCount")}>
+                    PRs
+                    <SortIcon active={sortField === "prsMergedCount"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden xl:table-cell`} onClick={() => handleSort("reviewsSubmittedCount")}>
-                  Reviews
-                  <SortIcon active={sortField === "reviewsSubmittedCount"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden xl:table-cell`} aria-sort={ariaSortValue("reviewsSubmittedCount")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("reviewsSubmittedCount")}>
+                    Reviews
+                    <SortIcon active={sortField === "reviewsSubmittedCount"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden xl:table-cell`} onClick={() => handleSort("activeDays")}>
-                  Days
-                  <SortIcon active={sortField === "activeDays"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden xl:table-cell`} aria-sort={ariaSortValue("activeDays")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("activeDays")}>
+                    Days
+                    <SortIcon active={sortField === "activeDays"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden xl:table-cell`} onClick={() => handleSort("totalStars")}>
-                  Stars
-                  <SortIcon active={sortField === "totalStars"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden xl:table-cell`} aria-sort={ariaSortValue("totalStars")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("totalStars")}>
+                    Stars
+                    <SortIcon active={sortField === "totalStars"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} hidden md:table-cell`} onClick={() => handleSort("fetchedAt")}>
-                  Updated
-                  <SortIcon active={sortField === "fetchedAt"} dir={sortDir} />
+                <th scope="col" className={`${thClasses} hidden md:table-cell`} aria-sort={ariaSortValue("fetchedAt")}>
+                  <button type="button" className={thBtnClasses} onClick={() => handleSort("fetchedAt")}>
+                    Updated
+                    <SortIcon active={sortField === "fetchedAt"} dir={sortDir} />
+                  </button>
                 </th>
-                <th className={`${thClasses} w-10`}>
+                <th scope="col" className={`${thClasses} w-10`}>
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>

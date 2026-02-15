@@ -4,6 +4,7 @@ import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
+import type { TerminalInputHandle } from "@/components/terminal/TerminalInput";
 import { TerminalOutput } from "@/components/terminal/TerminalOutput";
 import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
 import {
@@ -18,14 +19,19 @@ const OUTPUT_TIMEOUT_MS = 5000;
  * Fixed bottom command bar with navigation commands + AuthorTypewriter pill.
  * Use on any page that doesn't have its own terminal interface.
  */
-export function GlobalCommandBar() {
+export function GlobalCommandBar({
+  isAdmin,
+}: {
+  isAdmin?: boolean;
+} = {}) {
   const router = useRouter();
+  const terminalRef = useRef<TerminalInputHandle>(null);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const commands = useMemo(() => createNavigationCommands(), []);
+  const commands = useMemo(() => createNavigationCommands({ isAdmin }), [isAdmin]);
 
   // Auto-clear output after timeout
   useEffect(() => {
@@ -57,6 +63,14 @@ export function GlobalCommandBar() {
         } else {
           router.push(action.path);
         }
+      } else if (action?.type === "custom") {
+        window.dispatchEvent(
+          new CustomEvent(action.event, action.detail ? { detail: action.detail } : undefined),
+        );
+        // Custom actions provide their own visual feedback (e.g., spinning
+        // refresh icon, sorted table column). Clear output immediately so
+        // the command message doesn't linger in the command bar. (#283)
+        setOutputLines([]);
       }
     },
     [commands, router],
@@ -78,6 +92,10 @@ export function GlobalCommandBar() {
       setShowAutocomplete(false);
       setPartial("");
       handleSubmit(command);
+      // Autocomplete's capture-phase keydown calls stopPropagation on Enter,
+      // so TerminalInput's own handler never fires and setValue("") never runs.
+      // Clear the input imperatively via ref. (#283)
+      terminalRef.current?.clear();
     },
     [handleSubmit],
   );
@@ -118,9 +136,11 @@ export function GlobalCommandBar() {
           visible={showAutocomplete}
         />
         <TerminalInput
+          ref={terminalRef}
           onSubmit={handleSubmit}
           onPartialChange={handlePartialChange}
           prompt="chapa"
+          autoFocus={!!isAdmin}
         />
       </div>
     </div>

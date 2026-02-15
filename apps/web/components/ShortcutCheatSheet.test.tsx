@@ -54,4 +54,10 @@ describe("ShortcutCheatSheet (source-reading a11y)", () => {
   it("is a client component", () => {
     expect(SRC).toContain('"use client"');
   });
+
+  it("backdrop div has role='presentation' (#305)", () => {
+    // The outermost div (backdrop overlay) has onClick but needs
+    // role="presentation" for screen readers since it's non-semantic.
+    expect(SRC).toContain('role="presentation"');
+  });
 });

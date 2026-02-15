@@ -20,7 +20,7 @@ Generate a **live, embeddable, animated SVG badge** that showcases your develope
 
 Chapa analyzes your last 12 months of GitHub activity and generates a badge with:
 
-- **Impact Score** (0–100) with confidence rating and tier (Emerging → Solid → High → Elite)
+- **Impact Score** (0–100) with tier (Emerging → Solid → High → Elite)
 - **4-Dimension Profile** — Building, Guarding, Consistency, Breadth
 - **Developer Archetype** — Builder, Guardian, Marathoner, Polymath, Balanced, or Emerging
 - **Activity Heatmap** — 13-week daily contribution visualization
@@ -39,7 +39,7 @@ A 1200×630 animated SVG you can embed anywhere — GitHub profile READMEs, pers
 
 ### Share Page (`/u/:handle`)
 
-Public profile page with full score breakdown, confidence reasons, dimension details, embed snippets (Markdown + HTML), and one-click sharing to X.
+Public profile page with full score breakdown, dimension details with explanatory tooltips, embed snippets (Markdown + HTML), and one-click sharing to X.
 
 ### Creator Studio (`/studio`)
 
@@ -55,6 +55,10 @@ npx chapa-cli merge
 ```
 
 Supports `--insecure` for corporate networks with TLS interception and `--verbose` for diagnostics.
+
+### Admin Dashboard (`/admin`)
+
+Admin-only dashboard with user management, sortable data table, manual refresh, and a command bar with `/sort`, `/refresh` commands. Access controlled by the `ADMIN_HANDLES` environment variable.
 
 ### Badge Verification
 
@@ -82,15 +86,17 @@ pnpm run dev
 chapa/
 ├── apps/web/              # Next.js 16 app (App Router)
 │   ├── app/               # Pages and API routes
-│   │   ├── api/           # Auth, refresh, verify, health, CLI endpoints
+│   │   ├── api/           # Auth, refresh, verify, health, CLI, cron endpoints
+│   │   ├── admin/         # Admin dashboard (protected)
 │   │   ├── u/[handle]/    # Share page + badge.svg route
 │   │   ├── studio/        # Creator Studio
 │   │   └── verify/        # Badge verification landing
-│   ├── components/        # React components (terminal UI, badge, nav)
+│   ├── components/        # React components (terminal UI, badge, nav, tooltips)
 │   └── lib/               # Business logic
 │       ├── auth/          # GitHub OAuth + CLI token management
 │       ├── cache/         # Upstash Redis (24h TTL)
 │       ├── github/        # GraphQL client + stats aggregation
+│       ├── history/       # Lifetime metric snapshots (Redis sorted sets, no TTL)
 │       ├── impact/        # Impact v4 scoring engine
 │       ├── render/        # React-to-SVG badge renderer
 │       ├── verification/  # HMAC-SHA256 badge signing
@@ -113,7 +119,7 @@ Chapa computes a multi-dimensional developer profile from commits, PRs, code rev
 | **Consistency** | Activity spread, heatmap evenness, streak patterns |
 | **Breadth** | Repository diversity, language variety |
 
-A **confidence score** (50–100) reflects data completeness — messaging is always non-accusatory. The composite score is gently weighted by confidence to produce the final tier.
+An internal **confidence score** (50–100) reflects data completeness and gently adjusts the composite score to produce the final tier. Confidence is not shown on developer-facing pages — it works behind the scenes to ensure fair scoring.
 
 ## Tech Stack
 
@@ -164,8 +170,10 @@ A **confidence score** (50–100) reflects data completeness — messaging is al
 | `GET /u/:handle` | Share page — badge preview, breakdown, embed snippets |
 | `GET /u/:handle/badge.svg` | Embeddable SVG badge (CDN-cached) |
 | `GET /studio` | Creator Studio (auth required) |
+| `GET /admin` | Admin dashboard (admin handles only) |
 | `GET /api/health` | Health check |
 | `GET /api/verify/:hash` | Badge verification |
+| `GET /api/admin/users` | Admin user list (auth + admin check) |
 | `POST /api/refresh?handle=` | Force refresh (rate-limited) |
 
 ## Embed Your Badge

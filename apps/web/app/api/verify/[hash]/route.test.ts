@@ -18,6 +18,10 @@ vi.mock("@/lib/http/client-ip", () => ({
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
+vi.mock("@/lib/env", () => ({
+  getBaseUrl: () => "https://chapa.thecreativetoken.com",
+}));
+
 import { GET, OPTIONS } from "./route";
 import { NextRequest } from "next/server";
 

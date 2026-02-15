@@ -18,7 +18,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 8. Minimal analytics (PostHog) for key events.
 
 ## Non-goals (current scope)
-- No long-term history charts
+- No long-term history charts (lifetime metric snapshots are stored but no UI yet)
 - No leaderboard
 - No paid tiers
 
@@ -40,6 +40,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
 - POST `/api/studio/config` Save/load badge customization config
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
+- GET `/api/history/:handle` Score history, trend, and diff (public, rate-limited)
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
@@ -48,6 +49,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
+- `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Redis sorted sets)
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
@@ -72,6 +74,8 @@ Must be easy to swap/remove:
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)
 - Cache SVG output per user/day + theme (TTL 24h)
+- **Lifetime metrics**: `MetricsSnapshot` records stored in Redis sorted sets (`history:<handle>`) with **no TTL** — permanent history. Max 1 snapshot per user per day (date-based dedup). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
+- **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
 
@@ -81,16 +85,23 @@ Must be easy to swap/remove:
 - Impact scoring: `apps/web/lib/impact/*`, types in `packages/shared`
 - SVG rendering: `apps/web/lib/render/*`, `apps/web/app/u/[handle]/badge.svg/route.ts`
 - Share page: `apps/web/app/u/[handle]/page.tsx`, `apps/web/components/*`
+- Lifetime history: `apps/web/lib/history/*`
+- Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
+- Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
+- Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx`
 
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
 - Badge shows: heatmap, radar chart (4 dimensions), archetype label, stars/forks/watchers, Impact tier, adjusted score.
-- `/u/:handle` shows badge + breakdown + confidence reasons + embed snippet.
+- `/u/:handle` shows badge + breakdown + embed snippet. Confidence is computed internally but not shown to users.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
 - Repo contains `docs/impact-v4.md` and `docs/svg-design.md` as spec truth.
 - Creator Studio at `/studio` allows badge visual customization (9 categories).
+- Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
+- Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
+- Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).
 
 ## Engineering rules
 - Prefer pure functions for scoring & rendering.
@@ -184,6 +195,7 @@ NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, 
 NEXT_PUBLIC_SCORING_PAGE_ENABLED= # Set to "true" to enable the scoring methodology page (optional)
 
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
+ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
 ```

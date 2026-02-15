@@ -13,13 +13,14 @@ This document explains Chapa's Impact v4 Profile calculation, security model, ve
 5. [Data Sources and Verification](#data-sources-and-verification)
 6. [EMU Account Merge](#emu-account-merge)
 7. [Security Model](#security-model)
-8. [Privacy Guarantees](#privacy-guarantees)
+8. [Lifetime Metrics & Score History](#lifetime-metrics--score-history)
+9. [Privacy Guarantees](#privacy-guarantees)
 
 ---
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a **multi-dimensional Impact v4 Profile** — four independent dimension scores (0-100 each), a developer archetype label, a composite score (0-100), and a **Confidence** rating (50-100). The profile reflects the quality and breadth of contributions, not just volume.
+Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a **multi-dimensional Impact v4 Profile** — four independent dimension scores (0-100 each), a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
 
 ### Signals we track
 
@@ -155,12 +156,11 @@ The adjustment is deliberately gentle. Confidence provides transparency, not pun
 
 ### Why this matters
 
-Every badge displays both the score and confidence. Users and viewers can see:
-- A high score with high confidence = strong, clear signal
-- A high score with lower confidence = strong activity, but some patterns worth noting
-- The specific confidence reasons are shown on the share page
+Confidence is used **internally** to produce the adjusted score (which determines the tier), but it is **not displayed** on the badge or share page. Developers see their tier and adjusted score — the confidence calculation happens behind the scenes to ensure fair scoring without exposing a number that could be misinterpreted.
 
-**All confidence messaging is non-accusatory.** We never say "you gamed the system" -- we say "some activity appears in short bursts, which reduces timing confidence."
+The admin dashboard retains full visibility into confidence values for diagnostic purposes.
+
+**All confidence messaging is non-accusatory.** We never say "you gamed the system" -- we describe patterns like "some activity appears in short bursts, which reduces timing confidence."
 
 ---
 
@@ -377,14 +377,71 @@ Since badges are embeddable SVGs, all user-controlled text (handles, display nam
 
 ---
 
+## Lifetime Metrics & Score History
+
+Chapa captures daily snapshots of each user's metrics and stores them permanently in Redis sorted sets. This enables trend tracking, score change analysis, and historical comparisons.
+
+### How snapshots are captured
+
+Snapshots are recorded automatically in three places:
+1. **Cron warm-cache** — a scheduled job that refreshes active users daily
+2. **Badge route** — after rendering a badge SVG, a snapshot is captured via `after()`
+3. **Refresh endpoint** — when a manual refresh is triggered
+
+Each snapshot is deduplicated by date (one per user per day). If a user's badge is requested multiple times in one day, only the first snapshot is stored.
+
+### What's in a snapshot
+
+A `MetricsSnapshot` is a compact record (~300 bytes JSON) containing:
+- **Date and timestamp** — when it was captured
+- **13 key stats** — commits, PRs, reviews, issues, active days, repos, lines added/deleted, stars, forks, watchers, top repo share
+- **Explanatory stats** — max commits in a 10-minute window, micro-commit ratio, docs-only PR ratio
+- **Impact scores** — all 4 dimension scores, composite, adjusted composite, confidence
+- **Classification** — archetype, profile type, tier
+- **Confidence penalties** — active penalty flags and their values (omitted when empty)
+
+Snapshots deliberately exclude large or mutable data (heatmap grid, avatar URL, display name) to keep storage compact.
+
+### Querying history
+
+The history API endpoint exposes snapshot data:
+
+```
+GET /api/history/:handle?from=YYYY-MM-DD&to=YYYY-MM-DD&window=7&include=snapshots,trend,diff
+```
+
+- **Public** — no auth required (data is derived from public GitHub activity)
+- **Rate-limited** — 100 requests per IP per 60 seconds
+- **Cached** — 1 hour `s-maxage` with 24 hour `stale-while-revalidate`
+- **`include`** controls what's returned: `snapshots` (the raw data), `trend` (direction analysis), `diff` (comparison of two most recent snapshots)
+
+### Trend analysis
+
+The `computeTrend()` function analyzes recent snapshots to determine direction:
+- **Improving** — average delta per snapshot > +1.0 for adjusted composite
+- **Declining** — average delta per snapshot < -1.0
+- **Stable** — within ±1.0
+
+Trend analysis includes per-dimension direction and value arrays for future sparkline rendering.
+
+### Snapshot diffs
+
+The `compareSnapshots()` function produces structured deltas between two snapshots:
+- Numeric deltas for all stats and dimension scores
+- Categorical change detection for archetype, tier, and profile type
+- Added/removed confidence penalties
+- Human-readable explanations via `explainDiff()`
+
+---
+
 ## Privacy Guarantees
 
 1. **We never access your code.** We query contribution metadata (counts, dates, sizes) only.
 2. **We never store your tokens permanently.** OAuth tokens are encrypted in session cookies with a 24-hour expiry. CLI tokens are not stored at all.
 3. **Your EMU token stays on your machine.** The CLI tool uses it locally and uploads only the extracted statistics.
 4. **Private repo names are never exposed.** We track "repos contributed to" as a count, not a list.
-5. **All data is cached for 24 hours maximum.** Supplemental data, stats, and badge renders all expire after one day.
-6. **Confidence is transparent, not punitive.** Every confidence adjustment is shown with a clear, non-accusatory explanation.
+5. **Cached data expires after 24 hours.** Supplemental data, stats, and badge renders all expire after one day. Lifetime metric snapshots are stored permanently but contain only public data (scores, stats, dates — no private repo names, no code, no tokens).
+6. **Confidence is fair, not punitive.** Confidence adjustments affect the final score gently (max 7.5% reduction) and are never accusatory. Confidence values are visible to admins for diagnostics but are not shown on developer-facing pages.
 
 ---
 

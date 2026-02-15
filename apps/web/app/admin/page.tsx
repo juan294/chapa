@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { Navbar } from "@/components/Navbar";
+import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { AdminDashboardClient } from "./AdminDashboardClient";
 
 export const metadata: Metadata = {
@@ -24,9 +25,10 @@ export default async function AdminPage() {
   return (
     <>
       <Navbar />
-      <main className="mx-auto max-w-7xl px-6 pt-24 pb-16">
+      <main id="main-content" className="mx-auto max-w-7xl px-6 pt-24 pb-24">
         <AdminDashboardClient />
       </main>
+      <GlobalCommandBar isAdmin />
     </>
   );
 }

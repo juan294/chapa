@@ -26,29 +26,24 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // Issue #279 — confidence is internal-only, hidden from developer-facing UI
+  describe("confidence hidden (#279)", () => {
+    it("does not render confidence score or label", () => {
+      expect(SOURCE).not.toContain("impact.confidence");
+      expect(SOURCE).not.toContain("Confidence");
+    });
+
+    it("does not render confidence penalties", () => {
+      expect(SOURCE).not.toContain("confidencePenalties");
+    });
+  });
+
   // Issue #20 — progress bars need ARIA attributes
   describe("accessibility (#20)", () => {
-    it("confidence bar has role=progressbar", () => {
-      expect(SOURCE).toContain('role="progressbar"');
-    });
-
-    it("confidence bar has aria-valuenow for confidence", () => {
-      expect(SOURCE).toMatch(/aria-valuenow=\{impact\.confidence\}/);
-    });
-
-    it("confidence bar has aria-valuemin and aria-valuemax", () => {
-      expect(SOURCE).toContain("aria-valuemin={0}");
-      expect(SOURCE).toContain("aria-valuemax={100}");
-    });
-
-    it("confidence bar has aria-label", () => {
-      expect(SOURCE).toContain('aria-label="Confidence score"');
-    });
-
-    it("breakdown bars have role=progressbar", () => {
+    it("dimension bars have role=progressbar", () => {
       const matches = SOURCE.match(/role="progressbar"/g);
       expect(matches).not.toBeNull();
-      expect(matches!.length).toBeGreaterThanOrEqual(2);
+      expect(matches!.length).toBeGreaterThanOrEqual(1);
     });
 
     it("dimension bars have aria-valuenow with the dimension score", () => {
@@ -92,6 +87,58 @@ describe("ImpactBreakdown", () => {
     it("has unique colors per dimension (DIMENSION_COLORS)", () => {
       expect(SOURCE).toContain("DIMENSION_COLORS");
       expect(SOURCE).toContain("linear-gradient");
+    });
+  });
+
+  // Issue #281 — explanatory tooltips for badge elements
+  describe("info tooltips (#281)", () => {
+    it("imports InfoTooltip component", () => {
+      expect(SOURCE).toContain("InfoTooltip");
+    });
+
+    it("has tooltip IDs for all four dimensions", () => {
+      expect(SOURCE).toContain('"dim-building"');
+      expect(SOURCE).toContain('"dim-guarding"');
+      expect(SOURCE).toContain('"dim-consistency"');
+      expect(SOURCE).toContain('"dim-breadth"');
+    });
+
+    it("has tooltip IDs for all stats", () => {
+      expect(SOURCE).toContain('"stat-stars"');
+      expect(SOURCE).toContain('"stat-forks"');
+      expect(SOURCE).toContain('"stat-watchers"');
+      expect(SOURCE).toContain('"stat-active-days"');
+      expect(SOURCE).toContain('"stat-commits"');
+      expect(SOURCE).toContain('"stat-prs-merged"');
+      expect(SOURCE).toContain('"stat-reviews"');
+      expect(SOURCE).toContain('"stat-repos"');
+    });
+
+    it("does not add 'use client' directive (server component preserved)", () => {
+      expect(SOURCE).not.toMatch(/^["']use client["']/m);
+    });
+  });
+
+  describe("tooltip z-index elevation (#285)", () => {
+    it("dimension cards elevate z-index on hover and focus-within", () => {
+      // Cards with animate-fade-in-up create stacking contexts that trap
+      // tooltip z-index. Cards must elevate on interaction so the active
+      // tooltip renders above adjacent cards.
+      const dimCardMatch = SOURCE.match(
+        /className="[^"]*rounded-xl border border-stroke bg-card p-4 animate-fade-in-up[^"]*"/,
+      );
+      expect(dimCardMatch).not.toBeNull();
+      expect(dimCardMatch![0]).toContain("hover:z-10");
+      expect(dimCardMatch![0]).toContain("focus-within:z-10");
+    });
+
+    it("stat cards elevate z-index on hover and focus-within", () => {
+      const statCardMatch = SOURCE.match(
+        /className="[^"]*rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up[^"]*"/,
+      );
+      expect(statCardMatch).not.toBeNull();
+      expect(statCardMatch![0]).toContain("hover:z-10");
+      expect(statCardMatch![0]).toContain("focus-within:z-10");
     });
   });
 

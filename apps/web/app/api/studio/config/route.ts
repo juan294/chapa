@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
+import { requireSession } from "@/lib/auth/require-session";
 import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
@@ -41,16 +42,8 @@ export async function PUT(request: NextRequest): Promise<Response> {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
+  const { session, error } = requireSession(request);
+  if (error) return error;
 
   // Parse body
   let body: unknown;

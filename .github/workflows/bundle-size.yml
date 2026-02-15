@@ -1,3 +1,26 @@
+# Bundle Size Analysis
+#
+# NOTE: Turbopack limitation (see GitHub issue #303)
+#
+# Next.js builds with Turbopack (the default in dev and increasingly in
+# production) do NOT emit per-route JavaScript sizes in the build output.
+# The classic Webpack-based build prints a table like:
+#
+#   Route                              Size     First Load JS
+#   /                                  5.2 kB         89 kB
+#   /u/[handle]                        3.1 kB         87 kB
+#
+# Turbopack omits this entirely. As a result, this workflow measures
+# aggregate directory sizes (.next/static, .next/server, total) and lists
+# the largest individual JS files — but cannot report per-route First Load
+# JS budgets.
+#
+# For detailed per-route analysis, run locally with Webpack:
+#   ANALYZE=true pnpm --filter web build
+# This requires @next/bundle-analyzer to be configured in next.config.ts.
+#
+# Turbopack tracking: https://github.com/vercel/next.js/issues/49887
+
 name: Bundle Size Analysis
 
 on:
@@ -44,6 +67,7 @@ jobs:
 
       - name: Analyze bundle
         id: bundle
+        working-directory: apps/web
         run: |
           echo "## Bundle Size Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"

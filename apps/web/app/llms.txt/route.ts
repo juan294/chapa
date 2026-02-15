@@ -10,13 +10,14 @@ Chapa is a developer tool that generates a live, embeddable SVG badge showcasing
 
 - **Impact v4 Profile**: A composite score (0-100) based on four dimensions (Building, Guarding, Consistency, Breadth) computed from the last 12 months of GitHub activity.
 - **Confidence Rating**: A quality signal (50-100) that surfaces data patterns without making accusations. Higher confidence means more consistent, diverse activity.
-- **Tier System**: Four tiers based on adjusted score — Newcomer, Rising, Established, and Elite.
+- **Tier System**: Four tiers based on adjusted score — Emerging (0-39), Solid (40-69), High (70-84), and Elite (85-100).
 
 ## Endpoints
 
 - \`GET /\` — Landing page with GitHub OAuth login.
 - \`GET /u/{handle}\` — Share page showing a developer's badge, impact breakdown, confidence reasons, and embed snippets.
 - \`GET /u/{handle}/badge.svg\` — Embeddable SVG badge image. Public, no auth required. Cached for 24 hours.
+- \`GET /api/history/{handle}\` — Score history, trend analysis, and snapshot diffs. Public, rate-limited (100 req/IP/60s). Cached for 1 hour.
 
 ## How to Use
 

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getVerificationRecord } from "@/lib/verification/store";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { getBaseUrl } from "@/lib/env";
 
 const HASH_PATTERN = /^[0-9a-f]{8}([0-9a-f]{8})?$/;
 
@@ -38,7 +39,7 @@ export async function GET(
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() || "https://chapa.thecreativetoken.com";
+  const baseUrl = getBaseUrl();
 
   return NextResponse.json(
     {

@@ -167,10 +167,13 @@ describe("BadgeContent", () => {
     it("uses tierPillClasses", () => {
       expect(SOURCE).toContain("tierPillClasses");
     });
+  });
 
-    it("shows confidence percentage", () => {
-      expect(SOURCE).toContain("impact.confidence");
-      expect(SOURCE).toContain("Confidence");
+  // Issue #279 — confidence is internal-only, hidden from developer-facing UI
+  describe("confidence hidden (#279)", () => {
+    it("does not show confidence percentage", () => {
+      expect(SOURCE).not.toContain("impact.confidence");
+      expect(SOURCE).not.toMatch(/Confidence/);
     });
   });
 
@@ -201,6 +204,20 @@ describe("BadgeContent", () => {
     it("conditionally renders SparkleDots for enhanced tier", () => {
       expect(SOURCE).toContain("SparkleDots");
       expect(SOURCE).toContain('tierTreatment === "enhanced"');
+    });
+  });
+
+  // Issue #289 — no hardcoded accent hex in component; use WARM_AMBER.accent
+  describe("accent color constant (#289)", () => {
+    it("does not hardcode #7C6AEF in SVG markup", () => {
+      // Remove import lines and string literals from consideration —
+      // only SVG attributes should reference the accent color via the constant
+      const withoutImports = SOURCE.replace(/^import .*/gm, "");
+      expect(withoutImports).not.toContain('"#7C6AEF"');
+    });
+
+    it("imports WARM_AMBER from the render theme", () => {
+      expect(SOURCE).toMatch(/import\s+.*WARM_AMBER.*from\s+["']@\/lib\/render\/theme["']/);
     });
   });
 });

@@ -7,6 +7,16 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+const HISTORY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../lib/history/history.ts"),
+  "utf-8",
+);
+
+const DIFF_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../lib/history/diff.ts"),
+  "utf-8",
+);
+
 describe("Landing page — Enterprise EMU section", () => {
   it("contains the $ chapa enterprise terminal command", () => {
     expect(SOURCE).toContain("chapa enterprise");
@@ -62,5 +72,77 @@ describe("Landing page — design system tokens (#233)", () => {
   it("uses archetype design tokens for archetype links", () => {
     expect(SOURCE).toContain("text-archetype-guardian");
     expect(SOURCE).toContain("text-archetype-emerging");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #307 — Footer internal links should use Next.js Link component
+// ---------------------------------------------------------------------------
+
+describe("Landing page — footer internal links (#307)", () => {
+  it("imports Link from next/link", () => {
+    expect(SOURCE).toMatch(/import\s+Link\s+from\s+["']next\/link["']/);
+  });
+
+  it("uses <Link> for /about internal link", () => {
+    expect(SOURCE).toMatch(/<Link\s[^>]*href="\/about"/);
+  });
+
+  it("uses <Link> for /terms internal link", () => {
+    expect(SOURCE).toMatch(/<Link\s[^>]*href="\/terms"/);
+  });
+
+  it("uses <Link> for /privacy internal link", () => {
+    expect(SOURCE).toMatch(/<Link\s[^>]*href="\/privacy"/);
+  });
+
+  it("does not use plain <a> tags for internal footer links", () => {
+    // Extract just the footer section
+    const footerMatch = SOURCE.match(/<footer[\s\S]*?<\/footer>/);
+    expect(footerMatch).not.toBeNull();
+    const footer = footerMatch![0];
+
+    // Should not have <a href="/about">, <a href="/terms">, <a href="/privacy">
+    expect(footer).not.toMatch(/<a\s[^>]*href="\/about"/);
+    expect(footer).not.toMatch(/<a\s[^>]*href="\/terms"/);
+    expect(footer).not.toMatch(/<a\s[^>]*href="\/privacy"/);
+  });
+
+  it("keeps external GitHub link as a plain <a> with target=_blank", () => {
+    const footerMatch = SOURCE.match(/<footer[\s\S]*?<\/footer>/);
+    expect(footerMatch).not.toBeNull();
+    const footer = footerMatch![0];
+
+    expect(footer).toMatch(/<a\s[^>]*href="https:\/\/github\.com"/);
+    expect(footer).toContain('target="_blank"');
+    expect(footer).toContain('rel="noopener noreferrer"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #301 — History exports JSDoc documentation
+// ---------------------------------------------------------------------------
+
+describe("History module — pre-built API surface JSDoc (#301)", () => {
+  it("getLatestSnapshot has JSDoc mentioning pre-built API surface", () => {
+    // Find the JSDoc comment preceding getLatestSnapshot
+    const match = HISTORY_SOURCE.match(
+      /\/\*\*[\s\S]*?@prebuilt[\s\S]*?\*\/\s*export\s+async\s+function\s+getLatestSnapshot/,
+    );
+    expect(match).not.toBeNull();
+  });
+
+  it("getSnapshotCount has JSDoc mentioning pre-built API surface", () => {
+    const match = HISTORY_SOURCE.match(
+      /\/\*\*[\s\S]*?@prebuilt[\s\S]*?\*\/\s*export\s+async\s+function\s+getSnapshotCount/,
+    );
+    expect(match).not.toBeNull();
+  });
+
+  it("explainDiff has JSDoc mentioning pre-built API surface", () => {
+    const match = DIFF_SOURCE.match(
+      /\/\*\*[\s\S]*?@prebuilt[\s\S]*?\*\/\s*export\s+function\s+explainDiff/,
+    );
+    expect(match).not.toBeNull();
   });
 });

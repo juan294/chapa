@@ -1,7 +1,7 @@
 # Chapa Demo Script (2–3 minutes)
 
 ## Demo goal
-Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v4 Profile** (4 dimensions + archetype + confidence) that updates automatically and is easy to customize and share.
+Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v4 Profile** (4 dimensions + archetype + tier) that updates automatically and is easy to customize and share.
 
 ## 10-second opener (hook)
 "Developers already have GitHub graphs—but they're not embeddable, not beautiful, and they don't tell an impact story. Chapa generates a live badge you can embed anywhere, with a multi-dimensional Impact Profile that discourages gaming."
@@ -9,7 +9,7 @@ Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, anim
 ## Key highlights
 - Live endpoint: `/u/:handle/badge.svg`
 - Animated SVG (web-native)
-- Impact v4 = 4 dimensions (Building, Guarding, Consistency, Breadth) + archetype + confidence
+- Impact v4 = 4 dimensions (Building, Guarding, Consistency, Breadth) + archetype + tier
 - Radar chart visualization of developer strengths
 - Creator Studio for badge visual customization
 - Verified mode via GitHub OAuth
@@ -35,12 +35,13 @@ Say:
 Say:
 "This isn't just activity. Impact v4 measures four independent dimensions—shipping code, reviewing others, consistency, and cross-project breadth. Your archetype tells you what kind of developer you are. And the radar chart shows your profile shape at a glance."
 
-### 3) Confidence + non-toxic explanation (20s)
-- Scroll to breakdown
-- Show confidence reasons + dimension scores
+### 3) Breakdown + tooltips (20s)
+- Scroll to breakdown section
+- Hover over dimension cards and stat cards to show tooltips
+- Hover over badge elements (heatmap, radar, score) for explanations
 
 Say:
-"Confidence measures signal clarity, not morality. If activity is bursty or collaboration signals are low, we reduce confidence slightly and explain why. The four dimension scores give granular insight beyond a single number."
+"The breakdown shows each dimension score individually — hover any element for an explanation. The four dimensions give granular insight beyond a single number, and tooltips make everything self-explanatory."
 
 ### 4) Creator Studio (30s)
 - Navigate to `/studio`
@@ -90,7 +91,7 @@ GitHub branding is included but isolated behind a feature flag (`includeGithubBr
 ## What to show on screen (checklist)
 - [ ] Landing page with CTA
 - [ ] OAuth success
-- [ ] Share page with badge + breakdown (radar chart, archetype, dimensions)
+- [ ] Share page with badge + breakdown (radar chart, archetype, dimensions, tooltips)
 - [ ] Creator Studio — live badge customization
 - [ ] Copy embed snippet
 - [ ] README embed rendering

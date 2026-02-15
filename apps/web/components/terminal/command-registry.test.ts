@@ -3,6 +3,7 @@ import {
   parseCommand,
   executeCommand,
   createNavigationCommands,
+  createAdminCommands,
   getMatchingCommands,
   resolveCategory,
   makeLine,
@@ -287,6 +288,211 @@ describe("createNavigationCommands (studio enabled)", () => {
     const names = matches.map((m) => m.name);
     expect(names).toContain("/badge");
     expect(names).not.toContain("/studio");
+  });
+});
+
+describe("createAdminCommands", () => {
+  it("returns 3 admin commands", () => {
+    const cmds = createAdminCommands();
+    expect(cmds).toHaveLength(3);
+  });
+
+  it("includes /admin, /refresh, and /sort", () => {
+    const names = createAdminCommands().map((c) => c.name);
+    expect(names).toContain("/admin");
+    expect(names).toContain("/refresh");
+    expect(names).toContain("/sort");
+  });
+
+  it("/admin has navigate action to /admin", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/admin")!;
+    const result = cmd.execute([]);
+    expect(result.action).toEqual({ type: "navigate", path: "/admin" });
+  });
+
+  it("/refresh has custom event action", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/refresh")!;
+    const result = cmd.execute([]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-refresh",
+    });
+  });
+
+  it("/sort without args returns error with available fields", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute([]);
+    expect(result.lines[0]!.type).toBe("error");
+    expect(result.lines[0]!.text).toContain("Usage:");
+    expect(result.action).toBeUndefined();
+    // Should list available field aliases
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("score");
+    expect(allText).toContain("tier");
+    expect(allText).toContain("handle");
+  });
+
+  it("/sort score returns custom event with detail { field: 'adjustedComposite' }", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["score"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "adjustedComposite" },
+    });
+    expect(result.lines[0]!.type).toBe("system");
+  });
+
+  it("/sort conf resolves alias to confidence", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["conf"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "confidence" },
+    });
+  });
+
+  it("/sort name resolves alias to handle", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["name"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "handle" },
+    });
+  });
+
+  it("/sort handle works", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["handle"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "handle" },
+    });
+  });
+
+  it("/sort unknown returns error", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["unknown"]);
+    expect(result.lines[0]!.type).toBe("error");
+    expect(result.action).toBeUndefined();
+  });
+
+  it("/sort score desc passes dir 'desc' in detail", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["score", "desc"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "adjustedComposite", dir: "desc" },
+    });
+  });
+
+  it("/sort stars asc passes dir 'asc' in detail", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["stars", "asc"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "totalStars", dir: "asc" },
+    });
+  });
+
+  it("/sort field without dir omits dir from detail (backwards compatible)", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["tier"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-sort",
+      detail: { field: "tier" },
+    });
+  });
+
+  it("/sort field with invalid dir returns error", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    const result = cmd.execute(["score", "sideways"]);
+    expect(result.lines[0]!.type).toBe("error");
+    expect(result.action).toBeUndefined();
+  });
+
+  it("/sort usage text mentions direction parameter", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
+    expect(cmd.usage).toContain("asc");
+  });
+});
+
+describe("createNavigationCommands (isAdmin)", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+  });
+
+  it("includes admin commands when isAdmin is true", () => {
+    const commands = createNavigationCommands({ isAdmin: true });
+    const names = commands.map((c) => c.name);
+    expect(names).toContain("/admin");
+    expect(names).toContain("/refresh");
+  });
+
+  it("excludes admin commands when isAdmin is false", () => {
+    const commands = createNavigationCommands({ isAdmin: false });
+    const names = commands.map((c) => c.name);
+    expect(names).not.toContain("/admin");
+    expect(names).not.toContain("/refresh");
+  });
+
+  it("excludes admin commands when isAdmin is not provided", () => {
+    const commands = createNavigationCommands();
+    const names = commands.map((c) => c.name);
+    expect(names).not.toContain("/admin");
+    expect(names).not.toContain("/refresh");
+  });
+
+  it("returns 16 commands when isAdmin + studio disabled", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands({ isAdmin: true });
+    expect(commands).toHaveLength(16);
+  });
+
+  it("returns 17 commands when isAdmin + studio enabled", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands({ isAdmin: true });
+    expect(commands).toHaveLength(17);
+  });
+
+  it("/help includes Admin section when isAdmin", () => {
+    const commands = createNavigationCommands({ isAdmin: true });
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("Admin:");
+    expect(allText).toContain("/admin");
+    expect(allText).toContain("/refresh");
+    expect(allText).toContain("/sort");
+  });
+
+  it("/help does NOT include Admin section when not admin", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).not.toContain("Admin:");
+    expect(allText).not.toContain("/refresh");
+  });
+
+  it("/admin matches in autocomplete when isAdmin", () => {
+    const commands = createNavigationCommands({ isAdmin: true });
+    const matches = getMatchingCommands("/a", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).toContain("/admin");
+    expect(names).toContain("/about");
+  });
+
+  it("/admin does NOT match in autocomplete when not admin", () => {
+    const commands = createNavigationCommands();
+    const matches = getMatchingCommands("/a", commands);
+    const names = matches.map((m) => m.name);
+    expect(names).not.toContain("/admin");
+    expect(names).toContain("/about");
   });
 });
 

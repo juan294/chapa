@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
+import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { isValidHandle } from "@/lib/validation";
+import { buildSnapshot } from "@/lib/history/snapshot";
+import { recordSnapshot } from "@/lib/history/history";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -24,22 +26,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Auth: require session cookie
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json(
-      { error: "Server misconfigured" },
-      { status: 500 },
-    );
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json(
-      { error: "Authentication required" },
-      { status: 401 },
-    );
-  }
+  const { session, error } = requireSession(request);
+  if (error) return error;
 
   // Only the badge owner can refresh their own badge (case-insensitive)
   if (session.login.toLowerCase() !== handle.toLowerCase()) {
@@ -73,6 +61,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   const impact = computeImpactV4(stats);
+
+  // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
+  recordSnapshot(handle, buildSnapshot(stats, impact)).catch(() => {});
 
   return NextResponse.json({ stats, impact });
 }

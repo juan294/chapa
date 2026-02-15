@@ -28,7 +28,7 @@ export async function fetchAvatarBase64(
     });
     if (!res.ok) return undefined;
 
-    const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"]);
+    const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
     const rawType = res.headers.get("content-type")?.split(";")[0]?.trim() ?? "image/png";
     const contentType = ALLOWED_TYPES.has(rawType) ? rawType : "image/png";
     const buf = await res.arrayBuffer();

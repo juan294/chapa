@@ -9,7 +9,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["apps/web/lib/**", "packages/shared/**", "packages/cli/src/**"],
+      include: ["apps/web/lib/**", "packages/shared/**"],
     },
   },
   resolve: {
