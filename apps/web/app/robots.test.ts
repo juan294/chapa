@@ -7,73 +7,48 @@ vi.mock("@/lib/env", () => ({
 import robots from "./robots";
 
 describe("robots.ts", () => {
-  it("exports a default function that returns robots config", () => {
+  it("returns a valid robots configuration", () => {
     const result = robots();
-    expect(result).toBeDefined();
-    expect(result.rules).toBeDefined();
+
+    expect(result).toHaveProperty("rules");
+    expect(result).toHaveProperty("sitemap");
+    expect(Array.isArray(result.rules)).toBe(true);
   });
 
-  it("allows all user agents by default", () => {
+  it("allows root and badge paths", () => {
     const result = robots();
-    // rules can be an array or single object
     const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const wildcardRule = rules.find(
-      (r) => r.userAgent === "*" || (Array.isArray(r.userAgent) && r.userAgent.includes("*")),
-    );
-    expect(wildcardRule).toBeDefined();
-    expect(wildcardRule!.allow).toBe("/");
+    const mainRule = rules[0]!;
+
+    expect(mainRule.userAgent).toBe("*");
+    expect(mainRule.allow).toContain("/");
+    expect(mainRule.allow).toContain("/u/*/badge.svg");
   });
 
-  it("includes sitemap URL", () => {
+  it("disallows /api/, /admin/, and /experiments/", () => {
     const result = robots();
-    expect(result.sitemap).toContain("/sitemap.xml");
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const mainRule = rules[0]!;
+
+    expect(mainRule.disallow).toContain("/api/");
+    expect(mainRule.disallow).toContain("/admin/");
+    expect(mainRule.disallow).toContain("/experiments/");
   });
 
-  it("uses production base URL in sitemap", () => {
+  it("disallows /generating/ and /cli/", () => {
     const result = robots();
+    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
+    const mainRule = rules[0]!;
+
+    expect(mainRule.disallow).toContain("/generating/");
+    expect(mainRule.disallow).toContain("/cli/");
+  });
+
+  it("includes sitemap URL with production base", () => {
+    const result = robots();
+
     expect(result.sitemap).toBe(
       "https://chapa.thecreativetoken.com/sitemap.xml",
     );
-  });
-
-  it("disallows /api/ paths", () => {
-    const result = robots();
-    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const wildcardRule = rules.find(
-      (r) => r.userAgent === "*" || (Array.isArray(r.userAgent) && r.userAgent.includes("*")),
-    );
-    expect(wildcardRule!.disallow).toContain("/api/");
-  });
-
-  it("disallows /experiments/ paths", () => {
-    const result = robots();
-    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const wildcardRule = rules.find(
-      (r) => r.userAgent === "*" || (Array.isArray(r.userAgent) && r.userAgent.includes("*")),
-    );
-    const disallows = Array.isArray(wildcardRule!.disallow)
-      ? wildcardRule!.disallow
-      : [wildcardRule!.disallow];
-    expect(disallows).toContain("/experiments/");
-  });
-
-  it("explicitly allows AI/LLM crawlers", () => {
-    const result = robots();
-    const rules = Array.isArray(result.rules) ? result.rules : [result.rules];
-    const aiCrawlers = [
-      "GPTBot",
-      "ChatGPT-User",
-      "ClaudeBot",
-      "Claude-Web",
-      "Applebot",
-      "Bytespider",
-    ];
-    for (const crawler of aiCrawlers) {
-      const rule = rules.find(
-        (r) => r.userAgent === crawler || (Array.isArray(r.userAgent) && r.userAgent.includes(crawler)),
-      );
-      expect(rule, `Expected rule for ${crawler}`).toBeDefined();
-      expect(rule!.allow).toBe("/");
-    }
   });
 });

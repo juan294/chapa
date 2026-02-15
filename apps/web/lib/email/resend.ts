@@ -37,6 +37,25 @@ export function escapeHtml(str: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// HTML sanitization for forwarded email bodies
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip dangerous HTML constructs from an email body before forwarding.
+ * Removes `<script>` blocks, inline event handlers (onclick, onerror, ...),
+ * and `javascript:` URLs in href attributes.
+ *
+ * This is a defense-in-depth measure — the forwarded email is rendered in
+ * a mail client, but we still strip known XSS vectors to be safe.
+ */
+export function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"');
+}
+
+// ---------------------------------------------------------------------------
 // Lazy singleton
 // ---------------------------------------------------------------------------
 
@@ -188,7 +207,7 @@ export async function forwardEmail(
     `From: ${safeFrom}<br/>`,
     `Subject: ${safeSubject}`,
     `</div>`,
-    params.html,
+    sanitizeHtml(params.html),
   ].join("\n");
 
   const forwardedText = [
