@@ -46,4 +46,21 @@ describe("GlobalCommandBar", () => {
       expect(SOURCE).toContain("CustomEvent");
     });
   });
+
+  describe("custom action output clearing (#283)", () => {
+    it("clears output lines immediately after dispatching custom events", () => {
+      // Custom action commands (/refresh, /sort) provide their own visual feedback
+      // (spinning refresh icon, sorted table). Output lines should be cleared
+      // immediately inside the custom action branch, not left to linger for
+      // the full OUTPUT_TIMEOUT_MS.
+      //
+      // Extract the custom action branch block and verify setOutputLines([])
+      // is called within it (not in a separate function like handlePartialChange).
+      const customBlock = SOURCE.match(
+        /else if\s*\(action\?\.type\s*===\s*["']custom["']\)\s*\{([\s\S]*?)\n\s{4}\}/,
+      );
+      expect(customBlock).not.toBeNull();
+      expect(customBlock![1]).toContain("setOutputLines([])");
+    });
+  });
 });

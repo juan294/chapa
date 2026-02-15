@@ -65,6 +65,10 @@ export function GlobalCommandBar({
         window.dispatchEvent(
           new CustomEvent(action.event, action.detail ? { detail: action.detail } : undefined),
         );
+        // Custom actions provide their own visual feedback (e.g., spinning
+        // refresh icon, sorted table column). Clear output immediately so
+        // the command message doesn't linger in the command bar. (#283)
+        setOutputLines([]);
       }
     },
     [commands, router],
