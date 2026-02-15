@@ -4,6 +4,7 @@ import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
+import type { TerminalInputHandle } from "@/components/terminal/TerminalInput";
 import { TerminalOutput } from "@/components/terminal/TerminalOutput";
 import { AutocompleteDropdown } from "@/components/terminal/AutocompleteDropdown";
 import {
@@ -24,6 +25,7 @@ export function GlobalCommandBar({
   isAdmin?: boolean;
 } = {}) {
   const router = useRouter();
+  const terminalRef = useRef<TerminalInputHandle>(null);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
@@ -90,6 +92,10 @@ export function GlobalCommandBar({
       setShowAutocomplete(false);
       setPartial("");
       handleSubmit(command);
+      // Autocomplete's capture-phase keydown calls stopPropagation on Enter,
+      // so TerminalInput's own handler never fires and setValue("") never runs.
+      // Clear the input imperatively via ref. (#283)
+      terminalRef.current?.clear();
     },
     [handleSubmit],
   );
@@ -130,9 +136,11 @@ export function GlobalCommandBar({
           visible={showAutocomplete}
         />
         <TerminalInput
+          ref={terminalRef}
           onSubmit={handleSubmit}
           onPartialChange={handlePartialChange}
           prompt="chapa"
+          autoFocus={!!isAdmin}
         />
       </div>
     </div>
