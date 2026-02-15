@@ -49,8 +49,15 @@ const FEATURES = [
 
 const STEPS = [
   { number: "01", title: "Sign in with GitHub", description: "Secure OAuth over HTTPS \u2014 we only request read access to public data. No passwords stored, no private repos accessed." },
-  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity \u2014 4 dimensions, archetype, and composite score. The badge heatmap shows the last 90 days at a glance." },
-  { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere." },
+  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Building, Guarding, Consistency, and Breadth \u2014 plus archetype and composite score. The badge heatmap shows the last 90 days at a glance." },
+  { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere \u2014 and explore the full scoring breakdown on your share page." },
+];
+
+const DIMENSIONS = [
+  { title: "BUILDING", description: "Shipping meaningful changes \u2014 PRs merged, issues closed, code shipped." },
+  { title: "GUARDING", description: "Reviewing and quality gatekeeping \u2014 how much time you spend on others\u2019 code." },
+  { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
+  { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
 ];
 
 const STATS = [
@@ -263,6 +270,38 @@ export default async function Home({
                   </div>
                 </div>
               ))}
+
+              <div className="pt-4 space-y-4">
+                <h3 className="font-heading text-sm text-text-primary font-medium">
+                  What we measure
+                </h3>
+                {DIMENSIONS.map((dim) => (
+                  <div key={dim.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                    <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                      {dim.title}
+                    </span>
+                    <span className="text-text-secondary text-sm">
+                      {dim.description}
+                    </span>
+                  </div>
+                ))}
+                <p className="text-text-secondary text-sm">
+                  Your dimension profile determines your archetype:{" "}
+                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
+                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>,{" "}
+                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
+                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
+                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>.
+                </p>
+                <Link
+                  href="/about/scoring"
+                  className="inline-flex items-center gap-1 text-sm text-amber hover:text-amber-light transition-colors font-heading"
+                >
+                  Read the full scoring methodology
+                  <ArrowRightIcon className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
           </section>
 
@@ -423,6 +462,7 @@ export default async function Home({
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <Link href="/about" className="hover:text-amber transition-colors">About</Link>
+              <Link href="/about/scoring" className="hover:text-amber transition-colors">Scoring</Link>
               <Link href="/terms" className="hover:text-amber transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-amber transition-colors">Privacy</Link>
             </div>
