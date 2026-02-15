@@ -12,6 +12,7 @@
 import type { ImpactV4Result } from "@chapa/shared";
 import { getResend } from "./resend";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { getBaseUrl } from "@/lib/env";
 
 const MARKER_TTL = 31_536_000; // 365 days in seconds
 
@@ -39,9 +40,7 @@ export async function notifyFirstBadge(
     if (!to) return;
 
     // 5. Build email
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
-      "https://chapa.thecreativetoken.com";
+    const baseUrl = getBaseUrl();
     const shareUrl = `${baseUrl}/u/${lowerHandle}`;
     const badgeUrl = `${baseUrl}/u/${lowerHandle}/badge.svg`;
     const subject = `New badge: ${lowerHandle} — ${impact.archetype} (${impact.tier})`;

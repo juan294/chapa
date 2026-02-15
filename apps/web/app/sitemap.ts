@@ -1,8 +1,7 @@
 import type { MetadataRoute } from "next";
+import { getBaseUrl } from "@/lib/env";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
-  "https://chapa.thecreativetoken.com";
+const BASE_URL = getBaseUrl();
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

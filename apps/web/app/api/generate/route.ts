@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
+import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
@@ -17,22 +17,8 @@ import { computeImpactV4 } from "@/lib/impact/v4";
  * Rate limited: 10 requests per handle per hour.
  */
 export async function POST(request: NextRequest): Promise<Response> {
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json(
-      { error: "Server misconfigured" },
-      { status: 500 },
-    );
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json(
-      { error: "Authentication required" },
-      { status: 401 },
-    );
-  }
+  const { session, error } = requireSession(request);
+  if (error) return error;
 
   const handle = session.login;
 

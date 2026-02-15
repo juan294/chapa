@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: vi.fn(),
+vi.mock("@/lib/auth/require-session", () => ({
+  requireSession: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -13,12 +14,19 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 import { POST } from "./route";
-import { readSessionCookie } from "@/lib/auth/github";
+import { requireSession } from "@/lib/auth/require-session";
 import { cacheSet } from "@/lib/cache/redis";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const SESSION = {
+  token: "ghp_fake",
+  login: "testuser",
+  name: "Test User",
+  avatar_url: "https://example.com/avatar.png",
+};
 
 function makeRequest(body: unknown, cookie?: string): Request {
   const headers: Record<string, string> = {
@@ -35,7 +43,7 @@ function makeRequest(body: unknown, cookie?: string): Request {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.mocked(requireSession).mockReturnValue({ session: SESSION });
 });
 
 // ---------------------------------------------------------------------------
@@ -44,12 +52,6 @@ beforeEach(() => {
 
 describe("POST /api/cli/auth/approve", () => {
   it("returns 503 when Redis write fails", async () => {
-    vi.mocked(readSessionCookie).mockReturnValue({
-      token: "ghp_fake",
-      login: "testuser",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    });
     vi.mocked(cacheSet).mockResolvedValue(false);
 
     const res = await POST(
@@ -65,12 +67,6 @@ describe("POST /api/cli/auth/approve", () => {
   });
 
   it("returns 200 with success when Redis write succeeds", async () => {
-    vi.mocked(readSessionCookie).mockReturnValue({
-      token: "ghp_fake",
-      login: "testuser",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    });
     vi.mocked(cacheSet).mockResolvedValue(true);
 
     const res = await POST(
@@ -87,7 +83,12 @@ describe("POST /api/cli/auth/approve", () => {
   });
 
   it("returns 401 when session cookie is invalid", async () => {
-    vi.mocked(readSessionCookie).mockReturnValue(null);
+    vi.mocked(requireSession).mockReturnValue({
+      error: NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      ),
+    });
 
     const res = await POST(
       makeRequest(
@@ -100,13 +101,6 @@ describe("POST /api/cli/auth/approve", () => {
   });
 
   it("returns 400 for invalid session ID format", async () => {
-    vi.mocked(readSessionCookie).mockReturnValue({
-      token: "ghp_fake",
-      login: "testuser",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    });
-
     const res = await POST(
       makeRequest({ sessionId: "not-a-uuid" }, "chapa_session=valid"),
     );
@@ -115,7 +109,12 @@ describe("POST /api/cli/auth/approve", () => {
   });
 
   it("returns 500 when NEXTAUTH_SECRET is missing", async () => {
-    vi.stubEnv("NEXTAUTH_SECRET", "");
+    vi.mocked(requireSession).mockReturnValue({
+      error: NextResponse.json(
+        { error: "Server misconfigured" },
+        { status: 500 },
+      ),
+    });
 
     const res = await POST(
       makeRequest(

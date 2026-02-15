@@ -1,4 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("@/lib/env", () => ({
+  getBaseUrl: () => "https://chapa.thecreativetoken.com",
+}));
+
 import robots from "./robots";
 
 describe("robots.ts", () => {

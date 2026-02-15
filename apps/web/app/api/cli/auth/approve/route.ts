@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
+import { requireSession } from "@/lib/auth/require-session";
 import { cacheSet } from "@/lib/cache/redis";
 
 const DEVICE_SESSION_TTL = 300; // 5 minutes
 
 export async function POST(request: Request): Promise<Response> {
   // 1. Verify the user is logged in via web session
-  const secret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "Server misconfigured" },
-      { status: 500 },
-    );
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, secret);
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const { session, error } = requireSession(request);
+  if (error) return error;
 
   // 2. Parse body
   let body: { sessionId?: string };
