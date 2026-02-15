@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { isExperimentsEnabled } from "@/lib/feature-flags";
 
 export const metadata: Metadata = {
   robots: {
@@ -12,5 +14,8 @@ export default function ExperimentsLayout({
 }: {
   children: React.ReactNode;
 }) {
+  if (!isExperimentsEnabled()) {
+    notFound();
+  }
   return <>{children}</>;
 }
