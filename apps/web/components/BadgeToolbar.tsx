@@ -59,7 +59,7 @@ export function BadgeToolbar({
     } catch {
       /* clipboard API may be blocked */
     }
-  }, [shareUrl]);
+  }, [shareUrl, setShareOpen]);
 
   const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
 
