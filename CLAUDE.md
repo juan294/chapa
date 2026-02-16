@@ -278,3 +278,19 @@ Reference issues in commits with `Fixes #N` or `Refs #N`.
 **Cause**: GitHub API rate limits (60/hr unauthenticated, 5000/hr authenticated).
 
 **Fix**: Always serve cached data when available. If no cache exists and rate limit is hit, return a "try later" response — never an error page. Authenticated requests (OAuth token) get 80x more headroom.
+
+---
+
+# Headless Mode (CI / Automation)
+
+Run Claude Code non-interactively for automated tasks:
+
+```bash
+# Fix all TypeScript lint errors and run tests:
+claude -p "Fix all TypeScript lint errors and run tests" \
+  --allowedTools "Edit,Read,Bash,Write" --output-format json
+
+# Batch process GitHub issues:
+claude -p "Read issue #240 and implement the fix with TDD" \
+  --allowedTools "Edit,Read,Bash,Write,Grep"
+```
