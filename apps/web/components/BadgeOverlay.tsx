@@ -119,11 +119,11 @@ const HOTSPOTS: Hotspot[] = [
     width: "52%",
     height: "52%",
     leaderLine: {
-      // Curve up from top edge center to avoid overlapping embed section below
-      path: "M 372 189 C 365 100 348 0 336 -88",
-      panelTop: "-14%",
+      // Curve down from bottom edge center
+      path: "M 372 517 C 365 580 348 640 336 688",
+      panelTop: "109%",
       panelLeft: "28%",
-      panelAnchor: "above",
+      panelAnchor: "below",
     },
   },
   {

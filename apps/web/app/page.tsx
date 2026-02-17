@@ -166,7 +166,7 @@ export default async function Home({
           </section>
 
           {/* ── Badge Preview: $ chapa preview @developer ──── */}
-          <section id="badge-preview" className="animate-fade-in-up [animation-delay:200ms]">
+          <section id="badge-preview" className="relative z-10 animate-fade-in-up [animation-delay:200ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa preview @developer</span>
