@@ -9,12 +9,13 @@ import type { MetricsSnapshot } from "@chapa/shared";
 import type { VerificationRecord } from "../apps/web/lib/verification/types";
 
 /**
- * Parse a Redis sorted set member (JSON string) into a MetricsSnapshot.
- * Returns null if the JSON is invalid or required fields are missing.
+ * Parse a Redis sorted set member into a MetricsSnapshot.
+ * Accepts either a JSON string or a pre-parsed object (Upstash auto-deserializes).
+ * Returns null if the input is invalid or required fields are missing.
  */
-export function parseRedisSnapshot(json: string): MetricsSnapshot | null {
+export function parseRedisSnapshot(input: string | unknown): MetricsSnapshot | null {
   try {
-    const parsed = JSON.parse(json);
+    const parsed = typeof input === "string" ? JSON.parse(input) : input;
     if (
       typeof parsed !== "object" ||
       parsed === null ||

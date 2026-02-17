@@ -65,11 +65,12 @@ async function backfillSnapshots(
 
   for (const key of keys) {
     const handle = key.replace("history:", "");
-    const members = await redis.zrange<string[]>(key, 0, -1);
+    // Upstash auto-deserializes JSON — members are objects, not strings
+    const members = await redis.zrange<unknown[]>(key, 0, -1);
 
-    for (const memberJson of members) {
+    for (const member of members) {
       scanned++;
-      const snapshot = parseRedisSnapshot(memberJson);
+      const snapshot = parseRedisSnapshot(member);
       if (!snapshot) {
         console.warn(`  [SKIP] Invalid snapshot in ${key}`);
         errors++;
