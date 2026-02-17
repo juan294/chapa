@@ -75,6 +75,16 @@ describe("parseRedisSnapshot", () => {
     const result = parseRedisSnapshot(JSON.stringify(withOptional));
     expect(result).toEqual(withOptional);
   });
+
+  it("accepts a pre-parsed object (Upstash auto-deserializes)", () => {
+    const result = parseRedisSnapshot(validSnapshot);
+    expect(result).toEqual(validSnapshot);
+  });
+
+  it("returns null for non-object non-string input", () => {
+    expect(parseRedisSnapshot(42 as unknown as string)).toBeNull();
+    expect(parseRedisSnapshot(null as unknown as string)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
