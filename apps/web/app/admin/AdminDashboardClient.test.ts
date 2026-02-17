@@ -58,6 +58,49 @@ describe("AdminDashboardClient", () => {
     });
   });
 
+  describe("a11y: h1 heading in loading and error states (#364)", () => {
+    it("loading state contains an <h1> element", () => {
+      // The loading branch (if (loading)) must include an <h1> so screen
+      // readers have a heading landmark. We locate the loading block by
+      // finding the section between "Loading state" and "Error state" comments.
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).toMatch(/<h1[\s>]/);
+    });
+
+    it("error state contains an <h1> element", () => {
+      // The error branch (if (error)) must include an <h1> so screen
+      // readers have a heading landmark. We locate the error block by
+      // finding the section between "Error state" and "Dashboard" comments.
+      const errorBlock = SOURCE.match(
+        /\/\/ Error state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Dashboard/,
+      );
+      expect(errorBlock).not.toBeNull();
+      expect(errorBlock![0]).toMatch(/<h1[\s>]/);
+    });
+
+    it("loading and error h1 use font-heading class", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      const errorBlock = SOURCE.match(
+        /\/\/ Error state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Dashboard/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(errorBlock).not.toBeNull();
+
+      // Extract <h1 ...> tags from each block
+      const loadingH1 = loadingBlock![0].match(/<h1[^>]*>/);
+      const errorH1 = errorBlock![0].match(/<h1[^>]*>/);
+      expect(loadingH1).not.toBeNull();
+      expect(errorH1).not.toBeNull();
+      expect(loadingH1![0]).toContain("font-heading");
+      expect(errorH1![0]).toContain("font-heading");
+    });
+  });
+
   describe("a11y: refresh button (#306)", () => {
     it("uses aria-label instead of title on the refresh button", () => {
       // The refresh button should use aria-label for screen reader text,

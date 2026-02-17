@@ -278,6 +278,9 @@ export function AdminDashboardClient() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-32">
+        <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+          <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+        </h1>
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
         <p className="font-heading text-sm text-text-secondary">
           <span className="text-amber">$</span> fetching user data...
@@ -293,6 +296,9 @@ export function AdminDashboardClient() {
   if (error) {
     return (
       <div className="mx-auto max-w-lg py-32 text-center">
+        <h1 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
+          <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+        </h1>
         <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
           <p className="font-heading text-sm text-terminal-red">
             <span className="text-terminal-red/50">ERR</span> {error}
