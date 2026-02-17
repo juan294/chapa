@@ -100,7 +100,7 @@ export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
           </h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-amber/10 hover:text-text-primary"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-amber/10 hover:text-text-primary"
             aria-label="Close keyboard shortcuts"
           >
             <svg

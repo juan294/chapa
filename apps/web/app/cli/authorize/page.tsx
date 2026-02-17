@@ -13,11 +13,16 @@ export default async function CliAuthorizePage({ searchParams }: Props) {
 
   if (!sessionId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg">
-        <p className="text-terminal-red font-heading">
-          Missing session parameter. Run &quot;chapa login&quot; from your terminal.
-        </p>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-bg px-6">
+        <div className="w-full max-w-md rounded-xl border border-stroke bg-card p-8">
+          <h1 className="font-heading text-xl font-bold text-text-primary mb-4">
+            Authorize Chapa CLI
+          </h1>
+          <p className="text-terminal-red font-heading text-sm">
+            Missing session parameter. Run &quot;chapa login&quot; from your terminal.
+          </p>
+        </div>
+      </main>
     );
   }
 

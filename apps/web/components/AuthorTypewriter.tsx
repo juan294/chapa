@@ -157,6 +157,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
     <div
       className={`group relative z-20 transition-opacity duration-500 ${className ?? ""}`}
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
     >
       {/* Popover card — appears above the pill on hover */}
       {SOCIAL_LINKS.length > 0 && (
