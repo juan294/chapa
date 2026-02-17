@@ -338,3 +338,37 @@ describe("rowToSnapshot edge cases", () => {
     expect(result!.confidencePenalties).toEqual(penalties);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Runtime row validation (parseRow integration)
+// ---------------------------------------------------------------------------
+
+describe("runtime row validation", () => {
+  it("dbGetLatestSnapshot returns null for a malformed row (missing required key)", async () => {
+    // Simulate a row missing the "tier" field
+    const row = makeRow();
+    delete (row as Record<string, unknown>)["tier"];
+    terminalResolve = { data: row, error: null };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("dbGetSnapshots filters out malformed rows from the array", async () => {
+    const validRow = makeRow();
+    const incompleteRow = makeRow({ date: "2025-06-16" });
+    delete (incompleteRow as Record<string, unknown>)["archetype"];
+    terminalResolve = { data: [validRow, incompleteRow], error: null };
+
+    const result = await dbGetSnapshots("testuser");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.date).toBe("2025-06-15");
+  });
+
+  it("dbGetSnapshots returns empty array when all rows are malformed", async () => {
+    terminalResolve = { data: [{ bad: "data" }], error: null };
+
+    const result = await dbGetSnapshots("testuser");
+    expect(result).toEqual([]);
+  });
+});
