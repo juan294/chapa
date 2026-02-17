@@ -7,6 +7,25 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+// Read all admin sub-component sources for tests that check patterns
+// which may live in extracted components after the #369 refactor.
+function readIfExists(filename: string): string {
+  const p = path.resolve(__dirname, filename);
+  try {
+    return fs.readFileSync(p, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
+const ALL_ADMIN_SOURCE = [
+  SOURCE,
+  readIfExists("AdminSearchBar.tsx"),
+  readIfExists("AdminUserTable.tsx"),
+  readIfExists("AdminStatsCards.tsx"),
+  readIfExists("AdminSortableHeader.tsx"),
+].join("\n");
+
 describe("AdminDashboardClient", () => {
   describe("sort event handler (#284)", () => {
     it("reads dir from custom event detail", () => {
@@ -25,17 +44,17 @@ describe("AdminDashboardClient", () => {
   describe("table header keyboard accessibility (#286)", () => {
     it("wraps sort text in <button> elements inside <th>", () => {
       // Each sortable <th> should contain a <button> for keyboard access
-      expect(SOURCE).toMatch(/<th[^>]*>\s*<button/);
+      expect(ALL_ADMIN_SOURCE).toMatch(/<th[^>]*>\s*<button/);
     });
 
     it("does not use onClick on <th> elements directly", () => {
       // onClick should be on the <button> inside <th>, not on <th> itself
-      expect(SOURCE).not.toMatch(/<th[^>]*onClick/);
+      expect(ALL_ADMIN_SOURCE).not.toMatch(/<th[^>]*onClick/);
     });
 
     it("all <th> elements have scope='col'", () => {
       // Every <th> in the table header must have scope="col"
-      const thMatches = SOURCE.match(/<th\b[^>]*>/g) ?? [];
+      const thMatches = ALL_ADMIN_SOURCE.match(/<th\b[^>]*>/g) ?? [];
       expect(thMatches.length).toBeGreaterThan(0);
       for (const th of thMatches) {
         expect(th).toContain('scope="col"');
@@ -44,17 +63,17 @@ describe("AdminDashboardClient", () => {
 
     it("sorted column has aria-sort attribute", () => {
       // The currently sorted column should declare aria-sort
-      expect(SOURCE).toMatch(/aria-sort/);
+      expect(ALL_ADMIN_SOURCE).toMatch(/aria-sort/);
     });
   });
 
   describe("a11y: badge link aria-label (#334)", () => {
     it("uses aria-label on the badge SVG link", () => {
-      expect(SOURCE).toContain("aria-label={`View badge SVG for ${user.handle}`}");
+      expect(ALL_ADMIN_SOURCE).toContain("aria-label={`View badge SVG for ${user.handle}`}");
     });
 
     it("keeps title for tooltip", () => {
-      expect(SOURCE).toContain('title="View badge SVG"');
+      expect(ALL_ADMIN_SOURCE).toContain('title="View badge SVG"');
     });
   });
 
@@ -111,6 +130,52 @@ describe("AdminDashboardClient", () => {
       const refreshBtn = refreshBtnMatch![0];
       expect(refreshBtn).toContain('aria-label=');
       expect(refreshBtn).not.toContain('title=');
+    });
+  });
+
+  describe("component extraction (#369)", () => {
+    it("AdminSearchBar exists as a separate file", () => {
+      const src = readIfExists("AdminSearchBar.tsx");
+      expect(src.length).toBeGreaterThan(0);
+    });
+
+    it("AdminUserTable exists as a separate file", () => {
+      const src = readIfExists("AdminUserTable.tsx");
+      expect(src.length).toBeGreaterThan(0);
+    });
+
+    it("AdminStatsCards exists as a separate file", () => {
+      const src = readIfExists("AdminStatsCards.tsx");
+      expect(src.length).toBeGreaterThan(0);
+    });
+
+    it("AdminSortableHeader exists as a separate file", () => {
+      const src = readIfExists("AdminSortableHeader.tsx");
+      expect(src.length).toBeGreaterThan(0);
+    });
+
+    it("AdminDashboardClient imports sub-components", () => {
+      expect(SOURCE).toMatch(/from\s+["']\.\/AdminSearchBar["']/);
+      expect(SOURCE).toMatch(/from\s+["']\.\/AdminUserTable["']/);
+      expect(SOURCE).toMatch(/from\s+["']\.\/AdminStatsCards["']/);
+    });
+
+    it("AdminDashboardClient is under 300 lines after extraction", () => {
+      const lines = SOURCE.split("\n").length;
+      expect(lines).toBeLessThan(300);
+    });
+
+    it("AdminUserTable imports AdminSortableHeader", () => {
+      const src = readIfExists("AdminUserTable.tsx");
+      expect(src).toMatch(/from\s+["']\.\/AdminSortableHeader["']/);
+    });
+
+    it("shared types are exported from a types file", () => {
+      const typesSrc = readIfExists("admin-types.ts");
+      expect(typesSrc.length).toBeGreaterThan(0);
+      expect(typesSrc).toContain("AdminUser");
+      expect(typesSrc).toContain("SortField");
+      expect(typesSrc).toContain("SortDir");
     });
   });
 });
