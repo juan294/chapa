@@ -1,11 +1,12 @@
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { dbStoreVerification } from "@/lib/db/verification";
 import type { VerificationRecord } from "./types";
 
 const VERIFY_TTL = 2_592_000; // 30 days in seconds
 
 /**
- * Store a verification record in Redis.
- * Fail-open: silently no-ops if Redis is unavailable.
+ * Store a verification record in Redis + Supabase (dual-write).
+ * Fail-open: silently no-ops if either store is unavailable.
  */
 export async function storeVerificationRecord(
   hash: string,
@@ -17,7 +18,14 @@ export async function storeVerificationRecord(
       cacheSet(`verify-handle:${record.handle.toLowerCase()}`, hash, VERIFY_TTL),
     ]);
   } catch {
-    // Fail open — verification is non-critical
+    // Fail open — Redis verification is non-critical
+  }
+
+  // Dual-write to Supabase (fire-and-forget, independent of Redis)
+  try {
+    void dbStoreVerification(hash, record);
+  } catch {
+    // Supabase errors are non-critical
   }
 }
 
