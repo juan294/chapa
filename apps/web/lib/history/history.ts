@@ -1,4 +1,5 @@
 import { getRawRedis } from "@/lib/cache/redis";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import type { MetricsSnapshot } from "./types";
 
 /** Redis key prefix for history sorted sets. */
@@ -49,6 +50,9 @@ export async function recordSnapshot(
 
     // Fire-and-forget: prune old entries to prevent unbounded growth
     pruneSnapshots(handle, MAX_SNAPSHOTS).catch(() => {});
+
+    // Dual-write to Supabase (fire-and-forget)
+    dbInsertSnapshot(handle, snapshot).catch(() => {});
 
     return true;
   } catch (error) {

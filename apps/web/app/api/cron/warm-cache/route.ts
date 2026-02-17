@@ -5,6 +5,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { recordSnapshot } from "@/lib/history/history";
+import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -85,11 +86,20 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Clean expired verification records from Supabase (fire-and-forget safe)
+  let expiredVerificationsDeleted = 0;
+  try {
+    expiredVerificationsDeleted = await dbCleanExpiredVerifications();
+  } catch {
+    // Non-critical — don't fail the cron response
+  }
+
   return NextResponse.json(
     {
       warmed,
       failed,
       snapshots,
+      expiredVerificationsDeleted,
       total: toWarm.length,
       handles: toWarm,
       durationMs: Date.now() - start,

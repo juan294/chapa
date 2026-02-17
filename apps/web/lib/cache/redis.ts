@@ -10,6 +10,7 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { dbUpsertUser } from "@/lib/db/users";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton
@@ -299,6 +300,9 @@ export async function registerUser(handle: string): Promise<void> {
       handle: lowerHandle,
       registeredAt: new Date().toISOString(),
     });
+
+    // Dual-write to Supabase (fire-and-forget)
+    dbUpsertUser(handle).catch(() => {});
   } catch {
     // Fire-and-forget — user registration is non-critical
   }

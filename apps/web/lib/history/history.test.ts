@@ -19,6 +19,14 @@ vi.mock("@/lib/cache/redis", () => ({
   })),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock Supabase DB layer
+// ---------------------------------------------------------------------------
+
+vi.mock("@/lib/db/snapshots", () => ({
+  dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
+}));
+
 import {
   recordSnapshot,
   getSnapshots,
@@ -26,6 +34,7 @@ import {
   getSnapshotCount,
   pruneSnapshots,
 } from "./history";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -296,5 +305,52 @@ describe("recordSnapshot — prune integration", () => {
 
     expect(mockZcard).not.toHaveBeenCalled();
     expect(mockZremrangebyrank).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recordSnapshot — Supabase dual-write
+// ---------------------------------------------------------------------------
+
+describe("recordSnapshot — Supabase dual-write", () => {
+  it("calls dbInsertSnapshot after a successful Redis write", async () => {
+    mockZrange.mockResolvedValue([]);
+    mockZadd.mockResolvedValue(1);
+
+    const snapshot = makeSnapshot();
+    await recordSnapshot("TestUser", snapshot);
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(dbInsertSnapshot)).toHaveBeenCalledWith(
+        "TestUser",
+        snapshot,
+      );
+    });
+  });
+
+  it("does not call dbInsertSnapshot when Redis dedup skips write", async () => {
+    mockZrange.mockResolvedValue(["existing-member"]);
+
+    await recordSnapshot("TestUser", makeSnapshot());
+
+    expect(vi.mocked(dbInsertSnapshot)).not.toHaveBeenCalled();
+  });
+
+  it("still returns true when Supabase write fails (fire-and-forget)", async () => {
+    mockZrange.mockResolvedValue([]);
+    mockZadd.mockResolvedValue(1);
+    vi.mocked(dbInsertSnapshot).mockRejectedValue(new Error("Supabase down"));
+
+    const result = await recordSnapshot("TestUser", makeSnapshot());
+
+    expect(result).toBe(true);
+  });
+
+  it("does not call dbInsertSnapshot when Redis itself fails", async () => {
+    mockZrange.mockRejectedValue(new Error("Redis down"));
+
+    await recordSnapshot("TestUser", makeSnapshot());
+
+    expect(vi.mocked(dbInsertSnapshot)).not.toHaveBeenCalled();
   });
 });
