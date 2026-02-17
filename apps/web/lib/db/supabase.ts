@@ -30,6 +30,23 @@ export function getSupabase(): SupabaseClient | null {
   return _client;
 }
 
+/**
+ * Lightweight health check — same pattern as pingRedis().
+ * Returns "ok" if a trivial query succeeds, "unavailable" if env vars are
+ * missing, or "error" if the query fails.
+ */
+export async function pingSupabase(): Promise<"ok" | "error" | "unavailable"> {
+  const db = getSupabase();
+  if (!db) return "unavailable";
+
+  try {
+    const { error } = await db.from("users").select("id").limit(1);
+    return error ? "error" : "ok";
+  } catch {
+    return "error";
+  }
+}
+
 /** Reset the singleton — for tests only. */
 export function _resetClient(): void {
   _client = undefined;

@@ -5,7 +5,7 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
 }));
 
-import { getSupabase, _resetClient } from "./supabase";
+import { getSupabase, pingSupabase, _resetClient } from "./supabase";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,6 +23,19 @@ describe("getSupabase", () => {
 
     expect(getSupabase()).toBeNull();
     expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("logs a warning when env vars are missing", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+
+    getSupabase();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("SUPABASE_URL"),
+    );
+    warnSpy.mockRestore();
   });
 
   it("returns null when SUPABASE_SERVICE_ROLE_KEY is missing", () => {
@@ -76,5 +89,45 @@ describe("getSupabase", () => {
     getSupabase();
 
     expect(mockCreateClient).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pingSupabase
+// ---------------------------------------------------------------------------
+
+describe("pingSupabase", () => {
+  it("returns 'ok' when query succeeds", async () => {
+    const mockSelect = vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue({ error: null }),
+    });
+    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+
+    const result = await pingSupabase();
+    expect(result).toBe("ok");
+  });
+
+  it("returns 'unavailable' when env vars are missing", async () => {
+    vi.stubEnv("SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+
+    const result = await pingSupabase();
+    expect(result).toBe("unavailable");
+  });
+
+  it("returns 'error' when query fails", async () => {
+    const mockSelect = vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue({ error: new Error("DB down") }),
+    });
+    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+
+    const result = await pingSupabase();
+    expect(result).toBe("error");
   });
 });

@@ -2,21 +2,42 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { VerificationRecord } from "@/lib/verification/types";
 
 // ---------------------------------------------------------------------------
-// Mock Supabase client
+// Mock Supabase client — tracks arguments for all chain methods
 // ---------------------------------------------------------------------------
 
 const mockUpsert = vi.fn();
 const mockDelete = vi.fn();
+const mockSelect = vi.fn();
+const mockEq = vi.fn();
+const mockGt = vi.fn();
+const mockLt = vi.fn();
+const mockLimit = vi.fn();
 let terminalResolve: { data: unknown; error: unknown };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockFrom = vi.fn((): any => {
   const chain: Record<string, unknown> = {};
   chain.upsert = mockUpsert;
-  chain.select = () => chain;
-  chain.eq = () => chain;
-  chain.gt = () => chain;
-  chain.lt = () => chain;
+  chain.select = (...args: unknown[]) => {
+    mockSelect(...args);
+    return chain;
+  };
+  chain.eq = (...args: unknown[]) => {
+    mockEq(...args);
+    return chain;
+  };
+  chain.gt = (...args: unknown[]) => {
+    mockGt(...args);
+    return chain;
+  };
+  chain.lt = (...args: unknown[]) => {
+    mockLt(...args);
+    return chain;
+  };
+  chain.limit = (...args: unknown[]) => {
+    mockLimit(...args);
+    return chain;
+  };
   chain.delete = () => {
     mockDelete();
     return chain;
@@ -30,7 +51,7 @@ const mockFrom = vi.fn((): any => {
       else resolve(terminalResolve);
     },
   });
-  // For delete().select() chain
+  // For delete().lt().limit().select() chain
   chain.then = (
     resolve: (v: unknown) => void,
     reject: (e: unknown) => void,
@@ -50,6 +71,7 @@ import {
   dbStoreVerification,
   dbGetVerification,
   dbCleanExpiredVerifications,
+  CLEANUP_BATCH_SIZE,
 } from "./verification";
 
 const record: VerificationRecord = {
@@ -160,6 +182,17 @@ describe("dbGetVerification", () => {
     expect(result).toEqual(record);
   });
 
+  it("filters by expires_at > now using .gt()", async () => {
+    terminalResolve = { data: null, error: null };
+
+    await dbGetVerification("abc12345");
+
+    expect(mockGt).toHaveBeenCalledWith(
+      "expires_at",
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    );
+  });
+
   it("returns null on miss", async () => {
     terminalResolve = { data: null, error: null };
     const result = await dbGetVerification("nonexistent");
@@ -190,6 +223,15 @@ describe("dbCleanExpiredVerifications", () => {
     const result = await dbCleanExpiredVerifications();
     expect(result).toBe(2);
     expect(mockDelete).toHaveBeenCalled();
+  });
+
+  it("applies CLEANUP_BATCH_SIZE limit", async () => {
+    terminalResolve = { data: [], error: null };
+
+    await dbCleanExpiredVerifications();
+
+    expect(mockLimit).toHaveBeenCalledWith(CLEANUP_BATCH_SIZE);
+    expect(CLEANUP_BATCH_SIZE).toBe(1000);
   });
 
   it("returns 0 when DB is unavailable", async () => {

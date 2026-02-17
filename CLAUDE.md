@@ -86,6 +86,7 @@ Must be easy to swap/remove:
 - SVG rendering: `apps/web/lib/render/*`, `apps/web/app/u/[handle]/badge.svg/route.ts`
 - Share page: `apps/web/app/u/[handle]/page.tsx`, `apps/web/components/*`
 - Lifetime history: `apps/web/lib/history/*`
+- Data access (Supabase): `apps/web/lib/db/*`
 - Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
 - Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
 - Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx`
@@ -192,6 +193,9 @@ NEXT_PUBLIC_BASE_URL=      # Base URL for OAuth redirect (e.g., https://chapa.th
 
 UPSTASH_REDIS_REST_URL=    # Upstash Redis
 UPSTASH_REDIS_REST_TOKEN=  # Upstash Redis
+
+SUPABASE_URL=              # Supabase project URL (optional — database features degrade gracefully)
+SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBLIC_)
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host

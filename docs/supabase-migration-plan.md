@@ -440,20 +440,72 @@ SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBL
 
 ---
 
-## 8. Risk Mitigation
+## 8. Connection Pooling Strategy
+
+The Supabase JS SDK communicates via REST (PostgREST), not direct Postgres connections. This means:
+
+- **No connection pool exhaustion risk** — each request is a stateless HTTP call to PostgREST. There are no persistent database connections to manage or leak.
+- **No Supavisor needed for the JS SDK** — Supavisor (Supabase's connection pooler) is only relevant for direct Postgres connections (e.g., backfill scripts using `pg`, Prisma, or migration tools).
+- **Serverless-friendly by design** — Vercel serverless functions can spin up hundreds of instances without exhausting Postgres connection slots, because the JS SDK never opens a direct connection.
+
+**When Supavisor matters:**
+- Phase 3 backfill script (`scripts/backfill-supabase.ts`) — if it uses a direct Postgres client for bulk inserts, route it through Supavisor's pooled connection string.
+- Any future direct-connection use (analytics dashboards, migration runners).
+
+---
+
+## 9. Risk Mitigation
 
 | Risk | Mitigation |
 |------|-----------|
 | Supabase downtime during dual-write | Fire-and-forget writes — Postgres failures don't affect badge serving |
 | Data mismatch after backfill | Validation script compares Redis vs Postgres counts and latest values |
-| Latency increase on reads (Phase 4) | Supabase region matches Vercel region; add connection pooling via Supavisor |
+| Latency increase on reads (Phase 4) | Supabase JS SDK uses REST (no connection pool needed); region-match Vercel |
 | Breaking existing tests | Phase 1 adds new tests; Phase 4 updates existing tests; no test goes unmocked |
 | Accidental Redis data deletion | Phase 5 cleanup happens 1+ week after Phase 4 is stable |
 | Rollback needed | Until Phase 5, Redis still has all data — revert imports to Redis-backed functions |
 
 ---
 
-## 9. What This Unlocks
+## 10. Rollback Procedures & Incident Response
+
+### Phase-by-phase rollback
+
+| Phase | Rollback action | Time estimate | Data at risk |
+|-------|----------------|---------------|--------------|
+| Phase 1 | Remove `@supabase/supabase-js`, delete `lib/db/*` files | 5 min | None — no production paths use Supabase |
+| Phase 2 | Revert dual-write imports; Redis still has all data | 10 min | None — Redis is still the primary store |
+| Phase 3 | No rollback needed — backfill is additive (Postgres data can be truncated) | 2 min | None |
+| Phase 4 | Revert read imports back to Redis-backed functions | 15 min | None — Redis writes continued during Phase 4 |
+| Phase 5 | **Cannot easily rollback** — Redis keys have been deleted. Restore from backup or re-backfill from Postgres to Redis | 30-60 min | Depends on backup freshness |
+
+### Data validation checklist (run after each phase)
+
+```bash
+# Compare user counts
+redis-cli KEYS "user:registered:*" | wc -l
+# vs Supabase: SELECT count(*) FROM users;
+
+# Compare snapshot counts for a sample handle
+redis-cli ZCARD "history:juan294"
+# vs Supabase: SELECT count(*) FROM metrics_snapshots WHERE handle = 'juan294';
+
+# Compare latest snapshot values
+redis-cli ZRANGE "history:juan294" -1 -1
+# vs Supabase: SELECT * FROM metrics_snapshots WHERE handle = 'juan294' ORDER BY date DESC LIMIT 1;
+```
+
+### Incident response
+
+1. **Identify the phase** — Which phase is currently active? This determines which store is primary for reads.
+2. **Check Supabase status** — Visit `status.supabase.com` or run `pingSupabase()` via `/api/health`.
+3. **Verify fail-open behavior** — In Phases 1-3, Supabase failures should be invisible to users (all Supabase calls are fire-and-forget or optional). If users are affected, the issue is elsewhere.
+4. **Phase 4 read failures** — If Supabase reads fail in Phase 4, revert the import to the Redis-backed function. This is a single-line change per affected module.
+5. **Revert the deployment** — Use `vercel rollback` or revert the PR commit on `main`.
+
+---
+
+## 11. What This Unlocks
 
 Once complete, these become trivial to build:
 
@@ -466,7 +518,7 @@ Once complete, these become trivial to build:
 
 ---
 
-## 10. Migration Checklist
+## 12. Migration Checklist
 
 - [ ] **Phase 1:** Install `@supabase/supabase-js`, create client module, create tables, write data access layer + tests
 - [ ] **Phase 2:** Add dual-write to `recordSnapshot`, `registerUser`, `storeVerificationRecord`; add verification cleanup to cron

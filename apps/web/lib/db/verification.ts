@@ -150,8 +150,11 @@ export async function dbGetVerification(
   }
 }
 
+/** Max rows deleted per cleanup run to avoid locking the table. */
+export const CLEANUP_BATCH_SIZE = 1000;
+
 /**
- * Delete expired verification records.
+ * Delete expired verification records (batched to avoid table locks).
  * Intended to be called from cron (warm-cache).
  * Returns the number of deleted rows, or 0 on error.
  */
@@ -164,6 +167,7 @@ export async function dbCleanExpiredVerifications(): Promise<number> {
       .from("verification_records")
       .delete()
       .lt("expires_at", new Date().toISOString())
+      .limit(CLEANUP_BATCH_SIZE)
       .select("id");
 
     if (error) throw error;

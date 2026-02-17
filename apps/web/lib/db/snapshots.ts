@@ -62,6 +62,10 @@ function rowToSnapshot(row: SnapshotRow): MetricsSnapshot {
     totalForks: row.total_forks,
     totalWatchers: row.total_watchers,
     topRepoShare: row.top_repo_share,
+    // Design decision: default to 0, not undefined. maxCommitsIn10Min is
+    // required (not optional) in MetricsSnapshot. Impact scoring expects a
+    // number — undefined would cause NaN in burst-commit penalty calculations.
+    // The DB column is nullable only for rows inserted before this field existed.
     maxCommitsIn10Min: row.max_commits_in_10min ?? 0,
     ...(row.micro_commit_ratio != null && {
       microCommitRatio: row.micro_commit_ratio,

@@ -97,6 +97,46 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
+// Test data helpers
+// ---------------------------------------------------------------------------
+
+/** Builds a DB row with sensible defaults; override only what the test cares about. */
+function makeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    date: "2025-06-15",
+    captured_at: "2025-06-15T14:30:00.000Z",
+    commits_total: 150,
+    prs_merged_count: 30,
+    prs_merged_weight: 45,
+    reviews_submitted: 20,
+    issues_closed: 10,
+    repos_contributed: 8,
+    active_days: 200,
+    lines_added: 5000,
+    lines_deleted: 2000,
+    total_stars: 100,
+    total_forks: 25,
+    total_watchers: 50,
+    top_repo_share: 0.4,
+    max_commits_in_10min: 3,
+    micro_commit_ratio: null,
+    docs_only_pr_ratio: null,
+    building: 75,
+    guarding: 60,
+    consistency: 80,
+    breadth: 55,
+    archetype: "Builder",
+    profile_type: "collaborative",
+    composite_score: 67.5,
+    adjusted_composite: 60.75,
+    confidence: 90,
+    tier: "High",
+    confidence_penalties: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // dbInsertSnapshot
 // ---------------------------------------------------------------------------
 
@@ -149,39 +189,7 @@ describe("dbInsertSnapshot", () => {
 
 describe("dbGetSnapshots", () => {
   it("returns mapped snapshots ordered by date asc", async () => {
-    const row = {
-      date: "2025-06-15",
-      captured_at: "2025-06-15T14:30:00.000Z",
-      commits_total: 150,
-      prs_merged_count: 30,
-      prs_merged_weight: 45,
-      reviews_submitted: 20,
-      issues_closed: 10,
-      repos_contributed: 8,
-      active_days: 200,
-      lines_added: 5000,
-      lines_deleted: 2000,
-      total_stars: 100,
-      total_forks: 25,
-      total_watchers: 50,
-      top_repo_share: 0.4,
-      max_commits_in_10min: 3,
-      micro_commit_ratio: null,
-      docs_only_pr_ratio: null,
-      building: 75,
-      guarding: 60,
-      consistency: 80,
-      breadth: 55,
-      archetype: "Builder",
-      profile_type: "collaborative",
-      composite_score: 67.5,
-      adjusted_composite: 60.75,
-      confidence: 90,
-      tier: "High",
-      confidence_penalties: null,
-    };
-
-    terminalResolve = { data: [row], error: null };
+    terminalResolve = { data: [makeRow()], error: null };
 
     const result = await dbGetSnapshots("TestUser", "2025-06-14", "2025-06-16");
 
@@ -221,39 +229,7 @@ describe("dbGetSnapshots", () => {
 
 describe("dbGetLatestSnapshot", () => {
   it("returns the latest snapshot via order desc + limit 1", async () => {
-    const row = {
-      date: "2025-06-15",
-      captured_at: "2025-06-15T14:30:00.000Z",
-      commits_total: 150,
-      prs_merged_count: 30,
-      prs_merged_weight: 45,
-      reviews_submitted: 20,
-      issues_closed: 10,
-      repos_contributed: 8,
-      active_days: 200,
-      lines_added: 5000,
-      lines_deleted: 2000,
-      total_stars: 100,
-      total_forks: 25,
-      total_watchers: 50,
-      top_repo_share: 0.4,
-      max_commits_in_10min: 3,
-      micro_commit_ratio: null,
-      docs_only_pr_ratio: null,
-      building: 75,
-      guarding: 60,
-      consistency: 80,
-      breadth: 55,
-      archetype: "Builder",
-      profile_type: "collaborative",
-      composite_score: 67.5,
-      adjusted_composite: 60.75,
-      confidence: 90,
-      tier: "High",
-      confidence_penalties: null,
-    };
-
-    terminalResolve = { data: row, error: null };
+    terminalResolve = { data: makeRow(), error: null };
 
     const result = await dbGetLatestSnapshot("TestUser");
 
@@ -282,18 +258,29 @@ describe("dbGetLatestSnapshot", () => {
 // ---------------------------------------------------------------------------
 
 describe("dbGetSnapshotCount", () => {
-  it("returns count from head query", async () => {
-    terminalResolve = { data: null, error: null };
-    // Override the chain to return count
+  it("returns count from head query and verifies .select() and .eq() args", async () => {
+    const mockCountSelect = vi.fn();
+    const mockCountEq = vi.fn();
     mockFrom.mockReturnValueOnce({
-      select: () => ({
-        eq: () =>
-          Promise.resolve({ count: 42, error: null }),
-      }),
+      select: (...args: unknown[]) => {
+        mockCountSelect(...args);
+        return {
+          eq: (...eqArgs: unknown[]) => {
+            mockCountEq(...eqArgs);
+            return Promise.resolve({ count: 42, error: null });
+          },
+        };
+      },
     });
 
     const result = await dbGetSnapshotCount("TestUser");
+
     expect(result).toBe(42);
+    expect(mockCountSelect).toHaveBeenCalledWith("*", {
+      count: "exact",
+      head: true,
+    });
+    expect(mockCountEq).toHaveBeenCalledWith("handle", "testuser");
   });
 
   it("returns 0 when DB is unavailable", async () => {
@@ -312,5 +299,42 @@ describe("dbGetSnapshotCount", () => {
 
     const result = await dbGetSnapshotCount("testuser");
     expect(result).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rowToSnapshot edge cases
+// ---------------------------------------------------------------------------
+
+describe("rowToSnapshot edge cases", () => {
+  it("maps null max_commits_in_10min to 0", async () => {
+    terminalResolve = {
+      data: makeRow({ max_commits_in_10min: null }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.maxCommitsIn10Min).toBe(0);
+  });
+
+  it("omits confidencePenalties when array is empty", async () => {
+    terminalResolve = {
+      data: makeRow({ confidence_penalties: [] }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.confidencePenalties).toBeUndefined();
+  });
+
+  it("includes confidencePenalties when array is non-empty", async () => {
+    const penalties = [{ flag: "low_activity", penalty: 10 }];
+    terminalResolve = {
+      data: makeRow({ confidence_penalties: penalties }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.confidencePenalties).toEqual(penalties);
   });
 });

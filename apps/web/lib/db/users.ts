@@ -28,20 +28,29 @@ export async function dbUpsertUser(handle: string): Promise<void> {
 }
 
 /**
- * Get all registered users, ordered by registration date (newest first).
+ * Get registered users, ordered by registration date (newest first).
+ * Supports optional pagination via limit/offset.
  * Returns empty array when DB is unavailable.
  */
-export async function dbGetUsers(): Promise<
-  { handle: string; registeredAt: string }[]
-> {
+export async function dbGetUsers(
+  opts?: { limit?: number; offset?: number },
+): Promise<{ handle: string; registeredAt: string }[]> {
   const db = getSupabase();
   if (!db) return [];
 
   try {
-    const { data, error } = await db
+    let query = db
       .from("users")
       .select("handle, registered_at")
       .order("registered_at", { ascending: false });
+
+    if (opts?.limit) {
+      const from = opts.offset ?? 0;
+      const to = from + opts.limit - 1; // Supabase .range() is inclusive
+      query = query.range(from, to);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
