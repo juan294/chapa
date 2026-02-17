@@ -23,7 +23,9 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "core-js",
       "esbuild",
+      "protobufjs",
       "sharp",
       "unrs-resolver"
     ]

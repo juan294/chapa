@@ -70,7 +70,7 @@ export function MobileNav({ links }: MobileNavProps) {
     <>
       <button
         type="button"
-        className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg border border-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
+        className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg border border-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
         aria-label="Toggle navigation"
         aria-controls="mobile-nav-panel"
         aria-expanded={open}

@@ -119,11 +119,11 @@ const HOTSPOTS: Hotspot[] = [
     width: "52%",
     height: "52%",
     leaderLine: {
-      // Curve up from top edge center to avoid overlapping embed section below
-      path: "M 372 189 C 365 100 348 0 336 -88",
-      panelTop: "-14%",
+      // Curve down from bottom edge center
+      path: "M 372 517 C 365 580 348 640 336 688",
+      panelTop: "109%",
       panelLeft: "28%",
-      panelAnchor: "above",
+      panelAnchor: "below",
     },
   },
   {
@@ -279,7 +279,7 @@ export function BadgeOverlay() {
 
       {/* ── Desktop: leader line annotation panel (hidden on mobile) ── */}
       {/* Only the active hotspot's panel renders (#323 — lazy render) */}
-      <div className="hidden md:contents" aria-hidden="true">
+      <div className="hidden md:contents">
         {activeHotspot && (() => {
           const isAbove = activeHotspot.leaderLine.panelAnchor === "above";
           return (

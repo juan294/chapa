@@ -10,7 +10,6 @@
  */
 
 import { Redis } from "@upstash/redis";
-import { dbUpsertUser } from "@/lib/db/users";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton
@@ -34,15 +33,6 @@ function getRedis(): Redis | null {
 
   _redis = new Redis({ url, token, retry: { retries: 0, backoff: () => 0 } });
   return _redis;
-}
-
-/**
- * Expose the raw Upstash Redis client for operations not covered by the
- * convenience helpers (e.g. sorted set commands used by history storage).
- * Returns `null` when Redis credentials are missing.
- */
-export function getRawRedis(): Redis | null {
-  return getRedis();
 }
 
 // ---------------------------------------------------------------------------
@@ -108,35 +98,8 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Bulk read: SCAN + MGET
+// Bulk read: MGET
 // ---------------------------------------------------------------------------
-
-/**
- * Scan Redis for keys matching a glob pattern.
- * Iterates SCAN until cursor returns to 0. Returns all matching keys.
- * Returns `[]` if Redis is unavailable or on error.
- */
-export async function scanKeys(pattern: string): Promise<string[]> {
-  const redis = getRedis();
-  if (!redis) return [];
-
-  try {
-    const keys: string[] = [];
-    let cursor = 0;
-    do {
-      const [nextCursor, batch] = await redis.scan(cursor, {
-        match: pattern,
-        count: 100,
-      });
-      keys.push(...batch);
-      cursor = typeof nextCursor === "string" ? parseInt(nextCursor, 10) : nextCursor;
-    } while (cursor !== 0);
-    return keys;
-  } catch (error) {
-    console.error("[cache] scanKeys failed:", (error as Error).message);
-    return [];
-  }
-}
 
 /**
  * Get multiple cached values by key in a single MGET call.
@@ -276,35 +239,6 @@ export async function getBadgeStats(): Promise<BadgeStats> {
     };
   } catch {
     return { total: 0, unique: 0 };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Permanent user registry (no TTL — survives all cache expirations)
-// ---------------------------------------------------------------------------
-
-/**
- * Register a user in the permanent registry.
- * Writes `user:registered:<handle>` with no TTL so the admin dashboard
- * always knows who has used Chapa, even after stats caches expire.
- *
- * Fire-and-forget safe — never throws, silently no-ops if Redis is down.
- */
-export async function registerUser(handle: string): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
-
-  const lowerHandle = handle.toLowerCase();
-  try {
-    await redis.set(`user:registered:${lowerHandle}`, {
-      handle: lowerHandle,
-      registeredAt: new Date().toISOString(),
-    });
-
-    // Dual-write to Supabase (fire-and-forget)
-    dbUpsertUser(handle).catch(() => {});
-  } catch {
-    // Fire-and-forget — user registration is non-critical
   }
 }
 

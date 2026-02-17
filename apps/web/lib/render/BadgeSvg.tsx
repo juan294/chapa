@@ -43,6 +43,7 @@ export function renderBadgeSvg(
 
   // ── Archetype + repo metrics pill row (above heatmap, left-aligned) ─
   const metaRowY = 160;
+  const reposStr = formatCompact(stats.reposContributed ?? 0);
   const watchStr = formatCompact(stats.totalWatchers ?? 0);
   const forkStr = formatCompact(stats.totalForks ?? 0);
   const starsStr = formatCompact(stats.totalStars ?? 0);
@@ -56,10 +57,12 @@ export function renderBadgeSvg(
   const archetypeText = impact.archetype;
   const archetypePillWidth = 14 + 20 + 6 + archetypeText.length * 10 + 14;
   // Metric pills: icon(16) + gap(4) + "count label"
+  const reposLabel = `${reposStr} Repos`;
   const watchLabel = `${watchStr} Watch`;
   const forkLabel = `${forkStr} Fork`;
   const starLabel = `${starsStr} Star`;
   const metricCharW = 8;
+  const reposPillW = 12 + 16 + 6 + reposLabel.length * metricCharW + 12;
   const watchPillW = 12 + 16 + 6 + watchLabel.length * metricCharW + 12;
   const forkPillW = 12 + 16 + 6 + forkLabel.length * metricCharW + 12;
   const starPillW = 12 + 16 + 6 + starLabel.length * metricCharW + 12;
@@ -158,8 +161,18 @@ export function renderBadgeSvg(
   </g>
   <!-- · separator -->
   <text x="${heatmapX + archetypePillWidth + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
-  <!-- Watch pill -->
+  <!-- Repos pill -->
   <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+    <rect width="${reposPillW}" height="${pillH}" rx="${pillR}" fill="rgba(124,106,239,0.06)" stroke="rgba(124,106,239,0.15)" stroke-width="1"/>
+    <g transform="translate(12, 9)" opacity="0.7">
+      <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3zm6 0v10M2 8h12" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="${12 + 16 + 6}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">${reposLabel}</text>
+  </g>
+  <!-- · separator -->
+  <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
+  <!-- Watch pill -->
+  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${watchPillW}" height="${pillH}" rx="${pillR}" fill="rgba(124,106,239,0.06)" stroke="rgba(124,106,239,0.15)" stroke-width="1"/>
     <g transform="translate(12, 9)">
       <path d="M1 7.5C1 7.5 3.5 2.5 8 2.5S15 7.5 15 7.5S12.5 12.5 8 12.5S1 7.5 1 7.5Z" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
@@ -168,9 +181,9 @@ export function renderBadgeSvg(
     <text x="${12 + 16 + 6}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">${watchLabel}</text>
   </g>
   <!-- · separator -->
-  <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
+  <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Fork pill -->
-  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${forkPillW}" height="${pillH}" rx="${pillR}" fill="rgba(124,106,239,0.06)" stroke="rgba(124,106,239,0.15)" stroke-width="1"/>
     <g transform="translate(12, 9)" opacity="0.7">
       <path d="M6 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM6 11a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM14 3a2 2 0 1 0-4 0 2 2 0 0 0 4 0zM4 5v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V5" fill="none" stroke="${t.textSecondary}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" transform="scale(0.95)"/>
@@ -178,9 +191,9 @@ export function renderBadgeSvg(
     <text x="${12 + 16 + 6}" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}">${forkLabel}</text>
   </g>
   <!-- · separator -->
-  <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
+  <text x="${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap}" y="${metaRowY + 5}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="${t.textSecondary}" opacity="0.4">\u00B7</text>
   <!-- Star pill -->
-  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
+  <g transform="translate(${heatmapX + archetypePillWidth + pillGap + dotGap * 2 + pillGap + reposPillW + pillGap + dotGap * 2 + pillGap + watchPillW + pillGap + dotGap * 2 + pillGap + forkPillW + pillGap + dotGap * 2 + pillGap}, ${metaRowY - pillH / 2})">
     <rect width="${starPillW}" height="${pillH}" rx="${pillR}" fill="rgba(124,106,239,0.06)" stroke="rgba(124,106,239,0.15)" stroke-width="1"/>
     <text x="12" y="23" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14" fill="${t.textSecondary}"><tspan fill="${t.accent}">\u2605</tspan> ${starLabel}</text>
   </g>

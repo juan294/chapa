@@ -7,11 +7,6 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
-const HISTORY_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../lib/history/history.ts"),
-  "utf-8",
-);
-
 const DIFF_SOURCE = fs.readFileSync(
   path.resolve(__dirname, "../lib/history/diff.ts"),
   "utf-8",
@@ -170,20 +165,8 @@ describe("Landing page — scoring overview in How It Works section", () => {
 // ---------------------------------------------------------------------------
 
 describe("History module — pre-built API surface JSDoc (#301)", () => {
-  it("getLatestSnapshot has JSDoc mentioning pre-built API surface", () => {
-    // Find the JSDoc comment preceding getLatestSnapshot
-    const match = HISTORY_SOURCE.match(
-      /\/\*\*[\s\S]*?@prebuilt[\s\S]*?\*\/\s*export\s+async\s+function\s+getLatestSnapshot/,
-    );
-    expect(match).not.toBeNull();
-  });
-
-  it("getSnapshotCount has JSDoc mentioning pre-built API surface", () => {
-    const match = HISTORY_SOURCE.match(
-      /\/\*\*[\s\S]*?@prebuilt[\s\S]*?\*\/\s*export\s+async\s+function\s+getSnapshotCount/,
-    );
-    expect(match).not.toBeNull();
-  });
+  // getLatestSnapshot no longer carries @prebuilt tags —
+  // they are actively used delegates to Supabase (Phase 4).
 
   it("explainDiff has JSDoc mentioning pre-built API surface", () => {
     const match = DIFF_SOURCE.match(

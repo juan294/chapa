@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { scanKeys, cacheMGet, registerUser, rateLimit } from "@/lib/cache/redis";
+import { cacheMGet, rateLimit } from "@/lib/cache/redis";
+import { dbGetUsers } from "@/lib/db/users";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import type { StatsData } from "@chapa/shared";
@@ -26,19 +27,11 @@ interface AdminUserEntry {
 }
 
 /**
- * Extract unique handles from a set of Redis keys by stripping the prefix.
- * E.g. "stats:v2:juan294" with prefix "stats:v2:" yields "juan294".
- */
-function extractHandles(keys: string[], prefix: string): string[] {
-  return keys.map((k) => k.slice(prefix.length));
-}
-
-/**
  * GET /api/admin/users
  *
- * Discovers ALL users who have ever interacted with Chapa by scanning
- * multiple Redis key patterns (stats, stale, verify-handle, badge:notified).
- * Returns stats + impact where available; marks users with expired stats.
+ * Discovers ALL registered users from Supabase (Phase 4).
+ * Loads stats from Redis cache (ephemeral). Returns stats + impact
+ * where available; marks users with expired stats.
  */
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 60 seconds
@@ -68,33 +61,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Discover all user handles.
-  // Primary source: user:registered:* (permanent, no TTL).
-  // Legacy fallback: stats, stale, verify-handle, badge:notified (all have TTLs).
-  const [registryKeys, primaryKeys, staleKeys, verifyKeys, notifiedKeys] = await Promise.all([
-    scanKeys("user:registered:*"),
-    scanKeys("stats:v2:*"),
-    scanKeys("stats:stale:*"),
-    scanKeys("verify-handle:*"),
-    scanKeys("badge:notified:*"),
-  ]);
+  // Discover all user handles from Supabase
+  const registeredUsers = await dbGetUsers();
+  const handles = registeredUsers.map((u) => u.handle);
 
-  // Collect all unique handles from all sources
-  const registeredHandles = new Set(extractHandles(registryKeys, "user:registered:"));
-  const allHandles = new Set<string>(registeredHandles);
-  for (const h of extractHandles(primaryKeys, "stats:v2:")) allHandles.add(h);
-  for (const h of extractHandles(staleKeys, "stats:stale:")) allHandles.add(h);
-  for (const h of extractHandles(verifyKeys, "verify-handle:")) allHandles.add(h);
-  for (const h of extractHandles(notifiedKeys, "badge:notified:")) allHandles.add(h);
-
-  // Backfill: register any users found via legacy keys but not yet in registry
-  for (const h of allHandles) {
-    if (!registeredHandles.has(h)) {
-      void registerUser(h);
-    }
-  }
-
-  if (allHandles.size === 0) {
+  if (handles.length === 0) {
     return NextResponse.json(
       { users: [] },
       { headers: { "Cache-Control": "no-store" } },
@@ -102,7 +73,6 @@ export async function GET(request: NextRequest) {
   }
 
   // For each handle, try to load stats (primary first, then stale fallback)
-  const handles = [...allHandles];
   const primaryStatsKeys = handles.map((h) => `stats:v2:${h}`);
   const staleStatsKeys = handles.map((h) => `stats:stale:${h}`);
 
@@ -116,7 +86,7 @@ export async function GET(request: NextRequest) {
     const stats = primaryValues[i] ?? staleValues[i] ?? null;
 
     if (!stats) {
-      // User exists (has verify/notified keys) but stats fully expired
+      // User exists in Supabase but stats cache fully expired
       return {
         handle,
         displayName: null,

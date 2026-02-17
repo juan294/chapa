@@ -77,16 +77,17 @@ const THEME_TOGGLE_SOURCE = fs.readFileSync(
 );
 
 describe("ThemeToggle — mobile responsiveness (#240)", () => {
-  it("button uses h-10 w-10 for 40px touch target", () => {
-    expect(THEME_TOGGLE_SOURCE).toContain("h-10 w-10");
-    // Ensure the old smaller size is not used
+  it("button uses h-11 w-11 for 44px touch target (WCAG 2.5.8)", () => {
+    expect(THEME_TOGGLE_SOURCE).toContain("h-11 w-11");
+    // Ensure the old smaller sizes are not used
     expect(THEME_TOGGLE_SOURCE).not.toContain("h-8 w-8");
+    expect(THEME_TOGGLE_SOURCE).not.toContain("h-10 w-10");
   });
 
-  it("hydration placeholder also uses h-10 w-10", () => {
+  it("hydration placeholder also uses h-11 w-11", () => {
     // The placeholder div should match the button size to prevent layout shift
     const placeholderMatch = THEME_TOGGLE_SOURCE.match(
-      /className="h-10 w-10"[\s\S]*?aria-hidden="true"/,
+      /className="h-11 w-11"[\s\S]*?aria-hidden="true"/,
     );
     expect(placeholderMatch).not.toBeNull();
   });

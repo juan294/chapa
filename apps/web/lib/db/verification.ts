@@ -7,6 +7,7 @@
 
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getSupabase } from "./supabase";
+import { parseRow } from "./parse-row";
 
 // ---------------------------------------------------------------------------
 // Row ↔ Type mapping
@@ -52,6 +53,25 @@ function rowToRecord(row: VerificationRow): VerificationRecord {
     generatedAt: row.generated_at,
   };
 }
+
+/** Keys required on every VerificationRow — used by parseRow for runtime validation. */
+const VERIFICATION_REQUIRED_KEYS: readonly (keyof VerificationRow)[] = [
+  "hash",
+  "handle",
+  "adjusted_composite",
+  "confidence",
+  "tier",
+  "archetype",
+  "profile_type",
+  "building",
+  "guarding",
+  "consistency",
+  "breadth",
+  "commits_total",
+  "prs_merged_count",
+  "reviews_submitted",
+  "generated_at",
+] as const;
 
 const RECORD_COLUMNS = [
   "hash",
@@ -140,7 +160,10 @@ export async function dbGetVerification(
     if (error) throw error;
     if (!data) return null;
 
-    return rowToRecord(data as unknown as VerificationRow);
+    const row = parseRow<VerificationRow>(data, VERIFICATION_REQUIRED_KEYS, "verification_records");
+    if (!row) return null;
+
+    return rowToRecord(row);
   } catch (error) {
     console.error(
       "[db] dbGetVerification failed:",

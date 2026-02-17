@@ -43,7 +43,7 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
       <button
         type="button"
         onClick={() => setDismissed(true)}
-        className="ml-2 flex-shrink-0 rounded-full p-1 text-amber/70 transition-colors hover:bg-amber/10 hover:text-amber"
+        className="ml-2 flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full p-1 text-amber/70 transition-colors hover:bg-amber/10 hover:text-amber"
         aria-label="Dismiss error"
       >
         <svg

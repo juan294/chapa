@@ -8,8 +8,9 @@ export async function GET() {
     pingSupabase(),
   ]);
 
-  // Only Redis affects degraded status in Phase 1 — Supabase is optional
-  const status = redisStatus === "ok" ? "ok" : "degraded";
+  // Both Redis and Supabase are critical — either failing triggers degraded
+  const status =
+    redisStatus === "ok" && supabaseStatus === "ok" ? "ok" : "degraded";
   const httpStatus = status === "ok" ? 200 : 503;
 
   return NextResponse.json(

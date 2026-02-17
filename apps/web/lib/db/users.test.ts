@@ -10,17 +10,12 @@ const mockOrder = vi.fn();
 const mockRange = vi.fn();
 
 let listResolve: { data: unknown; error: unknown };
-let countResolve: { count: unknown; error: unknown };
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const mockFrom = vi.fn((_table: string): any => ({
   upsert: mockUpsert,
   select: (...args: unknown[]) => {
     mockSelect(...args);
-    // Head count query (.select("*", { count: "exact", head: true }))
-    if (args.length === 2 && (args[1] as any)?.head === true) {
-      return Promise.resolve(countResolve);
-    }
     // List query (.select("handle, registered_at"))
     return {
       order: (...orderArgs: unknown[]) => {
@@ -48,12 +43,11 @@ vi.mock("./supabase", () => ({
 }));
 
 import { getSupabase } from "./supabase";
-import { dbUpsertUser, dbGetUsers, dbGetUserCount } from "./users";
+import { dbUpsertUser, dbGetUsers } from "./users";
 
 beforeEach(() => {
   vi.clearAllMocks();
   listResolve = { data: [], error: null };
-  countResolve = { count: 0, error: null };
 });
 
 // ---------------------------------------------------------------------------
@@ -154,33 +148,3 @@ describe("dbGetUsers", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// dbGetUserCount
-// ---------------------------------------------------------------------------
-
-describe("dbGetUserCount", () => {
-  it("returns the count from a head query", async () => {
-    countResolve = { count: 42, error: null };
-
-    const result = await dbGetUserCount();
-    expect(result).toBe(42);
-    expect(mockSelect).toHaveBeenCalledWith("*", {
-      count: "exact",
-      head: true,
-    });
-  });
-
-  it("returns 0 when DB is unavailable", async () => {
-    vi.mocked(getSupabase).mockReturnValueOnce(null);
-
-    const result = await dbGetUserCount();
-    expect(result).toBe(0);
-  });
-
-  it("returns 0 on query error", async () => {
-    countResolve = { count: null, error: new Error("query failed") };
-
-    const result = await dbGetUserCount();
-    expect(result).toBe(0);
-  });
-});

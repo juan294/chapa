@@ -8,6 +8,7 @@
 
 import type { MetricsSnapshot } from "@/lib/history/types";
 import { getSupabase } from "./supabase";
+import { parseRow, parseRows } from "./parse-row";
 
 // ---------------------------------------------------------------------------
 // Row ↔ Type mapping
@@ -132,6 +133,35 @@ function snapshotToRow(
   };
 }
 
+/** Keys required on every SnapshotRow — used by parseRow for runtime validation. */
+const SNAPSHOT_REQUIRED_KEYS: readonly (keyof SnapshotRow)[] = [
+  "date",
+  "captured_at",
+  "commits_total",
+  "prs_merged_count",
+  "prs_merged_weight",
+  "reviews_submitted",
+  "issues_closed",
+  "repos_contributed",
+  "active_days",
+  "lines_added",
+  "lines_deleted",
+  "total_stars",
+  "total_forks",
+  "total_watchers",
+  "top_repo_share",
+  "building",
+  "guarding",
+  "consistency",
+  "breadth",
+  "archetype",
+  "profile_type",
+  "composite_score",
+  "adjusted_composite",
+  "confidence",
+  "tier",
+] as const;
+
 // Select clause for all snapshot columns (excludes id and handle)
 const SNAPSHOT_COLUMNS = [
   "date",
@@ -225,7 +255,7 @@ export async function dbGetSnapshots(
     const { data, error } = await query;
     if (error) throw error;
 
-    return (data ?? []).map((row) => rowToSnapshot(row as unknown as SnapshotRow));
+    return parseRows<SnapshotRow>(data, SNAPSHOT_REQUIRED_KEYS, "metrics_snapshots").map(rowToSnapshot);
   } catch (error) {
     console.error("[db] dbGetSnapshots failed:", (error as Error).message);
     return [];
@@ -254,37 +284,15 @@ export async function dbGetLatestSnapshot(
     if (error) throw error;
     if (!data) return null;
 
-    return rowToSnapshot(data as unknown as SnapshotRow);
+    const row = parseRow<SnapshotRow>(data, SNAPSHOT_REQUIRED_KEYS, "metrics_snapshots");
+    if (!row) return null;
+
+    return rowToSnapshot(row);
   } catch (error) {
     console.error(
       "[db] dbGetLatestSnapshot failed:",
       (error as Error).message,
     );
     return null;
-  }
-}
-
-/**
- * Get the total number of snapshots for a user.
- * Returns 0 on error or when DB is unavailable.
- */
-export async function dbGetSnapshotCount(handle: string): Promise<number> {
-  const db = getSupabase();
-  if (!db) return 0;
-
-  try {
-    const { count, error } = await db
-      .from("metrics_snapshots")
-      .select("*", { count: "exact", head: true })
-      .eq("handle", handle.toLowerCase());
-
-    if (error) throw error;
-    return count ?? 0;
-  } catch (error) {
-    console.error(
-      "[db] dbGetSnapshotCount failed:",
-      (error as Error).message,
-    );
-    return 0;
   }
 }

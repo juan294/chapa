@@ -6,6 +6,21 @@
  */
 
 import { getSupabase } from "./supabase";
+import { parseRows } from "./parse-row";
+
+// ---------------------------------------------------------------------------
+// Row type
+// ---------------------------------------------------------------------------
+
+interface UserRow {
+  handle: string;
+  registered_at: string;
+}
+
+const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
+  "handle",
+  "registered_at",
+] as const;
 
 /**
  * Register a user (upsert — idempotent).
@@ -54,7 +69,7 @@ export async function dbGetUsers(
 
     if (error) throw error;
 
-    return (data ?? []).map((row) => ({
+    return parseRows<UserRow>(data, USER_REQUIRED_KEYS, "users").map((row) => ({
       handle: row.handle,
       registeredAt: row.registered_at,
     }));
@@ -64,23 +79,3 @@ export async function dbGetUsers(
   }
 }
 
-/**
- * Get total registered user count.
- * Returns 0 when DB is unavailable.
- */
-export async function dbGetUserCount(): Promise<number> {
-  const db = getSupabase();
-  if (!db) return 0;
-
-  try {
-    const { count, error } = await db
-      .from("users")
-      .select("*", { count: "exact", head: true });
-
-    if (error) throw error;
-    return count ?? 0;
-  } catch (error) {
-    console.error("[db] dbGetUserCount failed:", (error as Error).message);
-    return 0;
-  }
-}

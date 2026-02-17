@@ -216,22 +216,43 @@ describe("renderBadgeSvg", () => {
       expect(pillArea).not.toContain("\u2605");
     });
 
-    it("shows watch, fork, star as labeled pills with counts and dot separators", () => {
+    it("shows repos, watch, fork, star as labeled pills with counts and dot separators", () => {
       const svg = renderBadgeSvg(
-        makeStats({ totalWatchers: 80, totalForks: 25, totalStars: 142 }),
+        makeStats({ reposContributed: 7, totalWatchers: 80, totalForks: 25, totalStars: 142 }),
         makeImpact(),
       );
       expect(svg).toContain("80");
       expect(svg).toContain("25");
       expect(svg).toContain("142");
       // Each metric should have its label word
+      expect(svg).toContain("Repos");
       expect(svg).toContain("Watch");
       expect(svg).toContain("Fork");
       expect(svg).toContain("Star");
-      // Dot separators between pills (at least 3: archetype·watch·fork·star)
+      // Dot separators between pills (at least 4: archetype·repos·watch·fork·star)
       const dots = svg.match(/\u00B7/g);
       expect(dots).not.toBeNull();
-      expect(dots!.length).toBeGreaterThanOrEqual(3);
+      expect(dots!.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("repos pill appears before watch pill in SVG order", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ reposContributed: 5 }),
+        makeImpact(),
+      );
+      const reposIdx = svg.indexOf("Repos");
+      const watchIdx = svg.indexOf("Watch");
+      expect(reposIdx).toBeGreaterThan(-1);
+      expect(watchIdx).toBeGreaterThan(-1);
+      expect(reposIdx).toBeLessThan(watchIdx);
+    });
+
+    it("shows reposContributed count in repos pill", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ reposContributed: 12 }),
+        makeImpact(),
+      );
+      expect(svg).toContain("12 Repos");
     });
 
     it("formats large counts with compact notation", () => {
@@ -256,10 +277,10 @@ describe("renderBadgeSvg", () => {
 
     it("metric pills have individual rect backgrounds", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      // At least 4 pill rects: 1 archetype + 3 metrics (Watch, Fork, Star)
+      // At least 5 pill rects: 1 archetype + 4 metrics (Repos, Watch, Fork, Star)
       const pillRects = svg.match(/rx="17"/g);
       expect(pillRects).not.toBeNull();
-      expect(pillRects!.length).toBeGreaterThanOrEqual(4);
+      expect(pillRects!.length).toBeGreaterThanOrEqual(5);
     });
 
     it("contains a radar chart with polygon", () => {

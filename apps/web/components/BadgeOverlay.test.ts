@@ -137,6 +137,27 @@ describe("BadgeOverlay CSS variable colors (#331)", () => {
   });
 });
 
+describe("BadgeOverlay aria-describedby resolves to visible content (#363)", () => {
+  it("desktop panel container does NOT have aria-hidden='true'", () => {
+    // The panel container wrapping tooltip content is referenced by aria-describedby
+    // on hotspot regions. If the container has aria-hidden="true", the referenced
+    // content is removed from the accessibility tree, making aria-describedby
+    // resolve to nothing for screen reader users.
+    // Match the panel section between "leader line annotation panel" comment and "Hotspot regions" comment.
+    const panelSection = SRC.match(
+      /leader line annotation panel[\s\S]*?Hotspot regions/,
+    )?.[0];
+    expect(panelSection).toBeDefined();
+    expect(panelSection).not.toContain('aria-hidden="true"');
+  });
+
+  it("hotspot regions use aria-describedby pointing to panel IDs", () => {
+    // Verify the linkage exists — hotspots reference panels via aria-describedby
+    expect(SRC).toContain("aria-describedby");
+    expect(SRC).toContain("-panel");
+  });
+});
+
 describe("BadgeOverlay mobile fallback", () => {
   it("leader line SVG and panels are hidden on small screens (md breakpoint)", () => {
     // Leader line visuals should be desktop-only
