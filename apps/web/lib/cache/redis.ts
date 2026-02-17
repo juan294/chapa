@@ -98,35 +98,8 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Bulk read: SCAN + MGET
+// Bulk read: MGET
 // ---------------------------------------------------------------------------
-
-/**
- * Scan Redis for keys matching a glob pattern.
- * Iterates SCAN until cursor returns to 0. Returns all matching keys.
- * Returns `[]` if Redis is unavailable or on error.
- */
-export async function scanKeys(pattern: string): Promise<string[]> {
-  const redis = getRedis();
-  if (!redis) return [];
-
-  try {
-    const keys: string[] = [];
-    let cursor = 0;
-    do {
-      const [nextCursor, batch] = await redis.scan(cursor, {
-        match: pattern,
-        count: 100,
-      });
-      keys.push(...batch);
-      cursor = typeof nextCursor === "string" ? parseInt(nextCursor, 10) : nextCursor;
-    } while (cursor !== 0);
-    return keys;
-  } catch (error) {
-    console.error("[cache] scanKeys failed:", (error as Error).message);
-    return [];
-  }
-}
 
 /**
  * Get multiple cached values by key in a single MGET call.

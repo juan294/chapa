@@ -9,18 +9,15 @@ vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
   dbGetSnapshots: vi.fn(() => Promise.resolve([])),
   dbGetLatestSnapshot: vi.fn(() => Promise.resolve(null)),
-  dbGetSnapshotCount: vi.fn(() => Promise.resolve(0)),
 }));
 
 import {
   getSnapshots,
   getLatestSnapshot,
-  getSnapshotCount,
 } from "./history";
 import {
   dbGetSnapshots,
   dbGetLatestSnapshot,
-  dbGetSnapshotCount,
 } from "@/lib/db/snapshots";
 
 beforeEach(() => {
@@ -81,29 +78,6 @@ describe("getLatestSnapshot", () => {
     const result = await getLatestSnapshot("TestUser");
 
     expect(result).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getSnapshotCount — reads from Supabase
-// ---------------------------------------------------------------------------
-
-describe("getSnapshotCount", () => {
-  it("delegates to dbGetSnapshotCount and returns result", async () => {
-    vi.mocked(dbGetSnapshotCount).mockResolvedValue(42);
-
-    const result = await getSnapshotCount("TestUser");
-
-    expect(result).toBe(42);
-    expect(dbGetSnapshotCount).toHaveBeenCalledWith("TestUser");
-  });
-
-  it("returns 0 when Supabase returns 0", async () => {
-    vi.mocked(dbGetSnapshotCount).mockResolvedValue(0);
-
-    const result = await getSnapshotCount("TestUser");
-
-    expect(result).toBe(0);
   });
 });
 

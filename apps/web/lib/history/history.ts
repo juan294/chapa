@@ -1,7 +1,6 @@
 import {
   dbGetSnapshots,
   dbGetLatestSnapshot,
-  dbGetSnapshotCount,
 } from "@/lib/db/snapshots";
 import type { MetricsSnapshot } from "./types";
 
@@ -32,11 +31,3 @@ export async function getLatestSnapshot(
   return dbGetLatestSnapshot(handle);
 }
 
-/**
- * Get the total number of snapshots stored for a user.
- * Reads from Supabase.
- * Returns 0 on error or if DB is unavailable.
- */
-export async function getSnapshotCount(handle: string): Promise<number> {
-  return dbGetSnapshotCount(handle);
-}

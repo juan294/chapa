@@ -79,23 +79,3 @@ export async function dbGetUsers(
   }
 }
 
-/**
- * Get total registered user count.
- * Returns 0 when DB is unavailable.
- */
-export async function dbGetUserCount(): Promise<number> {
-  const db = getSupabase();
-  if (!db) return 0;
-
-  try {
-    const { count, error } = await db
-      .from("users")
-      .select("*", { count: "exact", head: true });
-
-    if (error) throw error;
-    return count ?? 0;
-  } catch (error) {
-    console.error("[db] dbGetUserCount failed:", (error as Error).message);
-    return 0;
-  }
-}

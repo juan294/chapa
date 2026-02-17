@@ -165,7 +165,7 @@ describe("Landing page — scoring overview in How It Works section", () => {
 // ---------------------------------------------------------------------------
 
 describe("History module — pre-built API surface JSDoc (#301)", () => {
-  // getLatestSnapshot and getSnapshotCount no longer carry @prebuilt tags —
+  // getLatestSnapshot no longer carries @prebuilt tags —
   // they are actively used delegates to Supabase (Phase 4).
 
   it("explainDiff has JSDoc mentioning pre-built API surface", () => {
