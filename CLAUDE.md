@@ -206,7 +206,6 @@ SUPPORT_FORWARD_EMAIL=     # Gmail address for email forwarding (optional)
 
 GITHUB_TOKEN=              # GitHub personal access token (optional — fallback when no OAuth token available)
 
-COMING_SOON=               # When set to any truthy value, enables coming-soon gate that blocks most routes (optional)
 CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
 NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (optional, disabled by default)

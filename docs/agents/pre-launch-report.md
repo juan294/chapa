@@ -28,7 +28,7 @@ All 6 specialists report GREEN or YELLOW. No blockers. Both prior conditions res
 | # | Issue | Severity | Found By | Risk |
 |---|-------|----------|----------|------|
 | W1 | Local `develop` is 4 commits ahead of `origin/develop` — CI has not validated them | Medium | DevOps | Release could fail if CI finds issues |
-| W2 | `NEXT_PUBLIC_SCORING_PAGE_ENABLED` and `NEXT_PUBLIC_EXPERIMENTS_ENABLED` undocumented in CLAUDE.md | Low | DevOps | Documentation gap only; both are optional feature flags |
+| W2 | `NEXT_PUBLIC_EXPERIMENTS_ENABLED` undocumented in CLAUDE.md | Low | DevOps | Documentation gap only; optional feature flag |
 | W3 | 10 stale remote feature branches (merged but not deleted) | Low | DevOps | Clutter only, no functional risk |
 | W4 | `packages/cli/` contains stale `dist/` and `node_modules/` artifacts (CLI decoupled to separate repo) | Low | Architect | Confusing for new contributors; no functional risk |
 | W5 | Root `package.json` declares `vitest ^4.0.0` but installed version is `3.2.4` | Low | Architect | Fresh `pnpm install` might pull vitest 4.x with breaking changes |
@@ -171,7 +171,7 @@ All 6 specialists report GREEN or YELLOW. No blockers. Both prior conditions res
 
 **CI/CD:** 6 workflows (CI, security, bundle-size, gitleaks, knip, claude-review). Tests, typecheck, lint, E2E all in CI. Last 5 runs on `develop`: all SUCCESS.
 
-**Environment Variables:** 2 undocumented feature flags (`NEXT_PUBLIC_SCORING_PAGE_ENABLED`, `NEXT_PUBLIC_EXPERIMENTS_ENABLED`). All documented vars confirmed in use.
+**Environment Variables:** 1 undocumented feature flag (`NEXT_PUBLIC_EXPERIMENTS_ENABLED`). `NEXT_PUBLIC_SCORING_PAGE_ENABLED` was removed. All documented vars confirmed in use.
 
 **Badge Headers:** Match spec exactly (`public, s-maxage=21600, stale-while-revalidate=604800`, `image/svg+xml`).
 

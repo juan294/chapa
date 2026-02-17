@@ -296,28 +296,3 @@ export async function dbGetLatestSnapshot(
     return null;
   }
 }
-
-/**
- * Get the total number of snapshots for a user.
- * Returns 0 on error or when DB is unavailable.
- */
-export async function dbGetSnapshotCount(handle: string): Promise<number> {
-  const db = getSupabase();
-  if (!db) return 0;
-
-  try {
-    const { count, error } = await db
-      .from("metrics_snapshots")
-      .select("*", { count: "exact", head: true })
-      .eq("handle", handle.toLowerCase());
-
-    if (error) throw error;
-    return count ?? 0;
-  } catch (error) {
-    console.error(
-      "[db] dbGetSnapshotCount failed:",
-      (error as Error).message,
-    );
-    return 0;
-  }
-}

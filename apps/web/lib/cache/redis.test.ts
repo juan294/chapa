@@ -12,7 +12,6 @@ const mockIncr = vi.fn();
 const mockExpire = vi.fn();
 const mockPfadd = vi.fn();
 const mockPfcount = vi.fn();
-const mockScan = vi.fn();
 const mockMget = vi.fn();
 
 vi.mock("@upstash/redis", () => ({
@@ -24,7 +23,6 @@ vi.mock("@upstash/redis", () => ({
     expire = mockExpire;
     pfadd = mockPfadd;
     pfcount = mockPfcount;
-    scan = mockScan;
     mget = mockMget;
   },
 }));
@@ -37,7 +35,6 @@ import {
   rateLimit,
   trackBadgeGenerated,
   getBadgeStats,
-  scanKeys,
   cacheMGet,
   _resetClient,
 } from "./redis";
@@ -353,53 +350,6 @@ describe("getBadgeStats", () => {
     const result = await getBadgeStats();
 
     expect(result).toEqual({ total: 0, unique: 0 });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// scanKeys
-// ---------------------------------------------------------------------------
-
-describe("scanKeys", () => {
-  it("collects keys across multiple SCAN iterations", async () => {
-    // First scan returns cursor 5 + 2 keys
-    mockScan.mockResolvedValueOnce([5, ["stats:v2:user1", "stats:v2:user2"]]);
-    // Second scan returns cursor 0 (done) + 1 key
-    mockScan.mockResolvedValueOnce([0, ["stats:v2:user3"]]);
-
-    const keys = await scanKeys("stats:v2:*");
-
-    expect(keys).toEqual(["stats:v2:user1", "stats:v2:user2", "stats:v2:user3"]);
-    expect(mockScan).toHaveBeenCalledTimes(2);
-    expect(mockScan).toHaveBeenCalledWith(0, { match: "stats:v2:*", count: 100 });
-    expect(mockScan).toHaveBeenCalledWith(5, { match: "stats:v2:*", count: 100 });
-  });
-
-  it("returns empty array when no keys match", async () => {
-    mockScan.mockResolvedValueOnce([0, []]);
-
-    const keys = await scanKeys("nonexistent:*");
-
-    expect(keys).toEqual([]);
-  });
-
-  it("returns empty array when Redis is unavailable", async () => {
-    _resetClient();
-    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
-    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
-
-    const keys = await scanKeys("stats:v2:*");
-
-    expect(keys).toEqual([]);
-    expect(mockScan).not.toHaveBeenCalled();
-  });
-
-  it("returns empty array when Redis throws", async () => {
-    mockScan.mockRejectedValueOnce(new Error("Connection refused"));
-
-    const keys = await scanKeys("stats:v2:*");
-
-    expect(keys).toEqual([]);
   });
 });
 
