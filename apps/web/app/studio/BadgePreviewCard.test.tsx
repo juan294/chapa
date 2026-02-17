@@ -145,4 +145,75 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("HOLOGRAPHIC_CSS");
     });
   });
+
+  describe("lazy-loaded effects (dynamic imports)", () => {
+    it("imports next/dynamic", () => {
+      expect(SOURCE).toContain("from \"next/dynamic\"");
+    });
+
+    it("lazy-loads AuroraBackground via dynamic()", () => {
+      expect(SOURCE).toMatch(
+        /dynamic\(\s*\(\)\s*=>\s*import\(["']@\/lib\/effects\/backgrounds\/AuroraBackground["']\)/,
+      );
+    });
+
+    it("lazy-loads ParticleCanvas via dynamic()", () => {
+      // ParticleCanvas wraps useParticles and should be in its own dynamic chunk
+      expect(SOURCE).toMatch(
+        /dynamic\(\s*\(\)\s*=>\s*import\(["'].*Particle/,
+      );
+    });
+
+    it("lazy-loads GradientBorder via dynamic()", () => {
+      expect(SOURCE).toMatch(
+        /dynamic\(\s*\(\)\s*=>\s*import\(["']@\/lib\/effects\/borders\/GradientBorder["']\)/,
+      );
+    });
+
+    it("lazy-loads HolographicOverlay via dynamic()", () => {
+      expect(SOURCE).toMatch(
+        /dynamic\(\s*\(\)\s*=>\s*import\(["']@\/lib\/effects\/interactions\/HolographicOverlay["']\)/,
+      );
+    });
+
+    it("disables SSR for all dynamic effect components", () => {
+      // Count occurrences of ssr: false in dynamic() option objects
+      const ssrFalseCount = (SOURCE.match(/ssr:\s*false/g) ?? []).length;
+      expect(ssrFalseCount).toBeGreaterThanOrEqual(4);
+    });
+
+    it("provides loading fallbacks for dynamic components", () => {
+      // Count occurrences of loading: in dynamic() option objects
+      const loadingCount = (SOURCE.match(/loading:\s*\(\)/g) ?? []).length;
+      expect(loadingCount).toBeGreaterThanOrEqual(4);
+    });
+
+    it("does NOT eagerly import AuroraBackground component", () => {
+      // Static import of AuroraBackground should be gone
+      expect(SOURCE).not.toMatch(
+        /^import\s+\{[^}]*AuroraBackground[^}]*\}\s+from/m,
+      );
+    });
+
+    it("does NOT eagerly import ParticleBackground module", () => {
+      // Static import of useParticles/PARTICLE_PRESETS should be gone
+      expect(SOURCE).not.toMatch(
+        /^import\s+\{[^}]*useParticles[^}]*\}\s+from/m,
+      );
+    });
+
+    it("does NOT eagerly import GradientBorder component", () => {
+      // Static import of GradientBorder component should be gone (CSS constant may still be imported)
+      expect(SOURCE).not.toMatch(
+        /^import\s+\{[^}]*GradientBorder[^}]*\}\s+from\s+["']@\/lib\/effects\/borders\/GradientBorder["']/m,
+      );
+    });
+
+    it("does NOT eagerly import HolographicOverlay component", () => {
+      // Static import of HolographicOverlay component should be gone (CSS constant may still be imported)
+      expect(SOURCE).not.toMatch(
+        /^import\s+\{[^}]*HolographicOverlay[^}]*\}\s+from\s+["']@\/lib\/effects\/interactions\/HolographicOverlay["']/m,
+      );
+    });
+  });
 });

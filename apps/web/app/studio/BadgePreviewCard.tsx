@@ -1,20 +1,43 @@
 "use client";
 
-import { useRef, useEffect, memo } from "react";
+import { useEffect, memo } from "react";
+import dynamic from "next/dynamic";
 import type {
   BadgeConfig,
   StatsData,
   ImpactV4Result,
 } from "@chapa/shared";
 import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
-import { AuroraBackground } from "@/lib/effects/backgrounds/AuroraBackground";
-import { useParticles, PARTICLE_PRESETS } from "@/lib/effects/backgrounds/ParticleBackground";
 import { glassStyle } from "@/lib/effects/cards/glass-presets";
-import { GradientBorder, GRADIENT_BORDER_CSS } from "@/lib/effects/borders/GradientBorder";
+import { GRADIENT_BORDER_CSS } from "@/lib/effects/borders/gradient-border-css";
 import { useTilt } from "@/lib/effects/interactions/use-tilt";
-import { HolographicOverlay, HOLOGRAPHIC_CSS } from "@/lib/effects/interactions/HolographicOverlay";
+import { HOLOGRAPHIC_CSS } from "@/lib/effects/interactions/holographic-css";
 import { fireSingleBurst } from "@/lib/effects/celebrations/confetti";
 import { BadgeContent, getBadgeContentCSS } from "@/components/badge/BadgeContent";
+
+// ---------------------------------------------------------------------------
+// Lazy-loaded effect components (code-split, client-only)
+// ---------------------------------------------------------------------------
+
+const LazyAuroraBackground = dynamic(
+  () => import("@/lib/effects/backgrounds/AuroraBackground").then((m) => m.AuroraBackground),
+  { ssr: false, loading: () => <div className="absolute inset-0" aria-hidden="true" /> }
+);
+
+const LazyParticleCanvas = dynamic(
+  () => import("@/lib/effects/backgrounds/ParticleCanvas"),
+  { ssr: false, loading: () => <div className="absolute inset-0" aria-hidden="true" /> }
+);
+
+const LazyGradientBorder = dynamic(
+  () => import("@/lib/effects/borders/GradientBorder").then((m) => m.GradientBorder),
+  { ssr: false, loading: () => <div data-effect="gradient-border-loading" /> }
+);
+
+const LazyHolographicOverlay = dynamic(
+  () => import("@/lib/effects/interactions/HolographicOverlay").then((m) => m.HolographicOverlay),
+  { ssr: false, loading: () => <div data-effect="holographic-loading" /> }
+);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,16 +48,6 @@ export interface BadgePreviewCardProps {
   stats: StatsData;
   impact: ImpactV4Result;
   interactive?: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Particles sub-component (isolates hook to conditional mount)
-// ---------------------------------------------------------------------------
-
-function ParticleCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useParticles(canvasRef, PARTICLE_PRESETS.sparkle);
-  return <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 w-full h-full" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,9 +141,9 @@ function BadgePreviewCardInner({
 
   const withInteraction =
     config.interaction === "holographic" && interactive ? (
-      <HolographicOverlay variant="amber" autoAnimate>
+      <LazyHolographicOverlay variant="amber" autoAnimate>
         {cardContent}
-      </HolographicOverlay>
+      </LazyHolographicOverlay>
     ) : (
       cardContent
     );
@@ -142,7 +155,7 @@ function BadgePreviewCardInner({
   const withBorder =
     config.border === "gradient-rotating" ? (
       <div data-effect="gradient-border">
-        <GradientBorder>{withInteraction}</GradientBorder>
+        <LazyGradientBorder>{withInteraction}</LazyGradientBorder>
       </div>
     ) : (
       withInteraction
@@ -163,7 +176,7 @@ function BadgePreviewCardInner({
           data-effect="aurora"
           className="absolute inset-0 rounded-2xl overflow-hidden"
         >
-          <AuroraBackground positioning="absolute" />
+          <LazyAuroraBackground positioning="absolute" />
         </div>
       )}
       {config.background === "particles" && (
@@ -171,7 +184,7 @@ function BadgePreviewCardInner({
           data-effect="particles"
           className="absolute inset-0 rounded-2xl overflow-hidden"
         >
-          <ParticleCanvas />
+          <LazyParticleCanvas />
         </div>
       )}
 
