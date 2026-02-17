@@ -5,11 +5,11 @@ import type { StatsData, SupplementalStats } from "@chapa/shared";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockFetchStatsData, mockCacheGet, mockCacheSet, mockRegisterUser } = vi.hoisted(() => ({
+const { mockFetchStatsData, mockCacheGet, mockCacheSet, mockDbUpsertUser } = vi.hoisted(() => ({
   mockFetchStatsData: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
-  mockRegisterUser: vi.fn(),
+  mockDbUpsertUser: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("./stats", () => ({
@@ -19,7 +19,10 @@ vi.mock("./stats", () => ({
 vi.mock("../cache/redis", () => ({
   cacheGet: mockCacheGet,
   cacheSet: mockCacheSet,
-  registerUser: mockRegisterUser,
+}));
+
+vi.mock("@/lib/db/users", () => ({
+  dbUpsertUser: mockDbUpsertUser,
 }));
 
 import { getStats, _resetInflight } from "./client";
@@ -175,7 +178,7 @@ describe("getStats", () => {
     );
   });
 
-  it("registers user in permanent registry on successful fetch", async () => {
+  it("upserts user in Supabase on successful fetch", async () => {
     const fresh = makeStats();
     mockCacheGet
       .mockResolvedValueOnce(null) // primary
@@ -185,19 +188,19 @@ describe("getStats", () => {
 
     await getStats("Test-User");
 
-    expect(mockRegisterUser).toHaveBeenCalledWith("Test-User");
+    expect(mockDbUpsertUser).toHaveBeenCalledWith("Test-User");
   });
 
-  it("does NOT register user when serving from cache", async () => {
+  it("does NOT upsert user when serving from cache", async () => {
     const cached = makeStats();
     mockCacheGet.mockResolvedValue(cached);
 
     await getStats("test-user");
 
-    expect(mockRegisterUser).not.toHaveBeenCalled();
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
   });
 
-  it("does NOT register user when API fails", async () => {
+  it("does NOT upsert user when API fails", async () => {
     mockCacheGet
       .mockResolvedValueOnce(null) // primary
       .mockResolvedValueOnce(null); // stale
@@ -205,7 +208,7 @@ describe("getStats", () => {
 
     await getStats("test-user");
 
-    expect(mockRegisterUser).not.toHaveBeenCalled();
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
   });
 
   it("passes token argument through to fetchStats", async () => {

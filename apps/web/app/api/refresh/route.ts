@@ -5,7 +5,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
-import { recordSnapshot } from "@/lib/history/history";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const impact = computeImpactV4(stats);
 
   // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
-  recordSnapshot(handle, buildSnapshot(stats, impact)).catch(() => {});
+  dbInsertSnapshot(handle, buildSnapshot(stats, impact)).catch(() => {});
 
   return NextResponse.json({ stats, impact });
 }

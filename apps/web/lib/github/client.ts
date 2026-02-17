@@ -1,6 +1,7 @@
 import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
-import { cacheGet, cacheSet, registerUser } from "../cache/redis";
+import { cacheGet, cacheSet } from "../cache/redis";
+import { dbUpsertUser } from "@/lib/db/users";
 import type { StatsData, SupplementalStats } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
@@ -83,8 +84,8 @@ async function _fetchAndCache(
   await cacheSet(cacheKey, stats, CACHE_TTL);
   await cacheSet(staleKey, stats, STALE_TTL);
 
-  // Record in permanent registry (fire-and-forget, no TTL)
-  void registerUser(handle);
+  // Record in permanent user registry (fire-and-forget)
+  void dbUpsertUser(handle).catch(() => {});
 
   return stats;
 }

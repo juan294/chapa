@@ -29,10 +29,6 @@ vi.mock("@upstash/redis", () => ({
   },
 }));
 
-vi.mock("@/lib/db/users", () => ({
-  dbUpsertUser: vi.fn(() => Promise.resolve()),
-}));
-
 // Import after mock is set up
 import {
   cacheGet,
@@ -43,10 +39,8 @@ import {
   getBadgeStats,
   scanKeys,
   cacheMGet,
-  registerUser,
   _resetClient,
 } from "./redis";
-import { dbUpsertUser } from "@/lib/db/users";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -450,80 +444,3 @@ describe("cacheMGet", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// registerUser
-// ---------------------------------------------------------------------------
-
-describe("registerUser", () => {
-  it("writes a persistent key with handle and registeredAt", async () => {
-    mockSet.mockResolvedValueOnce("OK");
-
-    await registerUser("juan294");
-
-    expect(mockSet).toHaveBeenCalledWith(
-      "user:registered:juan294",
-      expect.objectContaining({ handle: "juan294", registeredAt: expect.any(String) }),
-    );
-    // No TTL option — key is persistent
-    expect(mockSet).toHaveBeenCalledWith(
-      "user:registered:juan294",
-      expect.anything(),
-    );
-  });
-
-  it("lowercases the handle", async () => {
-    mockSet.mockResolvedValueOnce("OK");
-
-    await registerUser("Juan294");
-
-    expect(mockSet).toHaveBeenCalledWith(
-      "user:registered:juan294",
-      expect.objectContaining({ handle: "juan294" }),
-    );
-  });
-
-  it("is a no-op when Redis is unavailable", async () => {
-    _resetClient();
-    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
-    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
-
-    await registerUser("juan294");
-
-    expect(mockSet).not.toHaveBeenCalled();
-  });
-
-  it("does not throw when Redis fails (fire-and-forget safe)", async () => {
-    mockSet.mockRejectedValueOnce(new Error("Connection refused"));
-
-    await expect(registerUser("juan294")).resolves.toBeUndefined();
-  });
-
-  it("calls dbUpsertUser after Redis write (dual-write)", async () => {
-    mockSet.mockResolvedValueOnce("OK");
-
-    await registerUser("juan294");
-
-    await vi.waitFor(() => {
-      expect(vi.mocked(dbUpsertUser)).toHaveBeenCalledWith("juan294");
-    });
-  });
-
-  it("does not fail when Supabase write fails (fire-and-forget)", async () => {
-    mockSet.mockResolvedValueOnce("OK");
-    vi.mocked(dbUpsertUser).mockRejectedValue(new Error("Supabase down"));
-
-    await expect(registerUser("juan294")).resolves.toBeUndefined();
-  });
-
-  it("still writes to Redis even when Supabase fails", async () => {
-    mockSet.mockResolvedValueOnce("OK");
-    vi.mocked(dbUpsertUser).mockRejectedValue(new Error("Supabase down"));
-
-    await registerUser("juan294");
-
-    expect(mockSet).toHaveBeenCalledWith(
-      "user:registered:juan294",
-      expect.objectContaining({ handle: "juan294" }),
-    );
-  });
-});

@@ -42,8 +42,8 @@ vi.mock("@/lib/history/snapshot", () => ({
   buildSnapshot: vi.fn(() => ({ date: "2025-01-01" })),
 }));
 
-vi.mock("@/lib/history/history", () => ({
-  recordSnapshot: vi.fn(() => Promise.resolve(true)),
+vi.mock("@/lib/db/snapshots", () => ({
+  dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
 }));
 
 import { requireSession } from "@/lib/auth/require-session";

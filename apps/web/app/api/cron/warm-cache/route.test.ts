@@ -5,8 +5,12 @@ import { NextRequest } from "next/server";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@/lib/cache/redis", () => ({
-  scanKeys: vi.fn(),
+vi.mock("@/lib/db/users", () => ({
+  dbGetUsers: vi.fn(),
+}));
+
+vi.mock("@/lib/db/snapshots", () => ({
+  dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -32,20 +36,17 @@ vi.mock("@/lib/history/snapshot", () => ({
   buildSnapshot: vi.fn(() => ({ date: "2025-01-01" })),
 }));
 
-vi.mock("@/lib/history/history", () => ({
-  recordSnapshot: vi.fn(() => Promise.resolve(true)),
-}));
-
 vi.mock("@/lib/db/verification", () => ({
   dbCleanExpiredVerifications: vi.fn(() => Promise.resolve(0)),
 }));
 
-import { scanKeys } from "@/lib/cache/redis";
+import { dbGetUsers } from "@/lib/db/users";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { getStats } from "@/lib/github/client";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { GET } from "./route";
 
-const mockedScanKeys = vi.mocked(scanKeys);
+const mockedDbGetUsers = vi.mocked(dbGetUsers);
 const mockedGetStats = vi.mocked(getStats);
 
 function makeRequest(cronSecret?: string): NextRequest {
@@ -87,42 +88,42 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("accepts a valid CRON_SECRET token", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+      mockedDbGetUsers.mockResolvedValue([]);
       const res = await GET(makeRequest("test-cron-secret"));
       expect(res.status).toBe(200);
     });
   });
 
   // ---------------------------------------------------------------------------
-  // Handle discovery
+  // Handle discovery (from Supabase)
   // ---------------------------------------------------------------------------
 
   describe("handle discovery", () => {
-    it("scans both primary and stale cache keys", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+    it("calls dbGetUsers for handle discovery", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
       await GET(makeRequest("test-cron-secret"));
 
-      expect(mockedScanKeys).toHaveBeenCalledWith("stats:v2:*");
-      expect(mockedScanKeys).toHaveBeenCalledWith("stats:stale:*");
+      expect(mockedDbGetUsers).toHaveBeenCalled();
     });
 
-    it("deduplicates handles from primary and stale keys", async () => {
-      mockedScanKeys
-        .mockResolvedValueOnce(["stats:v2:alice", "stats:v2:bob"]) // primary
-        .mockResolvedValueOnce(["stats:stale:alice", "stats:stale:charlie"]); // stale
+    it("uses handles from dbGetUsers result", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+        { handle: "bob", registeredAt: "2025-01-02" },
+        { handle: "charlie", registeredAt: "2025-01-03" },
+      ]);
 
       mockedGetStats.mockResolvedValue(null);
 
       const res = await GET(makeRequest("test-cron-secret"));
       const body = await res.json();
 
-      // alice appears in both — should only be warmed once
       expect(body.handles).toHaveLength(3);
       expect(new Set(body.handles)).toEqual(new Set(["alice", "bob", "charlie"]));
     });
 
-    it("returns empty results when no cached handles exist", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+    it("returns empty results when no users exist", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
 
       const res = await GET(makeRequest("test-cron-secret"));
       const body = await res.json();
@@ -139,9 +140,10 @@ describe("GET /api/cron/warm-cache", () => {
 
   describe("cache warming", () => {
     it("calls getStats for each discovered handle", async () => {
-      mockedScanKeys
-        .mockResolvedValueOnce(["stats:v2:alice", "stats:v2:bob"])
-        .mockResolvedValueOnce([]);
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+        { handle: "bob", registeredAt: "2025-01-02" },
+      ]);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
 
@@ -153,9 +155,9 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("uses GITHUB_TOKEN when available", async () => {
       process.env.GITHUB_TOKEN = "ghp_test_token";
-      mockedScanKeys
-        .mockResolvedValueOnce(["stats:v2:alice"])
-        .mockResolvedValueOnce([]);
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
 
@@ -167,9 +169,11 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("reports warmed count (successful fetches only)", async () => {
-      mockedScanKeys
-        .mockResolvedValueOnce(["stats:v2:alice", "stats:v2:bob", "stats:v2:charlie"])
-        .mockResolvedValueOnce([]);
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+        { handle: "bob", registeredAt: "2025-01-02" },
+        { handle: "charlie", registeredAt: "2025-01-03" },
+      ]);
 
       mockedGetStats
         .mockResolvedValueOnce({ handle: "alice" } as never) // success
@@ -184,10 +188,11 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("caps at 50 handles per run", async () => {
-      const keys = Array.from({ length: 60 }, (_, i) => `stats:v2:user${i}`);
-      mockedScanKeys
-        .mockResolvedValueOnce(keys)
-        .mockResolvedValueOnce([]);
+      const users = Array.from({ length: 60 }, (_, i) => ({
+        handle: `user${i}`,
+        registeredAt: "2025-01-01",
+      }));
+      mockedDbGetUsers.mockResolvedValue(users);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
 
@@ -199,9 +204,10 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("continues warming even if individual fetches fail", async () => {
-      mockedScanKeys
-        .mockResolvedValueOnce(["stats:v2:alice", "stats:v2:bob"])
-        .mockResolvedValueOnce([]);
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+        { handle: "bob", registeredAt: "2025-01-02" },
+      ]);
 
       mockedGetStats
         .mockRejectedValueOnce(new Error("network error"))
@@ -214,6 +220,21 @@ describe("GET /api/cron/warm-cache", () => {
       expect(body.warmed).toBe(1);
       expect(body.failed).toBe(1);
     });
+
+    it("calls dbInsertSnapshot for each successful warm", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(dbInsertSnapshot)).toHaveBeenCalledWith(
+        "alice",
+        expect.objectContaining({ date: "2025-01-01" }),
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -222,15 +243,15 @@ describe("GET /api/cron/warm-cache", () => {
 
   describe("response", () => {
     it("returns no-store cache control", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+      mockedDbGetUsers.mockResolvedValue([]);
       const res = await GET(makeRequest("test-cron-secret"));
       expect(res.headers.get("Cache-Control")).toBe("no-store");
     });
 
     it("returns the expected JSON shape", async () => {
-      mockedScanKeys
-        .mockResolvedValueOnce(["stats:v2:alice"])
-        .mockResolvedValueOnce([]);
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
 
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
 
@@ -247,7 +268,7 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("includes expiredVerificationsDeleted in response", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+      mockedDbGetUsers.mockResolvedValue([]);
       vi.mocked(dbCleanExpiredVerifications).mockResolvedValue(5);
 
       const res = await GET(makeRequest("test-cron-secret"));
@@ -263,7 +284,7 @@ describe("GET /api/cron/warm-cache", () => {
 
   describe("verification cleanup", () => {
     it("calls dbCleanExpiredVerifications", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+      mockedDbGetUsers.mockResolvedValue([]);
 
       await GET(makeRequest("test-cron-secret"));
 
@@ -271,7 +292,7 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("does not fail if cleanup throws", async () => {
-      mockedScanKeys.mockResolvedValue([]);
+      mockedDbGetUsers.mockResolvedValue([]);
       vi.mocked(dbCleanExpiredVerifications).mockRejectedValue(
         new Error("Supabase down"),
       );
