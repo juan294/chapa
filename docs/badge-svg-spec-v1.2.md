@@ -1,6 +1,6 @@
-# Embeddable SVG Badge — Design Spec v1.1
+# Embeddable SVG Badge — Design Spec v1.2
 
-> **Version**: 1.1
+> **Version**: 1.2
 > **Source of truth for**: The server-rendered SVG badge at `/u/:handle/badge.svg`
 > **NOT for**: The React component (`BadgeContent.tsx`) used in Creator Studio — see [`badge-design-v1.md`](./badge-design-v1.md)
 >
@@ -152,9 +152,9 @@ M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 
 ## 3. Metadata Pills Row
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  [< > Builder]  ·  [👁 3 Watch]  ·  [⑂ 1 Fork]  ·  [★ 12 Star] │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  [< > Builder]  ·  [▦ 4 Repos]  ·  [👁 3 Watch]  ·  [⑂ 1 Fork]  ·  [★ 12 Star] │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Row baseline Y**: `metaRowY = 160`
@@ -176,10 +176,12 @@ Each pill group is positioned using cumulative offsets. Let `X0 = heatmapX = PAD
 ```
 Archetype pill:  X0
 Dot separator 1: X0 + archetypePillWidth + pillGap + dotGap
-Watch pill:       X0 + archetypePillWidth + pillGap + dotGap*2 + pillGap
-Dot separator 2: <watch pill X> + watchPillW + pillGap + dotGap
+Repos pill:       X0 + archetypePillWidth + pillGap + dotGap*2 + pillGap
+Dot separator 2: <repos pill X> + reposPillW + pillGap + dotGap
+Watch pill:       <repos pill X> + reposPillW + pillGap + dotGap*2 + pillGap
+Dot separator 3: <watch pill X> + watchPillW + pillGap + dotGap
 Fork pill:        <watch pill X> + watchPillW + pillGap + dotGap*2 + pillGap
-Dot separator 3: <fork pill X> + forkPillW + pillGap + dotGap
+Dot separator 4: <fork pill X> + forkPillW + pillGap + dotGap
 Star pill:        <fork pill X> + forkPillW + pillGap + dotGap*2 + pillGap
 ```
 
@@ -237,7 +239,7 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 | Fill | `#9AA4B2` (textSecondary) |
 | Opacity | `0.4` |
 
-### 3e. Metric Pills (Watch, Fork, Star)
+### 3e. Metric Pills (Repos, Watch, Fork, Star)
 
 **Width formula** (same for all three): `12 + 16 + 6 + label.length * 8 + 12`
 
@@ -249,7 +251,7 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 | Text (per char) | `8` |
 | Right padding | `12` |
 
-**Pill background (all three metric pills):**
+**Pill background (all four metric pills):**
 
 | Property | Value |
 |----------|-------|
@@ -257,7 +259,7 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 | Stroke | `rgba(124,106,239,0.15)` |
 | Stroke width | `1` |
 
-**Label text (all three):**
+**Label text (all four):**
 
 | Property | Value |
 |----------|-------|
@@ -268,11 +270,24 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 | Fill | `#9AA4B2` (textSecondary) |
 
 **Label content** (dynamic):
+- Repos: `"{count} Repos"` — e.g., `4 Repos`
 - Watch: `"{count} Watch"` — e.g., `3 Watch`
 - Fork: `"{count} Fork"` — e.g., `1 Fork`
 - Star: `"★ {count} Star"` — the star character `\u2605` is a `<tspan fill="#7C6AEF">` prefix
 
 **Icons** (all at `translate(12, 9)` within their pill group):
+
+<details>
+<summary>Repos icon (grid/repo) — click to expand</summary>
+
+```xml
+<g opacity="0.7">
+  <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3zm6 0v10M2 8h12"
+        fill="none" stroke="#9AA4B2" stroke-width="1.3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+```
+</details>
 
 <details>
 <summary>Watch icon (eye) — click to expand</summary>
@@ -844,6 +859,7 @@ Uses SMIL `<animate>` elements (not CSS):
 | `stats.handle` | `StatsData.handle` | Header (if no displayName) |
 | `stats.displayName` | `StatsData.displayName` | Header name text |
 | `stats.avatarUrl` | `StatsData.avatarUrl` | Avatar image (fetched as base64) |
+| `stats.reposContributed` | `StatsData.reposContributed` | Repos pill |
 | `stats.totalWatchers` | `StatsData.totalWatchers` | Watch pill |
 | `stats.totalForks` | `StatsData.totalForks` | Fork pill |
 | `stats.totalStars` | `StatsData.totalStars` | Star pill |
@@ -919,5 +935,6 @@ Route handler: `apps/web/app/u/[handle]/badge.svg/route.ts`
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2 | 2026-02-17 | **Repos pill** — Added "Repos" metric pill (repos contributed to) between archetype pill and Watch pill. Uses `reposContributed` from `StatsData`. Repo icon is a grid/book SVG. Pill row now has 5 pills: Archetype, Repos, Watch, Fork, Star. |
 | 1.1 | 2026-02-13 | **Clickable verification hash** — Verification strip text (Section 9c) is now wrapped in an SVG `<a href>` element linking to `https://chapa.thecreativetoken.com/verify/{hash}` with `target="_blank"`. Added `style="cursor:pointer"` for hover affordance. No visual change to the badge appearance — only adds interactivity. Fixes #187. |
 | 1.0 | 2026-02-13 | Initial spec — documents current production SVG badge |
