@@ -246,3 +246,34 @@ describe("dbCleanExpiredVerifications", () => {
     expect(result).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Runtime row validation (parseRow integration)
+// ---------------------------------------------------------------------------
+
+describe("runtime row validation", () => {
+  it("dbGetVerification returns null for a malformed row (missing required key)", async () => {
+    // Row missing the "tier" field
+    const incompleteRow: Record<string, unknown> = {
+      hash: "abc12345",
+      handle: "testuser",
+      display_name: "Test User",
+      adjusted_composite: 52,
+      confidence: 85,
+      archetype: "Builder",
+      profile_type: "collaborative",
+      building: 70,
+      guarding: 50,
+      consistency: 60,
+      breadth: 40,
+      commits_total: 200,
+      prs_merged_count: 30,
+      reviews_submitted: 50,
+      generated_at: "2025-06-15",
+    };
+    terminalResolve = { data: incompleteRow, error: null };
+
+    const result = await dbGetVerification("abc12345");
+    expect(result).toBeNull();
+  });
+});

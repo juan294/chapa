@@ -6,6 +6,21 @@
  */
 
 import { getSupabase } from "./supabase";
+import { parseRows } from "./parse-row";
+
+// ---------------------------------------------------------------------------
+// Row type
+// ---------------------------------------------------------------------------
+
+interface UserRow {
+  handle: string;
+  registered_at: string;
+}
+
+const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
+  "handle",
+  "registered_at",
+] as const;
 
 /**
  * Register a user (upsert — idempotent).
@@ -54,7 +69,7 @@ export async function dbGetUsers(
 
     if (error) throw error;
 
-    return (data ?? []).map((row) => ({
+    return parseRows<UserRow>(data, USER_REQUIRED_KEYS, "users").map((row) => ({
       handle: row.handle,
       registeredAt: row.registered_at,
     }));
