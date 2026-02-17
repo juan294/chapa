@@ -170,9 +170,9 @@ test.describe("Integration — Share page (/u/:handle)", () => {
     expect(content).toBeTruthy();
 
     const parsed = JSON.parse(content!);
-    // The page may emit a Person (user-specific) or WebApplication (global) JSON-LD.
-    // In CI without real user data, the global WebApplication schema is used.
-    expect(["Person", "WebApplication"]).toContain(parsed["@type"]);
+    // The page may emit a Person (user-specific) or SoftwareApplication (global) JSON-LD.
+    // In CI without real user data, the global SoftwareApplication schema is used.
+    expect(["Person", "SoftwareApplication"]).toContain(parsed["@type"]);
   });
 });
 
