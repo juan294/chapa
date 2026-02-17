@@ -21,4 +21,17 @@ describe("BadgeToolbar", () => {
       expect(SOURCE).toContain("right-0 sm:left-0 sm:right-auto");
     });
   });
+
+  describe("WCAG 2.5.8 touch target size (#370)", () => {
+    it("toolbar button class includes min-h-[44px] for 44px minimum touch target", () => {
+      // WCAG 2.5.8 recommends a minimum touch target size of 44×44 CSS pixels.
+      // Toolbar buttons previously used px-2 py-2 producing ~32-36px height.
+      expect(SOURCE).toContain("min-h-[44px]");
+    });
+
+    it("toolbar button class includes min-w-[44px] for 44px minimum touch target width", () => {
+      // Square touch target ensures both width and height meet WCAG minimum.
+      expect(SOURCE).toContain("min-w-[44px]");
+    });
+  });
 });

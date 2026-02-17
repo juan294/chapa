@@ -129,7 +129,7 @@ export function BadgeToolbar({
   }, [handle]);
 
   const btnClass =
-    "inline-flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
 
   return (
     <div className="flex flex-wrap items-center gap-1">

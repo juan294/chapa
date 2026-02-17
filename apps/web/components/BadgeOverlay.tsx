@@ -279,7 +279,7 @@ export function BadgeOverlay() {
 
       {/* ── Desktop: leader line annotation panel (hidden on mobile) ── */}
       {/* Only the active hotspot's panel renders (#323 — lazy render) */}
-      <div className="hidden md:contents" aria-hidden="true">
+      <div className="hidden md:contents">
         {activeHotspot && (() => {
           const isAbove = activeHotspot.leaderLine.panelAnchor === "above";
           return (
