@@ -86,6 +86,7 @@ Must be easy to swap/remove:
 - SVG rendering: `apps/web/lib/render/*`, `apps/web/app/u/[handle]/badge.svg/route.ts`
 - Share page: `apps/web/app/u/[handle]/page.tsx`, `apps/web/components/*`
 - Lifetime history: `apps/web/lib/history/*`
+- Data access (Supabase): `apps/web/lib/db/*`
 - Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
 - Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
 - Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx`
@@ -107,6 +108,14 @@ Must be easy to swap/remove:
 - Prefer pure functions for scoring & rendering.
 - Escape/encode any user-controlled text in SVG (handle, display name).
 - Handle GitHub rate limit errors gracefully (serve cached or show "try later").
+
+## Deployment
+- Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
+- Always confirm the target branch before pushing — if the goal is production deployment, ensure the PR targets `main`.
+
+## Language & Tone
+- All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
+- For social media copy: keep tone confident and positive — avoid pitying, resentful, or overly dramatic language. Never mention unreleased/unpublished features.
 
 ---
 
@@ -142,6 +151,11 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 | Bug fix | `fix/short-name` | `fix/oauth-token-expiry` |
 | Refactor | `refactor/short-name` | `refactor/scoring-pipeline` |
 | Chore | `chore/short-name` | `chore/update-deps` |
+
+## Testing & CI
+- This project uses TDD. Always write tests before or alongside implementation.
+- All PRs must have CI green before merging. Run the full test suite locally before pushing.
+- After merging to develop, if production deployment is the goal, immediately create a PR from develop → main.
 
 ## Test Conventions
 
@@ -179,6 +193,9 @@ NEXT_PUBLIC_BASE_URL=      # Base URL for OAuth redirect (e.g., https://chapa.th
 
 UPSTASH_REDIS_REST_URL=    # Upstash Redis
 UPSTASH_REDIS_REST_TOKEN=  # Upstash Redis
+
+SUPABASE_URL=              # Supabase project URL (optional — database features degrade gracefully)
+SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBLIC_)
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
@@ -236,6 +253,16 @@ GitHub Issues is the single source of truth for planned work. Every issue gets *
 
 Reference issues in commits with `Fixes #N` or `Refs #N`.
 
+## Sub-Agent & Background Task Guidelines
+- Sub-agents (Task tool) may lack Bash or file-write permissions. If spawning agents for fixes, verify they have the required tool access first.
+- If a sub-agent fails due to permissions, take over manually immediately rather than retrying.
+- Be aware of context window limits when receiving multiple parallel task notifications.
+
+## Tool & API Awareness
+- You CAN set Vercel environment variables via CLI — do not claim otherwise.
+- You CANNOT handle credentials (npm tokens, API keys) directly — ask the user to provide/set them.
+- Upstash Redis API differs from standard Redis: use `zrange` with options instead of `zrangebyscore`/`zrevrangebyscore`.
+
 ---
 
 # Troubleshooting
@@ -255,3 +282,19 @@ Reference issues in commits with `Fixes #N` or `Refs #N`.
 **Cause**: GitHub API rate limits (60/hr unauthenticated, 5000/hr authenticated).
 
 **Fix**: Always serve cached data when available. If no cache exists and rate limit is hit, return a "try later" response — never an error page. Authenticated requests (OAuth token) get 80x more headroom.
+
+---
+
+# Headless Mode (CI / Automation)
+
+Run Claude Code non-interactively for automated tasks:
+
+```bash
+# Fix all TypeScript lint errors and run tests:
+claude -p "Fix all TypeScript lint errors and run tests" \
+  --allowedTools "Edit,Read,Bash,Write" --output-format json
+
+# Batch process GitHub issues:
+claude -p "Read issue #240 and implement the fix with TDD" \
+  --allowedTools "Edit,Read,Bash,Write,Grep"
+```

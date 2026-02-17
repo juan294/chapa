@@ -77,8 +77,9 @@ describe("BadgeContent", () => {
   });
 
   describe("header elements", () => {
-    it("renders avatar with decorative empty alt", () => {
-      expect(SOURCE).toContain('alt=""');
+    it("renders avatar with descriptive alt text", () => {
+      expect(SOURCE).toContain("stats.handle");
+      expect(SOURCE).toMatch(/alt=.*avatar/i);
     });
 
     it("renders displayName with handle fallback", () => {

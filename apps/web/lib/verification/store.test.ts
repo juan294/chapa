@@ -5,8 +5,13 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: vi.fn(),
 }));
 
+vi.mock("@/lib/db/verification", () => ({
+  dbStoreVerification: vi.fn(() => Promise.resolve()),
+}));
+
 import { storeVerificationRecord, getVerificationRecord } from "./store";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { dbStoreVerification } from "@/lib/db/verification";
 import type { VerificationRecord } from "./types";
 
 const record: VerificationRecord = {
@@ -88,5 +93,48 @@ describe("getVerificationRecord", () => {
     vi.mocked(cacheGet).mockRejectedValue(new Error("Redis down"));
     const result = await getVerificationRecord("abc12345");
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// storeVerificationRecord — Supabase dual-write
+// ---------------------------------------------------------------------------
+
+describe("storeVerificationRecord — Supabase dual-write", () => {
+  it("calls dbStoreVerification with hash and record", async () => {
+    await storeVerificationRecord("abc12345", record);
+
+    expect(vi.mocked(dbStoreVerification)).toHaveBeenCalledWith(
+      "abc12345",
+      record,
+    );
+  });
+
+  it("writes to Supabase even when Redis fails", async () => {
+    vi.mocked(cacheSet).mockRejectedValue(new Error("Redis down"));
+
+    await storeVerificationRecord("abc12345", record);
+
+    expect(vi.mocked(dbStoreVerification)).toHaveBeenCalledWith(
+      "abc12345",
+      record,
+    );
+  });
+
+  it("does not throw when Supabase write throws synchronously", async () => {
+    vi.mocked(dbStoreVerification).mockImplementation(() => {
+      throw new Error("Supabase down");
+    });
+
+    await expect(
+      storeVerificationRecord("abc12345", record),
+    ).resolves.toBeUndefined();
+  });
+
+  it("still writes to Redis regardless of Supabase", async () => {
+    await storeVerificationRecord("abc12345", record);
+
+    expect(vi.mocked(cacheSet)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(dbStoreVerification)).toHaveBeenCalledTimes(1);
   });
 });

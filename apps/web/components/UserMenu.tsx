@@ -77,7 +77,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               ) : (
                 <Image
                   src={avatarUrl}
-                  alt=""
+                  alt={`${login}'s avatar`}
                   width={40}
                   height={40}
                   className="h-10 w-10 rounded-full"

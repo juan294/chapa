@@ -1,9 +1,6 @@
 /** Number of days of GitHub activity used for scoring. */
 export const SCORING_WINDOW_DAYS = 365;
 
-/** Number of weeks shown in the badge heatmap visual. */
-export const BADGE_HEATMAP_WEEKS = 13;
-
 /** Cap for aggregated PR weight (used by buildStatsFromRaw and mergeStats). */
 export const PR_WEIGHT_AGG_CAP = 120;
 

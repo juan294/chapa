@@ -36,8 +36,13 @@ vi.mock("@/lib/history/history", () => ({
   recordSnapshot: vi.fn(() => Promise.resolve(true)),
 }));
 
+vi.mock("@/lib/db/verification", () => ({
+  dbCleanExpiredVerifications: vi.fn(() => Promise.resolve(0)),
+}));
+
 import { scanKeys } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
+import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { GET } from "./route";
 
 const mockedScanKeys = vi.mocked(scanKeys);
@@ -239,6 +244,41 @@ describe("GET /api/cron/warm-cache", () => {
         handles: ["alice"],
       });
       expect(typeof body.durationMs).toBe("number");
+    });
+
+    it("includes expiredVerificationsDeleted in response", async () => {
+      mockedScanKeys.mockResolvedValue([]);
+      vi.mocked(dbCleanExpiredVerifications).mockResolvedValue(5);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.expiredVerificationsDeleted).toBe(5);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Verification cleanup
+  // ---------------------------------------------------------------------------
+
+  describe("verification cleanup", () => {
+    it("calls dbCleanExpiredVerifications", async () => {
+      mockedScanKeys.mockResolvedValue([]);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(dbCleanExpiredVerifications)).toHaveBeenCalled();
+    });
+
+    it("does not fail if cleanup throws", async () => {
+      mockedScanKeys.mockResolvedValue([]);
+      vi.mocked(dbCleanExpiredVerifications).mockRejectedValue(
+        new Error("Supabase down"),
+      );
+
+      const res = await GET(makeRequest("test-cron-secret"));
+
+      expect(res.status).toBe(200);
     });
   });
 });

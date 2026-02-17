@@ -518,7 +518,7 @@ export function AdminDashboardClient() {
                         {user.avatarUrl && !imgErrors.has(user.handle) ? (
                           <Image
                             src={user.avatarUrl}
-                            alt=""
+                            alt={`${user.handle}'s avatar`}
                             width={28}
                             height={28}
                             className="h-7 w-7 rounded-full"

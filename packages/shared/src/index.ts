@@ -31,7 +31,6 @@ export { buildStatsFromRaw } from "./stats-aggregation";
 export { formatCompact } from "./format";
 export {
   SCORING_WINDOW_DAYS,
-  BADGE_HEATMAP_WEEKS,
   PR_WEIGHT_AGG_CAP,
   SCORING_CAPS,
   REPO_DEPTH_THRESHOLD,
