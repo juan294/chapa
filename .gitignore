@@ -54,6 +54,9 @@ playwright/.cache/
 .claude/skills/
 CLAUDE.local.md
 
+# product hunt launch assets
+producthunt/
+
 # misc
 *.tsbuildinfo
 next-env.d.ts
