@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { scanKeys } from "@/lib/cache/redis";
+import { dbGetUsers } from "@/lib/db/users";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { buildSnapshot } from "@/lib/history/snapshot";
-import { recordSnapshot } from "@/lib/history/history";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
@@ -17,8 +17,8 @@ const MAX_HANDLES = 50;
  * GET /api/cron/warm-cache
  *
  * Vercel Cron endpoint that pre-warms the stats cache for all known users.
- * Scans Redis for existing cache keys, deduplicates handles, and calls
- * getStats() for each to refresh their 6-hour cache window.
+ * Reads the user list from Supabase, and calls getStats() for each to
+ * refresh their 6-hour cache window.
  *
  * Protected by CRON_SECRET — Vercel sends this automatically as a Bearer token.
  */
@@ -38,23 +38,12 @@ export async function GET(request: NextRequest) {
 
   const start = Date.now();
 
-  // Discover all known handles from both primary and stale cache keys
-  const [primaryKeys, staleKeys] = await Promise.all([
-    scanKeys("stats:v2:*"),
-    scanKeys("stats:stale:*"),
-  ]);
-
-  // Deduplicate handles
-  const handles = new Set<string>();
-  for (const key of primaryKeys) {
-    handles.add(key.replace("stats:v2:", ""));
-  }
-  for (const key of staleKeys) {
-    handles.add(key.replace("stats:stale:", ""));
-  }
+  // Discover all known handles from Supabase (authoritative user list)
+  const users = await dbGetUsers();
+  const allHandles = users.map((u) => u.handle);
 
   // Cap the number of handles per run
-  const toWarm = [...handles].slice(0, MAX_HANDLES);
+  const toWarm = allHandles.slice(0, MAX_HANDLES);
 
   // Use fallback GitHub token for server-side fetches (no user session)
   const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
@@ -73,7 +62,7 @@ export async function GET(request: NextRequest) {
         try {
           const impact = computeImpactV4(stats);
           const snapshot = buildSnapshot(stats, impact);
-          const recorded = await recordSnapshot(handle, snapshot);
+          const recorded = await dbInsertSnapshot(handle, snapshot);
           if (recorded) snapshots++;
         } catch {
           // Snapshot recording is non-critical — don't fail the warm

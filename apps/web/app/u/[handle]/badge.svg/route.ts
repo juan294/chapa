@@ -8,7 +8,7 @@ import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
 import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
 import { buildSnapshot } from "@/lib/history/snapshot";
-import { recordSnapshot } from "@/lib/history/history";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
@@ -131,7 +131,7 @@ export async function GET(
     ops.push(trackBadgeGenerated(handle));
     ops.push(notifyFirstBadge(handle, impact));
     ops.push(
-      recordSnapshot(handle, buildSnapshot(stats, impact)).then(() => {}),
+      dbInsertSnapshot(handle, buildSnapshot(stats, impact)).then(() => {}),
     );
 
     return Promise.allSettled(ops);
