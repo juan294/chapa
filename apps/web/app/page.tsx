@@ -139,10 +139,13 @@ export default async function Home({
                 <br />
                 <span className="text-amber">Decoded</span>
               </h1>
-              <div className="space-y-1 font-heading text-sm text-text-secondary">
-                <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the real story.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
-                <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Four dimensions. Cryptographically verified.</p>
+              <div className="space-y-2 font-heading text-text-secondary">
+                <p className="text-base text-text-primary font-medium"><span className="text-amber select-none">&gt;</span> The new way to <span className="bg-amber/10 px-1 rounded">quantify</span> your <span className="bg-amber/10 px-1 rounded">impact</span> in AI&#8209;assisted coding.</p>
+                <div className="pl-5 space-y-1 text-sm">
+                  <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the complete story anymore.</p>
+                  <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
+                  <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Four dimensions. Cryptographically verified.</p>
+                </div>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
