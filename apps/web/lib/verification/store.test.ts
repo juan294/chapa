@@ -7,11 +7,12 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/db/verification", () => ({
   dbStoreVerification: vi.fn(() => Promise.resolve()),
+  dbGetVerification: vi.fn(() => Promise.resolve(null)),
 }));
 
 import { storeVerificationRecord, getVerificationRecord } from "./store";
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
-import { dbStoreVerification } from "@/lib/db/verification";
+import { cacheSet } from "@/lib/cache/redis";
+import { dbStoreVerification, dbGetVerification } from "@/lib/db/verification";
 import type { VerificationRecord } from "./types";
 
 const record: VerificationRecord = {
@@ -75,22 +76,26 @@ describe("storeVerificationRecord", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// getVerificationRecord — reads from Supabase (Phase 4)
+// ---------------------------------------------------------------------------
+
 describe("getVerificationRecord", () => {
-  it("returns the record from cache on hit", async () => {
-    vi.mocked(cacheGet).mockResolvedValue(record);
+  it("delegates to dbGetVerification and returns result", async () => {
+    vi.mocked(dbGetVerification).mockResolvedValue(record);
     const result = await getVerificationRecord("abc12345");
     expect(result).toEqual(record);
-    expect(vi.mocked(cacheGet)).toHaveBeenCalledWith("verify:abc12345");
+    expect(dbGetVerification).toHaveBeenCalledWith("abc12345");
   });
 
-  it("returns null on cache miss", async () => {
-    vi.mocked(cacheGet).mockResolvedValue(null);
+  it("returns null on Supabase miss", async () => {
+    vi.mocked(dbGetVerification).mockResolvedValue(null);
     const result = await getVerificationRecord("abc12345");
     expect(result).toBeNull();
   });
 
-  it("returns null if cacheGet throws", async () => {
-    vi.mocked(cacheGet).mockRejectedValue(new Error("Redis down"));
+  it("returns null if dbGetVerification throws", async () => {
+    vi.mocked(dbGetVerification).mockRejectedValue(new Error("Supabase down"));
     const result = await getVerificationRecord("abc12345");
     expect(result).toBeNull();
   });

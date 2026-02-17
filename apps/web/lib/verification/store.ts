@@ -1,5 +1,5 @@
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
-import { dbStoreVerification } from "@/lib/db/verification";
+import { cacheSet } from "@/lib/cache/redis";
+import { dbStoreVerification, dbGetVerification } from "@/lib/db/verification";
 import type { VerificationRecord } from "./types";
 
 const VERIFY_TTL = 2_592_000; // 30 days in seconds
@@ -31,13 +31,14 @@ export async function storeVerificationRecord(
 
 /**
  * Retrieve a verification record by hash.
- * Returns null on miss or if Redis is unavailable.
+ * Reads from Supabase (Phase 4).
+ * Returns null on miss or if DB is unavailable.
  */
 export async function getVerificationRecord(
   hash: string,
 ): Promise<VerificationRecord | null> {
   try {
-    return await cacheGet<VerificationRecord>(`verify:${hash}`);
+    return await dbGetVerification(hash);
   } catch {
     return null;
   }

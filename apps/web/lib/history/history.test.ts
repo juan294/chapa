@@ -25,6 +25,9 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
+  dbGetSnapshots: vi.fn(() => Promise.resolve([])),
+  dbGetLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+  dbGetSnapshotCount: vi.fn(() => Promise.resolve(0)),
 }));
 
 import {
@@ -34,7 +37,12 @@ import {
   getSnapshotCount,
   pruneSnapshots,
 } from "./history";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import {
+  dbInsertSnapshot,
+  dbGetSnapshots,
+  dbGetLatestSnapshot,
+  dbGetSnapshotCount,
+} from "@/lib/db/snapshots";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -114,115 +122,111 @@ describe("recordSnapshot", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getSnapshots
+// getSnapshots — reads from Supabase
 // ---------------------------------------------------------------------------
 
 describe("getSnapshots", () => {
-  it("returns parsed snapshots for a date range", async () => {
+  it("delegates to dbGetSnapshots and returns results", async () => {
     const s1 = makeSnapshot({ date: "2025-06-14" });
     const s2 = makeSnapshot({ date: "2025-06-15" });
-    mockZrange.mockResolvedValue([
-      JSON.stringify(s1),
-      JSON.stringify(s2),
-    ]);
+    vi.mocked(dbGetSnapshots).mockResolvedValue([s1, s2]);
 
     const result = await getSnapshots("TestUser", "2025-06-14", "2025-06-15");
 
     expect(result).toEqual([s1, s2]);
-    expect(mockZrange).toHaveBeenCalledWith(
-      "history:testuser",
-      expect.any(Number),
-      expect.any(Number),
-      { byScore: true },
-    );
+    expect(dbGetSnapshots).toHaveBeenCalledWith("TestUser", "2025-06-14", "2025-06-15");
   });
 
-  it("returns empty array on Redis error", async () => {
-    mockZrange.mockRejectedValue(new Error("timeout"));
+  it("returns empty array when Supabase returns empty", async () => {
+    vi.mocked(dbGetSnapshots).mockResolvedValue([]);
 
     const result = await getSnapshots("TestUser", "2025-06-14", "2025-06-15");
 
     expect(result).toEqual([]);
   });
 
-  it("returns all snapshots when no date range provided", async () => {
-    const s1 = makeSnapshot({ date: "2025-01-01" });
-    mockZrange.mockResolvedValue([JSON.stringify(s1)]);
+  it("passes undefined for omitted date range params", async () => {
+    vi.mocked(dbGetSnapshots).mockResolvedValue([]);
 
-    const result = await getSnapshots("TestUser");
+    await getSnapshots("TestUser");
 
-    expect(mockZrange).toHaveBeenCalledWith(
-      "history:testuser",
-      "-inf",
-      "+inf",
-      { byScore: true },
-    );
-    expect(result).toEqual([s1]);
+    expect(dbGetSnapshots).toHaveBeenCalledWith("TestUser", undefined, undefined);
+  });
+
+  it("does not call Redis for reads", async () => {
+    vi.mocked(dbGetSnapshots).mockResolvedValue([]);
+
+    await getSnapshots("TestUser");
+
+    expect(mockZrange).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// getLatestSnapshot
+// getLatestSnapshot — reads from Supabase
 // ---------------------------------------------------------------------------
 
 describe("getLatestSnapshot", () => {
-  it("returns the most recent snapshot", async () => {
+  it("delegates to dbGetLatestSnapshot and returns result", async () => {
     const latest = makeSnapshot({ date: "2025-06-15" });
-    mockZrange.mockResolvedValue([JSON.stringify(latest)]);
+    vi.mocked(dbGetLatestSnapshot).mockResolvedValue(latest);
 
     const result = await getLatestSnapshot("TestUser");
 
     expect(result).toEqual(latest);
-    expect(mockZrange).toHaveBeenCalledWith(
-      "history:testuser",
-      "+inf",
-      "-inf",
-      { byScore: true, rev: true, count: 1, offset: 0 },
-    );
+    expect(dbGetLatestSnapshot).toHaveBeenCalledWith("TestUser");
   });
 
   it("returns null when no snapshots exist", async () => {
-    mockZrange.mockResolvedValue([]);
+    vi.mocked(dbGetLatestSnapshot).mockResolvedValue(null);
 
     const result = await getLatestSnapshot("TestUser");
 
     expect(result).toBeNull();
   });
 
-  it("returns null on Redis error", async () => {
-    mockZrange.mockRejectedValue(new Error("boom"));
+  it("does not call Redis for reads", async () => {
+    vi.mocked(dbGetLatestSnapshot).mockResolvedValue(null);
 
-    const result = await getLatestSnapshot("TestUser");
+    await getLatestSnapshot("TestUser");
 
-    expect(result).toBeNull();
+    expect(mockZrange).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// getSnapshotCount
+// getSnapshotCount — reads from Supabase
 // ---------------------------------------------------------------------------
 
 describe("getSnapshotCount", () => {
-  it("returns the number of snapshots stored", async () => {
-    mockZcard.mockResolvedValue(42);
+  it("delegates to dbGetSnapshotCount and returns result", async () => {
+    vi.mocked(dbGetSnapshotCount).mockResolvedValue(42);
 
     const result = await getSnapshotCount("TestUser");
 
     expect(result).toBe(42);
-    expect(mockZcard).toHaveBeenCalledWith("history:testuser");
+    expect(dbGetSnapshotCount).toHaveBeenCalledWith("TestUser");
   });
 
-  it("returns 0 on Redis error", async () => {
-    mockZcard.mockRejectedValue(new Error("network"));
+  it("returns 0 when Supabase returns 0", async () => {
+    vi.mocked(dbGetSnapshotCount).mockResolvedValue(0);
 
     const result = await getSnapshotCount("TestUser");
 
     expect(result).toBe(0);
   });
+
+  it("does not call Redis for reads", async () => {
+    vi.mocked(dbGetSnapshotCount).mockResolvedValue(0);
+
+    await getSnapshotCount("TestUser");
+
+    expect(mockZcard).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
-// pruneSnapshots
+// pruneSnapshots (standalone — still exists, removed from recordSnapshot)
 // ---------------------------------------------------------------------------
 
 describe("pruneSnapshots", () => {
@@ -278,31 +282,19 @@ describe("pruneSnapshots", () => {
 });
 
 // ---------------------------------------------------------------------------
-// recordSnapshot — prune after write
+// recordSnapshot — no longer calls pruneSnapshots (Phase 4)
 // ---------------------------------------------------------------------------
 
-describe("recordSnapshot — prune integration", () => {
-  it("calls pruneSnapshots after a successful write", async () => {
+describe("recordSnapshot — no prune after write (Phase 4)", () => {
+  it("does NOT call pruneSnapshots after a successful write", async () => {
     mockZrange.mockResolvedValue([]); // no existing entry
     mockZadd.mockResolvedValue(1);
-    mockZcard.mockResolvedValue(400); // triggers prune
-    mockZremrangebyrank.mockResolvedValue(35);
 
     const result = await recordSnapshot("TestUser", makeSnapshot());
 
     expect(result).toBe(true);
-    // Prune should have been called (fire-and-forget, but we can check zcard was called)
-    // We need to flush microtasks for the fire-and-forget .catch() chain
-    await vi.waitFor(() => {
-      expect(mockZcard).toHaveBeenCalledWith("history:testuser");
-    });
-  });
-
-  it("does not call prune when write is skipped (duplicate)", async () => {
-    mockZrange.mockResolvedValue(["existing-member"]);
-
-    await recordSnapshot("TestUser", makeSnapshot());
-
+    // Prune-related Redis calls should NOT happen from recordSnapshot
+    // (zcard is only called by pruneSnapshots)
     expect(mockZcard).not.toHaveBeenCalled();
     expect(mockZremrangebyrank).not.toHaveBeenCalled();
   });
