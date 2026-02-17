@@ -61,7 +61,7 @@ export const DEMO_STATS: StatsData = {
   topRepoShare: 0.35,
   maxCommitsIn10Min: 3,
   totalStars: 1200,
-  totalForks: 340,
+  totalForks: 40,
   totalWatchers: 89,
   heatmapData: buildDemoHeatmap(),
   fetchedAt: "2025-01-01T00:00:00Z",
