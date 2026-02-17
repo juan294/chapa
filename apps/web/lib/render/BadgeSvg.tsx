@@ -61,11 +61,12 @@ export function renderBadgeSvg(
   const watchLabel = `${watchStr} Watch`;
   const forkLabel = `${forkStr} Fork`;
   const starLabel = `${starsStr} Star`;
-  const metricCharW = 8;
-  const reposPillW = 12 + 16 + 6 + reposLabel.length * metricCharW + 12;
-  const watchPillW = 12 + 16 + 6 + watchLabel.length * metricCharW + 12;
-  const forkPillW = 12 + 16 + 6 + forkLabel.length * metricCharW + 12;
-  const starPillW = 12 + 16 + 6 + starLabel.length * metricCharW + 12;
+  const metricCharW = 7.5;
+  const reposPillW = 12 + 16 + 6 + reposLabel.length * metricCharW + 10;
+  const watchPillW = 12 + 16 + 6 + watchLabel.length * metricCharW + 10;
+  const forkPillW = 12 + 16 + 6 + forkLabel.length * metricCharW + 10;
+  // Star uses inline ★ tspan (no separate icon <g>), so width = pad + text("★ " + label) + pad
+  const starPillW = 12 + (starLabel.length + 2) * metricCharW + 10;
 
   // ── Two-column body ─────────────────────────────────────────
   // Left column: heatmap (44px cells + 5px gap = 49px per cell)
