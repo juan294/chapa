@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe("GET /api/health", () => {
-  it("returns 200 with status 'ok' when Redis is reachable", async () => {
+  it("returns 200 with status 'ok' when both Redis and Supabase are reachable", async () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
@@ -42,6 +42,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(503);
     expect(body.status).toBe("degraded");
     expect(body.dependencies.redis).toBe("error");
+    expect(body.dependencies.supabase).toBe("ok");
   });
 
   it("returns 503 with status 'degraded' when Redis client is null (missing env vars)", async () => {
@@ -56,27 +57,42 @@ describe("GET /api/health", () => {
     expect(body.dependencies.redis).toBe("unavailable");
   });
 
-  it("stays 'ok' when Supabase is unavailable (optional in Phase 1)", async () => {
+  it("returns 503 with status 'degraded' when Supabase is unavailable", async () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("unavailable");
 
     const response = await GET();
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.status).toBe("ok");
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.redis).toBe("ok");
     expect(body.dependencies.supabase).toBe("unavailable");
   });
 
-  it("stays 'ok' when Supabase errors (optional in Phase 1)", async () => {
+  it("returns 503 with status 'degraded' when Supabase errors", async () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("error");
 
     const response = await GET();
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.status).toBe("ok");
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.redis).toBe("ok");
+    expect(body.dependencies.supabase).toBe("error");
+  });
+
+  it("returns 503 with status 'degraded' when both Redis and Supabase fail", async () => {
+    vi.mocked(pingRedis).mockResolvedValueOnce("error");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("error");
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.redis).toBe("error");
     expect(body.dependencies.supabase).toBe("error");
   });
 
