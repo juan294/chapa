@@ -8,6 +8,7 @@ export default defineConfig({
       "packages/**/*.test.{ts,tsx}",
       "scripts/**/*.test.ts",
     ],
+    setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
       include: ["apps/web/lib/**", "packages/shared/**"],
