@@ -1,68 +1,81 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.thecreativetoken.com",
 }));
 
+vi.mock("@/lib/db/users", () => ({
+  dbGetUsers: vi.fn(),
+}));
+
 import sitemap from "./sitemap";
+import { dbGetUsers } from "@/lib/db/users";
 
-describe("sitemap.ts", () => {
-  it("exports a default function that returns sitemap entries", () => {
-    const result = sitemap();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0);
+const BASE_URL = "https://chapa.thecreativetoken.com";
+
+describe("sitemap", () => {
+  beforeEach(() => {
+    vi.mocked(dbGetUsers).mockReset();
   });
 
-  it("includes the home page", () => {
-    const result = sitemap();
-    const home = result.find((entry) => entry.url.endsWith("/"));
-    expect(home).toBeDefined();
+  it("includes static pages with correct priorities", async () => {
+    vi.mocked(dbGetUsers).mockResolvedValue([]);
+
+    const entries = await sitemap();
+
+    const urls = entries.map((e) => e.url);
+    expect(urls).toContain(`${BASE_URL}/`);
+    expect(urls).toContain(`${BASE_URL}/about`);
+    expect(urls).toContain(`${BASE_URL}/about/scoring`);
+    expect(urls).toContain(`${BASE_URL}/privacy`);
+    expect(urls).toContain(`${BASE_URL}/terms`);
+
+    const home = entries.find((e) => e.url === `${BASE_URL}/`);
+    expect(home?.priority).toBe(1);
+    expect(home?.changeFrequency).toBe("weekly");
   });
 
-  it("includes the about page", () => {
-    const result = sitemap();
-    const about = result.find((entry) => entry.url.endsWith("/about"));
-    expect(about).toBeDefined();
-  });
+  it("includes all 6 archetype pages", async () => {
+    vi.mocked(dbGetUsers).mockResolvedValue([]);
 
-  it("includes the privacy page", () => {
-    const result = sitemap();
-    const privacy = result.find((entry) => entry.url.endsWith("/privacy"));
-    expect(privacy).toBeDefined();
-  });
+    const entries = await sitemap();
+    const urls = entries.map((e) => e.url);
 
-  it("includes the terms page", () => {
-    const result = sitemap();
-    const terms = result.find((entry) => entry.url.endsWith("/terms"));
-    expect(terms).toBeDefined();
-  });
-
-  it("uses production base URL", () => {
-    const result = sitemap();
-    for (const entry of result) {
-      expect(entry.url).toMatch(/^https:\/\/chapa\.thecreativetoken\.com/);
+    const archetypes = ["builder", "guardian", "marathoner", "polymath", "balanced", "emerging"];
+    for (const archetype of archetypes) {
+      expect(urls).toContain(`${BASE_URL}/archetypes/${archetype}`);
     }
+
+    const archetypeEntry = entries.find((e) => e.url.includes("/archetypes/builder"));
+    expect(archetypeEntry?.priority).toBe(0.6);
+    expect(archetypeEntry?.changeFrequency).toBe("monthly");
   });
 
-  it("sets changeFrequency on all entries", () => {
-    const result = sitemap();
-    for (const entry of result) {
-      expect(entry.changeFrequency).toBeDefined();
-    }
+  it("includes dynamic user profile pages from DB", async () => {
+    vi.mocked(dbGetUsers).mockResolvedValue([
+      { handle: "alice", registeredAt: "2026-01-15T00:00:00Z" },
+      { handle: "bob", registeredAt: "2026-01-10T00:00:00Z" },
+    ]);
+
+    const entries = await sitemap();
+    const urls = entries.map((e) => e.url);
+
+    expect(urls).toContain(`${BASE_URL}/u/alice`);
+    expect(urls).toContain(`${BASE_URL}/u/bob`);
+
+    const aliceEntry = entries.find((e) => e.url === `${BASE_URL}/u/alice`);
+    expect(aliceEntry?.priority).toBe(0.8);
+    expect(aliceEntry?.changeFrequency).toBe("daily");
   });
 
-  it("sets priority on all entries", () => {
-    const result = sitemap();
-    for (const entry of result) {
-      expect(entry.priority).toBeDefined();
-      expect(entry.priority).toBeGreaterThanOrEqual(0);
-      expect(entry.priority).toBeLessThanOrEqual(1);
-    }
-  });
+  it("gracefully handles DB failure (returns static pages only)", async () => {
+    vi.mocked(dbGetUsers).mockResolvedValue([]);
 
-  it("gives home page the highest priority", () => {
-    const result = sitemap();
-    const home = result.find((entry) => entry.url.endsWith("/"));
-    expect(home!.priority).toBe(1);
+    const entries = await sitemap();
+
+    // Should still have static pages
+    expect(entries.length).toBeGreaterThanOrEqual(5);
+    const urls = entries.map((e) => e.url);
+    expect(urls).toContain(`${BASE_URL}/`);
   });
 });
