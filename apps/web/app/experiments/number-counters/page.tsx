@@ -564,7 +564,7 @@ function ControlsSection({
       <div className="mt-10 flex justify-center">
         <button
           onClick={onReplayAll}
-          className="flex items-center gap-2 rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+          className="flex items-center gap-2 rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
         >
           <ReplayIcon />
           Replay All

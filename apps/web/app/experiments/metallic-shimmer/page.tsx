@@ -95,7 +95,7 @@ export default function MetallicShimmerPage() {
             <div className="flex items-end">
               <button
                 onClick={replay}
-                className="rounded-full bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-colors hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                className="rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-colors hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 Replay Animation
               </button>
