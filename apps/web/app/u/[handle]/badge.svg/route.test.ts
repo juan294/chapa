@@ -77,6 +77,20 @@ vi.mock("@/lib/history/snapshot", () => ({
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
+  dbGetLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+}));
+
+vi.mock("@/lib/impact/smoothing", () => ({
+  applyEMA: vi.fn((score: number) => score),
+}));
+
+vi.mock("@/lib/impact/utils", () => ({
+  getTier: vi.fn((score: number) => {
+    if (score >= 85) return "Elite";
+    if (score >= 70) return "High";
+    if (score >= 30) return "Solid";
+    return "Emerging";
+  }),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
