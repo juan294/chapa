@@ -62,17 +62,19 @@ export default function MarathonerPage() {
               <p>
                 The Consistency dimension in Chapa measures exactly this. It looks at how often
                 you show up, how evenly your contributions are spread across weeks, and whether
-                your work arrives in a measured cadence or frantic bursts. A developer who
-                contributes steadily across the year with even weekly distribution will score far
-                higher than one who crams all their work into a single month.
+                your work arrives in a measured cadence or frantic bursts. The active days signal
+                uses a concave curve that rewards getting started generously &mdash; coding a few
+                days a week builds real momentum &mdash; while the climb from good to great
+                remains meaningful. You don&apos;t need to code every single day to score well.
               </p>
 
               <p>
-                Heatmap evenness is particularly revealing. Chapa looks at your year and evaluates
-                how uniformly your contributions are distributed. A steady, even contribution
-                pattern scores well. A single burst followed by silence does not. This isn&apos;t
-                about punishing time off &mdash; it&apos;s about recognizing that sustainable
-                pace is itself a skill.
+                Heatmap evenness carries significant weight, on par with active days. Chapa looks
+                at your year and evaluates how uniformly your contributions are distributed. A
+                developer who codes three days a week every week is more consistent than one who
+                codes every day for a month and then disappears. This isn&apos;t about punishing
+                time off &mdash; it&apos;s about recognizing that sustainable pace is itself a
+                skill.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
@@ -93,11 +95,11 @@ export default function MarathonerPage() {
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-36">PRIMARY</span>
-                  <span className="text-text-secondary text-sm">Active days relative to total days &mdash; how often you show up.</span>
+                  <span className="text-text-secondary text-sm">Active days (concave curve) &mdash; how often you show up, with early momentum rewarded generously.</span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SECONDARY</span>
-                  <span className="text-text-secondary text-sm">Heatmap evenness &mdash; how uniformly contributions spread across weeks.</span>
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">CO-PRIMARY</span>
+                  <span className="text-text-secondary text-sm">Heatmap evenness &mdash; how uniformly contributions spread across weeks. Nearly as important as active days.</span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>

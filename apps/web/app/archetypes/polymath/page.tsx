@@ -59,20 +59,22 @@ export default function PolymathPage() {
               </p>
 
               <p>
-                The Breadth dimension in Chapa captures this cross-project influence through
-                multiple signals: how many repositories you contribute to, how evenly your work
-                is distributed across them, your community reach through stars and forks, and
-                whether you write documentation. Raw repo count matters, but concentration matters
-                too. Contributing to many repos with no single repo dominating scores higher than
-                contributing to the same number of repos where most of the work is in one.
+                The Breadth dimension in Chapa captures this cross-project influence by
+                prioritizing signals you can directly control: how many repositories you
+                contribute to, how evenly your work is distributed across them, and whether you
+                write documentation. Repo diversity is the dominant signal, followed by
+                contribution spread and docs-only PRs. Community signals like stars and forks
+                play a supporting role but are deliberately weighted low &mdash; Breadth is about
+                what you do, not what others think of it.
               </p>
 
               <p>
-                The documentation signal is unique to the Polymath. Chapa specifically tracks PRs
-                that only touch documentation files, because writing docs is one of the clearest
-                markers of someone who cares about the ecosystem beyond their own code. Polymaths
-                don&apos;t just build features; they make those features understandable to the next
-                person.
+                The documentation signal is especially important for Polymaths. Chapa specifically
+                tracks PRs that only touch documentation files, and this signal carries real
+                weight &mdash; on par with community reach from stars and forks combined. Writing
+                docs is one of the clearest markers of someone who cares about the ecosystem
+                beyond their own code. Polymaths don&apos;t just build features; they make those
+                features understandable to the next person.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
@@ -104,8 +106,12 @@ export default function PolymathPage() {
                   <span className="text-text-secondary text-sm">Distribution evenness &mdash; spreading work across repos, not concentrating it.</span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SECONDARY</span>
+                  <span className="text-text-secondary text-sm">Documentation contributions &mdash; docs-only PRs signal ecosystem investment you control.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
-                  <span className="text-text-secondary text-sm">Community signals (stars, forks) and documentation contributions.</span>
+                  <span className="text-text-secondary text-sm">Community signals (stars, forks) &mdash; external recognition, weighted low because it&apos;s outside your control.</span>
                 </div>
               </div>
 

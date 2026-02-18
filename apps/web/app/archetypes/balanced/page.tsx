@@ -59,11 +59,12 @@ export default function BalancedPage() {
 
               <p>
                 The Balanced archetype triggers when all four dimensions (Building, Guarding,
-                Consistency, Breadth) are closely matched and collectively strong. This is harder
-                than it sounds. Most developers naturally gravitate toward one style of
-                contribution. Maintaining high scores in shipping, reviewing, showing up
-                consistently, <em>and</em> working across multiple projects requires a rare kind
-                of discipline.
+                Consistency, Breadth) are closely matched and collectively solid. The gate is
+                intentionally inclusive &mdash; you don&apos;t need exceptionally high scores,
+                just a strong average without major imbalances. Most developers naturally
+                gravitate toward one style of contribution, so maintaining solid scores in
+                shipping, reviewing, showing up consistently, <em>and</em> working across
+                multiple projects is a distinctive achievement in itself.
               </p>
 
               <p>
