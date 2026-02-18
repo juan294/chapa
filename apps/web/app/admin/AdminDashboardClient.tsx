@@ -7,12 +7,13 @@ import { AdminSearchBar } from "./AdminSearchBar";
 import { AdminStatsCards } from "./AdminStatsCards";
 import { AdminUserTable } from "./AdminUserTable";
 import { AgentsDashboard } from "./agents/agents-dashboard";
+import { EngagementDashboard } from "./engagement/engagement-dashboard";
 
 // ---------------------------------------------------------------------------
 // Tab type
 // ---------------------------------------------------------------------------
 
-type AdminTab = "users" | "agents";
+type AdminTab = "users" | "agents" | "engagement";
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -65,7 +66,7 @@ export function AdminDashboardClient() {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       const tab = detail?.tab as AdminTab | undefined;
-      if (tab === "users" || tab === "agents") setActiveTab(tab);
+      if (tab === "users" || tab === "agents" || tab === "engagement") setActiveTab(tab);
     };
     window.addEventListener("chapa:admin-tab", handler);
     return () => window.removeEventListener("chapa:admin-tab", handler);
@@ -158,6 +159,16 @@ export function AdminDashboardClient() {
       >
         Agents
       </button>
+      <button
+        id="tab-engagement"
+        role="tab"
+        aria-selected={activeTab === "engagement"}
+        aria-controls="tabpanel-engagement"
+        className={tabClasses("engagement")}
+        onClick={() => setActiveTab("engagement")}
+      >
+        Engagement
+      </button>
     </div>
   );
 
@@ -223,6 +234,10 @@ export function AdminDashboardClient() {
       {activeTab === "agents" ? (
         <div role="tabpanel" id="tabpanel-agents" aria-labelledby="tab-agents">
           <AgentsDashboard />
+        </div>
+      ) : activeTab === "engagement" ? (
+        <div role="tabpanel" id="tabpanel-engagement" aria-labelledby="tab-engagement">
+          <EngagementDashboard />
         </div>
       ) : (
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
