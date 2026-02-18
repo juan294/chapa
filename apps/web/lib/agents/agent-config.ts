@@ -10,6 +10,8 @@ export interface AgentConfig {
   key: string;
   label: string;
   schedule: string;
+  /** Shell script filename without extension, e.g. "coverage-agent" → scripts/coverage-agent.sh */
+  scriptName: string;
   outputFile: string;
   defaultPrompt: string;
   allowedTools: string[];
@@ -20,6 +22,7 @@ export const AGENTS: Record<string, AgentConfig> = {
     key: "coverage_agent",
     label: "Coverage Agent",
     schedule: "Daily at 2:00 AM",
+    scriptName: "coverage-agent",
     outputFile: "docs/agents/coverage-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a test coverage analyst for the Chapa project (Next.js + TypeScript monorepo).
@@ -73,6 +76,7 @@ SHARED_CONTEXT_END`,
     key: "security_scanner",
     label: "Security Scanner",
     schedule: "Weekly Monday 9:00 AM",
+    scriptName: "security-agent",
     outputFile: "docs/agents/security-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a security auditor for the Chapa project (Next.js + TypeScript monorepo).
@@ -129,6 +133,7 @@ SHARED_CONTEXT_END`,
     key: "qa_agent",
     label: "QA Agent",
     schedule: "Weekly Wednesday 9:00 AM",
+    scriptName: "qa-agent",
     outputFile: "docs/agents/qa-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a QA engineer for the Chapa project (Next.js + TypeScript monorepo).
@@ -193,6 +198,7 @@ SHARED_CONTEXT_END`,
     key: "performance_agent",
     label: "Performance Agent",
     schedule: "Weekly Thursday 9:00 AM",
+    scriptName: "performance-agent",
     outputFile: "docs/agents/performance-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a performance engineer for the Chapa project (Next.js + TypeScript monorepo).
@@ -255,6 +261,7 @@ SHARED_CONTEXT_END`,
     key: "documentation_agent",
     label: "Documentation Agent",
     schedule: "Weekly Friday 9:00 AM",
+    scriptName: "documentation-agent",
     outputFile: "docs/agents/documentation-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a documentation auditor for the Chapa project (Next.js + TypeScript monorepo).
@@ -317,6 +324,7 @@ SHARED_CONTEXT_END`,
     key: "cost_analyst",
     label: "Cost Analyst",
     schedule: "Daily at 3:00 AM",
+    scriptName: "cost-analyst",
     outputFile: "docs/agents/cost-analyst-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a cost and infrastructure analyst for the Chapa project (Next.js + TypeScript monorepo).
@@ -392,6 +400,7 @@ SHARED_CONTEXT_END`,
     key: "localization_agent",
     label: "Localization Agent",
     schedule: "Weekly Saturday 9:00 AM",
+    scriptName: "localization-agent",
     outputFile: "docs/agents/localization-report.md",
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a localization and copy consistency auditor for the Chapa project (Next.js + TypeScript monorepo).

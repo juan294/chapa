@@ -22,11 +22,26 @@ export function TerminalDisplay({ agentKey, onClose }: TerminalDisplayProps) {
   const offsetRef = useRef(0);
 
   // Poll for log lines
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
   const poll = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/admin/agents/run?agentKey=${agentKey}&since=${offsetRef.current}`,
       );
+      if (res.status === 404) {
+        // Run doesn't exist — stop polling
+        setStatus("failed");
+        stopPolling();
+        return;
+      }
       if (!res.ok) return;
       const data = await res.json();
       setStatus(data.status);
@@ -35,16 +50,25 @@ export function TerminalDisplay({ agentKey, onClose }: TerminalDisplayProps) {
         setLines((prev) => [...prev, ...data.lines]);
         offsetRef.current = data.totalLines;
       }
+      // Stop polling once the run is no longer active
+      if (data.status === "completed" || data.status === "failed" || data.status === "stopped") {
+        stopPolling();
+      }
     } catch {
       // Network error — keep polling
     }
-  }, [agentKey]);
+  }, [agentKey, stopPolling]);
 
   useEffect(() => {
-    poll(); // Initial fetch
-    const interval = setInterval(poll, 2000);
-    return () => clearInterval(interval);
-  }, [poll]);
+    // Fire the first poll immediately via setTimeout to avoid synchronous
+    // setState inside an effect (lint: react-hooks/set-state-in-effect).
+    const initial = setTimeout(poll, 0);
+    intervalRef.current = setInterval(poll, 2000);
+    return () => {
+      clearTimeout(initial);
+      stopPolling();
+    };
+  }, [poll, stopPolling]);
 
   // Auto-scroll to bottom
   useEffect(() => {
