@@ -57,6 +57,9 @@ CLAUDE.local.md
 # product hunt launch assets
 producthunt/
 
+# agent logs
+logs/
+
 # misc
 *.tsbuildinfo
 next-env.d.ts
