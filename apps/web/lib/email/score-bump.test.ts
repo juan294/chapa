@@ -30,6 +30,12 @@ vi.mock("@/lib/db/users", () => ({
   dbGetUserEmail: (...args: unknown[]) => mockDbGetUserEmail(...args),
 }));
 
+const mockDbGetFeatureFlag = vi.fn();
+
+vi.mock("@/lib/db/feature-flags", () => ({
+  dbGetFeatureFlag: (...args: unknown[]) => mockDbGetFeatureFlag(...args),
+}));
+
 import { notifyScoreBump } from "./score-bump";
 import { _resetClient } from "./resend";
 import type { SnapshotDiff } from "@/lib/history/diff";
@@ -87,7 +93,9 @@ beforeEach(() => {
 
   vi.stubEnv("RESEND_API_KEY", "re_test_123");
   vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
-  vi.stubEnv("SCORE_NOTIFICATIONS_ENABLED", "true");
+
+  // DB feature flag: score_notifications enabled by default
+  mockDbGetFeatureFlag.mockResolvedValue({ key: "score_notifications", enabled: true });
 
   mockCacheGet.mockResolvedValue(null); // No dedup marker
   mockCacheSet.mockResolvedValue(true);
@@ -103,16 +111,25 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("feature flag guard", () => {
-  it("skips when SCORE_NOTIFICATIONS_ENABLED is not true", async () => {
-    vi.stubEnv("SCORE_NOTIFICATIONS_ENABLED", "");
+  it("skips when score_notifications flag is disabled in DB", async () => {
+    mockDbGetFeatureFlag.mockResolvedValue({ key: "score_notifications", enabled: false });
+
+    await notifyScoreBump("testuser", makeDiff(), makeSignificance("score_bump"));
+
+    expect(mockDbGetFeatureFlag).toHaveBeenCalledWith("score_notifications");
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("skips when score_notifications flag is not found in DB", async () => {
+    mockDbGetFeatureFlag.mockResolvedValue(null);
 
     await notifyScoreBump("testuser", makeDiff(), makeSignificance("score_bump"));
 
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it("skips when SCORE_NOTIFICATIONS_ENABLED is unset", async () => {
-    vi.stubEnv("SCORE_NOTIFICATIONS_ENABLED", "");
+  it("skips when DB is unavailable (fail-closed for notifications)", async () => {
+    mockDbGetFeatureFlag.mockRejectedValue(new Error("DB unavailable"));
 
     await notifyScoreBump("testuser", makeDiff(), makeSignificance("score_bump"));
 

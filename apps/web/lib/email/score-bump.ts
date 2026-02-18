@@ -5,7 +5,7 @@
  * significantly, their tier changes, or their archetype changes.
  *
  * Guards:
- *   1. SCORE_NOTIFICATIONS_ENABLED env var must be "true"
+ *   1. `score_notifications` feature flag must be enabled in Supabase
  *   2. User must have an email on file with notifications enabled
  *   3. Redis dedup marker (7-day TTL) prevents spam
  *
@@ -18,6 +18,7 @@ import type { SignificantChange } from "@/lib/history/significant-change";
 import { getResend, escapeHtml } from "./resend";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { dbGetUserEmail } from "@/lib/db/users";
+import { dbGetFeatureFlag } from "@/lib/db/feature-flags";
 import { getBaseUrl } from "@/lib/env";
 
 const DEDUP_TTL = 604_800; // 7 days in seconds
@@ -32,8 +33,9 @@ export async function notifyScoreBump(
   significance: SignificantChange,
 ): Promise<void> {
   try {
-    // 1. Feature flag guard
-    if (process.env.SCORE_NOTIFICATIONS_ENABLED?.trim() !== "true") return;
+    // 1. Feature flag guard (DB-backed, fail-closed)
+    const flag = await dbGetFeatureFlag("score_notifications");
+    if (!flag?.enabled) return;
 
     const lowerHandle = handle.toLowerCase();
 
