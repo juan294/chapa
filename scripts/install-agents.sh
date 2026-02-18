@@ -18,6 +18,10 @@ PLISTS=(
   "com.chapa.coverage-agent"
   "com.chapa.security-agent"
   "com.chapa.qa-agent"
+  "com.chapa.performance-agent"
+  "com.chapa.documentation-agent"
+  "com.chapa.cost-analyst"
+  "com.chapa.localization-agent"
 )
 
 # Ensure logs directory exists
