@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { AdminUser, SortField, SortDir } from "./admin-types";
 import { sortUsers, formatDate } from "./admin-types";
 import { AdminSearchBar } from "./AdminSearchBar";
 import { AdminStatsCards } from "./AdminStatsCards";
 import { AdminUserTable } from "./AdminUserTable";
+import { AdminTableSkeleton } from "./AdminTableSkeleton";
 import { AgentsDashboard } from "./agents/agents-dashboard";
 import { EngagementDashboard } from "./engagement/engagement-dashboard";
 
@@ -25,6 +26,7 @@ export function AdminDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [sortField, setSortField] = useState<SortField>("adjustedComposite");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
@@ -103,14 +105,14 @@ export function AdminDashboardClient() {
   }, [handleSort]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q = deferredSearch.toLowerCase().trim();
     if (!q) return users;
     return users.filter(
       (u) =>
         u.handle.toLowerCase().includes(q) ||
         (u.displayName?.toLowerCase().includes(q) ?? false),
     );
-  }, [users, search]);
+  }, [users, deferredSearch]);
 
   const sorted = useMemo(
     () => sortUsers(filtered, sortField, sortDir),
@@ -180,14 +182,12 @@ export function AdminDashboardClient() {
     return (
       <div className="space-y-6">
         {tabBar}
-        <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="flex flex-col items-center justify-center gap-4 py-32">
+        <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
           <h1 className="font-heading text-2xl tracking-tight text-text-primary">
             <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
           </h1>
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
-          <p className="font-heading text-sm text-text-secondary">
-            <span className="text-amber">$</span> fetching user data...
-          </p>
+          <span className="sr-only" aria-live="polite">Loading user data</span>
+          <AdminTableSkeleton />
         </div>
       </div>
     );

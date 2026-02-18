@@ -253,4 +253,54 @@ describe("AdminDashboardClient", () => {
       expect(tabBarRefs.length).toBeGreaterThanOrEqual(3);
     });
   });
+
+  describe("skeleton loading state", () => {
+    it("imports AdminTableSkeleton", () => {
+      expect(SOURCE).toMatch(/from\s+["']\.\/AdminTableSkeleton["']/);
+    });
+
+    it("renders AdminTableSkeleton in loading state", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).toContain("<AdminTableSkeleton");
+    });
+
+    it("does not render the old spinner in loading state", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).not.toContain("animate-spin");
+    });
+
+    it("has aria-live announcement in loading state", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).toContain('aria-live="polite"');
+    });
+  });
+
+  describe("deferred search", () => {
+    it("imports useDeferredValue from React", () => {
+      expect(SOURCE).toMatch(/useDeferredValue/);
+    });
+
+    it("creates deferredSearch from search state", () => {
+      expect(SOURCE).toMatch(/useDeferredValue\(search\)/);
+    });
+
+    it("uses deferredSearch in the filter useMemo dependency array", () => {
+      // The filtered memo should depend on deferredSearch, not search
+      const filteredMemo = SOURCE.match(
+        /const filtered = useMemo\(\(\) => \{[\s\S]*?\}, \[([^\]]+)\]\)/,
+      );
+      expect(filteredMemo).not.toBeNull();
+      expect(filteredMemo![1]).toContain("deferredSearch");
+      expect(filteredMemo![1]).not.toMatch(/(?<![dD]eferred)search/);
+    });
+  });
 });

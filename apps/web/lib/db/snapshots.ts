@@ -263,6 +263,56 @@ export async function dbGetSnapshots(
 }
 
 /**
+ * Get the latest snapshot for each handle in a single query.
+ * Returns a Map keyed by lowercase handle. Handles with no snapshots
+ * are simply absent from the Map. Short-circuits on empty input.
+ */
+export async function dbGetLatestSnapshotBatch(
+  handles: string[],
+): Promise<Map<string, MetricsSnapshot>> {
+  if (handles.length === 0) return new Map();
+
+  const db = getSupabase();
+  if (!db) return new Map();
+
+  const lowered = handles.map((h) => h.toLowerCase());
+
+  try {
+    const { data, error } = await db
+      .from("metrics_snapshots")
+      .select(`handle, ${SNAPSHOT_COLUMNS}`)
+      .in("handle", lowered)
+      .order("handle", { ascending: true })
+      .order("date", { ascending: false });
+
+    if (error) throw error;
+
+    const rows = parseRows<SnapshotRow & { handle: string }>(
+      data,
+      SNAPSHOT_REQUIRED_KEYS,
+      "metrics_snapshots",
+    );
+
+    // Deduplicate: keep first row per handle (latest date due to ordering)
+    const map = new Map<string, MetricsSnapshot>();
+    for (const row of rows) {
+      const key = row.handle.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, rowToSnapshot(row));
+      }
+    }
+
+    return map;
+  } catch (error) {
+    console.error(
+      "[db] dbGetLatestSnapshotBatch failed:",
+      (error as Error).message,
+    );
+    return new Map();
+  }
+}
+
+/**
  * Get the most recent snapshot for a user.
  * Returns null if no snapshots exist or on error.
  */
