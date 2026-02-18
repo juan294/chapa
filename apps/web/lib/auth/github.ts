@@ -18,7 +18,7 @@ export function buildAuthUrl(clientId: string, redirectUri: string, state: strin
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: "read:user",
+    scope: "read:user user:email",
     state,
   });
   return `https://github.com/login/oauth/authorize?${params.toString()}`;
@@ -119,6 +119,41 @@ export async function fetchGitHubUser(
       name: data.name ?? null,
       avatar_url: data.avatar_url,
     };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fetch primary verified email (requires user:email scope)
+// ---------------------------------------------------------------------------
+
+interface GitHubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+/**
+ * Fetch the user's primary verified email from GitHub.
+ * Requires the `user:email` OAuth scope. Returns null if no primary
+ * verified email is found or on any error.
+ */
+export async function fetchGitHubUserEmail(
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch("https://api.github.com/user/emails", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!res.ok) return null;
+
+    const emails: GitHubEmail[] = await res.json();
+    const primary = emails.find((e) => e.primary && e.verified);
+    return primary?.email ?? null;
   } catch {
     return null;
   }

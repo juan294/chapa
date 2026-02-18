@@ -3,6 +3,7 @@ import {
   buildAuthUrl,
   exchangeCodeForToken,
   fetchGitHubUser,
+  fetchGitHubUserEmail,
   encryptToken,
   decryptToken,
   createStateCookie,
@@ -34,10 +35,12 @@ describe("buildAuthUrl", () => {
     );
   });
 
-  it("requests read:user scope", () => {
+  it("requests read:user and user:email scopes", () => {
     const url = buildAuthUrl("cid", "http://localhost:3000/api/auth/callback", "test-state");
     const parsed = new URL(url);
-    expect(parsed.searchParams.get("scope")).toContain("read:user");
+    const scope = parsed.searchParams.get("scope")!;
+    expect(scope).toContain("read:user");
+    expect(scope).toContain("user:email");
   });
 
   it("includes the provided state parameter for CSRF protection", () => {
@@ -135,6 +138,83 @@ describe("fetchGitHubUser", () => {
 
     const user = await fetchGitHubUser("bad-token");
     expect(user).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchGitHubUserEmail
+// ---------------------------------------------------------------------------
+
+describe("fetchGitHubUserEmail", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns the primary verified email", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { email: "secondary@example.com", primary: false, verified: true },
+            { email: "primary@example.com", primary: true, verified: true },
+          ]),
+      })
+    );
+
+    const email = await fetchGitHubUserEmail("gho_abc123");
+    expect(email).toBe("primary@example.com");
+  });
+
+  it("returns null when no primary verified email exists", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { email: "unverified@example.com", primary: true, verified: false },
+            { email: "secondary@example.com", primary: false, verified: true },
+          ]),
+      })
+    );
+
+    const email = await fetchGitHubUserEmail("gho_abc123");
+    expect(email).toBeNull();
+  });
+
+  it("returns null when email list is empty", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+    );
+
+    const email = await fetchGitHubUserEmail("gho_abc123");
+    expect(email).toBeNull();
+  });
+
+  it("returns null on API failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 403 })
+    );
+
+    const email = await fetchGitHubUserEmail("bad-token");
+    expect(email).toBeNull();
+  });
+
+  it("returns null on network error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network error"))
+    );
+
+    const email = await fetchGitHubUserEmail("gho_abc123");
+    expect(email).toBeNull();
   });
 });
 

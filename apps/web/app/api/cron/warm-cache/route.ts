@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { dbGetUsers } from "@/lib/db/users";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { dbInsertSnapshot, dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { buildSnapshot } from "@/lib/history/snapshot";
+import { compareSnapshots } from "@/lib/history/diff";
+import { isSignificantChange } from "@/lib/history/significant-change";
+import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
@@ -52,6 +55,7 @@ export async function GET(request: NextRequest) {
   let warmed = 0;
   let failed = 0;
   let snapshots = 0;
+  let notifications = 0;
 
   for (const handle of toWarm) {
     try {
@@ -62,8 +66,28 @@ export async function GET(request: NextRequest) {
         try {
           const impact = computeImpactV4(stats);
           const snapshot = buildSnapshot(stats, impact);
+
+          // Fetch previous snapshot BEFORE inserting new one (for comparison)
+          const previousSnapshot = await dbGetLatestSnapshot(handle);
+
           const recorded = await dbInsertSnapshot(handle, snapshot);
-          if (recorded) snapshots++;
+          if (recorded) {
+            snapshots++;
+
+            // Score bump notification: compare new vs previous snapshot
+            if (previousSnapshot) {
+              try {
+                const diff = compareSnapshots(previousSnapshot, snapshot);
+                const result = isSignificantChange(diff);
+                if (result.significant) {
+                  await notifyScoreBump(handle, diff, result);
+                  notifications++;
+                }
+              } catch {
+                // Notification is non-critical — don't fail the warm
+              }
+            }
+          }
         } catch {
           // Snapshot recording is non-critical — don't fail the warm
         }
@@ -88,6 +112,7 @@ export async function GET(request: NextRequest) {
       warmed,
       failed,
       snapshots,
+      notifications,
       expiredVerificationsDeleted,
       total: toWarm.length,
       handles: toWarm,
