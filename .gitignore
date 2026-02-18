@@ -63,3 +63,4 @@ logs/
 # misc
 *.tsbuildinfo
 next-env.d.ts
+supabase/.temp/
