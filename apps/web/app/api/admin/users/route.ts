@@ -5,6 +5,9 @@ import { cacheMGet, rateLimit } from "@/lib/cache/redis";
 import { dbGetUsers } from "@/lib/db/users";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeImpactV4 } from "@/lib/impact/v4";
+import { applyEMA } from "@/lib/impact/smoothing";
+import { getTier } from "@/lib/impact/utils";
+import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import type { StatsData } from "@chapa/shared";
 
 /** Fields returned per user. Users without stats have `statsExpired: true`. */
@@ -81,50 +84,60 @@ export async function GET(request: NextRequest) {
     cacheMGet<StatsData>(staleStatsKeys),
   ]);
 
-  // Build user list — use primary stats if available, stale as fallback
-  const users: AdminUserEntry[] = handles.map((handle, i) => {
-    const stats = primaryValues[i] ?? staleValues[i] ?? null;
+  // Build user list — use primary stats if available, stale as fallback.
+  // Apply EMA smoothing (matching badge/share page behavior) so the admin
+  // panel shows the same score the user sees on their badge.
+  const users: AdminUserEntry[] = await Promise.all(
+    handles.map(async (handle, i) => {
+      const stats = primaryValues[i] ?? staleValues[i] ?? null;
 
-    if (!stats) {
-      // User exists in Supabase but stats cache fully expired
+      if (!stats) {
+        // User exists in Supabase but stats cache fully expired
+        return {
+          handle,
+          displayName: null,
+          avatarUrl: null,
+          fetchedAt: null,
+          commitsTotal: null,
+          prsMergedCount: null,
+          reviewsSubmittedCount: null,
+          activeDays: null,
+          reposContributed: null,
+          totalStars: null,
+          archetype: null,
+          tier: null,
+          adjustedComposite: null,
+          confidence: null,
+          statsExpired: true,
+        };
+      }
+
+      const impact = computeImpactV4(stats);
+
+      // EMA smoothing: fetch previous day's smoothed score from Supabase
+      const latestSnapshot = await dbGetLatestSnapshot(handle);
+      const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
+      const smoothedScore = applyEMA(impact.adjustedComposite, previousSmoothed);
+
       return {
-        handle,
-        displayName: null,
-        avatarUrl: null,
-        fetchedAt: null,
-        commitsTotal: null,
-        prsMergedCount: null,
-        reviewsSubmittedCount: null,
-        activeDays: null,
-        reposContributed: null,
-        totalStars: null,
-        archetype: null,
-        tier: null,
-        adjustedComposite: null,
-        confidence: null,
-        statsExpired: true,
+        handle: stats.handle,
+        displayName: stats.displayName ?? null,
+        avatarUrl: stats.avatarUrl ?? null,
+        fetchedAt: stats.fetchedAt,
+        commitsTotal: stats.commitsTotal,
+        prsMergedCount: stats.prsMergedCount,
+        reviewsSubmittedCount: stats.reviewsSubmittedCount,
+        activeDays: stats.activeDays,
+        reposContributed: stats.reposContributed,
+        totalStars: stats.totalStars,
+        archetype: impact.archetype,
+        tier: getTier(smoothedScore),
+        adjustedComposite: smoothedScore,
+        confidence: impact.confidence,
+        statsExpired: false,
       };
-    }
-
-    const impact = computeImpactV4(stats);
-    return {
-      handle: stats.handle,
-      displayName: stats.displayName ?? null,
-      avatarUrl: stats.avatarUrl ?? null,
-      fetchedAt: stats.fetchedAt,
-      commitsTotal: stats.commitsTotal,
-      prsMergedCount: stats.prsMergedCount,
-      reviewsSubmittedCount: stats.reviewsSubmittedCount,
-      activeDays: stats.activeDays,
-      reposContributed: stats.reposContributed,
-      totalStars: stats.totalStars,
-      archetype: impact.archetype,
-      tier: impact.tier,
-      adjustedComposite: impact.adjustedComposite,
-      confidence: impact.confidence,
-      statsExpired: false,
-    };
-  });
+    }),
+  );
 
   return NextResponse.json(
     { users },
