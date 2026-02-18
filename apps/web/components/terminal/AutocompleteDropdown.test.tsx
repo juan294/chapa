@@ -137,5 +137,17 @@ describe("AutocompleteDropdown", () => {
     it("marks active item with aria-selected", () => {
       expect(SOURCE).toContain("aria-selected");
     });
+
+    it("options use <div> not <button> (listbox children must not be interactive elements) (#421)", () => {
+      // role="option" elements inside a role="listbox" should not be
+      // interactive elements like <button>. Use <div role="option"> instead.
+      expect(SOURCE).not.toMatch(/<button[^>]*role="option"/);
+      expect(SOURCE).toMatch(/<div[^>]*role="option"/);
+    });
+
+    it("options have tabIndex={-1} for programmatic focus", () => {
+      // div[role="option"] elements need tabIndex so they can be focused programmatically
+      expect(SOURCE).toMatch(/role="option"[\s\S]*?tabIndex=\{-1\}/);
+    });
   });
 });
