@@ -8,6 +8,7 @@ import type {
 import { SCORING_CAPS, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness } from "./heatmap-evenness";
+import { computeRecencyRatio, applyRecencyWeight } from "./recency";
 
 // ---------------------------------------------------------------------------
 // Caps — calibrated for 365-day window (imported from shared constants)
@@ -61,13 +62,14 @@ export function computeGuarding(stats: StatsData): number {
 
 // ---------------------------------------------------------------------------
 // Consistency: reliable, sustained contributions
-// activeDays/SCORING_WINDOW_DAYS (50%), heatmap evenness (35%), inverse burst activity (15%)
+// V5: sqrt(activeDays/365) (45%), heatmap evenness (40%), inverse burst (15%)
+// sqrt curve: easier to start, harder to climb — 120 days ≈ 57% (was 33% linear)
 // ---------------------------------------------------------------------------
 
 export function computeConsistency(stats: StatsData): number {
   if (stats.activeDays === 0) return 0;
 
-  const streak = Math.min(stats.activeDays, SCORING_WINDOW_DAYS) / SCORING_WINDOW_DAYS;
+  const streak = Math.sqrt(Math.min(stats.activeDays, SCORING_WINDOW_DAYS) / SCORING_WINDOW_DAYS);
   const evenness = computeHeatmapEvenness(stats.heatmapData);
 
   // Inverse burst: low maxCommitsIn10Min → steady work
@@ -75,13 +77,14 @@ export function computeConsistency(stats: StatsData): number {
   const burstCap = 30;
   const inverseBurst = 1 - Math.min(stats.maxCommitsIn10Min, burstCap) / burstCap;
 
-  const raw = 100 * (0.5 * streak + 0.35 * evenness + 0.15 * inverseBurst);
+  const raw = 100 * (0.45 * streak + 0.40 * evenness + 0.15 * inverseBurst);
   return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
 // Breadth: cross-project influence
-// reposContributed (35%), inverse topRepoShare (25%), stars (15%), forks (10%), watchers (5%), docsOnlyPrRatio (10%)
+// V5: repos (40%), inverseConcentration (25%), stars (10%), forks (5%),
+//     docsOnlyPrRatio (15%), reserved 5% (zeros for now). Watchers dropped.
 // ---------------------------------------------------------------------------
 
 export function computeBreadth(stats: StatsData): number {
@@ -91,10 +94,9 @@ export function computeBreadth(stats: StatsData): number {
   const inverseConcentration = 1 - stats.topRepoShare;
   const stars = normalize(stats.totalStars, CAPS.stars);
   const forks = normalize(stats.totalForks, CAPS.forks);
-  const watchers = normalize(stats.totalWatchers, CAPS.watchers);
   const docsRatio = stats.docsOnlyPrRatio ?? 0;
 
-  const raw = 100 * (0.35 * repos + 0.25 * inverseConcentration + 0.15 * stars + 0.1 * forks + 0.05 * watchers + 0.1 * docsRatio);
+  const raw = 100 * (0.40 * repos + 0.25 * inverseConcentration + 0.10 * stars + 0.05 * forks + 0.15 * docsRatio);
   return clampScore(raw);
 }
 
@@ -156,31 +158,29 @@ export function deriveArchetype(
   const min = Math.min(...values);
   const range = max - min;
 
-  // Emerging: avg < 40 OR no dimension >= 50
-  if (avg < 40 || !values.some((v) => v >= 50)) {
+  // V5 Emerging: avg < 25 OR no dimension >= 40
+  if (avg < 25 || !values.some((v) => v >= 40)) {
     return "Emerging";
   }
 
-  // Balanced: all within 15 pts AND avg >= 60
-  if (range <= 15 && avg >= 60) {
+  // V5 Balanced: all within 20 pts AND avg >= 50
+  if (range <= 20 && avg >= 50) {
     return "Balanced";
   }
 
-  // Specific archetypes: highest dimension >= 70, with tie-breaking priority
+  // V5 Specific archetypes: highest dimension >= 60 (was 70), with tie-breaking priority
   // Solo profiles skip Guardian
   const candidates = isSolo
     ? ARCHETYPE_MAP.filter((a) => a.archetype !== "Guardian")
     : ARCHETYPE_MAP;
 
   for (const { key, archetype } of candidates) {
-    if (dimensions[key] >= 70 && dimensions[key] === max) {
+    if (dimensions[key] >= 60 && dimensions[key] === max) {
       return archetype;
     }
   }
 
-  // Fallback: if highest >= 70 but tied with another at the same value,
-  // the loop above already handles tie-breaking via order.
-  // If no dimension reaches 70, fall back to Emerging.
+  // Fallback: if no dimension reaches 60, fall back to Emerging.
   return "Emerging";
 }
 
@@ -206,8 +206,12 @@ export function computeImpactV4(stats: StatsData): ImpactV4Result {
             4
         );
 
+  // V5: Apply recency weighting before confidence adjustment
+  const recencyRatio = computeRecencyRatio(stats.heatmapData);
+  const recencyWeighted = applyRecencyWeight(compositeScore, recencyRatio);
+
   const { confidence, penalties } = computeConfidence(stats, profileType);
-  const adjustedComposite = computeAdjustedScore(compositeScore, confidence);
+  const adjustedComposite = computeAdjustedScore(recencyWeighted, confidence);
   const tier = getTier(adjustedComposite);
 
   return {

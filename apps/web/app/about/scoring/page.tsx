@@ -117,7 +117,7 @@ export default function ScoringMethodologyPage() {
               a prolific code shipper and a dedicated reviewer.
             </p>
             <p>
-              Impact v4 replaces that single number with a{" "}
+              Chapa replaces that single number with a{" "}
               <strong className="text-text-primary">
                 multi-dimensional impact breakdown
               </strong>
@@ -153,50 +153,51 @@ export default function ScoringMethodologyPage() {
             <SectionHeading>Signal caps</SectionHeading>
             <p>
               Each signal has a cap — the point beyond which additional volume
-              adds nothing. This is the primary anti-gaming mechanism.
+              adds nothing. Caps are calibrated to the P50-P75 developer range,
+              so a solid year of consistent work can reach maximum credit.
             </p>
             <Table
               headers={["Signal", "Cap", "Rationale"]}
               rows={[
                 [
                   "Commits",
-                  "600",
-                  "~1.6/day average is strong; more adds no extra credit",
+                  "300",
+                  "150 commits/year normalizes to ~81%; a strong year is fully rewarded",
                 ],
                 [
                   "PR Weight",
-                  "120",
-                  "Weighted by complexity, not count; cap prevents inflation",
+                  "60",
+                  "Weighted by complexity, not count; 25 weight normalizes to ~83%",
                 ],
                 [
                   "Reviews",
-                  "180",
-                  "Encourages collaboration without requiring extreme volume",
+                  "80",
+                  "30 reviews/year normalizes to ~78%; collaboration without extreme volume",
                 ],
                 [
                   "Issues",
-                  "80",
-                  "Meaningful issue resolution, not ticket churn",
+                  "40",
+                  "10 issues/year normalizes to ~70%; meaningful resolution, not churn",
                 ],
                 [
                   "Repos",
-                  "15",
-                  "Cross-project work beyond 15 repos is fully credited",
+                  "12",
+                  "Cross-project work; 5 repos normalizes to ~42%",
                 ],
                 [
                   "Stars",
-                  "500",
-                  "Community recognition; most abundant social signal",
+                  "150",
+                  "Community recognition; 10 stars normalizes to ~49%",
                 ],
                 [
                   "Forks",
-                  "200",
-                  "People building on your work; less common than stars",
+                  "80",
+                  "People building on your work; 10 forks normalizes to ~55%",
                 ],
                 [
                   "Watchers",
-                  "100",
-                  "Active repo followers; least common community signal",
+                  "50",
+                  "Active repo followers; retained for normalization but dropped from Breadth weights",
                 ],
               ]}
             />
@@ -279,13 +280,13 @@ export default function ScoringMethodologyPage() {
               headers={["Signal", "Weight", "Rationale"]}
               rows={[
                 [
-                  "Active Days / 365",
-                  "50%",
-                  "The most direct measure of sustained contribution — how many days out of the year you were active",
+                  "Active Days (sqrt curve)",
+                  "45%",
+                  "Square root of activeDays/365 — rewards getting started while still valuing sustained contribution. 120 active days scores ~57% (vs 33% with linear)",
                 ],
                 [
                   "Heatmap Evenness",
-                  "35%",
+                  "40%",
                   "Measures how evenly activity is distributed across weeks. A steady rhythm scores higher than concentrated bursts",
                 ],
                 [
@@ -296,6 +297,13 @@ export default function ScoringMethodologyPage() {
               ]}
             />
             <p>
+              The active days signal uses a{" "}
+              <strong className="text-text-primary">
+                square root curve
+              </strong>{" "}
+              instead of a linear ratio. This makes it easier to build early
+              momentum — 50 active days scores 37% instead of 14% — while
+              preserving the full range for dedicated daily contributors.
               Heatmap evenness uses the inverted coefficient of variation across
               weekly totals. Perfectly uniform activity scores 1.0; a single
               burst week scores ~0.2.
@@ -308,7 +316,7 @@ export default function ScoringMethodologyPage() {
               rows={[
                 [
                   "Repos Contributed",
-                  "35%",
+                  "40%",
                   "How many repos you contributed 3+ commits to. Single-commit drive-by contributions are excluded to ensure depth",
                 ],
                 [
@@ -317,36 +325,28 @@ export default function ScoringMethodologyPage() {
                   "Rewards diverse contribution across repos rather than concentration in one. If 95% of your work is in one repo, this approaches 0",
                 ],
                 [
-                  "Stars",
+                  "Docs-only PR Ratio",
                   "15%",
-                  "Broadest community recognition signal. High star counts reliably indicate work that resonated with a wide audience",
+                  "Documentation contributions show breadth of involvement beyond code — something every developer can control",
+                ],
+                [
+                  "Stars",
+                  "10%",
+                  "Broadest community recognition signal, but weighted lower because it is outside your direct control",
                 ],
                 [
                   "Forks",
-                  "10%",
-                  "Deeper engagement than stars — someone intends to build on your work. Narrower and noisier signal (people fork for many reasons)",
-                ],
-                [
-                  "Watchers",
                   "5%",
-                  "Most passive community signal. Indicates ongoing interest but weakest indicator of actual influence",
-                ],
-                [
-                  "Docs-only PR Ratio",
-                  "10%",
-                  "Documentation contributions show breadth of involvement beyond code",
+                  "Deeper engagement than stars — someone intends to build on your work. Narrower and noisier signal",
                 ],
               ]}
             />
             <p>
-              The community signals (stars, forks, watchers) follow a deliberate
-              hierarchy:{" "}
-              <strong className="text-text-primary">
-                broad recognition &gt; active reuse intent &gt; passive interest
-              </strong>
-              . Stars are the most abundant and reliable indicator of influence.
-              Forks represent deeper but noisier engagement. Watchers are the
-              smallest population and most passive signal.
+              Breadth prioritizes signals you can directly control — repo
+              diversity (40%), contribution spread (25%), and documentation
+              (15%) — over community signals like stars and forks that depend on
+              external recognition. Watchers have been dropped entirely as the
+              weakest and most passive indicator.
             </p>
 
             {/* ---------------------------------------------------------- */}
@@ -363,32 +363,32 @@ export default function ScoringMethodologyPage() {
               rows={[
                 [
                   "Emerging",
-                  "Average < 40 OR no dimension >= 50",
+                  "Average < 25 OR no dimension >= 40",
                   "Getting started or light activity period",
                 ],
                 [
                   "Balanced",
-                  "All dimensions within 15 pts AND avg >= 60",
+                  "All dimensions within 20 pts AND avg >= 50",
                   "Well-rounded contributor across all areas",
                 ],
                 [
                   "Polymath",
-                  "Breadth is highest AND >= 70",
+                  "Breadth is highest AND >= 60",
                   "Cross-project influence is your strongest suit",
                 ],
                 [
                   "Guardian",
-                  "Guarding is highest AND >= 70",
+                  "Guarding is highest AND >= 60",
                   "You spend significant time reviewing and gatekeeping quality",
                 ],
                 [
                   "Marathoner",
-                  "Consistency is highest AND >= 70",
+                  "Consistency is highest AND >= 60",
                   "Your most notable trait is sustained, reliable contribution",
                 ],
                 [
                   "Builder",
-                  "Building is highest AND >= 70",
+                  "Building is highest AND >= 60",
                   "You ship a high volume of meaningful code changes",
                 ],
               ]}
@@ -396,7 +396,7 @@ export default function ScoringMethodologyPage() {
             <p>
               Tie-breaking priority: Polymath &gt; Guardian &gt; Marathoner &gt;
               Builder. If no specific archetype matches (highest dimension &lt;
-              70 and not Balanced), the fallback is Emerging.
+              60 and not Balanced), the fallback is Emerging.
             </p>
 
             {/* ---------------------------------------------------------- */}
@@ -406,28 +406,39 @@ export default function ScoringMethodologyPage() {
             <p>
               The composite score is the average of all four dimensions (or
               three for solo developers who have zero reviews), rounded to an
-              integer. It is then adjusted by confidence:
+              integer. It then passes through recency weighting and confidence
+              adjustment:
             </p>
-            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
-              adjustedScore = compositeScore × (0.85 + 0.15 × confidence / 100)
+            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
+              <p>recencyWeighted = composite × recencyMultiplier</p>
+              <p>
+                adjustedScore = recencyWeighted × (0.85 + 0.15 × confidence /
+                100)
+              </p>
             </div>
             <p>
-              At full confidence (100), there is no reduction. At minimum
-              confidence (50), the reduction is only 7.5% — deliberate and
-              gentle.
+              The recency multiplier ranges from 0.98x (all activity is old) to
+              1.06x (all activity is recent), with proportional activity (25% in
+              the last 90 days) being neutral at 1.0x. This cushions the impact
+              of old contributions dropping out of the rolling window.
+            </p>
+            <p>
+              At full confidence (100), there is no confidence reduction. At
+              minimum confidence (50), the reduction is only 7.5% — deliberate
+              and gentle.
             </p>
             <Table
               headers={["Tier", "Score Range", "Description"]}
               rows={[
                 [
                   "Emerging",
-                  "0 – 39",
+                  "0 – 29",
                   "Getting started or light activity period",
                 ],
                 [
                   "Solid",
-                  "40 – 69",
-                  "Consistent, meaningful contributions",
+                  "30 – 69",
+                  "Active hobbyists through consistent contributors",
                 ],
                 [
                   "High",
@@ -520,6 +531,30 @@ export default function ScoringMethodologyPage() {
               <strong className="text-text-primary">mutually exclusive</strong>
               {" "} — only one can apply at a time, so the maximum of 7
               simultaneous penalties cannot be exceeded.
+            </p>
+
+            {/* ---------------------------------------------------------- */}
+            {/* Score smoothing                                             */}
+            {/* ---------------------------------------------------------- */}
+            <SectionHeading>Score smoothing</SectionHeading>
+            <p>
+              Your displayed score uses an{" "}
+              <strong className="text-text-primary">
+                exponential moving average (EMA)
+              </strong>{" "}
+              to prevent jarring day-to-day swings. Instead of recalculating
+              from scratch each time, the displayed score blends 15% of the
+              newly computed score with 85% of the previous day&apos;s smoothed
+              score.
+            </p>
+            <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
+              displayed = 0.15 × current + 0.85 × previous
+            </div>
+            <p>
+              This means a sudden 10-point raw drop manifests as roughly -1.5
+              per day, reaching the new level over about 4 days. On your first
+              visit (no previous score), the raw score passes through with no
+              smoothing.
             </p>
 
             {/* ---------------------------------------------------------- */}

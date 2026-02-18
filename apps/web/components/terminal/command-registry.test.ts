@@ -308,16 +308,19 @@ describe("createNavigationCommands (studio enabled)", () => {
 });
 
 describe("createAdminCommands", () => {
-  it("returns 3 admin commands", () => {
+  it("returns 6 admin commands", () => {
     const cmds = createAdminCommands();
-    expect(cmds).toHaveLength(3);
+    expect(cmds).toHaveLength(6);
   });
 
-  it("includes /admin, /refresh, and /sort", () => {
+  it("includes /admin, /refresh, /sort, /agents, /users, and /run", () => {
     const names = createAdminCommands().map((c) => c.name);
     expect(names).toContain("/admin");
     expect(names).toContain("/refresh");
     expect(names).toContain("/sort");
+    expect(names).toContain("/agents");
+    expect(names).toContain("/users");
+    expect(names).toContain("/run");
   });
 
   it("/admin has navigate action to /admin", () => {
@@ -437,6 +440,48 @@ describe("createAdminCommands", () => {
     const cmd = createAdminCommands().find((c) => c.name === "/sort")!;
     expect(cmd.usage).toContain("asc");
   });
+
+  it("/agents emits tab switch event", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/agents")!;
+    const result = cmd.execute([]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-tab",
+      detail: { tab: "agents" },
+    });
+  });
+
+  it("/users emits tab switch event", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/users")!;
+    const result = cmd.execute([]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-tab",
+      detail: { tab: "users" },
+    });
+  });
+
+  it("/run without args returns error", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/run")!;
+    const result = cmd.execute([]);
+    expect(result.lines[0]!.type).toBe("error");
+  });
+
+  it("/run with invalid agent returns error", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/run")!;
+    const result = cmd.execute(["nonexistent"]);
+    expect(result.lines[0]!.type).toBe("error");
+  });
+
+  it("/run with valid agent emits run event", () => {
+    const cmd = createAdminCommands().find((c) => c.name === "/run")!;
+    const result = cmd.execute(["coverage_agent"]);
+    expect(result.action).toEqual({
+      type: "custom",
+      event: "chapa:admin-run-agent",
+      detail: { agentKey: "coverage_agent" },
+    });
+  });
 });
 
 describe("createNavigationCommands (isAdmin)", () => {
@@ -465,16 +510,16 @@ describe("createNavigationCommands (isAdmin)", () => {
     expect(names).not.toContain("/refresh");
   });
 
-  it("returns 17 commands when isAdmin + studio disabled", () => {
+  it("returns 20 commands when isAdmin + studio disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(17);
+    expect(commands).toHaveLength(20);
   });
 
-  it("returns 18 commands when isAdmin + studio enabled", () => {
+  it("returns 21 commands when isAdmin + studio enabled", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands({ isAdmin: true });
-    expect(commands).toHaveLength(18);
+    expect(commands).toHaveLength(21);
   });
 
   it("/help includes Admin section when isAdmin", () => {

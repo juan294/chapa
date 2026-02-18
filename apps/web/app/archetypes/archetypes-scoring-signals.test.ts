@@ -25,7 +25,7 @@ const ARCHETYPES = [
   },
   {
     name: "polymath",
-    signals: ["Repositories contributed to", "Distribution evenness", "Community signals"],
+    signals: ["Repositories contributed to", "Distribution evenness", "Documentation contributions", "Community signals"],
   },
   {
     name: "balanced",

@@ -542,24 +542,28 @@ describe("computeAdjustedScore", () => {
 // getTier(adjustedScore)
 // ---------------------------------------------------------------------------
 
-describe("getTier", () => {
+describe("getTier — V5 boundaries", () => {
   it("returns Emerging for score 0", () => {
     expect(getTier(0)).toBe("Emerging");
   });
 
-  it("returns Emerging for score 39", () => {
-    expect(getTier(39)).toBe("Emerging");
+  it("returns Emerging for score 29", () => {
+    expect(getTier(29)).toBe("Emerging");
   });
 
-  it("returns Solid for score 40 (boundary)", () => {
-    expect(getTier(40)).toBe("Solid");
+  it("V5: returns Solid for score 30 (boundary lowered from 40)", () => {
+    expect(getTier(30)).toBe("Solid");
+  });
+
+  it("V5: score 35 is Solid (was Emerging in V4)", () => {
+    expect(getTier(35)).toBe("Solid");
   });
 
   it("returns Solid for score 69", () => {
     expect(getTier(69)).toBe("Solid");
   });
 
-  it("returns High for score 70 (boundary)", () => {
+  it("returns High for score 70 (boundary unchanged)", () => {
     expect(getTier(70)).toBe("High");
   });
 
@@ -567,7 +571,7 @@ describe("getTier", () => {
     expect(getTier(84)).toBe("High");
   });
 
-  it("returns Elite for score 85 (boundary)", () => {
+  it("returns Elite for score 85 (boundary unchanged)", () => {
     expect(getTier(85)).toBe("Elite");
   });
 

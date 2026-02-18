@@ -22,6 +22,7 @@ export type {
   BadgeTierTreatment,
   BadgeCelebration,
   BadgeConfig,
+  FeatureFlag,
 } from "./types";
 
 export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";

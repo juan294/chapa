@@ -11,7 +11,7 @@ import type { BadgeConfig } from "@chapa/shared";
  * Returns { config: BadgeConfig | null }.
  */
 export async function GET(request: NextRequest): Promise<Response> {
-  if (!isStudioEnabled()) {
+  if (!(await isStudioEnabled())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest): Promise<Response> {
  * Auth required. Rate limited: 30 requests/hour per user.
  */
 export async function PUT(request: NextRequest): Promise<Response> {
-  if (!isStudioEnabled()) {
+  if (!(await isStudioEnabled())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

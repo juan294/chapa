@@ -67,11 +67,11 @@ export default function EmergingPage() {
               </p>
 
               <p>
-                The Emerging classification is also the fallback. If the algorithm runs through
-                every archetype rule &mdash; Balanced, Polymath, Guardian, Marathoner, Builder
-                &mdash; and none of them match, Emerging is what you get. This can happen even
-                with moderate activity if your contributions are spread in a way that doesn&apos;t
-                trigger any specific archetype threshold.
+                The Emerging classification is also the fallback when no specific archetype
+                pattern matches. However, the thresholds are deliberately set low &mdash; even
+                moderate activity with at least one dimension showing strength is enough to
+                escape Emerging. The system is designed so that a few months of genuine
+                contribution will move you into a named archetype.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">

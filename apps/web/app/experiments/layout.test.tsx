@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
   notFound: (...args: unknown[]) => mockNotFound(...args),
 }));
 
-const mockIsExperimentsEnabled = vi.fn<() => boolean>();
+const mockIsExperimentsEnabled = vi.fn<() => Promise<boolean>>();
 vi.mock("@/lib/feature-flags", () => ({
   isExperimentsEnabled: () => mockIsExperimentsEnabled(),
 }));
@@ -47,16 +47,16 @@ describe("experiments layout", () => {
   });
 
   it("calls notFound when experiments flag returns false", async () => {
-    mockIsExperimentsEnabled.mockReturnValue(false);
+    mockIsExperimentsEnabled.mockResolvedValue(false);
     const mod = await import("./layout");
-    mod.default({ children: null });
+    await mod.default({ children: null });
     expect(mockNotFound).toHaveBeenCalled();
   });
 
   it("renders children when experiments flag returns true", async () => {
-    mockIsExperimentsEnabled.mockReturnValue(true);
+    mockIsExperimentsEnabled.mockResolvedValue(true);
     const mod = await import("./layout");
-    const result = mod.default({ children: "test-content" });
+    const result = await mod.default({ children: "test-content" });
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(result).toBeTruthy();
   });

@@ -84,19 +84,19 @@ describe("shared/constants", () => {
       }
     });
 
-    it("prWeight matches PR_WEIGHT_AGG_CAP", () => {
-      expect(SCORING_CAPS.prWeight).toBe(PR_WEIGHT_AGG_CAP);
+    it("has expected V5 specific values", () => {
+      expect(SCORING_CAPS.prWeight).toBe(60);
+      expect(SCORING_CAPS.issues).toBe(40);
+      expect(SCORING_CAPS.commits).toBe(300);
+      expect(SCORING_CAPS.reviews).toBe(80);
+      expect(SCORING_CAPS.repos).toBe(12);
+      expect(SCORING_CAPS.stars).toBe(150);
+      expect(SCORING_CAPS.forks).toBe(80);
+      expect(SCORING_CAPS.watchers).toBe(50);
     });
 
-    it("has expected specific values", () => {
-      expect(SCORING_CAPS.prWeight).toBe(120);
-      expect(SCORING_CAPS.issues).toBe(80);
-      expect(SCORING_CAPS.commits).toBe(600);
-      expect(SCORING_CAPS.reviews).toBe(180);
-      expect(SCORING_CAPS.repos).toBe(15);
-      expect(SCORING_CAPS.stars).toBe(500);
-      expect(SCORING_CAPS.forks).toBe(200);
-      expect(SCORING_CAPS.watchers).toBe(100);
+    it("prWeight is less than PR_WEIGHT_AGG_CAP (scoring cap < agg cap)", () => {
+      expect(SCORING_CAPS.prWeight).toBeLessThan(PR_WEIGHT_AGG_CAP);
     });
 
     it("no values are undefined or NaN", () => {

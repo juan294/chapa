@@ -231,14 +231,27 @@ describe("computeConsistency(stats)", () => {
     expect(score).toBeGreaterThan(80);
   });
 
-  it("weights activeDays/365 at 50%", () => {
+  it("V5: weights sqrt streak at 45%", () => {
     const stats = makeStats({
       activeDays: 365,
       heatmapData: [], // no heatmap data → evenness = 0
       maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
     });
     const score = computeConsistency(stats);
-    expect(score).toBe(50); // 50% from streak, 0% from evenness, 0% from burst
+    // sqrt(365/365) = 1.0; 45% * 1.0 * 100 = 45
+    expect(score).toBe(45);
+  });
+
+  it("V5: sqrt curve boosts moderate active days significantly", () => {
+    // 120 active days: V4 streak = 32.9%, V5 streak = sqrt(120/365) = 57.3%
+    const stats = makeStats({
+      activeDays: 120,
+      heatmapData: [], // no heatmap data → evenness = 0
+      maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
+    });
+    const score = computeConsistency(stats);
+    // sqrt(120/365) ≈ 0.573; 0.573 * 45 ≈ 25.8 → 26
+    expect(score).toBe(26);
   });
 
   it("penalizes burst activity", () => {
@@ -308,11 +321,11 @@ describe("computeBreadth(stats)", () => {
     expect(score).toBeGreaterThan(70);
   });
 
-  it("weights repos at 35%", () => {
-    const repoOnly = makeStats({ reposContributed: 15, topRepoShare: 1.0 });
-    // 35% from repos (maxed), 0% from inverse topRepoShare (1.0 = no diversity), 0% from others
+  it("V5: weights repos at 40%", () => {
+    const repoOnly = makeStats({ reposContributed: 12, topRepoShare: 1.0 });
+    // 40% from repos (maxed at new cap 12), 0% from inverse topRepoShare (1.0), 0% from others
     const score = computeBreadth(repoOnly);
-    expect(score).toBe(35);
+    expect(score).toBe(40);
   });
 
   it("rewards low topRepoShare (diverse)", () => {
@@ -327,40 +340,34 @@ describe("computeBreadth(stats)", () => {
     expect(computeBreadth(withDocs)).toBeGreaterThan(computeBreadth(noDocs));
   });
 
-  it("rewards totalStars (15% weight)", () => {
+  it("V5: rewards totalStars (10% weight)", () => {
     const noStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 0 });
-    const withStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 300 });
+    const withStars = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 100 });
     expect(computeBreadth(withStars)).toBeGreaterThan(computeBreadth(noStars));
   });
 
-  it("caps stars contribution at 500", () => {
-    const at500 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 500 });
-    const at1000 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 1000 });
-    expect(computeBreadth(at1000)).toBe(computeBreadth(at500));
+  it("V5: caps stars contribution at 150", () => {
+    const atCap = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 150 });
+    const overCap = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalStars: 500 });
+    expect(computeBreadth(overCap)).toBe(computeBreadth(atCap));
   });
 
-  it("rewards totalForks (10% weight)", () => {
+  it("V5: rewards totalForks (5% weight)", () => {
     const noForks = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 0 });
-    const withForks = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 100 });
+    const withForks = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 50 });
     expect(computeBreadth(withForks)).toBeGreaterThan(computeBreadth(noForks));
   });
 
-  it("caps forks contribution at 200", () => {
-    const at200 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 200 });
-    const at500 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 500 });
-    expect(computeBreadth(at500)).toBe(computeBreadth(at200));
+  it("V5: caps forks contribution at 80", () => {
+    const atCap = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 80 });
+    const overCap = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalForks: 300 });
+    expect(computeBreadth(overCap)).toBe(computeBreadth(atCap));
   });
 
-  it("rewards totalWatchers (5% weight)", () => {
+  it("V5: watchers have zero weight (dropped)", () => {
     const noWatch = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 0 });
     const withWatch = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 50 });
-    expect(computeBreadth(withWatch)).toBeGreaterThan(computeBreadth(noWatch));
-  });
-
-  it("caps watchers contribution at 100", () => {
-    const at100 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 100 });
-    const at300 = makeStats({ reposContributed: 5, topRepoShare: 0.5, totalWatchers: 300 });
-    expect(computeBreadth(at300)).toBe(computeBreadth(at100));
+    expect(computeBreadth(withWatch)).toBe(computeBreadth(noWatch));
   });
 
   it("handles missing docsOnlyPrRatio gracefully", () => {
@@ -441,84 +448,112 @@ describe("computeDimensions(stats)", () => {
 // deriveArchetype(dimensions)
 // ---------------------------------------------------------------------------
 
-describe("deriveArchetype(dimensions)", () => {
-  it("returns Builder when building is highest and >= 70", () => {
-    const dims: DimensionScores = { building: 80, guarding: 50, consistency: 60, breadth: 55 };
+describe("deriveArchetype(dimensions) — V5 thresholds", () => {
+  // V5: specialist threshold lowered from 70 to 60
+  it("returns Builder when building is highest and >= 60", () => {
+    const dims: DimensionScores = { building: 65, guarding: 45, consistency: 50, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Builder");
   });
 
-  it("returns Guardian when guarding is highest and >= 70", () => {
-    const dims: DimensionScores = { building: 50, guarding: 85, consistency: 60, breadth: 55 };
+  it("returns Guardian when guarding is highest and >= 60", () => {
+    const dims: DimensionScores = { building: 45, guarding: 65, consistency: 50, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Guardian");
   });
 
-  it("returns Marathoner when consistency is highest and >= 70", () => {
-    const dims: DimensionScores = { building: 50, guarding: 55, consistency: 80, breadth: 60 };
+  it("returns Marathoner when consistency is highest and >= 60", () => {
+    const dims: DimensionScores = { building: 45, guarding: 40, consistency: 65, breadth: 50 };
     expect(deriveArchetype(dims)).toBe("Marathoner");
   });
 
-  it("returns Polymath when breadth is highest and >= 70", () => {
-    const dims: DimensionScores = { building: 50, guarding: 55, consistency: 60, breadth: 75 };
+  it("returns Polymath when breadth is highest and >= 60", () => {
+    const dims: DimensionScores = { building: 45, guarding: 40, consistency: 50, breadth: 65 };
     expect(deriveArchetype(dims)).toBe("Polymath");
   });
 
-  it("returns Balanced when all within 15 pts and avg >= 60", () => {
-    const dims: DimensionScores = { building: 65, guarding: 70, consistency: 68, breadth: 62 };
+  // V5: Balanced gate expanded: range <= 20, avg >= 50
+  it("returns Balanced when all within 20 pts and avg >= 50", () => {
+    const dims: DimensionScores = { building: 55, guarding: 60, consistency: 58, breadth: 52 };
     expect(deriveArchetype(dims)).toBe("Balanced");
   });
 
-  it("returns Emerging when avg < 40", () => {
-    const dims: DimensionScores = { building: 30, guarding: 20, consistency: 25, breadth: 35 };
+  // V5: Emerging gate: avg < 25 OR no dim >= 40
+  it("returns Emerging when avg < 25", () => {
+    const dims: DimensionScores = { building: 20, guarding: 15, consistency: 10, breadth: 30 };
+    // avg = 18.75 < 25
     expect(deriveArchetype(dims)).toBe("Emerging");
   });
 
-  it("returns Emerging when no dimension >= 50", () => {
-    const dims: DimensionScores = { building: 45, guarding: 40, consistency: 35, breadth: 48 };
+  it("returns Emerging when no dimension >= 40", () => {
+    const dims: DimensionScores = { building: 35, guarding: 30, consistency: 25, breadth: 38 };
+    // avg = 32, no dim >= 40
     expect(deriveArchetype(dims)).toBe("Emerging");
+  });
+
+  it("V5: avg=30 with dim >= 40 passes Emerging gate but falls back to Emerging", () => {
+    // avg=30 > 25 AND building=42 >= 40 → passes Emerging gate
+    // But range=17 <=20 yet avg=30 < 50 → not Balanced
+    // Highest=42 < 60 → no specialist → falls back to Emerging
+    const dims: DimensionScores = { building: 42, guarding: 25, consistency: 25, breadth: 28 };
+    expect(deriveArchetype(dims)).toBe("Emerging");
+  });
+
+  it("V5: avg=30 with dim >= 60 escapes Emerging to specialist", () => {
+    // avg=30 > 25 AND building=60 >= 40 → passes Emerging gate
+    // range=60-10=50 > 20 → not Balanced; building=60 → Builder
+    const dims: DimensionScores = { building: 60, guarding: 10, consistency: 15, breadth: 35 };
+    expect(deriveArchetype(dims)).toBe("Builder");
   });
 
   // Tie-breaking: Polymath > Guardian > Marathoner > Builder
+  // Use range > 20 to avoid triggering V5 Balanced gate
   it("breaks ties favoring Polymath over Guardian", () => {
-    const dims: DimensionScores = { building: 60, guarding: 80, consistency: 60, breadth: 80 };
+    const dims: DimensionScores = { building: 40, guarding: 75, consistency: 40, breadth: 75 };
     expect(deriveArchetype(dims)).toBe("Polymath");
   });
 
   it("breaks ties favoring Guardian over Marathoner", () => {
-    const dims: DimensionScores = { building: 60, guarding: 80, consistency: 80, breadth: 60 };
+    const dims: DimensionScores = { building: 40, guarding: 75, consistency: 75, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Guardian");
   });
 
   it("breaks ties favoring Marathoner over Builder", () => {
-    const dims: DimensionScores = { building: 75, guarding: 50, consistency: 75, breadth: 50 };
+    const dims: DimensionScores = { building: 70, guarding: 40, consistency: 70, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Marathoner");
   });
 
-  it("breaks ties favoring Polymath over all others", () => {
+  it("returns Balanced when all tied at 80 (within 20 pts, avg >= 50)", () => {
     const dims: DimensionScores = { building: 80, guarding: 80, consistency: 80, breadth: 80 };
-    // All tied at 80, all >= 70 → within 15pts and avg >= 60 → Balanced
-    // BUT: check if "Balanced" takes priority over specific archetypes
-    // Actually all within 15 pts AND avg >= 60 → Balanced should match
     expect(deriveArchetype(dims)).toBe("Balanced");
   });
 
-  it("does NOT return Balanced if range exceeds 15 pts even with high avg", () => {
-    const dims: DimensionScores = { building: 90, guarding: 70, consistency: 75, breadth: 65 };
-    // range = 90 - 65 = 25 > 15 → not Balanced
-    // highest is building at 90, >= 70 → Builder
+  it("does NOT return Balanced if range exceeds 20 pts even with high avg", () => {
+    const dims: DimensionScores = { building: 90, guarding: 65, consistency: 75, breadth: 60 };
+    // range = 90 - 60 = 30 > 20 → not Balanced
+    // highest is building at 90, >= 60 → Builder
     expect(deriveArchetype(dims)).toBe("Builder");
   });
 
-  it("returns Emerging over Balanced when avg < 60 even if within 15 pts", () => {
-    const dims: DimensionScores = { building: 50, guarding: 55, consistency: 52, breadth: 48 };
-    // within 15 pts, but avg = 51.25 < 60
-    // Highest is guarding at 55, but < 70 → not Guardian
-    // Check Emerging: avg < 40? No (51.25). No dim >= 50? No (guarding is 55, building 50).
-    // So this falls through to a default
+  it("returns Balanced when range is exactly 20 and avg >= 50", () => {
+    const dims: DimensionScores = { building: 50, guarding: 60, consistency: 55, breadth: 70 };
+    // range = 70 - 50 = 20, avg = 58.75 >= 50
+    expect(deriveArchetype(dims)).toBe("Balanced");
+  });
+
+  it("returns Emerging over Balanced when avg < 50 even if within 20 pts", () => {
+    // avg = 42.5, no dim >= 40? guarding=45 >= 40, so NOT Emerging by dim gate
+    // But avg < 50 → not Balanced. Highest is guarding at 45, < 60 → no specialist
+    // Falls through to Emerging
+    const dims: DimensionScores = { building: 40, guarding: 45, consistency: 42, breadth: 43 };
     expect(deriveArchetype(dims)).not.toBe("Balanced");
   });
 
-  it("handles edge case where highest is exactly 70", () => {
-    const dims: DimensionScores = { building: 70, guarding: 50, consistency: 60, breadth: 55 };
+  it("V5: handles edge case where highest is exactly 60", () => {
+    const dims: DimensionScores = { building: 60, guarding: 45, consistency: 50, breadth: 40 };
+    expect(deriveArchetype(dims)).toBe("Builder");
+  });
+
+  it("V5: dim at 65 qualifies as specialist (was < 70 threshold in V4)", () => {
+    const dims: DimensionScores = { building: 65, guarding: 30, consistency: 40, breadth: 35 };
     expect(deriveArchetype(dims)).toBe("Builder");
   });
 
@@ -872,8 +907,8 @@ describe("solo developer archetype", () => {
     expect(deriveArchetype(dims, "solo")).toBe("Polymath");
   });
 
-  it("can assign Balanced to solo profile when 3 dims within 15 pts and avg >= 60", () => {
-    const dims: DimensionScores = { building: 70, guarding: 0, consistency: 65, breadth: 68 };
+  it("V5: can assign Balanced to solo profile when 3 dims within 20 pts and avg >= 50", () => {
+    const dims: DimensionScores = { building: 55, guarding: 0, consistency: 50, breadth: 60 };
     expect(deriveArchetype(dims, "solo")).toBe("Balanced");
   });
 

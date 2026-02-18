@@ -23,19 +23,19 @@ const FORBIDDEN_PATTERNS = [
   /\d{1,2}%\)/,
   /\(\d{1,2}%/,
 
-  // Specific threshold numbers in scoring context
-  /score (?:70|60|50|40) or (?:higher|lower)/i,
+  // Specific threshold numbers in scoring context (V4: 70/60/50/40, V5: 60/50/40/25)
+  /score (?:70|60|50|40|25) or (?:higher|lower)/i,
   /score is (?:below|above|at least) \d+/i,
-  /average (?:is|of) (?:60|40)/i,
+  /average (?:is|of|below|above) (?:60|50|40|25)/i,
   /reaches \d{2}/,
 
   // Specific caps
   /capped at \d+/i,
   /cap(?:ped)? at 5:1/i,
 
-  // Spread thresholds
-  /within 15 points/i,
-  /15 points or less/i,
+  // Spread thresholds (V4: 15, V5: 20)
+  /within \d+ points/i,
+  /\d+ points or less/i,
 
   // Specific number thresholds for burst detection
   /30\+ commits/,
@@ -53,8 +53,12 @@ const FORBIDDEN_PATTERNS = [
   // Tie-breaking priority details
   /tie-breaking priority/i,
 
-  // Specific signal caps
-  /(?:15 repos|500 stars|200 forks|100 watchers)/,
+  // Specific signal caps (V4 and V5 values)
+  /(?:15 repos|12 repos|500 stars|150 stars|200 forks|80 forks|100 watchers|50 watchers)/,
+
+  // Square root / sqrt formula details (V5 internal)
+  /square root of activeDays/i,
+  /sqrt\(/,
 ];
 
 describe("Archetype pages do not expose scoring methodology", () => {
