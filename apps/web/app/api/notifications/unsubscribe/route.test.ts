@@ -12,6 +12,16 @@ vi.mock("@/lib/db/users", () => ({
     mockDbUpdateEmailNotifications(...args),
 }));
 
+vi.mock("@/lib/email/resend", () => ({
+  escapeHtml: (str: string) =>
+    str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;"),
+}));
+
 import { GET } from "./route";
 
 function makeRequest(handle?: string): NextRequest {
@@ -61,6 +71,16 @@ describe("GET /api/notifications/unsubscribe", () => {
       "testuser",
       false,
     );
+  });
+
+  it("escapes HTML in handle to prevent XSS", async () => {
+    const res = await GET(makeRequest('<script>alert("xss")</script>'));
+    const body = await res.text();
+
+    // Must NOT contain raw script tag
+    expect(body).not.toContain("<script>");
+    // Must contain the escaped version
+    expect(body).toContain("&lt;script&gt;");
   });
 
   it("does not throw when DB update fails", async () => {

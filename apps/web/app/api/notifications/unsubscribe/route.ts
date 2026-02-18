@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { dbUpdateEmailNotifications } from "@/lib/db/users";
+import { escapeHtml } from "@/lib/email/resend";
 
 /**
  * GET /api/notifications/unsubscribe?handle=:handle
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
   <div class="card">
     <h1>Unsubscribed</h1>
     <p>
-      <span class="handle">@${handle}</span> will no longer receive
+      <span class="handle">@${escapeHtml(handle)}</span> will no longer receive
       score update emails from Chapa.
     </p>
     <a href="/">← Back to Chapa</a>
