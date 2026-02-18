@@ -14,6 +14,9 @@ import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
+import { applyEMA } from "@/lib/impact/smoothing";
+import { getTier } from "@/lib/impact/utils";
+import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -93,6 +96,12 @@ export async function GET(
 
   // Compute impact
   const impact = computeImpactV4(stats);
+
+  // V5: Apply EMA smoothing using previous day's snapshot
+  const latestSnapshot = await dbGetLatestSnapshot(handle);
+  const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
+  impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
+  impact.tier = getTier(impact.adjustedComposite);
 
   // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image).
   // Uses Redis cache to avoid re-fetching on every badge render within the TTL window.

@@ -156,6 +156,6 @@ export function computeAdjustedScore(
 export function getTier(adjustedScore: number): ImpactTier {
   if (adjustedScore >= 85) return "Elite";
   if (adjustedScore >= 70) return "High";
-  if (adjustedScore >= 40) return "Solid";
+  if (adjustedScore >= 30) return "Solid";
   return "Emerging";
 }

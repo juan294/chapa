@@ -6,17 +6,18 @@ export const PR_WEIGHT_AGG_CAP = 120;
 
 /**
  * Scoring dimension caps — used by computeImpactV4.
+ * V5 recalibration: caps target P50-P75 developers (was P99 in V4).
  * Calibrated for a 365-day window.
  */
 export const SCORING_CAPS = {
-  prWeight: 120,
-  issues: 80,
-  commits: 600,
-  reviews: 180,
-  repos: 15,
-  stars: 500,
-  forks: 200,
-  watchers: 100,
+  prWeight: 60,
+  issues: 40,
+  commits: 300,
+  reviews: 80,
+  repos: 12,
+  stars: 150,
+  forks: 80,
+  watchers: 50,
 } as const;
 
 /**
