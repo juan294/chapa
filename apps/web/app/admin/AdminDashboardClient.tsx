@@ -6,12 +6,20 @@ import { sortUsers, formatDate } from "./admin-types";
 import { AdminSearchBar } from "./AdminSearchBar";
 import { AdminStatsCards } from "./AdminStatsCards";
 import { AdminUserTable } from "./AdminUserTable";
+import { AgentsDashboard } from "./agents/agents-dashboard";
+
+// ---------------------------------------------------------------------------
+// Tab type
+// ---------------------------------------------------------------------------
+
+type AdminTab = "users" | "agents";
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
 export function AdminDashboardClient() {
+  const [activeTab, setActiveTab] = useState<AdminTab>("users");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +59,17 @@ export function AdminDashboardClient() {
     window.addEventListener("chapa:admin-refresh", handler);
     return () => window.removeEventListener("chapa:admin-refresh", handler);
   }, [fetchUsers]);
+
+  // Listen for tab-switching events from command bar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const tab = detail?.tab as AdminTab | undefined;
+      if (tab === "users" || tab === "agents") setActiveTab(tab);
+    };
+    window.addEventListener("chapa:admin-tab", handler);
+    return () => window.removeEventListener("chapa:admin-tab", handler);
+  }, []);
 
   const handleSort = useCallback(
     (field: SortField) => {
@@ -107,43 +126,66 @@ export function AdminDashboardClient() {
   }, [users]);
 
   // -------------------------------------------------------------------------
-  // Loading state
+  // Tab navigation
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  const tabClasses = (tab: AdminTab) =>
+    `px-4 py-2 font-heading text-sm transition-colors ${
+      activeTab === tab
+        ? "border-b-2 border-amber text-amber"
+        : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
+    }`;
+
+  // -------------------------------------------------------------------------
+  // Loading state (users tab only — agents tab has its own)
+  // -------------------------------------------------------------------------
+
+  if (loading && activeTab === "users") {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-32">
-        <h1 className="font-heading text-2xl tracking-tight text-text-primary">
-          <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-        </h1>
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
-        <p className="font-heading text-sm text-text-secondary">
-          <span className="text-amber">$</span> fetching user data...
-        </p>
+      <div className="space-y-6">
+        <div className="flex gap-0 border-b border-stroke">
+          <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>Users</button>
+          <button className={tabClasses("agents")} onClick={() => setActiveTab("agents")}>Agents</button>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-4 py-32">
+          <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+          </h1>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
+          <p className="font-heading text-sm text-text-secondary">
+            <span className="text-amber">$</span> fetching user data...
+          </p>
+        </div>
       </div>
     );
   }
 
   // -------------------------------------------------------------------------
-  // Error state
+  // Error state (users tab only)
   // -------------------------------------------------------------------------
 
-  if (error) {
+  if (error && activeTab === "users") {
     return (
-      <div className="mx-auto max-w-lg py-32 text-center">
-        <h1 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
-          <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-        </h1>
-        <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
-          <p className="font-heading text-sm text-terminal-red">
-            <span className="text-terminal-red/50">ERR</span> {error}
-          </p>
-          <button
-            onClick={() => { setError(null); setLoading(true); fetchUsers(); }}
-            className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
-          >
-            Retry
-          </button>
+      <div className="space-y-6">
+        <div className="flex gap-0 border-b border-stroke">
+          <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>Users</button>
+          <button className={tabClasses("agents")} onClick={() => setActiveTab("agents")}>Agents</button>
+        </div>
+        <div className="mx-auto max-w-lg py-32 text-center">
+          <h1 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
+            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+          </h1>
+          <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
+            <p className="font-heading text-sm text-terminal-red">
+              <span className="text-terminal-red/50">ERR</span> {error}
+            </p>
+            <button
+              onClick={() => { setError(null); setLoading(true); fetchUsers(); }}
+              className="mt-4 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -155,65 +197,78 @@ export function AdminDashboardClient() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="animate-fade-in-up flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-2xl tracking-tight text-text-primary">
-            <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-          </h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
-            {lastRefreshed && (
-              <span className="ml-2 text-text-secondary/60">
-                &middot; updated {formatDate(lastRefreshed.toISOString())}
-              </span>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={() => fetchUsers(true)}
-          disabled={refreshing}
-          className="flex items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Refresh data"
-        >
-          <svg
-            className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+      {/* Tab bar */}
+      <div className="flex gap-0 border-b border-stroke">
+        <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>Users</button>
+        <button className={tabClasses("agents")} onClick={() => setActiveTab("agents")}>Agents</button>
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "agents" ? (
+        <AgentsDashboard />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="animate-fade-in-up flex items-start justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+                <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
+              </h1>
+              <p className="mt-1 text-sm text-text-secondary">
+                {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
+                {lastRefreshed && (
+                  <span className="ml-2 text-text-secondary/60">
+                    &middot; updated {formatDate(lastRefreshed.toISOString())}
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => fetchUsers(true)}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 rounded-lg border border-stroke px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Refresh data"
+            >
+              <svg
+                className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+
+          {/* Summary cards */}
+          <AdminStatsCards totalUsers={users.length} tierCounts={tierCounts} />
+
+          {/* Search + Table */}
+          <div
+            className="rounded-xl border border-stroke bg-card overflow-hidden animate-fade-in-up"
+            style={{ animationDelay: "250ms" }}
           >
-            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-            <path d="M21 3v5h-5" />
-          </svg>
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </button>
-      </div>
-
-      {/* Summary cards */}
-      <AdminStatsCards totalUsers={users.length} tierCounts={tierCounts} />
-
-      {/* Search + Table */}
-      <div
-        className="rounded-xl border border-stroke bg-card overflow-hidden animate-fade-in-up"
-        style={{ animationDelay: "250ms" }}
-      >
-        <AdminSearchBar
-          search={search}
-          onSearchChange={setSearch}
-          resultCount={filtered.length}
-        />
-        <AdminUserTable
-          users={sorted}
-          search={search}
-          sortField={sortField}
-          sortDir={sortDir}
-          onSort={handleSort}
-        />
-      </div>
+            <AdminSearchBar
+              search={search}
+              onSearchChange={setSearch}
+              resultCount={filtered.length}
+            />
+            <AdminUserTable
+              users={sorted}
+              search={search}
+              sortField={sortField}
+              sortDir={sortDir}
+              onSort={handleSort}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

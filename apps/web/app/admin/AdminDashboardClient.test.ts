@@ -160,9 +160,9 @@ describe("AdminDashboardClient", () => {
       expect(SOURCE).toMatch(/from\s+["']\.\/AdminStatsCards["']/);
     });
 
-    it("AdminDashboardClient is under 300 lines after extraction", () => {
+    it("AdminDashboardClient is under 350 lines after agents tab addition", () => {
       const lines = SOURCE.split("\n").length;
-      expect(lines).toBeLessThan(300);
+      expect(lines).toBeLessThan(350);
     });
 
     it("AdminUserTable imports AdminSortableHeader", () => {
@@ -176,6 +176,33 @@ describe("AdminDashboardClient", () => {
       expect(typesSrc).toContain("AdminUser");
       expect(typesSrc).toContain("SortField");
       expect(typesSrc).toContain("SortDir");
+    });
+  });
+
+  describe("tab navigation (#416)", () => {
+    it("imports AgentsDashboard component", () => {
+      expect(SOURCE).toMatch(/from\s+["']\.\/agents\/agents-dashboard["']/);
+    });
+
+    it("has activeTab state with 'users' and 'agents' values", () => {
+      expect(SOURCE).toContain('AdminTab = "users" | "agents"');
+    });
+
+    it("renders tab buttons for Users and Agents", () => {
+      expect(SOURCE).toContain(">Users</button>");
+      expect(SOURCE).toContain(">Agents</button>");
+    });
+
+    it("renders AgentsDashboard when agents tab is active", () => {
+      expect(SOURCE).toContain("<AgentsDashboard");
+    });
+
+    it("listens for chapa:admin-tab events", () => {
+      expect(SOURCE).toContain("chapa:admin-tab");
+    });
+
+    it("uses amber border for active tab styling", () => {
+      expect(SOURCE).toContain("border-amber text-amber");
     });
   });
 });

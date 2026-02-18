@@ -103,6 +103,51 @@ export function createAdminCommands(): CommandDef[] {
       }),
     },
     {
+      name: "/agents",
+      description: "Switch to agents tab",
+      execute: () => ({
+        lines: [makeLine("system", "Switching to agents tab...")],
+        action: { type: "custom", event: "chapa:admin-tab", detail: { tab: "agents" } },
+      }),
+    },
+    {
+      name: "/users",
+      description: "Switch to users tab",
+      execute: () => ({
+        lines: [makeLine("system", "Switching to users tab...")],
+        action: { type: "custom", event: "chapa:admin-tab", detail: { tab: "users" } },
+      }),
+    },
+    {
+      name: "/run",
+      description: "Run an agent manually",
+      usage: "/run <agent_key>",
+      execute: (args) => {
+        const validAgents = ["coverage_agent", "security_scanner", "qa_agent"];
+        if (args.length === 0) {
+          return {
+            lines: [
+              makeLine("error", "Usage: /run <agent_key>"),
+              makeLine("info", `Available agents: ${validAgents.join(", ")}`),
+            ],
+          };
+        }
+        const agentKey = args[0]!;
+        if (!validAgents.includes(agentKey)) {
+          return {
+            lines: [
+              makeLine("error", `Unknown agent: ${agentKey}`),
+              makeLine("info", `Available agents: ${validAgents.join(", ")}`),
+            ],
+          };
+        }
+        return {
+          lines: [makeLine("system", `Starting ${agentKey}...`)],
+          action: { type: "custom", event: "chapa:admin-run-agent", detail: { agentKey } },
+        };
+      },
+    },
+    {
       name: "/sort",
       description: "Sort table by field",
       usage: "/sort <field> [asc|desc]",
@@ -183,6 +228,9 @@ export function createNavigationCommands(options?: {
           makeLine("info", "  /admin             Navigate to admin dashboard"),
           makeLine("info", "  /refresh           Refresh dashboard data"),
           makeLine("info", "  /sort <field> [asc|desc]  Sort table by field"),
+          makeLine("info", "  /users             Switch to users tab"),
+          makeLine("info", "  /agents            Switch to agents tab"),
+          makeLine("info", "  /run <agent_key>   Run an agent manually"),
         ]
       : []),
   ];
