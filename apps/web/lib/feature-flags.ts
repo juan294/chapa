@@ -21,10 +21,6 @@ export function isStudioEnabledSync(): boolean {
   return process.env.NEXT_PUBLIC_STUDIO_ENABLED?.trim() === "true";
 }
 
-export function isExperimentsEnabledSync(): boolean {
-  return process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED?.trim() === "true";
-}
-
 // ---------------------------------------------------------------------------
 // Async (DB-backed + env-var fallback) — for server components / API routes
 // ---------------------------------------------------------------------------
