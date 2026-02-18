@@ -156,6 +156,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
   return (
     <div
       className={`group relative z-20 transition-opacity duration-500 ${className ?? ""}`}
+      role="presentation"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
     >
