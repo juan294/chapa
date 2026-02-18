@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabled } from "@/lib/feature-flags";
+import { isStudioEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 
 interface UserMenuProps {
@@ -113,7 +113,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </svg>
               Your Badge
             </Link>
-            {isStudioEnabled() && (
+            {isStudioEnabledSync() && (
               <Link
                 href="/studio"
                 role="menuitem"

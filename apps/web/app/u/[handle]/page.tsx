@@ -181,7 +181,7 @@ export default async function SharePage({ params }: SharePageProps) {
           <BadgeToolbar
             handle={handle}
             isOwner={isOwner}
-            studioEnabled={isStudioEnabled()}
+            studioEnabled={await isStudioEnabled()}
           />
         </div>
 

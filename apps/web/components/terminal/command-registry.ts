@@ -1,4 +1,4 @@
-import { isStudioEnabled } from "../../lib/feature-flags";
+import { isStudioEnabledSync } from "../../lib/feature-flags";
 
 export type OutputLineType =
   | "info"
@@ -152,7 +152,7 @@ export function createAdminCommands(): CommandDef[] {
 export function createNavigationCommands(options?: {
   isAdmin?: boolean;
 }): CommandDef[] {
-  const studioEnabled = isStudioEnabled();
+  const studioEnabled = isStudioEnabledSync();
   const isAdmin = options?.isAdmin ?? false;
 
   const helpLines: OutputLine[] = [

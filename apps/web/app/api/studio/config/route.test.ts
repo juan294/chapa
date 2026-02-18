@@ -36,7 +36,7 @@ vi.mock("@/lib/validation", async () => {
 });
 
 vi.mock("@/lib/feature-flags", () => ({
-  isStudioEnabled: () => true,
+  isStudioEnabled: () => Promise.resolve(true),
 }));
 
 // ---------------------------------------------------------------------------

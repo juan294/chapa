@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 
 export default async function StudioPage() {
   // Feature flag gate — redirect when studio is disabled
-  if (!isStudioEnabled()) {
+  if (!(await isStudioEnabled())) {
     redirect("/");
   }
 

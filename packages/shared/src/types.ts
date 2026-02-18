@@ -248,3 +248,17 @@ export const DEFAULT_BADGE_CONFIG: BadgeConfig = {
   tierTreatment: "standard",
   celebration: "none",
 };
+
+// ---------------------------------------------------------------------------
+// Feature Flags — DB-backed feature toggle system
+// ---------------------------------------------------------------------------
+
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}

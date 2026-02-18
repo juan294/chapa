@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ExperimentsLayout({
+export default async function ExperimentsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  if (!isExperimentsEnabled()) {
+  if (!(await isExperimentsEnabled())) {
     notFound();
   }
   return <>{children}</>;
