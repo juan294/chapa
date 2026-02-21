@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { computeTilt } from "./use-tilt";
+import { renderHook, act } from "@testing-library/react";
+import { computeTilt, useTilt } from "./use-tilt";
 
 const RECT = { left: 100, top: 200, width: 600, height: 300 };
 
@@ -66,5 +68,140 @@ describe("computeTilt", () => {
   it("always returns isHovering true", () => {
     const result = computeTilt(400, 350, RECT, 15);
     expect(result.isHovering).toBe(true);
+  });
+});
+
+describe("useTilt", () => {
+  it("returns a ref object", () => {
+    const { result } = renderHook(() => useTilt());
+    expect(result.current.ref).toBeDefined();
+    expect(result.current.ref.current).toBeNull();
+  });
+
+  it("returns initial idle tilt state", () => {
+    const { result } = renderHook(() => useTilt());
+    expect(result.current.tilt).toEqual({
+      rotateX: 0,
+      rotateY: 0,
+      mouseX: "50%",
+      mouseY: "50%",
+      isHovering: false,
+    });
+  });
+
+  it("returns handleMouseMove function", () => {
+    const { result } = renderHook(() => useTilt());
+    expect(typeof result.current.handleMouseMove).toBe("function");
+  });
+
+  it("returns handleMouseLeave function", () => {
+    const { result } = renderHook(() => useTilt());
+    expect(typeof result.current.handleMouseLeave).toBe("function");
+  });
+
+  it("accepts custom maxTilt parameter", () => {
+    const { result } = renderHook(() => useTilt(25));
+    // Hook should still return the same structure
+    expect(result.current.tilt.rotateX).toBe(0);
+    expect(result.current.tilt.rotateY).toBe(0);
+  });
+
+  it("resets tilt state on mouse leave", () => {
+    const { result } = renderHook(() => useTilt());
+
+    act(() => {
+      result.current.handleMouseLeave();
+    });
+
+    expect(result.current.tilt).toEqual({
+      rotateX: 0,
+      rotateY: 0,
+      mouseX: "50%",
+      mouseY: "50%",
+      isHovering: false,
+    });
+  });
+
+  it("updates tilt state on mouse move when ref has an element", () => {
+    const { result } = renderHook(() => useTilt(15));
+
+    // Attach a div to the ref with a mocked getBoundingClientRect
+    const div = document.createElement("div");
+    Object.defineProperty(div, "getBoundingClientRect", {
+      value: () => ({
+        left: 100,
+        top: 200,
+        width: 600,
+        height: 300,
+        right: 700,
+        bottom: 500,
+        x: 100,
+        y: 200,
+        toJSON: () => {},
+      }),
+    });
+
+    // Set the ref manually
+    (result.current.ref as { current: HTMLDivElement }).current = div;
+
+    // Simulate mouse move at the center
+    act(() => {
+      result.current.handleMouseMove({
+        clientX: 400,
+        clientY: 350,
+      } as React.MouseEvent);
+    });
+
+    expect(result.current.tilt.isHovering).toBe(true);
+    expect(result.current.tilt.rotateX).toBeCloseTo(0);
+    expect(result.current.tilt.rotateY).toBeCloseTo(0);
+    expect(result.current.tilt.mouseX).toBe("50%");
+    expect(result.current.tilt.mouseY).toBe("50%");
+  });
+
+  it("ignores mouse move when ref is null", () => {
+    const { result } = renderHook(() => useTilt());
+
+    // Ref is null by default; handleMouseMove should not crash
+    act(() => {
+      result.current.handleMouseMove({
+        clientX: 200,
+        clientY: 300,
+      } as React.MouseEvent);
+    });
+
+    // Tilt should remain at idle
+    expect(result.current.tilt.isHovering).toBe(false);
+  });
+
+  it("computes tilt proportional to mouse offset from center", () => {
+    const { result } = renderHook(() => useTilt(15));
+
+    const div = document.createElement("div");
+    Object.defineProperty(div, "getBoundingClientRect", {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 200,
+        height: 200,
+        right: 200,
+        bottom: 200,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      }),
+    });
+    (result.current.ref as { current: HTMLDivElement }).current = div;
+
+    // Mouse at bottom-right corner: full tilt in both axes
+    act(() => {
+      result.current.handleMouseMove({
+        clientX: 200,
+        clientY: 200,
+      } as React.MouseEvent);
+    });
+
+    expect(result.current.tilt.rotateX).toBeCloseTo(-15);
+    expect(result.current.tilt.rotateY).toBeCloseTo(15);
   });
 });
