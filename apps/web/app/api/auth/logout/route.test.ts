@@ -12,6 +12,15 @@ vi.mock("@/lib/auth/github", () => ({
   clearSessionCookie: mockClearSessionCookie,
 }));
 
+const mockRateLimit = vi.fn();
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: () => "127.0.0.1",
+}));
+
 import { POST } from "./route";
 import { NextRequest } from "next/server";
 
@@ -36,6 +45,7 @@ describe("POST /api/auth/logout", () => {
     mockClearSessionCookie.mockReturnValue(
       "chapa_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
     );
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   });
 
   it("returns a redirect response (307)", async () => {
@@ -66,5 +76,16 @@ describe("POST /api/auth/logout", () => {
     await POST(makeRequest());
 
     expect(mockClearSessionCookie).toHaveBeenCalledOnce();
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    const body = await res.json();
+    expect(body.error).toMatch(/too many requests/i);
   });
 });

@@ -144,6 +144,16 @@ describe("fetchAvatarBase64 — SSRF prevention", () => {
     await fetchAvatarBase64("https://evil.com/avatar.png");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it("logs a warning when a non-GitHub URL is rejected", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await fetchAvatarBase64("https://evil.com/avatar.png");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[avatar] rejected non-GitHub URL:",
+      expect.stringContaining("evil.com"),
+    );
+    warnSpy.mockRestore();
+  });
 });
 
 // ---------------------------------------------------------------------------
