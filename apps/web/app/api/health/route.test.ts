@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 vi.mock("@/lib/cache/redis", () => ({
   pingRedis: vi.fn(),
+  rateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: () => "127.0.0.1",
 }));
 
 vi.mock("@/lib/db/supabase", () => ({
@@ -9,11 +15,16 @@ vi.mock("@/lib/db/supabase", () => ({
 }));
 
 import { GET } from "./route";
-import { pingRedis } from "@/lib/cache/redis";
+import { pingRedis, rateLimit } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
+
+function makeRequest(): NextRequest {
+  return new NextRequest("http://localhost:3001/api/health");
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 30 });
 });
 
 describe("GET /api/health", () => {
@@ -21,7 +32,7 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -36,7 +47,7 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("error");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -49,7 +60,7 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("unavailable");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -61,7 +72,7 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("unavailable");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -74,7 +85,7 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("error");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -87,7 +98,7 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("error");
     vi.mocked(pingSupabase).mockResolvedValueOnce("error");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -100,10 +111,21 @@ describe("GET /api/health", () => {
     vi.mocked(pingRedis).mockResolvedValueOnce("ok");
     vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
-    const response = await GET();
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(() => new Date(body.timestamp)).not.toThrow();
     expect(new Date(body.timestamp).toISOString()).toBe(body.timestamp);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 31, limit: 30 });
+
+    const response = await GET(makeRequest());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    const body = await response.json();
+    expect(body.error).toMatch(/too many requests/i);
   });
 });

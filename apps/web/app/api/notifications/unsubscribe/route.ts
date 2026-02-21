@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { dbUpdateEmailNotifications } from "@/lib/db/users";
 import { escapeHtml } from "@/lib/email/resend";
+import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 /**
  * GET /api/notifications/unsubscribe?handle=:handle
@@ -9,10 +11,20 @@ import { escapeHtml } from "@/lib/email/resend";
  * Sets email_notifications=false for the user. Returns a static
  * HTML confirmation page.
  *
+ * Rate limited: 10 requests per IP per 60 seconds.
  * Fail-open: even if the DB update fails, shows the confirmation
  * page so the user isn't confused.
  */
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:unsubscribe:${ip}`, 10, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   const handle = request.nextUrl.searchParams.get("handle")?.toLowerCase();
 
   if (!handle) {

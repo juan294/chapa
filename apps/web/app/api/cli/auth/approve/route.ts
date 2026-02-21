@@ -1,10 +1,27 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheSet } from "@/lib/cache/redis";
+import { cacheSet, rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 const DEVICE_SESSION_TTL = 300; // 5 minutes
 
+/**
+ * POST /api/cli/auth/approve
+ *
+ * Approves a CLI device auth session.
+ * Rate limited: 10 requests per IP per 60 seconds.
+ */
 export async function POST(request: Request): Promise<Response> {
+  // 0. Rate limit
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:cli-approve:${ip}`, 10, 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   // 1. Verify the user is logged in via web session
   const { session, error } = requireSession(request);
   if (error) return error;

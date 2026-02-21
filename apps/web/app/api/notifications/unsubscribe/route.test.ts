@@ -22,6 +22,15 @@ vi.mock("@/lib/email/resend", () => ({
       .replace(/'/g, "&#39;"),
 }));
 
+const mockRateLimit = vi.fn();
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: () => "127.0.0.1",
+}));
+
 import { GET } from "./route";
 
 function makeRequest(handle?: string): NextRequest {
@@ -33,6 +42,7 @@ function makeRequest(handle?: string): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mockDbUpdateEmailNotifications.mockResolvedValue(undefined);
+  mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
 });
 
 // ---------------------------------------------------------------------------
@@ -90,5 +100,16 @@ describe("GET /api/notifications/unsubscribe", () => {
 
     // Still shows confirmation — fail-open for UX
     expect(res.status).toBe(200);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await GET(makeRequest("testuser"));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    const body = await res.json();
+    expect(body.error).toMatch(/too many requests/i);
   });
 });

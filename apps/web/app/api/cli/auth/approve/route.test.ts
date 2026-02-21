@@ -11,11 +11,16 @@ vi.mock("@/lib/auth/require-session", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheSet: vi.fn(),
+  rateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: () => "127.0.0.1",
 }));
 
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
-import { cacheSet } from "@/lib/cache/redis";
+import { cacheSet, rateLimit } from "@/lib/cache/redis";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,6 +49,7 @@ function makeRequest(body: unknown, cookie?: string): Request {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(requireSession).mockReturnValue({ session: SESSION });
+  vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
 });
 
 // ---------------------------------------------------------------------------
@@ -124,5 +130,21 @@ describe("POST /api/cli/auth/approve", () => {
     );
 
     expect(res.status).toBe(500);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await POST(
+      makeRequest(
+        { sessionId: "1feae8e3-6bc0-47da-84aa-0e24e2510454" },
+        "chapa_session=valid",
+      ),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    const body = await res.json();
+    expect(body.error).toMatch(/too many requests/i);
   });
 });
