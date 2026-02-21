@@ -180,17 +180,19 @@ describe("AdminDashboardClient", () => {
   });
 
   describe("tab navigation (#416)", () => {
-    it("imports AgentsDashboard component", () => {
-      expect(SOURCE).toMatch(/from\s+["']\.\/agents\/agents-dashboard["']/);
+    it("dynamically imports AgentsDashboard component", () => {
+      expect(SOURCE).toMatch(/import\(["']\.\/agents\/agents-dashboard["']\)/);
     });
 
-    it("has activeTab state with 'users' and 'agents' values", () => {
-      expect(SOURCE).toContain('AdminTab = "users" | "agents"');
+    it("has activeTab state with 'users', 'agents', and 'engagement' values", () => {
+      expect(SOURCE).toContain('AdminTab = "users" | "agents" | "engagement"');
     });
 
     it("renders tab buttons for Users and Agents", () => {
-      expect(SOURCE).toContain(">Users</button>");
-      expect(SOURCE).toContain(">Agents</button>");
+      // After ARIA fix, tab buttons should not be wrapped in </button>
+      // They use role="tab" on <button> elements
+      expect(SOURCE).toContain("Users");
+      expect(SOURCE).toContain("Agents");
     });
 
     it("renders AgentsDashboard when agents tab is active", () => {
@@ -203,6 +205,102 @@ describe("AdminDashboardClient", () => {
 
     it("uses amber border for active tab styling", () => {
       expect(SOURCE).toContain("border-amber text-amber");
+    });
+  });
+
+  describe("a11y: ARIA tab roles (#421)", () => {
+    it("tab container has role='tablist'", () => {
+      expect(SOURCE).toContain('role="tablist"');
+    });
+
+    it("tab buttons have role='tab'", () => {
+      expect(SOURCE).toContain('role="tab"');
+    });
+
+    it("tab buttons have aria-selected attribute", () => {
+      // Each tab button should indicate whether it is the active tab
+      expect(SOURCE).toMatch(/aria-selected=\{activeTab === /);
+    });
+
+    it("tab buttons have aria-controls pointing to panel id", () => {
+      expect(SOURCE).toContain('aria-controls="tabpanel-');
+    });
+
+    it("tab buttons have unique id attributes", () => {
+      expect(SOURCE).toContain('id="tab-users"');
+      expect(SOURCE).toContain('id="tab-agents"');
+    });
+
+    it("tab panel has role='tabpanel'", () => {
+      expect(SOURCE).toContain('role="tabpanel"');
+    });
+
+    it("tab panel has id matching aria-controls", () => {
+      expect(SOURCE).toContain('id="tabpanel-users"');
+      expect(SOURCE).toContain('id="tabpanel-agents"');
+    });
+
+    it("tab panel has aria-labelledby pointing to the active tab", () => {
+      expect(SOURCE).toContain('aria-labelledby="tab-users"');
+      expect(SOURCE).toContain('aria-labelledby="tab-agents"');
+    });
+
+    it("tab bar is defined as a reusable variable used across all render branches", () => {
+      // The tabBar JSX variable is defined once with role="tablist" and
+      // referenced in loading, error, and dashboard return statements via {tabBar}.
+      expect(SOURCE).toContain('role="tablist"');
+      const tabBarRefs = SOURCE.match(/\{tabBar\}/g) ?? [];
+      expect(tabBarRefs.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe("skeleton loading state", () => {
+    it("imports AdminTableSkeleton", () => {
+      expect(SOURCE).toMatch(/from\s+["']\.\/AdminTableSkeleton["']/);
+    });
+
+    it("renders AdminTableSkeleton in loading state", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).toContain("<AdminTableSkeleton");
+    });
+
+    it("does not render the old spinner in loading state", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).not.toContain("animate-spin");
+    });
+
+    it("has aria-live announcement in loading state", () => {
+      const loadingBlock = SOURCE.match(
+        /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
+      );
+      expect(loadingBlock).not.toBeNull();
+      expect(loadingBlock![0]).toContain('aria-live="polite"');
+    });
+  });
+
+  describe("deferred search", () => {
+    it("imports useDeferredValue from React", () => {
+      expect(SOURCE).toMatch(/useDeferredValue/);
+    });
+
+    it("creates deferredSearch from search state", () => {
+      expect(SOURCE).toMatch(/useDeferredValue\(search\)/);
+    });
+
+    it("uses deferredSearch in the filter useMemo dependency array", () => {
+      // The filtered memo should depend on deferredSearch, not search
+      const filteredMemo = SOURCE.match(
+        /const filtered = useMemo\(\(\) => \{[\s\S]*?\}, \[([^\]]+)\]\)/,
+      );
+      expect(filteredMemo).not.toBeNull();
+      expect(filteredMemo![1]).toContain("deferredSearch");
+      expect(filteredMemo![1]).not.toMatch(/(?<![dD]eferred)search/);
     });
   });
 });

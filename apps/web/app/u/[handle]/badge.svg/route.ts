@@ -9,6 +9,7 @@ import { escapeXml } from "@/lib/render/escape";
 import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
@@ -16,7 +17,6 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
-import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -97,8 +97,8 @@ export async function GET(
   // Compute impact
   const impact = computeImpactV4(stats);
 
-  // V5: Apply EMA smoothing using previous day's snapshot
-  const latestSnapshot = await dbGetLatestSnapshot(handle);
+  // V5: Apply EMA smoothing using previous day's snapshot (Redis-cached)
+  const latestSnapshot = await getCachedLatestSnapshot(handle);
   const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
   impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
   impact.tier = getTier(impact.adjustedComposite);
@@ -139,8 +139,11 @@ export async function GET(
 
     ops.push(trackBadgeGenerated(handle));
     ops.push(notifyFirstBadge(handle, impact));
+    const snapshot = buildSnapshot(stats, impact);
     ops.push(
-      dbInsertSnapshot(handle, buildSnapshot(stats, impact)).then(() => {}),
+      dbInsertSnapshot(handle, snapshot).then((inserted) => {
+        if (inserted) updateSnapshotCache(handle, snapshot);
+      }),
     );
 
     return Promise.allSettled(ops);

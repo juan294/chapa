@@ -156,6 +156,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
   return (
     <div
       className={`group relative z-20 transition-opacity duration-500 ${className ?? ""}`}
+      role="presentation"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
     >
@@ -193,10 +194,10 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
       )}
 
       {/* Trigger pill — terminal typewriter */}
-      <div
+      <button
+        type="button"
         className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-full bg-amber/10 hover:bg-amber/15 backdrop-blur-sm cursor-default transition-all duration-150 border border-stroke"
         aria-label={`Made by ${AUTHOR_NAME}`}
-        tabIndex={0}
       >
         <span className="text-[10px] font-heading text-text-secondary group-hover:text-text-primary transition-colors duration-300 select-none whitespace-nowrap">
           <span ref={textRef}>{HOME_TEXT}</span>
@@ -207,7 +208,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
             &#9612;
           </span>
         </span>
-      </div>
+      </button>
     </div>
   );
 }

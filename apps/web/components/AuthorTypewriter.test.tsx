@@ -26,6 +26,12 @@ describe("AuthorTypewriter", () => {
     it("decorative SVGs are aria-hidden", () => {
       expect(SOURCE).toContain('aria-hidden="true"');
     });
+
+    it("outer wrapper has role=presentation for onClick semantics (#423)", () => {
+      // The outer div has onClick={e => e.stopPropagation()} which requires
+      // a role attribute to satisfy a11y linting (no static element with handlers)
+      expect(SOURCE).toContain('role="presentation"');
+    });
   });
 
   describe("keyboard accessibility (#219)", () => {
@@ -48,8 +54,9 @@ describe("AuthorTypewriter", () => {
       expect(SOURCE).toContain("group-focus-within:scale-100");
     });
 
-    it("trigger pill has tabIndex to ensure focusability", () => {
-      expect(SOURCE).toMatch(/tabIndex=\{0\}/);
+    it("trigger pill is a button element (natively focusable)", () => {
+      expect(SOURCE).toContain('<button');
+      expect(SOURCE).toContain('type="button"');
     });
   });
 

@@ -136,12 +136,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Spawn the agent shell script
-  const scriptName = agentKey.replace(/_/g, "-");
-  const scriptPath = join(process.cwd(), `scripts/${scriptName}.sh`);
+  // process.cwd() inside Next.js returns apps/web/ — go up to monorepo root
+  const projectRoot = join(process.cwd(), "..", "..");
+  const agentConfig = AGENTS[agentKey]!;
+  const scriptPath = join(projectRoot, `scripts/${agentConfig.scriptName}.sh`);
   const startedAt = new Date().toISOString();
 
   const child = spawn("bash", [scriptPath], {
-    cwd: process.cwd(),
+    cwd: projectRoot,
     env: { ...process.env },
     stdio: ["ignore", "pipe", "pipe"],
   });

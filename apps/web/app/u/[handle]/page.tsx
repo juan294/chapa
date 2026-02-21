@@ -2,7 +2,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
-import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import { ImpactBreakdown, getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
@@ -107,7 +107,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
   // V5: Apply EMA smoothing using previous day's snapshot
   if (impact) {
-    const latestSnapshot = await dbGetLatestSnapshot(handle);
+    const latestSnapshot = await getCachedLatestSnapshot(handle);
     const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
     impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
     impact.tier = getTier(impact.adjustedComposite);
@@ -120,7 +120,7 @@ export default async function SharePage({ params }: SharePageProps) {
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
-  const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
+  const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" height="315" />`;
 
   const displayLabel = stats?.displayName ?? handle;
 
@@ -314,6 +314,8 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-amber/70">{`"Chapa Badge for ${handle}"`}</span>
                 <span className="text-text-secondary">{" width="}</span>
                 <span className="text-amber/70">{'"600"'}</span>
+                <span className="text-text-secondary">{" height="}</span>
+                <span className="text-amber/70">{'"315"'}</span>
                 <span className="text-amber">{" />"}</span>
               </p>
             </div>

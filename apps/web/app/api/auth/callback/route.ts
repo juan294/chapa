@@ -2,12 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import {
   exchangeCodeForToken,
   fetchGitHubUser,
+  fetchGitHubUserEmail,
   createSessionCookie,
   validateState,
   clearStateCookie,
 } from "@/lib/auth/github";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { dbUpsertUser } from "@/lib/db/users";
 
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
@@ -95,6 +97,10 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.redirect(new URL("/?error=user_fetch", request.url));
   }
+
+  // Capture email and register user (fire-and-forget, non-blocking)
+  const email = await fetchGitHubUserEmail(token).catch(() => null);
+  void dbUpsertUser(user.login, email ?? undefined).catch(() => {});
 
   const cookie = createSessionCookie(
     {

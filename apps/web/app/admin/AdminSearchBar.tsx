@@ -19,7 +19,7 @@ export function AdminSearchBar({ search, onSearchChange, resultCount }: AdminSea
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="filter by handle or name..."
-        className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/50 font-heading outline-none"
+        className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/50 font-heading outline-none focus-visible:ring-2 focus-visible:ring-amber"
         aria-label="Filter users"
       />
       {search && (

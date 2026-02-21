@@ -97,14 +97,14 @@ export function AutocompleteDropdown({
       className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl"
     >
       {matching.map((cmd, i) => (
-        <button
+        <div
           key={cmd.name}
-          type="button"
           role="option"
+          tabIndex={-1}
           aria-selected={i === activeIndex}
           onClick={() => onSelect(cmd.name)}
           onMouseEnter={() => setActiveIndex(i)}
-          className={`flex w-full items-center px-4 py-1.5 text-left transition-colors ${
+          className={`flex w-full cursor-pointer items-center px-4 py-1.5 text-left transition-colors ${
             i === activeIndex
               ? "bg-amber/10 text-text-primary"
               : "text-text-secondary hover:bg-amber/5"
@@ -119,7 +119,7 @@ export function AutocompleteDropdown({
               {cmd.usage.replace(cmd.name + " ", "")}
             </span>
           )}
-        </button>
+        </div>
       ))}
     </div>
   );

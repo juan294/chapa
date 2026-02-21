@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig } from "./validation";
+import { isValidHandle, isValidEmuHandle, isValidStatsShape, isValidBadgeConfig, isValidTelemetryPayload } from "./validation";
 import { DEFAULT_BADGE_CONFIG, BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 
 describe("isValidHandle", () => {
@@ -307,5 +307,156 @@ describe("isValidBadgeConfig", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe("isValidTelemetryPayload", () => {
+  const validPayload = {
+    operationId: "550e8400-e29b-41d4-a716-446655440000",
+    targetHandle: "juan294",
+    sourceHandle: "juan_corp",
+    success: true,
+    stats: {
+      commitsTotal: 30,
+      reposContributed: 3,
+      prsMergedCount: 5,
+      activeDays: 20,
+      reviewsSubmittedCount: 10,
+    },
+    timing: {
+      fetchMs: 1200,
+      uploadMs: 300,
+      totalMs: 1500,
+    },
+    cliVersion: "0.3.1",
+  };
+
+  it("accepts a valid telemetry payload", () => {
+    expect(isValidTelemetryPayload(validPayload)).toBe(true);
+  });
+
+  it("accepts a failed operation with errorCategory", () => {
+    expect(isValidTelemetryPayload({
+      ...validPayload,
+      success: false,
+      errorCategory: "network",
+    })).toBe(true);
+  });
+
+  it("accepts all valid errorCategory values", () => {
+    for (const cat of ["auth", "network", "graphql", "server", "unknown"]) {
+      expect(isValidTelemetryPayload({
+        ...validPayload,
+        success: false,
+        errorCategory: cat,
+      })).toBe(true);
+    }
+  });
+
+  // --- Helpers ---
+
+  /** Create payload with specific keys removed */
+  function without<K extends string>(obj: Record<string, unknown>, ...keys: K[]) {
+    const copy = { ...obj };
+    for (const k of keys) delete copy[k];
+    return copy;
+  }
+
+  // --- Rejection tests ---
+
+  it("rejects null", () => {
+    expect(isValidTelemetryPayload(null)).toBe(false);
+  });
+
+  it("rejects non-object", () => {
+    expect(isValidTelemetryPayload("string")).toBe(false);
+    expect(isValidTelemetryPayload(42)).toBe(false);
+  });
+
+  it("rejects missing operationId", () => {
+    expect(isValidTelemetryPayload(without(validPayload, "operationId"))).toBe(false);
+  });
+
+  it("rejects invalid UUID format for operationId", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, operationId: "not-a-uuid" })).toBe(false);
+    expect(isValidTelemetryPayload({ ...validPayload, operationId: "550e8400e29b41d4a716446655440000" })).toBe(false);
+  });
+
+  it("rejects invalid targetHandle", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, targetHandle: "<script>" })).toBe(false);
+    expect(isValidTelemetryPayload({ ...validPayload, targetHandle: "" })).toBe(false);
+  });
+
+  it("rejects invalid sourceHandle", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, sourceHandle: "<script>" })).toBe(false);
+    expect(isValidTelemetryPayload({ ...validPayload, sourceHandle: "" })).toBe(false);
+  });
+
+  it("rejects non-boolean success", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, success: "true" })).toBe(false);
+    expect(isValidTelemetryPayload({ ...validPayload, success: 1 })).toBe(false);
+  });
+
+  it("rejects invalid errorCategory", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, errorCategory: "invalid" })).toBe(false);
+  });
+
+  it("rejects missing stats", () => {
+    expect(isValidTelemetryPayload(without(validPayload, "stats"))).toBe(false);
+  });
+
+  it("rejects stats with missing fields", () => {
+    expect(isValidTelemetryPayload({
+      ...validPayload,
+      stats: { commitsTotal: 10 },
+    })).toBe(false);
+  });
+
+  it("rejects stats with negative numbers", () => {
+    expect(isValidTelemetryPayload({
+      ...validPayload,
+      stats: { ...validPayload.stats, commitsTotal: -1 },
+    })).toBe(false);
+  });
+
+  it("rejects stats with non-integer numbers", () => {
+    expect(isValidTelemetryPayload({
+      ...validPayload,
+      stats: { ...validPayload.stats, commitsTotal: 1.5 },
+    })).toBe(false);
+  });
+
+  it("rejects missing timing", () => {
+    expect(isValidTelemetryPayload(without(validPayload, "timing"))).toBe(false);
+  });
+
+  it("rejects timing with missing fields", () => {
+    expect(isValidTelemetryPayload({
+      ...validPayload,
+      timing: { fetchMs: 100 },
+    })).toBe(false);
+  });
+
+  it("rejects timing with negative numbers", () => {
+    expect(isValidTelemetryPayload({
+      ...validPayload,
+      timing: { ...validPayload.timing, fetchMs: -1 },
+    })).toBe(false);
+  });
+
+  it("rejects missing cliVersion", () => {
+    expect(isValidTelemetryPayload(without(validPayload, "cliVersion"))).toBe(false);
+  });
+
+  it("rejects empty cliVersion", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, cliVersion: "" })).toBe(false);
+  });
+
+  it("rejects cliVersion exceeding 20 chars", () => {
+    expect(isValidTelemetryPayload({ ...validPayload, cliVersion: "a".repeat(21) })).toBe(false);
+  });
+
+  it("accepts payload without errorCategory when success is true", () => {
+    expect(isValidTelemetryPayload(without(validPayload, "errorCategory"))).toBe(true);
   });
 });

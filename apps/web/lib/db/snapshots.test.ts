@@ -8,6 +8,7 @@ import { makeSnapshot } from "../test-helpers/fixtures";
 const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
+const mockIn = vi.fn();
 const mockGte = vi.fn();
 const mockLte = vi.fn();
 const mockOrder = vi.fn();
@@ -22,6 +23,10 @@ function chainBuilder() {
   };
   chain.eq = (...args: unknown[]) => {
     mockEq(...args);
+    return chain;
+  };
+  chain.in = (...args: unknown[]) => {
+    mockIn(...args);
     return chain;
   };
   chain.gte = (...args: unknown[]) => {
@@ -88,6 +93,7 @@ import {
   dbInsertSnapshot,
   dbGetSnapshots,
   dbGetLatestSnapshot,
+  dbGetLatestSnapshotBatch,
 } from "./snapshots";
 
 beforeEach(() => {
@@ -320,5 +326,75 @@ describe("runtime row validation", () => {
 
     const result = await dbGetSnapshots("testuser");
     expect(result).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbGetLatestSnapshotBatch
+// ---------------------------------------------------------------------------
+
+describe("dbGetLatestSnapshotBatch", () => {
+  it("returns empty Map for empty handles array", async () => {
+    const result = await dbGetLatestSnapshotBatch([]);
+    expect(result).toEqual(new Map());
+    // Should short-circuit — no DB call
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("returns a Map keyed by lowercase handle with latest snapshot", async () => {
+    terminalResolve = {
+      data: [
+        { handle: "alice", ...makeRow({ date: "2025-06-16" }) },
+        { handle: "alice", ...makeRow({ date: "2025-06-15" }) },
+        { handle: "bob", ...makeRow({ date: "2025-06-14" }) },
+      ],
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshotBatch(["Alice", "Bob"]);
+
+    expect(result.size).toBe(2);
+    expect(result.get("alice")!.date).toBe("2025-06-16");
+    expect(result.get("bob")!.date).toBe("2025-06-14");
+    // Uses .in() with lowercased handles
+    expect(mockIn).toHaveBeenCalledWith("handle", ["alice", "bob"]);
+    // Ordered by handle ASC, date DESC
+    expect(mockOrder).toHaveBeenCalledWith("handle", { ascending: true });
+    expect(mockOrder).toHaveBeenCalledWith("date", { ascending: false });
+  });
+
+  it("handles with no snapshots are absent from Map", async () => {
+    terminalResolve = {
+      data: [
+        { handle: "alice", ...makeRow({ date: "2025-06-16" }) },
+      ],
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshotBatch(["alice", "bob"]);
+
+    expect(result.size).toBe(1);
+    expect(result.has("alice")).toBe(true);
+    expect(result.has("bob")).toBe(false);
+  });
+
+  it("returns empty Map when DB is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+    const result = await dbGetLatestSnapshotBatch(["alice"]);
+    expect(result).toEqual(new Map());
+  });
+
+  it("returns empty Map on query error", async () => {
+    terminalResolve = { data: null, error: new Error("timeout") };
+    const result = await dbGetLatestSnapshotBatch(["alice"]);
+    expect(result).toEqual(new Map());
+  });
+
+  it("lowercases handles before querying", async () => {
+    terminalResolve = { data: [], error: null };
+
+    await dbGetLatestSnapshotBatch(["UPPER", "MiXeD"]);
+
+    expect(mockIn).toHaveBeenCalledWith("handle", ["upper", "mixed"]);
   });
 });

@@ -7,22 +7,27 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const {
   mockExchangeCodeForToken,
   mockFetchGitHubUser,
+  mockFetchGitHubUserEmail,
   mockCreateSessionCookie,
   mockValidateState,
   mockClearStateCookie,
   mockRateLimit,
+  mockDbUpsertUser,
 } = vi.hoisted(() => ({
   mockExchangeCodeForToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
+  mockFetchGitHubUserEmail: vi.fn(),
   mockCreateSessionCookie: vi.fn(),
   mockValidateState: vi.fn(),
   mockClearStateCookie: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockDbUpsertUser: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/github", () => ({
   exchangeCodeForToken: mockExchangeCodeForToken,
   fetchGitHubUser: mockFetchGitHubUser,
+  fetchGitHubUserEmail: mockFetchGitHubUserEmail,
   createSessionCookie: mockCreateSessionCookie,
   validateState: mockValidateState,
   clearStateCookie: mockClearStateCookie,
@@ -35,6 +40,10 @@ vi.mock("@/lib/cache/redis", () => ({
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: (req: Request) =>
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
+}));
+
+vi.mock("@/lib/db/users", () => ({
+  dbUpsertUser: mockDbUpsertUser,
 }));
 
 import { GET } from "./route";
@@ -71,6 +80,8 @@ function makeRequest(params?: {
 
 function allowRateLimit() {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+  mockFetchGitHubUserEmail.mockResolvedValue(null);
+  mockDbUpsertUser.mockResolvedValue(undefined);
 }
 
 function setEnvVars() {
@@ -321,6 +332,45 @@ describe("GET /api/auth/callback — OAuth flow", () => {
       },
       "test-session-secret",
     );
+  });
+
+  it("captures email and upserts user on successful login", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue("octocat@github.com");
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockFetchGitHubUserEmail).toHaveBeenCalledWith("gho_valid_token");
+    expect(mockDbUpsertUser).toHaveBeenCalledWith("octocat", "octocat@github.com");
+  });
+
+  it("upserts user without email when email fetch fails", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockDbUpsertUser).toHaveBeenCalledWith("octocat", undefined);
   });
 
   it("ignores malicious redirect cookie and falls back to profile page", async () => {

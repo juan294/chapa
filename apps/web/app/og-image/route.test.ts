@@ -68,6 +68,9 @@ describe("GET /og-image", () => {
   });
 
   it("returns 500 when svgToPng throws", async () => {
+    // Silence expected console.error from the error-handling code path
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     mockSvgToPng.mockImplementation(() => {
       throw new Error("PNG conversion failed");
     });
@@ -75,5 +78,7 @@ describe("GET /og-image", () => {
     expect(res.status).toBe(500);
     const body = await res.text();
     expect(body).toBe("Failed to generate image");
+
+    consoleSpy.mockRestore();
   });
 });

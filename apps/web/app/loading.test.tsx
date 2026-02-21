@@ -27,4 +27,14 @@ describe("Root loading.tsx", () => {
   it("uses animate-pulse for skeleton effect", () => {
     expect(SOURCE).toContain("animate-pulse");
   });
+
+  it("has role='status' and aria-label='Loading' on the main container", () => {
+    expect(SOURCE).toContain('role="status"');
+    expect(SOURCE).toContain('aria-label="Loading"');
+  });
+
+  it("has an sr-only loading text span", () => {
+    expect(SOURCE).toContain('className="sr-only"');
+    expect(SOURCE).toContain("Loading...");
+  });
 });

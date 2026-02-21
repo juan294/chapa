@@ -8,16 +8,39 @@ const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockOrder = vi.fn();
 const mockRange = vi.fn();
+const mockEq = vi.fn();
+const mockUpdate = vi.fn();
+const mockMaybeSingle = vi.fn();
 
 let listResolve: { data: unknown; error: unknown };
+let singleResolve: { data: unknown; error: unknown };
+let updateResolve: { error: unknown };
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const mockFrom = vi.fn((_table: string): any => ({
   upsert: mockUpsert,
+  update: (...args: unknown[]) => {
+    mockUpdate(...args);
+    return {
+      eq: (...eqArgs: unknown[]) => {
+        mockEq(...eqArgs);
+        return Promise.resolve(updateResolve);
+      },
+    };
+  },
   select: (...args: unknown[]) => {
     mockSelect(...args);
     // List query (.select("handle, registered_at"))
     return {
+      eq: (...eqArgs: unknown[]) => {
+        mockEq(...eqArgs);
+        return {
+          maybeSingle: () => {
+            mockMaybeSingle();
+            return Promise.resolve(singleResolve);
+          },
+        };
+      },
       order: (...orderArgs: unknown[]) => {
         mockOrder(...orderArgs);
         return {
@@ -43,11 +66,18 @@ vi.mock("./supabase", () => ({
 }));
 
 import { getSupabase } from "./supabase";
-import { dbUpsertUser, dbGetUsers } from "./users";
+import {
+  dbUpsertUser,
+  dbGetUsers,
+  dbGetUserEmail,
+  dbUpdateEmailNotifications,
+} from "./users";
 
 beforeEach(() => {
   vi.clearAllMocks();
   listResolve = { data: [], error: null };
+  singleResolve = { data: null, error: null };
+  updateResolve = { error: null };
 });
 
 // ---------------------------------------------------------------------------
@@ -61,6 +91,28 @@ describe("dbUpsertUser", () => {
     await dbUpsertUser("TestUser");
 
     expect(mockFrom).toHaveBeenCalledWith("users");
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { handle: "testuser" },
+      { onConflict: "handle", ignoreDuplicates: true },
+    );
+  });
+
+  it("upserts user with email when provided", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+
+    await dbUpsertUser("TestUser", "test@example.com");
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { handle: "testuser", email: "test@example.com" },
+      { onConflict: "handle", ignoreDuplicates: false },
+    );
+  });
+
+  it("upserts without email field when email is undefined", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+
+    await dbUpsertUser("TestUser");
+
     expect(mockUpsert).toHaveBeenCalledWith(
       { handle: "testuser" },
       { onConflict: "handle", ignoreDuplicates: true },
@@ -145,6 +197,109 @@ describe("dbGetUsers", () => {
     await dbGetUsers();
 
     expect(mockRange).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbGetUserEmail
+// ---------------------------------------------------------------------------
+
+describe("dbGetUserEmail", () => {
+  it("returns email and notification preference for a user", async () => {
+    singleResolve = {
+      data: { email: "dev@example.com", email_notifications: true },
+      error: null,
+    };
+
+    const result = await dbGetUserEmail("testuser");
+
+    expect(mockFrom).toHaveBeenCalledWith("users");
+    expect(mockSelect).toHaveBeenCalledWith("email, email_notifications");
+    expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
+    expect(result).toEqual({
+      email: "dev@example.com",
+      emailNotifications: true,
+    });
+  });
+
+  it("returns null when user not found", async () => {
+    singleResolve = { data: null, error: null };
+
+    const result = await dbGetUserEmail("unknown");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when email is null", async () => {
+    singleResolve = {
+      data: { email: null, email_notifications: true },
+      error: null,
+    };
+
+    const result = await dbGetUserEmail("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when DB unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    const result = await dbGetUserEmail("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("returns null on query error", async () => {
+    singleResolve = { data: null, error: new Error("query failed") };
+
+    const result = await dbGetUserEmail("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("lowercases handle for lookup", async () => {
+    singleResolve = {
+      data: { email: "dev@example.com", email_notifications: true },
+      error: null,
+    };
+
+    await dbGetUserEmail("TestUser");
+    expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbUpdateEmailNotifications
+// ---------------------------------------------------------------------------
+
+describe("dbUpdateEmailNotifications", () => {
+  it("updates email_notifications for a user", async () => {
+    updateResolve = { error: null };
+
+    await dbUpdateEmailNotifications("testuser", false);
+
+    expect(mockFrom).toHaveBeenCalledWith("users");
+    expect(mockUpdate).toHaveBeenCalledWith({ email_notifications: false });
+    expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
+  });
+
+  it("lowercases handle", async () => {
+    updateResolve = { error: null };
+
+    await dbUpdateEmailNotifications("TestUser", true);
+    expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
+  });
+
+  it("does not throw when DB unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    await expect(
+      dbUpdateEmailNotifications("testuser", false),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not throw on update error", async () => {
+    updateResolve = { error: new Error("update failed") };
+
+    await expect(
+      dbUpdateEmailNotifications("testuser", false),
+    ).resolves.toBeUndefined();
   });
 });
 

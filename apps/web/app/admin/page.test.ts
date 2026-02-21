@@ -14,4 +14,12 @@ describe("AdminPage", () => {
       expect(SOURCE).toMatch(/<main[^>]*id="main-content"/);
     });
   });
+
+  describe("a11y: sr-only h1 heading (#421)", () => {
+    it("has a screen-reader-only <h1> with 'Admin Dashboard' text", () => {
+      // The admin page needs a static <h1> for screen readers so the page
+      // has a heading landmark independent of client-side loading state.
+      expect(SOURCE).toMatch(/<h1[^>]*className="sr-only"[^>]*>Admin Dashboard<\/h1>/);
+    });
+  });
 });

@@ -48,6 +48,13 @@ describe("InfoTooltip", () => {
     it("SVG icon has aria-hidden=true", () => {
       expect(SOURCE).toContain('aria-hidden="true"');
     });
+
+    it("focus ring uses ring-2 and ring-amber for visibility (#435)", () => {
+      expect(SOURCE).toContain("focus-visible:ring-2");
+      expect(SOURCE).toContain("focus-visible:ring-amber");
+      // Should not use the weaker ring-1 ring-amber/50
+      expect(SOURCE).not.toContain("ring-amber/50");
+    });
   });
 
   describe("SVG icon conventions", () => {

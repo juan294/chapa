@@ -41,7 +41,7 @@ export function VerifyForm() {
           maxLength={16}
           autoComplete="off"
           spellCheck={false}
-          className="w-full rounded-lg border border-stroke bg-card px-4 py-3 font-heading text-lg tracking-widest text-text-primary placeholder:text-text-secondary/30 focus:border-complement/40 focus-visible:outline-none focus:ring-1 focus:ring-complement/20 transition-colors"
+          className="w-full rounded-lg border border-stroke bg-card px-4 py-3 font-heading text-lg tracking-widest text-text-primary placeholder:text-text-secondary/30 focus:border-complement/40 focus-visible:outline-none focus:ring-1 focus:ring-complement/50 transition-colors"
         />
         {error && (
           <p role="alert" className="mt-2 text-sm text-terminal-red">{error}</p>

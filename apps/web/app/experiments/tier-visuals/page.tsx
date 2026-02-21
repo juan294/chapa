@@ -121,7 +121,7 @@ function tierPillClasses(tier: TierName): string {
     case "High":
       return "bg-amber/10 border-amber/25 text-amber";
     case "Elite":
-      return "tier-elite-pill border-amber/30 text-[#0C0D14] font-bold";
+      return "tier-elite-pill border-amber/30 text-white font-bold";
   }
 }
 
@@ -144,17 +144,17 @@ function SparkleDots() {
   return (
     <>
       <div
-        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#9D8FFF]"
+        className="sparkle-dot absolute w-1 h-1 rounded-full bg-amber-light"
         style={{ top: "12%", right: "8%", animationDelay: "0s" }}
         aria-hidden="true"
       />
       <div
-        className="sparkle-dot absolute w-[3px] h-[3px] rounded-full bg-[#7C6AEF]"
+        className="sparkle-dot absolute w-[3px] h-[3px] rounded-full bg-amber"
         style={{ bottom: "18%", left: "6%", animationDelay: "0.7s" }}
         aria-hidden="true"
       />
       <div
-        className="sparkle-dot absolute w-1 h-1 rounded-full bg-[#9D8FFF]"
+        className="sparkle-dot absolute w-1 h-1 rounded-full bg-amber-light"
         style={{ top: "45%", right: "3%", animationDelay: "1.4s" }}
         aria-hidden="true"
       />
@@ -218,7 +218,7 @@ function BadgeCard({ data, scoreOverride, tierOverride }: BadgeCardProps) {
         )}
 
         {/* Card body */}
-        <div className="relative z-10 rounded-2xl bg-[#13141E] p-4 sm:p-5 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
+        <div className="relative z-10 rounded-2xl bg-card p-4 sm:p-5 w-full aspect-[1200/630] flex flex-col justify-between overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between">
             <span className="font-heading text-[10px] sm:text-xs text-text-secondary truncate">
@@ -371,7 +371,7 @@ function TierTransitionDemo() {
             }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
               currentIndex === i
-                ? "bg-amber text-[#0C0D14]"
+                ? "bg-amber text-white"
                 : "border border-warm-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
             }`}
           >

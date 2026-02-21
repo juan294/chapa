@@ -127,6 +127,14 @@ describe("SharePage", () => {
     });
   });
 
+  // #440 — embed snippet includes both width and height for proper aspect ratio
+  describe("embed snippet dimensions", () => {
+    it("embed HTML includes width=\"600\" and height=\"315\"", () => {
+      expect(SOURCE).toContain('width="600"');
+      expect(SOURCE).toContain('height="315"');
+    });
+  });
+
   // #120 — JSON-LD script injection prevention
   describe("JSON-LD security", () => {
     it("escapes < characters in JSON-LD to prevent script injection", () => {

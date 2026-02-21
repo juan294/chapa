@@ -11,6 +11,7 @@ vi.mock("@/lib/db/users", () => ({
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
+  dbGetLatestSnapshotBatch: vi.fn(() => Promise.resolve(new Map())),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -40,10 +41,37 @@ vi.mock("@/lib/db/verification", () => ({
   dbCleanExpiredVerifications: vi.fn(() => Promise.resolve(0)),
 }));
 
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  updateSnapshotCache: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("@/lib/history/diff", () => ({
+  compareSnapshots: vi.fn(() => ({
+    direction: "stable",
+    adjustedComposite: 0,
+    tier: null,
+    archetype: null,
+  })),
+}));
+
+vi.mock("@/lib/history/significant-change", () => ({
+  isSignificantChange: vi.fn(() => ({ significant: false })),
+}));
+
+vi.mock("@/lib/email/score-bump", () => ({
+  notifyScoreBump: vi.fn(() => Promise.resolve()),
+}));
+
 import { dbGetUsers } from "@/lib/db/users";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import {
+  dbInsertSnapshot,
+  dbGetLatestSnapshotBatch,
+} from "@/lib/db/snapshots";
 import { getStats } from "@/lib/github/client";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { compareSnapshots } from "@/lib/history/diff";
+import { isSignificantChange } from "@/lib/history/significant-change";
+import { notifyScoreBump } from "@/lib/email/score-bump";
 import { GET } from "./route";
 
 const mockedDbGetUsers = vi.mocked(dbGetUsers);
@@ -119,7 +147,9 @@ describe("GET /api/cron/warm-cache", () => {
       const body = await res.json();
 
       expect(body.handles).toHaveLength(3);
-      expect(new Set(body.handles)).toEqual(new Set(["alice", "bob", "charlie"]));
+      expect(new Set(body.handles)).toEqual(
+        new Set(["alice", "bob", "charlie"]),
+      );
     });
 
     it("returns empty results when no users exist", async () => {
@@ -238,6 +268,76 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Parallel processing
+  // ---------------------------------------------------------------------------
+
+  describe("parallel processing", () => {
+    it("processes handles in parallel batches", async () => {
+      const callOrder: string[] = [];
+
+      mockedDbGetUsers.mockResolvedValue(
+        Array.from({ length: 7 }, (_, i) => ({
+          handle: `user${i}`,
+          registeredAt: "2025-01-01",
+        })),
+      );
+
+      mockedGetStats.mockImplementation(async (handle) => {
+        callOrder.push(handle as string);
+        // Small delay to let concurrent calls overlap
+        await new Promise((r) => setTimeout(r, 10));
+        return { handle } as never;
+      });
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      // All 7 handles should have been processed
+      expect(body.warmed).toBe(7);
+      expect(body.failed).toBe(0);
+      expect(callOrder).toHaveLength(7);
+    });
+
+    it("isolates failures across batches — one failure does not block others", async () => {
+      mockedDbGetUsers.mockResolvedValue(
+        Array.from({ length: 8 }, (_, i) => ({
+          handle: `user${i}`,
+          registeredAt: "2025-01-01",
+        })),
+      );
+
+      mockedGetStats.mockImplementation(async (handle) => {
+        if (handle === "user2" || handle === "user6") {
+          throw new Error(`Fetch failed for ${handle}`);
+        }
+        return { handle } as never;
+      });
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      // 8 total - 2 failures = 6 warmed
+      expect(body.warmed).toBe(6);
+      expect(body.failed).toBe(2);
+      expect(body.total).toBe(8);
+    });
+
+    it("uses batch snapshot pre-fetch for efficiency", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+        { handle: "bob", registeredAt: "2025-01-02" },
+      ]);
+
+      mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      // Should use dbGetLatestSnapshotBatch instead of individual calls
+      expect(vi.mocked(dbGetLatestSnapshotBatch)).toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Response shape
   // ---------------------------------------------------------------------------
 
@@ -300,6 +400,172 @@ describe("GET /api/cron/warm-cache", () => {
       const res = await GET(makeRequest("test-cron-secret"));
 
       expect(res.status).toBe(200);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Score bump notifications
+  // ---------------------------------------------------------------------------
+
+  describe("score bump notifications", () => {
+    it("compares snapshot with previous when snapshot is inserted", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
+        new Map([
+          [
+            "alice",
+            {
+              date: "2025-01-01",
+              adjustedComposite: 40,
+            } as never,
+          ],
+        ]),
+      );
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(dbGetLatestSnapshotBatch).toHaveBeenCalled();
+
+      expect(compareSnapshots).toHaveBeenCalled();
+    });
+
+    it("calls notifyScoreBump when change is significant", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
+        new Map([
+          [
+            "alice",
+            {
+              date: "2025-01-01",
+              adjustedComposite: 40,
+            } as never,
+          ],
+        ]),
+      );
+
+      vi.mocked(isSignificantChange).mockReturnValue({
+        significant: true,
+        reason: "score_bump",
+        allReasons: ["score_bump"],
+      });
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(notifyScoreBump).toHaveBeenCalledWith(
+        "alice",
+        expect.any(Object), // diff
+        expect.objectContaining({ significant: true, reason: "score_bump" }),
+      );
+    });
+
+    it("does not call notifyScoreBump when change is not significant", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
+        new Map([
+          [
+            "alice",
+            {
+              date: "2025-01-01",
+              adjustedComposite: 40,
+            } as never,
+          ],
+        ]),
+      );
+
+      vi.mocked(isSignificantChange).mockReturnValue({
+        significant: false,
+      });
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(notifyScoreBump).not.toHaveBeenCalled();
+    });
+
+    it("skips notification when no previous snapshot exists", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(new Map());
+
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(compareSnapshots).not.toHaveBeenCalled();
+      expect(notifyScoreBump).not.toHaveBeenCalled();
+    });
+
+    it("does not fail if notification throws", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
+        new Map([
+          [
+            "alice",
+            {
+              date: "2025-01-01",
+              adjustedComposite: 40,
+            } as never,
+          ],
+        ]),
+      );
+
+      vi.mocked(isSignificantChange).mockReturnValue({
+        significant: true,
+        reason: "tier_change",
+        allReasons: ["tier_change"],
+      });
+      vi.mocked(notifyScoreBump).mockRejectedValue(new Error("Email down"));
+
+      const res = await GET(makeRequest("test-cron-secret"));
+
+      expect(res.status).toBe(200);
+    });
+
+    it("reports notification count in response", async () => {
+      mockedDbGetUsers.mockResolvedValue([
+        { handle: "alice", registeredAt: "2025-01-01" },
+      ]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
+        new Map([
+          [
+            "alice",
+            {
+              date: "2025-01-01",
+              adjustedComposite: 40,
+            } as never,
+          ],
+        ]),
+      );
+
+      vi.mocked(isSignificantChange).mockReturnValue({
+        significant: true,
+        reason: "score_bump",
+        allReasons: ["score_bump"],
+      });
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.notifications).toBe(1);
     });
   });
 });

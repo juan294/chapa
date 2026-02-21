@@ -88,6 +88,7 @@ export function QuickControls({
             <div key={category.key} className="border-t border-stroke/50">
               <button
                 type="button"
+                aria-expanded={isExpanded}
                 onClick={() => setExpandedKey(isExpanded ? null : category.key)}
                 className="flex w-full items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-amber/[0.03]"
               >

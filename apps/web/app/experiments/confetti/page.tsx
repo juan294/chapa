@@ -199,7 +199,7 @@ export default function ConfettiExperimentPage() {
                     onClick={() => setPalette(p)}
                     className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                       palette === p
-                        ? "bg-amber text-warm-bg"
+                        ? "bg-amber text-white"
                         : "border border-warm-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
                     }`}
                   >
@@ -213,7 +213,7 @@ export default function ConfettiExperimentPage() {
             <div className="flex items-end">
               <button
                 onClick={handleReplayAll}
-                className="rounded-full bg-amber px-8 py-3 text-sm font-semibold text-warm-bg hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all w-full"
+                className="rounded-lg bg-amber px-8 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all w-full"
               >
                 Replay All
               </button>
@@ -231,7 +231,7 @@ export default function ConfettiExperimentPage() {
           >
             <button
               onClick={handleSingleBurst}
-              className="rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-warm-bg hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+              className="rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
             >
               Fire Burst
             </button>
@@ -245,7 +245,7 @@ export default function ConfettiExperimentPage() {
           >
             <button
               onClick={handleMultiBurst}
-              className="rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-warm-bg hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+              className="rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
             >
               Fire Multi-Burst
             </button>
@@ -259,7 +259,7 @@ export default function ConfettiExperimentPage() {
           >
             <button
               onClick={handleFireworks}
-              className="rounded-full bg-amber px-6 py-2.5 text-sm font-semibold text-warm-bg hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+              className="rounded-lg bg-amber px-6 py-2.5 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
             >
               Launch Fireworks
             </button>
@@ -273,10 +273,10 @@ export default function ConfettiExperimentPage() {
           >
             <button
               onClick={toggleSparkle}
-              className={`rounded-full px-6 py-2.5 text-sm font-semibold transition-all ${
+              className={`rounded-lg px-6 py-2.5 text-sm font-semibold transition-all ${
                 sparkleActive
-                  ? "bg-amber-dark text-warm-bg hover:bg-amber"
-                  : "bg-amber text-warm-bg hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                  ? "bg-amber-dark text-white hover:bg-amber"
+                  : "bg-amber text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               }`}
             >
               {sparkleActive ? "Stop Sparkle" : "Start Sparkle"}

@@ -1,18 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { AdminUser, SortField, SortDir } from "./admin-types";
 import { sortUsers, formatDate } from "./admin-types";
 import { AdminSearchBar } from "./AdminSearchBar";
 import { AdminStatsCards } from "./AdminStatsCards";
 import { AdminUserTable } from "./AdminUserTable";
-import { AgentsDashboard } from "./agents/agents-dashboard";
+import { AdminTableSkeleton } from "./AdminTableSkeleton";
+import dynamic from "next/dynamic";
+
+const AgentsDashboard = dynamic(
+  () => import("./agents/agents-dashboard").then((m) => ({ default: m.AgentsDashboard })),
+  { ssr: false, loading: () => <div className="animate-pulse p-8">Loading agents...</div> },
+);
+const EngagementDashboard = dynamic(
+  () => import("./engagement/engagement-dashboard").then((m) => ({ default: m.EngagementDashboard })),
+  { ssr: false, loading: () => <div className="animate-pulse p-8">Loading engagement...</div> },
+);
 
 // ---------------------------------------------------------------------------
 // Tab type
 // ---------------------------------------------------------------------------
 
-type AdminTab = "users" | "agents";
+type AdminTab = "users" | "agents" | "engagement";
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -24,6 +34,7 @@ export function AdminDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [sortField, setSortField] = useState<SortField>("adjustedComposite");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +76,7 @@ export function AdminDashboardClient() {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       const tab = detail?.tab as AdminTab | undefined;
-      if (tab === "users" || tab === "agents") setActiveTab(tab);
+      if (tab === "users" || tab === "agents" || tab === "engagement") setActiveTab(tab);
     };
     window.addEventListener("chapa:admin-tab", handler);
     return () => window.removeEventListener("chapa:admin-tab", handler);
@@ -102,14 +113,14 @@ export function AdminDashboardClient() {
   }, [handleSort]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q = deferredSearch.toLowerCase().trim();
     if (!q) return users;
     return users.filter(
       (u) =>
         u.handle.toLowerCase().includes(q) ||
         (u.displayName?.toLowerCase().includes(q) ?? false),
     );
-  }, [users, search]);
+  }, [users, deferredSearch]);
 
   const sorted = useMemo(
     () => sortUsers(filtered, sortField, sortDir),
@@ -136,6 +147,41 @@ export function AdminDashboardClient() {
         : "border-b-2 border-transparent text-text-secondary hover:text-text-primary"
     }`;
 
+  const tabBar = (
+    <div role="tablist" aria-label="Admin sections" className="flex gap-0 border-b border-stroke">
+      <button
+        id="tab-users"
+        role="tab"
+        aria-selected={activeTab === "users"}
+        aria-controls="tabpanel-users"
+        className={tabClasses("users")}
+        onClick={() => setActiveTab("users")}
+      >
+        Users
+      </button>
+      <button
+        id="tab-agents"
+        role="tab"
+        aria-selected={activeTab === "agents"}
+        aria-controls="tabpanel-agents"
+        className={tabClasses("agents")}
+        onClick={() => setActiveTab("agents")}
+      >
+        Agents
+      </button>
+      <button
+        id="tab-engagement"
+        role="tab"
+        aria-selected={activeTab === "engagement"}
+        aria-controls="tabpanel-engagement"
+        className={tabClasses("engagement")}
+        onClick={() => setActiveTab("engagement")}
+      >
+        Engagement
+      </button>
+    </div>
+  );
+
   // -------------------------------------------------------------------------
   // Loading state (users tab only — agents tab has its own)
   // -------------------------------------------------------------------------
@@ -143,18 +189,13 @@ export function AdminDashboardClient() {
   if (loading && activeTab === "users") {
     return (
       <div className="space-y-6">
-        <div className="flex gap-0 border-b border-stroke">
-          <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>Users</button>
-          <button className={tabClasses("agents")} onClick={() => setActiveTab("agents")}>Agents</button>
-        </div>
-        <div className="flex flex-col items-center justify-center gap-4 py-32">
+        {tabBar}
+        <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
           <h1 className="font-heading text-2xl tracking-tight text-text-primary">
             <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
           </h1>
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-stroke border-t-amber" />
-          <p className="font-heading text-sm text-text-secondary">
-            <span className="text-amber">$</span> fetching user data...
-          </p>
+          <span className="sr-only" aria-live="polite">Loading user data</span>
+          <AdminTableSkeleton />
         </div>
       </div>
     );
@@ -167,11 +208,8 @@ export function AdminDashboardClient() {
   if (error && activeTab === "users") {
     return (
       <div className="space-y-6">
-        <div className="flex gap-0 border-b border-stroke">
-          <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>Users</button>
-          <button className={tabClasses("agents")} onClick={() => setActiveTab("agents")}>Agents</button>
-        </div>
-        <div className="mx-auto max-w-lg py-32 text-center">
+        {tabBar}
+        <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="mx-auto max-w-lg py-32 text-center">
           <h1 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
             <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
           </h1>
@@ -198,16 +236,19 @@ export function AdminDashboardClient() {
   return (
     <div className="space-y-6">
       {/* Tab bar */}
-      <div className="flex gap-0 border-b border-stroke">
-        <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>Users</button>
-        <button className={tabClasses("agents")} onClick={() => setActiveTab("agents")}>Agents</button>
-      </div>
+      {tabBar}
 
       {/* Tab content */}
       {activeTab === "agents" ? (
-        <AgentsDashboard />
+        <div role="tabpanel" id="tabpanel-agents" aria-labelledby="tab-agents">
+          <AgentsDashboard />
+        </div>
+      ) : activeTab === "engagement" ? (
+        <div role="tabpanel" id="tabpanel-engagement" aria-labelledby="tab-engagement">
+          <EngagementDashboard />
+        </div>
       ) : (
-        <>
+        <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
           {/* Header */}
           <div className="animate-fade-in-up flex items-start justify-between gap-4">
             <div>
@@ -267,7 +308,7 @@ export function AdminDashboardClient() {
               onSort={handleSort}
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );

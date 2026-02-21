@@ -11,7 +11,14 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
-      include: ["apps/web/lib/**", "packages/shared/**"],
+      reporter: ["text-summary"],
+      include: [
+        "apps/web/lib/**",
+        "apps/web/app/**",
+        "apps/web/components/**",
+        "packages/shared/**",
+      ],
+      exclude: ["**/*.test.*", "**/*.d.ts"],
     },
   },
   resolve: {

@@ -6,6 +6,7 @@ import { computeImpactV4 } from "@/lib/impact/v4";
 import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -63,7 +64,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   const impact = computeImpactV4(stats);
 
   // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
-  dbInsertSnapshot(handle, buildSnapshot(stats, impact)).catch(() => {});
+  const snapshot = buildSnapshot(stats, impact);
+  dbInsertSnapshot(handle, snapshot)
+    .then((inserted) => {
+      if (inserted) updateSnapshotCache(handle, snapshot);
+    })
+    .catch(() => {});
 
   return NextResponse.json({ stats, impact });
 }

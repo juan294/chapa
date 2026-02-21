@@ -164,12 +164,16 @@ describe("agents integration: config → parsing → dashboard data", () => {
 
       const data: AgentsDashboardData = { agents, sharedContext };
 
-      expect(data.agents).toHaveLength(3);
+      expect(data.agents).toHaveLength(7);
       expect(data.sharedContext).toHaveLength(2);
       expect(data.agents.map((a) => a.key)).toEqual([
         "coverage_agent",
         "security_scanner",
         "qa_agent",
+        "performance_agent",
+        "documentation_agent",
+        "cost_analyst",
+        "localization_agent",
       ]);
     });
 
@@ -229,6 +233,10 @@ describe("agents integration: shell scripts and launchd plists", () => {
       coverage_agent: "scripts/coverage-agent.sh",
       security_scanner: "scripts/security-agent.sh",
       qa_agent: "scripts/qa-agent.sh",
+      performance_agent: "scripts/performance-agent.sh",
+      documentation_agent: "scripts/documentation-agent.sh",
+      cost_analyst: "scripts/cost-analyst.sh",
+      localization_agent: "scripts/localization-agent.sh",
     };
     for (const [key, scriptPath] of Object.entries(expected)) {
       const fullPath = path.join(projectRoot, scriptPath);
@@ -244,6 +252,10 @@ describe("agents integration: shell scripts and launchd plists", () => {
       "scripts/launchd/com.chapa.coverage-agent.plist",
       "scripts/launchd/com.chapa.security-agent.plist",
       "scripts/launchd/com.chapa.qa-agent.plist",
+      "scripts/launchd/com.chapa.performance-agent.plist",
+      "scripts/launchd/com.chapa.documentation-agent.plist",
+      "scripts/launchd/com.chapa.cost-analyst.plist",
+      "scripts/launchd/com.chapa.localization-agent.plist",
     ];
     for (const plistPath of expected) {
       const fullPath = path.join(projectRoot, plistPath);
@@ -259,6 +271,10 @@ describe("agents integration: shell scripts and launchd plists", () => {
       coverage_agent: "scripts/coverage-agent.sh",
       security_scanner: "scripts/security-agent.sh",
       qa_agent: "scripts/qa-agent.sh",
+      performance_agent: "scripts/performance-agent.sh",
+      documentation_agent: "scripts/documentation-agent.sh",
+      cost_analyst: "scripts/cost-analyst.sh",
+      localization_agent: "scripts/localization-agent.sh",
     };
     for (const [key, scriptPath] of Object.entries(scripts)) {
       const fullPath = path.join(projectRoot, scriptPath);
@@ -272,6 +288,10 @@ describe("agents integration: shell scripts and launchd plists", () => {
       "scripts/coverage-agent.sh",
       "scripts/security-agent.sh",
       "scripts/qa-agent.sh",
+      "scripts/performance-agent.sh",
+      "scripts/documentation-agent.sh",
+      "scripts/cost-analyst.sh",
+      "scripts/localization-agent.sh",
     ];
     for (const scriptPath of scripts) {
       const fullPath = path.join(projectRoot, scriptPath);
@@ -285,6 +305,10 @@ describe("agents integration: shell scripts and launchd plists", () => {
       "scripts/launchd/com.chapa.coverage-agent.plist",
       "scripts/launchd/com.chapa.security-agent.plist",
       "scripts/launchd/com.chapa.qa-agent.plist",
+      "scripts/launchd/com.chapa.performance-agent.plist",
+      "scripts/launchd/com.chapa.documentation-agent.plist",
+      "scripts/launchd/com.chapa.cost-analyst.plist",
+      "scripts/launchd/com.chapa.localization-agent.plist",
     ];
     for (const plistPath of plists) {
       const fullPath = path.join(projectRoot, plistPath);
@@ -305,12 +329,16 @@ describe("agents integration: shell scripts and launchd plists", () => {
     ).toBe(true);
   });
 
-  it("install-agents.sh references all three plist files", () => {
+  it("install-agents.sh references all seven plist files", () => {
     const fullPath = path.join(projectRoot, "scripts/install-agents.sh");
     const content = fs.readFileSync(fullPath, "utf-8");
     expect(content).toContain("com.chapa.coverage-agent");
     expect(content).toContain("com.chapa.security-agent");
     expect(content).toContain("com.chapa.qa-agent");
+    expect(content).toContain("com.chapa.performance-agent");
+    expect(content).toContain("com.chapa.documentation-agent");
+    expect(content).toContain("com.chapa.cost-analyst");
+    expect(content).toContain("com.chapa.localization-agent");
   });
 });
 

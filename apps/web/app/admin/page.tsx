@@ -26,6 +26,7 @@ export default async function AdminPage() {
     <>
       <Navbar />
       <main id="main-content" className="mx-auto max-w-7xl px-6 pt-24 pb-24">
+        <h1 className="sr-only">Admin Dashboard</h1>
         <AdminDashboardClient />
       </main>
       <GlobalCommandBar isAdmin />

@@ -1,6 +1,8 @@
-# Accepted Risks
+# Accepted Risks & Known Limitations
 
-Documented security and architectural decisions that were evaluated during the pre-launch audit and accepted as reasonable tradeoffs. Each entry references the original GitHub issue for full context.
+> Last reviewed: 2026-02-21 | Audit: v21
+
+Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
 ---
 
@@ -47,6 +49,42 @@ Documented security and architectural decisions that were evaluated during the p
 - **Mitigation:** Admin access requires both a valid authenticated session AND the user's GitHub handle being present in the `ADMIN_HANDLES` environment variable. Component-level protection is functionally equivalent to middleware protection -- unauthorized requests are rejected before any admin data is returned. The admin surface is small (one dashboard page, one API route) and does not handle destructive operations.
 - **Severity:** Low
 - **Future improvement:** Add `middleware.ts` with admin route matching when Next.js middleware stabilizes further or if the admin surface area grows significantly.
+
+## MPL-2.0 / LGPL-3.0 dependency (sharp/libvips) (#450)
+
+- **Risk:** The `sharp` image processing library is MPL-2.0 licensed and depends on `libvips` which is LGPL-3.0 (dynamically linked). Neither is on the project's explicit allowlist (MIT, Apache-2.0, BSD, ISC).
+- **Mitigation:** `sharp` is used by Next.js for image optimization and by `@resvg/resvg-js` for OG image generation — no viable alternative exists. LGPL-3.0 with dynamic linking does not require open-sourcing our code. MPL-2.0 is file-level copyleft only — modifications to MPL-licensed files must be shared, but our own code is unaffected. Both are compatible with our MIT license.
+- **Severity:** Low
+- **Accepted:** 2026-02-21
+
+---
+
+## Infrastructure
+
+## `packages/shared` has no build step (#450)
+
+- **Risk:** The shared types package has no `tsc` build or compiled output.
+- **Mitigation:** Next.js `transpilePackages` handles TypeScript compilation of workspace packages at build time. Adding a separate build step would add complexity and staleness risk without benefit. `pnpm run typecheck` validates the shared package.
+- **Severity:** None
+- **Accepted:** 2026-02-21
+
+## pnpm build warnings (core-js, protobufjs) (#450)
+
+- **Risk:** `pnpm install` shows deprecation warnings for `core-js` and `protobufjs`.
+- **Mitigation:** These are transitive dependencies pulled in by PostHog and other packages. We do not control their version selection. Warnings are cosmetic and do not affect functionality or security. They will resolve when upstream packages update.
+- **Severity:** None
+- **Accepted:** 2026-02-21
+
+---
+
+## Performance
+
+## No per-route bundle size reporting with Turbopack (#450)
+
+- **Risk:** Turbopack (Next.js 16) does not emit per-route "First Load JS" sizes like Webpack did, making it harder to catch per-route size regressions.
+- **Mitigation:** Bundle size is monitored via CI workflows (Dead Code Detection + Bundle Size Analysis). Individual chunks are inspected from `.next/static/chunks/`. The largest chunk is 219KB — well under the 500KB threshold. No route exceeds 300KB.
+- **Severity:** Low
+- **Accepted:** 2026-02-21
 
 ---
 

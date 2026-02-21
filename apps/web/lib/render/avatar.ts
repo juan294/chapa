@@ -21,6 +21,9 @@ export async function fetchAvatarBase64(
   try {
     const parsed = new URL(avatarUrl);
     if (!ALLOWED_AVATAR_HOSTS.has(parsed.hostname)) {
+      // Log rejected URLs for security monitoring (sanitize to prevent log injection)
+      const sanitizedUrl = avatarUrl.replace(/[\n\r]/g, "").slice(0, 200);
+      console.warn("[avatar] rejected non-GitHub URL:", sanitizedUrl);
       return undefined;
     }
     const res = await fetch(avatarUrl, {

@@ -16,6 +16,27 @@ describe("BadgeOverlay (source-reading a11y)", () => {
   });
 });
 
+describe("BadgeOverlay hotspot elements", () => {
+  it("hotspots use <div> with tabIndex to avoid nested <button> hydration error", () => {
+    // Hotspots contain InfoTooltip which renders a <button>. Using <button> for
+    // the hotspot would create nested buttons — invalid HTML that causes React
+    // hydration errors. Use <div tabIndex={0}> instead.
+    const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
+    expect(hotspotSection).toBeDefined();
+    expect(hotspotSection).not.toMatch(/<button[\s\n]/);
+    expect(hotspotSection).toContain("tabIndex={0}");
+    expect(hotspotSection).toContain('role="group"');
+  });
+
+  it("hotspots are keyboard accessible with aria-label", () => {
+    const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
+    expect(hotspotSection).toBeDefined();
+    expect(hotspotSection).toContain("aria-label");
+    expect(hotspotSection).toContain("onFocus");
+    expect(hotspotSection).toContain("onBlur");
+  });
+});
+
 describe("BadgeOverlay hover-reveal behavior", () => {
   it("uses group/badge on the container for hover-reveal", () => {
     // The parent container needs group/badge so child info icons
@@ -155,6 +176,12 @@ describe("BadgeOverlay aria-describedby resolves to visible content (#363)", () 
     // Verify the linkage exists — hotspots reference panels via aria-describedby
     expect(SRC).toContain("aria-describedby");
     expect(SRC).toContain("-panel");
+  });
+
+  it("aria-describedby is only set when the panel is rendered (active hotspot)", () => {
+    // The panel only exists on desktop when the hotspot is active.
+    // aria-describedby should be conditional to avoid referencing a non-existent element.
+    expect(SRC).toMatch(/aria-describedby=\{activeLeaderLine === hotspot\.id/);
   });
 });
 

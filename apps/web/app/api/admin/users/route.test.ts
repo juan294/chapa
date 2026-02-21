@@ -27,11 +27,26 @@ vi.mock("@/lib/impact/v4", () => ({
   computeImpactV4: vi.fn(),
 }));
 
+vi.mock("@/lib/impact/smoothing", () => ({
+  applyEMA: vi.fn(),
+}));
+
+vi.mock("@/lib/impact/utils", () => ({
+  getTier: vi.fn(),
+}));
+
+vi.mock("@/lib/db/snapshots", () => ({
+  dbGetLatestSnapshotBatch: vi.fn(),
+}));
+
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { cacheMGet, rateLimit } from "@/lib/cache/redis";
 import { dbGetUsers } from "@/lib/db/users";
 import { computeImpactV4 } from "@/lib/impact/v4";
+import { applyEMA } from "@/lib/impact/smoothing";
+import { getTier } from "@/lib/impact/utils";
+import { dbGetLatestSnapshotBatch } from "@/lib/db/snapshots";
 
 const MOCK_STATS = {
   handle: "testuser",
@@ -95,6 +110,10 @@ beforeEach(() => {
     .mockResolvedValueOnce([MOCK_STATS])            // primary stats
     .mockResolvedValueOnce([null]);                  // stale stats (not needed)
   vi.mocked(computeImpactV4).mockReturnValue(MOCK_IMPACT);
+  // EMA smoothing: by default, batch returns empty map → raw score passes through
+  vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(new Map());
+  vi.mocked(applyEMA).mockImplementation((current) => Math.round(current));
+  vi.mocked(getTier).mockReturnValue("Solid");
 });
 
 describe("GET /api/admin/users", () => {
@@ -221,5 +240,67 @@ describe("GET /api/admin/users", () => {
     expect(user).toHaveProperty("reposContributed");
     expect(user).toHaveProperty("totalStars");
     expect(user).toHaveProperty("confidence");
+  });
+
+  describe("EMA smoothing", () => {
+    it("applies EMA smoothing using previous snapshot from batch", async () => {
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
+        new Map([["testuser", { adjustedComposite: 50 } as never]]),
+      );
+      // applyEMA(65, 50) with alpha=0.15 → round(0.15*65 + 0.85*50) = round(52.25) = 52
+      vi.mocked(applyEMA).mockReturnValue(52);
+      vi.mocked(getTier).mockReturnValue("Emerging");
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(applyEMA).toHaveBeenCalledWith(65, 50);
+      expect(getTier).toHaveBeenCalledWith(52);
+      expect(body.users[0].adjustedComposite).toBe(52);
+      expect(body.users[0].tier).toBe("Emerging");
+    });
+
+    it("passes null to applyEMA when handle absent from batch Map", async () => {
+      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(new Map());
+      vi.mocked(applyEMA).mockReturnValue(65);
+      vi.mocked(getTier).mockReturnValue("Solid");
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(applyEMA).toHaveBeenCalledWith(65, null);
+      expect(body.users[0].adjustedComposite).toBe(65);
+    });
+
+    it("calls batch once with all stat-having handles", async () => {
+      vi.mocked(dbGetUsers).mockResolvedValue([
+        { handle: "user1", registeredAt: "2025-06-01T00:00:00Z" },
+        { handle: "user2", registeredAt: "2025-05-01T00:00:00Z" },
+      ]);
+      vi.mocked(cacheMGet)
+        .mockReset()
+        .mockResolvedValueOnce([MOCK_STATS, { ...MOCK_STATS, handle: "user2" }])
+        .mockResolvedValueOnce([null, null]);
+
+      await GET(makeRequest());
+
+      expect(dbGetLatestSnapshotBatch).toHaveBeenCalledTimes(1);
+      expect(dbGetLatestSnapshotBatch).toHaveBeenCalledWith(["user1", "user2"]);
+    });
+
+    it("does not include handles without stats in batch call", async () => {
+      vi.mocked(dbGetUsers).mockResolvedValue([
+        { handle: "nostats", registeredAt: "2025-06-01T00:00:00Z" },
+      ]);
+      vi.mocked(cacheMGet)
+        .mockReset()
+        .mockResolvedValueOnce([null])
+        .mockResolvedValueOnce([null]);
+
+      await GET(makeRequest());
+
+      // Batch is still called but with empty array (short-circuits internally)
+      expect(dbGetLatestSnapshotBatch).toHaveBeenCalledWith([]);
+    });
   });
 });

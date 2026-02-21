@@ -12,5 +12,11 @@ describe("VerifyForm", () => {
     it("has role='alert' on the error message", () => {
       expect(SOURCE).toContain('role="alert"');
     });
+
+    it("focus ring on input has sufficient opacity (#435)", () => {
+      // ring-complement/50 provides better visibility than /20
+      expect(SOURCE).toContain("ring-complement/50");
+      expect(SOURCE).not.toContain("ring-complement/20");
+    });
   });
 });

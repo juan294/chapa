@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks for cache layer (used by getAvatarBase64 tests)
@@ -107,8 +107,16 @@ describe("fetchAvatarBase64", () => {
 });
 
 describe("fetchAvatarBase64 — SSRF prevention", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Silence expected console.warn from SSRF rejection code path
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
   });
 
   it("rejects URLs from non-allowed hosts", async () => {
@@ -143,6 +151,14 @@ describe("fetchAvatarBase64 — SSRF prevention", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     await fetchAvatarBase64("https://evil.com/avatar.png");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("logs a warning when a non-GitHub URL is rejected", async () => {
+    await fetchAvatarBase64("https://evil.com/avatar.png");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[avatar] rejected non-GitHub URL:",
+      expect.stringContaining("evil.com"),
+    );
   });
 });
 
@@ -221,6 +237,9 @@ describe("getAvatarBase64", () => {
   });
 
   it("returns undefined when avatar host is not allowed (no cache write)", async () => {
+    // Silence expected console.warn from SSRF rejection code path
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     mockCacheGet.mockResolvedValue(null);
 
     const result = await getAvatarBase64(
@@ -230,5 +249,7 @@ describe("getAvatarBase64", () => {
 
     expect(result).toBeUndefined();
     expect(mockCacheSet).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 });

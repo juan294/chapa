@@ -108,6 +108,7 @@ Must be easy to swap/remove:
 - Prefer pure functions for scoring & rendering.
 - Escape/encode any user-controlled text in SVG (handle, display name).
 - Handle GitHub rate limit errors gracefully (serve cached or show "try later").
+- **Accepted risks**: See `docs/accepted-risks.md` for formally documented design decisions and known limitations. Items in that file are intentional and should not be flagged as audit warnings.
 
 ## Deployment
 - Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
@@ -212,6 +213,7 @@ NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (o
 
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)
+ALLOW_AGENT_RUN=               # Set to "true" to allow /api/admin/agents/run endpoint (optional, disabled by default)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
 

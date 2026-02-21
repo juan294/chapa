@@ -877,6 +877,10 @@ This section documents the concrete Chapa implementation of the template above.
 | Coverage Agent | `coverage_agent` | Daily at 2:00 AM | `docs/agents/coverage-report.md` |
 | Security Scanner | `security_scanner` | Weekly Monday 9:00 AM | `docs/agents/security-report.md` |
 | QA Agent | `qa_agent` | Weekly Wednesday 9:00 AM | `docs/agents/qa-report.md` |
+| Performance Agent | `performance_agent` | Weekly Thursday 9:00 AM | `docs/agents/performance-report.md` |
+| Documentation Agent | `documentation_agent` | Weekly Friday 9:00 AM | `docs/agents/documentation-report.md` |
+| Cost Analyst | `cost_analyst` | Daily at 3:00 AM | `docs/agents/cost-analyst-report.md` |
+| Localization Agent | `localization_agent` | Weekly Saturday 9:00 AM | `docs/agents/localization-report.md` |
 
 ### File Locations
 
@@ -885,6 +889,10 @@ scripts/
   coverage-agent.sh             # Coverage agent shell script
   security-agent.sh             # Security scanner shell script
   qa-agent.sh                   # QA agent shell script
+  performance-agent.sh          # Performance agent shell script
+  documentation-agent.sh        # Documentation agent shell script
+  cost-analyst.sh               # Cost analyst shell script
+  localization-agent.sh         # Localization agent shell script
   install-agents.sh             # launchd installation helper
   lib/
     agent-utils.sh              # Shared bash utilities
@@ -893,6 +901,10 @@ scripts/
     com.chapa.coverage-agent.plist
     com.chapa.security-agent.plist
     com.chapa.qa-agent.plist
+    com.chapa.performance-agent.plist
+    com.chapa.documentation-agent.plist
+    com.chapa.cost-analyst.plist
+    com.chapa.localization-agent.plist
 
 apps/web/
   lib/agents/
