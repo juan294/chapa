@@ -16,22 +16,24 @@ describe("BadgeOverlay (source-reading a11y)", () => {
   });
 });
 
-describe("BadgeOverlay hotspot elements (#433)", () => {
-  it("hotspots use <button> elements instead of <div tabIndex>", () => {
-    // Interactive hotspots should be native buttons for keyboard and screen reader support
+describe("BadgeOverlay hotspot elements", () => {
+  it("hotspots use <div> with tabIndex to avoid nested <button> hydration error", () => {
+    // Hotspots contain InfoTooltip which renders a <button>. Using <button> for
+    // the hotspot would create nested buttons — invalid HTML that causes React
+    // hydration errors. Use <div tabIndex={0}> instead.
     const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
     expect(hotspotSection).toBeDefined();
-    expect(hotspotSection).toContain("<button");
-    expect(hotspotSection).toContain('type="button"');
-    // Should not use tabIndex on divs for interactivity
-    expect(hotspotSection).not.toContain("tabIndex={0}");
+    expect(hotspotSection).not.toMatch(/<button[\s\n]/);
+    expect(hotspotSection).toContain("tabIndex={0}");
+    expect(hotspotSection).toContain('role="group"');
   });
 
-  it("hotspot buttons have reset styles (no default button appearance)", () => {
-    expect(SRC).toContain("bg-transparent");
-    expect(SRC).toContain("border-0");
-    expect(SRC).toContain("p-0");
-    expect(SRC).toContain("cursor-pointer");
+  it("hotspots are keyboard accessible with aria-label", () => {
+    const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
+    expect(hotspotSection).toBeDefined();
+    expect(hotspotSection).toContain("aria-label");
+    expect(hotspotSection).toContain("onFocus");
+    expect(hotspotSection).toContain("onBlur");
   });
 });
 

@@ -308,10 +308,11 @@ export function BadgeOverlay() {
 
       {/* ── Hotspot regions ── */}
       {HOTSPOTS.map((hotspot) => (
-        <button
+        <div
           key={hotspot.id}
-          type="button"
-          className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 bg-transparent border-0 p-0 cursor-pointer appearance-none"
+          role="group"
+          tabIndex={0}
+          className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber"
           style={{
             top: hotspot.top,
             left: hotspot.left,
@@ -332,7 +333,7 @@ export function BadgeOverlay() {
             position={hotspot.position}
             className={`opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 md:hidden`}
           />
-        </button>
+        </div>
       ))}
     </div>
   );
