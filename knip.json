@@ -11,12 +11,7 @@
         "postcss",
         "postcss-load-config"
       ],
-      "ignore": [
-        "lib/analytics/posthog.ts",
-        "app/experiments/**",
-        "lib/history/history.ts",
-        "lib/history/diff.ts"
-      ]
+      "ignore": []
     }
   }
 }

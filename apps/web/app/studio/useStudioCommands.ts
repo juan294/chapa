@@ -151,7 +151,7 @@ export function useStudioCommands({
             makeLine("success", `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`),
             makeLine("dim", ""),
             makeLine("info", "HTML:"),
-            makeLine("success", `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge" width="600" />`),
+            makeLine("success", `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge" width="600" height="315" />`),
           ],
         }),
       },

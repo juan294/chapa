@@ -120,7 +120,7 @@ export default async function SharePage({ params }: SharePageProps) {
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
-  const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" />`;
+  const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" height="315" />`;
 
   const displayLabel = stats?.displayName ?? handle;
 
@@ -314,6 +314,8 @@ export default async function SharePage({ params }: SharePageProps) {
                 <span className="text-amber/70">{`"Chapa Badge for ${handle}"`}</span>
                 <span className="text-text-secondary">{" width="}</span>
                 <span className="text-amber/70">{'"600"'}</span>
+                <span className="text-text-secondary">{" height="}</span>
+                <span className="text-amber/70">{'"315"'}</span>
                 <span className="text-amber">{" />"}</span>
               </p>
             </div>
