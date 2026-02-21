@@ -108,6 +108,7 @@ Must be easy to swap/remove:
 - Prefer pure functions for scoring & rendering.
 - Escape/encode any user-controlled text in SVG (handle, display name).
 - Handle GitHub rate limit errors gracefully (serve cached or show "try later").
+- **Accepted risks**: See `docs/accepted-risks.md` for formally documented design decisions and known limitations. Items in that file are intentional and should not be flagged as audit warnings.
 
 ## Deployment
 - Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
