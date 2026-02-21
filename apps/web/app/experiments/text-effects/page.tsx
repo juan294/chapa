@@ -102,9 +102,9 @@ function EffectText({
 
 function EffectCard({ info }: { info: EffectInfo }) {
   return (
-    <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E] p-8 flex flex-col items-center text-center gap-5 transition-colors hover:border-[rgba(124,106,239,0.2)] hover:bg-[#13141E]">
+    <div className="rounded-2xl border border-stroke bg-card p-8 flex flex-col items-center text-center gap-5 transition-colors hover:border-amber/20 hover:bg-card">
       {/* Effect name label */}
-      <p className="text-[#9AA4B2] text-xs tracking-widest uppercase font-semibold">
+      <p className="text-text-secondary text-xs tracking-widest uppercase font-semibold">
         {info.label}
       </p>
 
@@ -133,7 +133,7 @@ function EffectCard({ info }: { info: EffectInfo }) {
       </EffectText>
 
       {/* Description */}
-      <p className="text-[#9AA4B2] text-sm leading-relaxed mt-2">
+      <p className="text-text-secondary text-sm leading-relaxed mt-2">
         {info.description}
       </p>
     </div>
@@ -157,13 +157,13 @@ function ComparisonSection() {
       {compared.map(({ label, effect }) => (
         <div
           key={label}
-          className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E] p-6 flex flex-col items-center text-center gap-3"
+          className="rounded-2xl border border-stroke bg-card p-6 flex flex-col items-center text-center gap-3"
         >
-          <p className="text-[#9AA4B2] text-xs tracking-widest uppercase font-semibold">
+          <p className="text-text-secondary text-xs tracking-widest uppercase font-semibold">
             {label}
           </p>
           {effect === "plain" ? (
-            <span className="font-heading text-5xl font-extrabold tracking-tight leading-none text-[#E6EDF3]">
+            <span className="font-heading text-5xl font-extrabold tracking-tight leading-none text-text-primary">
               87
             </span>
           ) : (
@@ -175,7 +175,7 @@ function ComparisonSection() {
             </EffectText>
           )}
           {effect === "plain" ? (
-            <span className="font-heading text-sm font-bold tracking-wide text-[#E6EDF3]">
+            <span className="font-heading text-sm font-bold tracking-wide text-text-primary">
               Elite
             </span>
           ) : (
@@ -198,12 +198,12 @@ function ComparisonSection() {
 
 function ApplicationPreview() {
   return (
-    <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E] p-8 sm:p-10 max-w-xl mx-auto">
+    <div className="rounded-2xl border border-stroke bg-card p-8 sm:p-10 max-w-xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[rgba(124,106,239,0.15)] flex items-center justify-center">
-            <span className="font-heading text-sm font-bold text-[#7C6AEF]">
+          <div className="w-10 h-10 rounded-full bg-amber/15 flex items-center justify-center">
+            <span className="font-heading text-sm font-bold text-amber">
               C
             </span>
           </div>
@@ -214,7 +214,7 @@ function ApplicationPreview() {
             >
               @devhero
             </EffectText>
-            <p className="text-[#9AA4B2] text-xs">Dev Impact Badge</p>
+            <p className="text-text-secondary text-xs">Dev Impact Badge</p>
           </div>
         </div>
         <EffectText
@@ -247,12 +247,12 @@ function ApplicationPreview() {
           const intensity = pseudoRandom(i + 87);
           const bg =
             intensity > 0.7
-              ? "bg-[#7C6AEF]"
+              ? "bg-amber"
               : intensity > 0.4
-                ? "bg-[rgba(124,106,239,0.4)]"
+                ? "bg-amber/40"
                 : intensity > 0.15
-                  ? "bg-[rgba(124,106,239,0.15)]"
-                  : "bg-[rgba(124,106,239,0.04)]";
+                  ? "bg-amber/15"
+                  : "bg-amber/[0.04]";
           return (
             <div
               key={i}
@@ -305,8 +305,8 @@ function EffectSelector({
         onClick={() => onChange(null)}
         className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
           active === null
-            ? "bg-[#7C6AEF] text-[#0C0D14]"
-            : "border border-[rgba(124,106,239,0.12)] text-[#9AA4B2] hover:border-[rgba(124,106,239,0.2)] hover:text-[#E6EDF3]"
+            ? "bg-amber text-white"
+            : "border border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
         }`}
       >
         All
@@ -317,8 +317,8 @@ function EffectSelector({
           onClick={() => onChange(e.key)}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
             active === e.key
-              ? "bg-[#7C6AEF] text-[#0C0D14]"
-              : "border border-[rgba(124,106,239,0.12)] text-[#9AA4B2] hover:border-[rgba(124,106,239,0.2)] hover:text-[#E6EDF3]"
+              ? "bg-amber text-white"
+              : "border border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
           }`}
         >
           {e.label}
@@ -496,27 +496,27 @@ export default function TextEffectsExperimentPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#0C0D14] bg-grid-warm">
+      <div className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div
-          className="pointer-events-none fixed top-1/4 left-1/3 h-[500px] w-[500px] rounded-full bg-[rgba(124,106,239,0.03)] blur-[150px]"
+          className="pointer-events-none fixed top-1/4 left-1/3 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]"
           aria-hidden="true"
         />
         <div
-          className="pointer-events-none fixed bottom-1/3 right-1/4 h-[400px] w-[400px] rounded-full bg-[rgba(124,106,239,0.04)] blur-[120px]"
+          className="pointer-events-none fixed bottom-1/3 right-1/4 h-[400px] w-[400px] rounded-full bg-amber/[0.04] blur-[120px]"
           aria-hidden="true"
         />
 
         <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
           {/* ── Hero ─────────────────────────────────────────── */}
           <header className="mb-20 text-center animate-fade-in-up">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
+            <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
               Experiment #53
             </p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-[#E6EDF3] tracking-tight mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold font-heading text-text-primary tracking-tight mb-6">
               Premium Material Text Effects
             </h1>
-            <p className="text-[#9AA4B2] text-lg leading-relaxed max-w-2xl mx-auto mb-12">
+            <p className="text-text-secondary text-lg leading-relaxed max-w-2xl mx-auto mb-12">
               Embossed, chrome, gold leaf, sparkle -- making text look crafted
               and luxurious on the dark background. Pure CSS, no JavaScript
               dependencies.
@@ -561,13 +561,13 @@ export default function TextEffectsExperimentPage() {
 
           {/* ── Comparison ───────────────────────────────────── */}
           <section className="mb-20 animate-fade-in-up [animation-delay:400ms]">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
+            <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
               Comparison
             </p>
-            <h2 className="text-xl sm:text-2xl font-bold font-heading text-[#E6EDF3] tracking-tight mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mb-2">
               Plain vs. Effects
             </h2>
-            <p className="text-[#9AA4B2] text-sm leading-relaxed mb-8 max-w-2xl">
+            <p className="text-text-secondary text-sm leading-relaxed mb-8 max-w-2xl">
               Side by side comparison showing how material effects elevate
               otherwise flat text. Each effect adds depth and character.
             </p>
@@ -576,13 +576,13 @@ export default function TextEffectsExperimentPage() {
 
           {/* ── Application Preview ──────────────────────────── */}
           <section className="mb-20 animate-fade-in-up [animation-delay:500ms]">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-semibold">
+            <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
               Application
             </p>
-            <h2 className="text-xl sm:text-2xl font-bold font-heading text-[#E6EDF3] tracking-tight mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mb-2">
               Badge Mockup
             </h2>
-            <p className="text-[#9AA4B2] text-sm leading-relaxed mb-8 max-w-2xl">
+            <p className="text-text-secondary text-sm leading-relaxed mb-8 max-w-2xl">
               How the effects look when applied to an actual badge card. Score
               in gold shimmer, tier in gold leaf, section labels embossed, stats
               in neon glow.
@@ -591,38 +591,38 @@ export default function TextEffectsExperimentPage() {
           </section>
 
           {/* ── Implementation Notes ─────────────────────────── */}
-          <footer className="rounded-xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/40 p-6 animate-fade-in-up [animation-delay:600ms]">
-            <h3 className="font-heading text-sm font-semibold text-[#7C6AEF]">
+          <footer className="rounded-xl border border-stroke bg-card/40 p-6 animate-fade-in-up [animation-delay:600ms]">
+            <h3 className="font-heading text-sm font-semibold text-amber">
               Implementation Notes
             </h3>
-            <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-[#9AA4B2]">
+            <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-text-secondary">
               <li>
-                All effects are <strong className="text-[#E6EDF3]/70">pure CSS</strong> --
+                All effects are <strong className="text-text-primary/70">pure CSS</strong> --
                 no JavaScript needed for rendering.
               </li>
               <li>
                 Gradient-based effects (gold leaf, chrome, shimmer) use{" "}
-                <code className="text-[#E6EDF3]/70">background-clip: text</code>{" "}
+                <code className="text-text-primary/70">background-clip: text</code>{" "}
                 with{" "}
-                <code className="text-[#E6EDF3]/70">
+                <code className="text-text-primary/70">
                   -webkit-text-fill-color: transparent
                 </code>
                 .
               </li>
               <li>
                 Embossed/debossed effects use directional{" "}
-                <code className="text-[#E6EDF3]/70">text-shadow</code> to
+                <code className="text-text-primary/70">text-shadow</code> to
                 simulate depth on the{" "}
-                <code className="text-[#E6EDF3]/70">#13141E</code> surface.
+                <code className="text-text-primary/70">#13141E</code> surface.
               </li>
               <li>
                 Sparkle uses{" "}
-                <code className="text-[#E6EDF3]/70">::before</code> and{" "}
-                <code className="text-[#E6EDF3]/70">::after</code>{" "}
+                <code className="text-text-primary/70">::before</code> and{" "}
+                <code className="text-text-primary/70">::after</code>{" "}
                 pseudo-elements with rotating pulse animation.
               </li>
               <li>
-                <code className="text-[#E6EDF3]/70">
+                <code className="text-text-primary/70">
                   prefers-reduced-motion
                 </code>{" "}
                 disables shimmer and sparkle animations, showing static
@@ -630,16 +630,16 @@ export default function TextEffectsExperimentPage() {
               </li>
               <li>
                 All text remains readable on the{" "}
-                <code className="text-[#E6EDF3]/70">#0C0D14</code> background.
+                <code className="text-text-primary/70">#0C0D14</code> background.
                 Effects enhance without sacrificing legibility.
               </li>
             </ul>
           </footer>
 
           {/* Footer marker */}
-          <p className="text-center text-[#9AA4B2] text-sm mt-12">
+          <p className="text-center text-text-secondary text-sm mt-12">
             Experiment #53 &middot;{" "}
-            <span className="text-[#7C6AEF] font-medium">
+            <span className="text-amber font-medium">
               Pure CSS text effects
             </span>{" "}
             &middot; prefers-reduced-motion supported

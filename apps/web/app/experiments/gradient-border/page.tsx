@@ -14,7 +14,7 @@ import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
 
 function MockBadgeCard() {
   return (
-    <div className="relative z-10 rounded-2xl bg-[#13141E] p-6 sm:p-8 w-full aspect-[1200/630] overflow-hidden">
+    <div className="relative z-10 rounded-2xl bg-card p-6 sm:p-8 w-full aspect-[1200/630] overflow-hidden">
       <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
   );

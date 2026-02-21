@@ -287,7 +287,7 @@ function EasingPreview({
   const counter = useAnimatedCounter(target, duration, name, true);
 
   return (
-    <div className="rounded-xl border border-warm-stroke bg-[#0d0b08] p-4 text-center">
+    <div className="rounded-xl border border-warm-stroke bg-dark-section p-4 text-center">
       <span className="font-heading text-2xl font-bold text-amber sm:text-3xl">
         {counter.value}
       </span>
@@ -377,7 +377,7 @@ function StatCard({
   }, [inView, counter, stat.delay]);
 
   return (
-    <div className="rounded-xl border border-warm-stroke bg-[#0d0b08] p-6 text-center transition-all hover:border-amber/20 hover:bg-warm-card">
+    <div className="rounded-xl border border-warm-stroke bg-dark-section p-6 text-center transition-all hover:border-amber/20 hover:bg-warm-card">
       <span className="font-heading text-4xl font-bold text-amber sm:text-5xl">
         {counter.value}
       </span>
@@ -440,7 +440,7 @@ function ConfidenceSection({
         </div>
 
         {/* Track */}
-        <div className="h-4 overflow-hidden rounded-full bg-[#0d0b08] border border-warm-stroke">
+        <div className="h-4 overflow-hidden rounded-full bg-dark-section border border-warm-stroke">
           {/* Fill */}
           <div
             className="h-full rounded-full transition-none"
@@ -555,7 +555,7 @@ function ControlsSection({
               const v = Number(e.target.value);
               if (v >= 1 && v <= 9999) setTarget(v);
             }}
-            className="font-heading w-full rounded-lg border border-warm-stroke bg-[#0d0b08] px-4 py-2.5 text-lg text-text-primary outline-none transition-colors focus:border-amber"
+            className="font-heading w-full rounded-lg border border-warm-stroke bg-dark-section px-4 py-2.5 text-lg text-text-primary outline-none transition-colors focus:border-amber"
           />
         </div>
       </div>
@@ -564,7 +564,7 @@ function ControlsSection({
       <div className="mt-10 flex justify-center">
         <button
           onClick={onReplayAll}
-          className="flex items-center gap-2 rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+          className="flex items-center gap-2 rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
         >
           <ReplayIcon />
           Replay All
