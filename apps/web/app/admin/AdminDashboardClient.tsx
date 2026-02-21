@@ -7,8 +7,16 @@ import { AdminSearchBar } from "./AdminSearchBar";
 import { AdminStatsCards } from "./AdminStatsCards";
 import { AdminUserTable } from "./AdminUserTable";
 import { AdminTableSkeleton } from "./AdminTableSkeleton";
-import { AgentsDashboard } from "./agents/agents-dashboard";
-import { EngagementDashboard } from "./engagement/engagement-dashboard";
+import dynamic from "next/dynamic";
+
+const AgentsDashboard = dynamic(
+  () => import("./agents/agents-dashboard").then((m) => ({ default: m.AgentsDashboard })),
+  { ssr: false, loading: () => <div className="animate-pulse p-8">Loading agents...</div> },
+);
+const EngagementDashboard = dynamic(
+  () => import("./engagement/engagement-dashboard").then((m) => ({ default: m.EngagementDashboard })),
+  { ssr: false, loading: () => <div className="animate-pulse p-8">Loading engagement...</div> },
+);
 
 // ---------------------------------------------------------------------------
 // Tab type
