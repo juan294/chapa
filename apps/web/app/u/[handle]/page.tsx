@@ -2,7 +2,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
-import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import { ImpactBreakdown, getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
@@ -107,7 +107,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
   // V5: Apply EMA smoothing using previous day's snapshot
   if (impact) {
-    const latestSnapshot = await dbGetLatestSnapshot(handle);
+    const latestSnapshot = await getCachedLatestSnapshot(handle);
     const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
     impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
     impact.tier = getTier(impact.adjustedComposite);

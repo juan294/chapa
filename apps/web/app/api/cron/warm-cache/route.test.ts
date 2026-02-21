@@ -41,6 +41,10 @@ vi.mock("@/lib/db/verification", () => ({
   dbCleanExpiredVerifications: vi.fn(() => Promise.resolve(0)),
 }));
 
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  updateSnapshotCache: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("@/lib/history/diff", () => ({
   compareSnapshots: vi.fn(() => ({
     direction: "stable",
@@ -425,6 +429,7 @@ describe("GET /api/cron/warm-cache", () => {
       await GET(makeRequest("test-cron-secret"));
 
       expect(dbGetLatestSnapshotBatch).toHaveBeenCalled();
+
       expect(compareSnapshots).toHaveBeenCalled();
     });
 
@@ -445,6 +450,7 @@ describe("GET /api/cron/warm-cache", () => {
           ],
         ]),
       );
+
       vi.mocked(isSignificantChange).mockReturnValue({
         significant: true,
         reason: "score_bump",
@@ -477,6 +483,7 @@ describe("GET /api/cron/warm-cache", () => {
           ],
         ]),
       );
+
       vi.mocked(isSignificantChange).mockReturnValue({
         significant: false,
       });
@@ -493,6 +500,7 @@ describe("GET /api/cron/warm-cache", () => {
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
       vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(new Map());
+
 
       await GET(makeRequest("test-cron-secret"));
 
@@ -517,6 +525,7 @@ describe("GET /api/cron/warm-cache", () => {
           ],
         ]),
       );
+
       vi.mocked(isSignificantChange).mockReturnValue({
         significant: true,
         reason: "tier_change",
@@ -546,6 +555,7 @@ describe("GET /api/cron/warm-cache", () => {
           ],
         ]),
       );
+
       vi.mocked(isSignificantChange).mockReturnValue({
         significant: true,
         reason: "score_bump",

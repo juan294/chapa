@@ -46,6 +46,11 @@ vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
 }));
 
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  getCachedLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+  updateSnapshotCache: vi.fn(() => Promise.resolve()),
+}));
+
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";

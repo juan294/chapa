@@ -5,6 +5,7 @@ import {
   dbInsertSnapshot,
   dbGetLatestSnapshotBatch,
 } from "@/lib/db/snapshots";
+import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { buildSnapshot } from "@/lib/history/snapshot";
@@ -172,6 +173,8 @@ async function warmHandle(
       const recorded = await dbInsertSnapshot(handle, snapshot);
       if (recorded) {
         snapshotRecorded = true;
+        // Update snapshot cache so subsequent reads hit Redis
+        await updateSnapshotCache(handle, snapshot).catch(() => {});
 
         // Score bump notification: compare new vs previous snapshot
         if (previousSnapshot) {

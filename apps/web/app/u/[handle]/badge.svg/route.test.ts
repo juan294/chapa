@@ -77,7 +77,11 @@ vi.mock("@/lib/history/snapshot", () => ({
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
-  dbGetLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+}));
+
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  getCachedLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+  updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/impact/smoothing", () => ({
