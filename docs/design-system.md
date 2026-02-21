@@ -170,4 +170,4 @@ Defined in `globals.css`:
 - Add ambient glow blurs on dark backgrounds (invisible, wastes DOM).
 - Use `text-warm-bg` for button text — use `text-white` instead.
 - Touch badge SVG theme — it stays dark as an independent embeddable asset.
-- Use `rounded-full` for primary buttons — use `rounded-lg` instead.
+- Use `rounded-full` for text/CTA buttons — use `rounded-lg` instead. Exception: icon-only buttons (dismiss, info trigger, avatar) may use `rounded-full`.

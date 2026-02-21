@@ -1,6 +1,7 @@
 export default function SharePageLoading() {
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
+    <main id="main-content" className="min-h-screen bg-bg" role="status" aria-label="Loading">
+      <span className="sr-only">Loading...</span>
       <div className="relative mx-auto max-w-4xl px-6 py-16">
         {/* Header skeleton */}
         <div className="mb-12">

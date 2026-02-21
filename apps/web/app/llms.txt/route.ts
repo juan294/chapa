@@ -40,7 +40,7 @@ Markdown:
 
 HTML:
 \`\`\`
-<img src="https://chapa.thecreativetoken.com/u/{handle}/badge.svg" alt="Chapa Impact Badge" width="600" />
+<img src="https://chapa.thecreativetoken.com/u/{handle}/badge.svg" alt="Chapa Impact Badge" width="600" height="315" />
 \`\`\`
 
 ## Related Keywords
