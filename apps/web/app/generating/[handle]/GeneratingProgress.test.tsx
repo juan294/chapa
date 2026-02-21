@@ -73,6 +73,11 @@ describe("GeneratingProgress", () => {
     it("has role='alert' on the error message container", () => {
       expect(SOURCE).toContain('role="alert"');
     });
+
+    it("wraps content in a main landmark with skip-link target (#456)", () => {
+      expect(SOURCE).toContain("<main");
+      expect(SOURCE).toContain('id="main-content"');
+    });
   });
 
   describe("design system compliance", () => {

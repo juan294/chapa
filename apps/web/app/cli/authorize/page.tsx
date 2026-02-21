@@ -13,7 +13,7 @@ export default async function CliAuthorizePage({ searchParams }: Props) {
 
   if (!sessionId) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-bg px-6">
+      <main id="main-content" className="flex min-h-screen items-center justify-center bg-bg px-6">
         <div className="w-full max-w-md rounded-xl border border-stroke bg-card p-8">
           <h1 className="font-heading text-xl font-bold text-text-primary mb-4">
             Authorize Chapa CLI
