@@ -22,7 +22,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-bg` | `#0A0A0F` | `#FFFFFF` | `bg-bg` | Page background |
 | `--color-card` | `#111118` | `#F9FAFB` | `bg-card` | Card/panel surfaces |
 | `--color-text-primary` | `#E2E4E9` | `#1A1A2E` | `text-text-primary` | Headings, body text |
-| `--color-text-secondary` | `#6B6F7B` | `#6B7280` | `text-text-secondary` | Muted text, labels |
+| `--color-text-secondary` | `#8B8FA0` | `#6B7280` | `text-text-secondary` | Muted text, labels |
 | `--color-amber` | `#7C6AEF` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
 | `--color-amber-light` | `#9D8FFF` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
 | `--color-amber-dark` | `#5E4FCC` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
@@ -36,7 +36,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-terminal-green` | `#4ADE80` | `text-terminal-green` | Success messages, checkmarks |
 | `--color-terminal-red` | `#F87171` | `text-terminal-red` | Error messages |
 | `--color-terminal-yellow` | `#FBBF24` | `text-terminal-yellow` | Warning messages |
-| `--color-terminal-dim` | `#3A3A4A` | `text-terminal-dim` | Dim text, prefixes, decorative |
+| `--color-terminal-dim` | `#4A4A5E` | `text-terminal-dim` | Dim text, prefixes, decorative |
 | `--color-complement` | `#10B981` | `text-complement` | Soft teal accent (sparingly) |
 | `--color-complement-light` | `rgba(16,185,129,0.15)` | `bg-complement-light` | Teal tint |
 
