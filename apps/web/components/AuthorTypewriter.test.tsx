@@ -54,8 +54,9 @@ describe("AuthorTypewriter", () => {
       expect(SOURCE).toContain("group-focus-within:scale-100");
     });
 
-    it("trigger pill has tabIndex to ensure focusability", () => {
-      expect(SOURCE).toMatch(/tabIndex=\{0\}/);
+    it("trigger pill is a button element (natively focusable)", () => {
+      expect(SOURCE).toContain('<button');
+      expect(SOURCE).toContain('type="button"');
     });
   });
 

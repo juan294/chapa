@@ -90,7 +90,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
   }, [done, handle, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-6">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-md">
         {/* Terminal header */}
         <div className="mb-8 animate-fade-in-up">
@@ -205,6 +205,6 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           </p>
         )}
       </div>
-    </div>
+    </main>
   );
 }
