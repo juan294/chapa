@@ -13,4 +13,10 @@ describe("QuickControls", () => {
       expect(SOURCE).toContain("max-h-48 sm:max-h-64");
     });
   });
+
+  describe("accessibility (#437)", () => {
+    it("category toggle buttons have aria-expanded", () => {
+      expect(SOURCE).toContain("aria-expanded={isExpanded}");
+    });
+  });
 });

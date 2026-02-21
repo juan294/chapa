@@ -16,6 +16,25 @@ describe("BadgeOverlay (source-reading a11y)", () => {
   });
 });
 
+describe("BadgeOverlay hotspot elements (#433)", () => {
+  it("hotspots use <button> elements instead of <div tabIndex>", () => {
+    // Interactive hotspots should be native buttons for keyboard and screen reader support
+    const hotspotSection = SRC.match(/Hotspot regions[\s\S]*$/)?.[0];
+    expect(hotspotSection).toBeDefined();
+    expect(hotspotSection).toContain("<button");
+    expect(hotspotSection).toContain('type="button"');
+    // Should not use tabIndex on divs for interactivity
+    expect(hotspotSection).not.toContain("tabIndex={0}");
+  });
+
+  it("hotspot buttons have reset styles (no default button appearance)", () => {
+    expect(SRC).toContain("bg-transparent");
+    expect(SRC).toContain("border-0");
+    expect(SRC).toContain("p-0");
+    expect(SRC).toContain("cursor-pointer");
+  });
+});
+
 describe("BadgeOverlay hover-reveal behavior", () => {
   it("uses group/badge on the container for hover-reveal", () => {
     // The parent container needs group/badge so child info icons
@@ -155,6 +174,12 @@ describe("BadgeOverlay aria-describedby resolves to visible content (#363)", () 
     // Verify the linkage exists — hotspots reference panels via aria-describedby
     expect(SRC).toContain("aria-describedby");
     expect(SRC).toContain("-panel");
+  });
+
+  it("aria-describedby is only set when the panel is rendered (active hotspot)", () => {
+    // The panel only exists on desktop when the hotspot is active.
+    // aria-describedby should be conditional to avoid referencing a non-existent element.
+    expect(SRC).toMatch(/aria-describedby=\{activeLeaderLine === hotspot\.id/);
   });
 });
 

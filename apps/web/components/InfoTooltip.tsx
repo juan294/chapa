@@ -64,7 +64,7 @@ export function InfoTooltip({
         aria-label="More info"
         aria-describedby={id}
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-1 focus-visible:ring-amber/50 rounded-full"
+        className="inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-full"
       >
         <svg
           width="16"

@@ -24,6 +24,11 @@ describe("AdminSearchBar", () => {
     it("has an aria-label for accessibility", () => {
       expect(SOURCE).toContain('aria-label="Filter users"');
     });
+
+    it("has a visible focus indicator (#435)", () => {
+      expect(SOURCE).toContain("focus-visible:ring-2");
+      expect(SOURCE).toContain("focus-visible:ring-amber");
+    });
   });
 
   describe("onChange behavior", () => {

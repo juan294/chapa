@@ -308,9 +308,10 @@ export function BadgeOverlay() {
 
       {/* ── Hotspot regions ── */}
       {HOTSPOTS.map((hotspot) => (
-        <div
+        <button
           key={hotspot.id}
-          className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150"
+          type="button"
+          className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 bg-transparent border-0 p-0 cursor-pointer appearance-none"
           style={{
             top: hotspot.top,
             left: hotspot.left,
@@ -321,8 +322,7 @@ export function BadgeOverlay() {
           onMouseLeave={() => setActiveLeaderLine(null)}
           onFocus={() => setActiveLeaderLine(hotspot.id)}
           onBlur={() => setActiveLeaderLine(null)}
-          tabIndex={0}
-          aria-describedby={`${hotspot.id}-panel`}
+          aria-describedby={activeLeaderLine === hotspot.id ? `${hotspot.id}-panel` : undefined}
           aria-label={`${hotspot.id.replace("badge-", "")} info`}
         >
           {/* Mobile: standard InfoTooltip (hidden on desktop via md:hidden) */}
@@ -332,7 +332,7 @@ export function BadgeOverlay() {
             position={hotspot.position}
             className={`opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 md:hidden`}
           />
-        </div>
+        </button>
       ))}
     </div>
   );
