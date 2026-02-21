@@ -113,7 +113,7 @@ function AuroraBackground({
 
 function MockBadgeCard() {
   return (
-    <div className="relative rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/80 backdrop-blur-sm p-8 w-full max-w-[560px]">
+    <div className="relative rounded-2xl border border-stroke bg-card/80 backdrop-blur-sm p-8 w-full max-w-[560px]">
       <style>{getBadgeContentCSS({}).join("\n")}</style>
       <BadgeContent stats={MOCK_STATS} impact={MOCK_IMPACT} />
     </div>
@@ -137,7 +137,7 @@ function ControlGroup<T extends string>({
 }) {
   return (
     <div>
-      <p className="text-xs text-[#9AA4B2] uppercase tracking-wider mb-2 font-body">
+      <p className="text-xs text-text-secondary uppercase tracking-wider mb-2 font-body">
         {label}
       </p>
       <div className="flex gap-2">
@@ -148,8 +148,8 @@ function ControlGroup<T extends string>({
             onClick={() => onChange(opt.value)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
               value === opt.value
-                ? "bg-[#7C6AEF] text-[#0C0D14]"
-                : "border border-[rgba(124,106,239,0.12)] text-[#9AA4B2] hover:border-[#7C6AEF]/20 hover:text-[#E6EDF3] hover:bg-[#7C6AEF]/[0.04]"
+                ? "bg-amber text-white"
+                : "border border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary hover:bg-amber/[0.04]"
             }`}
           >
             {opt.label}
@@ -170,7 +170,7 @@ export default function AuroraExperimentPage() {
   const [speed, setSpeed] = useState<Speed>("medium");
 
   return (
-    <div className="relative min-h-screen bg-[#0C0D14]">
+    <div className="relative min-h-screen bg-bg">
       {/* Aurora effect — always behind everything */}
       <AuroraBackground
         intensity={intensity}
@@ -183,13 +183,13 @@ export default function AuroraExperimentPage() {
         {/* Header */}
         <header className="pt-12 pb-8 px-6">
           <div className="max-w-4xl mx-auto">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-3 font-body">
+            <p className="text-amber text-sm tracking-widest uppercase mb-3 font-body">
               Experiment #48
             </p>
-            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-[#E6EDF3] tracking-tight mb-3">
-              Aurora Borealis <span className="text-[#7C6AEF]">Background</span>
+            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-text-primary tracking-tight mb-3">
+              Aurora Borealis <span className="text-amber">Background</span>
             </h1>
-            <p className="text-[#9AA4B2] text-lg leading-relaxed max-w-2xl font-body">
+            <p className="text-text-secondary text-lg leading-relaxed max-w-2xl font-body">
               Large, slowly drifting amber glow blobs creating a living,
               atmospheric backdrop behind the badge card.
             </p>
@@ -199,8 +199,8 @@ export default function AuroraExperimentPage() {
         {/* Controls */}
         <section className="px-6 pb-12">
           <div className="max-w-4xl mx-auto">
-            <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/60 backdrop-blur-sm p-6">
-              <h2 className="font-heading text-lg font-bold text-[#E6EDF3] tracking-tight mb-5">
+            <div className="rounded-2xl border border-stroke bg-card/60 backdrop-blur-sm p-6">
+              <h2 className="font-heading text-lg font-bold text-text-primary tracking-tight mb-5">
                 Controls
               </h2>
               <div className="flex flex-wrap gap-8">
@@ -242,10 +242,10 @@ export default function AuroraExperimentPage() {
         {/* Badge card showcase */}
         <section className="px-6 pb-24">
           <div className="max-w-4xl mx-auto">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-body">
+            <p className="text-amber text-sm tracking-widest uppercase mb-4 font-body">
               Badge Preview
             </p>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-[#E6EDF3] tracking-tight mb-8">
+            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-text-primary tracking-tight mb-8">
               Card on Aurora
             </h2>
             <div className="flex justify-center">
@@ -257,13 +257,13 @@ export default function AuroraExperimentPage() {
         {/* Aurora-only section (no badge card) */}
         <section className="px-6 pb-24">
           <div className="max-w-4xl mx-auto">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-body">
+            <p className="text-amber text-sm tracking-widest uppercase mb-4 font-body">
               Effect Only
             </p>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-[#E6EDF3] tracking-tight mb-8">
+            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-text-primary tracking-tight mb-8">
               Aurora Without Card
             </h2>
-            <div className="relative rounded-2xl border border-[rgba(124,106,239,0.12)] overflow-hidden h-[400px] bg-[#0C0D14]">
+            <div className="relative rounded-2xl border border-stroke overflow-hidden h-[400px] bg-bg">
               {/* Local aurora inside this box */}
               <AuroraBackgroundLocal
                 intensity={intensity}
@@ -272,7 +272,7 @@ export default function AuroraExperimentPage() {
               />
               {/* Centered label */}
               <div className="absolute inset-0 flex items-center justify-center z-10">
-                <p className="text-[#9AA4B2] text-sm font-body tracking-wider uppercase">
+                <p className="text-text-secondary text-sm font-body tracking-wider uppercase">
                   Aurora effect in isolation
                 </p>
               </div>
@@ -283,13 +283,13 @@ export default function AuroraExperimentPage() {
         {/* Implementation notes */}
         <section className="px-6 pb-24">
           <div className="max-w-4xl mx-auto">
-            <p className="text-[#7C6AEF] text-sm tracking-widest uppercase mb-4 font-body">
+            <p className="text-amber text-sm tracking-widest uppercase mb-4 font-body">
               Notes
             </p>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-[#E6EDF3] tracking-tight mb-6">
+            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-text-primary tracking-tight mb-6">
               Implementation Details
             </h2>
-            <div className="rounded-2xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/60 p-6 space-y-4">
+            <div className="rounded-2xl border border-stroke bg-card/60 p-6 space-y-4">
               <DetailRow
                 title="Performance"
                 text="3 blobs with CSS blur + will-change: transform for GPU compositing. No JS animation loop."
@@ -371,10 +371,10 @@ function AuroraBackgroundLocal({
 function DetailRow({ title, text }: { title: string; text: string }) {
   return (
     <div>
-      <h3 className="font-heading text-sm font-bold text-[#7C6AEF] mb-1">
+      <h3 className="font-heading text-sm font-bold text-amber mb-1">
         {title}
       </h3>
-      <p className="text-sm text-[#9AA4B2] leading-relaxed font-body">
+      <p className="text-sm text-text-secondary leading-relaxed font-body">
         {text}
       </p>
     </div>

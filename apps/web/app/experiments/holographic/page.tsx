@@ -108,9 +108,9 @@ function Controls({
   setAutoAnimate,
 }: ControlsProps) {
   return (
-    <div className="flex flex-wrap items-center gap-6 rounded-xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/60 px-6 py-4">
+    <div className="flex flex-wrap items-center gap-6 rounded-xl border border-stroke bg-card/60 px-6 py-4">
       {/* Intensity */}
-      <label className="flex items-center gap-3 text-sm text-[#9AA4B2]">
+      <label className="flex items-center gap-3 text-sm text-text-secondary">
         <span className="min-w-[70px]">Intensity</span>
         <input
           type="range"
@@ -121,13 +121,13 @@ function Controls({
           onChange={(e) => setIntensity(parseFloat(e.target.value))}
           className="holo-slider w-28"
         />
-        <span className="w-8 font-heading text-xs text-[#7C6AEF]">
+        <span className="w-8 font-heading text-xs text-amber">
           {Math.round(intensity * 100)}%
         </span>
       </label>
 
       {/* Speed */}
-      <label className="flex items-center gap-3 text-sm text-[#9AA4B2]">
+      <label className="flex items-center gap-3 text-sm text-text-secondary">
         <span className="min-w-[50px]">Speed</span>
         <input
           type="range"
@@ -138,13 +138,13 @@ function Controls({
           onChange={(e) => setSpeed(parseFloat(e.target.value))}
           className="holo-slider w-28"
         />
-        <span className="w-8 font-heading text-xs text-[#7C6AEF]">
+        <span className="w-8 font-heading text-xs text-amber">
           {speed}s
         </span>
       </label>
 
       {/* Auto-animate toggle */}
-      <label className="flex cursor-pointer items-center gap-3 text-sm text-[#9AA4B2]">
+      <label className="flex cursor-pointer items-center gap-3 text-sm text-text-secondary">
         <span>Auto</span>
         <button
           type="button"
@@ -153,12 +153,12 @@ function Controls({
           onClick={() => setAutoAnimate(!autoAnimate)}
           className={`relative h-6 w-11 rounded-full border transition-colors ${
             autoAnimate
-              ? "border-[#7C6AEF]/40 bg-[#7C6AEF]/25"
-              : "border-[rgba(124,106,239,0.12)] bg-[#13141E]"
+              ? "border-amber/40 bg-amber/25"
+              : "border-stroke bg-card"
           }`}
         >
           <span
-            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#7C6AEF] transition-transform ${
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-amber transition-transform ${
               autoAnimate ? "translate-x-5" : "translate-x-0"
             }`}
           />
@@ -330,17 +330,17 @@ export default function HolographicExperimentPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-[#0C0D14] px-6 py-16">
+      <div className="min-h-screen bg-bg px-6 py-16">
         <div className="mx-auto max-w-5xl">
           {/* Page header */}
           <header className="mb-4">
-            <p className="mb-3 text-sm tracking-widest text-[#7C6AEF] uppercase">
+            <p className="mb-3 text-sm tracking-widest text-amber uppercase">
               Experiment #43
             </p>
-            <h1 className="font-heading text-3xl font-bold tracking-tight text-[#E6EDF3] sm:text-4xl">
+            <h1 className="font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
               Holographic / Iridescent Effect
             </h1>
-            <p className="mt-3 max-w-2xl text-base leading-relaxed text-[#9AA4B2]">
+            <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
               A trading-card-style holographic shimmer that plays on hover. Three
               variants: warm amber (on-brand), full rainbow, and
               mouse-tracking. Adjust intensity and speed below.
@@ -363,10 +363,10 @@ export default function HolographicExperimentPage() {
           <div className="space-y-16">
             {variants.map(({ key, title, description }) => (
               <section key={key}>
-                <h2 className="font-heading text-xl font-semibold tracking-tight text-[#E6EDF3]">
+                <h2 className="font-heading text-xl font-semibold tracking-tight text-text-primary">
                   {title}
                 </h2>
-                <p className="mt-1 mb-6 text-sm text-[#9AA4B2]">
+                <p className="mt-1 mb-6 text-sm text-text-secondary">
                   {description}
                 </p>
                 <HoloCard
@@ -380,28 +380,28 @@ export default function HolographicExperimentPage() {
           </div>
 
           {/* Notes */}
-          <footer className="mt-16 rounded-xl border border-[rgba(124,106,239,0.12)] bg-[#13141E]/40 p-6">
-            <h3 className="font-heading text-sm font-semibold text-[#7C6AEF]">
+          <footer className="mt-16 rounded-xl border border-stroke bg-card/40 p-6">
+            <h3 className="font-heading text-sm font-semibold text-amber">
               Implementation Notes
             </h3>
-            <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-[#9AA4B2]">
+            <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-text-secondary">
               <li>
-                Uses a <code className="text-[#E6EDF3]/70">{"::before"}</code>{" "}
+                Uses a <code className="text-text-primary/70">{"::before"}</code>{" "}
                 pseudo-element with{" "}
-                <code className="text-[#E6EDF3]/70">mix-blend-mode: color-dodge</code>{" "}
+                <code className="text-text-primary/70">mix-blend-mode: color-dodge</code>{" "}
                 for the overlay.
               </li>
               <li>
                 Mouse-tracking variant updates{" "}
-                <code className="text-[#E6EDF3]/70">--holo-angle</code> CSS
+                <code className="text-text-primary/70">--holo-angle</code> CSS
                 custom property via JS.
               </li>
               <li>
-                <code className="text-[#E6EDF3]/70">pointer-events: none</code>{" "}
+                <code className="text-text-primary/70">pointer-events: none</code>{" "}
                 on the overlay so content remains interactive.
               </li>
               <li>
-                <code className="text-[#E6EDF3]/70">
+                <code className="text-text-primary/70">
                   prefers-reduced-motion
                 </code>{" "}
                 shows a static, low-opacity overlay with no animation.

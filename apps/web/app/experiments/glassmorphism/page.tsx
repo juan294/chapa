@@ -630,7 +630,7 @@ export default function GlassmorphismExperimentPage() {
               </div>
 
               {/* CSS output */}
-              <div className="rounded-xl border border-warm-stroke bg-[#0d0b08] overflow-hidden">
+              <div className="rounded-xl border border-warm-stroke bg-dark-section overflow-hidden">
                 {/* Terminal header */}
                 <div className="flex items-center gap-2 border-b border-warm-stroke px-4 py-3">
                   <div className="h-3 w-3 rounded-full bg-amber/20" />

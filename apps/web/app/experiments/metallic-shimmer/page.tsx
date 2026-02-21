@@ -95,7 +95,7 @@ export default function MetallicShimmerPage() {
             <div className="flex items-end">
               <button
                 onClick={replay}
-                className="rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-warm-bg transition-colors hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                className="rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-white transition-colors hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 Replay Animation
               </button>
@@ -538,7 +538,7 @@ function CodeBlock({ code }: { code: string }) {
   }, []);
 
   return (
-    <div className="relative mt-6 overflow-hidden rounded-xl border border-warm-stroke bg-[#0d0b08]">
+    <div className="relative mt-6 overflow-hidden rounded-xl border border-warm-stroke bg-dark-section">
       {/* Terminal header */}
       <div className="flex items-center gap-2 border-b border-warm-stroke px-4 py-3">
         <span className="h-3 w-3 rounded-full bg-amber/20" aria-hidden="true" />
