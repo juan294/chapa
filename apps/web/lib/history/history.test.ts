@@ -8,17 +8,19 @@ import { makeSnapshot } from "../test-helpers/fixtures";
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
   dbGetSnapshots: vi.fn(() => Promise.resolve([])),
-  dbGetLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+}));
+
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  getCachedLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+  updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
 
 import {
   getSnapshots,
   getLatestSnapshot,
 } from "./history";
-import {
-  dbGetSnapshots,
-  dbGetLatestSnapshot,
-} from "@/lib/db/snapshots";
+import { dbGetSnapshots } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -62,18 +64,18 @@ describe("getSnapshots", () => {
 // ---------------------------------------------------------------------------
 
 describe("getLatestSnapshot", () => {
-  it("delegates to dbGetLatestSnapshot and returns result", async () => {
+  it("delegates to getCachedLatestSnapshot and returns result", async () => {
     const latest = makeSnapshot({ date: "2025-06-15" });
-    vi.mocked(dbGetLatestSnapshot).mockResolvedValue(latest);
+    vi.mocked(getCachedLatestSnapshot).mockResolvedValue(latest);
 
     const result = await getLatestSnapshot("TestUser");
 
     expect(result).toEqual(latest);
-    expect(dbGetLatestSnapshot).toHaveBeenCalledWith("TestUser");
+    expect(getCachedLatestSnapshot).toHaveBeenCalledWith("TestUser");
   });
 
   it("returns null when no snapshots exist", async () => {
-    vi.mocked(dbGetLatestSnapshot).mockResolvedValue(null);
+    vi.mocked(getCachedLatestSnapshot).mockResolvedValue(null);
 
     const result = await getLatestSnapshot("TestUser");
 

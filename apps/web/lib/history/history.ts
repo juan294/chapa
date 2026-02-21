@@ -1,7 +1,5 @@
-import {
-  dbGetSnapshots,
-  dbGetLatestSnapshot,
-} from "@/lib/db/snapshots";
+import { dbGetSnapshots } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import type { MetricsSnapshot } from "./types";
 
 /**
@@ -22,12 +20,12 @@ export async function getSnapshots(
 
 /**
  * Get the most recent snapshot for a user.
- * Reads from Supabase.
+ * Uses Redis cache (24h TTL) with Supabase fallback.
  * Returns `null` if no snapshots exist or on error.
  */
 export async function getLatestSnapshot(
   handle: string,
 ): Promise<MetricsSnapshot | null> {
-  return dbGetLatestSnapshot(handle);
+  return getCachedLatestSnapshot(handle);
 }
 

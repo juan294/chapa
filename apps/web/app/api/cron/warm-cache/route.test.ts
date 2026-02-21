@@ -40,9 +40,9 @@ vi.mock("@/lib/db/verification", () => ({
   dbCleanExpiredVerifications: vi.fn(() => Promise.resolve(0)),
 }));
 
-vi.mock("@/lib/db/snapshots", () => ({
-  dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
-  dbGetLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  getCachedLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+  updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/history/diff", () => ({
@@ -63,7 +63,8 @@ vi.mock("@/lib/email/score-bump", () => ({
 }));
 
 import { dbGetUsers } from "@/lib/db/users";
-import { dbInsertSnapshot, dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { compareSnapshots } from "@/lib/history/diff";
@@ -339,14 +340,14 @@ describe("GET /api/cron/warm-cache", () => {
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
-      vi.mocked(dbGetLatestSnapshot).mockResolvedValue({
+      vi.mocked(getCachedLatestSnapshot).mockResolvedValue({
         date: "2025-01-01",
         adjustedComposite: 40,
       } as never);
 
       await GET(makeRequest("test-cron-secret"));
 
-      expect(dbGetLatestSnapshot).toHaveBeenCalledWith("alice");
+      expect(getCachedLatestSnapshot).toHaveBeenCalledWith("alice");
       expect(compareSnapshots).toHaveBeenCalled();
     });
 
@@ -356,7 +357,7 @@ describe("GET /api/cron/warm-cache", () => {
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
-      vi.mocked(dbGetLatestSnapshot).mockResolvedValue({
+      vi.mocked(getCachedLatestSnapshot).mockResolvedValue({
         date: "2025-01-01",
         adjustedComposite: 40,
       } as never);
@@ -381,7 +382,7 @@ describe("GET /api/cron/warm-cache", () => {
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
-      vi.mocked(dbGetLatestSnapshot).mockResolvedValue({
+      vi.mocked(getCachedLatestSnapshot).mockResolvedValue({
         date: "2025-01-01",
         adjustedComposite: 40,
       } as never);
@@ -400,7 +401,7 @@ describe("GET /api/cron/warm-cache", () => {
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
-      vi.mocked(dbGetLatestSnapshot).mockResolvedValue(null);
+      vi.mocked(getCachedLatestSnapshot).mockResolvedValue(null);
 
       await GET(makeRequest("test-cron-secret"));
 
@@ -414,7 +415,7 @@ describe("GET /api/cron/warm-cache", () => {
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
-      vi.mocked(dbGetLatestSnapshot).mockResolvedValue({
+      vi.mocked(getCachedLatestSnapshot).mockResolvedValue({
         date: "2025-01-01",
         adjustedComposite: 40,
       } as never);
@@ -436,7 +437,7 @@ describe("GET /api/cron/warm-cache", () => {
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
-      vi.mocked(dbGetLatestSnapshot).mockResolvedValue({
+      vi.mocked(getCachedLatestSnapshot).mockResolvedValue({
         date: "2025-01-01",
         adjustedComposite: 40,
       } as never);

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { dbGetUsers } from "@/lib/db/users";
-import { dbInsertSnapshot, dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { buildSnapshot } from "@/lib/history/snapshot";
@@ -68,11 +69,13 @@ export async function GET(request: NextRequest) {
           const snapshot = buildSnapshot(stats, impact);
 
           // Fetch previous snapshot BEFORE inserting new one (for comparison)
-          const previousSnapshot = await dbGetLatestSnapshot(handle);
+          const previousSnapshot = await getCachedLatestSnapshot(handle);
 
           const recorded = await dbInsertSnapshot(handle, snapshot);
           if (recorded) {
             snapshots++;
+            // Update snapshot cache so subsequent reads hit Redis
+            await updateSnapshotCache(handle, snapshot).catch(() => {});
 
             // Score bump notification: compare new vs previous snapshot
             if (previousSnapshot) {
