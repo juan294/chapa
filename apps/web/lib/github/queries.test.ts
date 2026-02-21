@@ -46,6 +46,9 @@ describe("fetchContributionData", () => {
     const original = process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_TOKEN;
 
+    // Silence expected 401 console.error from the error-handling code path
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
@@ -58,6 +61,7 @@ describe("fetchContributionData", () => {
     const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBeUndefined();
 
+    consoleSpy.mockRestore();
     if (original !== undefined) process.env.GITHUB_TOKEN = original;
   });
 

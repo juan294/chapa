@@ -94,12 +94,17 @@ describe("GET /api/notifications/unsubscribe", () => {
   });
 
   it("does not throw when DB update fails", async () => {
+    // Silence expected console.error from the fail-open error-handling path
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     mockDbUpdateEmailNotifications.mockRejectedValue(new Error("DB down"));
 
     const res = await GET(makeRequest("testuser"));
 
     // Still shows confirmation — fail-open for UX
     expect(res.status).toBe(200);
+
+    consoleSpy.mockRestore();
   });
 
   it("returns 429 when rate limited", async () => {

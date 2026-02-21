@@ -265,12 +265,17 @@ describe("GET /u/[handle]/og-image", () => {
     });
 
     it("returns 500 when render pipeline throws", async () => {
+      // Silence expected console.error from the error-handling code path
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       mockSvgToPng.mockImplementation(() => {
         throw new Error("PNG conversion failed");
       });
       const [req, ctx] = makeRequest("testuser");
       const res = await GET(req, ctx);
       expect(res.status).toBe(500);
+
+      consoleSpy.mockRestore();
     });
   });
 });
