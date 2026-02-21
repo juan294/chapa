@@ -1,3 +1,5 @@
+export const revalidate = 3600;
+
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";

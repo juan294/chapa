@@ -180,12 +180,12 @@ describe("AdminDashboardClient", () => {
   });
 
   describe("tab navigation (#416)", () => {
-    it("imports AgentsDashboard component", () => {
-      expect(SOURCE).toMatch(/from\s+["']\.\/agents\/agents-dashboard["']/);
+    it("dynamically imports AgentsDashboard component", () => {
+      expect(SOURCE).toMatch(/import\(["']\.\/agents\/agents-dashboard["']\)/);
     });
 
-    it("has activeTab state with 'users' and 'agents' values", () => {
-      expect(SOURCE).toContain('AdminTab = "users" | "agents"');
+    it("has activeTab state with 'users', 'agents', and 'engagement' values", () => {
+      expect(SOURCE).toContain('AdminTab = "users" | "agents" | "engagement"');
     });
 
     it("renders tab buttons for Users and Agents", () => {
