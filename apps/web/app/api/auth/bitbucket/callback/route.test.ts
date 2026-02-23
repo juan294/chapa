@@ -257,7 +257,8 @@ describe("GET /api/auth/bitbucket/callback", () => {
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_bb_oauth_state=xyz" }),
     );
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:bitbucket:testuser");
   });
 
   it("clears CSRF state cookie on success", async () => {

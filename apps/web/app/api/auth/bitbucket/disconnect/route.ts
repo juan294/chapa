@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
   const success = await dbDeleteLinkedPlatform(handle, "bitbucket");
 
   // 4. Invalidate stats cache (force re-fetch without Bitbucket data)
-  void cacheDel(`stats:v2:${handle.toLowerCase()}`);
+  const lh = handle.toLowerCase();
+  void cacheDel(`stats:v2:merged:${lh}`);
+  void cacheDel(`stats:v2:bitbucket:${lh}`);
 
   // 5. Return result
   return NextResponse.json({ success });

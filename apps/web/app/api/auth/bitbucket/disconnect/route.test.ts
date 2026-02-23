@@ -109,7 +109,8 @@ describe("POST /api/auth/bitbucket/disconnect", () => {
   it("invalidates stats cache on success", async () => {
     await POST(makeRequest());
 
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:bitbucket:testuser");
   });
 
   it("returns { success: false } when DB delete fails", async () => {
@@ -128,6 +129,7 @@ describe("POST /api/auth/bitbucket/disconnect", () => {
     await POST(makeRequest());
 
     // Cache should still be invalidated to force re-fetch
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:bitbucket:testuser");
   });
 });

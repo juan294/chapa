@@ -247,8 +247,22 @@ describe("mergeStats", () => {
   });
 
   describe("hasSupplementalData flag", () => {
-    it("sets hasSupplementalData to true", () => {
+    it("sets hasSupplementalData to true by default (backward compat)", () => {
       const merged = mergeStats(makeStats(), makeStats());
+      expect(merged.hasSupplementalData).toBe(true);
+    });
+
+    it("sets hasSupplementalData to false when markAsSupplemental is false", () => {
+      const merged = mergeStats(makeStats(), makeStats(), {
+        markAsSupplemental: false,
+      });
+      expect(merged.hasSupplementalData).toBe(false);
+    });
+
+    it("sets hasSupplementalData to true when markAsSupplemental is true", () => {
+      const merged = mergeStats(makeStats(), makeStats(), {
+        markAsSupplemental: true,
+      });
       expect(merged.hasSupplementalData).toBe(true);
     });
   });

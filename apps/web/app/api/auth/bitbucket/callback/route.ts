@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
   }
 
   // 9. Invalidate stats cache (force re-merge on next badge request)
-  void cacheDel(`stats:v2:${handle.toLowerCase()}`);
+  const lh = handle.toLowerCase();
+  void cacheDel(`stats:v2:merged:${lh}`);
+  void cacheDel(`stats:v2:bitbucket:${lh}`);
 
   // 10. Clear state cookie and redirect to share page
   const response = NextResponse.redirect(
