@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync, isBitbucketEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 
 interface UserMenuProps {
@@ -17,6 +17,32 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
+
+  const [bbStatus, setBbStatus] = useState<{
+    linked: boolean;
+    remoteLogin: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isBitbucketEnabledSync()) return;
+    fetch("/api/auth/bitbucket/status")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.enabled) setBbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
+      })
+      .catch(() => {}); // Graceful — menu works without status
+  }, []);
+
+  async function handleUnlinkBitbucket() {
+    try {
+      const res = await fetch("/api/auth/bitbucket/disconnect", { method: "POST" });
+      if (res.ok) {
+        setBbStatus({ linked: false, remoteLogin: null });
+      }
+    } catch {
+      // Graceful failure — user can try again
+    }
+  }
 
   const fallbackLetter = login.charAt(0).toUpperCase();
 
@@ -134,6 +160,34 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 </svg>
                 Creator Studio
               </Link>
+            )}
+            {isBitbucketEnabledSync() && bbStatus && (
+              bbStatus.linked ? (
+                <div className="px-3 py-2">
+                  <div className="flex items-center gap-2 text-sm text-text-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
+                    </svg>
+                    <span className="text-text-primary">{bbStatus.remoteLogin}</span>
+                  </div>
+                  <button
+                    onClick={handleUnlinkBitbucket}
+                    className="mt-1 text-xs text-terminal-red hover:underline"
+                  >
+                    Unlink
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/bitbucket/connect"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
+                  </svg>
+                  Link Bitbucket
+                </a>
+              )
             )}
             {isAdmin && (
               <Link

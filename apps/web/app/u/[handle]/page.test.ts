@@ -143,4 +143,20 @@ describe("SharePage", () => {
       expect(SOURCE).toContain("u003c");
     });
   });
+
+  // Phase 5 Bitbucket — platform indicator when Bitbucket data is merged
+  describe("Bitbucket platform indicator", () => {
+    it("checks for linkedPlatforms including bitbucket", () => {
+      expect(SOURCE).toContain("linkedPlatforms");
+      expect(SOURCE).toContain('"bitbucket"');
+    });
+
+    it("renders a subtle + Bitbucket indicator", () => {
+      expect(SOURCE).toContain("+ Bitbucket");
+    });
+
+    it("uses inline Bitbucket SVG for the indicator", () => {
+      expect(SOURCE).toContain("M.778 1.211");
+    });
+  });
 });
