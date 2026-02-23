@@ -336,6 +336,7 @@ Reference issues in commits with `Fixes #N` or `Refs #N`.
 - Agent Teams are enabled via `.claude/settings.json` — use them for complex parallel work
 - When creating a team: break work so each teammate owns different files (avoid conflicts)
 - Teammates don't inherit conversation history — include full context in spawn prompts
+- Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
 
 ## Push Accountability
 

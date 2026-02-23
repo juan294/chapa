@@ -7,6 +7,7 @@
       "Bash(git *)",
       "Bash(gh *)",
       "Bash(pnpm run *)",
+      "Bash(npm run *)",
       "Bash(pnpm install *)",
       "Bash(pnpm install)",
       "Bash(pnpm add *)",
