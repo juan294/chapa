@@ -4,18 +4,17 @@ import { AGENTS } from "./agent-config";
 describe("AGENTS config", () => {
   const agentKeys = Object.keys(AGENTS);
 
-  it("defines exactly 7 agents", () => {
-    expect(agentKeys).toHaveLength(7);
+  it("defines exactly 6 agents", () => {
+    expect(agentKeys).toHaveLength(6);
   });
 
-  it("includes all 7 agent keys", () => {
+  it("includes all 6 agent keys", () => {
     expect(agentKeys).toContain("coverage_agent");
     expect(agentKeys).toContain("security_scanner");
     expect(agentKeys).toContain("qa_agent");
     expect(agentKeys).toContain("performance_agent");
     expect(agentKeys).toContain("documentation_agent");
     expect(agentKeys).toContain("cost_analyst");
-    expect(agentKeys).toContain("localization_agent");
   });
 
   it.each(agentKeys)("%s has all required fields", (key) => {
@@ -61,7 +60,4 @@ describe("AGENTS config", () => {
     expect(AGENTS.cost_analyst!.schedule).toMatch(/daily/i);
   });
 
-  it("localization_agent runs weekly", () => {
-    expect(AGENTS.localization_agent!.schedule).toMatch(/weekly/i);
-  });
 });
