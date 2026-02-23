@@ -10,6 +10,8 @@ import {
   isStudioEnabled,
   isExperimentsEnabled,
   isAgentEnabled,
+  isBitbucketEnabled,
+  isBitbucketEnabledSync,
   _resetFlagCache,
 } from "./feature-flags";
 
@@ -180,6 +182,82 @@ describe("isAgentEnabled", () => {
       .mockResolvedValueOnce(null);
 
     const result = await isAgentEnabled("nonexistent_agent");
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isBitbucketEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isBitbucketEnabledSync", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+  });
+
+  it("returns false when env var not set", () => {
+    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+    expect(isBitbucketEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "true";
+    expect(isBitbucketEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "false";
+    expect(isBitbucketEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "  true  ";
+    expect(isBitbucketEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isBitbucketEnabled (async, DB-backed)
+// ---------------------------------------------------------------------------
+
+describe("isBitbucketEnabled", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("bitbucket_integration", true),
+    );
+
+    const result = await isBitbucketEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when DB flag is disabled", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("bitbucket_integration", false),
+    );
+
+    const result = await isBitbucketEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("falls back to env var when DB unavailable", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "true";
+
+    const result = await isBitbucketEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when both DB and env var are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+
+    const result = await isBitbucketEnabled();
     expect(result).toBe(false);
   });
 });

@@ -45,6 +45,8 @@ export const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
     "Very limited activity in this period reduces the signal available for scoring.",
   review_volume_imbalance:
     "High review volume with very few merged changes reduces confidence in the activity mix.",
+  platform_linked:
+    "Includes verified data from a linked platform account.",
 };
 
 export function computeConfidence(
@@ -132,6 +134,16 @@ export function computeConfidence(
       reason: CONFIDENCE_REASONS.review_volume_imbalance,
     });
     score -= 10;
+  }
+
+  // Platform-linked data: informational only (0 penalty).
+  // Distinguished from supplemental_unverified — platform data is server-verified via OAuth.
+  if (stats.linkedPlatforms && stats.linkedPlatforms.length > 0 && !stats.hasSupplementalData) {
+    penalties.push({
+      flag: "platform_linked",
+      penalty: 0,
+      reason: CONFIDENCE_REASONS.platform_linked,
+    });
   }
 
   return { confidence: Math.max(50, score), penalties };
