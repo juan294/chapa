@@ -48,6 +48,10 @@ describe("UserMenu — Bitbucket integration", () => {
     expect(SOURCE).toContain("bbStatus.remoteLogin");
     expect(SOURCE).toContain("Unlink");
     expect(SOURCE).toContain("/api/auth/bitbucket/disconnect");
+    // Confirmation dialog state exists
+    expect(SOURCE).toContain("showUnlinkConfirm");
+    // ConfirmDialog component is imported
+    expect(SOURCE).toContain("ConfirmDialog");
   });
 
   it("uses inline Bitbucket SVG logo (no icon library)", () => {
@@ -62,5 +66,22 @@ describe("UserMenu — Bitbucket integration", () => {
     const adminIdx = SOURCE.indexOf("Admin Panel");
     expect(studioIdx).toBeLessThan(bitbucketIdx);
     expect(bitbucketIdx).toBeLessThan(adminIdx);
+  });
+
+  it("Bitbucket unlink opens confirmation dialog instead of directly unlinking", () => {
+    expect(SOURCE).toContain("setShowUnlinkConfirm(true)");
+    expect(SOURCE).toContain("open={showUnlinkConfirm}");
+  });
+
+  it("Unlink action uses hover:text-terminal-red (not permanent red)", () => {
+    expect(SOURCE).toContain("hover:text-terminal-red");
+    // Should NOT have permanent text-terminal-red on the Unlink button
+    expect(SOURCE).not.toContain("text-xs text-terminal-red hover:underline");
+  });
+
+  it("ConfirmDialog has correct props for unlink", () => {
+    expect(SOURCE).toContain('title="Unlink Bitbucket?"');
+    expect(SOURCE).toContain('confirmLabel="Unlink"');
+    expect(SOURCE).toContain('variant="destructive"');
   });
 });
