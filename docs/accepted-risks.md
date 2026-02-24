@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-02-21 | Audit: v21
+> Last reviewed: 2026-02-24 | Audit: v21
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -56,6 +56,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** `sharp` is used by Next.js for image optimization and by `@resvg/resvg-js` for OG image generation — no viable alternative exists. LGPL-3.0 with dynamic linking does not require open-sourcing our code. MPL-2.0 is file-level copyleft only — modifications to MPL-licensed files must be shared, but our own code is unaffected. Both are compatible with our MIT license.
 - **Severity:** Low
 - **Accepted:** 2026-02-21
+
+## MPL-2.0 dependencies (@resvg/resvg-js, @vercel/analytics) (#464)
+
+- **Risk:** Two production dependencies use MPL-2.0 (weak copyleft), which is not on the project's explicit allowlist (MIT, Apache-2.0, BSD, ISC). `@resvg/resvg-js` is used for SVG-to-PNG rendering and `@vercel/analytics` provides Vercel web analytics.
+- **Mitigation:** MPL-2.0 is a file-level weak copyleft license — it only requires sharing modifications to the MPL-licensed source files themselves. Chapa uses both packages as unmodified dependencies via their public APIs, so there is no obligation to open-source any of Chapa's own code. MPL-2.0 is not GPL, AGPL, or LGPL and is explicitly compatible with proprietary and MIT-licensed projects. No modifications are made to either package's source files.
+- **Severity:** Low
+- **Accepted:** 2026-02-24
 
 ---
 
