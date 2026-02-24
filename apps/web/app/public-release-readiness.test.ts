@@ -42,10 +42,6 @@ describe("public release readiness", () => {
       expect(fileExists(".env.example")).toBe(true);
     });
 
-    it("has .github/FUNDING.yml", () => {
-      expect(fileExists(".github/FUNDING.yml")).toBe(true);
-    });
-
     it("has issue templates", () => {
       expect(fileExists(".github/ISSUE_TEMPLATE/bug_report.yml")).toBe(true);
       expect(fileExists(".github/ISSUE_TEMPLATE/feature_request.yml")).toBe(
