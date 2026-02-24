@@ -142,6 +142,38 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  describe("data sources section", () => {
+    it("has a 'Data Sources' section header", () => {
+      expect(SOURCE).toContain("Data Sources");
+    });
+
+    it("imports Platform type from @chapa/shared", () => {
+      expect(SOURCE).toContain("Platform");
+      expect(SOURCE).toMatch(/from\s+["']@chapa\/shared["']/);
+    });
+
+    it("has a PLATFORM_DISPLAY config map", () => {
+      expect(SOURCE).toContain("PLATFORM_DISPLAY");
+    });
+
+    it("includes GitHub and Bitbucket SVG paths", () => {
+      // GitHub octocat path
+      expect(SOURCE).toContain("M8 0c4.42 0 8 3.58 8 8");
+      // Bitbucket path
+      expect(SOURCE).toContain("M.778 1.211");
+    });
+
+    it("references stats.linkedPlatforms for additional platforms", () => {
+      expect(SOURCE).toContain("stats.linkedPlatforms");
+    });
+
+    it("platform cards use design system tokens", () => {
+      // Cards should use border-stroke and bg-card
+      expect(SOURCE).toContain("border-stroke");
+      expect(SOURCE).toContain("bg-card");
+    });
+  });
+
   describe("design system tokens (#233)", () => {
     it("uses CSS variables for dimension colors, not hardcoded hex", () => {
       expect(SOURCE).toContain("var(--color-dimension-building)");

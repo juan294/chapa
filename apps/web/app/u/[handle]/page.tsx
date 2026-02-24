@@ -187,18 +187,6 @@ export default async function SharePage({ params }: SharePageProps) {
           )}
         </div>
 
-        {/* ── Platform Indicator ──────────────────────────────── */}
-        {stats?.linkedPlatforms?.includes("bitbucket") && (
-          <div className="mb-2 animate-fade-in-up [animation-delay:220ms]">
-            <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
-              </svg>
-              + Bitbucket
-            </span>
-          </div>
-        )}
-
         {/* ── Toolbar ──────────────────────────────────────────── */}
         <div className="flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
           <BadgeToolbar

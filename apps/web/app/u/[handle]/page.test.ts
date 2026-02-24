@@ -144,19 +144,18 @@ describe("SharePage", () => {
     });
   });
 
-  // Phase 5 Bitbucket — platform indicator when Bitbucket data is merged
-  describe("Bitbucket platform indicator", () => {
-    it("checks for linkedPlatforms including bitbucket", () => {
-      expect(SOURCE).toContain("linkedPlatforms");
-      expect(SOURCE).toContain('"bitbucket"');
+  // Platform indicator moved to ImpactBreakdown "Data Sources" section
+  describe("Bitbucket platform indicator removed from share page", () => {
+    it("does not render standalone '+ Bitbucket' indicator", () => {
+      expect(SOURCE).not.toContain("+ Bitbucket");
     });
 
-    it("renders a subtle + Bitbucket indicator", () => {
-      expect(SOURCE).toContain("+ Bitbucket");
+    it("does not contain inline Bitbucket SVG on the share page", () => {
+      expect(SOURCE).not.toContain("M.778 1.211");
     });
 
-    it("uses inline Bitbucket SVG for the indicator", () => {
-      expect(SOURCE).toContain("M.778 1.211");
+    it("passes stats to ImpactBreakdown (data flows through)", () => {
+      expect(SOURCE).toContain("stats={stats}");
     });
   });
 });
