@@ -77,30 +77,37 @@ describe("AdminDashboardClient", () => {
     });
   });
 
-  describe("a11y: h1 heading in loading and error states (#364)", () => {
-    it("loading state contains an <h1> element", () => {
-      // The loading branch (if (loading)) must include an <h1> so screen
-      // readers have a heading landmark. We locate the loading block by
-      // finding the section between "Loading state" and "Error state" comments.
+  describe("a11y: heading hierarchy — h2 in client component (#465)", () => {
+    it("loading state contains an <h2> (not <h1>) element", () => {
+      // The page-level <h1> lives in page.tsx (sr-only). The client
+      // component must use <h2> to avoid duplicate h1 landmarks.
       const loadingBlock = SOURCE.match(
         /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
       );
       expect(loadingBlock).not.toBeNull();
-      expect(loadingBlock![0]).toMatch(/<h1[\s>]/);
+      expect(loadingBlock![0]).toMatch(/<h2[\s>]/);
+      expect(loadingBlock![0]).not.toMatch(/<h1[\s>]/);
     });
 
-    it("error state contains an <h1> element", () => {
-      // The error branch (if (error)) must include an <h1> so screen
-      // readers have a heading landmark. We locate the error block by
-      // finding the section between "Error state" and "Dashboard" comments.
+    it("error state contains an <h2> (not <h1>) element", () => {
       const errorBlock = SOURCE.match(
         /\/\/ Error state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Dashboard/,
       );
       expect(errorBlock).not.toBeNull();
-      expect(errorBlock![0]).toMatch(/<h1[\s>]/);
+      expect(errorBlock![0]).toMatch(/<h2[\s>]/);
+      expect(errorBlock![0]).not.toMatch(/<h1[\s>]/);
     });
 
-    it("loading and error h1 use font-heading class", () => {
+    it("main dashboard view contains an <h2> (not <h1>) element", () => {
+      const dashboardBlock = SOURCE.match(
+        /\/\/ Dashboard[\s\S]*$/,
+      );
+      expect(dashboardBlock).not.toBeNull();
+      expect(dashboardBlock![0]).toMatch(/<h2[\s>]/);
+      expect(dashboardBlock![0]).not.toMatch(/<h1[\s>]/);
+    });
+
+    it("loading and error h2 use font-heading class", () => {
       const loadingBlock = SOURCE.match(
         /\/\/ Loading state[\s\S]*?\/\/ [-]+\s*\n\s*\/\/ Error state/,
       );
@@ -110,13 +117,17 @@ describe("AdminDashboardClient", () => {
       expect(loadingBlock).not.toBeNull();
       expect(errorBlock).not.toBeNull();
 
-      // Extract <h1 ...> tags from each block
-      const loadingH1 = loadingBlock![0].match(/<h1[^>]*>/);
-      const errorH1 = errorBlock![0].match(/<h1[^>]*>/);
-      expect(loadingH1).not.toBeNull();
-      expect(errorH1).not.toBeNull();
-      expect(loadingH1![0]).toContain("font-heading");
-      expect(errorH1![0]).toContain("font-heading");
+      const loadingH2 = loadingBlock![0].match(/<h2[^>]*>/);
+      const errorH2 = errorBlock![0].match(/<h2[^>]*>/);
+      expect(loadingH2).not.toBeNull();
+      expect(errorH2).not.toBeNull();
+      expect(loadingH2![0]).toContain("font-heading");
+      expect(errorH2![0]).toContain("font-heading");
+    });
+
+    it("no <h1> tags exist anywhere in AdminDashboardClient", () => {
+      // The only h1 should be the sr-only one in page.tsx, not here.
+      expect(SOURCE).not.toMatch(/<h1[\s>]/);
     });
   });
 
