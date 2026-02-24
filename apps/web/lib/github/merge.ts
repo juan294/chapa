@@ -18,6 +18,7 @@ import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
 export function mergeStats(
   primary: StatsData,
   supplemental: StatsData,
+  options?: { markAsSupplemental?: boolean },
 ): StatsData {
   const mergedHeatmap = mergeHeatmap(primary.heatmapData, supplemental.heatmapData);
   const activeDays = mergedHeatmap.filter((d) => d.count > 0).length;
@@ -53,7 +54,7 @@ export function mergeStats(
     microCommitRatio: mergeOptionalMax(primary.microCommitRatio, supplemental.microCommitRatio),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),
     heatmapData: mergedHeatmap,
-    hasSupplementalData: true,
+    hasSupplementalData: options?.markAsSupplemental ?? true,
   };
 }
 

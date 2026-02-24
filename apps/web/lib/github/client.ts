@@ -2,6 +2,14 @@ import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
+import { isBitbucketEnabled } from "@/lib/feature-flags";
+import {
+  dbGetLinkedPlatform,
+  dbDeleteLinkedPlatform,
+  dbUpdatePlatformTokens,
+} from "@/lib/db/user-platforms";
+import { isTokenExpired, refreshBitbucketToken } from "@/lib/auth/bitbucket";
+import { fetchBitbucketStats } from "@/lib/bitbucket/stats";
 import type { StatsData, SupplementalStats } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
@@ -17,10 +25,11 @@ export function _resetInflight(): void {
 }
 
 /**
- * Get StatsData for a user — cache-first, then GitHub API.
+ * Get StatsData for a user — cache-first, then GitHub + Bitbucket.
  * Returns cached data if available (within 6h).
  * Falls back to live fetch on cache miss.
  * If the API fails (e.g. rate limit 403), returns stale cached data (7d TTL) if available.
+ * If Bitbucket is linked, fetches and merges Bitbucket data.
  * If supplemental data exists (e.g. from an EMU upload), merges it into the result.
  *
  * Concurrent calls for the same handle are deduplicated — only one GitHub API
@@ -31,7 +40,7 @@ export async function getStats(
   token?: string,
 ): Promise<StatsData | null> {
   const lowerHandle = handle.toLowerCase();
-  const cacheKey = `stats:v2:${lowerHandle}`;
+  const cacheKey = `stats:v2:merged:${lowerHandle}`;
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
@@ -53,7 +62,7 @@ export async function getStats(
   return promise;
 }
 
-/** Internal: fetch from GitHub, apply stale fallback, merge supplemental, cache. */
+/** Internal: fetch from GitHub, merge Bitbucket + supplemental, cache. */
 async function _fetchAndCache(
   handle: string,
   lowerHandle: string,
@@ -76,11 +85,26 @@ async function _fetchAndCache(
     return null;
   }
 
+  // Fetch Bitbucket data (from cache or live)
+  const bbStats = await _fetchBitbucketIfLinked(handle, lowerHandle);
+
+  // Merge Bitbucket into primary (markAsSupplemental: false — linked platform, not EMU)
+  let stats: StatsData = bbStats
+    ? mergeStats(primary, bbStats, { markAsSupplemental: false })
+    : primary;
+
   // Check for supplemental data (e.g. EMU account)
   const supplemental = await cacheGet<SupplementalStats>(`supplemental:${lowerHandle}`);
-  const stats = supplemental ? mergeStats(primary, supplemental.stats) : primary;
+  if (supplemental) {
+    stats = mergeStats(stats, supplemental.stats);
+  }
 
-  // Cache the (possibly merged) result — both primary and stale fallback
+  // Set linkedPlatforms after all merges (so it survives EMU merge)
+  if (bbStats) {
+    stats = { ...stats, linkedPlatforms: ["bitbucket"] };
+  }
+
+  // Cache the final (possibly merged) result — both primary and stale fallback
   await cacheSet(cacheKey, stats, CACHE_TTL);
   await cacheSet(staleKey, stats, STALE_TTL);
 
@@ -88,4 +112,67 @@ async function _fetchAndCache(
   void dbUpsertUser(handle).catch(() => {});
 
   return stats;
+}
+
+/** Fetch Bitbucket stats from cache or live API. Returns null if not linked/disabled. */
+async function _fetchBitbucketIfLinked(
+  handle: string,
+  lowerHandle: string,
+): Promise<StatsData | null> {
+  const bbCacheKey = `stats:v2:bitbucket:${lowerHandle}`;
+
+  // Check Bitbucket cache first (cheap Redis read, always available)
+  const cached = await cacheGet<StatsData>(bbCacheKey);
+  if (cached) return cached;
+
+  // Check feature flag — only make live API calls if enabled
+  const enabled = await isBitbucketEnabled();
+  if (!enabled) return null;
+
+  // Check if user has linked Bitbucket
+  const linked = await dbGetLinkedPlatform(handle, "bitbucket");
+  if (!linked) return null;
+
+  let { accessToken } = linked.tokens;
+  const { refreshToken, expiresAt } = linked.tokens;
+
+  // Refresh token if expired
+  if (isTokenExpired(expiresAt)) {
+    if (!refreshToken) {
+      void dbDeleteLinkedPlatform(handle, "bitbucket");
+      return null;
+    }
+
+    const clientId = process.env.BITBUCKET_CLIENT_ID?.trim() ?? "";
+    const clientSecret = process.env.BITBUCKET_CLIENT_SECRET?.trim() ?? "";
+    const refreshed = await refreshBitbucketToken(refreshToken, clientId, clientSecret);
+
+    if (!refreshed) {
+      // Token revoked — unlink platform
+      void dbDeleteLinkedPlatform(handle, "bitbucket");
+      return null;
+    }
+
+    accessToken = refreshed.access_token;
+    void dbUpdatePlatformTokens(
+      handle,
+      "bitbucket",
+      refreshed.access_token,
+      refreshed.refresh_token,
+      new Date(Date.now() + refreshed.expires_in * 1000),
+    );
+  }
+
+  // Fetch Bitbucket stats
+  const bbStats = await fetchBitbucketStats(
+    linked.remoteLogin,
+    accessToken,
+    { displayName: linked.remoteLogin, avatarUrl: "" },
+  );
+
+  if (bbStats) {
+    await cacheSet(bbCacheKey, bbStats, CACHE_TTL);
+  }
+
+  return bbStats;
 }

@@ -880,7 +880,6 @@ This section documents the concrete Chapa implementation of the template above.
 | Performance Agent | `performance_agent` | Weekly Thursday 9:00 AM | `docs/agents/performance-report.md` |
 | Documentation Agent | `documentation_agent` | Weekly Friday 9:00 AM | `docs/agents/documentation-report.md` |
 | Cost Analyst | `cost_analyst` | Daily at 3:00 AM | `docs/agents/cost-analyst-report.md` |
-| Localization Agent | `localization_agent` | Weekly Saturday 9:00 AM | `docs/agents/localization-report.md` |
 
 ### File Locations
 
@@ -892,7 +891,6 @@ scripts/
   performance-agent.sh          # Performance agent shell script
   documentation-agent.sh        # Documentation agent shell script
   cost-analyst.sh               # Cost analyst shell script
-  localization-agent.sh         # Localization agent shell script
   install-agents.sh             # launchd installation helper
   lib/
     agent-utils.sh              # Shared bash utilities
@@ -904,7 +902,6 @@ scripts/
     com.chapa.performance-agent.plist
     com.chapa.documentation-agent.plist
     com.chapa.cost-analyst.plist
-    com.chapa.localization-agent.plist
 
 apps/web/
   lib/agents/

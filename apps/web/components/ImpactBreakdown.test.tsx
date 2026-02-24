@@ -142,6 +142,53 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // Data Sources is a standalone exported component (rendered on share page above breakdown)
+  describe("data sources component", () => {
+    it("exports a DataSources component", () => {
+      expect(SOURCE).toContain("export function DataSources");
+    });
+
+    it("imports Platform type from @chapa/shared", () => {
+      expect(SOURCE).toContain("Platform");
+      expect(SOURCE).toMatch(/from\s+["']@chapa\/shared["']/);
+    });
+
+    it("has a PLATFORM_DISPLAY config map", () => {
+      expect(SOURCE).toContain("PLATFORM_DISPLAY");
+    });
+
+    it("includes GitHub and Bitbucket SVG paths", () => {
+      expect(SOURCE).toContain("M8 0c4.42 0 8 3.58 8 8");
+      expect(SOURCE).toContain("M.778 1.211");
+    });
+
+    it("references stats.linkedPlatforms for additional platforms", () => {
+      expect(SOURCE).toContain("stats.linkedPlatforms");
+    });
+
+    it("platform cards use design system tokens", () => {
+      expect(SOURCE).toContain("border-stroke");
+      expect(SOURCE).toContain("bg-card");
+    });
+
+    it("does not render Data Sources inside ImpactBreakdown", () => {
+      // The ImpactBreakdown function body should not contain "Data Sources"
+      const fnBody = SOURCE.slice(SOURCE.indexOf("export function ImpactBreakdown"));
+      expect(fnBody).not.toContain("Data Sources");
+    });
+
+    it("accepts a handle prop for building profile URLs", () => {
+      expect(SOURCE).toContain("handle: string");
+    });
+
+    it("renders platform chips as links", () => {
+      // DataSources should use <a> tags for clickable platform links
+      expect(SOURCE).toMatch(/<a\s/);
+      expect(SOURCE).toContain("github.com/");
+      expect(SOURCE).toContain("bitbucket.org/");
+    });
+  });
+
   describe("design system tokens (#233)", () => {
     it("uses CSS variables for dimension colors, not hardcoded hex", () => {
       expect(SOURCE).toContain("var(--color-dimension-building)");

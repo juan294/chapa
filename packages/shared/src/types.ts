@@ -1,3 +1,5 @@
+import type { Platform } from "./platforms";
+
 /** Daily activity count for heatmap (up to 53 weeks × 7 days = 371 entries) */
 export interface HeatmapDay {
   date: string; // ISO date string (YYYY-MM-DD)
@@ -28,6 +30,7 @@ export interface StatsData {
   heatmapData: HeatmapDay[];
   fetchedAt: string; // ISO timestamp
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
+  linkedPlatforms?: Platform[]; // platforms whose data was merged (informational)
 }
 
 /** Confidence flag identifiers */
@@ -39,7 +42,8 @@ export type ConfidenceFlag =
   | "single_repo_concentration"
   | "supplemental_unverified"
   | "low_activity_signal"
-  | "review_volume_imbalance";
+  | "review_volume_imbalance"
+  | "platform_linked";
 
 /** A single confidence penalty with reason */
 export interface ConfidencePenalty {

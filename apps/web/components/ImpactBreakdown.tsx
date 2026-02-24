@@ -1,4 +1,4 @@
-import type { ImpactV4Result, DeveloperArchetype, StatsData } from "@chapa/shared";
+import type { ImpactV4Result, DeveloperArchetype, StatsData, Platform } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 
@@ -53,6 +53,74 @@ const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   Reviews: { id: "stat-reviews", tip: "Code reviews submitted on others\u2019 PRs in the last 365 days." },
   Repos: { id: "stat-repos", tip: "Distinct repositories you contributed to in the last 365 days." },
 };
+
+const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewBox: string }> = {
+  github: {
+    label: "GitHub",
+    svgPath: "M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 01-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 010 8c0-4.42 3.58-8 8-8z",
+    viewBox: "0 0 16 16",
+  },
+  bitbucket: {
+    label: "Bitbucket",
+    svgPath: "M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z",
+    viewBox: "0 0 24 24",
+  },
+};
+
+const PLATFORM_URLS: Record<Platform, (handle: string) => string> = {
+  github: (handle) => `https://github.com/${handle}`,
+  bitbucket: (handle) => `https://bitbucket.org/${handle}`,
+};
+
+interface DataSourcesProps {
+  stats: StatsData;
+  handle: string;
+}
+
+export function DataSources({ stats, handle }: DataSourcesProps) {
+  const platforms: Platform[] = [
+    "github",
+    ...(stats.linkedPlatforms?.filter((p): p is Platform => p !== "github") ?? []),
+  ];
+
+  return (
+    <div>
+      <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:260ms]">
+        Data Sources
+      </h3>
+      <div className="flex flex-wrap gap-3">
+        {platforms.map((platform, i) => {
+          const display = PLATFORM_DISPLAY[platform];
+          if (!display) return null;
+          return (
+            <a
+              key={platform}
+              href={PLATFORM_URLS[platform](handle)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors hover:border-amber/30 hover:text-amber"
+              style={{ animationDelay: `${280 + i * 80}ms` }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox={display.viewBox}
+                fill="currentColor"
+                className="text-text-secondary"
+                aria-hidden="true"
+              >
+                <path d={display.svgPath} />
+              </svg>
+              <span className="text-sm text-text-primary font-medium">
+                {display.label}
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
   Builder:

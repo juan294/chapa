@@ -23,7 +23,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@/": path.resolve(__dirname, "apps/web/"),
+      "@/": path.resolve(__dirname, "apps/web") + "/",
       "@chapa/shared": path.resolve(__dirname, "packages/shared/src"),
     },
   },

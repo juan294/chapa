@@ -191,9 +191,9 @@ export function AdminDashboardClient() {
       <div className="space-y-6">
         {tabBar}
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
-          <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+          <h2 className="font-heading text-2xl tracking-tight text-text-primary">
             <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-          </h1>
+          </h2>
           <span className="sr-only" aria-live="polite">Loading user data</span>
           <AdminTableSkeleton />
         </div>
@@ -210,9 +210,9 @@ export function AdminDashboardClient() {
       <div className="space-y-6">
         {tabBar}
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="mx-auto max-w-lg py-32 text-center">
-          <h1 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
+          <h2 className="font-heading text-2xl tracking-tight text-text-primary mb-6">
             <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-          </h1>
+          </h2>
           <div className="rounded-xl border border-terminal-red/20 bg-terminal-red/5 p-6">
             <p className="font-heading text-sm text-terminal-red">
               <span className="text-terminal-red/50">ERR</span> {error}
@@ -252,9 +252,9 @@ export function AdminDashboardClient() {
           {/* Header */}
           <div className="animate-fade-in-up flex items-start justify-between gap-4">
             <div>
-              <h1 className="font-heading text-2xl tracking-tight text-text-primary">
+              <h2 className="font-heading text-2xl tracking-tight text-text-primary">
                 <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
-              </h1>
+              </h2>
               <p className="mt-1 text-sm text-text-secondary">
                 {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
                 {lastRefreshed && (

@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync, isBitbucketEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface UserMenuProps {
   login: string;
@@ -17,6 +18,38 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
+
+  const [bbStatus, setBbStatus] = useState<{
+    linked: boolean;
+    remoteLogin: string | null;
+  } | null>(null);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [unlinkLoading, setUnlinkLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isBitbucketEnabledSync()) return;
+    fetch("/api/auth/bitbucket/status")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.enabled) setBbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
+      })
+      .catch(() => {}); // Graceful — menu works without status
+  }, []);
+
+  async function handleUnlinkBitbucket() {
+    setUnlinkLoading(true);
+    try {
+      const res = await fetch("/api/auth/bitbucket/disconnect", { method: "POST" });
+      if (res.ok) {
+        setBbStatus({ linked: false, remoteLogin: null });
+        setShowUnlinkConfirm(false);
+      }
+    } catch {
+      // Graceful failure — user can try again
+    } finally {
+      setUnlinkLoading(false);
+    }
+  }
 
   const fallbackLetter = login.charAt(0).toUpperCase();
 
@@ -134,6 +167,34 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 </svg>
                 Creator Studio
               </Link>
+            )}
+            {isBitbucketEnabledSync() && bbStatus && (
+              bbStatus.linked ? (
+                <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-3">
+                    <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
+                    </svg>
+                    <span className="text-sm text-text-primary">{bbStatus.remoteLogin}</span>
+                  </div>
+                  <button
+                    onClick={() => setShowUnlinkConfirm(true)}
+                    className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
+                  >
+                    Unlink
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/bitbucket/connect"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
+                  </svg>
+                  Link Bitbucket
+                </a>
+              )
             )}
             {isAdmin && (
               <Link
@@ -255,6 +316,17 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={showUnlinkConfirm}
+        title="Unlink Bitbucket?"
+        description="Your Bitbucket stats will no longer be included in your impact score. You can re-link anytime."
+        confirmLabel="Unlink"
+        cancelLabel="Cancel"
+        variant="destructive"
+        loading={unlinkLoading}
+        onConfirm={handleUnlinkBitbucket}
+        onCancel={() => setShowUnlinkConfirm(false)}
+      />
     </div>
   );
 }

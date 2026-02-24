@@ -113,6 +113,9 @@ const PENALTY_TRIGGERS: Record<ConfidenceFlag, Partial<StatsData>> = {
     reviewsSubmittedCount: 60,
     prsMergedCount: 1,
   },
+  platform_linked: {
+    linkedPlatforms: ["bitbucket"],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -157,8 +160,8 @@ describe("Non-accusatory confidence messaging", () => {
     }
   });
 
-  it("all 8 confidence flags are covered by this test", () => {
-    expect(allFlags).toHaveLength(8);
+  it("all 9 confidence flags are covered by this test", () => {
+    expect(allFlags).toHaveLength(9);
     expect(allFlags).toEqual(
       expect.arrayContaining([
         "burst_activity",
@@ -169,6 +172,7 @@ describe("Non-accusatory confidence messaging", () => {
         "supplemental_unverified",
         "low_activity_signal",
         "review_volume_imbalance",
+        "platform_linked",
       ]),
     );
   });

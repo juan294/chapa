@@ -3,29 +3,27 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.chapa.localization-agent</string>
+  <string>com.chapa.cc-rpi-update</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>CHAPA_PROJECT_DIR/scripts/localization-agent.sh</string>
+    <string>CHAPA_PROJECT_DIR/scripts/cc-rpi-update.sh</string>
   </array>
 
   <key>StartCalendarInterval</key>
   <dict>
-    <key>Weekday</key>
-    <integer>6</integer>
     <key>Hour</key>
-    <integer>9</integer>
+    <integer>3</integer>
     <key>Minute</key>
     <integer>0</integer>
   </dict>
 
   <key>StandardOutPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/localization-agent-launchd.log</string>
+  <string>CHAPA_PROJECT_DIR/logs/cc-rpi-update-launchd.log</string>
 
   <key>StandardErrorPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/localization-agent-launchd-error.log</string>
+  <string>CHAPA_PROJECT_DIR/logs/cc-rpi-update-launchd-error.log</string>
 
   <key>EnvironmentVariables</key>
   <dict>

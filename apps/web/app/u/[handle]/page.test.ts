@@ -143,4 +143,28 @@ describe("SharePage", () => {
       expect(SOURCE).toContain("u003c");
     });
   });
+
+  // Data Sources section — rendered before Impact Breakdown
+  describe("data sources section", () => {
+    it("imports DataSources component", () => {
+      expect(SOURCE).toContain("DataSources");
+    });
+
+    it("renders DataSources before Impact Breakdown heading", () => {
+      const dsIndex = SOURCE.indexOf("DataSources");
+      const breakdownIndex = SOURCE.indexOf("Impact Breakdown");
+      expect(dsIndex).toBeGreaterThan(-1);
+      expect(breakdownIndex).toBeGreaterThan(-1);
+      expect(dsIndex).toBeLessThan(breakdownIndex);
+    });
+
+    it("passes stats and handle to DataSources", () => {
+      expect(SOURCE).toContain("stats={stats}");
+      expect(SOURCE).toContain("handle={handle}");
+    });
+
+    it("does not render standalone '+ Bitbucket' indicator", () => {
+      expect(SOURCE).not.toContain("+ Bitbucket");
+    });
+  });
 });

@@ -21,7 +21,7 @@ PLISTS=(
   "com.chapa.performance-agent"
   "com.chapa.documentation-agent"
   "com.chapa.cost-analyst"
-  "com.chapa.localization-agent"
+  "com.chapa.cc-rpi-update"
 )
 
 # Ensure logs directory exists
