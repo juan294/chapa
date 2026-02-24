@@ -40,6 +40,10 @@ describe("AdminUserTable", () => {
       expect(SOURCE).toContain('label="Score"');
     });
 
+    it("renders Raw column", () => {
+      expect(SOURCE).toContain('label="Raw"');
+    });
+
     it("renders Confidence column", () => {
       expect(SOURCE).toContain('label="Conf"');
     });
@@ -84,7 +88,7 @@ describe("AdminUserTable", () => {
     });
 
     it("uses colSpan for the empty state row", () => {
-      expect(SOURCE).toContain("colSpan={12}");
+      expect(SOURCE).toContain("colSpan={13}");
     });
   });
 

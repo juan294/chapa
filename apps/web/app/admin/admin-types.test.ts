@@ -28,6 +28,7 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     archetype: null,
     tier: null,
     adjustedComposite: null,
+    rawScore: null,
     confidence: null,
     statsExpired: false,
     ...overrides,
@@ -111,6 +112,16 @@ describe("sortUsers", () => {
       ];
       const result = sortUsers(users, "adjustedComposite", "desc");
       expect(result.map((u) => u.adjustedComposite)).toEqual([95, 80, 50]);
+    });
+
+    it("sorts rawScore ascending", () => {
+      const users = [
+        makeUser({ handle: "a", rawScore: 70 }),
+        makeUser({ handle: "b", rawScore: 40 }),
+        makeUser({ handle: "c", rawScore: 90 }),
+      ];
+      const result = sortUsers(users, "rawScore", "asc");
+      expect(result.map((u) => u.rawScore)).toEqual([40, 70, 90]);
     });
 
     it("treats null numeric values as 0", () => {

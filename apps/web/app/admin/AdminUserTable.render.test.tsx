@@ -53,6 +53,7 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     archetype: "Builder",
     tier: "High",
     adjustedComposite: 72,
+    rawScore: 68,
     confidence: 85,
     statsExpired: false,
     ...overrides,
@@ -174,6 +175,16 @@ describe("AdminUserTable — render tests", () => {
         />,
       );
       expect(screen.getByText("88")).toBeDefined();
+    });
+
+    it("displays the raw score", () => {
+      render(
+        <AdminUserTable
+          {...defaultProps}
+          users={[makeUser({ rawScore: 55 })]}
+        />,
+      );
+      expect(screen.getByText("55")).toBeDefined();
     });
 
     it("displays the confidence value", () => {

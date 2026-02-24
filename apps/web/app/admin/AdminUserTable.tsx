@@ -39,6 +39,7 @@ export function AdminUserTable({
             <AdminSortableHeader field="archetype" label="Archetype" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden sm:table-cell" />
             <AdminSortableHeader field="tier" label="Tier" sortField={sortField} sortDir={sortDir} onSort={onSort} />
             <AdminSortableHeader field="adjustedComposite" label="Score" sortField={sortField} sortDir={sortDir} onSort={onSort} />
+            <AdminSortableHeader field="rawScore" label="Raw" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
             <AdminSortableHeader field="confidence" label="Conf" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
             <AdminSortableHeader field="commitsTotal" label="Commits" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
             <AdminSortableHeader field="prsMergedCount" label="PRs" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden lg:table-cell" />
@@ -55,7 +56,7 @@ export function AdminUserTable({
           {users.length === 0 ? (
             <tr>
               <td
-                colSpan={12}
+                colSpan={13}
                 className="px-3 py-12 text-center text-sm text-text-secondary"
               >
                 {search ? "No users match your search." : "No users found."}
@@ -129,6 +130,17 @@ export function AdminUserTable({
                   {user.adjustedComposite != null ? (
                     <span className={`font-heading text-sm tabular-nums ${TIER_COLOR[user.tier ?? ""] ?? "text-text-secondary"}`}>
                       {user.adjustedComposite}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-text-secondary/50">&mdash;</span>
+                  )}
+                </td>
+
+                {/* Raw Score */}
+                <td className="hidden md:table-cell px-3 py-2.5">
+                  {user.rawScore != null ? (
+                    <span className="font-heading text-xs tabular-nums text-text-secondary">
+                      {user.rawScore}
                     </span>
                   ) : (
                     <span className="text-xs text-text-secondary/50">&mdash;</span>

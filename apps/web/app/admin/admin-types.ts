@@ -16,6 +16,7 @@ export interface AdminUser {
   archetype: string | null;
   tier: string | null;
   adjustedComposite: number | null;
+  rawScore: number | null;
   confidence: number | null;
   statsExpired: boolean;
 }
@@ -25,6 +26,7 @@ export type SortField =
   | "archetype"
   | "tier"
   | "adjustedComposite"
+  | "rawScore"
   | "confidence"
   | "commitsTotal"
   | "prsMergedCount"
