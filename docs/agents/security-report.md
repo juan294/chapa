@@ -1,28 +1,56 @@
-The security audit is complete. I need write permissions to save the report to `docs/agents/security-report.md` and update `docs/agents/shared-context.md`. The report content is ready — here's the summary:
+---
+
+# Security Report
+> Generated: 2026-02-23 | Branch: `develop` | Health status: **green**
+
+## Executive Summary
+
+The Chapa codebase demonstrates strong security posture across all 8 audited areas. No critical or high-severity findings in application code. The only dependency vulnerabilities are in dev-only ESLint transitive dependencies (ReDoS in `minimatch` and `ajv`), which pose no production risk.
 
 ---
 
-## Security Audit Results — Health: GREEN
+## Dependency Vulnerabilities
 
-### Findings at a Glance
+**Source:** `pnpm audit` — 3 vulnerabilities (0 critical, 2 high, 1 moderate)
 
-| Area | Status | Details |
-|------|--------|---------|
-| Dependency vulns | 1 moderate | `ajv` ReDoS via eslint (dev-only, not in production) |
-| Hardcoded secrets | None | Only test fixtures with mock values |
-| Client-side leaks | None | No `NEXT_PUBLIC_*` exposes sensitive env vars |
-| SVG XSS | All escaped | 9 user input points, all through `escapeXml()` |
-| CORS | Appropriate | Only `/api/verify/[hash]` has wildcard (intentional, rate-limited) |
-| Supabase RLS | Enabled | All 4 tables, server-side only, no anon key |
-| Security headers | Comprehensive | HSTS, CSP, X-Frame-Options, nosniff, Permissions-Policy |
-| Licenses | Clean | 149 deps — 1 LGPL exception (sharp-libvips, dynamically linked) |
-| Unused deps (knip) | 0 | 4 knip.json ignore entries can be cleaned up |
+| Severity | Package | Issue | Paths | Fix |
+|----------|---------|-------|-------|-----|
+| High | `minimatch` (<10.2.1) | ReDoS via repeated wildcards | `eslint`, `typescript-eslint` (dev) | Upstream ESLint update |
+| High | `minimatch` (<10.2.1) | ReDoS via repeated wildcards | `typescript-estree` (dev) | Upstream ESLint update |
+| Moderate | `ajv` (<6.14.0) | ReDoS with `$data` option | `eslint` (dev) | Upstream ESLint update |
 
-### Recommendations (all low priority)
-1. Clean 4 stale knip.json ignore entries
-2. Document the sharp/LGPL-3.0 exception in CLAUDE.md
-3. Consider explicit RLS deny policies for defense-in-depth
-4. Update eslint when ajv >=8.18.0 becomes available upstream
-5. Add logging for rejected non-GitHub avatar URLs
+All 3 are **dev-only transitive deps** — not in production builds.
 
-Would you like me to save the full report to `docs/agents/security-report.md`?
+## Unused Dependencies (knip)
+
+`npx knip` — **no findings.** No unused deps, exports, or files. Attack surface is minimal.
+
+## Code Findings
+
+| Check | Result | Details |
+|-------|--------|---------|
+| Hardcoded secrets | **PASS** | No secrets in source. All use `process.env.VAR?.trim()`. Test mocks only. |
+| SVG XSS vectors | **PASS** | `escapeXml()` covers all 5 XML entities. All 6 user input paths escaped. No `dangerouslySetInnerHTML` in render pipeline. |
+| Secret leak to client | **PASS** | 7 server-only secrets verified isolated. No `process.env` server secrets in `"use client"` files. |
+| CORS headers | **PASS** | Only `/api/verify/[hash]` has `*` CORS (intentional, rate-limited). All other routes same-origin. Security headers in `next.config.ts`. |
+| Supabase RLS | **PASS** | All 5 tables have RLS + explicit deny policies for anon. No anon key in codebase. Service role server-side only. |
+
+## License Compliance
+
+| Package | License | Risk |
+|---------|---------|------|
+| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0-or-later | **Accepted** — dynamically linked, see `docs/accepted-risks.md` #450 |
+| `dompurify` | MPL-2.0 OR Apache-2.0 | **Safe** — Apache-2.0 option |
+
+All other deps: MIT, Apache-2.0, BSD, ISC, or 0BSD. **No GPL/AGPL violations.**
+
+## Recommendations
+
+1. **Monitor ESLint dep updates** for `minimatch`/`ajv` ReDoS fixes (low effort)
+2. **Add XSS payload test cases** to `escapeXml()` tests — e.g., `<img onerror=alert(1)>` as display name (medium)
+3. **CSP nonce support** when Next.js stabilizes it — replaces `unsafe-inline` for scripts (long-term)
+4. **Increase HMAC hash to 128 bits** when verification URL migration is feasible (long-term)
+
+---
+
+I was unable to write the report to `docs/agents/security-report.md` due to permission restrictions. Would you like me to retry, or would you prefer to save it yourself?
