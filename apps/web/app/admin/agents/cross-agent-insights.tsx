@@ -7,16 +7,33 @@ interface CrossAgentInsightsProps {
   entries: SharedContextEntry[];
 }
 
+/**
+ * Escape HTML entities in user-controlled strings before embedding in HTML.
+ *
+ * Uses numeric &#39; for single quotes (universally safe in HTML, including
+ * HTML4). Intentionally separate from escapeXml (which uses &apos;) in
+ * lib/render/escape.ts to avoid importing server-side modules into this
+ * "use client" component.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/'/g, "&#39;")
+    .replace(/"/g, "&quot;");
+}
+
 /** Simple markdown to HTML: headings, bold, bullets, inline code. */
-function renderMarkdown(md: string): string {
+export function renderMarkdown(md: string): string {
   return md
     .split("\n")
     .map((line) => {
-      // Headings
+      // Headings — escape text content, not the HTML wrapper
       if (line.startsWith("## "))
-        return `<h3 class="font-heading text-sm font-medium text-text-primary mt-3 mb-1">${line.slice(3)}</h3>`;
+        return `<h3 class="font-heading text-sm font-medium text-text-primary mt-3 mb-1">${escapeHtml(line.slice(3))}</h3>`;
       if (line.startsWith("# "))
-        return `<h2 class="font-heading text-base font-medium text-text-primary mt-3 mb-1">${line.slice(2)}</h2>`;
+        return `<h2 class="font-heading text-base font-medium text-text-primary mt-3 mb-1">${escapeHtml(line.slice(2))}</h2>`;
       // Bullets
       if (line.startsWith("- ")) {
         const content = line.slice(2);
@@ -30,8 +47,12 @@ function renderMarkdown(md: string): string {
     .join("");
 }
 
+/** Apply inline markdown formatting (bold, code) with HTML escaping. */
 function inlineFormat(text: string): string {
-  return text
+  // Escape HTML entities FIRST, then apply markdown formatting.
+  // **bold** and `code` delimiters don't contain &<>"' so escaping
+  // doesn't interfere with the regex patterns.
+  return escapeHtml(text)
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
     .replace(/`(.+?)`/g, '<code class="bg-stroke/50 px-1 rounded text-amber text-xs">$1</code>');
 }
