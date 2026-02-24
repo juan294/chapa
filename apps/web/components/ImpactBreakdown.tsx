@@ -67,6 +67,61 @@ const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewB
   },
 };
 
+const PLATFORM_URLS: Record<Platform, (handle: string) => string> = {
+  github: (handle) => `https://github.com/${handle}`,
+  bitbucket: (handle) => `https://bitbucket.org/${handle}`,
+};
+
+interface DataSourcesProps {
+  stats: StatsData;
+  handle: string;
+}
+
+export function DataSources({ stats, handle }: DataSourcesProps) {
+  const platforms: Platform[] = [
+    "github",
+    ...(stats.linkedPlatforms?.filter((p): p is Platform => p !== "github") ?? []),
+  ];
+
+  return (
+    <div>
+      <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:260ms]">
+        Data Sources
+      </h3>
+      <div className="flex flex-wrap gap-3">
+        {platforms.map((platform, i) => {
+          const display = PLATFORM_DISPLAY[platform];
+          if (!display) return null;
+          return (
+            <a
+              key={platform}
+              href={PLATFORM_URLS[platform](handle)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors hover:border-amber/30 hover:text-amber"
+              style={{ animationDelay: `${280 + i * 80}ms` }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox={display.viewBox}
+                fill="currentColor"
+                className="text-text-secondary"
+                aria-hidden="true"
+              >
+                <path d={display.svgPath} />
+              </svg>
+              <span className="text-sm text-text-primary font-medium">
+                {display.label}
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
   Builder:
     "Your profile is driven by output \u2014 you turn ideas into merged pull requests and closed issues at a pace that keeps the roadmap moving. Building is clearly your dominant dimension, meaning you thrive when shipping features and moving codebases forward.",
@@ -203,48 +258,6 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* ── Data Sources ─────────────────────────────────── */}
-      <div>
-        <h3
-          className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up"
-          style={{ animationDelay: "1200ms" }}
-        >
-          Data Sources
-        </h3>
-        <div className="flex flex-wrap gap-3">
-          {(
-            [
-              "github" as Platform,
-              ...(stats.linkedPlatforms?.filter((p) => p !== "github") ?? []),
-            ] as Platform[]
-          ).map((platform, i) => {
-            const display = PLATFORM_DISPLAY[platform];
-            if (!display) return null;
-            return (
-              <div
-                key={platform}
-                className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up"
-                style={{ animationDelay: `${1260 + i * 80}ms` }}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox={display.viewBox}
-                  fill="currentColor"
-                  className="text-text-secondary"
-                  aria-hidden="true"
-                >
-                  <path d={display.svgPath} />
-                </svg>
-                <span className="text-sm text-text-primary font-medium">
-                  {display.label}
-                </span>
-              </div>
-            );
-          })}
         </div>
       </div>
 

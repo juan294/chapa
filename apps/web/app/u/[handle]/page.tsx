@@ -3,7 +3,7 @@ import { computeImpactV4 } from "@/lib/impact/v4";
 import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { ImpactBreakdown, getArchetypeProfile } from "@/components/ImpactBreakdown";
+import { ImpactBreakdown, getArchetypeProfile, DataSources } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -223,6 +223,13 @@ export default async function SharePage({ params }: SharePageProps) {
         {isOwner && (
           <>
             <hr className="border-stroke mb-10" />
+
+            {/* ── Data Sources ──────────────────────────────────── */}
+            {stats && (
+              <section className="mb-10 animate-fade-in-up [animation-delay:260ms]">
+                <DataSources stats={stats} handle={handle} />
+              </section>
+            )}
 
             <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up [animation-delay:280ms]">
               Impact Breakdown
