@@ -25,8 +25,8 @@ function buildHeatmap(grid: number[][]): HeatmapDay[] {
   return days;
 }
 
-/* ── Deliverer: intense bursts of shipping, heavy weekday activity ───── */
-const DELIVERER_GRID: number[][] = [
+/* ── Builder: intense bursts of shipping, heavy weekday activity ───── */
+const BUILDER_GRID: number[][] = [
   [0, 3, 4, 4, 3, 1, 0],
   [0, 4, 4, 3, 4, 0, 0],
   [1, 3, 4, 4, 4, 2, 0],
@@ -42,8 +42,8 @@ const DELIVERER_GRID: number[][] = [
   [0, 4, 4, 3, 4, 1, 0],
 ];
 
-export const DELIVERER_STATS: StatsData = {
-  handle: "deliverer",
+export const BUILDER_STATS: StatsData = {
+  handle: "builder",
   displayName: "Alex Rivera",
   commitsTotal: 580,
   activeDays: 210,
@@ -59,12 +59,12 @@ export const DELIVERER_STATS: StatsData = {
   totalStars: 340,
   totalForks: 85,
   totalWatchers: 32,
-  heatmapData: buildHeatmap(DELIVERER_GRID),
+  heatmapData: buildHeatmap(BUILDER_GRID),
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const DELIVERER_IMPACT: ImpactV4Result = {
-  handle: "deliverer",
+export const BUILDER_IMPACT: ImpactV4Result = {
+  handle: "builder",
   profileType: "collaborative",
   dimensions: {
     delivery: 92,
@@ -72,7 +72,7 @@ export const DELIVERER_IMPACT: ImpactV4Result = {
     consistency: 68,
     breadth: 38,
   },
-  archetype: "Deliverer",
+  archetype: "Builder",
   compositeScore: 72,
   confidence: 91,
   confidencePenalties: [],

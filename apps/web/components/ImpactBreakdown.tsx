@@ -123,7 +123,7 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
 }
 
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
-  Deliverer:
+  Builder:
     "Your profile is driven by output \u2014 you turn ideas into merged pull requests and closed issues at a pace that keeps the roadmap moving. Delivery is clearly your dominant dimension, meaning you thrive when shipping features and moving codebases forward.",
   "Quality Champion":
     "Your profile is shaped by quality \u2014 you\u2019re the one reviewing pull requests, catching edge cases, and making sure nothing ships that shouldn\u2019t. Quality is your dominant dimension, and your team\u2019s code quality reflects it.",

@@ -421,7 +421,7 @@ On pages that don't have a dedicated terminal (share pages, about, terms, privac
 | `/about` | Go to the About page |
 | `/terms` | Terms of Service |
 | `/privacy` | Privacy Policy |
-| `/deliverer` | View the Deliverer archetype page |
+| `/builder` | View the Builder archetype page |
 | `/guardian` | View the Quality Champion archetype page |
 | `/marathoner` | View the Marathoner archetype page |
 | `/polymath` | View the Polymath archetype page |
@@ -552,7 +552,7 @@ curl "https://chapa.thecreativetoken.com/api/history/juan294?window=14"
       "quality": 45,
       "consistency": 68,
       "breadth": 55,
-      "archetype": "Deliverer",
+      "archetype": "Builder",
       "compositeScore": 60,
       "adjustedComposite": 58,
       "confidence": 85,

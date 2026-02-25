@@ -90,7 +90,7 @@ describe("isSignificantChange", () => {
   describe("archetype change", () => {
     it("detects archetype change as significant", () => {
       const result = isSignificantChange(
-        makeDiff({ archetype: { from: "Balanced", to: "Deliverer" } }),
+        makeDiff({ archetype: { from: "Balanced", to: "Builder" } }),
       );
       expect(result.significant).toBe(true);
       if (result.significant) {
@@ -123,7 +123,7 @@ describe("isSignificantChange", () => {
       const result = isSignificantChange(
         makeDiff({
           tier: { from: "Solid", to: "High" },
-          archetype: { from: "Balanced", to: "Deliverer" },
+          archetype: { from: "Balanced", to: "Builder" },
           adjustedComposite: 10,
         }),
       );

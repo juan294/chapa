@@ -144,7 +144,7 @@ describe("Landing page — scoring overview in How It Works section", () => {
     const howItWorksIndex = SOURCE.indexOf('id="how-it-works"');
     const enterpriseIndex = SOURCE.indexOf('id="enterprise"');
     const section = SOURCE.slice(howItWorksIndex, enterpriseIndex);
-    expect(section).toContain("/archetypes/deliverer");
+    expect(section).toContain("/archetypes/builder");
     expect(section).toContain("/archetypes/guardian");
   });
 

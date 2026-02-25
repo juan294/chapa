@@ -71,7 +71,7 @@ Watchers removed from scoring — weight shifted to repos and docs.
 | Balanced | range <= 15, avg >= 60 | range <= 20, avg >= 50 |
 | Specialist | dim >= 70 | dim >= 60 |
 
-No new archetypes. Same 6: Deliverer, Quality Champion, Marathoner, Polymath, Balanced, Emerging.
+No new archetypes. Same 6: Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging.
 
 ### 5. Tier Boundaries
 

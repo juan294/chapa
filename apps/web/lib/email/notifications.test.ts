@@ -37,7 +37,7 @@ const sampleImpact: ImpactV4Result = {
   handle: "TestUser",
   profileType: "solo",
   dimensions: { delivery: 80, quality: 60, consistency: 70, breadth: 50 },
-  archetype: "Deliverer",
+  archetype: "Builder",
   compositeScore: 72,
   confidence: 85,
   confidencePenalties: [],
@@ -131,7 +131,7 @@ describe("email content", () => {
 
     const call = mockSend.mock.calls[0]![0];
     expect(call.subject).toContain("testuser");
-    expect(call.subject).toContain("Deliverer");
+    expect(call.subject).toContain("Builder");
     expect(call.subject).toContain("High");
   });
 

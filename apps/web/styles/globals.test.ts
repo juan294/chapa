@@ -76,7 +76,7 @@ describe("globals.css", () => {
 
   describe("archetype color tokens (#233)", () => {
     const ARCHETYPE_TOKENS = [
-      "--color-archetype-deliverer",
+      "--color-archetype-builder",
       "--color-archetype-guardian",
       "--color-archetype-marathoner",
       "--color-archetype-polymath",

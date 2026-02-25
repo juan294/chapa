@@ -68,7 +68,7 @@ export interface DimensionScores {
 
 /** Developer archetype derived from dimension profile shape */
 export type DeveloperArchetype =
-  | "Deliverer"
+  | "Builder"
   | "Quality Champion"
   | "Marathoner"
   | "Polymath"

@@ -45,7 +45,7 @@ describe("DEMO_IMPACT", () => {
   });
 
   it("has a valid archetype", () => {
-    expect(["Deliverer", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(
+    expect(["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(
       DEMO_IMPACT.archetype,
     );
   });

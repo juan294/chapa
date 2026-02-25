@@ -23,7 +23,7 @@ The design principle: **verification should be visible, lightweight, and non-int
 When we render a badge, we build a deterministic string from the data that went into it:
 
 ```
-testuser|52|85|Solid|Deliverer|70|50|60|40|200|30|50|2025-06-15
+testuser|52|85|Solid|Builder|70|50|60|40|200|30|50|2025-06-15
 ```
 
 The fields, pipe-delimited:

@@ -93,7 +93,7 @@ describe("buildSnapshot", () => {
     expect(snapshot.quality).toBe(60);
     expect(snapshot.consistency).toBe(80);
     expect(snapshot.breadth).toBe(55);
-    expect(snapshot.archetype).toBe("Deliverer");
+    expect(snapshot.archetype).toBe("Builder");
     expect(snapshot.profileType).toBe("collaborative");
     expect(snapshot.compositeScore).toBe(67.5);
     expect(snapshot.adjustedComposite).toBe(60.75);

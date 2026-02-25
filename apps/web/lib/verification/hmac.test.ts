@@ -27,7 +27,7 @@ const baseImpact: ImpactV4Result = {
   handle: "TestUser",
   profileType: "collaborative",
   dimensions: { delivery: 70, quality: 50, consistency: 60, breadth: 40 },
-  archetype: "Deliverer",
+  archetype: "Builder",
   compositeScore: 55,
   confidence: 85,
   confidencePenalties: [],
@@ -40,7 +40,7 @@ describe("buildPayload", () => {
   it("produces a deterministic pipe-delimited string", () => {
     const result = buildPayload(baseStats, baseImpact, "2025-06-15");
     expect(result).toBe(
-      "testuser|52|85|Solid|Deliverer|70|50|60|40|200|30|50|2025-06-15",
+      "testuser|52|85|Solid|Builder|70|50|60|40|200|30|50|2025-06-15",
     );
   });
 

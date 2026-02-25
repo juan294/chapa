@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Impact v4 scoring engine with 4 dimensions (Delivery, Quality, Consistency, Breadth)
-- Developer archetype classification (Deliverer, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
+- Developer archetype classification (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
 - Embeddable SVG badge at `/u/:handle/badge.svg` with heatmap, radar chart, and animations
 - Share page at `/u/:handle` with score breakdown, tooltips, and embed snippets
 - Creator Studio at `/studio` with 9 visual customization categories

@@ -138,12 +138,12 @@ const SOLO_DIMENSION_KEYS: (keyof DimensionScores)[] = [
   "breadth",
 ];
 
-// Tie-breaking priority: Polymath > Quality Champion > Marathoner > Deliverer
+// Tie-breaking priority: Polymath > Quality Champion > Marathoner > Builder
 const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype }[] = [
   { key: "breadth", archetype: "Polymath" },
   { key: "quality", archetype: "Quality Champion" },
   { key: "consistency", archetype: "Marathoner" },
-  { key: "delivery", archetype: "Deliverer" },
+  { key: "delivery", archetype: "Builder" },
 ];
 
 export function deriveArchetype(

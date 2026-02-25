@@ -28,7 +28,7 @@ Say:
 - Point at the badge:
   - heatmap (left column, 13 weeks of activity)
   - radar chart (4 dimensions: Delivery, Quality, Consistency, Breadth)
-  - archetype label (e.g. Deliverer, Quality Champion, Marathoner, Polymath)
+  - archetype label (e.g. Builder, Quality Champion, Marathoner, Polymath)
   - adjusted composite score + tier (Emerging/Solid/High/Elite)
   - stars, forks, watchers metrics
 

@@ -50,7 +50,7 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     activeDays: 200,
     reposContributed: 5,
     totalStars: 42,
-    archetype: "Deliverer",
+    archetype: "Builder",
     tier: "High",
     adjustedComposite: 72,
     rawScore: 68,

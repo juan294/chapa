@@ -120,7 +120,7 @@ export default function BalancedPage() {
 
               <p>
                 Senior engineers who have grown out of their original specialization often end up
-                here. They started as Deliverers or Quality Champions, but years of experience taught them
+                here. They started as Builders or Quality Champions, but years of experience taught them
                 to contribute across every dimension. The Balanced archetype captures that maturity.
               </p>
 

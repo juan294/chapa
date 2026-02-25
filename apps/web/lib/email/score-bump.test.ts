@@ -258,7 +258,7 @@ describe("email content — tier change", () => {
 describe("email content — archetype change", () => {
   it("uses archetype change subject when archetype changed", async () => {
     const diff = makeDiff({
-      archetype: { from: "Balanced", to: "Deliverer" },
+      archetype: { from: "Balanced", to: "Builder" },
       adjustedComposite: 3,
     });
 
@@ -270,9 +270,9 @@ describe("email content — archetype change", () => {
 
     const call = mockSend.mock.calls[0]![0];
     expect(call.subject).toContain("Balanced");
-    expect(call.subject).toContain("Deliverer");
+    expect(call.subject).toContain("Builder");
     expect(call.html).toContain("Balanced");
-    expect(call.html).toContain("Deliverer");
+    expect(call.html).toContain("Builder");
   });
 });
 

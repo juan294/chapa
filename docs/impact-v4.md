@@ -39,7 +39,7 @@ evenness = 1 / (1 + CV)
 
 ## Developer Archetypes
 
-Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Deliverer.
+Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Builder.
 
 | Archetype | Rule |
 |-----------|------|
@@ -48,7 +48,7 @@ Derived from the dimension profile shape. Priority order for tie-breaking: Polym
 | **Polymath** | Breadth is highest AND >= 70 |
 | **Quality Champion** | Quality is highest AND >= 70 |
 | **Marathoner** | Consistency is highest AND >= 70 |
-| **Deliverer** | Delivery is highest AND >= 70 |
+| **Builder** | Delivery is highest AND >= 70 |
 
 Evaluation order: Emerging → Balanced → specific archetypes (by tie-breaking priority) → fallback to Emerging.
 

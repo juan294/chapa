@@ -29,7 +29,7 @@ const FEATURES = [
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/deliverer" className="font-semibold text-archetype-deliverer hover:text-amber-light transition-colors">Deliverer</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
+    description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
   },
   {
     title: "VERIFIED METRICS",
@@ -279,7 +279,7 @@ export default async function Home({
                 </h3>
                 <p className="text-text-secondary text-sm">
                   Chapa scores four independent dimensions of your GitHub activity from the last 12 months. Your unique combination across these dimensions determines your developer archetype:{" "}
-                  <Link href="/archetypes/deliverer" className="font-semibold text-archetype-deliverer hover:text-amber-light transition-colors">Deliverer</Link>,{" "}
+                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
                   <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
                   <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
                   <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}

@@ -45,7 +45,7 @@ const HOTSPOTS: Hotspot[] = [
   {
     id: "badge-archetype",
     tooltip:
-      "Your developer archetype based on which dimension is strongest. Six types: Deliverer, Quality Champion, Marathoner, Polymath, Balanced, Emerging.",
+      "Your developer archetype based on which dimension is strongest. Six types: Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging.",
     position: "bottom",
     // Pill at x=60, y=143, ~170×34 → center (144, 159)
     top: "22.5%",

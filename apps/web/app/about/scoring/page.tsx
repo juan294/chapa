@@ -389,7 +389,7 @@ export default function ScoringMethodologyPage() {
                   "Your most notable trait is sustained, reliable contribution",
                 ],
                 [
-                  "Deliverer",
+                  "Builder",
                   "Delivery is highest AND >= 60",
                   "You ship a high volume of meaningful code changes",
                 ],
@@ -397,7 +397,7 @@ export default function ScoringMethodologyPage() {
             />
             <p>
               Tie-breaking priority: Polymath &gt; Quality Champion &gt; Marathoner &gt;
-              Deliverer. If no specific archetype matches (highest dimension &lt;
+              Builder. If no specific archetype matches (highest dimension &lt;
               60 and not Balanced), the fallback is Emerging.
             </p>
 

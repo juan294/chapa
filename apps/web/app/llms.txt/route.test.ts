@@ -26,7 +26,7 @@ describe("GET /llms.txt", () => {
     expect(text).toContain("Breadth");
 
     // Archetypes
-    expect(text).toContain("Deliverer");
+    expect(text).toContain("Builder");
     expect(text).toContain("Quality Champion");
     expect(text).toContain("Marathoner");
     expect(text).toContain("Polymath");

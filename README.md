@@ -22,7 +22,7 @@ Chapa analyzes your last 12 months of GitHub activity and generates a badge with
 
 - **Impact Score** (0–100) with tier (Emerging → Solid → High → Elite)
 - **4-Dimension Profile** — Delivery, Quality, Consistency, Breadth
-- **Developer Archetype** — Deliverer, Quality Champion, Marathoner, Polymath, Balanced, or Emerging
+- **Developer Archetype** — Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging
 - **Activity Heatmap** — 13-week daily contribution visualization
 - **Radar Chart** — visual breakdown of your 4 dimensions
 - **Verification Hash** — HMAC-SHA256 watermark proving badge authenticity

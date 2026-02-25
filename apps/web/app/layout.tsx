@@ -105,7 +105,7 @@ export default function RootLayout({
               },
               featureList: [
                 "Four-dimension impact scoring (Delivery, Quality, Consistency, Breadth)",
-                "Developer archetype classification (Deliverer, Quality Champion, Marathoner, Polymath, Balanced, Emerging)",
+                "Developer archetype classification (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)",
                 "Live embeddable SVG badge for GitHub README",
                 "52-week contribution heatmap",
                 "Four-axis radar chart visualization",

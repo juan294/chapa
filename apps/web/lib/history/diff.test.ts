@@ -83,16 +83,16 @@ describe("compareSnapshots", () => {
   });
 
   it("detects archetype change", () => {
-    const prev = makeSnapshot({ archetype: "Deliverer", date: "2025-06-14" });
+    const prev = makeSnapshot({ archetype: "Builder", date: "2025-06-14" });
     const curr = makeSnapshot({ archetype: "Polymath", date: "2025-06-15" });
     const diff = compareSnapshots(prev, curr);
 
-    expect(diff.archetype).toEqual({ from: "Deliverer", to: "Polymath" });
+    expect(diff.archetype).toEqual({ from: "Builder", to: "Polymath" });
   });
 
   it("returns null archetype when unchanged", () => {
-    const prev = makeSnapshot({ archetype: "Deliverer", date: "2025-06-14" });
-    const curr = makeSnapshot({ archetype: "Deliverer", date: "2025-06-15" });
+    const prev = makeSnapshot({ archetype: "Builder", date: "2025-06-14" });
+    const curr = makeSnapshot({ archetype: "Builder", date: "2025-06-15" });
     const diff = compareSnapshots(prev, curr);
 
     expect(diff.archetype).toBeNull();
@@ -235,7 +235,7 @@ describe("explainDiff", () => {
 
   it("mentions archetype change when present", () => {
     const prev = makeSnapshot({
-      archetype: "Deliverer",
+      archetype: "Builder",
       adjustedComposite: 50,
       date: "2025-06-14",
     });
@@ -247,7 +247,7 @@ describe("explainDiff", () => {
     const diff = compareSnapshots(prev, curr);
     const explanations = explainDiff(diff);
 
-    expect(explanations.some((e) => e.includes("Deliverer") && e.includes("Polymath"))).toBe(true);
+    expect(explanations.some((e) => e.includes("Builder") && e.includes("Polymath"))).toBe(true);
   });
 
   it("mentions penalty additions", () => {

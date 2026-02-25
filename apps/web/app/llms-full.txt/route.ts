@@ -35,7 +35,7 @@ The composite score (0-100) is a weighted combination of the four dimensions. It
 
 Based on the shape of the four-dimension radar chart, each developer is assigned an archetype:
 
-- **Deliverer**: Dominant in Delivery. Ships features, closes issues, high PR merge rate. The quintessential feature developer.
+- **Builder**: Dominant in Delivery. Ships features, closes issues, high PR merge rate. The quintessential feature developer.
 - **Quality Champion**: Dominant in Quality. Reviews code rigorously, provides thorough feedback. The team's quality gatekeeper.
 - **Marathoner**: Dominant in Consistency. Shows up reliably week after week. Steady, dependable contributor.
 - **Polymath**: Dominant in Breadth. Works across many repos, orgs, and project boundaries. A cross-team collaborator.

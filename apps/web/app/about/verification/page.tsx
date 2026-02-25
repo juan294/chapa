@@ -229,7 +229,7 @@ export default function VerificationPage() {
                 ["Tier", "High", "Prevents tier from being changed"],
                 [
                   "Archetype",
-                  "Deliverer",
+                  "Builder",
                   "Locks the archetype label to the data",
                 ],
                 [

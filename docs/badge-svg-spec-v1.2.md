@@ -153,7 +153,7 @@ M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  [< > Deliverer]  ·  [▦ 4 Repos]  ·  [👁 3 Watch]  ·  [⑂ 1 Fork]  ·  [★ 12 Star] │
+│  [< > Builder]  ·  [▦ 4 Repos]  ·  [👁 3 Watch]  ·  [⑂ 1 Fork]  ·  [★ 12 Star] │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -747,7 +747,7 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
 
 | Archetype | Hex | Visual |
 |-----------|-----|--------|
-| `Deliverer` | `#7C6AEF` | Signature purple |
+| `Builder` | `#7C6AEF` | Signature purple |
 | `Quality Champion` | `#F472B6` | Pink |
 | `Marathoner` | `#4ADE80` | Green |
 | `Polymath` | `#FBBF24` | Amber/gold |

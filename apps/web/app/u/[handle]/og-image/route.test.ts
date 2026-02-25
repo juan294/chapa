@@ -95,7 +95,7 @@ const FAKE_IMPACT = {
   tier: "Solid",
   confidence: 85,
   dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-  archetype: "Deliverer",
+  archetype: "Builder",
 };
 
 /** The base64-encoded form of FAKE_PNG that the route stores in Redis. */

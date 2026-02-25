@@ -60,7 +60,7 @@ export const MOCK_IMPACT: ImpactV4Result = {
     consistency: 91,
     breadth: 68,
   },
-  archetype: "Deliverer",
+  archetype: "Builder",
   compositeScore: 79,
   confidence: 92,
   confidencePenalties: [],

@@ -76,7 +76,7 @@ export const DEMO_IMPACT: ImpactV4Result = {
     consistency: 80,
     breadth: 65,
   },
-  archetype: "Deliverer",
+  archetype: "Builder",
   compositeScore: 76,
   confidence: 87,
   confidencePenalties: [],

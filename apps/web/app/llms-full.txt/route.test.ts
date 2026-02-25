@@ -32,7 +32,7 @@ describe("GET /llms-full.txt", () => {
     const res = getLlmsFullTxt();
     const text = await res.text();
 
-    expect(text).toContain("Deliverer");
+    expect(text).toContain("Builder");
     expect(text).toContain("Quality Champion");
     expect(text).toContain("Marathoner");
     expect(text).toContain("Polymath");

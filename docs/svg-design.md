@@ -26,7 +26,7 @@
 - All user text escaped via `escapeXml()` for XSS prevention
 
 ### 3) Archetype + metrics pill row
-- **Archetype pill**: colored bracket icon + archetype label (e.g. "Deliverer", "Quality Champion")
+- **Archetype pill**: colored bracket icon + archetype label (e.g. "Builder", "Quality Champion")
 - **Metric pills** (right of archetype, separated by dots):
   - Watch count (eye icon)
   - Fork count (fork icon)
@@ -108,7 +108,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 ### Archetype colors
 | Archetype | Color |
 |-----------|-------|
-| Deliverer | `#7C6AEF` (purple) |
+| Builder | `#7C6AEF` (purple) |
 | Quality Champion | `#F472B6` (pink) |
 | Marathoner | `#4ADE80` (green) |
 | Polymath | `#FBBF24` (amber/gold) |

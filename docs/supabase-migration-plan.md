@@ -509,7 +509,7 @@ redis-cli ZRANGE "history:juan294" -1 -1
 
 Once complete, these become trivial to build:
 
-- **Cross-user queries**: "Top 10 Deliverers this month" — `SELECT ... ORDER BY delivery DESC LIMIT 10`
+- **Cross-user queries**: "Top 10 Builders this month" — `SELECT ... ORDER BY delivery DESC LIMIT 10`
 - **Unbounded history**: Remove the 365-day cap, keep years of data at negligible cost
 - **Admin analytics**: User growth over time, archetype distribution, tier breakdown — all SQL
 - **Leaderboards**: Indexed queries on `adjusted_composite`, `archetype`, `tier`

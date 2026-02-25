@@ -6,7 +6,7 @@
  *
  * Trigger priority (highest first):
  *   1. Tier change (e.g., Solid → High)
- *   2. Archetype change (e.g., Balanced → Deliverer)
+ *   2. Archetype change (e.g., Balanced → Builder)
  *   3. Adjusted composite increase ≥ threshold
  */
 

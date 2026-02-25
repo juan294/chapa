@@ -58,7 +58,7 @@ test.describe("Static pages — load and render", () => {
     await page.goto("/archetypes/builder");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Deliverer");
+    await expect(h1).toContainText("Builder");
   });
 
   test("archetype page /archetypes/guardian loads", async ({ page }) => {

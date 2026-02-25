@@ -41,7 +41,7 @@
   --color-dimension-breadth-light: #f9a8d4;
 
   /* Archetype colors — accent color per developer archetype */
-  --color-archetype-deliverer: #7C6AEF;
+  --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
   --color-archetype-marathoner: #16A34A;
   --color-archetype-polymath: #FCD34D;
@@ -89,7 +89,7 @@
   --color-dimension-consistency-light: #67e8f9;
   --color-dimension-breadth-light: #f9a8d4;
 
-  --color-archetype-deliverer: #7C6AEF;
+  --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
   --color-archetype-marathoner: #16A34A;
   --color-archetype-polymath: #FCD34D;
@@ -129,7 +129,7 @@
   --color-dimension-consistency-light: #67e8f9;
   --color-dimension-breadth-light: #f9a8d4;
 
-  --color-archetype-deliverer: #7C6AEF;
+  --color-archetype-builder: #7C6AEF;
   --color-archetype-guardian: #F472B6;
   --color-archetype-marathoner: #16A34A;
   --color-archetype-polymath: #FCD34D;
