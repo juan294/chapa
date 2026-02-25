@@ -121,7 +121,7 @@ describe("Landing page — footer internal links (#307)", () => {
 describe("Landing page — scoring overview in How It Works section", () => {
   it("contains a DIMENSIONS data array with all four dimensions", () => {
     expect(SOURCE).toContain('"BUILDING"');
-    expect(SOURCE).toContain('"GUARDING"');
+    expect(SOURCE).toContain('"QUALITY"');
     expect(SOURCE).toContain('"CONSISTENCY"');
     expect(SOURCE).toContain('"BREADTH"');
   });

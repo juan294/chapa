@@ -32,11 +32,11 @@
 
   /* Dimension colors — data visualization accents for the 4 impact dimensions */
   --color-dimension-building: #22c55e;
-  --color-dimension-guarding: #f97316;
+  --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
   --color-dimension-building-light: #86efac;
-  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-quality-light: #fdba74;
   --color-dimension-consistency-light: #67e8f9;
   --color-dimension-breadth-light: #f9a8d4;
 
@@ -81,11 +81,11 @@
   --color-track: rgba(0, 0, 0, 0.06);
 
   --color-dimension-building: #22c55e;
-  --color-dimension-guarding: #f97316;
+  --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
   --color-dimension-building-light: #86efac;
-  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-quality-light: #fdba74;
   --color-dimension-consistency-light: #67e8f9;
   --color-dimension-breadth-light: #f9a8d4;
 
@@ -121,11 +121,11 @@
   --color-track: rgba(255, 255, 255, 0.06);
 
   --color-dimension-building: #22c55e;
-  --color-dimension-guarding: #f97316;
+  --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
   --color-dimension-building-light: #86efac;
-  --color-dimension-guarding-light: #fdba74;
+  --color-dimension-quality-light: #fdba74;
   --color-dimension-consistency-light: #67e8f9;
   --color-dimension-breadth-light: #f9a8d4;
 

@@ -20,7 +20,7 @@ export interface TrendSummary {
   compositeValues: DateValue[];
   dimensions: {
     building: DimensionTrend;
-    guarding: DimensionTrend;
+    quality: DimensionTrend;
     consistency: DimensionTrend;
     breadth: DimensionTrend;
   };
@@ -66,7 +66,7 @@ export function computeTrend(
     compositeValues,
     dimensions: {
       building: dimensionTrend(recent, "building"),
-      guarding: dimensionTrend(recent, "guarding"),
+      quality: dimensionTrend(recent, "quality"),
       consistency: dimensionTrend(recent, "consistency"),
       breadth: dimensionTrend(recent, "breadth"),
     },
@@ -88,7 +88,7 @@ function averageDelta(values: number[]): number {
 
 function dimensionTrend(
   snapshots: MetricsSnapshot[],
-  key: "building" | "guarding" | "consistency" | "breadth",
+  key: "building" | "quality" | "consistency" | "breadth",
 ): DimensionTrend {
   const values = snapshots.map((s) => ({ date: s.date, value: s[key] }));
   return {

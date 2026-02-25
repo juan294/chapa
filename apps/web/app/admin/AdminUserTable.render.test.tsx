@@ -154,10 +154,10 @@ describe("AdminUserTable — render tests", () => {
       render(
         <AdminUserTable
           {...defaultProps}
-          users={[makeUser({ archetype: "Guardian" })]}
+          users={[makeUser({ archetype: "Quality Champion" })]}
         />,
       );
-      expect(screen.getByText("Guardian")).toBeDefined();
+      expect(screen.getByText("Quality Champion")).toBeDefined();
     });
 
     it("displays the tier as a badge", () => {

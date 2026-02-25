@@ -119,7 +119,7 @@ export default function BuilderPage() {
               </p>
 
               <p>
-                Builders often pair well with Guardians &mdash; the Builder ships fast, the Guardian
+                Builders often pair well with Quality Champions &mdash; the Builder ships fast, the Quality Champion
                 reviews carefully, and together they find a rhythm that balances speed with quality.
               </p>
 
@@ -129,7 +129,7 @@ export default function BuilderPage() {
 
               <p>
                 On the Chapa radar chart, a Builder&apos;s shape leans heavily toward the top
-                (Building axis), often with moderate Consistency and Breadth, and a thinner Guarding
+                (Building axis), often with moderate Consistency and Breadth, and a thinner Quality
                 profile. The visual signature is unmistakable: a diamond that points upward, like an
                 arrow aimed at the next release.
               </p>

@@ -9,7 +9,7 @@ Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, anim
 ## Key highlights
 - Live endpoint: `/u/:handle/badge.svg`
 - Animated SVG (web-native)
-- Impact v4 = 4 dimensions (Building, Guarding, Consistency, Breadth) + archetype + tier
+- Impact v4 = 4 dimensions (Building, Quality, Consistency, Breadth) + archetype + tier
 - Radar chart visualization of developer strengths
 - Creator Studio for badge visual customization
 - Verified mode via GitHub OAuth
@@ -27,8 +27,8 @@ Say:
 ### 2) The badge (45s)
 - Point at the badge:
   - heatmap (left column, 13 weeks of activity)
-  - radar chart (4 dimensions: Building, Guarding, Consistency, Breadth)
-  - archetype label (e.g. Builder, Guardian, Marathoner, Polymath)
+  - radar chart (4 dimensions: Building, Quality, Consistency, Breadth)
+  - archetype label (e.g. Builder, Quality Champion, Marathoner, Polymath)
   - adjusted composite score + tier (Emerging/Solid/High/Elite)
   - stars, forks, watchers metrics
 

@@ -375,7 +375,7 @@ All four dimensions operate on `StatsData` and are **completely platform-agnosti
 | Dimension | Formula | Bitbucket data quality |
 |-----------|---------|----------------------|
 | **Building** | `0.7*norm(prWeight,60) + 0.2*norm(issues,40) + 0.1*norm(commits,300)` | Full: PRs + commits available. Issues may be 0 if Jira used |
-| **Guarding** | `0.6*norm(reviews,80) + 0.25*reviewRatio + 0.15*inverseMicro` | Partial: "approvals" map to reviews but may undercount |
+| **Quality** | `0.6*norm(reviews,80) + 0.25*reviewRatio + 0.15*inverseMicro` | Partial: "approvals" map to reviews but may undercount |
 | **Consistency** | `0.45*sqrt(activeDays/365) + 0.40*evenness + 0.15*inverseBurst` | Full: commits provide dates for heatmap |
 | **Breadth** | `0.40*repos + 0.25*inverseConc + 0.10*stars + 0.05*forks + 0.15*docs` | Partial: no stars, limited watchers |
 
@@ -560,6 +560,6 @@ The scoring pipeline (`computeImpactV4`) and merge infrastructure (`mergeStats`)
 
 5. **API call budget is manageable.** ~100-150 REST calls per user at 1,000/hr limit, cached daily.
 
-6. **Scoring fairness:** A developer using only Bitbucket would have stars=0 and watchers=0. This reduces Breadth's maximum by ~15% (10% stars + 5% watchers contribute nothing). The other 85% of Breadth and 100% of Building/Guarding/Consistency function normally.
+6. **Scoring fairness:** A developer using only Bitbucket would have stars=0 and watchers=0. This reduces Breadth's maximum by ~15% (10% stars + 5% watchers contribute nothing). The other 85% of Breadth and 100% of Building/Quality/Consistency function normally.
 
 7. **Shared investment with other platforms.** Building the platform abstraction layer (`PlatformQuery` interface, `user_platforms` table, multi-provider OAuth linking) benefits all future integrations (GitLab, Codeberg, etc.). Bitbucket is a viable second platform to build this infrastructure for.

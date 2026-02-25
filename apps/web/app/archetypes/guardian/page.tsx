@@ -6,9 +6,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "The Guardian Archetype",
+  title: "The Quality Champion Archetype",
   description:
-    "Guardians are the quality gatekeepers. They review pull requests, catch bugs before they ship, and raise the bar for everyone around them.",
+    "Quality Champions are the quality gatekeepers. They review pull requests, catch bugs before they ship, and raise the bar for everyone around them.",
 };
 
 const badgeSvg = renderBadgeSvg(GUARDIAN_STATS, GUARDIAN_IMPACT, {
@@ -32,10 +32,10 @@ export default function GuardianPage() {
             {/* Header */}
             <div>
               <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-archetype-guardian">Guardian</span>
+                The <span className="text-archetype-guardian">Quality Champion</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-archetype-guardian">Guarding</span>
+                Dominant dimension: <span className="text-archetype-guardian">Quality</span>
               </p>
             </div>
 
@@ -44,7 +44,7 @@ export default function GuardianPage() {
             <div
               className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
               role="img"
-              aria-label="Example Chapa badge for The Guardian archetype"
+              aria-label="Example Chapa badge for The Quality Champion archetype"
               dangerouslySetInnerHTML={{ __html: badgeSvg }}
             />
 
@@ -52,14 +52,14 @@ export default function GuardianPage() {
             <div className="space-y-6 text-text-secondary text-sm leading-relaxed">
               <p>
                 Software teams talk a lot about shipping, but rarely about the people who make sure
-                what ships actually works. Guardians are those people. They live in the pull request
+                what ships actually works. Quality Champions are those people. They live in the pull request
                 review queue. They read diffs the way editors read manuscripts &mdash; not just for
                 correctness, but for clarity, maintainability, and the subtle ways that today&apos;s
                 shortcut becomes next quarter&apos;s outage.
               </p>
 
               <p>
-                The Guarding dimension in Chapa measures review behavior, not just review count.
+                The Quality dimension in Chapa measures review behavior, not just review count.
                 It considers how many reviews you submit, the ratio of reviews to your own PRs,
                 and code hygiene signals. A developer who reviews multiple PRs for every one they
                 open scores higher than someone who rubber-stamps approvals to unblock the pipeline.
@@ -74,15 +74,15 @@ export default function GuardianPage() {
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
-                How Chapa identifies a Guardian
+                How Chapa identifies a Quality Champion
               </h2>
 
               <p>
-                To earn the Guardian archetype, your Guarding dimension must be strong and your
-                most dominant trait. There&apos;s an important constraint: the Guardian archetype
+                To earn the Quality Champion archetype, your Quality dimension must be strong and your
+                most dominant trait. There&apos;s an important constraint: the Quality Champion archetype
                 is only available to collaborative profiles. If you work solo and have zero code
-                reviews, Chapa won&apos;t assign you as a Guardian &mdash; because guarding is
-                fundamentally a team activity.
+                reviews, Chapa won&apos;t assign you as a Quality Champion &mdash; because quality
+                gatekeeping is fundamentally a team activity.
               </p>
 
               <p>
@@ -110,11 +110,11 @@ export default function GuardianPage() {
               </div>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
-                What a Guardian looks like in practice
+                What a Quality Champion looks like in practice
               </h2>
 
               <p>
-                Guardians are often the senior engineers, the tech leads, the staff developers who
+                Quality Champions are often the senior engineers, the tech leads, the staff developers who
                 have shifted from writing features to multiplying the effectiveness of everyone
                 around them. They&apos;re the reason your team catches the SQL injection before it
                 hits production. They&apos;re the reason the junior developer&apos;s second PR is
@@ -122,18 +122,18 @@ export default function GuardianPage() {
               </p>
 
               <p>
-                In open-source projects, Guardians are the maintainers who triage issues, review
+                In open-source projects, Quality Champions are the maintainers who triage issues, review
                 community contributions, and set the quality bar that defines the project&apos;s
                 reputation. Without them, codebases drift toward entropy.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
-                The Guardian&apos;s radar shape
+                The Quality Champion&apos;s radar shape
               </h2>
 
               <p>
-                On the Chapa radar chart, a Guardian&apos;s shape extends strongly to the right
-                (Guarding axis). The visual is a diamond that leans sideways &mdash; wide where
+                On the Chapa radar chart, a Quality Champion&apos;s shape extends strongly to the right
+                (Quality axis). The visual is a diamond that leans sideways &mdash; wide where
                 quality matters, narrow where raw shipping volume might be thinner. It&apos;s the
                 shape of someone who makes everyone else&apos;s code better.
               </p>

@@ -406,7 +406,7 @@ function rowToSnapshot(row: SnapshotRow): MetricsSnapshot {
     microCommitRatio: row.micro_commit_ratio ?? undefined,
     docsOnlyPrRatio: row.docs_only_pr_ratio ?? undefined,
     building: row.building,
-    guarding: row.guarding,
+    quality: row.guarding,
     consistency: row.consistency,
     breadth: row.breadth,
     archetype: row.archetype,

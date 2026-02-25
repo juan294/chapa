@@ -98,7 +98,7 @@ describe("ImpactBreakdown", () => {
 
     it("has tooltip IDs for all four dimensions", () => {
       expect(SOURCE).toContain('"dim-building"');
-      expect(SOURCE).toContain('"dim-guarding"');
+      expect(SOURCE).toContain('"dim-quality"');
       expect(SOURCE).toContain('"dim-consistency"');
       expect(SOURCE).toContain('"dim-breadth"');
     });
@@ -192,7 +192,7 @@ describe("ImpactBreakdown", () => {
   describe("design system tokens (#233)", () => {
     it("uses CSS variables for dimension colors, not hardcoded hex", () => {
       expect(SOURCE).toContain("var(--color-dimension-building)");
-      expect(SOURCE).toContain("var(--color-dimension-guarding)");
+      expect(SOURCE).toContain("var(--color-dimension-quality)");
       expect(SOURCE).toContain("var(--color-dimension-consistency)");
       expect(SOURCE).toContain("var(--color-dimension-breadth)");
     });

@@ -63,8 +63,8 @@ describe("computeTrend", () => {
 
   it("includes per-dimension value arrays", () => {
     const snapshots = [
-      makeSnapshot({ date: "2025-06-13", building: 70, guarding: 50, consistency: 80, breadth: 40 }),
-      makeSnapshot({ date: "2025-06-14", building: 75, guarding: 55, consistency: 75, breadth: 45 }),
+      makeSnapshot({ date: "2025-06-13", building: 70, quality: 50, consistency: 80, breadth: 40 }),
+      makeSnapshot({ date: "2025-06-14", building: 75, quality: 55, consistency: 75, breadth: 45 }),
     ];
     const trend = computeTrend(snapshots);
 

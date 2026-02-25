@@ -4,21 +4,21 @@ import { InfoTooltip } from "./InfoTooltip";
 
 const DIMENSION_LABELS: Record<string, string> = {
   building: "Building",
-  guarding: "Guarding",
+  quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
 };
 
 const DIMENSION_SUBTITLES: Record<string, string> = {
   building: "PRs merged \u00b7 issues closed \u00b7 commits",
-  guarding: "Code reviews \u00b7 quality gatekeeping",
+  quality: "Code reviews \u00b7 quality gatekeeping",
   consistency: "Active days \u00b7 sustained contributions",
   breadth: "Repos contributed \u00b7 community reach",
 };
 
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   building: { from: "var(--color-dimension-building)", to: "var(--color-dimension-building-light)" },
-  guarding: { from: "var(--color-dimension-guarding)", to: "var(--color-dimension-guarding-light)" },
+  quality: { from: "var(--color-dimension-quality)", to: "var(--color-dimension-quality-light)" },
   consistency: { from: "var(--color-dimension-consistency)", to: "var(--color-dimension-consistency-light)" },
   breadth: { from: "var(--color-dimension-breadth)", to: "var(--color-dimension-breadth-light)" },
 };
@@ -29,8 +29,8 @@ const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
     id: "dim-building",
     tip: "Measures shipping output: PRs merged, issues closed, and commits. High score = consistently turning ideas into merged code.",
   },
-  guarding: {
-    id: "dim-guarding",
+  quality: {
+    id: "dim-quality",
     tip: "Measures code review impact: reviews submitted and review quality. High score = actively protecting code quality.",
   },
   consistency: {
@@ -125,8 +125,8 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
   Builder:
     "Your profile is driven by output \u2014 you turn ideas into merged pull requests and closed issues at a pace that keeps the roadmap moving. Building is clearly your dominant dimension, meaning you thrive when shipping features and moving codebases forward.",
-  Guardian:
-    "Your profile is shaped by quality \u2014 you\u2019re the one reviewing pull requests, catching edge cases, and making sure nothing ships that shouldn\u2019t. Guarding is your dominant dimension, and your team\u2019s code quality reflects it.",
+  "Quality Champion":
+    "Your profile is shaped by quality \u2014 you\u2019re the one reviewing pull requests, catching edge cases, and making sure nothing ships that shouldn\u2019t. Quality is your dominant dimension, and your team\u2019s code quality reflects it.",
   Marathoner:
     "Your profile is defined by consistency \u2014 you show up day after day with steady, sustained contributions that compound over time. Consistency is your dominant dimension, making you the reliable backbone of any team.",
   Polymath:
@@ -139,7 +139,7 @@ const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
 
 const DIMENSION_TIPS: Record<string, string> = {
   building: "To strengthen Building, focus on opening and merging more pull requests \u2014 even small, focused PRs that close open issues count significantly.",
-  guarding: "To strengthen Guarding, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
+  quality: "To strengthen Quality, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
   consistency: "To strengthen Consistency, aim for regular contributions across more days \u2014 even small commits on consecutive days build this dimension faster than occasional bursts.",
   breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
 };
@@ -180,7 +180,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           Performance Dimensions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {(["building", "guarding", "consistency", "breadth"] as const).map(
+          {(["building", "quality", "consistency", "breadth"] as const).map(
             (key, i) => (
               <div
                 key={key}

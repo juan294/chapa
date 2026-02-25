@@ -505,7 +505,7 @@ export default function GlassmorphismExperimentPage() {
               style={presetToStyle("medium", showBorder)}
             />
             <StatCard
-              label="Guarding"
+              label="Quality"
               value={28}
               maxValue={30}
               detail="Code reviews, issue triage, and quality enforcement. Active reviewer with thoughtful feedback."

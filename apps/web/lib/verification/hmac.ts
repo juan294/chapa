@@ -17,7 +17,7 @@ export function buildPayload(
     impact.tier,
     impact.archetype,
     Math.round(impact.dimensions.building),
-    Math.round(impact.dimensions.guarding),
+    Math.round(impact.dimensions.quality),
     Math.round(impact.dimensions.consistency),
     Math.round(impact.dimensions.breadth),
     stats.commitsTotal,

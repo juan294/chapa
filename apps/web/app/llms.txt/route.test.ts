@@ -21,13 +21,13 @@ describe("GET /llms.txt", () => {
 
     // Impact dimensions
     expect(text).toContain("Building");
-    expect(text).toContain("Guarding");
+    expect(text).toContain("Quality");
     expect(text).toContain("Consistency");
     expect(text).toContain("Breadth");
 
     // Archetypes
     expect(text).toContain("Builder");
-    expect(text).toContain("Guardian");
+    expect(text).toContain("Quality Champion");
     expect(text).toContain("Marathoner");
     expect(text).toContain("Polymath");
     expect(text).toContain("Balanced");

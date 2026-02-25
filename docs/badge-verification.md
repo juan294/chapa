@@ -36,7 +36,7 @@ The fields, pipe-delimited:
 | 3 | Tier | `impact.tier` |
 | 4 | Archetype | `impact.archetype` |
 | 5 | Building dimension (rounded) | `impact.dimensions.building` |
-| 6 | Guarding dimension (rounded) | `impact.dimensions.guarding` |
+| 6 | Quality dimension (rounded) | `impact.dimensions.quality` |
 | 7 | Consistency dimension (rounded) | `impact.dimensions.consistency` |
 | 8 | Breadth dimension (rounded) | `impact.dimensions.breadth` |
 | 9 | Total commits | `stats.commitsTotal` |
@@ -83,7 +83,7 @@ The `VerificationRecord` contains the full snapshot of what the badge displayed:
   confidence: number;
   tier: string;
   archetype: string;
-  dimensions: { building, guarding, consistency, breadth };
+  dimensions: { building, quality, consistency, breadth };
   commitsTotal: number;
   prsMergedCount: number;
   reviewsSubmittedCount: number;

@@ -58,7 +58,7 @@ export default function BalancedPage() {
               </p>
 
               <p>
-                The Balanced archetype triggers when all four dimensions (Building, Guarding,
+                The Balanced archetype triggers when all four dimensions (Building, Quality,
                 Consistency, Breadth) are closely matched and collectively solid. The gate is
                 intentionally inclusive &mdash; you don&apos;t need exceptionally high scores,
                 just a strong average without major imbalances. Most developers naturally
@@ -95,7 +95,7 @@ export default function BalancedPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-36">REQUIREMENT</span>
-                  <span className="text-text-secondary text-sm">Collectively strong &mdash; high average across Building, Guarding, Consistency, and Breadth.</span>
+                  <span className="text-text-secondary text-sm">Collectively strong &mdash; high average across Building, Quality, Consistency, and Breadth.</span>
                 </div>
               </div>
 
@@ -120,7 +120,7 @@ export default function BalancedPage() {
 
               <p>
                 Senior engineers who have grown out of their original specialization often end up
-                here. They started as Builders or Guardians, but years of experience taught them
+                here. They started as Builders or Quality Champions, but years of experience taught them
                 to contribute across every dimension. The Balanced archetype captures that maturity.
               </p>
 

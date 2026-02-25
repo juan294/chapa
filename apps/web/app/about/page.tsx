@@ -53,7 +53,7 @@ export default function AboutPage() {
             <p>
               <strong className="text-text-primary">Building</strong> — shipping meaningful changes
               (PRs merged, issues closed).{" "}
-              <strong className="text-text-primary">Guarding</strong> — reviewing and quality
+              <strong className="text-text-primary">Quality</strong> — reviewing and quality
               gatekeeping.{" "}
               <strong className="text-text-primary">Consistency</strong> — reliable, sustained
               contributions over time.{" "}
@@ -67,7 +67,7 @@ export default function AboutPage() {
             <p>
               Your dimension profile shape determines your archetype:{" "}
               <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
-              <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Guardian</Link>,{" "}
+              <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
               <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
               <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
               <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}

@@ -127,14 +127,14 @@ describe("BadgeContent", () => {
 
     it("renders data polygon from dimensions", () => {
       expect(SOURCE).toContain("impact.dimensions.building");
-      expect(SOURCE).toContain("impact.dimensions.guarding");
+      expect(SOURCE).toContain("impact.dimensions.quality");
       expect(SOURCE).toContain("impact.dimensions.consistency");
       expect(SOURCE).toContain("impact.dimensions.breadth");
     });
 
     it("renders axis labels", () => {
       expect(SOURCE).toContain("Build");
-      expect(SOURCE).toContain("Guard");
+      expect(SOURCE).toContain("Quality");
       expect(SOURCE).toContain("Consist");
       expect(SOURCE).toContain("Breadth");
     });
@@ -181,7 +181,7 @@ describe("BadgeContent", () => {
   describe("dimension cards", () => {
     it("renders 4 AnimatedStatCards", () => {
       expect(SOURCE).toContain('"Building"');
-      expect(SOURCE).toContain('"Guarding"');
+      expect(SOURCE).toContain('"Quality"');
       expect(SOURCE).toContain('"Consistency"');
       expect(SOURCE).toContain('"Breadth"');
     });

@@ -66,7 +66,7 @@ function VerifiedCard({
     archetype: string;
     dimensions: {
       building: number;
-      guarding: number;
+      quality: number;
       consistency: number;
       breadth: number;
     };

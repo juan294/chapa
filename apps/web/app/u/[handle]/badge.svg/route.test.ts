@@ -155,7 +155,7 @@ const FAKE_IMPACT = {
   adjustedComposite: 65,
   tier: "Solid",
   confidence: 85,
-  dimensions: { building: 70, guarding: 60, consistency: 65, breadth: 55 },
+  dimensions: { building: 70, quality: 60, consistency: 65, breadth: 55 },
   archetype: "Builder",
 };
 

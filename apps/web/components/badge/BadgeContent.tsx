@@ -183,20 +183,20 @@ export function BadgeContent({
                 <line x1="15" y1="70" x2="125" y2="70" stroke="rgba(124,106,239,0.08)" strokeWidth="1" />
                 {/* Data polygon */}
                 <polygon
-                  points={`70,${70 - (impact.dimensions.building / 100) * 55} ${70 + (impact.dimensions.guarding / 100) * 55},70 70,${70 + (impact.dimensions.consistency / 100) * 55} ${70 - (impact.dimensions.breadth / 100) * 55},70`}
+                  points={`70,${70 - (impact.dimensions.building / 100) * 55} ${70 + (impact.dimensions.quality / 100) * 55},70 70,${70 + (impact.dimensions.consistency / 100) * 55} ${70 - (impact.dimensions.breadth / 100) * 55},70`}
                   fill="rgba(124,106,239,0.20)"
                   stroke={WARM_AMBER.accent}
                   strokeWidth="1.5"
                 />
                 {/* Vertex dots */}
                 <circle cx="70" cy={70 - (impact.dimensions.building / 100) * 55} r="3" fill={WARM_AMBER.accent} />
-                <circle cx={70 + (impact.dimensions.guarding / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
+                <circle cx={70 + (impact.dimensions.quality / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
                 <circle cx="70" cy={70 + (impact.dimensions.consistency / 100) * 55} r="3" fill={WARM_AMBER.accent} />
                 <circle cx={70 - (impact.dimensions.breadth / 100) * 55} cy="70" r="3" fill={WARM_AMBER.accent} />
               </svg>
               {/* Axis labels */}
               <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Build</span>
-              <span className="absolute top-1/2 -right-2 -translate-y-1/2 text-[9px] text-text-secondary">Guard</span>
+              <span className="absolute top-1/2 -right-2 -translate-y-1/2 text-[9px] text-text-secondary">Quality</span>
               <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-text-secondary">Consist</span>
               <span className="absolute top-1/2 -left-3 -translate-y-1/2 text-[9px] text-text-secondary">Breadth</span>
             </div>
@@ -240,8 +240,8 @@ export function BadgeContent({
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard
-          value={impact.dimensions.guarding}
-          label="Guarding"
+          value={impact.dimensions.quality}
+          label="Quality"
           statsDisplay={statsDisplay}
         />
         <AnimatedStatCard

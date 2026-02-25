@@ -237,7 +237,7 @@ export default function VerificationPage() {
                   "80",
                   "Each dimension score is individually signed",
                 ],
-                ["Guarding", "55", ""],
+                ["Quality", "55", ""],
                 ["Consistency", "68", ""],
                 ["Breadth", "45", ""],
                 [

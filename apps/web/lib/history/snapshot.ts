@@ -36,7 +36,7 @@ export function buildSnapshot(
     ...(stats.docsOnlyPrRatio !== undefined && { docsOnlyPrRatio: stats.docsOnlyPrRatio }),
 
     building: impact.dimensions.building,
-    guarding: impact.dimensions.guarding,
+    quality: impact.dimensions.quality,
     consistency: impact.dimensions.consistency,
     breadth: impact.dimensions.breadth,
     archetype: impact.archetype,

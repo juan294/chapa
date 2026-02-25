@@ -82,7 +82,7 @@ const record: VerificationRecord = {
   tier: "Solid",
   archetype: "Builder",
   profileType: "collaborative",
-  dimensions: { building: 70, guarding: 50, consistency: 60, breadth: 40 },
+  dimensions: { building: 70, quality: 50, consistency: 60, breadth: 40 },
   commitsTotal: 200,
   prsMergedCount: 30,
   reviewsSubmittedCount: 50,

@@ -91,13 +91,13 @@ SVG container: `w-[140px] h-[140px]`, `viewBox="0 0 140 140"`.
 - `stroke="rgba(124,106,239,0.08)" strokeWidth="1"`
 
 **Data polygon**:
-- Points derived from `impact.dimensions` (building=top, guarding=right, consistency=bottom, breadth=left)
+- Points derived from `impact.dimensions` (building=top, quality=right, consistency=bottom, breadth=left)
 - Each vertex at `70 ± (dimension/100) * 55` along its axis
 - `fill="rgba(124,106,239,0.20)" stroke="#7C6AEF" strokeWidth="1.5"`
 
 **Vertex dots** (4 circles, `r="3" fill="#7C6AEF"`):
 - Top: `cx=70, cy=70-(building/100)*55`
-- Right: `cx=70+(guarding/100)*55, cy=70`
+- Right: `cx=70+(quality/100)*55, cy=70`
 - Bottom: `cx=70, cy=70+(consistency/100)*55`
 - Left: `cx=70-(breadth/100)*55, cy=70`
 
@@ -134,7 +134,7 @@ Each card (`AnimatedStatCard`):
 - Value: `block text-2xl font-heading font-bold tracking-tight text-text-primary leading-none`
 - Label: `block text-[10px] uppercase tracking-wider text-text-secondary mt-1.5`
 
-Cards in order: Building, Guarding, Consistency, Breadth.
+Cards in order: Building, Quality, Consistency, Breadth.
 
 Values support animated counters via `useAnimatedCounter(value, 2000, easing, isAnimated)` where `easing` is `"spring"` for `animated-spring` and `"easeOut"` for `animated-ease`.
 

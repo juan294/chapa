@@ -41,7 +41,7 @@ function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
     handle: "TestUser",
     dimensions: {
       building: 75,
-      guarding: 60,
+      quality: 60,
       consistency: 80,
       breadth: 55,
     },
@@ -90,7 +90,7 @@ describe("buildSnapshot", () => {
     const snapshot = buildSnapshot(stats, impact);
 
     expect(snapshot.building).toBe(75);
-    expect(snapshot.guarding).toBe(60);
+    expect(snapshot.quality).toBe(60);
     expect(snapshot.consistency).toBe(80);
     expect(snapshot.breadth).toBe(55);
     expect(snapshot.archetype).toBe("Builder");

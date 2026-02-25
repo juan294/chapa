@@ -48,7 +48,7 @@ export function makeImpact(
     profileType: "collaborative",
     dimensions: {
       building: 72,
-      guarding: 55,
+      quality: 55,
       consistency: 68,
       breadth: 48,
     },
@@ -88,7 +88,7 @@ export function makeSnapshot(
     topRepoShare: 0.4,
     maxCommitsIn10Min: 3,
     building: 75,
-    guarding: 60,
+    quality: 60,
     consistency: 80,
     breadth: 55,
     archetype: "Builder",

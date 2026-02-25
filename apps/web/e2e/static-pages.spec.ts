@@ -65,7 +65,7 @@ test.describe("Static pages — load and render", () => {
     await page.goto("/archetypes/guardian");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Guardian");
+    await expect(h1).toContainText("Quality Champion");
   });
 
   test("archetype page has back link to features", async ({ page }) => {

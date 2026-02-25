@@ -31,11 +31,11 @@ export function computeBuilding(stats: StatsData): number {
 }
 
 // ---------------------------------------------------------------------------
-// Guarding: reviewing & quality gatekeeping
+// Quality: reviewing & quality gatekeeping
 // reviewsSubmittedCount (60%), review-to-PR ratio (25%), inverse microCommitRatio (15%)
 // ---------------------------------------------------------------------------
 
-export function computeGuarding(stats: StatsData): number {
+export function computeQuality(stats: StatsData): number {
   if (stats.reviewsSubmittedCount === 0) return 0;
 
   const reviews = normalize(stats.reviewsSubmittedCount, CAPS.reviews);
@@ -107,7 +107,7 @@ export function computeBreadth(stats: StatsData): number {
 export function computeDimensions(stats: StatsData): DimensionScores {
   return {
     building: computeBuilding(stats),
-    guarding: computeGuarding(stats),
+    quality: computeQuality(stats),
     consistency: computeConsistency(stats),
     breadth: computeBreadth(stats),
   };
@@ -127,7 +127,7 @@ export function detectProfileType(stats: StatsData): ProfileType {
 
 const DIMENSION_KEYS: (keyof DimensionScores)[] = [
   "building",
-  "guarding",
+  "quality",
   "consistency",
   "breadth",
 ];
@@ -138,10 +138,10 @@ const SOLO_DIMENSION_KEYS: (keyof DimensionScores)[] = [
   "breadth",
 ];
 
-// Tie-breaking priority: Polymath > Guardian > Marathoner > Builder
+// Tie-breaking priority: Polymath > Quality Champion > Marathoner > Builder
 const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype }[] = [
   { key: "breadth", archetype: "Polymath" },
-  { key: "guarding", archetype: "Guardian" },
+  { key: "quality", archetype: "Quality Champion" },
   { key: "consistency", archetype: "Marathoner" },
   { key: "building", archetype: "Builder" },
 ];
@@ -169,9 +169,9 @@ export function deriveArchetype(
   }
 
   // V5 Specific archetypes: highest dimension >= 60 (was 70), with tie-breaking priority
-  // Solo profiles skip Guardian
+  // Solo profiles skip Quality Champion
   const candidates = isSolo
-    ? ARCHETYPE_MAP.filter((a) => a.archetype !== "Guardian")
+    ? ARCHETYPE_MAP.filter((a) => a.archetype !== "Quality Champion")
     : ARCHETYPE_MAP;
 
   for (const { key, archetype } of candidates) {
@@ -200,7 +200,7 @@ export function computeImpactV4(stats: StatsData): ImpactV4Result {
         )
       : Math.round(
           (dimensions.building +
-            dimensions.guarding +
+            dimensions.quality +
             dimensions.consistency +
             dimensions.breadth) /
             4

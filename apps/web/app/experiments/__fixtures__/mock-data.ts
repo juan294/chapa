@@ -56,7 +56,7 @@ export const MOCK_IMPACT: ImpactV4Result = {
   profileType: "collaborative",
   dimensions: {
     building: 85,
-    guarding: 72,
+    quality: 72,
     consistency: 91,
     breadth: 68,
   },

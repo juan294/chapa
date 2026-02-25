@@ -47,7 +47,7 @@ export function getTierColor(tier: ImpactTier): string {
 
 const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
   Builder: "#7C6AEF",   // signature purple
-  Guardian: "#F472B6",  // pink
+  "Quality Champion": "#F472B6",  // pink
   Marathoner: "#4ADE80", // green
   Polymath: "#FBBF24",  // amber/gold
   Balanced: "#94A3B8",  // steel blue (lighter for dark badge bg)

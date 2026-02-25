@@ -9,7 +9,7 @@ import type { DimensionScores } from "@chapa/shared";
 function makeDimensions(overrides: Partial<DimensionScores> = {}): DimensionScores {
   return {
     building: 50,
-    guarding: 50,
+    quality: 50,
     consistency: 50,
     breadth: 50,
     ...overrides,
@@ -34,7 +34,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
 
   it("polygon points are within bounds of center + radius", () => {
     const cx = 200, cy = 200, r = 100;
-    const svg = renderRadarChart(makeDimensions({ building: 100, guarding: 100, consistency: 100, breadth: 100 }), cx, cy, r);
+    const svg = renderRadarChart(makeDimensions({ building: 100, quality: 100, consistency: 100, breadth: 100 }), cx, cy, r);
     const pointsMatch = svg.match(/points="([^"]+)"/);
     expect(pointsMatch).not.toBeNull();
     const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
@@ -59,7 +59,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
   });
 
   it("all-zero dimensions produce a point at center", () => {
-    const svg = renderRadarChart(makeDimensions({ building: 0, guarding: 0, consistency: 0, breadth: 0 }), 200, 200, 100);
+    const svg = renderRadarChart(makeDimensions({ building: 0, quality: 0, consistency: 0, breadth: 0 }), 200, 200, 100);
     // Match the data polygon (fill-opacity, not fill="none")
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
@@ -72,7 +72,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
   });
 
   it("uniform scores produce a symmetric shape", () => {
-    const svg = renderRadarChart(makeDimensions({ building: 70, guarding: 70, consistency: 70, breadth: 70 }), 200, 200, 100);
+    const svg = renderRadarChart(makeDimensions({ building: 70, quality: 70, consistency: 70, breadth: 70 }), 200, 200, 100);
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
     const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
@@ -102,10 +102,10 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     expect(svg).toMatch(/fill="[^"]*"/);
   });
 
-  it("has 4 axis labels (Building, Guarding, Consistency, Breadth)", () => {
+  it("has 4 axis labels (Building, Quality, Consistency, Breadth)", () => {
     const svg = renderRadarChart(makeDimensions(), 200, 200, 100);
     expect(svg).toContain(">Building<");
-    expect(svg).toContain(">Guarding<");
+    expect(svg).toContain(">Quality<");
     expect(svg).toContain(">Consistency<");
     expect(svg).toContain(">Breadth<");
   });

@@ -43,7 +43,7 @@ function rowToRecord(row: VerificationRow): VerificationRecord {
     profileType: row.profile_type,
     dimensions: {
       building: row.building,
-      guarding: row.guarding,
+      quality: row.guarding,
       consistency: row.consistency,
       breadth: row.breadth,
     },
@@ -118,7 +118,7 @@ export async function dbStoreVerification(
         archetype: record.archetype,
         profile_type: record.profileType,
         building: record.dimensions.building,
-        guarding: record.dimensions.guarding,
+        guarding: record.dimensions.quality,
         consistency: record.dimensions.consistency,
         breadth: record.dimensions.breadth,
         commits_total: record.commitsTotal,
