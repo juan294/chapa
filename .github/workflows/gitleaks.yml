@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "0 4 * * *" # Daily 04:00 UTC — full history scan
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   gitleaks:
     name: Gitleaks
