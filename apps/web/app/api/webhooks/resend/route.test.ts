@@ -118,6 +118,18 @@ describe("POST /api/webhooks/resend", () => {
     expect(body.error).toContain("signature");
   });
 
+  it("returns 400 when body is malformed JSON", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+
+    const req = makeRequest("not valid json {{{", validHeaders);
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Invalid JSON payload");
+  });
+
   it("returns 200 and ignores non email.received events", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
 

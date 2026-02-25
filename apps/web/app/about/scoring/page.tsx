@@ -213,8 +213,8 @@ export default function ScoringMethodologyPage() {
               0 when its primary signal is completely absent.
             </p>
 
-            {/* Building */}
-            <SubHeading>Building — shipping meaningful changes</SubHeading>
+            {/* Delivery */}
+            <SubHeading>Delivery — shipping meaningful changes</SubHeading>
             <Table
               headers={["Signal", "Weight", "Rationale"]}
               rows={[
@@ -244,9 +244,9 @@ export default function ScoringMethodologyPage() {
               normal PRs are unaffected.
             </p>
 
-            {/* Guarding */}
+            {/* Quality */}
             <SubHeading>
-              Guarding — reviewing and quality gatekeeping
+              Quality — reviewing and quality gatekeeping
             </SubHeading>
             <Table
               headers={["Signal", "Weight", "Rationale"]}
@@ -270,7 +270,7 @@ export default function ScoringMethodologyPage() {
             />
             <p>
               Returns 0 if you have zero reviews. Solo developers who never
-              review are not penalized — their composite score excludes Guarding
+              review are not penalized — their composite score excludes Quality
               entirely and averages the remaining three dimensions.
             </p>
 
@@ -379,8 +379,8 @@ export default function ScoringMethodologyPage() {
                   "Cross-project influence is your strongest suit",
                 ],
                 [
-                  "Guardian",
-                  "Guarding is highest AND >= 60",
+                  "Quality Champion",
+                  "Quality is highest AND >= 60",
                   "You spend significant time reviewing and gatekeeping quality",
                 ],
                 [
@@ -390,13 +390,13 @@ export default function ScoringMethodologyPage() {
                 ],
                 [
                   "Builder",
-                  "Building is highest AND >= 60",
+                  "Delivery is highest AND >= 60",
                   "You ship a high volume of meaningful code changes",
                 ],
               ]}
             />
             <p>
-              Tie-breaking priority: Polymath &gt; Guardian &gt; Marathoner &gt;
+              Tie-breaking priority: Polymath &gt; Quality Champion &gt; Marathoner &gt;
               Builder. If no specific archetype matches (highest dimension &lt;
               60 and not Balanced), the fallback is Emerging.
             </p>

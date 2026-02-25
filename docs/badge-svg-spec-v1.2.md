@@ -403,11 +403,11 @@ Grid extent:
 ## 5. Radar Chart
 
 ```
-         Building
+         Delivery
             ▲
            / \
           /   \
-  Breadth ◄─────► Guarding
+  Breadth ◄─────► Quality
           \   /
            \ /
             ▼
@@ -430,8 +430,8 @@ Axes are positioned using trigonometric angles:
 
 | Axis | Key | Label | Angle (radians) | Direction |
 |------|-----|-------|-----------------|-----------|
-| Top | `building` | `Building` | `-π/2` (−90°) | Up |
-| Right | `guarding` | `Guarding` | `0` (0°) | Right |
+| Top | `delivery` | `Delivery` | `-π/2` (−90°) | Up |
+| Right | `quality` | `Quality` | `0` (0°) | Right |
 | Bottom | `consistency` | `Consistency` | `π/2` (90°) | Down |
 | Left | `breadth` | `Breadth` | `π` (180°) | Left |
 
@@ -450,8 +450,8 @@ At full radius (100):
 
 | Axis | Point |
 |------|-------|
-| Building (top) | `(905, 190)` |
-| Guarding (right) | `(990, 275)` |
+| Delivery (top) | `(905, 190)` |
+| Quality (right) | `(990, 275)` |
 | Consistency (bottom) | `(905, 360)` |
 | Breadth (left) | `(820, 275)` |
 
@@ -517,8 +517,8 @@ Labels offset `20px` beyond the radius, with dynamic anchoring:
 
 | Label | Approx position | Anchor |
 |-------|----------------|--------|
-| `Building` | `(905, 170)` | `middle` |
-| `Guarding` | `(1014, 279)` | `start` |
+| `Delivery` | `(905, 170)` | `middle` |
+| `Quality` | `(1014, 279)` | `start` |
 | `Consistency` | `(905, 394)` | `middle` |
 | `Breadth` | `(796, 279)` | `end` |
 
@@ -748,7 +748,7 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
 | Archetype | Hex | Visual |
 |-----------|-----|--------|
 | `Builder` | `#7C6AEF` | Signature purple |
-| `Guardian` | `#F472B6` | Pink |
+| `Quality Champion` | `#F472B6` | Pink |
 | `Marathoner` | `#4ADE80` | Green |
 | `Polymath` | `#FBBF24` | Amber/gold |
 | `Balanced` | `#E6EDF3` | Light gray |

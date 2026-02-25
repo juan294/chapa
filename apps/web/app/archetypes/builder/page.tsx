@@ -35,7 +35,7 @@ export default function BuilderPage() {
                 The <span className="text-amber">Builder</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-amber">Building</span>
+                Dominant dimension: <span className="text-amber">Delivery</span>
               </p>
             </div>
 
@@ -63,7 +63,7 @@ export default function BuilderPage() {
                 What distinguishes a Builder from someone who simply writes a lot of code is
                 <em> intent</em>. Builders don&apos;t just commit. They ship. Their pull requests get
                 merged because they solve real problems. Their issues get closed because they
-                follow through. The Building dimension in Chapa deliberately prioritizes outcomes
+                follow through. The Delivery dimension in Chapa deliberately prioritizes outcomes
                 over activity &mdash; merged PRs matter most, followed by closed issues, with
                 raw commit volume weighted least.
               </p>
@@ -80,7 +80,7 @@ export default function BuilderPage() {
               </h2>
 
               <p>
-                To earn the Builder archetype, your Building dimension must be strong and your
+                To earn the Builder archetype, your Delivery dimension must be strong and your
                 most dominant trait. The algorithm looks at your last 12 months of GitHub activity
                 and evaluates the weight and frequency of your merged PRs, your issue closure rate,
                 and your commit volume &mdash; all normalized so that early contributions count
@@ -119,7 +119,7 @@ export default function BuilderPage() {
               </p>
 
               <p>
-                Builders often pair well with Guardians &mdash; the Builder ships fast, the Guardian
+                Builders often pair well with Quality Champions &mdash; the Builder ships fast, the Quality Champion
                 reviews carefully, and together they find a rhythm that balances speed with quality.
               </p>
 
@@ -129,7 +129,7 @@ export default function BuilderPage() {
 
               <p>
                 On the Chapa radar chart, a Builder&apos;s shape leans heavily toward the top
-                (Building axis), often with moderate Consistency and Breadth, and a thinner Guarding
+                (Delivery axis), often with moderate Consistency and Breadth, and a thinner Quality
                 profile. The visual signature is unmistakable: a diamond that points upward, like an
                 arrow aimed at the next release.
               </p>

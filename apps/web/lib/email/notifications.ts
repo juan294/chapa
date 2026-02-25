@@ -72,8 +72,8 @@ export async function notifyFirstBadge(
       `Confidence:  ${impact.confidence}%`,
       "",
       "Dimensions:",
-      `  Building:    ${dimensions.building}`,
-      `  Guarding:    ${dimensions.guarding}`,
+      `  Delivery:    ${dimensions.delivery}`,
+      `  Quality:     ${dimensions.quality}`,
       `  Consistency: ${dimensions.consistency}`,
       `  Breadth:     ${dimensions.breadth}`,
       "",
@@ -118,7 +118,7 @@ interface EmailData {
   adjustedComposite: number;
   tier: string;
   confidence: number;
-  dimensions: { building: number; guarding: number; consistency: number; breadth: number };
+  dimensions: { delivery: number; quality: number; consistency: number; breadth: number };
   shareUrl: string;
   badgeUrl: string;
   computedAt: string;
@@ -191,8 +191,8 @@ function buildHtml(data: EmailData): string {
           <!-- Dimensions -->
           <div style="font-size:12px;color:#6B6F7B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Dimensions</div>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-            ${dimensionBar("Building", data.dimensions.building)}
-            ${dimensionBar("Guarding", data.dimensions.guarding)}
+            ${dimensionBar("Delivery", data.dimensions.delivery)}
+            ${dimensionBar("Quality", data.dimensions.quality)}
             ${dimensionBar("Consistency", data.dimensions.consistency)}
             ${dimensionBar("Breadth", data.dimensions.breadth)}
           </table>

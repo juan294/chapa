@@ -498,14 +498,14 @@ export default function GlassmorphismExperimentPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
-              label="Building"
+              label="Delivery"
               value={34}
               maxValue={40}
               detail="Core code contributions across 12 repos. Consistent daily contribution pattern with weekend peaks."
               style={presetToStyle("medium", showBorder)}
             />
             <StatCard
-              label="Guarding"
+              label="Quality"
               value={28}
               maxValue={30}
               detail="Code reviews, issue triage, and quality enforcement. Active reviewer with thoughtful feedback."

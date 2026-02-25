@@ -13,7 +13,7 @@ function makeDiff(overrides: Partial<SnapshotDiff> = {}): SnapshotDiff {
     compositeScore: 0,
     adjustedComposite: 0,
     confidence: 0,
-    dimensions: { building: 0, guarding: 0, consistency: 0, breadth: 0 },
+    dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 },
     stats: {
       commitsTotal: 0,
       prsMergedCount: 0,
@@ -141,7 +141,7 @@ describe("isSignificantChange", () => {
     it("archetype_change takes priority over score_bump", () => {
       const result = isSignificantChange(
         makeDiff({
-          archetype: { from: "Guardian", to: "Polymath" },
+          archetype: { from: "Quality Champion", to: "Polymath" },
           adjustedComposite: 8,
         }),
       );

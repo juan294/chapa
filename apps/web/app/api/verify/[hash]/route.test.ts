@@ -45,7 +45,7 @@ const FAKE_RECORD = {
   confidence: 85,
   tier: "Solid",
   archetype: "Builder",
-  dimensions: { building: 70, guarding: 50, consistency: 60, breadth: 40 },
+  dimensions: { delivery: 70, quality: 50, consistency: 60, breadth: 40 },
   commitsTotal: 200,
   prsMergedCount: 30,
   reviewsSubmittedCount: 50,

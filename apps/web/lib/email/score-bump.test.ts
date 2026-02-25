@@ -52,7 +52,7 @@ function makeDiff(overrides: Partial<SnapshotDiff> = {}): SnapshotDiff {
     compositeScore: 8,
     adjustedComposite: 8,
     confidence: 2,
-    dimensions: { building: 5, guarding: 2, consistency: 1, breadth: 0 },
+    dimensions: { delivery: 5, quality: 2, consistency: 1, breadth: 0 },
     stats: {
       commitsTotal: 10,
       prsMergedCount: 3,

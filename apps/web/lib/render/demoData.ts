@@ -71,8 +71,8 @@ export const DEMO_IMPACT: ImpactV4Result = {
   handle: "developer",
   profileType: "collaborative",
   dimensions: {
-    building: 88,
-    guarding: 72,
+    delivery: 88,
+    quality: 72,
     consistency: 80,
     breadth: 65,
   },

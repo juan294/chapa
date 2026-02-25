@@ -45,7 +45,7 @@ describe("DEMO_IMPACT", () => {
   });
 
   it("has a valid archetype", () => {
-    expect(["Builder", "Guardian", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(
+    expect(["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(
       DEMO_IMPACT.archetype,
     );
   });
@@ -61,7 +61,7 @@ describe("DEMO_IMPACT", () => {
   });
 
   it("has dimension scores each in 0-100", () => {
-    for (const key of ["building", "guarding", "consistency", "breadth"] as const) {
+    for (const key of ["delivery", "quality", "consistency", "breadth"] as const) {
       expect(DEMO_IMPACT.dimensions[key]).toBeGreaterThanOrEqual(0);
       expect(DEMO_IMPACT.dimensions[key]).toBeLessThanOrEqual(100);
     }

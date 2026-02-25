@@ -65,8 +65,8 @@ function VerifiedCard({
     tier: string;
     archetype: string;
     dimensions: {
-      building: number;
-      guarding: number;
+      delivery: number;
+      quality: number;
       consistency: number;
       breadth: number;
     };

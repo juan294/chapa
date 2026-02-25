@@ -10,16 +10,16 @@ AI-assisted development makes traditional volume metrics (commits, LOC, PR count
 
 | Dimension | What it measures | Primary signals | Weights |
 |-----------|-----------------|-----------------|---------|
-| **Building** | Shipping meaningful changes | `prsMergedWeight` (70%), `issuesClosedCount` (20%), `commitsTotal` (10%) | Log-normalized with caps |
-| **Guarding** | Reviewing & quality gatekeeping | `reviewsSubmittedCount` (60%), review-to-PR ratio (25%), inverse `microCommitRatio` (15%) | Reviews log-normalized; ratio capped at 5:1 |
+| **Delivery** | Shipping meaningful changes | `prsMergedWeight` (70%), `issuesClosedCount` (20%), `commitsTotal` (10%) | Log-normalized with caps |
+| **Quality** | Reviewing & quality gatekeeping | `reviewsSubmittedCount` (60%), review-to-PR ratio (25%), inverse `microCommitRatio` (15%) | Reviews log-normalized; ratio capped at 5:1 |
 | **Consistency** | Reliable, sustained contributions | `activeDays/365` (50%), heatmap evenness (35%), inverse burst activity (15%) | Linear for streak; CV-based for evenness |
 | **Breadth** | Cross-project influence | `reposContributed` (35%), inverse `topRepoShare` (25%), `totalStars` (15%), `totalForks` (10%), `totalWatchers` (5%), `docsOnlyPrRatio` (10%) | Linear with caps; community metrics log-normalized (stars cap 500, forks cap 200, watchers cap 100) |
 
 ### Guards
 
 Each dimension returns 0 when the primary signal is absent:
-- Building: always has activity if any stats present
-- Guarding: returns 0 if `reviewsSubmittedCount === 0`
+- Delivery: always has activity if any stats present
+- Quality: returns 0 if `reviewsSubmittedCount === 0`
 - Consistency: returns 0 if `activeDays === 0`
 - Breadth: returns 0 if `reposContributed === 0`
 
@@ -39,22 +39,22 @@ evenness = 1 / (1 + CV)
 
 ## Developer Archetypes
 
-Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Guardian > Marathoner > Builder.
+Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Builder.
 
 | Archetype | Rule |
 |-----------|------|
 | **Emerging** | avg < 40 OR no dimension >= 50 |
 | **Balanced** | All dimensions within 15 pts AND avg >= 60 |
 | **Polymath** | Breadth is highest AND >= 70 |
-| **Guardian** | Guarding is highest AND >= 70 |
+| **Quality Champion** | Quality is highest AND >= 70 |
 | **Marathoner** | Consistency is highest AND >= 70 |
-| **Builder** | Building is highest AND >= 70 |
+| **Builder** | Delivery is highest AND >= 70 |
 
 Evaluation order: Emerging → Balanced → specific archetypes (by tie-breaking priority) → fallback to Emerging.
 
 ## Composite Score & Tiers
 
-- `compositeScore = round(avg(building, guarding, consistency, breadth))`
+- `compositeScore = round(avg(delivery, quality, consistency, breadth))`
 - Confidence: 8 penalty flags, range 50-100 (see Anti-Gaming Hardening below)
 - `adjustedComposite = compositeScore × (0.85 + 0.15 × confidence/100)`
 - Tiers: Emerging (0-39), Solid (40-69), High (70-84), Elite (85-100)
@@ -81,7 +81,7 @@ weight = rawWeight * sizeMultiplier
 
 - Empty PRs (0 files, 0 lines) → weight 0 (was 0.5)
 - Normal PRs (10+ total changes) → unaffected (multiplier = 1.0)
-- Prevents inflating Building score by spamming trivial/empty PRs
+- Prevents inflating Delivery score by spamming trivial/empty PRs
 
 Implementation: `packages/shared/src/scoring.ts`
 
@@ -96,7 +96,7 @@ Implementation: `packages/shared/src/stats-aggregation.ts`
 
 ### 3. Unknown microCommitRatio default (no free points)
 
-When `microCommitRatio` is `undefined` (the common case — data not available), the default is now `0.3` instead of `0`. This means `inverseMicro = 0.7` instead of `1.0`, costing ~4.5 Guarding points for profiles without this data. Profiles with an explicitly measured `microCommitRatio` of 0 still get full inverseMicro.
+When `microCommitRatio` is `undefined` (the common case — data not available), the default is now `0.3` instead of `0`. This means `inverseMicro = 0.7` instead of `1.0`, costing ~4.5 Quality points for profiles without this data. Profiles with an explicitly measured `microCommitRatio` of 0 still get full inverseMicro.
 
 Implementation: `apps/web/lib/impact/v4.ts` (line 54)
 

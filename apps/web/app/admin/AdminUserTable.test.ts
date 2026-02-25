@@ -40,6 +40,10 @@ describe("AdminUserTable", () => {
       expect(SOURCE).toContain('label="Score"');
     });
 
+    it("renders Raw column", () => {
+      expect(SOURCE).toContain('label="Raw"');
+    });
+
     it("renders Confidence column", () => {
       expect(SOURCE).toContain('label="Conf"');
     });
@@ -84,7 +88,7 @@ describe("AdminUserTable", () => {
     });
 
     it("uses colSpan for the empty state row", () => {
-      expect(SOURCE).toContain("colSpan={12}");
+      expect(SOURCE).toContain("colSpan={13}");
     });
   });
 
@@ -93,7 +97,7 @@ describe("AdminUserTable", () => {
       expect(SOURCE).toContain("users.map((user)");
     });
 
-    it("uses handle as the row key", () => {
+    it("uses handle as the row key via AdminUserTableRow", () => {
       expect(SOURCE).toContain("key={user.handle}");
     });
 
@@ -139,6 +143,26 @@ describe("AdminUserTable", () => {
 
     it("has an accessible label", () => {
       expect(SOURCE).toContain("View badge SVG for");
+    });
+  });
+
+  describe("memoized row component (#479)", () => {
+    it("exports AdminUserTableRow as a named component", () => {
+      expect(SOURCE).toContain("export const AdminUserTableRow = memo(");
+    });
+
+    it("wraps AdminUserTableRow in React.memo", () => {
+      expect(SOURCE).toMatch(/memo\(function AdminUserTableRow/);
+    });
+
+    it("renders AdminUserTableRow in the users map", () => {
+      expect(SOURCE).toContain("<AdminUserTableRow");
+    });
+
+    it("passes user, hasImgError, and onImgError props to row", () => {
+      expect(SOURCE).toContain("user={user}");
+      expect(SOURCE).toContain("hasImgError={imgErrors.has(user.handle)}");
+      expect(SOURCE).toContain("onImgError={handleImgError}");
     });
   });
 

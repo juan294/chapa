@@ -73,7 +73,7 @@ const MOCK_STATS = {
 const MOCK_IMPACT = {
   handle: "testuser",
   profileType: "collaborative" as const,
-  dimensions: { building: 70, guarding: 60, consistency: 80, breadth: 50 },
+  dimensions: { delivery: 70, quality: 60, consistency: 80, breadth: 50 },
   archetype: "Builder" as const,
   compositeScore: 65,
   confidence: 85,

@@ -233,11 +233,11 @@ export default function VerificationPage() {
                   "Locks the archetype label to the data",
                 ],
                 [
-                  "Building",
+                  "Delivery",
                   "80",
                   "Each dimension score is individually signed",
                 ],
-                ["Guarding", "55", ""],
+                ["Quality", "55", ""],
                 ["Consistency", "68", ""],
                 ["Breadth", "45", ""],
                 [

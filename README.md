@@ -21,8 +21,8 @@ Generate a **live, embeddable, animated SVG badge** that showcases your develope
 Chapa analyzes your last 12 months of GitHub activity and generates a badge with:
 
 - **Impact Score** (0–100) with tier (Emerging → Solid → High → Elite)
-- **4-Dimension Profile** — Building, Guarding, Consistency, Breadth
-- **Developer Archetype** — Builder, Guardian, Marathoner, Polymath, Balanced, or Emerging
+- **4-Dimension Profile** — Delivery, Quality, Consistency, Breadth
+- **Developer Archetype** — Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging
 - **Activity Heatmap** — 13-week daily contribution visualization
 - **Radar Chart** — visual breakdown of your 4 dimensions
 - **Verification Hash** — HMAC-SHA256 watermark proving badge authenticity
@@ -114,8 +114,8 @@ Chapa computes a multi-dimensional developer profile from commits, PRs, code rev
 
 | Dimension | What it measures |
 |-----------|-----------------|
-| **Building** | Commits landed, PRs merged, code volume |
-| **Guarding** | Code reviews, review comments, review depth |
+| **Delivery** | Commits landed, PRs merged, code volume |
+| **Quality** | Code reviews, review comments, review depth |
 | **Consistency** | Activity spread, heatmap evenness, streak patterns |
 | **Breadth** | Repository diversity, language variety |
 

@@ -55,8 +55,8 @@ export const MOCK_IMPACT: ImpactV4Result = {
   handle: "juan294",
   profileType: "collaborative",
   dimensions: {
-    building: 85,
-    guarding: 72,
+    delivery: 85,
+    quality: 72,
     consistency: 91,
     breadth: 68,
   },

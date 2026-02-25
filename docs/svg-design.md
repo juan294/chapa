@@ -26,7 +26,7 @@
 - All user text escaped via `escapeXml()` for XSS prevention
 
 ### 3) Archetype + metrics pill row
-- **Archetype pill**: colored bracket icon + archetype label (e.g. "Builder", "Guardian")
+- **Archetype pill**: colored bracket icon + archetype label (e.g. "Builder", "Quality Champion")
 - **Metric pills** (right of archetype, separated by dots):
   - Watch count (eye icon)
   - Fork count (fork icon)
@@ -48,7 +48,7 @@
 
 **Center column: Radar chart**
 - 4-point radar/spider chart showing dimension scores
-- Axes: Building (top), Guarding (right), Consistency (bottom), Breadth (left)
+- Axes: Delivery (top), Quality (right), Consistency (bottom), Breadth (left)
 - Filled polygon with purple accent fill at low opacity
 - Axis labels at each corner
 - Grid rings at 25%, 50%, 75%, 100%
@@ -109,7 +109,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 | Archetype | Color |
 |-----------|-------|
 | Builder | `#7C6AEF` (purple) |
-| Guardian | `#F472B6` (pink) |
+| Quality Champion | `#F472B6` (pink) |
 | Marathoner | `#4ADE80` (green) |
 | Polymath | `#FBBF24` (amber/gold) |
 | Balanced | `#E6EDF3` (light gray) |
@@ -142,7 +142,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 
 **From `ImpactV4Result`:**
 - `archetype` (archetype pill)
-- `dimensions` (radar chart: building, guarding, consistency, breadth)
+- `dimensions` (radar chart: delivery, quality, consistency, breadth)
 - `adjustedComposite` (score ring)
 - `tier` (tier label)
 

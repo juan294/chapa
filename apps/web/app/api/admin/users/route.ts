@@ -25,6 +25,7 @@ interface AdminUserEntry {
   archetype: string | null;
   tier: string | null;
   adjustedComposite: number | null;
+  rawScore: number | null;
   confidence: number | null;
   statsExpired: boolean;
 }
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
         archetype: null,
         tier: null,
         adjustedComposite: null,
+        rawScore: null,
         confidence: null,
         statsExpired: true,
       };
@@ -136,6 +138,7 @@ export async function GET(request: NextRequest) {
       archetype: impact.archetype,
       tier: getTier(smoothedScore),
       adjustedComposite: smoothedScore,
+      rawScore: impact.adjustedComposite,
       confidence: impact.confidence,
       statsExpired: false,
     };

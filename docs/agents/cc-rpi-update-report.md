@@ -1,46 +1,48 @@
-# cc-rpi Sync Report
+# cc-rpi Update Report
+> Generated: 2026-02-25 | Blueprint: v1.2.0 → v1.2.1 | Commit: `25ec671`
 
-> **Date:** 2026-02-24
-> **Blueprint version:** v1.2.0 (`f86d3a7`)
-> **Previous version:** v1.1.0 (`d14fb65`)
-> **Branch:** `develop`
+## Summary
 
-## Result: METADATA-ONLY UPDATE
+Synced from cc-rpi v1.2.0 to v1.2.1. **No project file changes required** — all updates were to blueprint-internal files (patterns, CI, README).
 
-No project files were changed. Only sync metadata was updated.
+## Blueprint Changes Since Last Sync (7 commits)
 
-## Blueprint Changes (v1.1.0 → v1.2.0)
+| Commit | Description |
+|--------|-------------|
+| `25ec671` | fix: don't default to open-source license badge in templates |
+| `c8efd94` | docs: add CI status badge to README |
+| `6bc51d1` | fix: skip fenced code blocks in CI link checker |
+| `f8a72c3` | docs: add errors #30-#31, expand #1 scope to all tool types |
+| `3274424` | docs: add errors #28-#29 — linter auto-fix and uv Python version |
+| `30ab298` | docs: add errors #26-#27 and expand #25 with git push variant |
+| `30fb65b` | release: add v1.2.1 version badge to README |
 
-3 commits in cc-rpi since last sync:
-- `f86d3a7` — ci: add lightweight validation workflow for links, shellcheck, and configs
-- `e9a37c1` — release: v1.2.0
-- `46ba416` — feat: add Memory Management section and memory-save phases to bootstrap/adopt
+## Changed Blueprint Files
 
-### Changed files in blueprint
-| File | Action taken |
-|------|--------------|
-| `templates/CLAUDE.md.template` | New "Memory Management" section — **skipped** (section doesn't exist in project; use `/adopt` to add) |
-| `templates/commands/bootstrap.md` | Skipped (user-level command) |
-| `templates/commands/adopt.md` | Skipped (user-level command) |
-| `templates/commands/update.md` | Skipped (user-level command) |
-| `.github/workflows/validate.yml` | Blueprint CI only, not synced to projects |
-| `CHANGELOG.md` | Blueprint docs only |
+- `patterns/agent-errors.md` — 6 new error patterns (#26-#31)
+- `patterns/quick-reference.md` — 6 new rules (#26-#31), Error #1 expanded to all tool types
+- `.github/workflows/validate.yml` — CI link checker fix
+- `README.md` — version badge
+- `templates/README-header.md` — license badge fix
+- `templates/setup-checklist.md` — setup checklist update
 
-## Commands Updated/Added
-None — no project-level commands (research, plan, implement, validate, describe-pr, pre-launch) were changed.
+## Project File Status
 
-## CLAUDE.md Sections Updated
-None — the only template change was a new "Memory Management" section which doesn't exist in the project's CLAUDE.md. Per update rules, new sections are not added during sync (that's `/adopt`'s job).
+| Area | Status | Details |
+|------|--------|---------|
+| Slash commands (6) | No changes needed | All 6 match blueprint templates |
+| CLAUDE.md blueprint sections (7) | No changes needed | All match template |
+| settings.json | No changes needed | Has all template entries + project additions |
+| Sync metadata | Updated | v1.2.0 → v1.2.1 |
 
-## settings.json Changes
-None — `settings.json.template` was not modified in v1.2.0.
+## New Knowledge Internalized
 
-## Notable New Content
-- **Memory Management section** (available via `/adopt`): Instructs agents to proactively save operational lessons (CI patterns, workarounds, environment quirks) to auto memory without being asked.
-- **4 new error patterns** (#22–#25) added to the blueprint knowledge base (agent-errors.md, quick-reference.md). These are reference material, not synced to project files.
+New error patterns added to the blueprint (not requiring project file changes, but useful for agents):
 
-## Environment Issue Noted
-Pre-commit hook test runner has a pre-existing rollup native module architecture mismatch (`@rollup/rollup-darwin-x64` not found on arm64 machine in git hook context). Typecheck and lint pass. This should be investigated separately.
-
-## Recommendation
-Run `/adopt` if you want to add the new "Memory Management" section to CLAUDE.md.
+- **#26**: Don't build complex regex pipelines in shell — use dedicated tools
+- **#27**: Only pass correct file types to linters — don't fight intentional patterns
+- **#28**: Use `--fix` for auto-fixable linter issues — don't manually edit
+- **#29**: Specify Python version for `uv sync` — system default may be too new
+- **#30**: Always `git push -u` before `gh pr create`
+- **#31**: Don't guess CLI flags on unfamiliar tools — run `--help` first
+- **#1 expanded**: Sibling tool call error now documents all tool types (Bash, TaskOutput, Read), not just Bash

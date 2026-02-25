@@ -25,7 +25,7 @@ function buildHeatmap(grid: number[][]): HeatmapDay[] {
   return days;
 }
 
-/* ── Builder: intense bursts of shipping, heavy weekday activity ─────── */
+/* ── Builder: intense bursts of shipping, heavy weekday activity ───── */
 const BUILDER_GRID: number[][] = [
   [0, 3, 4, 4, 3, 1, 0],
   [0, 4, 4, 3, 4, 0, 0],
@@ -67,8 +67,8 @@ export const BUILDER_IMPACT: ImpactV4Result = {
   handle: "builder",
   profileType: "collaborative",
   dimensions: {
-    building: 92,
-    guarding: 34,
+    delivery: 92,
+    quality: 34,
     consistency: 68,
     breadth: 38,
   },
@@ -81,7 +81,7 @@ export const BUILDER_IMPACT: ImpactV4Result = {
   computedAt: "2025-01-01T00:00:00Z",
 };
 
-/* ── Guardian: steady review activity, fewer personal commits ────────── */
+/* ── Quality Champion: steady review activity, fewer personal commits ── */
 const GUARDIAN_GRID: number[][] = [
   [0, 2, 2, 2, 2, 0, 0],
   [0, 2, 3, 2, 2, 1, 0],
@@ -123,12 +123,12 @@ export const GUARDIAN_IMPACT: ImpactV4Result = {
   handle: "guardian",
   profileType: "collaborative",
   dimensions: {
-    building: 38,
-    guarding: 90,
+    delivery: 38,
+    quality: 90,
     consistency: 62,
     breadth: 30,
   },
-  archetype: "Guardian",
+  archetype: "Quality Champion",
   compositeScore: 68,
   confidence: 88,
   confidencePenalties: [],
@@ -179,8 +179,8 @@ export const MARATHONER_IMPACT: ImpactV4Result = {
   handle: "marathoner",
   profileType: "collaborative",
   dimensions: {
-    building: 52,
-    guarding: 36,
+    delivery: 52,
+    quality: 36,
     consistency: 94,
     breadth: 32,
   },
@@ -235,8 +235,8 @@ export const POLYMATH_IMPACT: ImpactV4Result = {
   handle: "polymath",
   profileType: "collaborative",
   dimensions: {
-    building: 48,
-    guarding: 40,
+    delivery: 48,
+    quality: 40,
     consistency: 50,
     breadth: 88,
   },
@@ -291,8 +291,8 @@ export const BALANCED_IMPACT: ImpactV4Result = {
   handle: "balanced",
   profileType: "collaborative",
   dimensions: {
-    building: 72,
-    guarding: 68,
+    delivery: 72,
+    quality: 68,
     consistency: 74,
     breadth: 66,
   },
@@ -347,8 +347,8 @@ export const EMERGING_IMPACT: ImpactV4Result = {
   handle: "emerging",
   profileType: "solo",
   dimensions: {
-    building: 22,
-    guarding: 8,
+    delivery: 22,
+    quality: 8,
     consistency: 18,
     breadth: 15,
   },

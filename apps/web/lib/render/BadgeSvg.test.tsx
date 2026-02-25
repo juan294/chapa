@@ -291,8 +291,8 @@ describe("renderBadgeSvg", () => {
 
     it("radar chart shows dimension labels", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain(">Building<");
-      expect(svg).toContain(">Guarding<");
+      expect(svg).toContain(">Delivery<");
+      expect(svg).toContain(">Quality<");
       expect(svg).toContain(">Consistency<");
       expect(svg).toContain(">Breadth<");
     });
@@ -487,7 +487,7 @@ describe("renderBadgeSvg", () => {
 
   describe("archetype display", () => {
     it("shows each archetype type correctly", () => {
-      const archetypes = ["Builder", "Guardian", "Marathoner", "Polymath", "Balanced", "Emerging"] as const;
+      const archetypes = ["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"] as const;
       for (const archetype of archetypes) {
         const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype }));
         expect(svg).toContain(archetype);

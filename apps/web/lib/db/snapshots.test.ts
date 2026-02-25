@@ -159,7 +159,7 @@ describe("dbInsertSnapshot", () => {
         handle: "testuser",
         date: snapshot.date,
         commits_total: snapshot.commitsTotal,
-        building: snapshot.building,
+        building: snapshot.delivery,
         archetype: snapshot.archetype,
       }),
       { onConflict: "handle,date", ignoreDuplicates: true },

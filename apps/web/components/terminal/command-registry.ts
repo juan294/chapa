@@ -216,7 +216,7 @@ export function createNavigationCommands(options?: {
     makeLine("dim", ""),
     makeLine("system", "Archetypes:"),
     makeLine("info", "  /builder           The Builder archetype"),
-    makeLine("info", "  /guardian           The Guardian archetype"),
+    makeLine("info", "  /guardian           The Quality Champion archetype"),
     makeLine("info", "  /marathoner        The Marathoner archetype"),
     makeLine("info", "  /polymath          The Polymath archetype"),
     makeLine("info", "  /balanced          The Balanced archetype"),
@@ -329,9 +329,9 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/guardian",
-      description: "The Guardian archetype",
+      description: "The Quality Champion archetype",
       execute: () => ({
-        lines: [makeLine("system", "Opening Guardian archetype...")],
+        lines: [makeLine("system", "Opening Quality Champion archetype...")],
         action: { type: "navigate", path: "/archetypes/guardian" },
       }),
     },

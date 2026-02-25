@@ -4,15 +4,16 @@ import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
+import { NavLink } from "./NavLink";
 import { ThemeToggle } from "./ThemeToggle";
 
-interface NavLink {
+interface NavLinkItem {
   label: string;
   href: string;
 }
 
 interface NavbarProps {
-  navLinks?: NavLink[];
+  navLinks?: NavLinkItem[];
 }
 
 export async function Navbar({ navLinks }: NavbarProps) {
@@ -46,13 +47,12 @@ export async function Navbar({ navLinks }: NavbarProps) {
         {navLinks && navLinks.length > 0 && (
           <div className="hidden md:flex items-center gap-4 font-heading text-xs text-terminal-dim">
             {navLinks.map((link) => (
-              <a
+              <NavLink
                 key={link.label}
                 href={link.href}
+                label={link.label}
                 className="transition-colors hover:text-text-secondary"
-              >
-                <span className="text-amber/50">/</span> {link.label.toLowerCase()}
-              </a>
+              />
             ))}
           </div>
         )}

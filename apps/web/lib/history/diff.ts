@@ -25,8 +25,8 @@ export interface SnapshotDiff {
   confidence: number;
 
   dimensions: {
-    building: number;
-    guarding: number;
+    delivery: number;
+    quality: number;
     consistency: number;
     breadth: number;
   };
@@ -107,8 +107,8 @@ export function compareSnapshots(
     confidence: current.confidence - previous.confidence,
 
     dimensions: {
-      building: current.building - previous.building,
-      guarding: current.guarding - previous.guarding,
+      delivery: current.delivery - previous.delivery,
+      quality: current.quality - previous.quality,
       consistency: current.consistency - previous.consistency,
       breadth: current.breadth - previous.breadth,
     },
@@ -153,8 +153,8 @@ export function compareSnapshots(
 // ---------------------------------------------------------------------------
 
 const DIMENSION_LABELS: Record<string, string> = {
-  building: "Building",
-  guarding: "Guarding",
+  delivery: "Delivery",
+  quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
 };

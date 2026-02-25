@@ -96,7 +96,7 @@ Backed by a well-funded company but unclear adoption outside enterprise CI/CD pi
 | **Community** | Thousands (niche — kernel devs, FOSS purists) |
 | **Feasibility** | **2/5** |
 
-The email-patch workflow is philosophically incompatible with PR-based metrics. Building/Guarding/Breadth dimensions would need complete reimagining. Tiny user base doesn't justify the effort.
+The email-patch workflow is philosophically incompatible with PR-based metrics. Delivery/Quality/Breadth dimensions would need complete reimagining. Tiny user base doesn't justify the effort.
 
 #### Radicle (radicle.xyz)
 
@@ -160,8 +160,8 @@ Owned repos:      stargazerCount, forkCount, watchers (max 100)
 |----------|--------|-------------------|
 | **Identity** | handle, displayName, avatarUrl | Yes (all platforms have user profiles) |
 | **Activity** | commitsTotal, activeDays, heatmapData | Yes (universal git concepts) |
-| **Building** | prsMergedCount, prsMergedWeight, issuesClosedCount, linesAdded, linesDeleted | Yes (PR/MR + issues exist everywhere) |
-| **Guarding** | reviewsSubmittedCount | Yes (code review is universal) |
+| **Delivery** | prsMergedCount, prsMergedWeight, issuesClosedCount, linesAdded, linesDeleted | Yes (PR/MR + issues exist everywhere) |
+| **Quality** | reviewsSubmittedCount | Yes (code review is universal) |
 | **Consistency** | maxCommitsIn10Min | Yes (temporal analysis) |
 | **Breadth** | reposContributed, topRepoShare, totalStars, totalForks, totalWatchers | Conceptually yes (naming differs) |
 | **Quality** | microCommitRatio, docsOnlyPrRatio | Yes (computed from git data) |
@@ -175,8 +175,8 @@ All 4 dimensions operate on `StatsData` (platform-agnostic):
 
 | Dimension | Formula | GitHub-specific inputs | Notes |
 |-----------|---------|----------------------|-------|
-| **Building** | 70% PR weight + 20% issues + 10% commits | None | PRs/MRs universal |
-| **Guarding** | 60% reviews + 25% review ratio + 15% code quality | None | Reviews universal |
+| **Delivery** | 70% PR weight + 20% issues + 10% commits | None | PRs/MRs universal |
+| **Quality** | 60% reviews + 25% review ratio + 15% code quality | None | Reviews universal |
 | **Consistency** | 50% active days + 35% heatmap evenness + 15% inverse burst | None | Temporal analysis |
 | **Breadth** | 35% repos + 25% concentration + 15% stars + 10% forks + 5% watchers + 10% docs | Star/fork/watcher naming | Conceptually universal |
 

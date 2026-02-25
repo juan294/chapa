@@ -35,8 +35,8 @@ describe("globals.css", () => {
 
   describe("dimension color tokens (#233)", () => {
     const DIMENSION_TOKENS = [
-      "--color-dimension-building",
-      "--color-dimension-guarding",
+      "--color-dimension-delivery",
+      "--color-dimension-quality",
       "--color-dimension-consistency",
       "--color-dimension-breadth",
     ];

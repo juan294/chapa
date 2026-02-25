@@ -135,7 +135,7 @@ export default function EmergingPage() {
                 On the Chapa radar chart, an Emerging developer&apos;s shape is small and close
                 to the center &mdash; a compact polygon that hasn&apos;t yet expanded outward in
                 any direction. It&apos;s not a limitation. It&apos;s a starting point. Every
-                Builder, Guardian, Marathoner, and Polymath once had a radar chart that looked
+                Builder, Quality Champion, Marathoner, and Polymath once had a radar chart that looked
                 exactly like this.
               </p>
             </div>

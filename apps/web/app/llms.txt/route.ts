@@ -10,9 +10,9 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 
 ## Key Concepts
 
-- **Impact v4 Profile**: A composite developer impact score (0-100) based on four independent dimensions — Building, Guarding, Consistency, and Breadth — computed from 12 months of public GitHub activity.
-- **Four Dimensions**: Building measures shipping (PRs merged, issues closed). Guarding measures code review quality. Consistency measures sustained contributions over time. Breadth measures cross-project influence.
-- **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Guardian, Marathoner, Polymath, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
+- **Impact v4 Profile**: A composite developer impact score (0-100) based on four independent dimensions — Delivery, Quality, Consistency, and Breadth — computed from 12 months of public GitHub activity.
+- **Four Dimensions**: Delivery measures shipping (PRs merged, issues closed). Quality measures code review quality. Consistency measures sustained contributions over time. Breadth measures cross-project influence.
+- **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
 - **Tier System**: Four tiers based on adjusted score — Emerging (0-39), Solid (40-69), High (70-84), and Elite (85-100).
 - **Confidence Rating**: A quality signal (50-100) based on data diversity and consistency.
 - **Badge Verification**: Every badge includes a cryptographic HMAC-SHA256 hash proving data authenticity.
