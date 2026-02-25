@@ -18,8 +18,11 @@ function readIfExists(filename: string): string {
   }
 }
 
+const HOOK_SOURCE = readIfExists("useAdminDashboard.ts");
+
 const ALL_ADMIN_SOURCE = [
   SOURCE,
+  HOOK_SOURCE,
   readIfExists("AdminSearchBar.tsx"),
   readIfExists("AdminUserTable.tsx"),
   readIfExists("AdminStatsCards.tsx"),
@@ -31,13 +34,14 @@ describe("AdminDashboardClient", () => {
     it("reads dir from custom event detail", () => {
       // The chapa:admin-sort handler must read an optional dir from the
       // event detail so the /sort command can specify asc/desc explicitly.
-      expect(SOURCE).toMatch(/detail\?\.dir/);
+      // After #480, this logic lives in useAdminDashboard hook.
+      expect(HOOK_SOURCE).toMatch(/detail\?\.dir/);
     });
 
     it("applies dir directly when provided instead of toggling", () => {
       // When dir is provided, setSortDir should be called with it directly,
       // not via the toggle logic.
-      expect(SOURCE).toMatch(/setSortDir\(dir\)/);
+      expect(HOOK_SOURCE).toMatch(/setSortDir\(dir\)/);
     });
   });
 
@@ -165,6 +169,14 @@ describe("AdminDashboardClient", () => {
       expect(src.length).toBeGreaterThan(0);
     });
 
+    it("useAdminDashboard hook exists as a separate file (#480)", () => {
+      expect(HOOK_SOURCE.length).toBeGreaterThan(0);
+    });
+
+    it("AdminDashboardClient imports useAdminDashboard hook", () => {
+      expect(SOURCE).toMatch(/from\s+["']\.\/useAdminDashboard["']/);
+    });
+
     it("AdminDashboardClient imports sub-components", () => {
       expect(SOURCE).toMatch(/from\s+["']\.\/AdminSearchBar["']/);
       expect(SOURCE).toMatch(/from\s+["']\.\/AdminUserTable["']/);
@@ -195,8 +207,10 @@ describe("AdminDashboardClient", () => {
       expect(SOURCE).toMatch(/import\(["']\.\/agents\/agents-dashboard["']\)/);
     });
 
-    it("has activeTab state with 'users', 'agents', and 'engagement' values", () => {
-      expect(SOURCE).toContain('AdminTab = "users" | "agents" | "engagement"');
+    it("has AdminTab type with 'users', 'agents', and 'engagement' values", () => {
+      // After #480, AdminTab type is defined in useAdminDashboard hook
+      // and imported by AdminDashboardClient.
+      expect(HOOK_SOURCE).toContain('AdminTab = "users" | "agents" | "engagement"');
     });
 
     it("renders tab buttons for Users and Agents", () => {
@@ -211,7 +225,8 @@ describe("AdminDashboardClient", () => {
     });
 
     it("listens for chapa:admin-tab events", () => {
-      expect(SOURCE).toContain("chapa:admin-tab");
+      // After #480, event listeners live in useAdminDashboard hook
+      expect(HOOK_SOURCE).toContain("chapa:admin-tab");
     });
 
     it("uses amber border for active tab styling", () => {
@@ -296,22 +311,81 @@ describe("AdminDashboardClient", () => {
   });
 
   describe("deferred search", () => {
-    it("imports useDeferredValue from React", () => {
-      expect(SOURCE).toMatch(/useDeferredValue/);
+    it("uses useDeferredValue in the hook", () => {
+      // After #480, deferred search logic lives in useAdminDashboard hook
+      expect(HOOK_SOURCE).toMatch(/useDeferredValue/);
     });
 
     it("creates deferredSearch from search state", () => {
-      expect(SOURCE).toMatch(/useDeferredValue\(search\)/);
+      expect(HOOK_SOURCE).toMatch(/useDeferredValue\(search\)/);
     });
 
     it("uses deferredSearch in the filter useMemo dependency array", () => {
       // The filtered memo should depend on deferredSearch, not search
-      const filteredMemo = SOURCE.match(
+      const filteredMemo = HOOK_SOURCE.match(
         /const filtered = useMemo\(\(\) => \{[\s\S]*?\}, \[([^\]]+)\]\)/,
       );
       expect(filteredMemo).not.toBeNull();
       expect(filteredMemo![1]).toContain("deferredSearch");
       expect(filteredMemo![1]).not.toMatch(/(?<![dD]eferred)search/);
+    });
+  });
+
+  describe("useAdminDashboard hook (#480)", () => {
+    it("exports useAdminDashboard as a named function", () => {
+      expect(HOOK_SOURCE).toContain("export function useAdminDashboard");
+    });
+
+    it("exports AdminTab type", () => {
+      expect(HOOK_SOURCE).toContain("export type AdminTab");
+    });
+
+    it("exports AdminDashboardState interface", () => {
+      expect(HOOK_SOURCE).toContain("export interface AdminDashboardState");
+    });
+
+    it("manages users state", () => {
+      expect(HOOK_SOURCE).toMatch(/useState<AdminUser\[\]>/);
+    });
+
+    it("manages loading state", () => {
+      expect(HOOK_SOURCE).toContain("useState(true)");
+    });
+
+    it("manages sort state", () => {
+      expect(HOOK_SOURCE).toMatch(/useState<SortField>/);
+      expect(HOOK_SOURCE).toMatch(/useState<SortDir>/);
+    });
+
+    it("defines fetchUsers callback", () => {
+      expect(HOOK_SOURCE).toContain("const fetchUsers = useCallback");
+    });
+
+    it("defines handleSort callback", () => {
+      expect(HOOK_SOURCE).toContain("const handleSort = useCallback");
+    });
+
+    it("listens for chapa:admin-refresh events", () => {
+      expect(HOOK_SOURCE).toContain("chapa:admin-refresh");
+    });
+
+    it("listens for chapa:admin-sort events", () => {
+      expect(HOOK_SOURCE).toContain("chapa:admin-sort");
+    });
+
+    it("computes filtered, sorted, and tierCounts", () => {
+      expect(HOOK_SOURCE).toContain("const filtered = useMemo");
+      expect(HOOK_SOURCE).toContain("const sorted = useMemo");
+      expect(HOOK_SOURCE).toContain("const tierCounts = useMemo");
+    });
+
+    it("returns all necessary state and handlers", () => {
+      // Check the return statement includes key fields
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*activeTab[\s\S]*\}/);
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*fetchUsers[\s\S]*\}/);
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*handleSort[\s\S]*\}/);
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*sorted[\s\S]*\}/);
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*tierCounts[\s\S]*\}/);
     });
   });
 });
