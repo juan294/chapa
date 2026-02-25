@@ -39,6 +39,7 @@ coverage/
 playwright-report/
 test-results/
 playwright/.cache/
+.lighthouseci/
 
 # vercel
 .vercel
