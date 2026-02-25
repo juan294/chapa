@@ -16,7 +16,7 @@ export function buildPayload(
     impact.confidence,
     impact.tier,
     impact.archetype,
-    Math.round(impact.dimensions.building),
+    Math.round(impact.dimensions.delivery),
     Math.round(impact.dimensions.quality),
     Math.round(impact.dimensions.consistency),
     Math.round(impact.dimensions.breadth),

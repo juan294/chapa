@@ -214,7 +214,7 @@ describe("createNavigationCommands (studio enabled)", () => {
     expect(names).toContain("/about");
     expect(names).toContain("/terms");
     expect(names).toContain("/privacy");
-    expect(names).toContain("/builder");
+    expect(names).toContain("/deliverer");
     expect(names).toContain("/guardian");
     expect(names).toContain("/marathoner");
     expect(names).toContain("/polymath");

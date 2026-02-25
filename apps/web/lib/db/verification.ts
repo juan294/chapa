@@ -42,7 +42,7 @@ function rowToRecord(row: VerificationRow): VerificationRecord {
     archetype: row.archetype,
     profileType: row.profile_type,
     dimensions: {
-      building: row.building,
+      delivery: row.building,
       quality: row.guarding,
       consistency: row.consistency,
       breadth: row.breadth,
@@ -117,7 +117,7 @@ export async function dbStoreVerification(
         tier: record.tier,
         archetype: record.archetype,
         profile_type: record.profileType,
-        building: record.dimensions.building,
+        building: record.dimensions.delivery,
         guarding: record.dimensions.quality,
         consistency: record.dimensions.consistency,
         breadth: record.dimensions.breadth,

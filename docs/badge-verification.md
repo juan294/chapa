@@ -23,7 +23,7 @@ The design principle: **verification should be visible, lightweight, and non-int
 When we render a badge, we build a deterministic string from the data that went into it:
 
 ```
-testuser|52|85|Solid|Builder|70|50|60|40|200|30|50|2025-06-15
+testuser|52|85|Solid|Deliverer|70|50|60|40|200|30|50|2025-06-15
 ```
 
 The fields, pipe-delimited:
@@ -35,7 +35,7 @@ The fields, pipe-delimited:
 | 2 | Confidence | `impact.confidence` |
 | 3 | Tier | `impact.tier` |
 | 4 | Archetype | `impact.archetype` |
-| 5 | Building dimension (rounded) | `impact.dimensions.building` |
+| 5 | Delivery dimension (rounded) | `impact.dimensions.delivery` |
 | 6 | Quality dimension (rounded) | `impact.dimensions.quality` |
 | 7 | Consistency dimension (rounded) | `impact.dimensions.consistency` |
 | 8 | Breadth dimension (rounded) | `impact.dimensions.breadth` |
@@ -83,7 +83,7 @@ The `VerificationRecord` contains the full snapshot of what the badge displayed:
   confidence: number;
   tier: string;
   archetype: string;
-  dimensions: { building, quality, consistency, breadth };
+  dimensions: { delivery, quality, consistency, breadth };
   commitsTotal: number;
   prsMergedCount: number;
   reviewsSubmittedCount: number;

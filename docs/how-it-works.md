@@ -79,7 +79,7 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 
 | Dimension | What it measures | Signals & weights |
 |-----------|-----------------|-------------------|
-| **Building** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
+| **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
 | **Quality** | Reviewing & quality gatekeeping | Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%) |
 | **Consistency** | Reliable, sustained contributions | Active days / 365 (50%), heatmap evenness (35%), inverse burst activity (15%) |
 | **Breadth** | Cross-project influence | Repos contributed (35%), inverse top-repo share (25%), stars (15%), forks (10%), watchers (5%), docs-only PR ratio (10%) |
@@ -88,7 +88,7 @@ Each dimension returns 0 when the primary signal is absent (e.g., Quality = 0 if
 
 ### Developer archetypes
 
-Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Builder.
+Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Deliverer.
 
 | Archetype | Rule |
 |-----------|------|
@@ -97,14 +97,14 @@ Derived from the dimension profile shape. Priority order for tie-breaking: Polym
 | **Polymath** | Breadth is highest AND >= 70 |
 | **Quality Champion** | Quality is highest AND >= 70 |
 | **Marathoner** | Consistency is highest AND >= 70 |
-| **Builder** | Building is highest AND >= 70 |
+| **Deliverer** | Delivery is highest AND >= 70 |
 
 ### Composite score
 
 The composite score is the average of all four dimensions, rounded to an integer:
 
 ```
-compositeScore = round(avg(building, quality, consistency, breadth))
+compositeScore = round(avg(delivery, quality, consistency, breadth))
 ```
 
 The composite is then adjusted by confidence (see below) and mapped to a tier.
@@ -472,4 +472,4 @@ A: Linear scoring rewards volume -- 200 commits would score 2x higher than 100. 
 A: Multiple layers. (1) **Log normalization** makes volume-based gaming impractical. (2) **PR size multiplier** means empty/trivial PRs contribute zero weight. (3) **Repo depth threshold** requires 3+ commits per repo to count toward Breadth. (4) **Confidence penalties** detect patterns like review spam, burst commits, and thin activity profiles. (5) **Caps** on every metric mean there's a ceiling — you can't just do more of one thing to inflate your score.
 
 **Q: What are the four dimensions?**
-A: Building (shipping code), Quality (reviewing others), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.
+A: Delivery (shipping code), Quality (reviewing others), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Deliverer, Quality Champion, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.

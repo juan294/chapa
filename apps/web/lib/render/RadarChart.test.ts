@@ -8,7 +8,7 @@ import type { DimensionScores } from "@chapa/shared";
 
 function makeDimensions(overrides: Partial<DimensionScores> = {}): DimensionScores {
   return {
-    building: 50,
+    delivery: 50,
     quality: 50,
     consistency: 50,
     breadth: 50,
@@ -34,7 +34,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
 
   it("polygon points are within bounds of center + radius", () => {
     const cx = 200, cy = 200, r = 100;
-    const svg = renderRadarChart(makeDimensions({ building: 100, quality: 100, consistency: 100, breadth: 100 }), cx, cy, r);
+    const svg = renderRadarChart(makeDimensions({ delivery: 100, quality: 100, consistency: 100, breadth: 100 }), cx, cy, r);
     const pointsMatch = svg.match(/points="([^"]+)"/);
     expect(pointsMatch).not.toBeNull();
     const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
@@ -59,7 +59,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
   });
 
   it("all-zero dimensions produce a point at center", () => {
-    const svg = renderRadarChart(makeDimensions({ building: 0, quality: 0, consistency: 0, breadth: 0 }), 200, 200, 100);
+    const svg = renderRadarChart(makeDimensions({ delivery: 0, quality: 0, consistency: 0, breadth: 0 }), 200, 200, 100);
     // Match the data polygon (fill-opacity, not fill="none")
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
@@ -72,7 +72,7 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
   });
 
   it("uniform scores produce a symmetric shape", () => {
-    const svg = renderRadarChart(makeDimensions({ building: 70, quality: 70, consistency: 70, breadth: 70 }), 200, 200, 100);
+    const svg = renderRadarChart(makeDimensions({ delivery: 70, quality: 70, consistency: 70, breadth: 70 }), 200, 200, 100);
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
     const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
@@ -83,16 +83,16 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
   });
 
   it("higher score means further from center", () => {
-    const lowSvg = renderRadarChart(makeDimensions({ building: 30 }), 200, 200, 100);
-    const highSvg = renderRadarChart(makeDimensions({ building: 90 }), 200, 200, 100);
-    // Extract the building point (top) from both
+    const lowSvg = renderRadarChart(makeDimensions({ delivery: 30 }), 200, 200, 100);
+    const highSvg = renderRadarChart(makeDimensions({ delivery: 90 }), 200, 200, 100);
+    // Extract the delivery point (top) from both
     const extractFirstPoint = (svg: string) => {
       const match = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
       return match![1]!.split(" ")[0]!.split(",").map(Number);
     };
     const lowPt = extractFirstPoint(lowSvg);
     const highPt = extractFirstPoint(highSvg);
-    // Building is at top → higher score = smaller y value (further up)
+    // Delivery is at top → higher score = smaller y value (further up)
     expect(highPt[1]!).toBeLessThan(lowPt[1]!);
   });
 
@@ -102,23 +102,23 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     expect(svg).toMatch(/fill="[^"]*"/);
   });
 
-  it("has 4 axis labels (Building, Quality, Consistency, Breadth)", () => {
+  it("has 4 axis labels (Delivery, Quality, Consistency, Breadth)", () => {
     const svg = renderRadarChart(makeDimensions(), 200, 200, 100);
-    expect(svg).toContain(">Building<");
+    expect(svg).toContain(">Delivery<");
     expect(svg).toContain(">Quality<");
     expect(svg).toContain(">Consistency<");
     expect(svg).toContain(">Breadth<");
   });
 
-  it("building axis points straight up (no rotation)", () => {
+  it("delivery axis points straight up (no rotation)", () => {
     const cx = 200, cy = 200, r = 100;
-    const svg = renderRadarChart(makeDimensions({ building: 100 }), cx, cy, r);
-    // With 0° rotation, building angle = -π/2 → straight up
+    const svg = renderRadarChart(makeDimensions({ delivery: 100 }), cx, cy, r);
+    // With 0° rotation, delivery angle = -π/2 → straight up
     // cos(-π/2) = 0 → x = cx, sin(-π/2) = -1 → y = cy - r
     const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
     expect(pointsMatch).not.toBeNull();
     const bPt = pointsMatch![1]!.split(" ")[0]!.split(",").map(Number);
-    // Building should be directly above center (x ≈ cx, y = cy - r)
+    // Delivery should be directly above center (x ≈ cx, y = cy - r)
     expect(Math.abs(bPt[0]! - cx)).toBeLessThan(2);
     expect(bPt[1]!).toBe(cy - r);
   });

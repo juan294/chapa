@@ -36,8 +36,8 @@ import type { ImpactV4Result } from "@chapa/shared";
 const sampleImpact: ImpactV4Result = {
   handle: "TestUser",
   profileType: "solo",
-  dimensions: { building: 80, quality: 60, consistency: 70, breadth: 50 },
-  archetype: "Builder",
+  dimensions: { delivery: 80, quality: 60, consistency: 70, breadth: 50 },
+  archetype: "Deliverer",
   compositeScore: 72,
   confidence: 85,
   confidencePenalties: [],
@@ -131,7 +131,7 @@ describe("email content", () => {
 
     const call = mockSend.mock.calls[0]![0];
     expect(call.subject).toContain("testuser");
-    expect(call.subject).toContain("Builder");
+    expect(call.subject).toContain("Deliverer");
     expect(call.subject).toContain("High");
   });
 
@@ -156,12 +156,12 @@ describe("email content", () => {
 
     const call = mockSend.mock.calls[0]![0];
     // HTML should contain all four dimension values
-    expect(call.html).toContain("80"); // building
+    expect(call.html).toContain("80"); // delivery
     expect(call.html).toContain("60"); // quality
     expect(call.html).toContain("70"); // consistency
     expect(call.html).toContain("50"); // breadth
     // Plain text too
-    expect(call.text).toContain("Building:");
+    expect(call.text).toContain("Delivery:");
     expect(call.text).toContain("80");
     expect(call.text).toContain("Quality:");
     expect(call.text).toContain("60");

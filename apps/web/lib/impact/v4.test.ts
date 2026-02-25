@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  computeBuilding,
+  computeDelivery,
   computeQuality,
   computeConsistency,
   computeBreadth,
@@ -71,12 +71,12 @@ function makeBurstHeatmap(total: number) {
 }
 
 // ---------------------------------------------------------------------------
-// computeBuilding(stats)
+// computeDelivery(stats)
 // ---------------------------------------------------------------------------
 
-describe("computeBuilding(stats)", () => {
+describe("computeDelivery(stats)", () => {
   it("returns 0 for zero activity", () => {
-    expect(computeBuilding(makeStats())).toBe(0);
+    expect(computeDelivery(makeStats())).toBe(0);
   });
 
   it("returns 100 for maxed-out shipping signals", () => {
@@ -85,31 +85,31 @@ describe("computeBuilding(stats)", () => {
       issuesClosedCount: 80,
       commitsTotal: 600,
     });
-    expect(computeBuilding(stats)).toBe(100);
+    expect(computeDelivery(stats)).toBe(100);
   });
 
   it("weights PRs at 70%", () => {
     // Only PRs, no issues/commits
     const prOnly = makeStats({ prsMergedWeight: 120 });
-    const score = computeBuilding(prOnly);
+    const score = computeDelivery(prOnly);
     expect(score).toBe(70);
   });
 
   it("weights issues at 20%", () => {
     const issueOnly = makeStats({ issuesClosedCount: 80 });
-    const score = computeBuilding(issueOnly);
+    const score = computeDelivery(issueOnly);
     expect(score).toBe(20);
   });
 
   it("weights commits at 10%", () => {
     const commitOnly = makeStats({ commitsTotal: 600 });
-    const score = computeBuilding(commitOnly);
+    const score = computeDelivery(commitOnly);
     expect(score).toBe(10);
   });
 
   it("returns an integer", () => {
     const stats = makeStats({ prsMergedWeight: 12, issuesClosedCount: 5, commitsTotal: 30 });
-    expect(Number.isInteger(computeBuilding(stats))).toBe(true);
+    expect(Number.isInteger(computeDelivery(stats))).toBe(true);
   });
 
   it("handles mid-range input", () => {
@@ -118,7 +118,7 @@ describe("computeBuilding(stats)", () => {
       issuesClosedCount: 10,
       commitsTotal: 80,
     });
-    const score = computeBuilding(stats);
+    const score = computeDelivery(stats);
     expect(score).toBeGreaterThan(30);
     expect(score).toBeLessThanOrEqual(80);
   });
@@ -129,7 +129,7 @@ describe("computeBuilding(stats)", () => {
       issuesClosedCount: 200,
       commitsTotal: 1500,
     });
-    expect(computeBuilding(stats)).toBe(100);
+    expect(computeDelivery(stats)).toBe(100);
   });
 });
 
@@ -402,7 +402,7 @@ describe("computeBreadth(stats)", () => {
 describe("computeDimensions(stats)", () => {
   it("returns all zeros for inactive user", () => {
     const dims = computeDimensions(makeStats());
-    expect(dims.building).toBe(0);
+    expect(dims.delivery).toBe(0);
     expect(dims.quality).toBe(0);
     expect(dims.consistency).toBe(0);
     expect(dims.breadth).toBe(0);
@@ -418,7 +418,7 @@ describe("computeDimensions(stats)", () => {
       heatmapData: makeUniformHeatmap(10),
     });
     const dims = computeDimensions(stats);
-    for (const key of ["building", "quality", "consistency", "breadth"] as const) {
+    for (const key of ["delivery", "quality", "consistency", "breadth"] as const) {
       expect(dims[key]).toBeGreaterThanOrEqual(0);
       expect(dims[key]).toBeLessThanOrEqual(100);
     }
@@ -437,7 +437,7 @@ describe("computeDimensions(stats)", () => {
       topRepoShare: 0.3,
     });
     const dims = computeDimensions(stats);
-    expect(dims.building).toBe(computeBuilding(stats));
+    expect(dims.delivery).toBe(computeDelivery(stats));
     expect(dims.quality).toBe(computeQuality(stats));
     expect(dims.consistency).toBe(computeConsistency(stats));
     expect(dims.breadth).toBe(computeBreadth(stats));
@@ -450,91 +450,91 @@ describe("computeDimensions(stats)", () => {
 
 describe("deriveArchetype(dimensions) — V5 thresholds", () => {
   // V5: specialist threshold lowered from 70 to 60
-  it("returns Builder when building is highest and >= 60", () => {
-    const dims: DimensionScores = { building: 65, quality: 45, consistency: 50, breadth: 40 };
-    expect(deriveArchetype(dims)).toBe("Builder");
+  it("returns Deliverer when delivery is highest and >= 60", () => {
+    const dims: DimensionScores = { delivery: 65, quality: 45, consistency: 50, breadth: 40 };
+    expect(deriveArchetype(dims)).toBe("Deliverer");
   });
 
   it("returns Quality Champion when quality is highest and >= 60", () => {
-    const dims: DimensionScores = { building: 45, quality: 65, consistency: 50, breadth: 40 };
+    const dims: DimensionScores = { delivery: 45, quality: 65, consistency: 50, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Quality Champion");
   });
 
   it("returns Marathoner when consistency is highest and >= 60", () => {
-    const dims: DimensionScores = { building: 45, quality: 40, consistency: 65, breadth: 50 };
+    const dims: DimensionScores = { delivery: 45, quality: 40, consistency: 65, breadth: 50 };
     expect(deriveArchetype(dims)).toBe("Marathoner");
   });
 
   it("returns Polymath when breadth is highest and >= 60", () => {
-    const dims: DimensionScores = { building: 45, quality: 40, consistency: 50, breadth: 65 };
+    const dims: DimensionScores = { delivery: 45, quality: 40, consistency: 50, breadth: 65 };
     expect(deriveArchetype(dims)).toBe("Polymath");
   });
 
   // V5: Balanced gate expanded: range <= 20, avg >= 50
   it("returns Balanced when all within 20 pts and avg >= 50", () => {
-    const dims: DimensionScores = { building: 55, quality: 60, consistency: 58, breadth: 52 };
+    const dims: DimensionScores = { delivery: 55, quality: 60, consistency: 58, breadth: 52 };
     expect(deriveArchetype(dims)).toBe("Balanced");
   });
 
   // V5: Emerging gate: avg < 25 OR no dim >= 40
   it("returns Emerging when avg < 25", () => {
-    const dims: DimensionScores = { building: 20, quality: 15, consistency: 10, breadth: 30 };
+    const dims: DimensionScores = { delivery: 20, quality: 15, consistency: 10, breadth: 30 };
     // avg = 18.75 < 25
     expect(deriveArchetype(dims)).toBe("Emerging");
   });
 
   it("returns Emerging when no dimension >= 40", () => {
-    const dims: DimensionScores = { building: 35, quality: 30, consistency: 25, breadth: 38 };
+    const dims: DimensionScores = { delivery: 35, quality: 30, consistency: 25, breadth: 38 };
     // avg = 32, no dim >= 40
     expect(deriveArchetype(dims)).toBe("Emerging");
   });
 
   it("V5: avg=30 with dim >= 40 passes Emerging gate but falls back to Emerging", () => {
-    // avg=30 > 25 AND building=42 >= 40 → passes Emerging gate
+    // avg=30 > 25 AND delivery=42 >= 40 → passes Emerging gate
     // But range=17 <=20 yet avg=30 < 50 → not Balanced
     // Highest=42 < 60 → no specialist → falls back to Emerging
-    const dims: DimensionScores = { building: 42, quality: 25, consistency: 25, breadth: 28 };
+    const dims: DimensionScores = { delivery: 42, quality: 25, consistency: 25, breadth: 28 };
     expect(deriveArchetype(dims)).toBe("Emerging");
   });
 
   it("V5: avg=30 with dim >= 60 escapes Emerging to specialist", () => {
-    // avg=30 > 25 AND building=60 >= 40 → passes Emerging gate
-    // range=60-10=50 > 20 → not Balanced; building=60 → Builder
-    const dims: DimensionScores = { building: 60, quality: 10, consistency: 15, breadth: 35 };
-    expect(deriveArchetype(dims)).toBe("Builder");
+    // avg=30 > 25 AND delivery=60 >= 40 → passes Emerging gate
+    // range=60-10=50 > 20 → not Balanced; delivery=60 → Deliverer
+    const dims: DimensionScores = { delivery: 60, quality: 10, consistency: 15, breadth: 35 };
+    expect(deriveArchetype(dims)).toBe("Deliverer");
   });
 
-  // Tie-breaking: Polymath > Quality Champion > Marathoner > Builder
+  // Tie-breaking: Polymath > Quality Champion > Marathoner > Deliverer
   // Use range > 20 to avoid triggering V5 Balanced gate
   it("breaks ties favoring Polymath over Quality Champion", () => {
-    const dims: DimensionScores = { building: 40, quality: 75, consistency: 40, breadth: 75 };
+    const dims: DimensionScores = { delivery: 40, quality: 75, consistency: 40, breadth: 75 };
     expect(deriveArchetype(dims)).toBe("Polymath");
   });
 
   it("breaks ties favoring Quality Champion over Marathoner", () => {
-    const dims: DimensionScores = { building: 40, quality: 75, consistency: 75, breadth: 40 };
+    const dims: DimensionScores = { delivery: 40, quality: 75, consistency: 75, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Quality Champion");
   });
 
-  it("breaks ties favoring Marathoner over Builder", () => {
-    const dims: DimensionScores = { building: 70, quality: 40, consistency: 70, breadth: 40 };
+  it("breaks ties favoring Marathoner over Deliverer", () => {
+    const dims: DimensionScores = { delivery: 70, quality: 40, consistency: 70, breadth: 40 };
     expect(deriveArchetype(dims)).toBe("Marathoner");
   });
 
   it("returns Balanced when all tied at 80 (within 20 pts, avg >= 50)", () => {
-    const dims: DimensionScores = { building: 80, quality: 80, consistency: 80, breadth: 80 };
+    const dims: DimensionScores = { delivery: 80, quality: 80, consistency: 80, breadth: 80 };
     expect(deriveArchetype(dims)).toBe("Balanced");
   });
 
   it("does NOT return Balanced if range exceeds 20 pts even with high avg", () => {
-    const dims: DimensionScores = { building: 90, quality: 65, consistency: 75, breadth: 60 };
+    const dims: DimensionScores = { delivery: 90, quality: 65, consistency: 75, breadth: 60 };
     // range = 90 - 60 = 30 > 20 → not Balanced
-    // highest is building at 90, >= 60 → Builder
-    expect(deriveArchetype(dims)).toBe("Builder");
+    // highest is delivery at 90, >= 60 → Deliverer
+    expect(deriveArchetype(dims)).toBe("Deliverer");
   });
 
   it("returns Balanced when range is exactly 20 and avg >= 50", () => {
-    const dims: DimensionScores = { building: 50, quality: 60, consistency: 55, breadth: 70 };
+    const dims: DimensionScores = { delivery: 50, quality: 60, consistency: 55, breadth: 70 };
     // range = 70 - 50 = 20, avg = 58.75 >= 50
     expect(deriveArchetype(dims)).toBe("Balanced");
   });
@@ -543,27 +543,27 @@ describe("deriveArchetype(dimensions) — V5 thresholds", () => {
     // avg = 42.5, no dim >= 40? quality=45 >= 40, so NOT Emerging by dim gate
     // But avg < 50 → not Balanced. Highest is quality at 45, < 60 → no specialist
     // Falls through to Emerging
-    const dims: DimensionScores = { building: 40, quality: 45, consistency: 42, breadth: 43 };
+    const dims: DimensionScores = { delivery: 40, quality: 45, consistency: 42, breadth: 43 };
     expect(deriveArchetype(dims)).not.toBe("Balanced");
   });
 
   it("V5: handles edge case where highest is exactly 60", () => {
-    const dims: DimensionScores = { building: 60, quality: 45, consistency: 50, breadth: 40 };
-    expect(deriveArchetype(dims)).toBe("Builder");
+    const dims: DimensionScores = { delivery: 60, quality: 45, consistency: 50, breadth: 40 };
+    expect(deriveArchetype(dims)).toBe("Deliverer");
   });
 
   it("V5: dim at 65 qualifies as specialist (was < 70 threshold in V4)", () => {
-    const dims: DimensionScores = { building: 65, quality: 30, consistency: 40, breadth: 35 };
-    expect(deriveArchetype(dims)).toBe("Builder");
+    const dims: DimensionScores = { delivery: 65, quality: 30, consistency: 40, breadth: 35 };
+    expect(deriveArchetype(dims)).toBe("Deliverer");
   });
 
   it("handles all zeros (Emerging)", () => {
-    const dims: DimensionScores = { building: 0, quality: 0, consistency: 0, breadth: 0 };
+    const dims: DimensionScores = { delivery: 0, quality: 0, consistency: 0, breadth: 0 };
     expect(deriveArchetype(dims)).toBe("Emerging");
   });
 
   it("handles all 100s (Balanced)", () => {
-    const dims: DimensionScores = { building: 100, quality: 100, consistency: 100, breadth: 100 };
+    const dims: DimensionScores = { delivery: 100, quality: 100, consistency: 100, breadth: 100 };
     expect(deriveArchetype(dims)).toBe("Balanced");
   });
 });
@@ -593,8 +593,8 @@ describe("computeImpactV4(stats)", () => {
 
     expect(result.handle).toBe("test-user");
     expect(result.dimensions).toBeDefined();
-    expect(result.dimensions.building).toBeGreaterThanOrEqual(0);
-    expect(result.dimensions.building).toBeLessThanOrEqual(100);
+    expect(result.dimensions.delivery).toBeGreaterThanOrEqual(0);
+    expect(result.dimensions.delivery).toBeLessThanOrEqual(100);
     expect(result.dimensions.quality).toBeGreaterThanOrEqual(0);
     expect(result.dimensions.quality).toBeLessThanOrEqual(100);
     expect(result.dimensions.consistency).toBeGreaterThanOrEqual(0);
@@ -602,7 +602,7 @@ describe("computeImpactV4(stats)", () => {
     expect(result.dimensions.breadth).toBeGreaterThanOrEqual(0);
     expect(result.dimensions.breadth).toBeLessThanOrEqual(100);
     expect(result.archetype).toBeTruthy();
-    expect(["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(result.archetype);
+    expect(["Deliverer", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"]).toContain(result.archetype);
     expect(result.compositeScore).toBeGreaterThanOrEqual(0);
     expect(result.compositeScore).toBeLessThanOrEqual(100);
     expect(result.confidence).toBeGreaterThanOrEqual(50);
@@ -626,7 +626,7 @@ describe("computeImpactV4(stats)", () => {
     const result = computeImpactV4(stats);
     const dims = result.dimensions;
     const expectedAvg = Math.round(
-      (dims.building + dims.quality + dims.consistency + dims.breadth) / 4
+      (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
     );
     expect(result.compositeScore).toBe(expectedAvg);
   });
@@ -655,7 +655,7 @@ describe("computeImpactV4(stats)", () => {
     expect(result.tier).toBe("Emerging");
   });
 
-  it("identifies a Builder archetype", () => {
+  it("identifies a Deliverer archetype", () => {
     const stats = makeStats({
       prsMergedWeight: 100,
       issuesClosedCount: 50,
@@ -668,7 +668,7 @@ describe("computeImpactV4(stats)", () => {
       topRepoShare: 0.7,
     });
     const result = computeImpactV4(stats);
-    expect(result.archetype).toBe("Builder");
+    expect(result.archetype).toBe("Deliverer");
   });
 
   it("identifies a Quality Champion archetype", () => {
@@ -782,9 +782,9 @@ describe("solo developer composite scoring", () => {
     const result = computeImpactV4(stats);
     const dims = result.dimensions;
 
-    // Solo composite = (building + consistency + breadth) / 3
+    // Solo composite = (delivery + consistency + breadth) / 3
     const expectedAvg = Math.round(
-      (dims.building + dims.consistency + dims.breadth) / 3
+      (dims.delivery + dims.consistency + dims.breadth) / 3
     );
     expect(result.compositeScore).toBe(expectedAvg);
     expect(result.profileType).toBe("solo");
@@ -807,7 +807,7 @@ describe("solo developer composite scoring", () => {
 
     // The old 4-dim average would be lower because quality = 0
     const old4DimAvg = Math.round(
-      (dims.building + dims.quality + dims.consistency + dims.breadth) / 4
+      (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
     );
     expect(result.compositeScore).toBeGreaterThan(old4DimAvg);
   });
@@ -824,7 +824,7 @@ describe("solo developer composite scoring", () => {
     const result = computeImpactV4(stats);
     const dims = result.dimensions;
     const expectedAvg = Math.round(
-      (dims.building + dims.quality + dims.consistency + dims.breadth) / 4
+      (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
     );
     expect(result.compositeScore).toBe(expectedAvg);
     expect(result.profileType).toBe("collaborative");
@@ -837,7 +837,7 @@ describe("solo developer composite scoring", () => {
     expect(result.tier).toBe("Emerging");
   });
 
-  it("solo with maxed building/consistency/breadth scores near 100", () => {
+  it("solo with maxed delivery/consistency/breadth scores near 100", () => {
     const stats = makeStats({
       prsMergedWeight: 120,
       issuesClosedCount: 80,
@@ -888,37 +888,37 @@ describe("solo developer composite scoring", () => {
 describe("solo developer archetype", () => {
   it("never assigns Quality Champion to solo profiles", () => {
     // Even if quality dimension were somehow high, solo should not get Quality Champion
-    const dims: DimensionScores = { building: 50, quality: 85, consistency: 60, breadth: 55 };
+    const dims: DimensionScores = { delivery: 50, quality: 85, consistency: 60, breadth: 55 };
     expect(deriveArchetype(dims, "solo")).not.toBe("Quality Champion");
   });
 
-  it("can assign Builder to solo profile", () => {
-    const dims: DimensionScores = { building: 80, quality: 0, consistency: 50, breadth: 55 };
-    expect(deriveArchetype(dims, "solo")).toBe("Builder");
+  it("can assign Deliverer to solo profile", () => {
+    const dims: DimensionScores = { delivery: 80, quality: 0, consistency: 50, breadth: 55 };
+    expect(deriveArchetype(dims, "solo")).toBe("Deliverer");
   });
 
   it("can assign Marathoner to solo profile", () => {
-    const dims: DimensionScores = { building: 50, quality: 0, consistency: 80, breadth: 55 };
+    const dims: DimensionScores = { delivery: 50, quality: 0, consistency: 80, breadth: 55 };
     expect(deriveArchetype(dims, "solo")).toBe("Marathoner");
   });
 
   it("can assign Polymath to solo profile", () => {
-    const dims: DimensionScores = { building: 50, quality: 0, consistency: 55, breadth: 80 };
+    const dims: DimensionScores = { delivery: 50, quality: 0, consistency: 55, breadth: 80 };
     expect(deriveArchetype(dims, "solo")).toBe("Polymath");
   });
 
   it("V5: can assign Balanced to solo profile when 3 dims within 20 pts and avg >= 50", () => {
-    const dims: DimensionScores = { building: 55, quality: 0, consistency: 50, breadth: 60 };
+    const dims: DimensionScores = { delivery: 55, quality: 0, consistency: 50, breadth: 60 };
     expect(deriveArchetype(dims, "solo")).toBe("Balanced");
   });
 
   it("returns Emerging for low solo dimensions", () => {
-    const dims: DimensionScores = { building: 20, quality: 0, consistency: 25, breadth: 15 };
+    const dims: DimensionScores = { delivery: 20, quality: 0, consistency: 25, breadth: 15 };
     expect(deriveArchetype(dims, "solo")).toBe("Emerging");
   });
 
   it("defaults to collaborative behavior when profileType is omitted", () => {
-    const dims: DimensionScores = { building: 50, quality: 85, consistency: 60, breadth: 55 };
+    const dims: DimensionScores = { delivery: 50, quality: 85, consistency: 60, breadth: 55 };
     // Without profileType arg, should use all 4 dims → Quality Champion
     expect(deriveArchetype(dims)).toBe("Quality Champion");
   });

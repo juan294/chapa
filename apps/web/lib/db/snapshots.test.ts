@@ -130,7 +130,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     guarding: 60,
     consistency: 80,
     breadth: 55,
-    archetype: "Builder",
+    archetype: "Deliverer",
     profile_type: "collaborative",
     composite_score: 67.5,
     adjusted_composite: 60.75,
@@ -159,7 +159,7 @@ describe("dbInsertSnapshot", () => {
         handle: "testuser",
         date: snapshot.date,
         commits_total: snapshot.commitsTotal,
-        building: snapshot.building,
+        building: snapshot.delivery,
         archetype: snapshot.archetype,
       }),
       { onConflict: "handle,date", ignoreDuplicates: true },
@@ -200,7 +200,7 @@ describe("dbGetSnapshots", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]!.commitsTotal).toBe(150);
-    expect(result[0]!.archetype).toBe("Builder");
+    expect(result[0]!.archetype).toBe("Deliverer");
     expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
     expect(mockGte).toHaveBeenCalledWith("date", "2025-06-14");
     expect(mockLte).toHaveBeenCalledWith("date", "2025-06-16");

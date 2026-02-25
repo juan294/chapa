@@ -52,14 +52,14 @@ describe("compareSnapshots", () => {
 
   it("computes per-dimension deltas", () => {
     const prev = makeSnapshot({
-      building: 70,
+      delivery: 70,
       quality: 50,
       consistency: 80,
       breadth: 40,
       date: "2025-06-14",
     });
     const curr = makeSnapshot({
-      building: 75,
+      delivery: 75,
       quality: 55,
       consistency: 70,
       breadth: 60,
@@ -67,7 +67,7 @@ describe("compareSnapshots", () => {
     });
     const diff = compareSnapshots(prev, curr);
 
-    expect(diff.dimensions.building).toBe(5);
+    expect(diff.dimensions.delivery).toBe(5);
     expect(diff.dimensions.quality).toBe(5);
     expect(diff.dimensions.consistency).toBe(-10);
     expect(diff.dimensions.breadth).toBe(20);
@@ -83,16 +83,16 @@ describe("compareSnapshots", () => {
   });
 
   it("detects archetype change", () => {
-    const prev = makeSnapshot({ archetype: "Builder", date: "2025-06-14" });
+    const prev = makeSnapshot({ archetype: "Deliverer", date: "2025-06-14" });
     const curr = makeSnapshot({ archetype: "Polymath", date: "2025-06-15" });
     const diff = compareSnapshots(prev, curr);
 
-    expect(diff.archetype).toEqual({ from: "Builder", to: "Polymath" });
+    expect(diff.archetype).toEqual({ from: "Deliverer", to: "Polymath" });
   });
 
   it("returns null archetype when unchanged", () => {
-    const prev = makeSnapshot({ archetype: "Builder", date: "2025-06-14" });
-    const curr = makeSnapshot({ archetype: "Builder", date: "2025-06-15" });
+    const prev = makeSnapshot({ archetype: "Deliverer", date: "2025-06-14" });
+    const curr = makeSnapshot({ archetype: "Deliverer", date: "2025-06-15" });
     const diff = compareSnapshots(prev, curr);
 
     expect(diff.archetype).toBeNull();
@@ -199,13 +199,13 @@ describe("explainDiff", () => {
   it("produces explanation for improving score with dimension changes", () => {
     const prev = makeSnapshot({
       adjustedComposite: 50,
-      building: 60,
+      delivery: 60,
       consistency: 70,
       date: "2025-06-14",
     });
     const curr = makeSnapshot({
       adjustedComposite: 65,
-      building: 80,
+      delivery: 80,
       consistency: 85,
       date: "2025-06-15",
     });
@@ -235,7 +235,7 @@ describe("explainDiff", () => {
 
   it("mentions archetype change when present", () => {
     const prev = makeSnapshot({
-      archetype: "Builder",
+      archetype: "Deliverer",
       adjustedComposite: 50,
       date: "2025-06-14",
     });
@@ -247,7 +247,7 @@ describe("explainDiff", () => {
     const diff = compareSnapshots(prev, curr);
     const explanations = explainDiff(diff);
 
-    expect(explanations.some((e) => e.includes("Builder") && e.includes("Polymath"))).toBe(true);
+    expect(explanations.some((e) => e.includes("Deliverer") && e.includes("Polymath"))).toBe(true);
   });
 
   it("mentions penalty additions", () => {
@@ -279,7 +279,7 @@ describe("explainDiff", () => {
   it("highlights significant dimension changes (>=5 points)", () => {
     const prev = makeSnapshot({
       adjustedComposite: 50,
-      building: 70,
+      delivery: 70,
       quality: 60,
       consistency: 80,
       breadth: 40,
@@ -287,7 +287,7 @@ describe("explainDiff", () => {
     });
     const curr = makeSnapshot({
       adjustedComposite: 55,
-      building: 80,
+      delivery: 80,
       quality: 62,
       consistency: 70,
       breadth: 50,
@@ -296,8 +296,8 @@ describe("explainDiff", () => {
     const diff = compareSnapshots(prev, curr);
     const explanations = explainDiff(diff);
 
-    // Building +10 and Consistency -10 should be mentioned, Quality +2 should not
-    expect(explanations.some((e) => e.includes("Building"))).toBe(true);
+    // Delivery +10 and Consistency -10 should be mentioned, Quality +2 should not
+    expect(explanations.some((e) => e.includes("Delivery"))).toBe(true);
     expect(explanations.some((e) => e.includes("Consistency"))).toBe(true);
   });
 });

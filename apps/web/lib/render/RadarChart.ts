@@ -4,7 +4,7 @@ import { WARM_AMBER } from "./theme";
 /**
  * Renders a 4-point diamond/radar chart as SVG markup.
  *
- * Axes (clockwise from top): Building, Quality, Consistency, Breadth.
+ * Axes (clockwise from top): Delivery, Quality, Consistency, Breadth.
  * Each dimension (0-100) maps to distance from center (0 = center, 100 = edge).
  *
  * @param dimensions - Four dimension scores
@@ -21,9 +21,9 @@ export function renderRadarChart(
 ): string {
   const t = WARM_AMBER;
 
-  // Original diamond: Building=top, Quality=right, Consistency=bottom, Breadth=left
+  // Original diamond: Delivery=top, Quality=right, Consistency=bottom, Breadth=left
   const axes: { key: keyof DimensionScores; label: string; angle: number }[] = [
-    { key: "building", label: "Building", angle: -Math.PI / 2 },
+    { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
     { key: "quality", label: "Quality", angle: 0 },
     { key: "consistency", label: "Consistency", angle: Math.PI / 2 },
     { key: "breadth", label: "Breadth", angle: Math.PI },

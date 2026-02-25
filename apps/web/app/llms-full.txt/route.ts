@@ -12,7 +12,7 @@ Chapa is a free, open web application that generates live, embeddable SVG badges
 
 ### Four Dimensions (each scored 0-100)
 
-1. **Building** — Measures shipping capability. Inputs: pull requests merged, issues closed, commit frequency to non-fork repos. A high Building score indicates a developer who consistently ships meaningful changes.
+1. **Delivery** — Measures shipping capability. Inputs: pull requests merged, issues closed, commit frequency to non-fork repos. A high Delivery score indicates a developer who consistently ships meaningful changes.
 
 2. **Quality** — Measures code review and quality gatekeeping. Inputs: pull request reviews given, review comments, approval/change-request ratio. A high Quality score indicates someone who actively improves code quality through reviews.
 
@@ -35,7 +35,7 @@ The composite score (0-100) is a weighted combination of the four dimensions. It
 
 Based on the shape of the four-dimension radar chart, each developer is assigned an archetype:
 
-- **Builder**: Dominant in Building. Ships features, closes issues, high PR merge rate. The quintessential feature developer.
+- **Deliverer**: Dominant in Delivery. Ships features, closes issues, high PR merge rate. The quintessential feature developer.
 - **Quality Champion**: Dominant in Quality. Reviews code rigorously, provides thorough feedback. The team's quality gatekeeper.
 - **Marathoner**: Dominant in Consistency. Shows up reliably week after week. Steady, dependable contributor.
 - **Polymath**: Dominant in Breadth. Works across many repos, orgs, and project boundaries. A cross-team collaborator.

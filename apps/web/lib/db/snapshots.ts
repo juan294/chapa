@@ -74,7 +74,7 @@ function rowToSnapshot(row: SnapshotRow): MetricsSnapshot {
     ...(row.docs_only_pr_ratio != null && {
       docsOnlyPrRatio: row.docs_only_pr_ratio,
     }),
-    building: row.building,
+    delivery: row.building,
     quality: row.guarding,
     consistency: row.consistency,
     breadth: row.breadth,
@@ -116,7 +116,7 @@ function snapshotToRow(
     max_commits_in_10min: s.maxCommitsIn10Min,
     micro_commit_ratio: s.microCommitRatio ?? null,
     docs_only_pr_ratio: s.docsOnlyPrRatio ?? null,
-    building: s.building,
+    building: s.delivery,
     guarding: s.quality,
     consistency: s.consistency,
     breadth: s.breadth,

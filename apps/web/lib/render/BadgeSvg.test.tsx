@@ -197,20 +197,20 @@ describe("renderBadgeSvg", () => {
     });
 
     it("contains the archetype label above the heatmap", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
-      expect(svg).toContain("Builder");
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Deliverer" }));
+      expect(svg).toContain("Deliverer");
       // Archetype pill should appear before the heatmap rects in SVG order
-      const archetypeIdx = svg.indexOf("Builder");
+      const archetypeIdx = svg.indexOf("Deliverer");
       const firstHeatmapRect = svg.indexOf('rx="4"');
       expect(archetypeIdx).toBeLessThan(firstHeatmapRect);
     });
 
     it("contains a code-brackets icon in the archetype pill (not a star)", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Deliverer" }));
       // Code brackets icon rendered as SVG <path> near the archetype text
-      const builderIdx = svg.indexOf(">Builder<");
-      expect(builderIdx).toBeGreaterThan(-1);
-      const pillArea = svg.slice(Math.max(0, builderIdx - 400), builderIdx);
+      const delivererIdx = svg.indexOf(">Deliverer<");
+      expect(delivererIdx).toBeGreaterThan(-1);
+      const pillArea = svg.slice(Math.max(0, delivererIdx - 400), delivererIdx);
       expect(pillArea).toContain("<path");
       // ★ should NOT appear before the archetype name in the pill
       expect(pillArea).not.toContain("\u2605");
@@ -291,7 +291,7 @@ describe("renderBadgeSvg", () => {
 
     it("radar chart shows dimension labels", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain(">Building<");
+      expect(svg).toContain(">Delivery<");
       expect(svg).toContain(">Quality<");
       expect(svg).toContain(">Consistency<");
       expect(svg).toContain(">Breadth<");
@@ -321,7 +321,7 @@ describe("renderBadgeSvg", () => {
     it("always shows tier label below the score ring", () => {
       const svgWithDifferentTier = renderBadgeSvg(
         makeStats(),
-        makeImpact({ archetype: "Builder", tier: "Elite" }),
+        makeImpact({ archetype: "Deliverer", tier: "Elite" }),
       );
       expect(svgWithDifferentTier).toContain(">Elite<");
 
@@ -441,8 +441,8 @@ describe("renderBadgeSvg", () => {
     });
 
     it("archetype pill text font-size is at least 17", () => {
-      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Builder" }));
-      const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*>Builder</);
+      const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype: "Deliverer" }));
+      const match = svg.match(/font-size="(\d+)"[^>]*font-weight="600"[^>]*>Deliverer</);
       expect(match).not.toBeNull();
       expect(parseInt(match![1]!, 10)).toBeGreaterThanOrEqual(17);
     });
@@ -487,7 +487,7 @@ describe("renderBadgeSvg", () => {
 
   describe("archetype display", () => {
     it("shows each archetype type correctly", () => {
-      const archetypes = ["Builder", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"] as const;
+      const archetypes = ["Deliverer", "Quality Champion", "Marathoner", "Polymath", "Balanced", "Emerging"] as const;
       for (const archetype of archetypes) {
         const svg = renderBadgeSvg(makeStats(), makeImpact({ archetype }));
         expect(svg).toContain(archetype);
@@ -502,7 +502,7 @@ describe("renderBadgeSvg", () => {
   describe("SVG XSS prevention", () => {
     it("escapes special XML characters in archetype", () => {
       const maliciousImpact = makeImpact({
-        archetype: 'Builder<script>alert("xss")</script>' as unknown as ImpactV4Result["archetype"],
+        archetype: 'Deliverer<script>alert("xss")</script>' as unknown as ImpactV4Result["archetype"],
       });
       const svg = renderBadgeSvg(makeStats(), maliciousImpact);
       expect(svg).not.toContain('<script>');

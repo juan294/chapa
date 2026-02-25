@@ -26,8 +26,8 @@ const baseStats: StatsData = {
 const baseImpact: ImpactV4Result = {
   handle: "TestUser",
   profileType: "collaborative",
-  dimensions: { building: 70, quality: 50, consistency: 60, breadth: 40 },
-  archetype: "Builder",
+  dimensions: { delivery: 70, quality: 50, consistency: 60, breadth: 40 },
+  archetype: "Deliverer",
   compositeScore: 55,
   confidence: 85,
   confidencePenalties: [],
@@ -40,7 +40,7 @@ describe("buildPayload", () => {
   it("produces a deterministic pipe-delimited string", () => {
     const result = buildPayload(baseStats, baseImpact, "2025-06-15");
     expect(result).toBe(
-      "testuser|52|85|Solid|Builder|70|50|60|40|200|30|50|2025-06-15",
+      "testuser|52|85|Solid|Deliverer|70|50|60|40|200|30|50|2025-06-15",
     );
   });
 
@@ -58,11 +58,11 @@ describe("buildPayload", () => {
   it("rounds dimension scores to integers", () => {
     const impact = {
       ...baseImpact,
-      dimensions: { building: 70.6, quality: 50.3, consistency: 60.9, breadth: 40.1 },
+      dimensions: { delivery: 70.6, quality: 50.3, consistency: 60.9, breadth: 40.1 },
     };
     const result = buildPayload(baseStats, impact, "2025-06-15");
     const parts = result.split("|");
-    expect(parts[5]).toBe("71"); // building rounded
+    expect(parts[5]).toBe("71"); // delivery rounded
     expect(parts[6]).toBe("50"); // quality rounded
     expect(parts[7]).toBe("61"); // consistency rounded
     expect(parts[8]).toBe("40"); // breadth rounded

@@ -229,11 +229,11 @@ export default function VerificationPage() {
                 ["Tier", "High", "Prevents tier from being changed"],
                 [
                   "Archetype",
-                  "Builder",
+                  "Deliverer",
                   "Locks the archetype label to the data",
                 ],
                 [
-                  "Building",
+                  "Delivery",
                   "80",
                   "Each dimension score is individually signed",
                 ],

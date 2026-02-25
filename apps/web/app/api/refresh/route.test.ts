@@ -32,8 +32,8 @@ vi.mock("@/lib/impact/v4", () => ({
     confidence: 85,
     tier: "Solid",
     confidencePenalties: [],
-    dimensions: { building: 75, quality: 65, consistency: 70, breadth: 60 },
-    archetype: "Builder",
+    dimensions: { delivery: 75, quality: 65, consistency: 70, breadth: 60 },
+    archetype: "Deliverer",
     computedAt: new Date().toISOString(),
   }),
 }));

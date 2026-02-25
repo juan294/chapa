@@ -88,7 +88,7 @@ describe("POST /api/generate", () => {
   it("returns 200 with success when stats are generated", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     const fakeStats = { handle: "juan294", commitsTotal: 100 } as unknown as StatsData;
-    const fakeImpact = { archetype: "Builder", adjustedComposite: 72 } as unknown as ImpactV4Result;
+    const fakeImpact = { archetype: "Deliverer", adjustedComposite: 72 } as unknown as ImpactV4Result;
     mockGetStats.mockResolvedValue(fakeStats);
     mockComputeImpact.mockReturnValue(fakeImpact);
 
@@ -102,7 +102,7 @@ describe("POST /api/generate", () => {
   it("calls getStats with the session handle and token", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
-    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV4Result);
+    mockComputeImpact.mockReturnValue({ archetype: "Deliverer" } as unknown as ImpactV4Result);
 
     await POST(makeRequest("chapa_session=abc"));
 

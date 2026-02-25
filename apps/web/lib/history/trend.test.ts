@@ -63,16 +63,16 @@ describe("computeTrend", () => {
 
   it("includes per-dimension value arrays", () => {
     const snapshots = [
-      makeSnapshot({ date: "2025-06-13", building: 70, quality: 50, consistency: 80, breadth: 40 }),
-      makeSnapshot({ date: "2025-06-14", building: 75, quality: 55, consistency: 75, breadth: 45 }),
+      makeSnapshot({ date: "2025-06-13", delivery: 70, quality: 50, consistency: 80, breadth: 40 }),
+      makeSnapshot({ date: "2025-06-14", delivery: 75, quality: 55, consistency: 75, breadth: 45 }),
     ];
     const trend = computeTrend(snapshots);
 
-    expect(trend!.dimensions.building.values).toEqual([
+    expect(trend!.dimensions.delivery.values).toEqual([
       { date: "2025-06-13", value: 70 },
       { date: "2025-06-14", value: 75 },
     ]);
-    expect(trend!.dimensions.building.avgDelta).toBe(5);
+    expect(trend!.dimensions.delivery.avgDelta).toBe(5);
   });
 
   it("respects window parameter to limit recent snapshots", () => {
@@ -139,13 +139,13 @@ describe("computeTrend", () => {
 
   it("handles exactly 2 snapshots", () => {
     const snapshots = [
-      makeSnapshot({ date: "2025-06-14", adjustedComposite: 50, building: 60 }),
-      makeSnapshot({ date: "2025-06-15", adjustedComposite: 55, building: 70 }),
+      makeSnapshot({ date: "2025-06-14", adjustedComposite: 50, delivery: 60 }),
+      makeSnapshot({ date: "2025-06-15", adjustedComposite: 55, delivery: 70 }),
     ];
     const trend = computeTrend(snapshots);
 
     expect(trend!.avgDelta).toBe(5);
-    expect(trend!.dimensions.building.avgDelta).toBe(10);
+    expect(trend!.dimensions.delivery.avgDelta).toBe(10);
   });
 
   it("is a pure function — does not mutate input array", () => {

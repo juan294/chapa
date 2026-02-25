@@ -6,8 +6,8 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
 2. Compute **Impact v4 Profile** from last 12 months (365 days):
-   - 4 dimensions (Building, Quality, Consistency, Breadth), each 0–100
-   - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
+   - 4 dimensions (Delivery, Quality, Consistency, Breadth), each 0–100
+   - developer archetype (Deliverer, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
    - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 
 3. Serve **Creator Studio**: `/studio` (badge customization with 9 visual categories).

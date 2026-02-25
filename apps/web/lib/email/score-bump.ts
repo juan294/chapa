@@ -166,8 +166,8 @@ function buildText(data: TemplateData): string {
 
   lines.push("");
   lines.push("Dimension changes:");
-  if (diff.dimensions.building !== 0)
-    lines.push(`  Building:    ${formatDelta(diff.dimensions.building)}`);
+  if (diff.dimensions.delivery !== 0)
+    lines.push(`  Delivery:    ${formatDelta(diff.dimensions.delivery)}`);
   if (diff.dimensions.quality !== 0)
     lines.push(`  Quality:     ${formatDelta(diff.dimensions.quality)}`);
   if (diff.dimensions.consistency !== 0)
@@ -223,7 +223,7 @@ function buildHtml(data: TemplateData): string {
 
   // Dimension deltas
   const dims = [
-    { label: "Building", delta: diff.dimensions.building },
+    { label: "Delivery", delta: diff.dimensions.delivery },
     { label: "Quality", delta: diff.dimensions.quality },
     { label: "Consistency", delta: diff.dimensions.consistency },
     { label: "Breadth", delta: diff.dimensions.breadth },

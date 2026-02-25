@@ -3,21 +3,21 @@ import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 
 const DIMENSION_LABELS: Record<string, string> = {
-  building: "Building",
+  delivery: "Delivery",
   quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
 };
 
 const DIMENSION_SUBTITLES: Record<string, string> = {
-  building: "PRs merged \u00b7 issues closed \u00b7 commits",
+  delivery: "PRs merged \u00b7 issues closed \u00b7 commits",
   quality: "Code reviews \u00b7 quality gatekeeping",
   consistency: "Active days \u00b7 sustained contributions",
   breadth: "Repos contributed \u00b7 community reach",
 };
 
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
-  building: { from: "var(--color-dimension-building)", to: "var(--color-dimension-building-light)" },
+  delivery: { from: "var(--color-dimension-delivery)", to: "var(--color-dimension-delivery-light)" },
   quality: { from: "var(--color-dimension-quality)", to: "var(--color-dimension-quality-light)" },
   consistency: { from: "var(--color-dimension-consistency)", to: "var(--color-dimension-consistency-light)" },
   breadth: { from: "var(--color-dimension-breadth)", to: "var(--color-dimension-breadth-light)" },
@@ -25,8 +25,8 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
 
 
 const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
-  building: {
-    id: "dim-building",
+  delivery: {
+    id: "dim-delivery",
     tip: "Measures shipping output: PRs merged, issues closed, and commits. High score = consistently turning ideas into merged code.",
   },
   quality: {
@@ -123,8 +123,8 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
 }
 
 const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
-  Builder:
-    "Your profile is driven by output \u2014 you turn ideas into merged pull requests and closed issues at a pace that keeps the roadmap moving. Building is clearly your dominant dimension, meaning you thrive when shipping features and moving codebases forward.",
+  Deliverer:
+    "Your profile is driven by output \u2014 you turn ideas into merged pull requests and closed issues at a pace that keeps the roadmap moving. Delivery is clearly your dominant dimension, meaning you thrive when shipping features and moving codebases forward.",
   "Quality Champion":
     "Your profile is shaped by quality \u2014 you\u2019re the one reviewing pull requests, catching edge cases, and making sure nothing ships that shouldn\u2019t. Quality is your dominant dimension, and your team\u2019s code quality reflects it.",
   Marathoner:
@@ -132,13 +132,13 @@ const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
   Polymath:
     "Your profile is marked by reach \u2014 you contribute across multiple repositories and technology areas, connecting the dots between projects. Breadth is your dominant dimension, giving you a uniquely wide perspective.",
   Balanced:
-    "Your profile is impressively well-rounded \u2014 no single dimension dominates because you invest across building, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
+    "Your profile is impressively well-rounded \u2014 no single dimension dominates because you invest across delivery, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
   Emerging:
     "Your profile is still taking shape \u2014 with more contributions over the coming months, your strongest dimensions will emerge and reveal your developer identity. Every commit, review, and repo you touch sharpens the picture.",
 };
 
 const DIMENSION_TIPS: Record<string, string> = {
-  building: "To strengthen Building, focus on opening and merging more pull requests \u2014 even small, focused PRs that close open issues count significantly.",
+  delivery: "To strengthen Delivery, focus on opening and merging more pull requests \u2014 even small, focused PRs that close open issues count significantly.",
   quality: "To strengthen Quality, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
   consistency: "To strengthen Consistency, aim for regular contributions across more days \u2014 even small commits on consecutive days build this dimension faster than occasional bursts.",
   breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
@@ -180,7 +180,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           Performance Dimensions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {(["building", "quality", "consistency", "breadth"] as const).map(
+          {(["delivery", "quality", "consistency", "breadth"] as const).map(
             (key, i) => (
               <div
                 key={key}

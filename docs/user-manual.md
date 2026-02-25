@@ -421,7 +421,7 @@ On pages that don't have a dedicated terminal (share pages, about, terms, privac
 | `/about` | Go to the About page |
 | `/terms` | Terms of Service |
 | `/privacy` | Privacy Policy |
-| `/builder` | View the Builder archetype page |
+| `/deliverer` | View the Deliverer archetype page |
 | `/guardian` | View the Quality Champion archetype page |
 | `/marathoner` | View the Marathoner archetype page |
 | `/polymath` | View the Polymath archetype page |
@@ -494,7 +494,7 @@ Hovering over elements on the badge preview reveals explanations:
 ### Breakdown Tooltips
 
 In the impact breakdown section below the badge:
-- **Dimension cards** (Building, Quality, Consistency, Breadth) — Hover for a description of what each dimension measures
+- **Dimension cards** (Delivery, Quality, Consistency, Breadth) — Hover for a description of what each dimension measures
 - **Stat cards** (commits, PRs, reviews, etc.) — Hover for an explanation of how each stat contributes to the score
 
 Tooltips are accessible via keyboard (Tab + focus) and auto-position to stay within the viewport.
@@ -548,11 +548,11 @@ curl "https://chapa.thecreativetoken.com/api/history/juan294?window=14"
       "date": "2026-02-14",
       "capturedAt": "2026-02-14T08:30:00Z",
       "commitsTotal": 342,
-      "building": 72,
+      "delivery": 72,
       "quality": 45,
       "consistency": 68,
       "breadth": 55,
-      "archetype": "Builder",
+      "archetype": "Deliverer",
       "compositeScore": 60,
       "adjustedComposite": 58,
       "confidence": 85,
@@ -566,7 +566,7 @@ curl "https://chapa.thecreativetoken.com/api/history/juan294?window=14"
     "compositeAvgDelta": 1.5,
     "compositeValues": [55, 56, 57, 57, 58, 58, 58],
     "dimensions": {
-      "building": { "direction": "improving", "avgDelta": 2.0 },
+      "delivery": { "direction": "improving", "avgDelta": 2.0 },
       "quality": { "direction": "stable", "avgDelta": 0.3 },
       "consistency": { "direction": "improving", "avgDelta": 1.2 },
       "breadth": { "direction": "stable", "avgDelta": -0.1 }
@@ -578,14 +578,14 @@ curl "https://chapa.thecreativetoken.com/api/history/juan294?window=14"
     "compositeScore": 2,
     "adjustedComposite": 1,
     "dimensions": {
-      "building": 3,
+      "delivery": 3,
       "quality": 0,
       "consistency": 2,
       "breadth": 1
     },
     "explanations": [
       "Adjusted composite improved by 1 (57 → 58)",
-      "Building improved by 3 (69 → 72)"
+      "Delivery improved by 3 (69 → 72)"
     ]
   }
 }

@@ -21,7 +21,7 @@ export function parseRedisSnapshot(input: string | unknown): MetricsSnapshot | n
       parsed === null ||
       typeof parsed.date !== "string" ||
       typeof parsed.commitsTotal !== "number" ||
-      typeof parsed.building !== "number" ||
+      typeof parsed.delivery !== "number" ||
       typeof parsed.tier !== "string"
     ) {
       return null;
@@ -96,7 +96,7 @@ export function snapshotToRow(
     max_commits_in_10min: s.maxCommitsIn10Min,
     micro_commit_ratio: s.microCommitRatio ?? null,
     docs_only_pr_ratio: s.docsOnlyPrRatio ?? null,
-    building: s.building,
+    building: s.delivery,
     guarding: s.quality,
     consistency: s.consistency,
     breadth: s.breadth,
@@ -129,7 +129,7 @@ export function verificationToRow(
     tier: r.tier,
     archetype: r.archetype,
     profile_type: r.profileType,
-    building: r.dimensions.building,
+    building: r.dimensions.delivery,
     guarding: r.dimensions.quality,
     consistency: r.dimensions.consistency,
     breadth: r.dimensions.breadth,

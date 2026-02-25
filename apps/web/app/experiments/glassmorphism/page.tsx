@@ -498,7 +498,7 @@ export default function GlassmorphismExperimentPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <StatCard
-              label="Building"
+              label="Delivery"
               value={34}
               maxValue={40}
               detail="Core code contributions across 12 repos. Consistent daily contribution pattern with weekend peaks."

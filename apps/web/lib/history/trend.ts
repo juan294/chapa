@@ -19,7 +19,7 @@ export interface TrendSummary {
   avgDelta: number;
   compositeValues: DateValue[];
   dimensions: {
-    building: DimensionTrend;
+    delivery: DimensionTrend;
     quality: DimensionTrend;
     consistency: DimensionTrend;
     breadth: DimensionTrend;
@@ -65,7 +65,7 @@ export function computeTrend(
     avgDelta,
     compositeValues,
     dimensions: {
-      building: dimensionTrend(recent, "building"),
+      delivery: dimensionTrend(recent, "delivery"),
       quality: dimensionTrend(recent, "quality"),
       consistency: dimensionTrend(recent, "consistency"),
       breadth: dimensionTrend(recent, "breadth"),
@@ -88,7 +88,7 @@ function averageDelta(values: number[]): number {
 
 function dimensionTrend(
   snapshots: MetricsSnapshot[],
-  key: "building" | "quality" | "consistency" | "breadth",
+  key: "delivery" | "quality" | "consistency" | "breadth",
 ): DimensionTrend {
   const values = snapshots.map((s) => ({ date: s.date, value: s[key] }));
   return {

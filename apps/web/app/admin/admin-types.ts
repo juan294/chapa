@@ -49,7 +49,7 @@ export const TIER_ORDER: Record<string, number> = {
 };
 
 export const ARCHETYPE_COLOR: Record<string, string> = {
-  Builder: "text-archetype-builder",
+  Deliverer: "text-archetype-deliverer",
   "Quality Champion": "text-archetype-guardian",
   Marathoner: "text-archetype-marathoner",
   Polymath: "text-archetype-polymath",

@@ -60,7 +60,7 @@ export type ProfileType = "solo" | "collaborative";
 
 /** Four independent dimension scores (each 0..100) */
 export interface DimensionScores {
-  building: number;
+  delivery: number;
   quality: number;
   consistency: number;
   breadth: number;
@@ -68,7 +68,7 @@ export interface DimensionScores {
 
 /** Developer archetype derived from dimension profile shape */
 export type DeveloperArchetype =
-  | "Builder"
+  | "Deliverer"
   | "Quality Champion"
   | "Marathoner"
   | "Polymath"
@@ -185,7 +185,7 @@ export interface MetricsSnapshot {
   docsOnlyPrRatio?: number;
 
   // Impact dimensions + classification
-  building: number;
+  delivery: number;
   quality: number;
   consistency: number;
   breadth: number;

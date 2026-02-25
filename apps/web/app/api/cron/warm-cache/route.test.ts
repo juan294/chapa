@@ -22,7 +22,7 @@ vi.mock("@/lib/impact/v4", () => ({
   computeImpactV4: vi.fn(() => ({
     handle: "mock",
     profileType: "collaborative",
-    dimensions: { building: 50, quality: 50, consistency: 50, breadth: 50 },
+    dimensions: { delivery: 50, quality: 50, consistency: 50, breadth: 50 },
     archetype: "Balanced",
     compositeScore: 50,
     confidence: 80,

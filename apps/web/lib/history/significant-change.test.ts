@@ -13,7 +13,7 @@ function makeDiff(overrides: Partial<SnapshotDiff> = {}): SnapshotDiff {
     compositeScore: 0,
     adjustedComposite: 0,
     confidence: 0,
-    dimensions: { building: 0, quality: 0, consistency: 0, breadth: 0 },
+    dimensions: { delivery: 0, quality: 0, consistency: 0, breadth: 0 },
     stats: {
       commitsTotal: 0,
       prsMergedCount: 0,
@@ -90,7 +90,7 @@ describe("isSignificantChange", () => {
   describe("archetype change", () => {
     it("detects archetype change as significant", () => {
       const result = isSignificantChange(
-        makeDiff({ archetype: { from: "Balanced", to: "Builder" } }),
+        makeDiff({ archetype: { from: "Balanced", to: "Deliverer" } }),
       );
       expect(result.significant).toBe(true);
       if (result.significant) {
@@ -123,7 +123,7 @@ describe("isSignificantChange", () => {
       const result = isSignificantChange(
         makeDiff({
           tier: { from: "Solid", to: "High" },
-          archetype: { from: "Balanced", to: "Builder" },
+          archetype: { from: "Balanced", to: "Deliverer" },
           adjustedComposite: 10,
         }),
       );

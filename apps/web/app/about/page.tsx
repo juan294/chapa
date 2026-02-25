@@ -51,7 +51,7 @@ export default function AboutPage() {
               Four dimensions
             </h2>
             <p>
-              <strong className="text-text-primary">Building</strong> — shipping meaningful changes
+              <strong className="text-text-primary">Delivery</strong> — shipping meaningful changes
               (PRs merged, issues closed).{" "}
               <strong className="text-text-primary">Quality</strong> — reviewing and quality
               gatekeeping.{" "}
@@ -66,7 +66,7 @@ export default function AboutPage() {
             </h2>
             <p>
               Your dimension profile shape determines your archetype:{" "}
-              <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
+              <Link href="/archetypes/deliverer" className="font-semibold text-archetype-deliverer hover:text-amber-light transition-colors">Deliverer</Link>,{" "}
               <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
               <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
               <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}

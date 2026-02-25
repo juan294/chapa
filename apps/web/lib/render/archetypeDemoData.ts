@@ -25,8 +25,8 @@ function buildHeatmap(grid: number[][]): HeatmapDay[] {
   return days;
 }
 
-/* ── Builder: intense bursts of shipping, heavy weekday activity ─────── */
-const BUILDER_GRID: number[][] = [
+/* ── Deliverer: intense bursts of shipping, heavy weekday activity ───── */
+const DELIVERER_GRID: number[][] = [
   [0, 3, 4, 4, 3, 1, 0],
   [0, 4, 4, 3, 4, 0, 0],
   [1, 3, 4, 4, 4, 2, 0],
@@ -42,8 +42,8 @@ const BUILDER_GRID: number[][] = [
   [0, 4, 4, 3, 4, 1, 0],
 ];
 
-export const BUILDER_STATS: StatsData = {
-  handle: "builder",
+export const DELIVERER_STATS: StatsData = {
+  handle: "deliverer",
   displayName: "Alex Rivera",
   commitsTotal: 580,
   activeDays: 210,
@@ -59,20 +59,20 @@ export const BUILDER_STATS: StatsData = {
   totalStars: 340,
   totalForks: 85,
   totalWatchers: 32,
-  heatmapData: buildHeatmap(BUILDER_GRID),
+  heatmapData: buildHeatmap(DELIVERER_GRID),
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const BUILDER_IMPACT: ImpactV4Result = {
-  handle: "builder",
+export const DELIVERER_IMPACT: ImpactV4Result = {
+  handle: "deliverer",
   profileType: "collaborative",
   dimensions: {
-    building: 92,
+    delivery: 92,
     quality: 34,
     consistency: 68,
     breadth: 38,
   },
-  archetype: "Builder",
+  archetype: "Deliverer",
   compositeScore: 72,
   confidence: 91,
   confidencePenalties: [],
@@ -123,7 +123,7 @@ export const GUARDIAN_IMPACT: ImpactV4Result = {
   handle: "guardian",
   profileType: "collaborative",
   dimensions: {
-    building: 38,
+    delivery: 38,
     quality: 90,
     consistency: 62,
     breadth: 30,
@@ -179,7 +179,7 @@ export const MARATHONER_IMPACT: ImpactV4Result = {
   handle: "marathoner",
   profileType: "collaborative",
   dimensions: {
-    building: 52,
+    delivery: 52,
     quality: 36,
     consistency: 94,
     breadth: 32,
@@ -235,7 +235,7 @@ export const POLYMATH_IMPACT: ImpactV4Result = {
   handle: "polymath",
   profileType: "collaborative",
   dimensions: {
-    building: 48,
+    delivery: 48,
     quality: 40,
     consistency: 50,
     breadth: 88,
@@ -291,7 +291,7 @@ export const BALANCED_IMPACT: ImpactV4Result = {
   handle: "balanced",
   profileType: "collaborative",
   dimensions: {
-    building: 72,
+    delivery: 72,
     quality: 68,
     consistency: 74,
     breadth: 66,
@@ -347,7 +347,7 @@ export const EMERGING_IMPACT: ImpactV4Result = {
   handle: "emerging",
   profileType: "solo",
   dimensions: {
-    building: 22,
+    delivery: 22,
     quality: 8,
     consistency: 18,
     breadth: 15,

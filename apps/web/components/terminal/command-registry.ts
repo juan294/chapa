@@ -215,7 +215,7 @@ export function createNavigationCommands(options?: {
     makeLine("info", "  /privacy           Privacy Policy"),
     makeLine("dim", ""),
     makeLine("system", "Archetypes:"),
-    makeLine("info", "  /builder           The Builder archetype"),
+    makeLine("info", "  /deliverer         The Deliverer archetype"),
     makeLine("info", "  /guardian           The Quality Champion archetype"),
     makeLine("info", "  /marathoner        The Marathoner archetype"),
     makeLine("info", "  /polymath          The Polymath archetype"),
@@ -320,11 +320,11 @@ export function createNavigationCommands(options?: {
       }),
     },
     {
-      name: "/builder",
-      description: "The Builder archetype",
+      name: "/deliverer",
+      description: "The Deliverer archetype",
       execute: () => ({
-        lines: [makeLine("system", "Opening Builder archetype...")],
-        action: { type: "navigate", path: "/archetypes/builder" },
+        lines: [makeLine("system", "Opening Deliverer archetype...")],
+        action: { type: "navigate", path: "/archetypes/deliverer" },
       }),
     },
     {

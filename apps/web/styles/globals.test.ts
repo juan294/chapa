@@ -35,7 +35,7 @@ describe("globals.css", () => {
 
   describe("dimension color tokens (#233)", () => {
     const DIMENSION_TOKENS = [
-      "--color-dimension-building",
+      "--color-dimension-delivery",
       "--color-dimension-quality",
       "--color-dimension-consistency",
       "--color-dimension-breadth",
@@ -76,7 +76,7 @@ describe("globals.css", () => {
 
   describe("archetype color tokens (#233)", () => {
     const ARCHETYPE_TOKENS = [
-      "--color-archetype-builder",
+      "--color-archetype-deliverer",
       "--color-archetype-guardian",
       "--color-archetype-marathoner",
       "--color-archetype-polymath",

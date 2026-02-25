@@ -405,7 +405,7 @@ function rowToSnapshot(row: SnapshotRow): MetricsSnapshot {
     maxCommitsIn10Min: row.max_commits_in_10min ?? undefined,
     microCommitRatio: row.micro_commit_ratio ?? undefined,
     docsOnlyPrRatio: row.docs_only_pr_ratio ?? undefined,
-    building: row.building,
+    delivery: row.building,
     quality: row.guarding,
     consistency: row.consistency,
     breadth: row.breadth,
@@ -509,7 +509,7 @@ redis-cli ZRANGE "history:juan294" -1 -1
 
 Once complete, these become trivial to build:
 
-- **Cross-user queries**: "Top 10 Builders this month" — `SELECT ... ORDER BY building DESC LIMIT 10`
+- **Cross-user queries**: "Top 10 Deliverers this month" — `SELECT ... ORDER BY delivery DESC LIMIT 10`
 - **Unbounded history**: Remove the 365-day cap, keep years of data at negligible cost
 - **Admin analytics**: User growth over time, archetype distribution, tier breakdown — all SQL
 - **Leaderboards**: Indexed queries on `adjusted_composite`, `archetype`, `tier`

@@ -138,11 +138,11 @@ describe("sortUsers", () => {
     it("sorts alphabetically ascending", () => {
       const users = [
         makeUser({ handle: "a", archetype: "Polymath" }),
-        makeUser({ handle: "b", archetype: "Builder" }),
+        makeUser({ handle: "b", archetype: "Deliverer" }),
         makeUser({ handle: "c", archetype: "Quality Champion" }),
       ];
       const result = sortUsers(users, "archetype", "asc");
-      expect(result.map((u) => u.archetype)).toEqual(["Builder", "Polymath", "Quality Champion"]);
+      expect(result.map((u) => u.archetype)).toEqual(["Deliverer", "Polymath", "Quality Champion"]);
     });
   });
 
@@ -297,7 +297,7 @@ describe("ARCHETYPE_COLOR", () => {
   it("maps all 6 archetypes to color classes", () => {
     expect(Object.keys(ARCHETYPE_COLOR).sort()).toEqual([
       "Balanced",
-      "Builder",
+      "Deliverer",
       "Emerging",
       "Marathoner",
       "Polymath",

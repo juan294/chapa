@@ -120,7 +120,7 @@ describe("Landing page — footer internal links (#307)", () => {
 
 describe("Landing page — scoring overview in How It Works section", () => {
   it("contains a DIMENSIONS data array with all four dimensions", () => {
-    expect(SOURCE).toContain('"BUILDING"');
+    expect(SOURCE).toContain('"DELIVERY"');
     expect(SOURCE).toContain('"QUALITY"');
     expect(SOURCE).toContain('"CONSISTENCY"');
     expect(SOURCE).toContain('"BREADTH"');
@@ -144,7 +144,7 @@ describe("Landing page — scoring overview in How It Works section", () => {
     const howItWorksIndex = SOURCE.indexOf('id="how-it-works"');
     const enterpriseIndex = SOURCE.indexOf('id="enterprise"');
     const section = SOURCE.slice(howItWorksIndex, enterpriseIndex);
-    expect(section).toContain("/archetypes/builder");
+    expect(section).toContain("/archetypes/deliverer");
     expect(section).toContain("/archetypes/guardian");
   });
 

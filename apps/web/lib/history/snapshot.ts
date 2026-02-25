@@ -35,7 +35,7 @@ export function buildSnapshot(
     ...(stats.microCommitRatio !== undefined && { microCommitRatio: stats.microCommitRatio }),
     ...(stats.docsOnlyPrRatio !== undefined && { docsOnlyPrRatio: stats.docsOnlyPrRatio }),
 
-    building: impact.dimensions.building,
+    delivery: impact.dimensions.delivery,
     quality: impact.dimensions.quality,
     consistency: impact.dimensions.consistency,
     breadth: impact.dimensions.breadth,

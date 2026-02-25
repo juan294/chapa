@@ -25,11 +25,11 @@ const NAV_LINKS = [
 const FEATURES = [
   {
     title: "FOUR DIMENSIONS",
-    description: "Commit counts reward volume, not impact. Chapa scores four dimensions — Building, Quality, Consistency, Breadth — to show what kind of engineer you actually are.",
+    description: "Commit counts reward volume, not impact. Chapa scores four dimensions — Delivery, Quality, Consistency, Breadth — to show what kind of engineer you actually are.",
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
+    description: (<>No two developers contribute the same way, but GitHub treats everyone as a commit counter. Your archetype — <Link href="/archetypes/deliverer" className="font-semibold text-archetype-deliverer hover:text-amber-light transition-colors">Deliverer</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
   },
   {
     title: "VERIFIED METRICS",
@@ -47,12 +47,12 @@ const FEATURES = [
 
 const STEPS = [
   { number: "01", title: "Sign in with GitHub", description: "Secure OAuth over HTTPS \u2014 we only request read access to public data. No passwords stored, no private repos accessed." },
-  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Building, Quality, Consistency, and Breadth \u2014 plus archetype and composite score. The badge heatmap shows the last 90 days at a glance." },
+  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Delivery, Quality, Consistency, and Breadth \u2014 plus archetype and composite score. The badge heatmap shows the last 90 days at a glance." },
   { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere \u2014 and explore the full scoring breakdown on your share page." },
 ];
 
 const DIMENSIONS = [
-  { title: "BUILDING", description: "Shipping meaningful changes \u2014 PRs merged, issues closed, code shipped." },
+  { title: "DELIVERY", description: "Shipping meaningful changes \u2014 PRs merged, issues closed, code shipped." },
   { title: "QUALITY", description: "Reviewing and quality gatekeeping \u2014 how much time you spend on others\u2019 code." },
   { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
   { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
@@ -279,7 +279,7 @@ export default async function Home({
                 </h3>
                 <p className="text-text-secondary text-sm">
                   Chapa scores four independent dimensions of your GitHub activity from the last 12 months. Your unique combination across these dimensions determines your developer archetype:{" "}
-                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
+                  <Link href="/archetypes/deliverer" className="font-semibold text-archetype-deliverer hover:text-amber-light transition-colors">Deliverer</Link>,{" "}
                   <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
                   <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
                   <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
