@@ -1,0 +1,67 @@
+# Lighthouse CI — Core Web Vitals tracking
+#
+# Runs Lighthouse audits on key pages after a successful build.
+# Uses the build artifact from the CI workflow to avoid rebuilding.
+# Results are uploaded to temporary public storage (free, no server needed).
+#
+# Thresholds are intentionally lenient (warn, not error) so the team
+# can calibrate before making this a required check.
+
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+# Cancel in-progress runs on the same PR
+concurrency:
+  group: lighthouse-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+    # Don't block PRs — let the team calibrate thresholds first
+    continue-on-error: true
+
+    env:
+      # Dummy values for build — real values are in Vercel
+      GITHUB_CLIENT_ID: dummy
+      GITHUB_CLIENT_SECRET: dummy
+      NEXTAUTH_SECRET: dummy-secret-for-ci
+      UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
+      UPSTASH_REDIS_REST_TOKEN: dummy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run Lighthouse CI
+        run: |
+          pnpm dlx @lhci/cli autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          retention-days: 14
