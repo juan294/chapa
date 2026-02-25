@@ -34,7 +34,7 @@ describe("Navbar", () => {
 
   describe("navigation links", () => {
     it("accepts optional navLinks prop", () => {
-      expect(SOURCE).toContain("navLinks?: NavLink[]");
+      expect(SOURCE).toContain("navLinks?: NavLinkItem[]");
     });
 
     it("renders nav links with href", () => {
@@ -100,6 +100,11 @@ describe("Navbar", () => {
   describe("accessibility", () => {
     it("uses <nav> element with aria-label", () => {
       expect(SOURCE).toContain('aria-label="Main navigation"');
+    });
+
+    it("uses NavLink component for nav links (supports aria-current)", () => {
+      expect(SOURCE).toContain("NavLink");
+      expect(SOURCE).toMatch(/<NavLink\s/);
     });
   });
 

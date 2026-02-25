@@ -58,10 +58,18 @@ export async function POST(request: Request) {
   }
 
   // 4. Parse payload and check event type
-  const payload = JSON.parse(rawBody) as {
-    type: string;
-    data: { email_id?: string };
-  };
+  let payload: { type: string; data: { email_id?: string } };
+  try {
+    payload = JSON.parse(rawBody) as {
+      type: string;
+      data: { email_id?: string };
+    };
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON payload" },
+      { status: 400 },
+    );
+  }
 
   if (payload.type !== "email.received") {
     return NextResponse.json({ status: "ignored", type: payload.type });
