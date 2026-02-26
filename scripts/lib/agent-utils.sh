@@ -5,6 +5,12 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
+# File descriptor limit — Claude Code needs more than the default 256
+# that launchd provides. Raise it early so all downstream tools benefit.
+# ---------------------------------------------------------------------------
+ulimit -n 2147483646 2>/dev/null || ulimit -n 10240 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
