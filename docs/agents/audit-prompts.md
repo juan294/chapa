@@ -130,7 +130,7 @@ This is a **read-only audit** — do NOT modify any files. Only investigate and 
 Your responsibilities:
 1. Run `pnpm outdated` in the project root and check for duplicate/conflicting dependencies
 2. Review tsconfig.json files for strict mode settings (check apps/web/tsconfig.json and packages/shared/tsconfig.json)
-3. Check for circular dependencies — run `npx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/` (uses a dedicated tsconfig with `baseUrl` and `moduleResolution: "node"` so madge can resolve `@/` path aliases)
+3. Check for circular dependencies — run `pnpm run check:circular` (uses `tsconfig.madge.json` with `baseUrl` and `moduleResolution: "node"` so madge can resolve `@/` path aliases)
 4. Run `pnpm run typecheck` and report any errors
 5. Run `npx knip` for dead code detection (unused files, exports, dependencies). If knip isn't installed, search for unused exports manually using grep.
 6. Check for duplicate code patterns across modules
