@@ -129,11 +129,11 @@ export default function GradientBorderExperiment() {
 .animated-gradient-border {
   background: conic-gradient(
     from var(--gradient-angle),
-    #5E4FCC,
-    #7C6AEF,
-    #9D8FFF,
-    #7C6AEF,
-    #5E4FCC
+    var(--color-amber-dark),
+    var(--color-amber),
+    var(--color-amber-light),
+    var(--color-amber),
+    var(--color-amber-dark)
   );
   animation: rotate-gradient-border 4s linear infinite;
 }
@@ -141,7 +141,7 @@ export default function GradientBorderExperiment() {
 /* ── Technique 2: Fallback for browsers without @property ── */
 @supports not (background: conic-gradient(from var(--gradient-angle), red, blue)) {
   .animated-gradient-border {
-    background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
+    background: linear-gradient(90deg, var(--color-amber-dark), var(--color-amber), var(--color-amber-light), var(--color-amber), var(--color-amber-dark));
     background-size: 300% 300%;
     animation: gradient-shift-fallback 3s ease infinite;
   }
@@ -159,11 +159,11 @@ export default function GradientBorderExperiment() {
     animation: none !important;
     background: conic-gradient(
       from 45deg,
-      #5E4FCC,
-      #7C6AEF,
-      #9D8FFF,
-      #7C6AEF,
-      #5E4FCC
+      var(--color-amber-dark),
+      var(--color-amber),
+      var(--color-amber-light),
+      var(--color-amber),
+      var(--color-amber-dark)
     );
   }
 }

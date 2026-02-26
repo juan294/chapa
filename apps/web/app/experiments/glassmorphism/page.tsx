@@ -129,7 +129,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           left: "20%",
           width: "24rem",
           height: "24rem",
-          background: "#7C6AEF",
+          background: "var(--color-amber)",
           opacity: 0.08,
           filter: "blur(100px)",
         }}
@@ -142,7 +142,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           right: "20%",
           width: "20rem",
           height: "20rem",
-          background: "#9D8FFF",
+          background: "var(--color-amber-light)",
           opacity: 0.06,
           filter: "blur(120px)",
         }}
@@ -156,7 +156,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           transform: "translate(-50%, -50%)",
           width: "500px",
           height: "300px",
-          background: "#5E4FCC",
+          background: "var(--color-amber-dark)",
           opacity: 0.05,
           filter: "blur(150px)",
         }}
@@ -169,7 +169,7 @@ function BackgroundBlobs({ visible }: { visible: boolean }) {
           left: "10%",
           width: "18rem",
           height: "18rem",
-          background: "#7C6AEF",
+          background: "var(--color-amber)",
           opacity: 0.04,
           filter: "blur(130px)",
         }}

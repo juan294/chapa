@@ -387,7 +387,7 @@ export default function TextEffectsExperimentPage() {
         /*  3. Embossed (Raised)                             */
         /* ================================================ */
         .te-embossed {
-          color: rgba(124, 106, 239, 0.8);
+          color: color-mix(in srgb, var(--color-amber) 80%, transparent);
           text-shadow:
             -1px -1px 1px rgba(255, 255, 255, 0.2),
             1px 1px 2px rgba(0, 0, 0, 0.8);
@@ -397,7 +397,7 @@ export default function TextEffectsExperimentPage() {
         /*  4. Debossed (Pressed In)                         */
         /* ================================================ */
         .te-debossed {
-          color: rgba(124, 106, 239, 0.5);
+          color: color-mix(in srgb, var(--color-amber) 50%, transparent);
           text-shadow:
             1px 1px 1px rgba(255, 255, 255, 0.1),
             -1px -1px 2px rgba(0, 0, 0, 0.9);
@@ -410,13 +410,13 @@ export default function TextEffectsExperimentPage() {
           display: inline-block;
           background: linear-gradient(
             90deg,
-            #5E4FCC 0%,
-            #7C6AEF 20%,
+            var(--color-amber-dark) 0%,
+            var(--color-amber) 20%,
             #A99BFF 40%,
             #D0C9FF 50%,
             #A99BFF 60%,
-            #7C6AEF 80%,
-            #5E4FCC 100%
+            var(--color-amber) 80%,
+            var(--color-amber-dark) 100%
           );
           background-size: 200% 100%;
           -webkit-background-clip: text;
@@ -434,12 +434,12 @@ export default function TextEffectsExperimentPage() {
         /*  6. Neon Glow (Amber)                             */
         /* ================================================ */
         .te-neon-amber {
-          color: #7C6AEF;
+          color: var(--color-amber);
           text-shadow:
-            0 0 7px rgba(124, 106, 239, 0.5),
-            0 0 10px rgba(124, 106, 239, 0.4),
-            0 0 21px rgba(124, 106, 239, 0.3),
-            0 0 42px rgba(124, 106, 239, 0.2);
+            0 0 7px color-mix(in srgb, var(--color-amber) 50%, transparent),
+            0 0 10px color-mix(in srgb, var(--color-amber) 40%, transparent),
+            0 0 21px color-mix(in srgb, var(--color-amber) 30%, transparent),
+            0 0 42px color-mix(in srgb, var(--color-amber) 20%, transparent);
         }
 
         /* ================================================ */
@@ -448,7 +448,7 @@ export default function TextEffectsExperimentPage() {
         .te-sparkle {
           position: relative;
           display: inline-block;
-          color: #7C6AEF;
+          color: var(--color-amber);
         }
 
         .te-sparkle::before,
@@ -456,7 +456,7 @@ export default function TextEffectsExperimentPage() {
           content: "\\2726";
           position: absolute;
           font-size: 0.4em;
-          color: #9D8FFF;
+          color: var(--color-amber-light);
           animation: te-sparkle-pulse 2s ease-in-out infinite;
           pointer-events: none;
         }

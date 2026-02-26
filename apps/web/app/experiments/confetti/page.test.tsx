@@ -1,0 +1,24 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from "vitest";
+import { render } from "@testing-library/react";
+
+vi.mock("@/components/badge/BadgeContent", () => ({
+  BadgeContent: () => <div data-testid="badge-content">badge</div>,
+  getBadgeContentCSS: () => [""],
+}));
+
+// Mock confetti — depends on canvas-confetti
+vi.mock("@/lib/effects/celebrations/confetti", () => ({
+  fireSingleBurst: vi.fn(),
+  fireMultiBurst: vi.fn(),
+  fireFireworks: vi.fn(),
+  fireSubtleSparkle: vi.fn().mockResolvedValue(() => {}),
+}));
+
+describe("confetti experiment page", () => {
+  it("renders without throwing", async () => {
+    const { default: Page } = await import("./page");
+    const { container } = render(<Page />);
+    expect(container.querySelector("div")).toBeTruthy();
+  });
+});

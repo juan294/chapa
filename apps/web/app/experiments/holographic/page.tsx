@@ -217,14 +217,14 @@ export default function HolographicExperimentPage() {
           width: 100%;
           max-width: 560px;
           border-radius: 1rem;
-          border: 1px solid rgba(124, 106, 239, 0.12);
-          background: #13141E;
+          border: 1px solid color-mix(in srgb, var(--color-amber) 12%, transparent);
+          background: var(--color-card);
           transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
 
         .holo-card:hover {
-          border-color: rgba(124, 106, 239, 0.25);
-          box-shadow: 0 0 40px rgba(124, 106, 239, 0.06);
+          border-color: color-mix(in srgb, var(--color-amber) 25%, transparent);
+          box-shadow: 0 0 40px color-mix(in srgb, var(--color-amber) 6%, transparent);
         }
 
         /* ---- Holographic overlay ---- */
@@ -245,11 +245,11 @@ export default function HolographicExperimentPage() {
           background: linear-gradient(
             var(--holo-angle, 115deg),
             transparent 20%,
-            rgba(124, 106, 239, 0.3) 36%,
-            rgba(157, 143, 255, 0.3) 42%,
+            color-mix(in srgb, var(--color-amber) 30%, transparent) 36%,
+            color-mix(in srgb, var(--color-amber-light) 30%, transparent) 42%,
             rgba(255, 255, 255, 0.2) 48%,
-            rgba(157, 143, 255, 0.3) 54%,
-            rgba(94, 79, 204, 0.3) 60%,
+            color-mix(in srgb, var(--color-amber-light) 30%, transparent) 54%,
+            color-mix(in srgb, var(--color-amber-dark) 30%, transparent) 60%,
             transparent 80%
           );
           background-size: 200% 200%;
@@ -300,7 +300,7 @@ export default function HolographicExperimentPage() {
           appearance: none;
           height: 4px;
           border-radius: 2px;
-          background: rgba(124, 106, 239, 0.15);
+          background: color-mix(in srgb, var(--color-amber) 15%, transparent);
           outline: none;
         }
 
@@ -310,22 +310,22 @@ export default function HolographicExperimentPage() {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: #7C6AEF;
+          background: var(--color-amber);
           cursor: pointer;
-          border: 2px solid #0C0D14;
+          border: 2px solid var(--color-bg);
         }
 
         .holo-slider::-moz-range-thumb {
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: #7C6AEF;
+          background: var(--color-amber);
           cursor: pointer;
-          border: 2px solid #0C0D14;
+          border: 2px solid var(--color-bg);
         }
 
         .holo-slider:focus-visible::-webkit-slider-thumb {
-          outline: 2px solid #7C6AEF;
+          outline: 2px solid var(--color-amber);
           outline-offset: 2px;
         }
       `}</style>
