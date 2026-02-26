@@ -11,8 +11,8 @@ afterEach(cleanup);
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
-  default: (props: Record<string, unknown>) => {
-    const { fill: _f, priority: _p, placeholder: _ph, blurDataURL: _b, ...rest } = props;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  default: ({ fill, priority, placeholder, blurDataURL, ...rest }: Record<string, unknown>) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...(rest as React.ImgHTMLAttributes<HTMLImageElement>)} />;
   },

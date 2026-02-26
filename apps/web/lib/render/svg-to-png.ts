@@ -8,7 +8,13 @@
 import { Resvg } from "@resvg/resvg-js";
 import { join } from "path";
 
-/** Font files bundled in public/fonts/ for server-side SVG rendering. */
+/**
+ * Font files co-located with the render module for server-side SVG rendering.
+ *
+ * These TTF files are ONLY used server-side by resvg (SVG-to-PNG conversion)
+ * and are intentionally NOT in `public/` to avoid exposing them to browsers.
+ * Browser fonts are loaded via `next/font/google` in layout.tsx.
+ */
 const FONT_FILES = [
   "PlusJakartaSans-Regular.ttf",
   "PlusJakartaSans-SemiBold.ttf",
@@ -19,11 +25,12 @@ const FONT_FILES = [
 /**
  * Resolve absolute paths to the bundled TTF font files.
  *
- * Uses `process.cwd()` which points to the Next.js app root both locally
- * and on Vercel serverless functions.
+ * Uses `path.join(__dirname, "fonts", ...)` so Next.js output file tracing
+ * can detect the dependency and include the font files in the serverless
+ * function bundle on Vercel.
  */
 export function getFontPaths(): string[] {
-  return FONT_FILES.map((f) => join(process.cwd(), "public", "fonts", f));
+  return FONT_FILES.map((f) => join(__dirname, "fonts", f));
 }
 
 /**
