@@ -72,10 +72,10 @@ const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewB
   },
 };
 
-const PLATFORM_URLS: Record<Platform, (handle: string) => string> = {
+// Only GitHub handle is guaranteed to match — linked platforms (Bitbucket,
+// Codeberg) may have different usernames, so we don't link to their profiles.
+const PLATFORM_URLS: Partial<Record<Platform, (handle: string) => string>> = {
   github: (handle) => `https://github.com/${handle}`,
-  bitbucket: (handle) => `https://bitbucket.org/${handle}`,
-  codeberg: (handle) => `https://codeberg.org/${handle}`,
 };
 
 interface DataSourcesProps {
@@ -98,15 +98,10 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
         {platforms.map((platform, i) => {
           const display = PLATFORM_DISPLAY[platform];
           if (!display) return null;
-          return (
-            <a
-              key={platform}
-              href={PLATFORM_URLS[platform](handle)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors hover:border-amber/30 hover:text-amber"
-              style={{ animationDelay: `${280 + i * 80}ms` }}
-            >
+          const urlBuilder = PLATFORM_URLS[platform];
+          const sharedClass = "inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors";
+          const inner = (
+            <>
               <svg
                 width="16"
                 height="16"
@@ -120,7 +115,27 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
               <span className="text-sm text-text-primary font-medium">
                 {display.label}
               </span>
+            </>
+          );
+          return urlBuilder ? (
+            <a
+              key={platform}
+              href={urlBuilder(handle)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${sharedClass} hover:border-amber/30 hover:text-amber`}
+              style={{ animationDelay: `${280 + i * 80}ms` }}
+            >
+              {inner}
             </a>
+          ) : (
+            <span
+              key={platform}
+              className={sharedClass}
+              style={{ animationDelay: `${280 + i * 80}ms` }}
+            >
+              {inner}
+            </span>
           );
         })}
       </div>

@@ -181,11 +181,22 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain("handle: string");
     });
 
-    it("renders platform chips as links", () => {
-      // DataSources should use <a> tags for clickable platform links
-      expect(SOURCE).toMatch(/<a\s/);
+    it("renders GitHub as a clickable link", () => {
       expect(SOURCE).toContain("github.com/");
-      expect(SOURCE).toContain("bitbucket.org/");
+      expect(SOURCE).toMatch(/<a\s/);
+    });
+
+    it("only links to GitHub profiles (non-GitHub handles may differ)", () => {
+      // PLATFORM_URLS should only contain github — linked platforms like
+      // bitbucket/codeberg have different usernames than the GitHub handle,
+      // so linking to bitbucket.org/{github-handle} would 404.
+      expect(SOURCE).toContain("github: (handle)");
+      // Extract just the PLATFORM_URLS block
+      const urlsStart = SOURCE.indexOf("PLATFORM_URLS");
+      const urlsEnd = SOURCE.indexOf("};", urlsStart);
+      const urlsBlock = SOURCE.slice(urlsStart, urlsEnd);
+      expect(urlsBlock).not.toContain("bitbucket");
+      expect(urlsBlock).not.toContain("codeberg");
     });
   });
 
