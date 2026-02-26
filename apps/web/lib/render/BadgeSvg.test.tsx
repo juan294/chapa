@@ -157,7 +157,7 @@ describe("renderBadgeSvg", () => {
   // ---------------------------------------------------------------------------
 
   describe("verified icon", () => {
-    it("contains a shield/checkmark icon", () => {
+    it("contains a shield/checkmark icon in non-demo mode", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("M12 1L3 5v6");
     });
@@ -181,6 +181,13 @@ describe("renderBadgeSvg", () => {
       // Shield should appear just before the subtitle in SVG source order
       expect(shieldIdx).toBeLessThan(subtitleIdx);
       expect(subtitleIdx - shieldIdx).toBeLessThan(400);
+    });
+
+    it("hides shield icon in demo mode (no duplicate shields)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), { demoMode: true });
+      // The verified shield path should NOT appear (avatar already has a shield)
+      expect(svg).not.toContain("M12 1L3 5v6");
+      expect(svg).toContain("Simulated metrics");
     });
   });
 

@@ -55,4 +55,13 @@ describe("renderBadgeBranding", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
     expect(svg).toContain("<path d=");
   });
+
+  it("renders logos before text (icons leading)", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
+    const logoIdx = svg.indexOf("M12 0C5.37"); // GitHub path
+    const textIdx = svg.indexOf("Built from your commitment");
+    expect(logoIdx).toBeGreaterThan(-1);
+    expect(textIdx).toBeGreaterThan(-1);
+    expect(logoIdx).toBeLessThan(textIdx);
+  });
 });

@@ -19,24 +19,25 @@ export function renderBadgeBranding(
   rightX: number,
   platforms: Platform[],
 ): string {
-  const logoSize = 14;
-  const logoGap = 8;
-  const textEndX = x + 275; // approximate width of "Built from your commitment" at 17px
-  const logosStartX = textEndX + 16;
+  const logoSize = 20; // ~same as old GitHub icon (scale 0.85 on 24px viewBox)
+  const logoGap = 10;
 
   // Sort platforms in canonical order
   const sorted = PLATFORM_ORDER.filter((p) => platforms.includes(p));
 
+  // Icons first (leading), then text
   const logosSvg = sorted
     .map((platform, i) => {
-      const logoX = logosStartX + i * (logoSize + logoGap);
+      const logoX = x + i * (logoSize + logoGap);
       const scale = (logoSize / 24).toFixed(4);
-      return `<g transform="translate(${logoX}, ${y - 2})"><path d="${PLATFORM_LOGOS[platform]}" fill="#9AA4B2" opacity="0.6" transform="scale(${scale})"/></g>`;
+      return `<g transform="translate(${logoX}, ${y - 2})"><path d="${PLATFORM_LOGOS[platform]}" fill="#9AA4B2" opacity="0.8" transform="scale(${scale})"/></g>`;
     })
     .join("\n    ");
 
+  const textStartX = x + sorted.length * (logoSize + logoGap) + 6;
+
   return `
-    <text x="${x}" y="${y + 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2" opacity="0.8">Built from your commitment</text>
     ${logosSvg}
+    <text x="${textStartX}" y="${y + 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2" opacity="0.8">Built from your commitment</text>
     <text x="${rightX}" y="${y + 12}" font-family="'JetBrains Mono', monospace" font-size="17" fill="#9AA4B2" opacity="0.8" text-anchor="end">chapa.thecreativetoken.com</text>`;
 }
