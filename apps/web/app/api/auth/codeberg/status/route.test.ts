@@ -8,10 +8,14 @@ const {
   mockIsCodebergEnabled,
   mockRequireSession,
   mockDbGetLinkedPlatforms,
+  mockRateLimit,
+  mockGetClientIp,
 } = vi.hoisted(() => ({
   mockIsCodebergEnabled: vi.fn(),
   mockRequireSession: vi.fn(),
   mockDbGetLinkedPlatforms: vi.fn(),
+  mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -24,6 +28,14 @@ vi.mock("@/lib/auth/require-session", () => ({
 
 vi.mock("@/lib/db/user-platforms", () => ({
   dbGetLinkedPlatforms: mockDbGetLinkedPlatforms,
+}));
+
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: mockGetClientIp,
 }));
 
 import { GET } from "./route";
@@ -58,6 +70,8 @@ describe("GET /api/auth/codeberg/status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsCodebergEnabled.mockResolvedValue(true);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+    mockGetClientIp.mockReturnValue("1.2.3.4");
     allowSession();
     mockDbGetLinkedPlatforms.mockResolvedValue([]);
   });
@@ -69,6 +83,13 @@ describe("GET /api/auth/codeberg/status", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ enabled: false });
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 21, limit: 20 });
+
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {

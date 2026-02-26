@@ -14,6 +14,8 @@ const {
   mockComputeTokenExpiry,
   mockDbUpsertLinkedPlatform,
   mockCacheDel,
+  mockRateLimit,
+  mockGetClientIp,
 } = vi.hoisted(() => ({
   mockIsCodebergEnabled: vi.fn(),
   mockRequireSession: vi.fn(),
@@ -24,6 +26,8 @@ const {
   mockComputeTokenExpiry: vi.fn(),
   mockDbUpsertLinkedPlatform: vi.fn(),
   mockCacheDel: vi.fn(),
+  mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -51,6 +55,11 @@ vi.mock("@/lib/db/user-platforms", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: mockCacheDel,
+  rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: mockGetClientIp,
 }));
 
 import { GET } from "./route";
@@ -100,6 +109,8 @@ function clearEnvVars() {
 
 function setupHappyPath() {
   mockIsCodebergEnabled.mockResolvedValue(true);
+  mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+  mockGetClientIp.mockReturnValue("1.2.3.4");
   allowSession();
   setEnvVars();
   mockValidateCodebergState.mockReturnValue(true);
@@ -143,6 +154,15 @@ describe("GET /api/auth/codeberg/callback", () => {
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_cb_oauth_state=xyz" }),
     );
     expect(res.status).toBe(404);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await GET(
+      makeRequest({ code: "abc", state: "xyz", cookie: "chapa_cb_oauth_state=xyz" }),
+    );
+    expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {

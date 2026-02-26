@@ -9,7 +9,8 @@ import {
 } from "@/lib/auth/codeberg";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
 import { dbUpsertLinkedPlatform } from "@/lib/db/user-platforms";
-import { cacheDel } from "@/lib/cache/redis";
+import { cacheDel, rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 
 export async function GET(request: NextRequest) {
   // 1. Feature flag check
@@ -17,14 +18,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // 2. Require authenticated session
+  // 2. Rate limit: 10 requests per IP per 15 minutes
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:cb:callback:${ip}`, 10, 900);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "900" } },
+    );
+  }
+
+  // 3. Require authenticated session
   const { session, error } = requireSession(request);
   if (error) return error;
 
   const handle = session.login;
   const errorRedirectBase = `/u/${handle}`;
 
-  // 3. Validate authorization code
+  // 4. Validate authorization code
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
     return NextResponse.redirect(
@@ -32,7 +43,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 4. Validate CSRF state
+  // 5. Validate CSRF state
   const queryState = request.nextUrl.searchParams.get("state");
   const cookieHeader = request.headers.get("cookie");
   if (!validateCodebergState(cookieHeader, queryState)) {
@@ -41,7 +52,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 5. Validate env vars
+  // 6. Validate env vars
   const clientId = process.env.CODEBERG_CLIENT_ID?.trim();
   const clientSecret = process.env.CODEBERG_CLIENT_SECRET?.trim();
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
@@ -51,7 +62,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 6. Exchange code for tokens
+  // 7. Exchange code for tokens
   const redirectUri = `${baseUrl}/api/auth/codeberg/callback`;
   const tokens = await exchangeCodebergCode(
     code,
@@ -65,7 +76,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 7. Fetch Codeberg user profile
+  // 8. Fetch Codeberg user profile
   const cbUser = await fetchCodebergUser(tokens.access_token);
   if (!cbUser) {
     return NextResponse.redirect(
@@ -73,7 +84,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 8. Store encrypted tokens in user_platforms
+  // 9. Store encrypted tokens in user_platforms
   // Handle optional expires_in: if absent, pass null for expiresAt
   const expiresAt = tokens.expires_in
     ? computeTokenExpiry(tokens.expires_in)
@@ -92,12 +103,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 9. Invalidate stats cache (force re-merge on next badge request)
+  // 10. Invalidate stats cache (force re-merge on next badge request)
   const lh = handle.toLowerCase();
   void cacheDel(`stats:v2:merged:${lh}`);
   void cacheDel(`stats:v2:codeberg:${lh}`);
 
-  // 10. Clear state cookie and redirect to share page
+  // 11. Clear state cookie and redirect to share page
   const response = NextResponse.redirect(
     new URL(`/u/${handle}?codeberg=linked`, request.url),
   );
