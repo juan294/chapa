@@ -1,5 +1,5 @@
 /** Supported platform identifiers */
-export type Platform = "github" | "bitbucket";
+export type Platform = "github" | "bitbucket" | "codeberg";
 
 /** Linked platform record (returned from DB, tokens excluded) */
 export interface LinkedPlatform {
