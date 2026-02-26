@@ -131,7 +131,7 @@ function rowToAdminUser(row: AdminUserRow): AdminUserEntry {
   return {
     handle: row.handle,
     displayName: row.display_name,
-    avatarUrl: row.avatar_url,
+    avatarUrl: row.avatar_url ?? `https://github.com/${row.handle}.png`,
     registeredAt: row.registered_at,
     lastSnapshotDate: row.snapshot_date,
     fetchedAt: row.snapshot_captured_at,

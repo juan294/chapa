@@ -281,6 +281,36 @@ describe("dbGetAdminUsers", () => {
     });
   });
 
+  it("falls back to GitHub avatar URL when avatar_url is null", async () => {
+    const row = makeAdminRow({
+      handle: "alice",
+      avatar_url: null,
+    });
+
+    terminalResolve = { data: [row], error: null, count: 1 };
+
+    const result = await dbGetAdminUsers(defaultQuery());
+
+    expect(result.users[0]!.avatarUrl).toBe(
+      "https://github.com/alice.png",
+    );
+  });
+
+  it("uses stored avatar_url when present", async () => {
+    const row = makeAdminRow({
+      handle: "bob",
+      avatar_url: "https://avatars.githubusercontent.com/u/123",
+    });
+
+    terminalResolve = { data: [row], error: null, count: 1 };
+
+    const result = await dbGetAdminUsers(defaultQuery());
+
+    expect(result.users[0]!.avatarUrl).toBe(
+      "https://avatars.githubusercontent.com/u/123",
+    );
+  });
+
   it("escapes percent signs in search terms", async () => {
     terminalResolve = { data: [], error: null, count: 0 };
 
