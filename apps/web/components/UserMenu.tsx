@@ -206,12 +206,17 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             {isBitbucketEnabledSync() && bbStatus && (
               bbStatus.linked ? (
                 <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-3">
+                  <a
+                    href={`https://bitbucket.org/${bbStatus.remoteLogin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 transition-colors hover:text-amber"
+                  >
                     <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
                     </svg>
                     <span className="text-sm text-text-primary">{bbStatus.remoteLogin}</span>
-                  </div>
+                  </a>
                   <button
                     onClick={() => setShowUnlinkConfirm(true)}
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
@@ -234,10 +239,15 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             {isCodebergEnabledSync() && cbStatus && (
               cbStatus.linked ? (
                 <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-3">
+                  <a
+                    href={`https://codeberg.org/${cbStatus.remoteLogin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 transition-colors hover:text-amber"
+                  >
                     <CodebergIcon />
                     <span className="text-sm text-text-primary">{cbStatus.remoteLogin}</span>
-                  </div>
+                  </a>
                   <button
                     onClick={() => setShowCbUnlinkConfirm(true)}
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"

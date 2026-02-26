@@ -142,6 +142,37 @@ describe("UserMenu — Codeberg integration", () => {
   });
 });
 
+describe("UserMenu — linked platform profile links", () => {
+  it("renders Bitbucket username as a clickable link to bitbucket.org profile", () => {
+    expect(SOURCE).toContain("https://bitbucket.org/");
+    // The link should include the remoteLogin in the href
+    expect(SOURCE).toContain("bbStatus.remoteLogin");
+    // Extract the Bitbucket linked state block
+    const bbLinkedStart = SOURCE.indexOf("bbStatus.linked ?");
+    const bbLinkedEnd = SOURCE.indexOf("Link Bitbucket");
+    const bbBlock = SOURCE.slice(bbLinkedStart, bbLinkedEnd);
+    expect(bbBlock).toContain("<a");
+    expect(bbBlock).toContain("bitbucket.org/");
+  });
+
+  it("renders Codeberg username as a clickable link to codeberg.org profile", () => {
+    expect(SOURCE).toContain("https://codeberg.org/");
+    // The link should include the remoteLogin in the href
+    expect(SOURCE).toContain("cbStatus.remoteLogin");
+    // Extract the Codeberg linked state block
+    const cbLinkedStart = SOURCE.indexOf("cbStatus.linked ?");
+    const cbLinkedEnd = SOURCE.indexOf("Link Codeberg");
+    const cbBlock = SOURCE.slice(cbLinkedStart, cbLinkedEnd);
+    expect(cbBlock).toContain("<a");
+    expect(cbBlock).toContain("codeberg.org/");
+  });
+
+  it("profile links open in new tab", () => {
+    expect(SOURCE).toContain('target="_blank"');
+    expect(SOURCE).toContain('rel="noopener noreferrer"');
+  });
+});
+
 describe("UserMenu — page refresh after unlink", () => {
   it("imports useRouter from next/navigation", () => {
     expect(SOURCE).toContain("useRouter");
