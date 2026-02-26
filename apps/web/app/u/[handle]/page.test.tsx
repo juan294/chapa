@@ -143,13 +143,9 @@ vi.mock("next/navigation", () => ({
   notFound: () => { mockNotFound(); throw new Error("NOT_FOUND"); },
 }));
 
-// Mock next/dynamic to return a no-op component
-vi.mock("next/dynamic", () => ({
-  default: () => {
-    const Stub = () => null;
-    Stub.displayName = "DynamicStub";
-    return Stub;
-  },
+// Mock the lazy-loaded GlobalCommandBar wrapper
+vi.mock("@/components/GlobalCommandBarLazy", () => ({
+  GlobalCommandBarLazy: () => null,
 }));
 
 // Mock components to return simple elements

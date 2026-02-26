@@ -12,7 +12,6 @@ import { isValidHandle } from "@/lib/validation";
 import { cacheGet, trackBadgeGenerated } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -30,11 +29,7 @@ import type { VerificationRecord } from "@/lib/verification/types";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
-
-const GlobalCommandBarLazy = dynamic(
-  () => import("@/components/GlobalCommandBar").then(m => ({ default: m.GlobalCommandBar })),
-  { ssr: false },
-);
+import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 
 const BASE_URL = getBaseUrl();
 
