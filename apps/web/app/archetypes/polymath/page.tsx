@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 const badgeSvg = renderBadgeSvg(POLYMATH_STATS, POLYMATH_IMPACT, {
-  includeGithubBranding: true,
+  includeBranding: true,
   demoMode: true,
 });
 

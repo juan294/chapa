@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 const badgeSvg = renderBadgeSvg(EMERGING_STATS, EMERGING_IMPACT, {
-  includeGithubBranding: true,
+  includeBranding: true,
   demoMode: true,
 });
 
