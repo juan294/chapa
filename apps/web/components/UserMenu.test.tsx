@@ -85,3 +85,113 @@ describe("UserMenu — Bitbucket integration", () => {
     expect(SOURCE).toContain('variant="destructive"');
   });
 });
+
+describe("UserMenu — Codeberg integration", () => {
+  it("imports isCodebergEnabledSync from feature-flags", () => {
+    expect(SOURCE).toContain("isCodebergEnabledSync");
+    expect(SOURCE).toContain("@/lib/feature-flags");
+  });
+
+  it("fetches Codeberg status on mount when feature enabled", () => {
+    expect(SOURCE).toContain("/api/auth/codeberg/status");
+    expect(SOURCE).toContain("isCodebergEnabledSync()");
+  });
+
+  it("renders Link Codeberg item conditionally on feature flag", () => {
+    expect(SOURCE).toContain("isCodebergEnabledSync()");
+    expect(SOURCE).toContain("Link Codeberg");
+    expect(SOURCE).toContain('href="/api/auth/codeberg/connect"');
+  });
+
+  it("renders Codeberg linked state with remoteLogin and Unlink button", () => {
+    expect(SOURCE).toContain("cbStatus.remoteLogin");
+    expect(SOURCE).toContain("/api/auth/codeberg/disconnect");
+    expect(SOURCE).toContain("showCbUnlinkConfirm");
+  });
+
+  it("uses inline Codeberg SVG logo (no icon library)", () => {
+    // The Codeberg mountain logo path is distinctive
+    expect(SOURCE).toContain("M11.955.49");
+    expect(SOURCE).toContain("CodebergIcon");
+  });
+
+  it("Codeberg section appears after Bitbucket and before Admin Panel", () => {
+    const bitbucketIdx = SOURCE.indexOf("Link Bitbucket");
+    const codebergIdx = SOURCE.indexOf("Link Codeberg");
+    const adminIdx = SOURCE.indexOf("Admin Panel");
+    expect(bitbucketIdx).toBeLessThan(codebergIdx);
+    expect(codebergIdx).toBeLessThan(adminIdx);
+  });
+
+  it("Codeberg unlink opens confirmation dialog instead of directly unlinking", () => {
+    expect(SOURCE).toContain("setShowCbUnlinkConfirm(true)");
+    expect(SOURCE).toContain("open={showCbUnlinkConfirm}");
+  });
+
+  it("ConfirmDialog has correct props for Codeberg unlink", () => {
+    expect(SOURCE).toContain('title="Unlink Codeberg?"');
+    expect(SOURCE).toContain('confirmLabel="Unlink"');
+    expect(SOURCE).toContain("handleUnlinkCodeberg");
+    expect(SOURCE).toContain("cbUnlinkLoading");
+  });
+
+  it("Codeberg unlink handler calls disconnect endpoint", () => {
+    expect(SOURCE).toContain("/api/auth/codeberg/disconnect");
+    expect(SOURCE).toContain("setCbStatus");
+    expect(SOURCE).toContain("setCbUnlinkLoading");
+  });
+});
+
+describe("UserMenu — linked platform profile links", () => {
+  it("renders Bitbucket username as a clickable link to bitbucket.org profile", () => {
+    expect(SOURCE).toContain("https://bitbucket.org/");
+    // The link should include the remoteLogin in the href
+    expect(SOURCE).toContain("bbStatus.remoteLogin");
+    // Extract the Bitbucket linked state block
+    const bbLinkedStart = SOURCE.indexOf("bbStatus.linked ?");
+    const bbLinkedEnd = SOURCE.indexOf("Link Bitbucket");
+    const bbBlock = SOURCE.slice(bbLinkedStart, bbLinkedEnd);
+    expect(bbBlock).toContain("<a");
+    expect(bbBlock).toContain("bitbucket.org/");
+  });
+
+  it("renders Codeberg username as a clickable link to codeberg.org profile", () => {
+    expect(SOURCE).toContain("https://codeberg.org/");
+    // The link should include the remoteLogin in the href
+    expect(SOURCE).toContain("cbStatus.remoteLogin");
+    // Extract the Codeberg linked state block
+    const cbLinkedStart = SOURCE.indexOf("cbStatus.linked ?");
+    const cbLinkedEnd = SOURCE.indexOf("Link Codeberg");
+    const cbBlock = SOURCE.slice(cbLinkedStart, cbLinkedEnd);
+    expect(cbBlock).toContain("<a");
+    expect(cbBlock).toContain("codeberg.org/");
+  });
+
+  it("profile links open in new tab", () => {
+    expect(SOURCE).toContain('target="_blank"');
+    expect(SOURCE).toContain('rel="noopener noreferrer"');
+  });
+});
+
+describe("UserMenu — page refresh after unlink", () => {
+  it("imports useRouter from next/navigation", () => {
+    expect(SOURCE).toContain("useRouter");
+    expect(SOURCE).toContain("next/navigation");
+  });
+
+  it("calls router.refresh() after successful Bitbucket unlink", () => {
+    // Extract the handleUnlinkBitbucket function body
+    const fnStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
+    const fnEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const fnBody = SOURCE.slice(fnStart, fnEnd);
+    expect(fnBody).toContain("router.refresh()");
+  });
+
+  it("calls router.refresh() after successful Codeberg unlink", () => {
+    // Extract the handleUnlinkCodeberg function body
+    const fnStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const fnEnd = SOURCE.indexOf("const fallbackLetter");
+    const fnBody = SOURCE.slice(fnStart, fnEnd);
+    expect(fnBody).toContain("router.refresh()");
+  });
+});

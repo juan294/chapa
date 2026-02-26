@@ -65,11 +65,19 @@ const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewB
     svgPath: "M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z",
     viewBox: "0 0 24 24",
   },
+  codeberg: {
+    label: "Codeberg",
+    svgPath: "M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z",
+    viewBox: "0 0 24 24",
+  },
 };
 
-const PLATFORM_URLS: Record<Platform, (handle: string) => string> = {
-  github: (handle) => `https://github.com/${handle}`,
-  bitbucket: (handle) => `https://bitbucket.org/${handle}`,
+// URL builders per platform. GitHub uses the main handle; Bitbucket/Codeberg
+// use the platform-specific username from linkedPlatformLogins.
+const PLATFORM_URLS: Partial<Record<Platform, (username: string) => string>> = {
+  github: (username) => `https://github.com/${username}`,
+  bitbucket: (username) => `https://bitbucket.org/${username}`,
+  codeberg: (username) => `https://codeberg.org/${username}`,
 };
 
 interface DataSourcesProps {
@@ -92,15 +100,15 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
         {platforms.map((platform, i) => {
           const display = PLATFORM_DISPLAY[platform];
           if (!display) return null;
-          return (
-            <a
-              key={platform}
-              href={PLATFORM_URLS[platform](handle)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors hover:border-amber/30 hover:text-amber"
-              style={{ animationDelay: `${280 + i * 80}ms` }}
-            >
+          const urlBuilder = PLATFORM_URLS[platform];
+          // GitHub uses the main handle; linked platforms use their own username
+          const username = platform === "github"
+            ? handle
+            : stats.linkedPlatformLogins?.[platform];
+          const href = urlBuilder && username ? urlBuilder(username) : null;
+          const sharedClass = "inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors";
+          const inner = (
+            <>
               <svg
                 width="16"
                 height="16"
@@ -114,7 +122,27 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
               <span className="text-sm text-text-primary font-medium">
                 {display.label}
               </span>
+            </>
+          );
+          return href ? (
+            <a
+              key={platform}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${sharedClass} hover:border-amber/30 hover:text-amber`}
+              style={{ animationDelay: `${280 + i * 80}ms` }}
+            >
+              {inner}
             </a>
+          ) : (
+            <span
+              key={platform}
+              className={sharedClass}
+              style={{ animationDelay: `${280 + i * 80}ms` }}
+            >
+              {inner}
+            </span>
           );
         })}
       </div>

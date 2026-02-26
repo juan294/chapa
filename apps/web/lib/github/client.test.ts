@@ -11,24 +11,30 @@ const {
   mockCacheSet,
   mockDbUpsertUser,
   mockIsBitbucketEnabled,
+  mockIsCodebergEnabled,
   mockDbGetLinkedPlatform,
   mockDbDeleteLinkedPlatform,
   mockDbUpdatePlatformTokens,
   mockIsTokenExpired,
   mockRefreshBitbucketToken,
   mockFetchBitbucketStats,
+  mockRefreshCodebergToken,
+  mockFetchCodebergStats,
 } = vi.hoisted(() => ({
   mockFetchStatsData: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockDbUpsertUser: vi.fn(() => Promise.resolve()),
   mockIsBitbucketEnabled: vi.fn(),
+  mockIsCodebergEnabled: vi.fn(),
   mockDbGetLinkedPlatform: vi.fn(),
   mockDbDeleteLinkedPlatform: vi.fn(),
   mockDbUpdatePlatformTokens: vi.fn(),
   mockIsTokenExpired: vi.fn(),
   mockRefreshBitbucketToken: vi.fn(),
   mockFetchBitbucketStats: vi.fn(),
+  mockRefreshCodebergToken: vi.fn(),
+  mockFetchCodebergStats: vi.fn(),
 }));
 
 vi.mock("./stats", () => ({
@@ -46,6 +52,7 @@ vi.mock("@/lib/db/users", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   isBitbucketEnabled: mockIsBitbucketEnabled,
+  isCodebergEnabled: mockIsCodebergEnabled,
 }));
 
 vi.mock("@/lib/db/user-platforms", () => ({
@@ -61,6 +68,14 @@ vi.mock("@/lib/auth/bitbucket", () => ({
 
 vi.mock("@/lib/bitbucket/stats", () => ({
   fetchBitbucketStats: mockFetchBitbucketStats,
+}));
+
+vi.mock("@/lib/auth/codeberg", () => ({
+  refreshCodebergToken: mockRefreshCodebergToken,
+}));
+
+vi.mock("@/lib/codeberg/stats", () => ({
+  fetchCodebergStats: mockFetchCodebergStats,
 }));
 
 import { getStats, _resetInflight } from "./client";
@@ -89,9 +104,11 @@ function setupCacheMiss(githubStats: StatsData) {
     .mockResolvedValueOnce(null) // stats:v2:merged:test-user (primary)
     .mockResolvedValueOnce(null) // stats:stale:test-user (stale fallback)
     .mockResolvedValueOnce(null) // stats:v2:bitbucket:test-user (bitbucket cache)
+    .mockResolvedValueOnce(null) // stats:v2:codeberg:test-user (codeberg cache)
     .mockResolvedValueOnce(null); // supplemental:test-user
   mockFetchStatsData.mockResolvedValue(githubStats);
   mockIsBitbucketEnabled.mockResolvedValue(false);
+  mockIsCodebergEnabled.mockResolvedValue(false);
 }
 
 function setupBitbucketLinked(bbStats: StatsData | null) {
@@ -117,6 +134,7 @@ describe("getStats", () => {
     vi.clearAllMocks();
     mockCacheSet.mockResolvedValue(undefined);
     mockIsBitbucketEnabled.mockResolvedValue(false);
+    mockIsCodebergEnabled.mockResolvedValue(false);
     mockDbGetLinkedPlatform.mockResolvedValue(null);
     mockDbDeleteLinkedPlatform.mockResolvedValue(true);
     mockDbUpdatePlatformTokens.mockResolvedValue(true);
@@ -129,6 +147,39 @@ describe("getStats", () => {
 
     const result = await getStats("test-user");
     expect(result).toEqual(cached);
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
+  });
+
+  it("enriches cached stats with linkedPlatformLogins when missing", async () => {
+    // Simulate pre-deploy cached data: has linkedPlatforms but no linkedPlatformLogins
+    const cached = makeStats({
+      linkedPlatforms: ["bitbucket", "codeberg"],
+    });
+    mockCacheGet.mockResolvedValue(cached);
+    mockDbGetLinkedPlatform.mockImplementation(
+      (_handle: string, platform: string) => {
+        if (platform === "bitbucket") {
+          return Promise.resolve({
+            remoteLogin: "bb-user",
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        }
+        if (platform === "codeberg") {
+          return Promise.resolve({
+            remoteLogin: "cb-user",
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        }
+        return Promise.resolve(null);
+      },
+    );
+
+    const result = await getStats("test-user");
+
+    expect(result!.linkedPlatformLogins).toEqual({
+      bitbucket: "bb-user",
+      codeberg: "cb-user",
+    });
     expect(mockFetchStatsData).not.toHaveBeenCalled();
   });
 
@@ -156,6 +207,7 @@ describe("getStats", () => {
       .mockResolvedValueOnce(null) // merged
       .mockResolvedValueOnce(null) // stale
       .mockResolvedValueOnce(null) // bitbucket cache
+      .mockResolvedValueOnce(null) // codeberg cache
       .mockResolvedValueOnce(null); // supplemental
     mockFetchStatsData.mockResolvedValue(fresh);
     mockIsBitbucketEnabled.mockResolvedValue(false);
@@ -198,6 +250,7 @@ describe("getStats", () => {
       .mockResolvedValueOnce(null) // merged
       .mockResolvedValueOnce(null) // stale
       .mockResolvedValueOnce(null) // bitbucket cache
+      .mockResolvedValueOnce(null) // codeberg cache
       .mockResolvedValueOnce(supplemental); // supplemental hit
     mockFetchStatsData.mockResolvedValue(primary);
     mockIsBitbucketEnabled.mockResolvedValue(false);
@@ -233,6 +286,7 @@ describe("getStats", () => {
       .mockResolvedValueOnce(null) // merged
       .mockResolvedValueOnce(null) // stale
       .mockResolvedValueOnce(null) // bitbucket cache
+      .mockResolvedValueOnce(null) // codeberg cache
       .mockResolvedValueOnce(supplemental);
     mockFetchStatsData.mockResolvedValue(primary);
     mockIsBitbucketEnabled.mockResolvedValue(false);
@@ -352,6 +406,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged miss
         .mockResolvedValueOnce(stale) // stale exists
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // no supplemental
       mockFetchStatsData.mockResolvedValue(fresh); // API succeeds
       mockIsBitbucketEnabled.mockResolvedValue(false);
@@ -513,6 +568,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       setupBitbucketLinked(bb);
@@ -540,6 +596,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       mockIsBitbucketEnabled.mockResolvedValue(true);
@@ -559,16 +616,23 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(cachedBb) // bitbucket cache HIT
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
 
       const result = await getStats("test-user");
 
       expect(result!.commitsTotal).toBe(80);
-      // Should NOT have called the DB or fetch — used cache
-      expect(mockDbGetLinkedPlatform).not.toHaveBeenCalled();
+      // Should NOT have called fetch — used cache for stats
       expect(mockFetchBitbucketStats).not.toHaveBeenCalled();
+      // DB is called once to resolve the remote username for profile URL
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "bitbucket");
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
     });
 
     it("refreshes expired token before fetching", async () => {
@@ -579,6 +643,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       mockIsBitbucketEnabled.mockResolvedValue(true);
@@ -629,6 +694,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       mockIsBitbucketEnabled.mockResolvedValue(true);
@@ -666,6 +732,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       setupBitbucketLinked(bb);
@@ -673,6 +740,24 @@ describe("getStats", () => {
       const result = await getStats("test-user");
 
       expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+    });
+
+    it("sets linkedPlatformLogins with Bitbucket remote username", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 30 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      setupBitbucketLinked(bb);
+
+      const result = await getStats("test-user");
+
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
     });
 
     it("does NOT set hasSupplementalData when only Bitbucket is merged", async () => {
@@ -683,6 +768,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // no supplemental
       mockFetchStatsData.mockResolvedValue(github);
       setupBitbucketLinked(bb);
@@ -707,6 +793,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(supplemental); // supplemental hit
       mockFetchStatsData.mockResolvedValue(github);
       setupBitbucketLinked(bb);
@@ -736,6 +823,7 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null) // merged
         .mockResolvedValueOnce(null) // stale
         .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       setupBitbucketLinked(bb);
@@ -745,6 +833,373 @@ describe("getStats", () => {
       expect(mockCacheSet).toHaveBeenCalledWith(
         "stats:v2:bitbucket:test-user",
         bb,
+        21600,
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Codeberg integration
+  // -----------------------------------------------------------------------
+
+  describe("Codeberg integration", () => {
+    it("fetches and merges Codeberg data when platform is linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "cb-token",
+          refreshToken: "cb-refresh",
+          expiresAt: new Date("2027-12-31"),
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(false);
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      const result = await getStats("test-user");
+
+      expect(result).not.toBeNull();
+      expect(result!.commitsTotal).toBe(75); // 50 + 25
+      expect(mockFetchCodebergStats).toHaveBeenCalledWith(
+        "cb-user",
+        "cb-token",
+        { displayName: "cb-user", avatarUrl: "" },
+      );
+    });
+
+    it("skips Codeberg when feature flag is disabled", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      setupCacheMiss(github);
+      // isCodebergEnabled already returns false from setupCacheMiss
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(50);
+      expect(mockFetchCodebergStats).not.toHaveBeenCalled();
+    });
+
+    it("skips Codeberg when not linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue(null); // not linked
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(50);
+      expect(mockFetchCodebergStats).not.toHaveBeenCalled();
+    });
+
+    it("serves cached Codeberg stats", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cachedCb = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(cachedCb) // codeberg cache HIT
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(75); // 50 + 25
+      // Should NOT have checked feature flag or DB — used cache
+      expect(mockIsCodebergEnabled).not.toHaveBeenCalled();
+      expect(mockFetchCodebergStats).not.toHaveBeenCalled();
+    });
+
+    it("refreshes expired Codeberg token", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "expired-token",
+          refreshToken: "cb-refresh",
+          expiresAt: new Date("2020-01-01"), // expired
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockRefreshCodebergToken.mockResolvedValue({
+        access_token: "new-cb-token",
+        refresh_token: "new-cb-refresh",
+        expires_in: 7200,
+        token_type: "bearer",
+      });
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      vi.stubEnv("CODEBERG_CLIENT_ID", "cb-client-id");
+      vi.stubEnv("CODEBERG_CLIENT_SECRET", "cb-client-secret");
+
+      const result = await getStats("test-user");
+
+      expect(mockRefreshCodebergToken).toHaveBeenCalledWith(
+        "cb-refresh",
+        "cb-client-id",
+        "cb-client-secret",
+      );
+      expect(mockDbUpdatePlatformTokens).toHaveBeenCalled();
+      expect(mockFetchCodebergStats).toHaveBeenCalledWith(
+        "cb-user",
+        "new-cb-token",
+        { displayName: "cb-user", avatarUrl: "" },
+      );
+      expect(result!.commitsTotal).toBe(75);
+
+      vi.unstubAllEnvs();
+    });
+
+    it("unlinks Codeberg when refresh fails", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "expired-token",
+          refreshToken: "cb-refresh",
+          expiresAt: new Date("2020-01-01"),
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockRefreshCodebergToken.mockResolvedValue(null); // refresh failed
+
+      vi.stubEnv("CODEBERG_CLIENT_ID", "cb-client-id");
+      vi.stubEnv("CODEBERG_CLIENT_SECRET", "cb-client-secret");
+
+      const result = await getStats("test-user");
+
+      expect(mockDbDeleteLinkedPlatform).toHaveBeenCalledWith(
+        "test-user",
+        "codeberg",
+      );
+      expect(result!.commitsTotal).toBe(50); // GitHub-only
+
+      vi.unstubAllEnvs();
+    });
+
+    it("handles long-lived token (no expiry, no refresh_token)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "long-lived-token",
+          refreshToken: null,
+          expiresAt: null, // no expiry
+        },
+      });
+      // isTokenExpired(null) returns true, but the code should proceed anyway
+      mockIsTokenExpired.mockReturnValue(true);
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      const result = await getStats("test-user");
+
+      // Should NOT have tried to refresh or unlink
+      expect(mockRefreshCodebergToken).not.toHaveBeenCalled();
+      expect(mockDbDeleteLinkedPlatform).not.toHaveBeenCalled();
+      // Should have used the original token
+      expect(mockFetchCodebergStats).toHaveBeenCalledWith(
+        "cb-user",
+        "long-lived-token",
+        { displayName: "cb-user", avatarUrl: "" },
+      );
+      expect(result!.commitsTotal).toBe(75);
+    });
+
+    it("sets linkedPlatforms to ['codeberg'] when only Codeberg linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "cb-token",
+          refreshToken: null,
+          expiresAt: null,
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true); // null → true
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      const result = await getStats("test-user");
+
+      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+    });
+
+    it("sets linkedPlatforms to ['bitbucket', 'codeberg'] when both linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 20 });
+      const cb = makeStats({ commitsTotal: 15 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      // Return different linked data based on platform argument
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          if (platform === "bitbucket") {
+            return Promise.resolve({
+              remoteLogin: "bb-user",
+              tokens: {
+                accessToken: "bb-token",
+                refreshToken: "bb-refresh",
+                expiresAt: new Date("2027-12-31"),
+              },
+            });
+          }
+          if (platform === "codeberg") {
+            return Promise.resolve({
+              remoteLogin: "cb-user",
+              tokens: {
+                accessToken: "cb-token",
+                refreshToken: null,
+                expiresAt: null,
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+      mockFetchBitbucketStats.mockResolvedValue(bb);
+      // isTokenExpired is called twice: once for bb (not expired), once for cb (null → true)
+      mockIsTokenExpired
+        .mockReturnValueOnce(false) // bitbucket: not expired
+        .mockReturnValueOnce(true); // codeberg: null → true
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(85); // 50 + 20 + 15
+      expect(result!.linkedPlatforms).toEqual(["bitbucket", "codeberg"]);
+      expect(result!.linkedPlatformLogins).toEqual({
+        bitbucket: "bb-user",
+        codeberg: "cb-user",
+      });
+    });
+
+    it("handles Codeberg fetch failure gracefully (returns GitHub-only)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "cb-token",
+          refreshToken: null,
+          expiresAt: null,
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockFetchCodebergStats.mockResolvedValue(null); // fetch failed
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(50); // GitHub-only
+      expect(result!.linkedPlatforms).toBeUndefined();
+    });
+
+    it("caches Codeberg stats separately", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "cb-token",
+          refreshToken: null,
+          expiresAt: null,
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:codeberg:test-user",
+        cb,
         21600,
       );
     });

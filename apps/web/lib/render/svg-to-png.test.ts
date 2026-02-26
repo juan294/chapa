@@ -40,7 +40,7 @@ describe("getFontPaths", () => {
     expect(paths).toHaveLength(4);
     for (const p of paths) {
       expect(p).toMatch(/\.ttf$/);
-      expect(p).toContain("public/fonts/");
+      expect(p).toContain("lib/render/fonts/");
     }
   });
 

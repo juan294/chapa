@@ -181,11 +181,34 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain("handle: string");
     });
 
-    it("renders platform chips as links", () => {
-      // DataSources should use <a> tags for clickable platform links
-      expect(SOURCE).toMatch(/<a\s/);
+    it("renders GitHub as a clickable link", () => {
       expect(SOURCE).toContain("github.com/");
+      expect(SOURCE).toMatch(/<a\s/);
+    });
+
+    it("has URL builders for all three platforms", () => {
+      // PLATFORM_URLS should contain builders for github, bitbucket, and codeberg.
+      // Bitbucket/Codeberg use the platform-specific username from linkedPlatformLogins.
+      const urlsStart = SOURCE.indexOf("PLATFORM_URLS");
+      const urlsEnd = SOURCE.indexOf("};", urlsStart);
+      const urlsBlock = SOURCE.slice(urlsStart, urlsEnd);
+      expect(urlsBlock).toContain("github");
+      expect(urlsBlock).toContain("bitbucket");
+      expect(urlsBlock).toContain("codeberg");
+    });
+
+    it("uses linkedPlatformLogins for platform-specific usernames", () => {
+      // DataSources must read stats.linkedPlatformLogins to resolve the correct
+      // username per platform (GitHub handle !== Bitbucket/Codeberg username).
+      expect(SOURCE).toContain("linkedPlatformLogins");
+    });
+
+    it("builds Bitbucket profile URL with bitbucket.org", () => {
       expect(SOURCE).toContain("bitbucket.org/");
+    });
+
+    it("builds Codeberg profile URL with codeberg.org", () => {
+      expect(SOURCE).toContain("codeberg.org/");
     });
   });
 

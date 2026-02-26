@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync, isBitbucketEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -15,6 +16,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
+  const router = useRouter();
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -26,14 +28,30 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkLoading, setUnlinkLoading] = useState(false);
 
+  const [cbStatus, setCbStatus] = useState<{
+    linked: boolean;
+    remoteLogin: string | null;
+  } | null>(null);
+  const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
+  const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
+
   useEffect(() => {
-    if (!isBitbucketEnabledSync()) return;
-    fetch("/api/auth/bitbucket/status")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.enabled) setBbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
-      })
-      .catch(() => {}); // Graceful — menu works without status
+    if (isBitbucketEnabledSync()) {
+      fetch("/api/auth/bitbucket/status")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.enabled) setBbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
+        })
+        .catch(() => {}); // Graceful — menu works without status
+    }
+    if (isCodebergEnabledSync()) {
+      fetch("/api/auth/codeberg/status")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.enabled) setCbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
+        })
+        .catch(() => {}); // Graceful
+    }
   }, []);
 
   async function handleUnlinkBitbucket() {
@@ -43,11 +61,28 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       if (res.ok) {
         setBbStatus({ linked: false, remoteLogin: null });
         setShowUnlinkConfirm(false);
+        router.refresh();
       }
     } catch {
       // Graceful failure — user can try again
     } finally {
       setUnlinkLoading(false);
+    }
+  }
+
+  async function handleUnlinkCodeberg() {
+    setCbUnlinkLoading(true);
+    try {
+      const res = await fetch("/api/auth/codeberg/disconnect", { method: "POST" });
+      if (res.ok) {
+        setCbStatus({ linked: false, remoteLogin: null });
+        setShowCbUnlinkConfirm(false);
+        router.refresh();
+      }
+    } catch {
+      // Graceful failure
+    } finally {
+      setCbUnlinkLoading(false);
     }
   }
 
@@ -171,12 +206,17 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             {isBitbucketEnabledSync() && bbStatus && (
               bbStatus.linked ? (
                 <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
-                  <div className="flex items-center gap-3">
+                  <a
+                    href={`https://bitbucket.org/${bbStatus.remoteLogin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 transition-colors hover:text-amber"
+                  >
                     <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
                     </svg>
                     <span className="text-sm text-text-primary">{bbStatus.remoteLogin}</span>
-                  </div>
+                  </a>
                   <button
                     onClick={() => setShowUnlinkConfirm(true)}
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
@@ -193,6 +233,35 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                     <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
                   </svg>
                   Link Bitbucket
+                </a>
+              )
+            )}
+            {isCodebergEnabledSync() && cbStatus && (
+              cbStatus.linked ? (
+                <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
+                  <a
+                    href={`https://codeberg.org/${cbStatus.remoteLogin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 transition-colors hover:text-amber"
+                  >
+                    <CodebergIcon />
+                    <span className="text-sm text-text-primary">{cbStatus.remoteLogin}</span>
+                  </a>
+                  <button
+                    onClick={() => setShowCbUnlinkConfirm(true)}
+                    className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
+                  >
+                    Unlink
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/codeberg/connect"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
+                >
+                  <CodebergIcon />
+                  Link Codeberg
                 </a>
               )
             )}
@@ -327,6 +396,25 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         onConfirm={handleUnlinkBitbucket}
         onCancel={() => setShowUnlinkConfirm(false)}
       />
+      <ConfirmDialog
+        open={showCbUnlinkConfirm}
+        title="Unlink Codeberg?"
+        description="Your Codeberg stats will no longer be included in your impact score. You can re-link anytime."
+        confirmLabel="Unlink"
+        cancelLabel="Cancel"
+        variant="destructive"
+        loading={cbUnlinkLoading}
+        onConfirm={handleUnlinkCodeberg}
+        onCancel={() => setShowCbUnlinkConfirm(false)}
+      />
     </div>
+  );
+}
+
+function CodebergIcon() {
+  return (
+    <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
+    </svg>
   );
 }
