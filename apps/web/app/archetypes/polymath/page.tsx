@@ -54,7 +54,7 @@ export default function PolymathPage() {
                 Some developers go deep. Polymaths go wide. They&apos;re the ones with
                 contributions scattered across 10 different repositories, pull requests that range
                 from backend API changes to documentation fixes to DevOps pipeline improvements.
-                Their GitHub profile reads less like a specialist&apos;s resume and more like a map
+                Their contribution profile reads less like a specialist&apos;s resume and more like a map
                 of everywhere interesting things are happening.
               </p>
 

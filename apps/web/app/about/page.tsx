@@ -42,7 +42,7 @@ export default function AboutPage() {
 
             <p>
               Chapa generates a live, embeddable SVG badge that decodes your
-              developer impact from GitHub activity. It analyzes your
+              developer impact from your linked platforms. It analyzes your
               last 12 months across four independent dimensions to show what kind
               of developer you are.
             </p>
@@ -80,7 +80,7 @@ export default function AboutPage() {
               Privacy and fairness
             </h2>
             <p>
-              Chapa only requests access to public GitHub data. Confidence
+              Chapa only requests access to public data from your linked platforms. Confidence
               messaging is designed to surface patterns without making
               accusations. The scoring model is built to reward genuine
               contribution and resist gaming — volume alone does not

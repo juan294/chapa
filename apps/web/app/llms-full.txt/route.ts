@@ -6,7 +6,7 @@ This is the extended documentation for AI models and LLM crawlers. For a concise
 
 ## Overview
 
-Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their GitHub activity. Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of GitHub data across four independent dimensions to produce a nuanced developer impact profile. Each badge includes a cryptographic verification hash (HMAC-SHA256) proving the data hasn't been tampered with.
+Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four independent dimensions to produce a nuanced developer impact profile. Each badge includes a cryptographic verification hash (HMAC-SHA256) proving the data hasn't been tampered with.
 
 ## Scoring Model: Impact v4
 
@@ -84,7 +84,7 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS, Upstash Redis for cac
 
 ## Data & Privacy
 
-- Only public GitHub data is analyzed. No private repository access.
+- Only public data from linked platforms is analyzed. No private repository access.
 - Scores cached 24 hours, then recomputed from fresh data.
 - No personal data sold or shared with third parties.
 - Full privacy policy: https://chapa.thecreativetoken.com/privacy
@@ -92,7 +92,7 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS, Upstash Redis for cac
 
 ## Related Topics
 
-GitHub developer metrics, GitHub contribution analytics, developer impact score, GitHub profile badge, developer portfolio badge, GitHub stats SVG, open source contribution metrics, code review metrics, developer archetype classification, GitHub activity analysis, developer impact measurement, engineering metrics, developer productivity tools, GitHub README badges, contribution visualization.
+developer metrics, multi-platform developer badge, developer impact score, GitHub profile badge, Bitbucket developer metrics, Codeberg developer metrics, developer portfolio badge, developer stats SVG, open source contribution metrics, code review metrics, developer archetype classification, developer activity analysis, developer impact measurement, engineering metrics, developer productivity tools, README badges, contribution visualization.
 
 ## Contact
 

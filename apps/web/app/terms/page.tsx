@@ -42,18 +42,20 @@ export default function TermsPage() {
             </h2>
             <p>
               Chapa provides a developer impact scoring and badge generation
-              service using publicly available GitHub data. The service is
+              service using publicly available data from linked developer
+              platforms (GitHub, Bitbucket, Codeberg). The service is
               provided &quot;as is&quot; without warranties of any kind.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              3. GitHub Data Usage
+              3. Platform Data Usage
             </h2>
             <p>
-              Chapa accesses your public GitHub profile and activity data
-              through the GitHub API. We only request read access to public
-              information. We do not access private repositories or private
-              profile data.
+              Chapa accesses your public profile and activity data through
+              the APIs of linked platforms (GitHub, Bitbucket, Codeberg).
+              We only request read access to public information. We do not
+              access private repositories or private profile data on any
+              platform.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">

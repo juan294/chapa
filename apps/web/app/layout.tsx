@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s — Chapa",
   },
   description:
-    "Your developer impact, decoded into four dimensions — Delivery, Quality, Consistency, Breadth — from 12 months of GitHub activity. Live, embeddable SVG badge.",
+    "Your developer impact, decoded into four dimensions — Delivery, Quality, Consistency, Breadth — from 12 months of development activity. Live, embeddable SVG badge.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     siteName: "Chapa",
     title: "Chapa — Developer Impact, Decoded",
     description:
-      "Your developer impact, decoded into four dimensions from 12 months of GitHub activity. Live, embeddable SVG badge.",
+      "Your developer impact, decoded into four dimensions from 12 months of development activity. Live, embeddable SVG badge.",
     url: BASE_URL,
     images: [
       {
@@ -93,11 +93,11 @@ export default function RootLayout({
               name: "Chapa",
               url: BASE_URL,
               description:
-                "Developer impact badge tool that analyzes 12 months of GitHub activity across four dimensions — Delivery, Quality, Consistency, and Breadth — to generate a live, embeddable SVG badge with archetype classification and impact scoring.",
+                "Developer impact badge tool that analyzes 12 months of development activity across four dimensions — Delivery, Quality, Consistency, and Breadth — to generate a live, embeddable SVG badge with archetype classification and impact scoring.",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               keywords:
-                "GitHub developer metrics, developer impact score, GitHub profile badge, GitHub stats SVG, code review metrics, developer archetype, contribution analytics, open source metrics",
+                "developer metrics, developer impact score, GitHub profile badge, Bitbucket badge, Codeberg badge, developer stats SVG, code review metrics, developer archetype, contribution analytics, open source metrics, multi-platform developer badge",
               offers: {
                 "@type": "Offer",
                 price: "0",
@@ -106,7 +106,7 @@ export default function RootLayout({
               featureList: [
                 "Four-dimension impact scoring (Delivery, Quality, Consistency, Breadth)",
                 "Developer archetype classification (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)",
-                "Live embeddable SVG badge for GitHub README",
+                "Live embeddable SVG badge for READMEs and portfolios",
                 "52-week contribution heatmap",
                 "Four-axis radar chart visualization",
                 "Badge visual customization via Creator Studio",

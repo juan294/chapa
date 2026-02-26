@@ -25,7 +25,7 @@ export default function ComingSoonPage() {
 
         {/* Tagline */}
         <p className="mt-6 text-sm leading-relaxed text-text-secondary">
-          Developer impact badges, powered by GitHub.
+          Developer impact badges, powered by your code.
         </p>
       </div>
     </main>

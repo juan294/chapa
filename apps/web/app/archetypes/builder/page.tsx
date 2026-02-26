@@ -81,7 +81,7 @@ export default function BuilderPage() {
 
               <p>
                 To earn the Builder archetype, your Delivery dimension must be strong and your
-                most dominant trait. The algorithm looks at your last 12 months of GitHub activity
+                most dominant trait. The algorithm looks at your last 12 months of development activity
                 and evaluates the weight and frequency of your merged PRs, your issue closure rate,
                 and your commit volume &mdash; all normalized so that early contributions count
                 more and diminishing returns kick in naturally.

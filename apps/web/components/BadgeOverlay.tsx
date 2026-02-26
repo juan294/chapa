@@ -197,7 +197,7 @@ const HOTSPOTS: Hotspot[] = [
   {
     id: "badge-github",
     tooltip:
-      "Chapa uses public GitHub metrics. GitHub is not affiliated with or endorsing this project.",
+      "Chapa analyzes public metrics from GitHub and other linked platforms. These platforms are not affiliated with or endorsing this project.",
     position: "top",
     // Footer: GitHub logo+text at x=60, y≈575 → center (156, 589)
     top: "90%",
