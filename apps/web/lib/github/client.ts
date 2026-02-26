@@ -46,7 +46,7 @@ export async function getStats(
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
-  if (cached) return cached;
+  if (cached) return _enrichWithLogins(cached, handle);
 
   // Check if there's already an in-flight request for this handle
   const existing = _inflight.get(lowerHandle);
@@ -62,6 +62,32 @@ export async function getStats(
   });
 
   return promise;
+}
+
+/**
+ * Enrich cached stats with linkedPlatformLogins if missing.
+ * Handles pre-deploy cached data that has linkedPlatforms but no logins.
+ */
+async function _enrichWithLogins(
+  stats: StatsData,
+  handle: string,
+): Promise<StatsData> {
+  const platforms = stats.linkedPlatforms;
+  if (!platforms || platforms.length === 0 || stats.linkedPlatformLogins) {
+    return stats;
+  }
+
+  const results = await Promise.all(
+    platforms.map((p) => dbGetLinkedPlatform(handle, p)),
+  );
+  const logins: Record<string, string> = {};
+  platforms.forEach((p, i) => {
+    if (results[i]) logins[p] = results[i].remoteLogin;
+  });
+
+  return Object.keys(logins).length > 0
+    ? { ...stats, linkedPlatformLogins: logins }
+    : stats;
 }
 
 /** Internal: fetch from GitHub, merge Bitbucket + supplemental, cache. */

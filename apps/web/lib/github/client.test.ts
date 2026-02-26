@@ -150,6 +150,39 @@ describe("getStats", () => {
     expect(mockFetchStatsData).not.toHaveBeenCalled();
   });
 
+  it("enriches cached stats with linkedPlatformLogins when missing", async () => {
+    // Simulate pre-deploy cached data: has linkedPlatforms but no linkedPlatformLogins
+    const cached = makeStats({
+      linkedPlatforms: ["bitbucket", "codeberg"],
+    });
+    mockCacheGet.mockResolvedValue(cached);
+    mockDbGetLinkedPlatform.mockImplementation(
+      (_handle: string, platform: string) => {
+        if (platform === "bitbucket") {
+          return Promise.resolve({
+            remoteLogin: "bb-user",
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        }
+        if (platform === "codeberg") {
+          return Promise.resolve({
+            remoteLogin: "cb-user",
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        }
+        return Promise.resolve(null);
+      },
+    );
+
+    const result = await getStats("test-user");
+
+    expect(result!.linkedPlatformLogins).toEqual({
+      bitbucket: "bb-user",
+      codeberg: "cb-user",
+    });
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
+  });
+
   it("fetches from GitHub on cache miss and caches result", async () => {
     const fresh = makeStats();
     setupCacheMiss(fresh);
