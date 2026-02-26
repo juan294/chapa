@@ -25,6 +25,10 @@ export function isBitbucketEnabledSync(): boolean {
   return process.env.NEXT_PUBLIC_BITBUCKET_ENABLED?.trim() === "true";
 }
 
+export function isCodebergEnabledSync(): boolean {
+  return process.env.NEXT_PUBLIC_CODEBERG_ENABLED?.trim() === "true";
+}
+
 // ---------------------------------------------------------------------------
 // Async (DB-backed + env-var fallback) — for server components / API routes
 // ---------------------------------------------------------------------------
@@ -56,6 +60,13 @@ export async function isBitbucketEnabled(): Promise<boolean> {
   return checkFlag(
     "bitbucket_integration",
     process.env.NEXT_PUBLIC_BITBUCKET_ENABLED,
+  );
+}
+
+export async function isCodebergEnabled(): Promise<boolean> {
+  return checkFlag(
+    "codeberg_integration",
+    process.env.NEXT_PUBLIC_CODEBERG_ENABLED,
   );
 }
 

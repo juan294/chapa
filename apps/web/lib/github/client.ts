@@ -2,15 +2,17 @@ import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
-import { isBitbucketEnabled } from "@/lib/feature-flags";
+import { isBitbucketEnabled, isCodebergEnabled } from "@/lib/feature-flags";
 import {
   dbGetLinkedPlatform,
   dbDeleteLinkedPlatform,
   dbUpdatePlatformTokens,
 } from "@/lib/db/user-platforms";
 import { isTokenExpired, refreshBitbucketToken } from "@/lib/auth/bitbucket";
+import { refreshCodebergToken } from "@/lib/auth/codeberg";
 import { fetchBitbucketStats } from "@/lib/bitbucket/stats";
-import type { StatsData, SupplementalStats } from "@chapa/shared";
+import { fetchCodebergStats } from "@/lib/codeberg/stats";
+import type { StatsData, SupplementalStats, Platform } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
 const STALE_TTL = 604800; // 7 days
@@ -93,6 +95,14 @@ async function _fetchAndCache(
     ? mergeStats(primary, bbStats, { markAsSupplemental: false })
     : primary;
 
+  // Fetch Codeberg data (from cache or live)
+  const cbStats = await _fetchCodebergIfLinked(handle, lowerHandle);
+
+  // Merge Codeberg into current stats
+  if (cbStats) {
+    stats = mergeStats(stats, cbStats, { markAsSupplemental: false });
+  }
+
   // Check for supplemental data (e.g. EMU account)
   const supplemental = await cacheGet<SupplementalStats>(`supplemental:${lowerHandle}`);
   if (supplemental) {
@@ -100,8 +110,11 @@ async function _fetchAndCache(
   }
 
   // Set linkedPlatforms after all merges (so it survives EMU merge)
-  if (bbStats) {
-    stats = { ...stats, linkedPlatforms: ["bitbucket"] };
+  const linkedPlatforms: Platform[] = [];
+  if (bbStats) linkedPlatforms.push("bitbucket");
+  if (cbStats) linkedPlatforms.push("codeberg");
+  if (linkedPlatforms.length > 0) {
+    stats = { ...stats, linkedPlatforms };
   }
 
   // Cache the final (possibly merged) result — both primary and stale fallback
@@ -175,4 +188,77 @@ async function _fetchBitbucketIfLinked(
   }
 
   return bbStats;
+}
+
+/** Fetch Codeberg stats from cache or live API. Returns null if not linked/disabled. */
+async function _fetchCodebergIfLinked(
+  handle: string,
+  lowerHandle: string,
+): Promise<StatsData | null> {
+  const cbCacheKey = `stats:v2:codeberg:${lowerHandle}`;
+
+  // Check Codeberg cache first (cheap Redis read, always available)
+  const cached = await cacheGet<StatsData>(cbCacheKey);
+  if (cached) return cached;
+
+  // Check feature flag — only make live API calls if enabled
+  const enabled = await isCodebergEnabled();
+  if (!enabled) return null;
+
+  // Check if user has linked Codeberg
+  const linked = await dbGetLinkedPlatform(handle, "codeberg");
+  if (!linked) return null;
+
+  let { accessToken } = linked.tokens;
+  const { refreshToken, expiresAt } = linked.tokens;
+
+  // Refresh token if expired (only if refresh_token exists)
+  if (isTokenExpired(expiresAt)) {
+    if (!refreshToken) {
+      // No refresh token and token expired — can't recover
+      // If expiresAt is null, token may be long-lived — try anyway
+      if (expiresAt !== null) {
+        void dbDeleteLinkedPlatform(handle, "codeberg");
+        return null;
+      }
+      // expiresAt is null → token might be long-lived, proceed with current token
+    } else {
+      const clientId = process.env.CODEBERG_CLIENT_ID?.trim() ?? "";
+      const clientSecret = process.env.CODEBERG_CLIENT_SECRET?.trim() ?? "";
+      const refreshed = await refreshCodebergToken(
+        refreshToken,
+        clientId,
+        clientSecret,
+      );
+
+      if (!refreshed) {
+        void dbDeleteLinkedPlatform(handle, "codeberg");
+        return null;
+      }
+
+      accessToken = refreshed.access_token;
+      void dbUpdatePlatformTokens(
+        handle,
+        "codeberg",
+        refreshed.access_token,
+        refreshed.refresh_token ?? null,
+        refreshed.expires_in
+          ? new Date(Date.now() + refreshed.expires_in * 1000)
+          : null,
+      );
+    }
+  }
+
+  // Fetch Codeberg stats
+  const cbStats = await fetchCodebergStats(
+    linked.remoteLogin,
+    accessToken,
+    { displayName: linked.remoteLogin, avatarUrl: "" },
+  );
+
+  if (cbStats) {
+    await cacheSet(cbCacheKey, cbStats, CACHE_TTL);
+  }
+
+  return cbStats;
 }

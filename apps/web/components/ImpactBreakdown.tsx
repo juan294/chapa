@@ -65,11 +65,17 @@ const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewB
     svgPath: "M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z",
     viewBox: "0 0 24 24",
   },
+  codeberg: {
+    label: "Codeberg",
+    svgPath: "M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z",
+    viewBox: "0 0 24 24",
+  },
 };
 
 const PLATFORM_URLS: Record<Platform, (handle: string) => string> = {
   github: (handle) => `https://github.com/${handle}`,
   bitbucket: (handle) => `https://bitbucket.org/${handle}`,
+  codeberg: (handle) => `https://codeberg.org/${handle}`,
 };
 
 interface DataSourcesProps {

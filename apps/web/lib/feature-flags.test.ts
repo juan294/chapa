@@ -12,6 +12,8 @@ import {
   isAgentEnabled,
   isBitbucketEnabled,
   isBitbucketEnabledSync,
+  isCodebergEnabled,
+  isCodebergEnabledSync,
   _resetFlagCache,
 } from "./feature-flags";
 
@@ -258,6 +260,82 @@ describe("isBitbucketEnabled", () => {
     delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
 
     const result = await isBitbucketEnabled();
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCodebergEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isCodebergEnabledSync", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+  });
+
+  it("returns false when env var not set", () => {
+    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+    expect(isCodebergEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "true";
+    expect(isCodebergEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "false";
+    expect(isCodebergEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "  true  ";
+    expect(isCodebergEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCodebergEnabled (async, DB-backed)
+// ---------------------------------------------------------------------------
+
+describe("isCodebergEnabled", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("codeberg_integration", true),
+    );
+
+    const result = await isCodebergEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when DB flag is disabled", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("codeberg_integration", false),
+    );
+
+    const result = await isCodebergEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("falls back to env var when DB unavailable", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "true";
+
+    const result = await isCodebergEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when both DB and env var are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+
+    const result = await isCodebergEnabled();
     expect(result).toBe(false);
   });
 });
