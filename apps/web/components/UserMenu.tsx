@@ -8,6 +8,24 @@ import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync } fr
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
 
+/** Module-level cache for platform status fetches — persists across mounts */
+const platformStatusCache: {
+  fetched: boolean;
+  bitbucket: { linked: boolean; remoteLogin: string | null } | null;
+  codeberg: { linked: boolean; remoteLogin: string | null } | null;
+} = {
+  fetched: false,
+  bitbucket: null,
+  codeberg: null,
+};
+
+/** Clear the platform status cache — call after link/unlink actions */
+export function clearPlatformStatusCache() {
+  platformStatusCache.fetched = false;
+  platformStatusCache.bitbucket = null;
+  platformStatusCache.codeberg = null;
+}
+
 interface UserMenuProps {
   login: string;
   name: string | null;
@@ -36,11 +54,20 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
 
   useEffect(() => {
+    if (platformStatusCache.fetched) {
+      if (platformStatusCache.bitbucket) setBbStatus(platformStatusCache.bitbucket);
+      if (platformStatusCache.codeberg) setCbStatus(platformStatusCache.codeberg);
+      return;
+    }
     if (isBitbucketEnabledSync()) {
       fetch("/api/auth/bitbucket/status")
         .then((r) => r.json())
         .then((data) => {
-          if (data.enabled) setBbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
+          if (data.enabled) {
+            const status = { linked: data.linked, remoteLogin: data.remoteLogin };
+            platformStatusCache.bitbucket = status;
+            setBbStatus(status);
+          }
         })
         .catch(() => {}); // Graceful — menu works without status
     }
@@ -48,10 +75,15 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       fetch("/api/auth/codeberg/status")
         .then((r) => r.json())
         .then((data) => {
-          if (data.enabled) setCbStatus({ linked: data.linked, remoteLogin: data.remoteLogin });
+          if (data.enabled) {
+            const status = { linked: data.linked, remoteLogin: data.remoteLogin };
+            platformStatusCache.codeberg = status;
+            setCbStatus(status);
+          }
         })
         .catch(() => {}); // Graceful
     }
+    platformStatusCache.fetched = true;
   }, []);
 
   async function handleUnlinkBitbucket() {
@@ -59,6 +91,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     try {
       const res = await fetch("/api/auth/bitbucket/disconnect", { method: "POST" });
       if (res.ok) {
+        clearPlatformStatusCache();
         setBbStatus({ linked: false, remoteLogin: null });
         setShowUnlinkConfirm(false);
         router.refresh();
@@ -75,6 +108,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     try {
       const res = await fetch("/api/auth/codeberg/disconnect", { method: "POST" });
       if (res.ok) {
+        clearPlatformStatusCache();
         setCbStatus({ linked: false, remoteLogin: null });
         setShowCbUnlinkConfirm(false);
         router.refresh();
