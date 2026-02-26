@@ -2,9 +2,16 @@ import { describe, it, expect } from "vitest";
 import { renderBadgeBranding } from "./BadgeBranding";
 
 describe("renderBadgeBranding", () => {
-  it("returns SVG markup with branding text", () => {
+  it("returns SVG markup with branding text (opacity contrast tspans)", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
-    expect(svg).toContain("Forged from purpose. Driven by curiosity.");
+    expect(svg).toContain("Forged from ");
+    expect(svg).toContain("purpose");
+    expect(svg).toContain("Driven by ");
+    expect(svg).toContain("curiosity");
+    // Opacity contrast: connecting words at 0.5, key words at 0.9
+    expect(svg).toContain('opacity="0.5">Forged from ');
+    expect(svg).toContain('opacity="0.9">purpose');
+    expect(svg).toContain('opacity="0.9">curiosity');
   });
 
   it("contains the domain text", () => {
@@ -59,9 +66,16 @@ describe("renderBadgeBranding", () => {
   it("renders logos before text (icons leading)", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
     const logoIdx = svg.indexOf("M12 0C5.37"); // GitHub path
-    const textIdx = svg.indexOf("Forged from purpose. Driven by curiosity.");
+    const textIdx = svg.indexOf("Forged from ");
     expect(logoIdx).toBeGreaterThan(-1);
     expect(textIdx).toBeGreaterThan(-1);
     expect(logoIdx).toBeLessThan(textIdx);
+  });
+
+  it("renders grouped pill container around logos", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, ["github", "bitbucket"]);
+    // Pill is a rounded rect with purple tint
+    expect(svg).toContain('fill="rgba(124,106,239,0.08)"');
+    expect(svg).toContain('stroke="rgba(124,106,239,0.15)"');
   });
 });

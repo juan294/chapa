@@ -19,25 +19,33 @@ export function renderBadgeBranding(
   rightX: number,
   platforms: Platform[],
 ): string {
-  const logoSize = 20; // ~same as old GitHub icon (scale 0.85 on 24px viewBox)
-  const logoGap = 10;
+  const logoSize = 20;
+  const logoGap = 12;
+  const pillPadX = 10;
+  const pillPadY = 5;
 
   // Sort platforms in canonical order
   const sorted = PLATFORM_ORDER.filter((p) => platforms.includes(p));
 
-  // Icons first (leading), then text
+  // Grouped pill container for logos
+  const pillW = pillPadX * 2 + sorted.length * logoSize + (sorted.length - 1) * logoGap;
+  const pillH = logoSize + pillPadY * 2;
+  const pillY = y - pillPadY;
+  const pillSvg = `<rect x="${x}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="rgba(124,106,239,0.08)" stroke="rgba(124,106,239,0.15)" stroke-width="1"/>`;
+
+  const scale = (logoSize / 24).toFixed(4);
   const logosSvg = sorted
     .map((platform, i) => {
-      const logoX = x + i * (logoSize + logoGap);
-      const scale = (logoSize / 24).toFixed(4);
-      return `<g transform="translate(${logoX}, ${y - 2})"><path d="${PLATFORM_LOGOS[platform]}" fill="#9AA4B2" opacity="0.8" transform="scale(${scale})"/></g>`;
+      const logoX = x + pillPadX + i * (logoSize + logoGap);
+      return `<g transform="translate(${logoX}, ${y})"><path d="${PLATFORM_LOGOS[platform]}" fill="#9AA4B2" opacity="0.8" transform="scale(${scale})"/></g>`;
     })
     .join("\n    ");
 
-  const textStartX = x + sorted.length * (logoSize + logoGap) + 6;
+  const textStartX = x + pillW + 12;
 
   return `
+    ${pillSvg}
     ${logosSvg}
-    <text x="${textStartX}" y="${y + 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2" opacity="0.8">Forged from purpose. Driven by curiosity.</text>
-    <text x="${rightX}" y="${y + 12}" font-family="'JetBrains Mono', monospace" font-size="17" fill="#9AA4B2" opacity="0.8" text-anchor="end">chapa.thecreativetoken.com</text>`;
+    <text x="${textStartX}" y="${y + 14}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2"><tspan opacity="0.5">Forged from </tspan><tspan opacity="0.9">purpose</tspan><tspan opacity="0.5">. Driven by </tspan><tspan opacity="0.9">curiosity</tspan><tspan opacity="0.5">.</tspan></text>
+    <text x="${rightX}" y="${y + 14}" font-family="'JetBrains Mono', monospace" font-size="17" fill="#9AA4B2" opacity="0.8" text-anchor="end">chapa.thecreativetoken.com</text>`;
 }
