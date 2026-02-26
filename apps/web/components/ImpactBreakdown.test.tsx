@@ -186,17 +186,29 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toMatch(/<a\s/);
     });
 
-    it("only links to GitHub profiles (non-GitHub handles may differ)", () => {
-      // PLATFORM_URLS should only contain github — linked platforms like
-      // bitbucket/codeberg have different usernames than the GitHub handle,
-      // so linking to bitbucket.org/{github-handle} would 404.
-      expect(SOURCE).toContain("github: (handle)");
-      // Extract just the PLATFORM_URLS block
+    it("has URL builders for all three platforms", () => {
+      // PLATFORM_URLS should contain builders for github, bitbucket, and codeberg.
+      // Bitbucket/Codeberg use the platform-specific username from linkedPlatformLogins.
       const urlsStart = SOURCE.indexOf("PLATFORM_URLS");
       const urlsEnd = SOURCE.indexOf("};", urlsStart);
       const urlsBlock = SOURCE.slice(urlsStart, urlsEnd);
-      expect(urlsBlock).not.toContain("bitbucket");
-      expect(urlsBlock).not.toContain("codeberg");
+      expect(urlsBlock).toContain("github");
+      expect(urlsBlock).toContain("bitbucket");
+      expect(urlsBlock).toContain("codeberg");
+    });
+
+    it("uses linkedPlatformLogins for platform-specific usernames", () => {
+      // DataSources must read stats.linkedPlatformLogins to resolve the correct
+      // username per platform (GitHub handle !== Bitbucket/Codeberg username).
+      expect(SOURCE).toContain("linkedPlatformLogins");
+    });
+
+    it("builds Bitbucket profile URL with bitbucket.org", () => {
+      expect(SOURCE).toContain("bitbucket.org/");
+    });
+
+    it("builds Codeberg profile URL with codeberg.org", () => {
+      expect(SOURCE).toContain("codeberg.org/");
     });
   });
 

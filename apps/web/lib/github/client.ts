@@ -114,7 +114,20 @@ async function _fetchAndCache(
   if (bbStats) linkedPlatforms.push("bitbucket");
   if (cbStats) linkedPlatforms.push("codeberg");
   if (linkedPlatforms.length > 0) {
-    stats = { ...stats, linkedPlatforms };
+    // Also fetch remote usernames for profile URLs (parallel DB queries)
+    const [bbLinked, cbLinked] = await Promise.all([
+      bbStats ? dbGetLinkedPlatform(handle, "bitbucket") : null,
+      cbStats ? dbGetLinkedPlatform(handle, "codeberg") : null,
+    ]);
+    const linkedPlatformLogins: Record<string, string> = {};
+    if (bbLinked) linkedPlatformLogins.bitbucket = bbLinked.remoteLogin;
+    if (cbLinked) linkedPlatformLogins.codeberg = cbLinked.remoteLogin;
+
+    stats = {
+      ...stats,
+      linkedPlatforms,
+      ...(Object.keys(linkedPlatformLogins).length > 0 && { linkedPlatformLogins }),
+    };
   }
 
   // Cache the final (possibly merged) result — both primary and stale fallback

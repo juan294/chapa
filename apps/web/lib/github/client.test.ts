@@ -587,13 +587,19 @@ describe("getStats", () => {
         .mockResolvedValueOnce(null); // supplemental
       mockFetchStatsData.mockResolvedValue(github);
       mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
 
       const result = await getStats("test-user");
 
       expect(result!.commitsTotal).toBe(80);
-      // Should NOT have called the DB or fetch — used cache
-      expect(mockDbGetLinkedPlatform).not.toHaveBeenCalled();
+      // Should NOT have called fetch — used cache for stats
       expect(mockFetchBitbucketStats).not.toHaveBeenCalled();
+      // DB is called once to resolve the remote username for profile URL
+      expect(mockDbGetLinkedPlatform).toHaveBeenCalledWith("test-user", "bitbucket");
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
     });
 
     it("refreshes expired token before fetching", async () => {
@@ -701,6 +707,24 @@ describe("getStats", () => {
       const result = await getStats("test-user");
 
       expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+    });
+
+    it("sets linkedPlatformLogins with Bitbucket remote username", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 30 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      setupBitbucketLinked(bb);
+
+      const result = await getStats("test-user");
+
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
     });
 
     it("does NOT set hasSupplementalData when only Bitbucket is merged", async () => {
@@ -1079,6 +1103,10 @@ describe("getStats", () => {
 
       expect(result!.commitsTotal).toBe(85); // 50 + 20 + 15
       expect(result!.linkedPlatforms).toEqual(["bitbucket", "codeberg"]);
+      expect(result!.linkedPlatformLogins).toEqual({
+        bitbucket: "bb-user",
+        codeberg: "cb-user",
+      });
     });
 
     it("handles Codeberg fetch failure gracefully (returns GitHub-only)", async () => {

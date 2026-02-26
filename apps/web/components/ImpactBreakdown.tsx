@@ -72,10 +72,12 @@ const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewB
   },
 };
 
-// Only GitHub handle is guaranteed to match — linked platforms (Bitbucket,
-// Codeberg) may have different usernames, so we don't link to their profiles.
-const PLATFORM_URLS: Partial<Record<Platform, (handle: string) => string>> = {
-  github: (handle) => `https://github.com/${handle}`,
+// URL builders per platform. GitHub uses the main handle; Bitbucket/Codeberg
+// use the platform-specific username from linkedPlatformLogins.
+const PLATFORM_URLS: Partial<Record<Platform, (username: string) => string>> = {
+  github: (username) => `https://github.com/${username}`,
+  bitbucket: (username) => `https://bitbucket.org/${username}`,
+  codeberg: (username) => `https://codeberg.org/${username}`,
 };
 
 interface DataSourcesProps {
@@ -99,6 +101,11 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
           const display = PLATFORM_DISPLAY[platform];
           if (!display) return null;
           const urlBuilder = PLATFORM_URLS[platform];
+          // GitHub uses the main handle; linked platforms use their own username
+          const username = platform === "github"
+            ? handle
+            : stats.linkedPlatformLogins?.[platform];
+          const href = urlBuilder && username ? urlBuilder(username) : null;
           const sharedClass = "inline-flex items-center gap-2 rounded-lg border border-stroke bg-card px-3 py-2 animate-fade-in-up transition-colors";
           const inner = (
             <>
@@ -117,10 +124,10 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
               </span>
             </>
           );
-          return urlBuilder ? (
+          return href ? (
             <a
               key={platform}
-              href={urlBuilder(handle)}
+              href={href}
               target="_blank"
               rel="noopener noreferrer"
               className={`${sharedClass} hover:border-amber/30 hover:text-amber`}

@@ -31,6 +31,7 @@ export interface StatsData {
   fetchedAt: string; // ISO timestamp
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
   linkedPlatforms?: Platform[]; // platforms whose data was merged (informational)
+  linkedPlatformLogins?: Record<string, string>; // platform → remote username (for profile URLs)
 }
 
 /** Confidence flag identifiers */
