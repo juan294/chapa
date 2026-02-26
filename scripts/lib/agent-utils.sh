@@ -35,12 +35,25 @@ log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2; }
 
 # check_agent_enabled <agent_key>
 # Returns 0 if both master toggle and individual agent are enabled.
-# Returns 1 otherwise (fails open if API is unreachable).
+# Returns 1 if explicitly disabled.
+# Fail-open: if no API is reachable, proceeds with execution (returns 0).
 check_agent_enabled() {
   local agent_key="$1"
 
-  local flags_json
-  flags_json=$(curl -s --max-time 5 "${API_BASE}/api/feature-flags" 2>/dev/null || echo '{"flags":[]}')
+  # Try production first, then local dev server.
+  # Production is always available; localhost only works when dev server is running.
+  local flags_json=""
+  local production_url="${CHAPA_PRODUCTION_URL:-https://chapa.thecreativetoken.com}"
+
+  flags_json=$(curl -s --max-time 5 "${production_url}/api/feature-flags" 2>/dev/null) \
+    || flags_json=$(curl -s --max-time 5 "${API_BASE}/api/feature-flags" 2>/dev/null) \
+    || true
+
+  # Fail-open: if neither API responded, run the agent
+  if [ -z "${flags_json}" ]; then
+    log_info "Feature flags API unreachable — fail-open, proceeding with execution."
+    return 0
+  fi
 
   local master_enabled
   master_enabled=$(echo "${flags_json}" | python3 -c "
@@ -48,7 +61,7 @@ import sys, json
 data = json.load(sys.stdin)
 flags = {f['key']: f['enabled'] for f in data.get('flags', [])}
 print('true' if flags.get('automated_agents', False) else 'false')
-" 2>/dev/null || echo "false")
+" 2>/dev/null || echo "true")
 
   if [ "${master_enabled}" != "true" ]; then
     log_info "Master toggle 'automated_agents' is disabled. Skipping."
@@ -61,7 +74,7 @@ import sys, json
 data = json.load(sys.stdin)
 flags = {f['key']: f['enabled'] for f in data.get('flags', [])}
 print('true' if flags.get('${agent_key}', False) else 'false')
-" 2>/dev/null || echo "false")
+" 2>/dev/null || echo "true")
 
   if [ "${agent_enabled}" != "true" ]; then
     log_info "Agent '${agent_key}' is disabled. Skipping."
@@ -80,9 +93,14 @@ print('true' if flags.get('${agent_key}', False) else 'false')
 get_agent_prompt() {
   local agent_key="$1"
 
-  # Try to get custom prompt from feature flag config
+  # Try to get custom prompt from feature flag config (production first, then local)
   local custom_prompt
-  custom_prompt=$(curl -s --max-time 5 "${API_BASE}/api/feature-flags" 2>/dev/null | python3 -c "
+  local production_url="${CHAPA_PRODUCTION_URL:-https://chapa.thecreativetoken.com}"
+  local prompt_flags_json
+  prompt_flags_json=$(curl -s --max-time 5 "${production_url}/api/feature-flags" 2>/dev/null) \
+    || prompt_flags_json=$(curl -s --max-time 5 "${API_BASE}/api/feature-flags" 2>/dev/null) \
+    || true
+  custom_prompt=$(echo "${prompt_flags_json}" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 for f in data.get('flags', []):
