@@ -188,7 +188,7 @@ export default async function SharePage({ params }: SharePageProps) {
         </div>
 
         {/* ── Toolbar ──────────────────────────────────────────── */}
-        <div className="flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
+        <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
           <BadgeToolbar
             handle={handle}
             isOwner={isOwner}
