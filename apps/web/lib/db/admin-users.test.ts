@@ -292,7 +292,7 @@ describe("dbGetAdminUsers", () => {
     const result = await dbGetAdminUsers(defaultQuery());
 
     expect(result.users[0]!.avatarUrl).toBe(
-      "https://github.com/alice.png",
+      "https://avatars.githubusercontent.com/alice",
     );
   });
 
