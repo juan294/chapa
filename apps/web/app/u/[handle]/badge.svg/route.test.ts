@@ -16,6 +16,7 @@ const {
   mockGenerateVerificationCode,
   mockStoreVerificationRecord,
   mockNotifyFirstBadge,
+  mockGetCachedLatestSnapshot,
 } = vi.hoisted(() => ({
   mockGetStatsData: vi.fn(),
   mockComputeImpactV4: vi.fn(),
@@ -28,6 +29,7 @@ const {
   mockGenerateVerificationCode: vi.fn(),
   mockStoreVerificationRecord: vi.fn(),
   mockNotifyFirstBadge: vi.fn(),
+  mockGetCachedLatestSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -80,7 +82,7 @@ vi.mock("@/lib/db/snapshots", () => ({
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
-  getCachedLatestSnapshot: vi.fn(() => Promise.resolve(null)),
+  getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
   updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
 
@@ -177,6 +179,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockGenerateVerificationCode.mockReturnValue(null);
     mockStoreVerificationRecord.mockResolvedValue(undefined);
     mockTrackBadgeGenerated.mockResolvedValue(undefined);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
   });
 
   // -------------------------------------------------------------------------
@@ -439,6 +442,75 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Parallel fetching of snapshot + avatar (issue #505)
+  // -------------------------------------------------------------------------
+
+  describe("parallel snapshot and avatar fetching", () => {
+    it("calls getCachedLatestSnapshot with the handle", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockGetCachedLatestSnapshot).toHaveBeenCalledWith("testuser");
+    });
+
+    it("calls both getCachedLatestSnapshot and getAvatarBase64 after getStats", async () => {
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockGetCachedLatestSnapshot).toHaveBeenCalledTimes(1);
+      expect(mockGetAvatarBase64).toHaveBeenCalledTimes(1);
+    });
+
+    it("fetches snapshot and avatar concurrently (both started before either awaited)", async () => {
+      // Track the order of call starts and resolutions to verify parallelism.
+      // If they run sequentially, snapshot resolves BEFORE avatar starts.
+      // If parallel, both start before either resolves.
+      const callOrder: string[] = [];
+
+      mockGetCachedLatestSnapshot.mockImplementation(() => {
+        callOrder.push("snapshot:start");
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            callOrder.push("snapshot:resolve");
+            resolve(null);
+          }, 10);
+        });
+      });
+
+      mockGetAvatarBase64.mockImplementation(() => {
+        callOrder.push("avatar:start");
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            callOrder.push("avatar:resolve");
+            resolve("data:image/png;base64,abc123");
+          }, 10);
+        });
+      });
+
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+
+      // Both should start before either resolves (parallel via Promise.all)
+      const snapshotStartIdx = callOrder.indexOf("snapshot:start");
+      const avatarStartIdx = callOrder.indexOf("avatar:start");
+      const snapshotResolveIdx = callOrder.indexOf("snapshot:resolve");
+      const avatarResolveIdx = callOrder.indexOf("avatar:resolve");
+
+      // Both starts must happen before any resolve
+      expect(snapshotStartIdx).toBeLessThan(snapshotResolveIdx);
+      expect(avatarStartIdx).toBeLessThan(avatarResolveIdx);
+      // Key assertion: both must START before either RESOLVES
+      expect(snapshotStartIdx).toBeLessThan(avatarResolveIdx);
+      expect(avatarStartIdx).toBeLessThan(snapshotResolveIdx);
+    });
+
+    it("does not call getCachedLatestSnapshot when stats fetch fails", async () => {
+      mockGetStatsData.mockResolvedValue(null);
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
     });
   });
 
