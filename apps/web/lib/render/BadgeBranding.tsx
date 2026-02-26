@@ -38,6 +38,6 @@ export function renderBadgeBranding(
 
   return `
     ${logosSvg}
-    <text x="${textStartX}" y="${y + 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2" opacity="0.8">Built from your commitment</text>
+    <text x="${textStartX}" y="${y + 12}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="17" fill="#9AA4B2" opacity="0.8">Forged from purpose. Driven by curiosity.</text>
     <text x="${rightX}" y="${y + 12}" font-family="'JetBrains Mono', monospace" font-size="17" fill="#9AA4B2" opacity="0.8" text-anchor="end">chapa.thecreativetoken.com</text>`;
 }

@@ -66,7 +66,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## Badge branding
-Footer shows "Built from your commitment" + dynamic platform logos (GitHub, Bitbucket, Codeberg).
+Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg).
 - Personal badges show only logos for platforms the user has connected
 - Demo badges show all 3 platform logos
 - Branding is behind a flag: `includeBranding`

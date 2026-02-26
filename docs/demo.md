@@ -69,7 +69,7 @@ Say:
 "Chapa is viral by design: one beautiful badge leads to another."
 
 ## Badge branding
-Badge footer shows "Built from your commitment" with dynamic platform logos. Branding is isolated behind a feature flag (`includeBranding`) in `BadgeBranding.tsx`, so it can be toggled or customized.
+Badge footer shows "Forged from purpose. Driven by curiosity." with dynamic platform logos. Branding is isolated behind a feature flag (`includeBranding`) in `BadgeBranding.tsx`, so it can be toggled or customized.
 
 ## Scaling
 - Daily cache per handle, plus SVG cache

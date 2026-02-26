@@ -402,14 +402,14 @@ describe("renderBadgeSvg", () => {
   describe("footer", () => {
     it("includes branding text by default", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("Built from your commitment");
+      expect(svg).toContain("Forged from purpose. Driven by curiosity.");
     });
 
     it("omits branding when includeBranding is false", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact(), {
         includeBranding: false,
       });
-      expect(svg).not.toContain("Built from your commitment");
+      expect(svg).not.toContain("Forged from purpose. Driven by curiosity.");
       expect(svg).not.toContain("chapa.thecreativetoken.com");
     });
 
@@ -420,7 +420,7 @@ describe("renderBadgeSvg", () => {
 
     it("footer text is at least 17px for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:Built from your commitment|chapa\.thecreativetoken\.com)/g);
+      const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:Forged from purpose. Driven by curiosity.|chapa\.thecreativetoken\.com)/g);
       expect(brandingFontSizes).not.toBeNull();
       for (const match of brandingFontSizes!) {
         const size = parseInt(match.match(/font-size="(\d+)"/)![1]!, 10);
@@ -430,7 +430,7 @@ describe("renderBadgeSvg", () => {
 
     it("footer text opacity is at least 0.75 for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>(?:Built from your commitment|chapa\.thecreativetoken\.com)/g)];
+      const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>(?:Forged from purpose. Driven by curiosity.|chapa\.thecreativetoken\.com)/g)];
       expect(opacityMatches.length).toBeGreaterThanOrEqual(1);
       for (const match of opacityMatches) {
         expect(parseFloat(match[1]!)).toBeGreaterThanOrEqual(0.75);
@@ -586,7 +586,7 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("M14 0.875L25.375 5.25");
       expect(svg).not.toContain("M14 0C6.27");
       // Footer: branding text + GitHub logo only
-      expect(svg).toContain("Built from your commitment");
+      expect(svg).toContain("Forged from purpose. Driven by curiosity.");
       expect(svg).toContain("M12 0C5.37");     // GitHub
       expect(svg).not.toContain("M.778 1.211"); // No Bitbucket
     });
@@ -598,7 +598,7 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("<image");
       expect(svg).toContain(dataUri);
       // Footer: branding text + GitHub only
-      expect(svg).toContain("Built from your commitment");
+      expect(svg).toContain("Forged from purpose. Driven by curiosity.");
       expect(svg).toContain("M12 0C5.37");
     });
 
@@ -646,7 +646,7 @@ describe("renderBadgeSvg", () => {
         { includeBranding: false },
       );
       expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield still shown
-      expect(svg).not.toContain("Built from your commitment");
+      expect(svg).not.toContain("Forged from purpose. Driven by curiosity.");
       expect(svg).not.toContain("chapa.thecreativetoken.com");
     });
   });

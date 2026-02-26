@@ -60,7 +60,7 @@
 - Tier label below (color-coded: Emerging=gray, Solid=white, High=light purple, Elite=purple)
 
 ### 5) Footer
-- "Built from your commitment" text + dynamic platform logos (behind `includeBranding` flag)
+- "Forged from purpose. Driven by curiosity." text + dynamic platform logos (behind `includeBranding` flag)
 - Platform logos shown: GitHub always, plus Bitbucket/Codeberg if user has linked them
 - Demo badges show all 3 platform logos regardless of linked status
 - Branding isolated in `BadgeBranding` component
@@ -75,7 +75,7 @@
 ## Badge branding
 - `includeBranding: boolean`
 - Branding isolated in `apps/web/lib/render/BadgeBranding.tsx`
-- Shows "Built from your commitment" + dynamic platform logos (GitHub, Bitbucket, Codeberg)
+- Shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg)
 - If disabled, layout should still look balanced (no big empty gap).
 
 ## Theme tokens (Warm Amber)

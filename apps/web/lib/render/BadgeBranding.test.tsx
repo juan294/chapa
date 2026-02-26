@@ -4,7 +4,7 @@ import { renderBadgeBranding } from "./BadgeBranding";
 describe("renderBadgeBranding", () => {
   it("returns SVG markup with branding text", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
-    expect(svg).toContain("Built from your commitment");
+    expect(svg).toContain("Forged from purpose. Driven by curiosity.");
   });
 
   it("contains the domain text", () => {
@@ -59,7 +59,7 @@ describe("renderBadgeBranding", () => {
   it("renders logos before text (icons leading)", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
     const logoIdx = svg.indexOf("M12 0C5.37"); // GitHub path
-    const textIdx = svg.indexOf("Built from your commitment");
+    const textIdx = svg.indexOf("Forged from purpose. Driven by curiosity.");
     expect(logoIdx).toBeGreaterThan(-1);
     expect(textIdx).toBeGreaterThan(-1);
     expect(logoIdx).toBeLessThan(textIdx);

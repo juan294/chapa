@@ -147,7 +147,7 @@ Layout: `mt-4 pt-3 border-t border-stroke/50 flex items-center justify-between`.
 | Element | Classes | Details |
 |---------|---------|---------|
 | Platform logos | `w-3.5 h-3.5` fill SVG | Dynamic: GitHub always shown, plus Bitbucket/Codeberg if linked. |
-| "Built from your commitment" | `text-xs text-text-secondary/60` with `flex items-center gap-2` | Adjacent to platform logos. |
+| "Forged from purpose. Driven by curiosity." | `text-xs text-text-secondary/60` with `flex items-center gap-2` | Adjacent to platform logos. |
 | Domain text | `text-xs text-text-secondary/60 font-heading` | `chapa.thecreativetoken.com`. |
 
 ---
