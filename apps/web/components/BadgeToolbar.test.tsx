@@ -69,6 +69,16 @@ describe("BadgeToolbar", () => {
       expect(SOURCE).toContain('target="_blank"');
       expect(SOURCE).toContain('rel="noopener noreferrer"');
     });
+
+    describe("linkedin share", () => {
+      it("links to LinkedIn share-offsite URL", () => {
+        expect(SOURCE).toContain("linkedin.com/sharing/share-offsite");
+      });
+
+      it("tracks share event with linkedin platform", () => {
+        expect(SOURCE).toContain('platform: "linkedin"');
+      });
+    });
   });
 
   describe("customize link", () => {
