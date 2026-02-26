@@ -557,6 +557,66 @@ describe("createNavigationCommands (isAdmin)", () => {
   });
 });
 
+describe("navigation command execute coverage", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+  });
+
+  it("/about navigates to /about", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/about", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/about" });
+  });
+
+  it("/terms navigates to /terms", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/terms", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/terms" });
+  });
+
+  it("/privacy navigates to /privacy", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/privacy", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/privacy" });
+  });
+
+  it("/builder navigates to /archetypes/builder", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/builder", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/archetypes/builder" });
+  });
+
+  it("/guardian navigates to /archetypes/guardian", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/guardian", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/archetypes/guardian" });
+  });
+
+  it("/marathoner navigates to /archetypes/marathoner", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/marathoner", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/archetypes/marathoner" });
+  });
+
+  it("/polymath navigates to /archetypes/polymath", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/polymath", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/archetypes/polymath" });
+  });
+
+  it("/balanced navigates to /archetypes/balanced", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/balanced", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/archetypes/balanced" });
+  });
+
+  it("/emerging navigates to /archetypes/emerging", () => {
+    const commands = createNavigationCommands();
+    const result = executeCommand("/emerging", commands);
+    expect(result.action).toEqual({ type: "navigate", path: "/archetypes/emerging" });
+  });
+});
+
 describe("makeLine", () => {
   it("creates a line with unique id", () => {
     const line1 = makeLine("info", "hello");

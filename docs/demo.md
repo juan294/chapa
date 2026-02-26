@@ -68,8 +68,8 @@ Say:
 Say:
 "Chapa is viral by design: one beautiful badge leads to another."
 
-## GitHub branding
-GitHub branding is included but isolated behind a feature flag (`includeGithubBranding`), so it can be swapped or removed for compliance.
+## Badge branding
+Badge footer shows "Forged from purpose. Driven by curiosity." with dynamic platform logos. Branding is isolated behind a feature flag (`includeBranding`) in `BadgeBranding.tsx`, so it can be toggled or customized.
 
 ## Scaling
 - Daily cache per handle, plus SVG cache

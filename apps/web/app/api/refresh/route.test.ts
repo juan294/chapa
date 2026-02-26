@@ -191,4 +191,14 @@ describe("POST /api/refresh", () => {
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(502);
   });
+
+  it("returns 500 when an unexpected error is thrown", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockRejectedValue(new Error("unexpected boom"));
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Internal server error");
+  });
 });

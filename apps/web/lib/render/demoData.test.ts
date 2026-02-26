@@ -71,7 +71,7 @@ describe("DEMO_IMPACT", () => {
 describe("renderBadgeSvg with demo data", () => {
   it("returns a valid SVG string", () => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
-      includeGithubBranding: true,
+      includeBranding: true,
     });
     expect(svg).toContain("<svg");
     expect(svg).toContain("</svg>");

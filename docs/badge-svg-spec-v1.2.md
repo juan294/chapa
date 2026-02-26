@@ -628,7 +628,7 @@ M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 
 ```
 </details>
 
-**"Powered by GitHub" text:**
+**"Forged from purpose. Driven by curiosity." text:**
 
 | Property | Value |
 |----------|-------|
@@ -790,7 +790,7 @@ Every text element in the badge:
 | Radar axis labels | Plus Jakarta Sans | `13` | normal | `#9AA4B2` | dynamic | — |
 | Score number | JetBrains Mono | `52` | `700` | `#E6EDF3` | `middle` | `dominant-baseline="central"` |
 | Tier label | Plus Jakarta Sans | `17` | normal | `{tierColor}` | `middle` | — |
-| "Powered by GitHub" | Plus Jakarta Sans | `17` | normal | `#9AA4B2` | `start` | `opacity="0.8"` |
+| "Forged from purpose. Driven by curiosity." | Plus Jakarta Sans | `17` | normal | `#9AA4B2` | `start` | `opacity="0.8"` |
 | Domain text | JetBrains Mono | `17` | normal | `#9AA4B2` | `end` | `opacity="0.8"` |
 | Verification text | JetBrains Mono | `11` | normal | `#E05A47` | `middle` | `opacity="0.50"`, `letter-spacing="2"` |
 
@@ -892,9 +892,10 @@ Uses SMIL `<animate>` elements (not CSS):
 
 | Element | Condition |
 |---------|-----------|
-| Avatar image vs octocat fallback | `avatarDataUri` provided or not |
+| Avatar image vs Chapa shield fallback | `avatarDataUri` provided or not |
 | Display name vs `@handle` | `stats.displayName` truthy or not |
-| GitHub branding | `includeGithubBranding` option (default `true`) |
+| Badge branding (footer) | `includeBranding` option (default `true`) |
+| Platform logos in footer | `stats.linkedPlatforms` + `demoMode` (demo shows all 3) |
 | Verification strip | Both `verificationHash` and `verificationDate` provided |
 
 ---
@@ -922,7 +923,7 @@ Source files (in `apps/web/lib/render/`):
 | `RadarChart.ts` | 4-axis diamond radar chart |
 | `heatmap.ts` | 13×7 heatmap grid cells + animation |
 | `theme.ts` | Color palette, tier colors, archetype colors, heatmap color mapping |
-| `GithubBranding.tsx` | Footer GitHub branding section |
+| `BadgeBranding.tsx` | Footer branding: "Forged from purpose. Driven by curiosity." + dynamic platform logos |
 | `VerificationStrip.ts` | Right-edge verification seal |
 | `avatar.ts` | Avatar URL → base64 data URI conversion |
 | `escape.ts` | XML entity escaping for user-controlled text |

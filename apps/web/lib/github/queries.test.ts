@@ -320,6 +320,94 @@ describe("fetchContributionData", () => {
     consoleSpy.mockRestore();
   });
 
+  it("maps ownedRepoStars nodes correctly, filtering nulls", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                login: "testuser",
+                name: "Test",
+                avatarUrl: "https://example.com/avatar.png",
+                contributionsCollection: {
+                  contributionCalendar: { totalContributions: 0, weeks: [] },
+                  pullRequestContributions: { totalCount: 0, nodes: [] },
+                  pullRequestReviewContributions: { totalCount: 0 },
+                  issueContributions: { totalCount: 0 },
+                },
+                repositories: { totalCount: 0, nodes: [] },
+                ownedRepos: {
+                  nodes: [
+                    { stargazerCount: 50, forkCount: 10, watchers: { totalCount: 5 } },
+                    null,
+                    { stargazerCount: 30, forkCount: 8, watchers: { totalCount: 3 } },
+                  ],
+                },
+              },
+            },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).not.toBeNull();
+    expect(result!.ownedRepoStars.nodes).toHaveLength(2);
+    expect(result!.ownedRepoStars.nodes[0]!.stargazerCount).toBe(50);
+    expect(result!.ownedRepoStars.nodes[1]!.stargazerCount).toBe(30);
+  });
+
+  it("handles missing ownedRepos gracefully", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                login: "testuser",
+                name: "Test",
+                avatarUrl: "https://example.com/avatar.png",
+                contributionsCollection: {
+                  contributionCalendar: { totalContributions: 0, weeks: [] },
+                  pullRequestContributions: { totalCount: 0, nodes: [] },
+                  pullRequestReviewContributions: { totalCount: 0 },
+                  issueContributions: { totalCount: 0 },
+                },
+                repositories: { totalCount: 0, nodes: [] },
+              },
+            },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).not.toBeNull();
+    expect(result!.ownedRepoStars.nodes).toEqual([]);
+  });
+
+  it("handles unreadable error body on HTTP failure", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.reject(new Error("body read failed")),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[github] GraphQL HTTP 500"),
+    );
+    consoleSpy.mockRestore();
+  });
+
   it("logs network/fetch errors", async () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(

@@ -65,6 +65,8 @@ export const DEMO_STATS: StatsData = {
   totalWatchers: 89,
   heatmapData: buildDemoHeatmap(),
   fetchedAt: "2025-01-01T00:00:00Z",
+  linkedPlatforms: ["bitbucket", "codeberg"],
+  linkedPlatformLogins: { bitbucket: "developer", codeberg: "developer" },
 };
 
 export const DEMO_IMPACT: ImpactV4Result = {

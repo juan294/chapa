@@ -1,18 +1,18 @@
-# Pre-Launch Audit Report (v29)
+# Pre-Launch Audit Report (v30)
 
-> Generated on 2026-02-26 | Branch: `develop` | Commit: `b2a3392`
-> 3,654 tests | 211 test files | 58 static pages | Next.js 16.1.6 (Turbopack)
-> CI: ALL GREEN (5/5 workflows passed)
+> Generated on 2026-02-26 | Branch: `develop` | Commit: `32150c0`
+> 3,671 tests | 211 test files | 58 routes (11 static, 47 dynamic) | Next.js 16.1.6 (Turbopack)
+> CI: ALL GREEN (5/5 workflows passed) | 6 parallel specialists
 
-## Verdict: READY
+## Verdict: CONDITIONAL
 
-No blockers found across all 6 specialist domains. The codebase is production-ready.
+No blockers. 12 warnings across all specialists. 5 unpushed commits on develop.
 
 ---
 
-## Blockers
+## Blockers (must fix before release)
 
-**None.** All 6 specialists report GREEN with zero blocking issues.
+None.
 
 ---
 
@@ -20,23 +20,18 @@ No blockers found across all 6 specialist domains. The codebase is production-re
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | 1 unpushed commit on local `develop` | Medium | devops | CI hasn't validated this commit on remote |
-| W2 | ESLint major version bump available (9.39.2 → 10.0.2) | Low | architect | Not blocking; plan migration post-release |
-| W3 | Code duplication in auth platform routes (Bitbucket/Codeberg) ~6.4% | Low | architect | Maintainability concern, not a release blocker |
-| W4 | Missing additional tsconfig strict flags (`noUnusedLocals`, etc.) | Low | architect | Core `strict: true` is enabled; these are extras |
-| W5 | `actions/upload-artifact@v6` vs `actions/download-artifact@v7` version mismatch in CI | Low | devops | Currently compatible but should be aligned |
-| W6 | Per-route bundle sizes cannot be verified (Turbopack limitation) | Low | performance-eng | No size data in build output; use `ANALYZE=true` periodically |
-| W7 | Experiment pages: missing `<main>` landmark and `#main-content` skip target | Low | ux-reviewer | Only affects internal `/experiments/*` pages (behind feature flag) |
-| W8 | Experiment pages: heading order issues (h2 before h1 in some pages) | Low | ux-reviewer | Only affects internal `/experiments/*` pages |
-| W9 | Experiment pages: `rounded-full` on text buttons (design system violation) | Low | ux-reviewer | Only affects internal `/experiments/*` pages |
-| W10 | All 12 experiment pages use `"use client"` at page level | Low | performance-eng | Behind feature flag, not production-facing |
-| W11 | `dangerouslySetInnerHTML` in admin cross-agent-insights (properly escaped) | Low | security-reviewer | Content escaped via `escapeHtml()` first; admin-only |
-| W12 | HMAC verification hash truncated to 64 bits | Low | security-reviewer | Documented in `accepted-risks.md` #401 |
-| W13 | No edge middleware for route protection | Low | security-reviewer | Auth at handler level; documented in `accepted-risks.md` #402 |
-| W14 | Rate limiter fail-open design | Low | security-reviewer | Intentional; documented in `accepted-risks.md` #398 |
-| W15 | `unsafe-inline` in CSP script-src | Low | security-reviewer | Required by Next.js App Router; documented in `accepted-risks.md` #396 |
-| W16 | `SharePageShortcuts.tsx` untested (59 lines, 3 branches) | Low | qa-lead | Client-only keyboard handler; low risk |
-| W17 | `codeberg/stats.ts` untested (24 lines) | Low | qa-lead | Thin orchestration; dependencies are tested |
+| W1 | 5 unpushed commits on `develop` (badge branding changes) | Medium | devops | Code not on remote; blocks release PR |
+| W2 | 2 untracked plan files in `docs/plans/` | Low | devops | Should be committed or confirmed local-only |
+| W3 | ESLint 10.0.2 available (current: 9.39.2) — major version bump | Low | architect | No security issue; plan migration separately |
+| W4 | `sharp` native dep uses LGPL-3.0 (dynamic linking — compliant) | Low | security | Acceptable per LGPL terms; document in accepted risks |
+| W5 | Bitbucket/Codeberg status/connect/disconnect routes lack explicit rate limiting | Low | security | Auth-gated; low abuse risk |
+| W6 | Function coverage at 46.81% (line coverage 61.15%) | Medium | qa-lead | Some utility functions untested |
+| W7 | API routes `/api/refresh`, `/api/generate`, `/api/history/[handle]`, `/api/verify/[hash]` lack top-level try/catch | Low | qa-lead | Next.js error boundaries catch these; API callers get generic 500 |
+| W8 | Coverage reporter is summary-only (no per-file breakdown) | Low | qa-lead | Harder to spot undertested files |
+| W9 | Missing `loading.tsx` for `/generating/[handle]` | Low | performance, ux | Potential blank flash; mitigated by client-side loading state |
+| W10 | No per-route bundle size data from Turbopack build | Low | performance | Run `ANALYZE=true pnpm run build` periodically |
+| W11 | `/u/[handle]` (most public route) has no dedicated `error.tsx` | Low | ux | Falls to global error boundary; lacks route-specific context |
+| W12 | Two experiment pages have h2 before h1 in DOM order | Low | ux | Behind feature flag; not user-facing |
 
 ---
 
@@ -44,157 +39,136 @@ No blockers found across all 6 specialist domains. The codebase is production-re
 
 ### 1. Quality Assurance (qa-lead) — GREEN
 
-**Test Suite:**
-- **3,654 tests** across 211 files — all passing, zero failures, zero skipped
-- Duration: 6.17s
-- TypeScript: PASS (zero errors)
-- Lint: PASS (zero warnings/errors)
+| Metric | Result |
+|--------|--------|
+| Tests | 3,671 passed / 0 failed (100%) |
+| Test files | 211 |
+| Duration | 6.20s |
+| TypeScript | PASS (zero errors, strict mode) |
+| Lint | PASS (zero errors, zero warnings) |
 
-**Critical Path Coverage:**
+**Coverage:**
 
-| Path | Tests | Status |
-|------|-------|--------|
-| Scoring pipeline (`lib/impact/`) | 217 | COVERED |
-| SVG rendering (`lib/render/`) | 164 | COVERED |
-| OAuth (`api/auth/`) | 110 | COVERED |
-| Badge route (`badge.svg/`) | 31 | COVERED |
-| Cache layer (`lib/cache/`) | 39 | COVERED |
-| Share page (`u/[handle]/`) | 48 | COVERED |
-| GitHub client (`lib/github/`) | 88 | COVERED |
-| History/snapshots (`lib/history/`) | 66 | COVERED |
-| Verification (`lib/verification/`) | 20 | COVERED |
-| Admin dashboard | 200+ | COVERED |
-| Creator Studio | 129 | COVERED |
+| Metric | Covered | Total | % |
+|--------|---------|-------|---|
+| Statements | 3,435 | 5,657 | 60.72% |
+| Branches | 1,784 | 3,034 | 58.80% |
+| Functions | 566 | 1,209 | 46.81% |
+| Lines | 3,111 | 5,087 | 61.15% |
 
-**Acceptance Criteria:** All 11 criteria from CLAUDE.md verified as covered by tests.
+**Critical path coverage:**
 
-**Graceful Degradation:** Tested for GitHub API failure, Redis unavailable, missing stats, Supabase down, email service down.
+| File | Tests | Level |
+|------|-------|-------|
+| `lib/impact/v4.ts` | 88 | HIGH |
+| `lib/render/BadgeSvg.tsx` | 67 | HIGH |
+| `app/u/[handle]/badge.svg/route.ts` | 31 | GOOD |
+| `lib/cache/redis.ts` | 30 | GOOD |
+| `app/api/auth/callback/route.ts` | 17 | GOOD |
+| `lib/render/BadgeBranding.tsx` | 11 | MODERATE |
 
-**Untested Files (5):** All low-risk — thin wrappers, data fixtures, type-only files. `SharePageShortcuts.tsx` is the only one with non-trivial logic.
+**Graceful degradation:** Well-implemented. Cache-first pattern with stale fallbacks. Badge route returns branded fallback SVG on failure. Rate limiter is fail-open (documented design decision). Auth callback redirects to `/?error=<code>` on failure.
 
 ---
 
 ### 2. Security (security-reviewer) — GREEN
 
-**Dependency Vulnerabilities:** CLEAN — `pnpm audit` reports zero known vulnerabilities.
-
-**Hardcoded Secrets:** CLEAN — No API keys, tokens, or passwords in source. `.env.local` properly gitignored.
-
-**Auth Implementation:**
-- CSRF: STRONG — Random state tokens with `timingSafeEqual` on all 3 OAuth flows
-- Tokens: STRONG — AES-256-GCM encrypted in HttpOnly/Secure/SameSite=Lax cookies
-- Redirect: STRONG — `isSafeRedirect()` validates same-origin/relative paths
-- Session endpoint: SAFE — Only exposes `login`, `name`, `avatar_url` (never the token)
-- Rate limiting: Applied to all auth endpoints
-
-**XSS in SVG:** STRONG — `escapeXml()` applied to all user-controlled text (handle, displayName, archetype, tier, avatar URI). Comprehensive test coverage.
-
-**Client Secret Leakage:** CLEAN — All `NEXT_PUBLIC_*` vars are appropriate (feature flags, analytics keys, base URL). Server secrets never prefixed.
-
-**CORS:** Appropriate — Only enabled on `/api/verify/[hash]` (public read-only endpoint).
-
-**Cache Key Injection:** SAFE — Handles validated by strict regex before reaching cache key construction.
-
-**Security Headers:** Comprehensive — CSP, HSTS (2yr), X-Frame-Options, Permissions-Policy, X-Content-Type-Options all configured.
-
-**All 5 warnings (W11-W15) are already documented in `docs/accepted-risks.md`.**
+| Check | Result |
+|-------|--------|
+| `pnpm audit` | 0 vulnerabilities |
+| Hardcoded secrets | CLEAN (test fixtures only) |
+| Client env var safety | CLEAN (7 `NEXT_PUBLIC_` vars, none contain secrets) |
+| SVG XSS protection | All user input escaped via `escapeXml()` |
+| OAuth CSRF | `timingSafeEqual()` state validation on all 3 providers |
+| Session security | AES-256-GCM encryption, HttpOnly, SameSite=Lax, 24h TTL |
+| Open redirect protection | `isSafeRedirect()` validates same-origin only |
+| Admin authorization | Session + `isAdminHandle()` on all admin routes |
+| Security headers | HSTS, CSP, X-Content-Type-Options, Permissions-Policy |
+| `.env` gitignored | YES |
+| License compliance | CLEAN (one LGPL-3.0 native binary via dynamic linking — compliant) |
 
 ---
 
 ### 3. Infrastructure (devops) — GREEN
 
-**Build:** PASS — Next.js 16.1.6 compiles cleanly, 58 static pages, 73+ routes, zero errors.
-
-**CI:** PASS — 5/5 most recent runs on `develop` all green (Secret Scanning, Claude Code Review, Security Scan, Dead Code Detection, Bundle Size Analysis).
-
-**Environment Variables:** 28/28 documented vars match code usage. All use `.trim()`. No undocumented vars found.
-
-**Error Pages:** All 3 present — `not-found.tsx` (404), `error.tsx` (500), `global-error.tsx` (global boundary).
-
-**Health Endpoint:** Well-implemented — checks Redis + Supabase in parallel, returns 200/503 with dependency breakdown, rate-limited.
-
-**Git State:** Clean working tree, no stale worktrees, no stashed changes, 2 local branches (`develop`, `main`). **1 unpushed commit** (W1).
-
-**Cron:** Daily `warm-cache` at 06:00 UTC, protected with `CRON_SECRET` via timing-safe comparison.
-
-**7 CI Workflows:** ci.yml, claude-review.yml, knip.yml, security.yml, bundle-size.yml, lighthouse.yml, gitleaks.yml.
+| Check | Result |
+|-------|--------|
+| Build | PASS — compiled in 2.2s, 58 routes generated |
+| CI (last 5 runs) | ALL GREEN (Secret Scan, Security Scan, Dead Code, Code Review, Bundle Size) |
+| Git state | 5 unpushed commits, 2 untracked plan files |
+| Worktrees | Clean (none stale) |
+| Branches | Clean (`develop` + `main` only) |
+| Env vars | 29 documented = 29 used. All `.trim()`'d. All gitignored. |
+| Error pages | All 4 present (`error.tsx`, `global-error.tsx`, `not-found.tsx`, `loading.tsx`) |
+| Health endpoint | `/api/health` — checks Redis + Supabase, returns 503 on degraded |
+| Badge cache headers | `s-maxage=21600, stale-while-revalidate=604800` (matches spec) |
+| Cron | `warm-cache` daily at 06:00 UTC |
 
 ---
 
 ### 4. Architecture (architect) — GREEN
 
-**TypeScript:** PASS — Zero errors across all packages.
+| Check | Result |
+|-------|--------|
+| TypeScript | PASS — zero errors, strict mode + `noUncheckedIndexedAccess` |
+| Dependencies | 0 vulnerabilities, consistent React 19.2.4 + TS 5.9.3 |
+| Dead code (knip) | CLEAN — no unused files, exports, or dependencies |
+| Circular deps | CLEAN — 0 cycles found (450 files scanned) |
+| License compliance | CLEAN — no copyleft violations |
 
-**Circular Dependencies:** PASS — None found in 430 files.
+**Outdated packages (non-urgent):**
 
-**Dead Code:** PASS — Knip found no unused files, exports, or dependencies.
-
-**Dependencies:** 3 outdated — `@types/node` (patch), `posthog-js` (patch), `eslint` (major v10). No urgent updates.
-
-**Code Duplication:** 6.42% (232 clones across 272 files). Hotspots:
-- Bitbucket vs Codeberg auth routes (near-identical copies)
-- Admin session/auth boilerplate across 5+ routes
-- Type definitions duplicated between admin-types.ts and API routes
-
-**tsconfig:** All 3 configs have `strict: true` + `noUncheckedIndexedAccess: true`. Missing extras: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`.
+| Package | Current | Latest | Type |
+|---------|---------|--------|------|
+| `eslint` (dev) | 9.39.2 | 10.0.2 | Major |
+| `@types/node` (dev) | 25.3.0 | 25.3.1 | Patch |
+| `@supabase/supabase-js` | 2.97.0 | 2.98.0 | Minor |
+| `posthog-js` | 1.353.1 | 1.354.4 | Patch |
 
 ---
 
 ### 5. Performance (performance-eng) — GREEN
 
-**Build:** Compiled in 2.4s, 58 static pages in 213ms, zero warnings.
-
-**Code Splitting:** Well-implemented — `ShortcutCheatSheet`, `ShareBadgePreview`, `AgentsDashboard`, `EngagementDashboard`, and 4 badge effect components all dynamically imported with loading fallbacks.
-
-**Server/Client Boundary:** Correct — Root layout is RSC. Heavy deps (`@resvg/resvg-js`, `resend`, `@supabase/supabase-js`, `@upstash/redis`) are server-only. No leakage into client bundle.
-
-**Font Loading:** Optimal — `next/font/google` with `display: "swap"` and CSS variables.
-
-**Analytics:** Lazy-loaded — PostHog loads on first user interaction with 5s fallback.
-
-**Cache Headers:** Well-differentiated — badge (6h CDN/7d stale), OG images (24h), session (no-store), admin (no-store), feature flags (60s/5min stale).
-
-**Reduced Motion:** 35+ locations, covering CSS animations, canvas effects, and JS checks.
-
-**Images:** All `<Image>` components have explicit dimensions — minimal CLS risk.
-
-**Resource Hints:** `preconnect` to `api.github.com` and `eu.i.posthog.com`.
+| Check | Result |
+|-------|--------|
+| Build | PASS — 4.5s with Turbopack |
+| `"use client"` placement | Correct — leaf components only, no pages/layouts |
+| Heavy deps server-isolated | `@resvg/resvg-js`, `@supabase`, `resend`, `svix` server-only |
+| Client deps lazy-loaded | `posthog-js` (interaction-triggered), `canvas-confetti` (call-site import) |
+| Code splitting | 8 dynamic imports with loading states |
+| `prefers-reduced-motion` | Comprehensive (global CSS + component-level JS checks) |
+| Image optimization | All rendered images use `next/image` |
+| Loading boundaries | 4/8 key routes have `loading.tsx` |
 
 ---
 
 ### 6. UX/Accessibility (ux-reviewer) — GREEN
 
-**Heading Hierarchy:** PASS on all core pages (landing, share, studio, admin, verify, terms, privacy, about, archetypes). Experiment pages have some ordering issues (W8).
-
-**ARIA Labels:** Excellent — 125 uses of `aria-hidden="true"` on decorative icons. All interactive elements (buttons, menus, modals, tabs, tooltips) have proper ARIA attributes.
-
-**Focus Indicators:** Global `*:focus-visible` with 2px solid amber outline + 2px offset. Component-level `focus-visible:ring-2` where needed.
-
-**Reduced Motion:** Comprehensive (see Performance section).
-
-**Alt Text:** All `<img>` and `<Image>` elements have `alt` attributes.
-
-**Keyboard Navigation:**
-- Skip-to-content link targeting `#main-content`
-- Zero `<div onClick>` without keyboard handlers
-- Focus traps in `ShortcutCheatSheet` and `MobileNav`
-- `ConfirmDialog` auto-focuses Cancel button (safe default)
-- Escape key handling in all modals/overlays
-
-**Error/Loading States:** Error boundaries at root, admin, and global level. Loading pages with `role="status"` at root, studio, share, and admin. `ErrorBanner` with `role="alert"`. Live regions (`aria-live="polite"`) in terminal output, copy button, progress indicator, and admin dashboard.
-
-**Design Consistency:** Core pages use correct tokens, fonts, and border radii. Experiment pages deviate (W4, W5, W9) but are behind a feature flag.
+| Check | Result |
+|-------|--------|
+| Heading hierarchy | Correct on all production pages (2 experiment pages have minor issues) |
+| ARIA labels | Excellent — all interactive elements labeled, roles on menus/tabs/dialogs |
+| `aria-live` regions | Present on terminal output, copy button, progress, admin loading |
+| Focus indicators | Global `*:focus-visible` rule + component-level styles |
+| Skip-to-content | Present and functional (`sr-only` → `focus:not-sr-only`) |
+| `prefers-reduced-motion` | Global CSS catch-all + JS `matchMedia` checks in animated components |
+| Alt text | All images have descriptive alt text; decorative SVGs use `aria-hidden` |
+| Keyboard navigation | No onClick-only violations; all interactive elements are semantic HTML |
+| Error/loading states | Global boundaries present; `/generating/[handle]` and `/u/[handle]` could use dedicated ones |
+| Design token consistency | All production components use semantic tokens; no hardcoded colors |
+| `lang="en"` | Set on `<html>` element |
 
 ---
 
-## Recommendations (Post-Release)
+## Recommendations (non-blocking)
 
-1. **Push the unpushed commit** and verify CI passes on remote before creating the release PR.
-2. **Extract shared auth middleware** — session validation + admin check duplicated across 5+ admin routes.
-3. **Create platform-agnostic OAuth route factory** — Bitbucket/Codeberg auth routes are near-identical copies.
-4. **Add tests for `SharePageShortcuts.tsx`** — 59 lines with 3 untested branches.
-5. **Align CI artifact action versions** — upload@v6 → v7 to match download@v7.
-6. **Run `ANALYZE=true pnpm run build`** periodically to verify bundle sizes (Turbopack doesn't report them).
-7. **Enable `noUnusedLocals`/`noUnusedParameters`** in tsconfig for additional compile-time checks.
-8. **Fix experiment page accessibility** — add `<main>`, `#main-content`, correct heading order (low priority, behind feature flag).
-9. **Plan ESLint v10 migration** post-release.
+1. **Push 5 local commits to `origin/develop`** before creating release PR.
+2. **Decide on untracked plan files** — commit or add to `.gitignore`.
+3. **Add `error.tsx` for `/u/[handle]`** — the most public route deserves a context-specific error page.
+4. **Add `loading.tsx` for `/generating/[handle]`** — avoid potential blank flash.
+5. **Add try/catch to 4 API routes** (`/api/refresh`, `/api/generate`, `/api/history/[handle]`, `/api/verify/[hash]`) for structured error JSON.
+6. **Plan ESLint 10 migration** as a separate task (not pre-release).
+7. **Add explicit rate limiting** to Bitbucket/Codeberg connect/status/disconnect routes.
+8. **Add per-file coverage reporter** (`"text"` or `"lcov"`) to vitest config.
+9. **Document `sharp` LGPL-3.0** in `docs/accepted-risks.md`.
+10. **Run `ANALYZE=true pnpm run build`** periodically to track bundle size trends.

@@ -17,34 +17,42 @@ import { computeImpactV4 } from "@/lib/impact/v4";
  * Rate limited: 10 requests per handle per hour.
  */
 export async function POST(request: NextRequest): Promise<Response> {
-  const { session, error } = requireSession(request);
-  if (error) return error;
+  try {
+    const { session, error } = requireSession(request);
+    if (error) return error;
 
-  const handle = session.login;
+    const handle = session.login;
 
-  // Rate limit: 10 generates per handle per hour
-  const rl = await rateLimit(
-    `ratelimit:generate:${handle.toLowerCase()}`,
-    10,
-    3600,
-  );
-  if (!rl.allowed) {
+    // Rate limit: 10 generates per handle per hour
+    const rl = await rateLimit(
+      `ratelimit:generate:${handle.toLowerCase()}`,
+      10,
+      3600,
+    );
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": "3600" } },
+      );
+    }
+
+    const stats = await getStats(handle, session.token);
+    if (!stats) {
+      return NextResponse.json(
+        { error: "Failed to fetch stats. Try again later." },
+        { status: 502 },
+      );
+    }
+
+    // Compute impact (also warms any downstream caches)
+    computeImpactV4(stats);
+
+    return NextResponse.json({ success: true, handle });
+  } catch (err) {
+    console.error("[generate] Unhandled error:", err);
     return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "3600" } },
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
-
-  const stats = await getStats(handle, session.token);
-  if (!stats) {
-    return NextResponse.json(
-      { error: "Failed to fetch stats. Try again later." },
-      { status: 502 },
-    );
-  }
-
-  // Compute impact (also warms any downstream caches)
-  computeImpactV4(stats);
-
-  return NextResponse.json({ success: true, handle });
 }

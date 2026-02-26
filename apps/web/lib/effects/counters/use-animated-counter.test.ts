@@ -105,4 +105,58 @@ describe("easings", () => {
       expect(mid).toBeLessThanOrEqual(1.5);
     }
   });
+
+  it("easeOut is faster than linear at midpoint", () => {
+    // Cubic ease-out should be ahead of linear at t=0.5
+    expect(easings.easeOut!(0.5)).toBeGreaterThan(0.5);
+  });
+
+  it("easeInOut is at ~0.5 at midpoint", () => {
+    const mid = easings.easeInOut!(0.5);
+    expect(mid).toBeCloseTo(0.5, 1);
+  });
+
+  it("easeInOut first half is below 0.5", () => {
+    expect(easings.easeInOut!(0.25)).toBeLessThan(0.5);
+  });
+
+  it("easeInOut second half is above 0.5", () => {
+    expect(easings.easeInOut!(0.75)).toBeGreaterThan(0.5);
+  });
+
+  it("spring overshoots slightly near t=0.4", () => {
+    const val = easings.spring!(0.4);
+    // Spring should be close to 1 but may overshoot
+    expect(val).toBeGreaterThan(0.5);
+  });
+});
+
+describe("useAnimatedCounter advanced", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    stubMatchMedia(false);
+  });
+
+  it("animate triggers animation state", () => {
+    const { result } = renderHook(() => useAnimatedCounter(100));
+    act(() => {
+      result.current.animate();
+    });
+    // After calling animate, isAnimating should be true (before any frames run)
+    expect(result.current.isAnimating).toBe(true);
+  });
+
+  it("starts animation on mount when startOnMount is true", () => {
+    const rafCalls: FrameRequestCallback[] = [];
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation((cb) => {
+      rafCalls.push(cb);
+      return rafCalls.length;
+    });
+    renderHook(() =>
+      useAnimatedCounter(50, 2000, "easeOut", true),
+    );
+    // requestAnimationFrame should have been called for the initial animation
+    expect(rafSpy).toHaveBeenCalled();
+    rafSpy.mockRestore();
+  });
 });

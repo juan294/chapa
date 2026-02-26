@@ -65,11 +65,13 @@ Shared types live in: `packages/shared/src/types.ts`
 - Light/dark theme support via `next-themes`. Light is the default; dark (`#0A0A0F`) is the signature brand look. Badge SVG always renders dark.
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
-## GitHub branding
-Include GitHub logo and "Powered by GitHub" text.
-Must be easy to swap/remove:
-- Branding is behind a flag: `includeGithubBranding`
-- Branding is isolated in one component/file.
+## Badge branding
+Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg).
+- Personal badges show only logos for platforms the user has connected
+- Demo badges show all 3 platform logos
+- Branding is behind a flag: `includeBranding`
+- Branding is isolated in `apps/web/lib/render/BadgeBranding.tsx`
+- Avatar placeholder (when no user photo) shows the Chapa shield icon
 
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)

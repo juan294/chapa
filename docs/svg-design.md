@@ -60,8 +60,10 @@
 - Tier label below (color-coded: Emerging=gray, Solid=white, High=light purple, Elite=purple)
 
 ### 5) Footer
-- "Powered by GitHub" + GitHub mark (behind `includeGithubBranding` flag)
-- Branding isolated in `GithubBranding` component
+- "Forged from purpose. Driven by curiosity." text + dynamic platform logos (behind `includeBranding` flag)
+- Platform logos shown: GitHub always, plus Bitbucket/Codeberg if user has linked them
+- Demo badges show all 3 platform logos regardless of linked status
+- Branding isolated in `BadgeBranding` component
 - If disabled, layout stays balanced
 
 ### 6) Verification strip (optional, right edge)
@@ -70,9 +72,10 @@
 - Only present when `verificationHash` and `verificationDate` are provided
 - Rendered by `VerificationStrip` component
 
-## GitHub branding swap
-- `includeGithubBranding: boolean`
-- Branding isolated in `apps/web/lib/render/GithubBranding.tsx`
+## Badge branding
+- `includeBranding: boolean`
+- Branding isolated in `apps/web/lib/render/BadgeBranding.tsx`
+- Shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg)
 - If disabled, layout should still look balanced (no big empty gap).
 
 ## Theme tokens (Warm Amber)
@@ -147,7 +150,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 - `tier` (tier label)
 
 **From options:**
-- `includeGithubBranding` (footer)
+- `includeBranding` (footer)
 - `avatarDataUri` (inline avatar)
 - `verificationHash`, `verificationDate` (verification strip)
 

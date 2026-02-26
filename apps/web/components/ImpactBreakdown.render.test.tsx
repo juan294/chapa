@@ -1,0 +1,175 @@
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
+import { ImpactBreakdown, DataSources, getArchetypeProfile } from "./ImpactBreakdown";
+import type { ImpactV4Result, StatsData } from "@chapa/shared";
+
+afterEach(cleanup);
+
+const SAMPLE_IMPACT: ImpactV4Result = {
+  handle: "testuser",
+  profileType: "collaborative",
+  dimensions: { delivery: 85, quality: 42, consistency: 70, breadth: 55 },
+  archetype: "Builder",
+  compositeScore: 72,
+  confidence: 90,
+  confidencePenalties: [],
+  adjustedComposite: 78,
+  tier: "High",
+  computedAt: "2025-01-01T00:00:00Z",
+};
+
+const SAMPLE_STATS: StatsData = {
+  handle: "testuser",
+  displayName: "Test User",
+  commitsTotal: 320,
+  activeDays: 180,
+  prsMergedCount: 65,
+  prsMergedWeight: 72,
+  reviewsSubmittedCount: 30,
+  issuesClosedCount: 20,
+  linesAdded: 40000,
+  linesDeleted: 15000,
+  reposContributed: 6,
+  topRepoShare: 0.4,
+  maxCommitsIn10Min: 2,
+  totalStars: 500,
+  totalForks: 120,
+  totalWatchers: 45,
+  heatmapData: [],
+  fetchedAt: "2025-01-01T00:00:00Z",
+};
+
+describe("getArchetypeProfile", () => {
+  it("returns profile with tip for Builder archetype", () => {
+    const result = getArchetypeProfile(SAMPLE_IMPACT);
+    expect(result).toContain("driven by output");
+    // Builder's weakest is quality (42), so should include quality tip
+    expect(result).toContain("Quality");
+  });
+
+  it("returns profile with tip for Quality Champion", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      archetype: "Quality Champion",
+      dimensions: { delivery: 30, quality: 90, consistency: 50, breadth: 40 },
+    };
+    const result = getArchetypeProfile(impact);
+    expect(result).toContain("shaped by quality");
+    // Weakest is delivery (30)
+    expect(result).toContain("Delivery");
+  });
+
+  it("returns profile with tip for Marathoner", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      archetype: "Marathoner",
+      dimensions: { delivery: 40, quality: 20, consistency: 92, breadth: 35 },
+    };
+    const result = getArchetypeProfile(impact);
+    expect(result).toContain("defined by consistency");
+  });
+
+  it("returns profile with tip for Polymath", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      archetype: "Polymath",
+      dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 88 },
+    };
+    const result = getArchetypeProfile(impact);
+    expect(result).toContain("marked by reach");
+  });
+
+  it("returns profile without tip for Balanced archetype", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      archetype: "Balanced",
+      dimensions: { delivery: 70, quality: 68, consistency: 72, breadth: 66 },
+    };
+    const result = getArchetypeProfile(impact);
+    expect(result).toContain("well-rounded");
+    // Should NOT contain a dimension tip since Balanced skips tips
+    expect(result).not.toContain("To strengthen");
+  });
+
+  it("returns profile without tip for Emerging archetype", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      archetype: "Emerging",
+      dimensions: { delivery: 15, quality: 10, consistency: 12, breadth: 8 },
+    };
+    const result = getArchetypeProfile(impact);
+    expect(result).toContain("still taking shape");
+    expect(result).not.toContain("To strengthen");
+  });
+});
+
+describe("ImpactBreakdown", () => {
+  it("renders all four dimension cards", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    expect(screen.getByText("Delivery")).toBeDefined();
+    expect(screen.getByText("Quality")).toBeDefined();
+    expect(screen.getByText("Consistency")).toBeDefined();
+    expect(screen.getByText("Breadth")).toBeDefined();
+  });
+
+  it("renders dimension scores", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    expect(screen.getByText("85")).toBeDefined();
+    expect(screen.getByText("42")).toBeDefined();
+    expect(screen.getByText("70")).toBeDefined();
+    expect(screen.getByText("55")).toBeDefined();
+  });
+
+  it("renders progress bars with correct aria-valuenow", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars).toHaveLength(4);
+    expect(bars[0]!.getAttribute("aria-valuenow")).toBe("85");
+    expect(bars[1]!.getAttribute("aria-valuenow")).toBe("42");
+  });
+
+  it("renders key numbers section", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    expect(screen.getByText("Key Numbers")).toBeDefined();
+    expect(screen.getByText("Stars")).toBeDefined();
+    expect(screen.getByText("Forks")).toBeDefined();
+    expect(screen.getByText("Watchers")).toBeDefined();
+  });
+});
+
+describe("DataSources", () => {
+  it("renders GitHub as default data source", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    expect(screen.getByText("GitHub")).toBeDefined();
+  });
+
+  it("renders linked platforms when present", () => {
+    const stats: StatsData = {
+      ...SAMPLE_STATS,
+      linkedPlatforms: ["github", "bitbucket"],
+      linkedPlatformLogins: { bitbucket: "bbuser" },
+    };
+    render(<DataSources stats={stats} handle="testuser" />);
+    expect(screen.getByText("GitHub")).toBeDefined();
+    expect(screen.getByText("Bitbucket")).toBeDefined();
+  });
+
+  it("renders GitHub link with handle", () => {
+    render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
+    const link = screen.getByText("GitHub").closest("a");
+    expect(link?.getAttribute("href")).toBe("https://github.com/testuser");
+  });
+
+  it("renders Codeberg platform when linked", () => {
+    const stats: StatsData = {
+      ...SAMPLE_STATS,
+      linkedPlatforms: ["github", "codeberg"],
+      linkedPlatformLogins: { codeberg: "cbuser" },
+    };
+    render(<DataSources stats={stats} handle="testuser" />);
+    expect(screen.getByText("Codeberg")).toBeDefined();
+    const link = screen.getByText("Codeberg").closest("a");
+    expect(link?.getAttribute("href")).toBe("https://codeberg.org/cbuser");
+  });
+});

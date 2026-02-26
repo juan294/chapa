@@ -126,21 +126,28 @@ describe("renderBadgeSvg", () => {
       expect(svg).not.toContain("https://avatars.githubusercontent.com/u/123");
     });
 
-    it("falls back to octocat icon when no avatarDataUri and no avatarUrl", () => {
+    it("falls back to Chapa shield icon when no avatarDataUri and no avatarUrl", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: undefined }),
         makeImpact(),
       );
       expect(svg).toContain("<circle");
-      expect(svg).toContain("M14 0C6.27");
+      // Shield outline path
+      expect(svg).toContain("M14 0.875L25.375 5.25");
+      // Chevron inside shield
+      expect(svg).toContain("M8.75 17.5L14 10.5L19.25 17.5");
+      // No Octocat path
+      expect(svg).not.toContain("M14 0C6.27");
     });
 
-    it("falls back to octocat icon when avatarUrl exists but avatarDataUri is not provided", () => {
+    it("falls back to Chapa shield icon when avatarUrl exists but avatarDataUri is not provided", () => {
       const svg = renderBadgeSvg(
         makeStats({ avatarUrl: "https://avatars.githubusercontent.com/u/123" }),
         makeImpact(),
       );
-      expect(svg).toContain("M14 0C6.27");
+      // Shield outline path (not Octocat)
+      expect(svg).toContain("M14 0.875L25.375 5.25");
+      expect(svg).not.toContain("M14 0C6.27");
       expect(svg).not.toContain("https://avatars.githubusercontent.com/u/123");
     });
   });
@@ -150,7 +157,7 @@ describe("renderBadgeSvg", () => {
   // ---------------------------------------------------------------------------
 
   describe("verified icon", () => {
-    it("contains a shield/checkmark icon", () => {
+    it("contains a shield/checkmark icon in non-demo mode", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("M12 1L3 5v6");
     });
@@ -174,6 +181,13 @@ describe("renderBadgeSvg", () => {
       // Shield should appear just before the subtitle in SVG source order
       expect(shieldIdx).toBeLessThan(subtitleIdx);
       expect(subtitleIdx - shieldIdx).toBeLessThan(400);
+    });
+
+    it("hides shield icon in demo mode (no duplicate shields)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), { demoMode: true });
+      // The verified shield path should NOT appear (avatar already has a shield)
+      expect(svg).not.toContain("M12 1L3 5v6");
+      expect(svg).toContain("Simulated metrics");
     });
   });
 
@@ -386,16 +400,19 @@ describe("renderBadgeSvg", () => {
   // ---------------------------------------------------------------------------
 
   describe("footer", () => {
-    it("includes GitHub branding by default", () => {
+    it("includes branding text by default", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      expect(svg).toContain("Powered by GitHub");
+      expect(svg).toContain("Forged from ");
+      expect(svg).toContain("purpose");
+      expect(svg).toContain("curiosity");
     });
 
-    it("omits GitHub branding when includeGithubBranding is false", () => {
+    it("omits branding when includeBranding is false", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact(), {
-        includeGithubBranding: false,
+        includeBranding: false,
       });
-      expect(svg).not.toContain("Powered by GitHub");
+      expect(svg).not.toContain("Forged from ");
+      expect(svg).not.toContain("chapa.thecreativetoken.com");
     });
 
     it("contains the domain name in footer", () => {
@@ -405,7 +422,7 @@ describe("renderBadgeSvg", () => {
 
     it("footer text is at least 17px for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g);
+      const brandingFontSizes = svg.match(/font-size="(\d+)"[^>]*>(?:<tspan[^>]*>Forged from |chapa\.thecreativetoken\.com)/g);
       expect(brandingFontSizes).not.toBeNull();
       for (const match of brandingFontSizes!) {
         const size = parseInt(match.match(/font-size="(\d+)"/)![1]!, 10);
@@ -413,9 +430,9 @@ describe("renderBadgeSvg", () => {
       }
     });
 
-    it("footer text opacity is at least 0.75 for readability", () => {
+    it("footer domain text opacity is at least 0.75 for readability", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
-      const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>(?:Powered by GitHub|chapa\.thecreativetoken\.com)/g)];
+      const opacityMatches = [...svg.matchAll(/opacity="([0-9.]+)"[^>]*>chapa\.thecreativetoken\.com/g)];
       expect(opacityMatches.length).toBeGreaterThanOrEqual(1);
       for (const match of opacityMatches) {
         expect(parseFloat(match[1]!)).toBeGreaterThanOrEqual(0.75);
@@ -425,6 +442,39 @@ describe("renderBadgeSvg", () => {
     it("contains a divider line above footer", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("<line");
+    });
+
+    it("shows only GitHub logo when no linkedPlatforms", () => {
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), makeImpact());
+      expect(svg).toContain("M12 0C5.37");    // GitHub logo
+      expect(svg).not.toContain("M.778 1.211"); // No Bitbucket
+      expect(svg).not.toContain("M11.955.49");  // No Codeberg
+    });
+
+    it("shows GitHub + Bitbucket logos when bitbucket is linked", () => {
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: ["bitbucket"] }), makeImpact());
+      expect(svg).toContain("M12 0C5.37");    // GitHub
+      expect(svg).toContain("M.778 1.211");   // Bitbucket
+      expect(svg).not.toContain("M11.955.49"); // No Codeberg
+    });
+
+    it("shows all 3 platform logos when both linked", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ linkedPlatforms: ["bitbucket", "codeberg"] }),
+        makeImpact(),
+      );
+      expect(svg).toContain("M12 0C5.37");   // GitHub
+      expect(svg).toContain("M.778 1.211");  // Bitbucket
+      expect(svg).toContain("M11.955.49");   // Codeberg
+    });
+
+    it("shows all 3 platform logos in demo mode regardless of linkedPlatforms", () => {
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), makeImpact(), {
+        demoMode: true,
+      });
+      expect(svg).toContain("M12 0C5.37");   // GitHub
+      expect(svg).toContain("M.778 1.211");  // Bitbucket
+      expect(svg).toContain("M11.955.49");   // Codeberg
     });
   });
 
@@ -524,6 +574,84 @@ describe("renderBadgeSvg", () => {
       });
       expect(svg).not.toContain('"onload="alert(1)"');
       expect(svg).toContain('&quot;onload=');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Badge branding integration (avatar + footer combined scenarios)
+  // ---------------------------------------------------------------------------
+
+  describe("badge branding integration", () => {
+    it("new user, no photo: Chapa shield avatar + GitHub-only footer", () => {
+      const svg = renderBadgeSvg(makeStats({ avatarUrl: undefined }), makeImpact());
+      // Avatar: Chapa shield (not Octocat)
+      expect(svg).toContain("M14 0.875L25.375 5.25");
+      expect(svg).not.toContain("M14 0C6.27");
+      // Footer: branding text + GitHub logo only
+      expect(svg).toContain("Forged from ");
+      expect(svg).toContain("purpose");
+      expect(svg).toContain("M12 0C5.37");     // GitHub
+      expect(svg).not.toContain("M.778 1.211"); // No Bitbucket
+    });
+
+    it("user with photo: embedded image avatar + GitHub-only footer", () => {
+      const dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), { avatarDataUri: dataUri });
+      // Avatar: embedded image
+      expect(svg).toContain("<image");
+      expect(svg).toContain(dataUri);
+      // Footer: branding text + GitHub only
+      expect(svg).toContain("Forged from ");
+      expect(svg).toContain("curiosity");
+      expect(svg).toContain("M12 0C5.37");
+    });
+
+    it("user + Bitbucket: Chapa shield + GitHub + Bitbucket footer logos", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ avatarUrl: undefined, linkedPlatforms: ["bitbucket"] }),
+        makeImpact(),
+      );
+      expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield avatar
+      expect(svg).toContain("M12 0C5.37");    // GitHub logo
+      expect(svg).toContain("M.778 1.211");   // Bitbucket logo
+      expect(svg).not.toContain("M11.955.49"); // No Codeberg
+    });
+
+    it("user + all platforms: photo avatar + all 3 footer logos", () => {
+      const dataUri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+      const svg = renderBadgeSvg(
+        makeStats({ linkedPlatforms: ["bitbucket", "codeberg"] }),
+        makeImpact(),
+        { avatarDataUri: dataUri },
+      );
+      expect(svg).toContain("<image");        // Photo avatar
+      expect(svg).toContain("M12 0C5.37");   // GitHub
+      expect(svg).toContain("M.778 1.211");  // Bitbucket
+      expect(svg).toContain("M11.955.49");   // Codeberg
+    });
+
+    it("demo badge: Chapa shield + all 3 logos regardless of linkedPlatforms", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ avatarUrl: undefined, linkedPlatforms: undefined }),
+        makeImpact(),
+        { demoMode: true },
+      );
+      expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield
+      expect(svg).toContain("Simulated metrics");
+      expect(svg).toContain("M12 0C5.37");   // GitHub
+      expect(svg).toContain("M.778 1.211");  // Bitbucket
+      expect(svg).toContain("M11.955.49");   // Codeberg
+    });
+
+    it("branding disabled: Chapa shield avatar + no footer at all", () => {
+      const svg = renderBadgeSvg(
+        makeStats({ avatarUrl: undefined }),
+        makeImpact(),
+        { includeBranding: false },
+      );
+      expect(svg).toContain("M14 0.875L25.375 5.25"); // Shield still shown
+      expect(svg).not.toContain("Forged from ");
+      expect(svg).not.toContain("chapa.thecreativetoken.com");
     });
   });
 

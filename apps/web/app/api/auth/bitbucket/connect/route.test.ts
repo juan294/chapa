@@ -9,11 +9,15 @@ const {
   mockRequireSession,
   mockCreateBitbucketStateCookie,
   mockBuildBitbucketAuthUrl,
+  mockRateLimit,
+  mockGetClientIp,
 } = vi.hoisted(() => ({
   mockIsBitbucketEnabled: vi.fn(),
   mockRequireSession: vi.fn(),
   mockCreateBitbucketStateCookie: vi.fn(),
   mockBuildBitbucketAuthUrl: vi.fn(),
+  mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -27,6 +31,14 @@ vi.mock("@/lib/auth/require-session", () => ({
 vi.mock("@/lib/auth/bitbucket", () => ({
   createBitbucketStateCookie: mockCreateBitbucketStateCookie,
   buildBitbucketAuthUrl: mockBuildBitbucketAuthUrl,
+}));
+
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: mockGetClientIp,
 }));
 
 import { GET } from "./route";
@@ -71,6 +83,8 @@ describe("GET /api/auth/bitbucket/connect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsBitbucketEnabled.mockResolvedValue(true);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockGetClientIp.mockReturnValue("1.2.3.4");
     allowSession();
     setEnvVars();
     mockCreateBitbucketStateCookie.mockReturnValue({
@@ -91,6 +105,13 @@ describe("GET /api/auth/bitbucket/connect", () => {
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(404);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {

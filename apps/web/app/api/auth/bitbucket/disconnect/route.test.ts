@@ -9,11 +9,15 @@ const {
   mockRequireSession,
   mockDbDeleteLinkedPlatform,
   mockCacheDel,
+  mockRateLimit,
+  mockGetClientIp,
 } = vi.hoisted(() => ({
   mockIsBitbucketEnabled: vi.fn(),
   mockRequireSession: vi.fn(),
   mockDbDeleteLinkedPlatform: vi.fn(),
   mockCacheDel: vi.fn(),
+  mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -30,6 +34,11 @@ vi.mock("@/lib/db/user-platforms", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: mockCacheDel,
+  rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: mockGetClientIp,
 }));
 
 import { POST } from "./route";
@@ -65,6 +74,8 @@ describe("POST /api/auth/bitbucket/disconnect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsBitbucketEnabled.mockResolvedValue(true);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockGetClientIp.mockReturnValue("1.2.3.4");
     allowSession();
     mockDbDeleteLinkedPlatform.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
@@ -75,6 +86,13 @@ describe("POST /api/auth/bitbucket/disconnect", () => {
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(404);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {
