@@ -205,6 +205,7 @@ export function BadgeToolbar({
           <div
             className="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 p-1.5 z-20 animate-terminal-fade-in"
             role="menu"
+            aria-label="Share options"
           >
             <a
               href={`https://x.com/intent/tweet?text=${tweetText}`}

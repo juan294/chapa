@@ -107,7 +107,14 @@ export const AdminUserTableRow = memo(function AdminUserTableRow({
       <td className="hidden md:table-cell px-3 py-2.5">
         {user.confidence != null ? (
           <div className="flex items-center gap-1.5">
-            <div className="h-1 w-10 rounded-full bg-stroke overflow-hidden">
+            <div
+              className="h-1 w-10 rounded-full bg-stroke overflow-hidden"
+              role="progressbar"
+              aria-valuenow={user.confidence}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Confidence score"
+            >
               <div
                 className="h-full rounded-full bg-amber/60"
                 style={{ width: `${user.confidence}%` }}
@@ -191,7 +198,7 @@ export function AdminUserTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" aria-label="Registered users">
         <thead>
           <tr className="border-b border-stroke">
             <AdminSortableHeader field="handle" label="Developer" sortField={sortField} sortDir={sortDir} onSort={onSort} />

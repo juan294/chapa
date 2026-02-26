@@ -133,6 +133,12 @@ describe("BadgeToolbar", () => {
     });
   });
 
+  describe("#520 — aria-label on share dropdown menu", () => {
+    it("share dropdown menu has aria-label 'Share options'", () => {
+      expect(SOURCE).toContain('aria-label="Share options"');
+    });
+  });
+
   describe("arrow key navigation for share dropdown (#236)", () => {
     it("delegates keyboard navigation to useDropdownMenu hook", () => {
       // Arrow key, Escape, and click-outside behavior is now handled by

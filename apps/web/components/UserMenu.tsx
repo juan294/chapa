@@ -133,6 +133,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       {open && (
         <div
           role="menu"
+          aria-label="User menu options"
           className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-stroke bg-card shadow-xl shadow-stroke animate-scale-in"
         >
           {/* Header */}
@@ -219,6 +220,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   </a>
                   <button
                     onClick={() => setShowUnlinkConfirm(true)}
+                    aria-label="Unlink Bitbucket account"
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
                   >
                     Unlink
@@ -250,6 +252,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   </a>
                   <button
                     onClick={() => setShowCbUnlinkConfirm(true)}
+                    aria-label="Unlink Codeberg account"
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
                   >
                     Unlink

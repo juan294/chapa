@@ -142,6 +142,22 @@ describe("UserMenu — Codeberg integration", () => {
   });
 });
 
+describe("UserMenu — #520 aria-label on dropdown menu", () => {
+  it("dropdown menu has aria-label 'User menu options'", () => {
+    expect(SOURCE).toContain('aria-label="User menu options"');
+  });
+});
+
+describe("UserMenu — #521 distinguishing aria-labels on Unlink buttons", () => {
+  it("Bitbucket Unlink button has aria-label 'Unlink Bitbucket account'", () => {
+    expect(SOURCE).toContain('aria-label="Unlink Bitbucket account"');
+  });
+
+  it("Codeberg Unlink button has aria-label 'Unlink Codeberg account'", () => {
+    expect(SOURCE).toContain('aria-label="Unlink Codeberg account"');
+  });
+});
+
 describe("UserMenu — linked platform profile links", () => {
   it("renders Bitbucket username as a clickable link to bitbucket.org profile", () => {
     expect(SOURCE).toContain("https://bitbucket.org/");
