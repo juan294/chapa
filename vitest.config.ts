@@ -19,6 +19,12 @@ export default defineConfig({
         "packages/shared/**",
       ],
       exclude: ["**/*.test.*", "**/*.d.ts"],
+      thresholds: {
+        statements: 75,
+        branches: 70,
+        functions: 65,
+        lines: 75,
+      },
     },
   },
   resolve: {
