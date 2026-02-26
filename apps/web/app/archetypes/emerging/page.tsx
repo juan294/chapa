@@ -54,7 +54,7 @@ export default function EmergingPage() {
                 Every developer starts somewhere. The Emerging archetype is where Chapa puts
                 profiles that haven&apos;t yet accumulated enough activity to reveal a clear
                 pattern. This isn&apos;t a judgment &mdash; it&apos;s a snapshot. You&apos;re
-                early in your contribution history, or your GitHub activity in the last 12 months
+                early in your contribution history, or your development activity in the last 12 months
                 has been light, and the algorithm doesn&apos;t have enough signal to classify you
                 with confidence.
               </p>
@@ -113,10 +113,9 @@ export default function EmergingPage() {
 
               <p>
                 Emerging profiles belong to a wide range of people. New developers writing their
-                first pull requests. Experienced engineers who just joined GitHub after years on
-                internal tools. Developers returning from a long break. Students building their
-                first open-source contributions. People who primarily code on platforms Chapa
-                doesn&apos;t track yet.
+                first pull requests. Experienced engineers who recently started contributing to
+                open source after years on internal tools. Developers returning from a long
+                break. Students building their first open-source contributions.
               </p>
 
               <p>

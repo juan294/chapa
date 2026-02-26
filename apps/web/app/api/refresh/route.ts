@@ -56,7 +56,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const stats = await getStats(handle, session.token);
   if (!stats) {
     return NextResponse.json(
-      { error: "Failed to fetch stats from GitHub. Try again later." },
+      { error: "Failed to fetch stats. Try again later." },
       { status: 502 },
     );
   }

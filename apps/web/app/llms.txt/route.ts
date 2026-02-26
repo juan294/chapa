@@ -4,13 +4,13 @@ const LLMS_TXT = `# Chapa — Developer Impact Badge
 
 ## What is Chapa?
 
-Chapa is a free developer tool that generates a live, embeddable SVG badge showcasing a developer's Impact Score from their GitHub activity. It analyzes the last 12 months of commits, pull requests, code reviews, and issues to produce a transparent, data-driven developer impact rating. Think of it as a GitHub stats badge that goes beyond commit counts.
+Chapa is a free developer tool that generates a live, embeddable SVG badge showcasing a developer's Impact Score from their development activity across linked platforms (GitHub, Bitbucket, Codeberg). It analyzes the last 12 months of commits, pull requests, code reviews, and issues to produce a transparent, data-driven developer impact rating. Think of it as a developer stats badge that goes beyond commit counts.
 
 For full technical details, see: https://chapa.thecreativetoken.com/llms-full.txt
 
 ## Key Concepts
 
-- **Impact v4 Profile**: A composite developer impact score (0-100) based on four independent dimensions — Delivery, Quality, Consistency, and Breadth — computed from 12 months of public GitHub activity.
+- **Impact v4 Profile**: A composite developer impact score (0-100) based on four independent dimensions — Delivery, Quality, Consistency, and Breadth — computed from 12 months of public development activity across linked platforms.
 - **Four Dimensions**: Delivery measures shipping (PRs merged, issues closed). Quality measures code review quality. Consistency measures sustained contributions over time. Breadth measures cross-project influence.
 - **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
 - **Tier System**: Four tiers based on adjusted score — Emerging (0-39), Solid (40-69), High (70-84), and Elite (85-100).
@@ -30,7 +30,7 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
-2. Chapa computes your Impact v4 Profile from public GitHub data.
+2. Chapa computes your Impact v4 Profile from public platform data (GitHub, Bitbucket, Codeberg).
 3. Embed the badge in your README, portfolio, resume, or LinkedIn:
 
 Markdown:
@@ -45,15 +45,15 @@ HTML:
 
 ## Related Keywords
 
-GitHub developer metrics, GitHub contribution analytics, developer impact score, GitHub profile badge, developer portfolio badge, GitHub stats SVG, open source contribution metrics, code review metrics, developer archetype, GitHub activity analysis, developer impact measurement.
+developer metrics, multi-platform developer badge, developer impact score, GitHub profile badge, Bitbucket developer metrics, Codeberg developer metrics, developer portfolio badge, developer stats SVG, open source contribution metrics, code review metrics, developer archetype, developer activity analysis, developer impact measurement.
 
 ## Target Audience
 
-Software developers, open source contributors, and engineering teams who want to showcase and understand GitHub contributions with a verified, data-driven impact badge.
+Software developers, open source contributors, and engineering teams who want to showcase and understand their development contributions with a verified, data-driven impact badge.
 
 ## Data & Privacy
 
-- Only public GitHub data is accessed (no private repos).
+- Only public data from linked platforms is accessed (no private repos).
 - Scores are cached for 24 hours, then recomputed.
 - No personal data is sold or shared with third parties.
 - Privacy policy: https://chapa.thecreativetoken.com/privacy

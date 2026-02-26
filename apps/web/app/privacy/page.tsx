@@ -5,11 +5,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Privacy Policy for Chapa. Learn how we handle your GitHub data, session storage, and analytics.",
+    "Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.",
   openGraph: {
     title: "Privacy Policy — Chapa",
     description:
-      "Privacy Policy for Chapa. Learn how we handle your GitHub data, session storage, and analytics.",
+      "Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.",
   },
 };
 
@@ -36,13 +36,16 @@ export default function PrivacyPage() {
               When you sign in with GitHub, we receive your public profile
               information (username, display name, avatar URL) and a
               time-limited access token to fetch your public activity data.
+              If you link additional platforms (Bitbucket, Codeberg), we
+              receive similar public profile and activity data from those
+              services.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
               2. How We Use Your Information
             </h2>
             <p>
-              We use your GitHub activity data solely to compute your Developer
+              We use your development activity data solely to compute your Developer
               Impact Profile and generate your badge. We cache computed profiles
               for up to 24 hours to reduce API calls. We do not sell, share, or
               transfer your data to third parties.
@@ -72,7 +75,9 @@ export default function PrivacyPage() {
             <p>
               You can sign out at any time to clear your session. You can revoke
               Chapa&apos;s access to your GitHub account through your GitHub
-              settings under &quot;Authorized OAuth Apps.&quot;
+              settings under &quot;Authorized OAuth Apps.&quot; You can also
+              unlink Bitbucket or Codeberg accounts from your profile at
+              any time.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">

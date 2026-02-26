@@ -100,7 +100,7 @@ function VerifiedCard({
             Verified Badge
           </h1>
           <p className="text-sm text-text-secondary">
-            This badge was generated from authentic GitHub data.
+            This badge was generated from authentic platform data.
           </p>
         </div>
       </div>
