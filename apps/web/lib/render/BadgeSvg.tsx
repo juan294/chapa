@@ -76,8 +76,8 @@ export function renderBadgeSvg(
   const heatmapSvg = renderHeatmapSvg(heatmapCells);
 
   // Right column: radar chart + score ring (no pill — it moved above)
-  const profileColX = 670;
-  const profileColW = W - PAD - profileColX; // 470px
+  const profileColX = 720;
+  const profileColW = W - PAD - profileColX; // 420px
 
   // Radar chart centered in the right column
   const radarCX = profileColX + profileColW / 2;
