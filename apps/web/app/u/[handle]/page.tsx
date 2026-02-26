@@ -1,17 +1,17 @@
+import { after } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
-import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
+import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { ImpactBreakdown, getArchetypeProfile, DataSources } from "@/components/ImpactBreakdown";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
-import { cacheGet } from "@/lib/cache/redis";
+import { cacheGet, trackBadgeGenerated } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
 import Link from "next/link";
-import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -21,6 +21,15 @@ import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { getBaseUrl } from "@/lib/env";
+import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import { getAvatarBase64 } from "@/lib/render/avatar";
+import { generateVerificationCode } from "@/lib/verification/hmac";
+import { storeVerificationRecord } from "@/lib/verification/store";
+import type { VerificationRecord } from "@/lib/verification/types";
+import { notifyFirstBadge } from "@/lib/email/notifications";
+import { buildSnapshot } from "@/lib/history/snapshot";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 
 const BASE_URL = getBaseUrl();
 
@@ -99,15 +108,22 @@ export default async function SharePage({ params }: SharePageProps) {
     }
   }
 
-  const [stats, savedConfig] = await Promise.all([
+  // Fetch stats, config, and snapshot in parallel (snapshot was previously sequential)
+  const [stats, savedConfig, latestSnapshot] = await Promise.all([
     getStats(handle, token),
     cacheGet<BadgeConfig>(`config:${handle}`),
+    getCachedLatestSnapshot(handle),
   ]);
+
   const impact = stats ? computeImpactV4(stats) : null;
+
+  // Start avatar fetch immediately (runs concurrently with EMA computation)
+  const avatarPromise = stats?.avatarUrl
+    ? getAvatarBase64(handle, stats.avatarUrl)
+    : Promise.resolve(undefined);
 
   // V5: Apply EMA smoothing using previous day's snapshot
   if (impact) {
-    const latestSnapshot = await getCachedLatestSnapshot(handle);
     const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
     impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
     impact.tier = getTier(impact.adjustedComposite);
@@ -116,6 +132,55 @@ export default async function SharePage({ params }: SharePageProps) {
   const isOwner = sessionLogin !== null && sessionLogin === handle;
   const useInteractivePreview =
     hasCustomConfig(savedConfig) && stats && impact;
+
+  // Render badge SVG inline during SSR to eliminate second round-trip
+  const avatarDataUri = await avatarPromise;
+  const verification = stats && impact
+    ? generateVerificationCode(stats, impact)
+    : null;
+  const inlineSvg = stats && impact && !useInteractivePreview
+    ? renderBadgeSvg(stats, impact, {
+        avatarDataUri,
+        verificationHash: verification?.hash,
+        verificationDate: verification?.date,
+      })
+    : null;
+
+  // Deferred work: verification storage, tracking, snapshots (runs after response)
+  if (stats && impact && inlineSvg) {
+    after(() => {
+      const ops: Promise<void>[] = [];
+
+      if (verification) {
+        const record: VerificationRecord = {
+          handle: stats.handle.toLowerCase(),
+          displayName: stats.displayName,
+          adjustedComposite: impact.adjustedComposite,
+          confidence: impact.confidence,
+          tier: impact.tier,
+          archetype: impact.archetype,
+          dimensions: impact.dimensions,
+          commitsTotal: stats.commitsTotal,
+          prsMergedCount: stats.prsMergedCount,
+          reviewsSubmittedCount: stats.reviewsSubmittedCount,
+          generatedAt: verification.date,
+          profileType: impact.profileType,
+        };
+        ops.push(storeVerificationRecord(verification.hash, record));
+      }
+
+      ops.push(trackBadgeGenerated(handle));
+      ops.push(notifyFirstBadge(handle, impact));
+      const snapshot = buildSnapshot(stats, impact);
+      ops.push(
+        dbInsertSnapshot(handle, snapshot).then((inserted) => {
+          if (inserted) updateSnapshotCache(handle, snapshot);
+        }),
+      );
+
+      return Promise.allSettled(ops);
+    });
+  }
 
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
 
@@ -174,15 +239,25 @@ export default async function SharePage({ params }: SharePageProps) {
             />
           ) : (
             <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
-                alt={`Chapa badge for ${handle}`}
-                width={1200}
-                height={630}
-                fetchPriority="high"
-                className="w-full rounded-xl"
-              />
+              {inlineSvg ? (
+                <div
+                  role="img"
+                  aria-label={`Chapa badge for ${handle}`}
+                  className="w-full rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
+                  dangerouslySetInnerHTML={{ __html: inlineSvg }}
+                />
+              ) : (
+                /* Fallback: if SVG render failed, load via <img> */
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
+                  alt={`Chapa badge for ${handle}`}
+                  width={1200}
+                  height={630}
+                  fetchPriority="high"
+                  className="w-full rounded-xl"
+                />
+              )}
             </div>
           )}
         </div>
@@ -332,7 +407,7 @@ export default async function SharePage({ params }: SharePageProps) {
         )}
       </div>
 
-      <GlobalCommandBar />
+      <GlobalCommandBarLazy />
     </main>
   );
 }
