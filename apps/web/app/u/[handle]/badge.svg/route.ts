@@ -9,6 +9,7 @@ import { escapeXml } from "@/lib/render/escape";
 import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { dbUpsertUser } from "@/lib/db/users";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
@@ -148,6 +149,16 @@ export async function GET(
         if (inserted) updateSnapshotCache(handle, snapshot);
       }),
     );
+
+    // Persist profile fields so admin dashboard always has latest data
+    if (stats.displayName || stats.avatarUrl) {
+      ops.push(
+        dbUpsertUser(handle, {
+          displayName: stats.displayName ?? undefined,
+          avatarUrl: stats.avatarUrl ?? undefined,
+        }).catch(() => {}),
+      );
+    }
 
     return Promise.allSettled(ops);
   });

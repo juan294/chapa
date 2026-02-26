@@ -43,6 +43,8 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     handle: "testuser",
     displayName: "Test User",
     avatarUrl: "https://example.com/avatar.png",
+    registeredAt: "2025-06-01T00:00:00Z",
+    lastSnapshotDate: "2025-06-01",
     fetchedAt: new Date().toISOString(),
     commitsTotal: 150,
     prsMergedCount: 25,
@@ -55,7 +57,6 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     adjustedComposite: 72,
     rawScore: 68,
     confidence: 85,
-    statsExpired: false,
     ...overrides,
   };
 }
@@ -207,33 +208,33 @@ describe("AdminUserTable — render tests", () => {
     });
   });
 
-  describe("expired users", () => {
-    it("shows 'data expired' label for expired users", () => {
+  describe("users without snapshot data", () => {
+    it("shows 'no data yet' label for users with null lastSnapshotDate", () => {
       render(
         <AdminUserTable
           {...defaultProps}
-          users={[makeUser({ statsExpired: true })]}
+          users={[makeUser({ lastSnapshotDate: null })]}
         />,
       );
-      expect(screen.getByText("data expired")).toBeDefined();
+      expect(screen.getByText("no data yet")).toBeDefined();
     });
 
-    it("dims expired user rows with opacity", () => {
+    it("dims users with null lastSnapshotDate via opacity", () => {
       const { container } = render(
         <AdminUserTable
           {...defaultProps}
-          users={[makeUser({ statsExpired: true })]}
+          users={[makeUser({ lastSnapshotDate: null })]}
         />,
       );
       const row = container.querySelector("tbody tr");
       expect(row?.className).toContain("opacity-60");
     });
 
-    it("does not dim non-expired users", () => {
+    it("does not dim users with a lastSnapshotDate", () => {
       const { container } = render(
         <AdminUserTable
           {...defaultProps}
-          users={[makeUser({ statsExpired: false })]}
+          users={[makeUser({ lastSnapshotDate: "2025-06-01" })]}
         />,
       );
       const row = container.querySelector("tbody tr");

@@ -1,41 +1,34 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { cacheMGet, rateLimit } from "@/lib/cache/redis";
-import { dbGetUsers } from "@/lib/db/users";
+import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { computeImpactV4 } from "@/lib/impact/v4";
-import { applyEMA } from "@/lib/impact/smoothing";
-import { getTier } from "@/lib/impact/utils";
-import { dbGetLatestSnapshotBatch } from "@/lib/db/snapshots";
-import type { StatsData } from "@chapa/shared";
+import {
+  dbGetAdminUsers,
+  type AdminSortField,
+} from "@/lib/db/admin-users";
 
-/** Fields returned per user. Users without stats have `statsExpired: true`. */
-interface AdminUserEntry {
-  handle: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  fetchedAt: string | null;
-  commitsTotal: number | null;
-  prsMergedCount: number | null;
-  reviewsSubmittedCount: number | null;
-  activeDays: number | null;
-  reposContributed: number | null;
-  totalStars: number | null;
-  archetype: string | null;
-  tier: string | null;
-  adjustedComposite: number | null;
-  rawScore: number | null;
-  confidence: number | null;
-  statsExpired: boolean;
-}
+const VALID_SORT_FIELDS: AdminSortField[] = [
+  "handle",
+  "adjustedComposite",
+  "rawScore",
+  "confidence",
+  "commitsTotal",
+  "prsMergedCount",
+  "reviewsSubmittedCount",
+  "activeDays",
+  "totalStars",
+  "tier",
+  "archetype",
+  "registeredAt",
+  "lastSnapshotDate",
+];
 
 /**
  * GET /api/admin/users
  *
- * Discovers ALL registered users from Supabase (Phase 4).
- * Loads stats from Redis cache (ephemeral). Returns stats + impact
- * where available; marks users with expired stats.
+ * Server-side paginated, sorted, and filtered admin user list.
+ * Data comes from Supabase `admin_users` view (users + latest snapshot).
  */
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 60 seconds
@@ -65,87 +58,44 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Discover all user handles from Supabase
-  const registeredUsers = await dbGetUsers();
-  const handles = registeredUsers.map((u) => u.handle);
+  // Parse query params
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get("page") ?? "1", 10) || 1;
+  const limit = parseInt(url.searchParams.get("limit") ?? "25", 10) || 25;
+  const sort = (url.searchParams.get("sort") ?? "adjustedComposite") as AdminSortField;
+  const dir = (url.searchParams.get("dir") ?? "desc") as "asc" | "desc";
+  const search = url.searchParams.get("search") ?? undefined;
+  const tier = url.searchParams.get("tier") ?? undefined;
+  const archetype = url.searchParams.get("archetype") ?? undefined;
 
-  if (handles.length === 0) {
+  // Validate sort field
+  if (!VALID_SORT_FIELDS.includes(sort)) {
     return NextResponse.json(
-      { users: [] },
-      { headers: { "Cache-Control": "no-store" } },
+      { error: "Invalid sort field" },
+      { status: 400 },
     );
   }
 
-  // For each handle, try to load stats (primary first, then stale fallback)
-  const primaryStatsKeys = handles.map((h) => `stats:v2:${h}`);
-  const staleStatsKeys = handles.map((h) => `stats:stale:${h}`);
+  // Validate dir
+  if (dir !== "asc" && dir !== "desc") {
+    return NextResponse.json(
+      { error: "Invalid sort direction" },
+      { status: 400 },
+    );
+  }
 
-  const [primaryValues, staleValues] = await Promise.all([
-    cacheMGet<StatsData>(primaryStatsKeys),
-    cacheMGet<StatsData>(staleStatsKeys),
-  ]);
-
-  // Batch fetch latest snapshots for EMA smoothing (single query instead of N)
-  const handlesWithStats = handles.filter(
-    (_, i) => primaryValues[i] != null || staleValues[i] != null,
-  );
-  const snapshotMap = await dbGetLatestSnapshotBatch(handlesWithStats);
-
-  // Build user list — use primary stats if available, stale as fallback.
-  // Apply EMA smoothing (matching badge/share page behavior) so the admin
-  // panel shows the same score the user sees on their badge.
-  const users: AdminUserEntry[] = handles.map((handle, i) => {
-    const stats = primaryValues[i] ?? staleValues[i] ?? null;
-
-    if (!stats) {
-      return {
-        handle,
-        displayName: null,
-        avatarUrl: null,
-        fetchedAt: null,
-        commitsTotal: null,
-        prsMergedCount: null,
-        reviewsSubmittedCount: null,
-        activeDays: null,
-        reposContributed: null,
-        totalStars: null,
-        archetype: null,
-        tier: null,
-        adjustedComposite: null,
-        rawScore: null,
-        confidence: null,
-        statsExpired: true,
-      };
-    }
-
-    const impact = computeImpactV4(stats);
-
-    const latestSnapshot = snapshotMap.get(handle.toLowerCase()) ?? null;
-    const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
-    const smoothedScore = applyEMA(impact.adjustedComposite, previousSmoothed);
-
-    return {
-      handle: stats.handle,
-      displayName: stats.displayName ?? null,
-      avatarUrl: stats.avatarUrl ?? null,
-      fetchedAt: stats.fetchedAt,
-      commitsTotal: stats.commitsTotal,
-      prsMergedCount: stats.prsMergedCount,
-      reviewsSubmittedCount: stats.reviewsSubmittedCount,
-      activeDays: stats.activeDays,
-      reposContributed: stats.reposContributed,
-      totalStars: stats.totalStars,
-      archetype: impact.archetype,
-      tier: getTier(smoothedScore),
-      adjustedComposite: smoothedScore,
-      rawScore: impact.adjustedComposite,
-      confidence: impact.confidence,
-      statsExpired: false,
-    };
+  // Single Supabase call replaces: dbGetUsers + cacheMGet + computeImpactV4 + EMA
+  const result = await dbGetAdminUsers({
+    page,
+    limit,
+    sort,
+    dir,
+    search,
+    tier,
+    archetype,
   });
 
-  return NextResponse.json(
-    { users },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return NextResponse.json(result, {
+    headers: { "Cache-Control": "no-store" },
+  });
 }

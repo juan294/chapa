@@ -22,7 +22,7 @@ export const AdminUserTableRow = memo(function AdminUserTableRow({
 }: AdminUserTableRowProps) {
   return (
     <tr
-      className={`transition-colors hover:bg-amber/[0.03] ${user.statsExpired ? "opacity-60" : ""}`}
+      className={`transition-colors hover:bg-amber/[0.03] ${user.lastSnapshotDate === null ? "opacity-60" : ""}`}
     >
       {/* Developer */}
       <td className="px-3 py-2.5">
@@ -48,8 +48,8 @@ export const AdminUserTableRow = memo(function AdminUserTableRow({
             <p className="truncate font-heading text-sm text-text-primary group-hover:text-amber transition-colors">
               {user.handle}
             </p>
-            {user.statsExpired ? (
-              <p className="text-xs text-terminal-yellow">data expired</p>
+            {user.lastSnapshotDate === null ? (
+              <p className="text-xs text-text-secondary">no data yet</p>
             ) : user.displayName ? (
               <p className="truncate text-xs text-text-secondary">
                 {user.displayName}
@@ -205,7 +205,7 @@ export function AdminUserTable({
             <AdminSortableHeader field="reviewsSubmittedCount" label="Reviews" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="activeDays" label="Days" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="totalStars" label="Stars" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
-            <AdminSortableHeader field="fetchedAt" label="Updated" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
+            <AdminSortableHeader field="lastSnapshotDate" label="Updated" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
             <AdminHeaderCell className="w-10">
               <span className="sr-only">Actions</span>
             </AdminHeaderCell>

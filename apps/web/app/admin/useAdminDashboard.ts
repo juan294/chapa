@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
-import type { AdminUser, SortField, SortDir } from "./admin-types";
-import { sortUsers } from "./admin-types";
+import type { AdminUser, SortField, SortDir, PaginatedResponse } from "./admin-types";
 
 // ---------------------------------------------------------------------------
 // Tab type
@@ -29,11 +28,14 @@ export interface AdminDashboardState {
   lastRefreshed: Date | null;
   fetchUsers: (isRefresh?: boolean) => Promise<void>;
   handleSort: (field: SortField) => void;
-  filtered: AdminUser[];
-  sorted: AdminUser[];
   tierCounts: Record<string, number>;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  page: number;
+  setPage: (page: number) => void;
+  total: number;
+  totalPages: number;
+  limit: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,23 +47,39 @@ export function useAdminDashboard(): AdminDashboardState {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearchRaw] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [sortField, setSortField] = useState<SortField>("adjustedComposite");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const limit = 25;
 
   const fetchUsers = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const res = await fetch("/api/admin/users");
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+        sort: sortField,
+        dir: sortDir,
+      });
+      if (deferredSearch.trim()) {
+        params.set("search", deferredSearch.trim());
+      }
+
+      const res = await fetch(`/api/admin/users?${params}`);
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
-      const data = await res.json();
+      const data: PaginatedResponse = await res.json();
       setUsers(data.users ?? []);
+      setTotal(data.total ?? 0);
+      setTotalPages(data.totalPages ?? 0);
       setError(null);
       setLastRefreshed(new Date());
     } catch (err) {
@@ -70,7 +88,7 @@ export function useAdminDashboard(): AdminDashboardState {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [page, sortField, sortDir, deferredSearch]);
 
   useEffect(() => {
     fetchUsers();
@@ -102,6 +120,7 @@ export function useAdminDashboard(): AdminDashboardState {
         setSortField(field);
         setSortDir("desc");
       }
+      setPage(1);
     },
     [sortField],
   );
@@ -124,22 +143,13 @@ export function useAdminDashboard(): AdminDashboardState {
     return () => window.removeEventListener("chapa:admin-sort", handler);
   }, [handleSort]);
 
-  const filtered = useMemo(() => {
-    const q = deferredSearch.toLowerCase().trim();
-    if (!q) return users;
-    return users.filter(
-      (u) =>
-        u.handle.toLowerCase().includes(q) ||
-        (u.displayName?.toLowerCase().includes(q) ?? false),
-    );
-  }, [users, deferredSearch]);
+  // Search resets to page 1
+  const setSearch = useCallback((value: string) => {
+    setSearchRaw(value);
+    setPage(1);
+  }, []);
 
-  const sorted = useMemo(
-    () => sortUsers(filtered, sortField, sortDir),
-    [filtered, sortField, sortDir],
-  );
-
-  // Summary stats
+  // Summary stats — computed from current page users
   const tierCounts = useMemo(() => {
     const counts: Record<string, number> = { Elite: 0, High: 0, Solid: 0, Emerging: 0 };
     for (const u of users) {
@@ -163,10 +173,13 @@ export function useAdminDashboard(): AdminDashboardState {
     lastRefreshed,
     fetchUsers,
     handleSort,
-    filtered,
-    sorted,
     tierCounts,
     setError,
     setLoading,
+    page,
+    setPage,
+    total,
+    totalPages,
+    limit,
   };
 }

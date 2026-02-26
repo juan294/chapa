@@ -120,14 +120,22 @@ describe("AdminUserTable", () => {
     });
   });
 
-  describe("expired users", () => {
-    it("dims expired user rows with opacity", () => {
-      expect(SOURCE).toContain("statsExpired");
+  describe("users without snapshot data", () => {
+    it("dims users with null lastSnapshotDate via opacity", () => {
+      expect(SOURCE).toContain("lastSnapshotDate === null");
       expect(SOURCE).toContain("opacity-60");
     });
 
-    it("shows data expired label", () => {
-      expect(SOURCE).toContain("data expired");
+    it("shows 'no data yet' label for users without snapshots", () => {
+      expect(SOURCE).toContain("no data yet");
+    });
+
+    it("does not reference statsExpired", () => {
+      expect(SOURCE).not.toContain("statsExpired");
+    });
+
+    it("does not show 'data expired' label", () => {
+      expect(SOURCE).not.toContain("data expired");
     });
   });
 

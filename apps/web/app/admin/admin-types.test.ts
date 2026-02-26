@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  sortUsers,
   formatDate,
   tierBadgeClasses,
   TIER_ORDER,
   ARCHETYPE_COLOR,
   TIER_COLOR,
 } from "./admin-types";
-import type { AdminUser } from "./admin-types";
+import type { AdminUser, PaginatedResponse } from "./admin-types";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -18,6 +17,8 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     handle: "user",
     displayName: null,
     avatarUrl: null,
+    registeredAt: "2025-06-01T00:00:00Z",
+    lastSnapshotDate: null,
     fetchedAt: null,
     commitsTotal: null,
     prsMergedCount: null,
@@ -30,164 +31,52 @@ function makeUser(overrides: Partial<AdminUser> = {}): AdminUser {
     adjustedComposite: null,
     rawScore: null,
     confidence: null,
-    statsExpired: false,
     ...overrides,
   };
 }
 
 // ---------------------------------------------------------------------------
-// sortUsers
+// AdminUser type shape
 // ---------------------------------------------------------------------------
 
-describe("sortUsers", () => {
-  describe("handle field (string sort)", () => {
-    it("sorts alphabetically ascending", () => {
-      const users = [
-        makeUser({ handle: "charlie" }),
-        makeUser({ handle: "alice" }),
-        makeUser({ handle: "bob" }),
-      ];
-      const result = sortUsers(users, "handle", "asc");
-      expect(result.map((u) => u.handle)).toEqual(["alice", "bob", "charlie"]);
-    });
-
-    it("sorts alphabetically descending", () => {
-      const users = [
-        makeUser({ handle: "alice" }),
-        makeUser({ handle: "charlie" }),
-        makeUser({ handle: "bob" }),
-      ];
-      const result = sortUsers(users, "handle", "desc");
-      expect(result.map((u) => u.handle)).toEqual(["charlie", "bob", "alice"]);
-    });
+describe("AdminUser type shape", () => {
+  it("has registeredAt field", () => {
+    const user = makeUser({ registeredAt: "2025-01-01T00:00:00Z" });
+    expect(user.registeredAt).toBe("2025-01-01T00:00:00Z");
   });
 
-  describe("tier field (ordinal sort)", () => {
-    it("sorts by tier order ascending", () => {
-      const users = [
-        makeUser({ handle: "a", tier: "Elite" }),
-        makeUser({ handle: "b", tier: "Emerging" }),
-        makeUser({ handle: "c", tier: "High" }),
-      ];
-      const result = sortUsers(users, "tier", "asc");
-      expect(result.map((u) => u.tier)).toEqual(["Emerging", "High", "Elite"]);
-    });
+  it("has lastSnapshotDate field (nullable)", () => {
+    const userWithSnapshot = makeUser({ lastSnapshotDate: "2025-06-01" });
+    expect(userWithSnapshot.lastSnapshotDate).toBe("2025-06-01");
 
-    it("sorts by tier order descending", () => {
-      const users = [
-        makeUser({ handle: "a", tier: "Emerging" }),
-        makeUser({ handle: "b", tier: "Elite" }),
-        makeUser({ handle: "c", tier: "Solid" }),
-      ];
-      const result = sortUsers(users, "tier", "desc");
-      expect(result.map((u) => u.tier)).toEqual(["Elite", "Solid", "Emerging"]);
-    });
-
-    it("treats null tier as lowest rank", () => {
-      const users = [
-        makeUser({ handle: "a", tier: "High" }),
-        makeUser({ handle: "b", tier: null }),
-      ];
-      const result = sortUsers(users, "tier", "asc");
-      expect(result.map((u) => u.tier)).toEqual([null, "High"]);
-    });
+    const userWithoutSnapshot = makeUser({ lastSnapshotDate: null });
+    expect(userWithoutSnapshot.lastSnapshotDate).toBeNull();
   });
 
-  describe("numeric fields", () => {
-    it("sorts adjustedComposite ascending", () => {
-      const users = [
-        makeUser({ handle: "a", adjustedComposite: 80 }),
-        makeUser({ handle: "b", adjustedComposite: 50 }),
-        makeUser({ handle: "c", adjustedComposite: 95 }),
-      ];
-      const result = sortUsers(users, "adjustedComposite", "asc");
-      expect(result.map((u) => u.adjustedComposite)).toEqual([50, 80, 95]);
-    });
-
-    it("sorts adjustedComposite descending", () => {
-      const users = [
-        makeUser({ handle: "a", adjustedComposite: 50 }),
-        makeUser({ handle: "b", adjustedComposite: 95 }),
-        makeUser({ handle: "c", adjustedComposite: 80 }),
-      ];
-      const result = sortUsers(users, "adjustedComposite", "desc");
-      expect(result.map((u) => u.adjustedComposite)).toEqual([95, 80, 50]);
-    });
-
-    it("sorts rawScore ascending", () => {
-      const users = [
-        makeUser({ handle: "a", rawScore: 70 }),
-        makeUser({ handle: "b", rawScore: 40 }),
-        makeUser({ handle: "c", rawScore: 90 }),
-      ];
-      const result = sortUsers(users, "rawScore", "asc");
-      expect(result.map((u) => u.rawScore)).toEqual([40, 70, 90]);
-    });
-
-    it("treats null numeric values as 0", () => {
-      const users = [
-        makeUser({ handle: "a", commitsTotal: 100 }),
-        makeUser({ handle: "b", commitsTotal: null }),
-      ];
-      const result = sortUsers(users, "commitsTotal", "asc");
-      expect(result.map((u) => u.commitsTotal)).toEqual([null, 100]);
-    });
+  it("does NOT have statsExpired field", () => {
+    const user = makeUser();
+    expect(user).not.toHaveProperty("statsExpired");
   });
+});
 
-  describe("archetype field (string sort)", () => {
-    it("sorts alphabetically ascending", () => {
-      const users = [
-        makeUser({ handle: "a", archetype: "Polymath" }),
-        makeUser({ handle: "b", archetype: "Builder" }),
-        makeUser({ handle: "c", archetype: "Quality Champion" }),
-      ];
-      const result = sortUsers(users, "archetype", "asc");
-      expect(result.map((u) => u.archetype)).toEqual(["Builder", "Polymath", "Quality Champion"]);
-    });
-  });
+// ---------------------------------------------------------------------------
+// PaginatedResponse type shape
+// ---------------------------------------------------------------------------
 
-  describe("fetchedAt field (date sort)", () => {
-    it("sorts by date ascending", () => {
-      const users = [
-        makeUser({ handle: "a", fetchedAt: "2026-02-20T12:00:00Z" }),
-        makeUser({ handle: "b", fetchedAt: "2026-02-18T12:00:00Z" }),
-        makeUser({ handle: "c", fetchedAt: "2026-02-19T12:00:00Z" }),
-      ];
-      const result = sortUsers(users, "fetchedAt", "asc");
-      expect(result.map((u) => u.handle)).toEqual(["b", "c", "a"]);
-    });
-  });
-
-  describe("expired users always sort to bottom", () => {
-    it("puts expired users at the end regardless of sort direction", () => {
-      const users = [
-        makeUser({ handle: "expired", adjustedComposite: 99, statsExpired: true }),
-        makeUser({ handle: "active", adjustedComposite: 10, statsExpired: false }),
-      ];
-      const resultAsc = sortUsers(users, "adjustedComposite", "asc");
-      expect(resultAsc.map((u) => u.handle)).toEqual(["active", "expired"]);
-
-      const resultDesc = sortUsers(users, "adjustedComposite", "desc");
-      expect(resultDesc.map((u) => u.handle)).toEqual(["active", "expired"]);
-    });
-
-    it("sorts expired users among themselves", () => {
-      const users = [
-        makeUser({ handle: "exp-b", adjustedComposite: 50, statsExpired: true }),
-        makeUser({ handle: "active", adjustedComposite: 10, statsExpired: false }),
-        makeUser({ handle: "exp-a", adjustedComposite: 90, statsExpired: true }),
-      ];
-      const result = sortUsers(users, "adjustedComposite", "desc");
-      expect(result.map((u) => u.handle)).toEqual(["active", "exp-a", "exp-b"]);
-    });
-  });
-
-  describe("does not mutate the input array", () => {
-    it("returns a new array", () => {
-      const users = [makeUser({ handle: "a" }), makeUser({ handle: "b" })];
-      const result = sortUsers(users, "handle", "asc");
-      expect(result).not.toBe(users);
-    });
+describe("PaginatedResponse type shape", () => {
+  it("has all required pagination fields", () => {
+    const response: PaginatedResponse = {
+      users: [makeUser()],
+      total: 50,
+      page: 1,
+      limit: 25,
+      totalPages: 2,
+    };
+    expect(response.total).toBe(50);
+    expect(response.page).toBe(1);
+    expect(response.limit).toBe(25);
+    expect(response.totalPages).toBe(2);
+    expect(response.users).toHaveLength(1);
   });
 });
 

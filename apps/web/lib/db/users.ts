@@ -15,6 +15,8 @@ import { parseRows } from "./parse-row";
 interface UserRow {
   handle: string;
   registered_at: string;
+  display_name: string | null;
+  avatar_url: string | null;
 }
 
 const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
@@ -22,31 +24,45 @@ const USER_REQUIRED_KEYS: readonly (keyof UserRow)[] = [
   "registered_at",
 ] as const;
 
+interface UpsertUserOpts {
+  email?: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}
+
 /**
  * Register a user (upsert — idempotent).
  * Handles are stored lowercase for consistent lookups.
  *
- * When `email` is provided, updates the email even for existing users
- * (ignoreDuplicates: false). Without email, existing rows are left untouched.
+ * When any profile field is provided, updates the existing row
+ * (ignoreDuplicates: false). Without extra fields, existing rows
+ * are left untouched.
  */
 export async function dbUpsertUser(
   handle: string,
-  email?: string,
+  opts?: UpsertUserOpts,
 ): Promise<void> {
   const db = getSupabase();
   if (!db) return;
 
   try {
-    const row: Record<string, string> = { handle: handle.toLowerCase() };
-    if (email) row.email = email;
+    const row: Record<string, string | null> = { handle: handle.toLowerCase() };
+    if (opts?.email) row.email = opts.email;
+    if (opts?.displayName !== undefined) row.display_name = opts.displayName;
+    if (opts?.avatarUrl !== undefined) row.avatar_url = opts.avatarUrl;
+
+    const hasUpdateFields =
+      opts?.email ||
+      opts?.displayName !== undefined ||
+      opts?.avatarUrl !== undefined;
 
     await db
       .from("users")
       .upsert(row, {
         onConflict: "handle",
-        // When we have new data (email), update the existing row.
-        // Without email, skip duplicates to preserve existing data.
-        ignoreDuplicates: !email,
+        // When we have new data, update the existing row.
+        // Without extra fields, skip duplicates to preserve existing data.
+        ignoreDuplicates: !hasUpdateFields,
       });
   } catch (error) {
     console.error("[db] dbUpsertUser failed:", (error as Error).message);
@@ -60,14 +76,14 @@ export async function dbUpsertUser(
  */
 export async function dbGetUsers(
   opts?: { limit?: number; offset?: number },
-): Promise<{ handle: string; registeredAt: string }[]> {
+): Promise<{ handle: string; registeredAt: string; displayName: string | null; avatarUrl: string | null }[]> {
   const db = getSupabase();
   if (!db) return [];
 
   try {
     let query = db
       .from("users")
-      .select("handle, registered_at")
+      .select("handle, registered_at, display_name, avatar_url")
       .order("registered_at", { ascending: false });
 
     if (opts?.limit) {
@@ -83,6 +99,8 @@ export async function dbGetUsers(
     return parseRows<UserRow>(data, USER_REQUIRED_KEYS, "users").map((row) => ({
       handle: row.handle,
       registeredAt: row.registered_at,
+      displayName: row.display_name ?? null,
+      avatarUrl: row.avatar_url ?? null,
     }));
   } catch (error) {
     console.error("[db] dbGetUsers failed:", (error as Error).message);

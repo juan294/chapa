@@ -98,9 +98,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/?error=user_fetch", request.url));
   }
 
-  // Capture email and register user (fire-and-forget, non-blocking)
+  // Capture email and profile, register user (fire-and-forget, non-blocking)
   const email = await fetchGitHubUserEmail(token).catch(() => null);
-  void dbUpsertUser(user.login, email ?? undefined).catch(() => {});
+  void dbUpsertUser(user.login, {
+    email: email ?? undefined,
+    displayName: user.name ?? null,
+    avatarUrl: user.avatar_url ?? null,
+  }).catch(() => {});
 
   const cookie = createSessionCookie(
     {

@@ -37,11 +37,14 @@ export function AdminDashboardClient() {
     lastRefreshed,
     fetchUsers,
     handleSort,
-    filtered,
-    sorted,
     tierCounts,
     setError,
     setLoading,
+    page,
+    setPage,
+    total,
+    totalPages,
+    limit,
   } = useAdminDashboard();
 
   // -------------------------------------------------------------------------
@@ -164,7 +167,7 @@ export function AdminDashboardClient() {
                 <span className="text-amber">$</span> admin<span className="text-text-secondary">/</span>users
               </h2>
               <p className="mt-1 text-sm text-text-secondary">
-                {users.length} developer{users.length !== 1 ? "s" : ""} with cached badge data
+                {total} developer{total !== 1 ? "s" : ""}
                 {lastRefreshed && (
                   <span className="ml-2 text-text-secondary/60">
                     &middot; updated {formatDate(lastRefreshed.toISOString())}
@@ -196,7 +199,7 @@ export function AdminDashboardClient() {
           </div>
 
           {/* Summary cards */}
-          <AdminStatsCards totalUsers={users.length} tierCounts={tierCounts} />
+          <AdminStatsCards totalUsers={total} tierCounts={tierCounts} />
 
           {/* Search + Table */}
           <div
@@ -206,15 +209,44 @@ export function AdminDashboardClient() {
             <AdminSearchBar
               search={search}
               onSearchChange={setSearch}
-              resultCount={filtered.length}
+              resultCount={total}
             />
             <AdminUserTable
-              users={sorted}
+              users={users}
               search={search}
               sortField={sortField}
               sortDir={sortDir}
               onSort={handleSort}
             />
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-stroke px-4 py-3">
+                <span className="text-xs text-text-secondary tabular-nums">
+                  Showing {((page - 1) * limit) + 1}&ndash;{Math.min(page * limit, total)} of {total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage(page - 1)}
+                    className="rounded-md border border-stroke px-3 py-1 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Previous page"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-text-secondary tabular-nums">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(page + 1)}
+                    className="rounded-md border border-stroke px-3 py-1 text-xs font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Next page"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

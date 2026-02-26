@@ -45,6 +45,11 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
   updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("@/lib/cache/redis", () => ({
+  cacheGet: vi.fn(() => Promise.resolve(null)),
+  cacheSet: vi.fn(() => Promise.resolve(true)),
+}));
+
 vi.mock("@/lib/history/diff", () => ({
   compareSnapshots: vi.fn(() => ({
     direction: "stable",
@@ -72,10 +77,16 @@ import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { GET } from "./route";
 
 const mockedDbGetUsers = vi.mocked(dbGetUsers);
 const mockedGetStats = vi.mocked(getStats);
+
+/** Helper to build mock user rows with required profile fields */
+function mockUser(handle: string, registeredAt = "2025-01-01") {
+  return { handle, registeredAt, displayName: null as string | null, avatarUrl: null as string | null };
+}
 
 function makeRequest(cronSecret?: string): NextRequest {
   const headers: Record<string, string> = {};
@@ -136,9 +147,9 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("uses handles from dbGetUsers result", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
-        { handle: "bob", registeredAt: "2025-01-02" },
-        { handle: "charlie", registeredAt: "2025-01-03" },
+        mockUser("alice"),
+        mockUser("bob", "2025-01-02"),
+        mockUser("charlie", "2025-01-03"),
       ]);
 
       mockedGetStats.mockResolvedValue(null);
@@ -171,8 +182,8 @@ describe("GET /api/cron/warm-cache", () => {
   describe("cache warming", () => {
     it("calls getStats for each discovered handle", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
-        { handle: "bob", registeredAt: "2025-01-02" },
+        mockUser("alice"),
+        mockUser("bob", "2025-01-02"),
       ]);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
@@ -186,7 +197,7 @@ describe("GET /api/cron/warm-cache", () => {
     it("uses GITHUB_TOKEN when available", async () => {
       process.env.GITHUB_TOKEN = "ghp_test_token";
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
@@ -200,9 +211,9 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("reports warmed count (successful fetches only)", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
-        { handle: "bob", registeredAt: "2025-01-02" },
-        { handle: "charlie", registeredAt: "2025-01-03" },
+        mockUser("alice"),
+        mockUser("bob", "2025-01-02"),
+        mockUser("charlie", "2025-01-03"),
       ]);
 
       mockedGetStats
@@ -218,10 +229,7 @@ describe("GET /api/cron/warm-cache", () => {
     });
 
     it("caps at 50 handles per run", async () => {
-      const users = Array.from({ length: 60 }, (_, i) => ({
-        handle: `user${i}`,
-        registeredAt: "2025-01-01",
-      }));
+      const users = Array.from({ length: 60 }, (_, i) => mockUser(`user${i}`));
       mockedDbGetUsers.mockResolvedValue(users);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
@@ -235,8 +243,8 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("continues warming even if individual fetches fail", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
-        { handle: "bob", registeredAt: "2025-01-02" },
+        mockUser("alice"),
+        mockUser("bob", "2025-01-02"),
       ]);
 
       mockedGetStats
@@ -253,7 +261,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("calls dbInsertSnapshot for each successful warm", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
 
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
@@ -276,10 +284,7 @@ describe("GET /api/cron/warm-cache", () => {
       const callOrder: string[] = [];
 
       mockedDbGetUsers.mockResolvedValue(
-        Array.from({ length: 7 }, (_, i) => ({
-          handle: `user${i}`,
-          registeredAt: "2025-01-01",
-        })),
+        Array.from({ length: 7 }, (_, i) => mockUser(`user${i}`)),
       );
 
       mockedGetStats.mockImplementation(async (handle) => {
@@ -300,10 +305,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("isolates failures across batches — one failure does not block others", async () => {
       mockedDbGetUsers.mockResolvedValue(
-        Array.from({ length: 8 }, (_, i) => ({
-          handle: `user${i}`,
-          registeredAt: "2025-01-01",
-        })),
+        Array.from({ length: 8 }, (_, i) => mockUser(`user${i}`)),
       );
 
       mockedGetStats.mockImplementation(async (handle) => {
@@ -324,8 +326,8 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("uses batch snapshot pre-fetch for efficiency", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
-        { handle: "bob", registeredAt: "2025-01-02" },
+        mockUser("alice"),
+        mockUser("bob", "2025-01-02"),
       ]);
 
       mockedGetStats.mockResolvedValue({ handle: "mock" } as never);
@@ -350,7 +352,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("returns the expected JSON shape", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
 
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
@@ -410,7 +412,7 @@ describe("GET /api/cron/warm-cache", () => {
   describe("score bump notifications", () => {
     it("compares snapshot with previous when snapshot is inserted", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
@@ -435,7 +437,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("calls notifyScoreBump when change is significant", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
@@ -468,7 +470,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("does not call notifyScoreBump when change is not significant", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
@@ -495,7 +497,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("skips notification when no previous snapshot exists", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
@@ -510,7 +512,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("does not fail if notification throws", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
@@ -540,7 +542,7 @@ describe("GET /api/cron/warm-cache", () => {
 
     it("reports notification count in response", async () => {
       mockedDbGetUsers.mockResolvedValue([
-        { handle: "alice", registeredAt: "2025-01-01" },
+        mockUser("alice"),
       ]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
@@ -566,6 +568,119 @@ describe("GET /api/cron/warm-cache", () => {
       const body = await res.json();
 
       expect(body.notifications).toBe(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Handle rotation
+  // ---------------------------------------------------------------------------
+
+  describe("handle rotation", () => {
+    it("starts at offset 0 when no stored offset exists", async () => {
+      vi.mocked(cacheGet).mockResolvedValue(null);
+      const users = Array.from({ length: 10 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.rotation.offset).toBe(0);
+      expect(body.handles).toEqual(users.map((u) => u.handle));
+    });
+
+    it("reads stored offset and slices from that position", async () => {
+      // 80 users, offset=10, MAX_HANDLES=50 → takes users 10–59
+      vi.mocked(cacheGet).mockResolvedValue(10);
+      const users = Array.from({ length: 80 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.rotation.offset).toBe(10);
+      expect(body.handles[0]).toBe("user10");
+      expect(body.handles).toHaveLength(50);
+      expect(body.handles[49]).toBe("user59");
+    });
+
+    it("stores next offset after processing", async () => {
+      vi.mocked(cacheGet).mockResolvedValue(0);
+      const users = Array.from({ length: 60 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      // Next offset should be 50 (0 + MAX_HANDLES)
+      expect(cacheSet).toHaveBeenCalledWith(
+        "cron:warm-cache:offset",
+        50,
+        0,
+      );
+    });
+
+    it("wraps around when offset + MAX_HANDLES exceeds total users", async () => {
+      // 120 users, offset=100, MAX_HANDLES=50 → takes 100–119 + 0–29
+      vi.mocked(cacheGet).mockResolvedValue(100);
+      const users = Array.from({ length: 120 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.handles).toHaveLength(50);
+      expect(body.handles[0]).toBe("user100");
+      expect(body.handles[19]).toBe("user119");
+      expect(body.handles[20]).toBe("user0");
+      expect(body.handles[49]).toBe("user29");
+      expect(body.rotation.nextOffset).toBe(30); // (100 + 50) % 120
+    });
+
+    it("resets offset to 0 when stored offset is past end of user list", async () => {
+      // 80 users but offset=200 → reset to 0
+      vi.mocked(cacheGet).mockResolvedValue(200);
+      const users = Array.from({ length: 80 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.handles[0]).toBe("user0");
+      expect(body.handles).toHaveLength(50);
+    });
+
+    it("includes rotation metadata in response", async () => {
+      vi.mocked(cacheGet).mockResolvedValue(0);
+      const users = Array.from({ length: 120 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.rotation).toEqual({
+        offset: 0,
+        nextOffset: 50,
+        totalUsers: 120,
+        coversAll: false,
+      });
+    });
+
+    it("sets coversAll=true when all users fit in one run", async () => {
+      vi.mocked(cacheGet).mockResolvedValue(0);
+      const users = Array.from({ length: 30 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.rotation.coversAll).toBe(true);
+      expect(body.rotation.totalUsers).toBe(30);
     });
   });
 });
