@@ -9,6 +9,7 @@ import { escapeXml } from "@/lib/render/escape";
 import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { dbUpsertUser } from "@/lib/db/users";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { storeVerificationRecord } from "@/lib/verification/store";
@@ -97,17 +98,20 @@ export async function GET(
   // Compute impact
   const impact = computeImpactV4(stats);
 
+  // Fetch snapshot (for EMA smoothing) and avatar in parallel — both are
+  // independent I/O operations that previously ran sequentially (~50-200ms saving).
+  // Pattern matches the share page (apps/web/app/u/[handle]/page.tsx).
+  const [latestSnapshot, avatarDataUri] = await Promise.all([
+    getCachedLatestSnapshot(handle),
+    stats.avatarUrl
+      ? getAvatarBase64(handle, stats.avatarUrl)
+      : Promise.resolve(undefined),
+  ]);
+
   // V5: Apply EMA smoothing using previous day's snapshot (Redis-cached)
-  const latestSnapshot = await getCachedLatestSnapshot(handle);
   const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
   impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
   impact.tier = getTier(impact.adjustedComposite);
-
-  // Fetch avatar as base64 data URI (external URLs don't load in SVG-as-image).
-  // Uses Redis cache to avoid re-fetching on every badge render within the TTL window.
-  const avatarDataUri = stats.avatarUrl
-    ? await getAvatarBase64(handle, stats.avatarUrl)
-    : undefined;
 
   // Generate verification code (returns null if secret is unset)
   const verification = generateVerificationCode(stats, impact);
@@ -145,6 +149,16 @@ export async function GET(
         if (inserted) updateSnapshotCache(handle, snapshot);
       }),
     );
+
+    // Persist profile fields so admin dashboard always has latest data
+    if (stats.displayName || stats.avatarUrl) {
+      ops.push(
+        dbUpsertUser(handle, {
+          displayName: stats.displayName ?? undefined,
+          avatarUrl: stats.avatarUrl ?? undefined,
+        }).catch(() => {}),
+      );
+    }
 
     return Promise.allSettled(ops);
   });

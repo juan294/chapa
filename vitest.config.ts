@@ -18,7 +18,13 @@ export default defineConfig({
         "apps/web/components/**",
         "packages/shared/**",
       ],
-      exclude: ["**/*.test.*", "**/*.d.ts"],
+      exclude: ["**/*.test.*", "**/*.d.ts", "**/*.md"],
+      thresholds: {
+        statements: 75,
+        branches: 70,
+        functions: 65,
+        lines: 75,
+      },
     },
   },
   resolve: {

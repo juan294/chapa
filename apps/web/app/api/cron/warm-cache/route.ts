@@ -13,6 +13,7 @@ import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -22,6 +23,9 @@ const MAX_HANDLES = 50;
 
 /** Number of handles to process concurrently per batch. */
 const BATCH_SIZE = 5;
+
+/** Redis key storing the rotation offset for round-robin handle processing. */
+const ROTATION_KEY = "cron:warm-cache:offset";
 
 /**
  * Process items in parallel batches of a fixed size.
@@ -82,8 +86,31 @@ export async function GET(request: NextRequest) {
   const users = await dbGetUsers();
   const allHandles = users.map((u) => u.handle);
 
-  // Cap the number of handles per run
-  const toWarm = allHandles.slice(0, MAX_HANDLES);
+  // Rotation: read stored offset, slice with wrap-around, store next offset
+  const storedOffset = await cacheGet<number>(ROTATION_KEY);
+  const offset = (storedOffset != null && storedOffset < allHandles.length)
+    ? storedOffset
+    : 0;
+
+  let toWarm: string[];
+  if (allHandles.length <= MAX_HANDLES) {
+    // All users fit in one run — no rotation needed
+    toWarm = allHandles;
+  } else if (offset + MAX_HANDLES > allHandles.length) {
+    // Wraps around: take remaining + start from beginning
+    const remaining = allHandles.slice(offset);
+    const fromStart = allHandles.slice(0, MAX_HANDLES - remaining.length);
+    toWarm = [...remaining, ...fromStart];
+  } else {
+    toWarm = allHandles.slice(offset, offset + MAX_HANDLES);
+  }
+
+  const nextOffset = allHandles.length <= MAX_HANDLES
+    ? 0
+    : (offset + MAX_HANDLES) % allHandles.length;
+
+  // Persist rotation offset for next cron run (TTL=0 means no expiry)
+  await cacheSet(ROTATION_KEY, nextOffset, 0);
 
   // Use fallback GitHub token for server-side fetches (no user session)
   const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
@@ -139,6 +166,12 @@ export async function GET(request: NextRequest) {
       expiredVerificationsDeleted,
       total: toWarm.length,
       handles: toWarm,
+      rotation: {
+        offset,
+        nextOffset,
+        totalUsers: allHandles.length,
+        coversAll: allHandles.length <= MAX_HANDLES,
+      },
       durationMs: Date.now() - start,
     },
     { headers: { "Cache-Control": "no-store" } },

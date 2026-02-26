@@ -53,8 +53,8 @@ describe("sitemap", () => {
 
   it("includes dynamic user profile pages from DB", async () => {
     vi.mocked(dbGetUsers).mockResolvedValue([
-      { handle: "alice", registeredAt: "2026-01-15T00:00:00Z" },
-      { handle: "bob", registeredAt: "2026-01-10T00:00:00Z" },
+      { handle: "alice", registeredAt: "2026-01-15T00:00:00Z", displayName: null, avatarUrl: null },
+      { handle: "bob", registeredAt: "2026-01-10T00:00:00Z", displayName: null, avatarUrl: null },
     ]);
 
     const entries = await sitemap();

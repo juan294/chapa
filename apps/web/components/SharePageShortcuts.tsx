@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import { useKeyboardShortcutsContext } from "./KeyboardShortcutsProvider";
+import { useKeyboardShortcutsContext } from "./KeyboardShortcutsListener";
 
 interface SharePageShortcutsProps {
   embedMarkdown: string;
@@ -11,7 +11,7 @@ interface SharePageShortcutsProps {
 
 /**
  * Renderless client component that registers share-page keyboard shortcuts.
- * Must be rendered inside KeyboardShortcutsProvider.
+ * Requires KeyboardShortcutsListener to be mounted.
  */
 export function SharePageShortcuts({
   embedMarkdown,

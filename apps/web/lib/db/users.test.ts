@@ -100,10 +100,59 @@ describe("dbUpsertUser", () => {
   it("upserts user with email when provided", async () => {
     mockUpsert.mockResolvedValue({ error: null });
 
-    await dbUpsertUser("TestUser", "test@example.com");
+    await dbUpsertUser("TestUser", { email: "test@example.com" });
 
     expect(mockUpsert).toHaveBeenCalledWith(
       { handle: "testuser", email: "test@example.com" },
+      { onConflict: "handle", ignoreDuplicates: false },
+    );
+  });
+
+  it("upserts user with displayName and avatarUrl", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+
+    await dbUpsertUser("TestUser", {
+      displayName: "Test User",
+      avatarUrl: "https://avatars.example.com/test.png",
+    });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      {
+        handle: "testuser",
+        display_name: "Test User",
+        avatar_url: "https://avatars.example.com/test.png",
+      },
+      { onConflict: "handle", ignoreDuplicates: false },
+    );
+  });
+
+  it("upserts user with all profile fields", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+
+    await dbUpsertUser("TestUser", {
+      email: "test@example.com",
+      displayName: "Test User",
+      avatarUrl: "https://avatars.example.com/test.png",
+    });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      {
+        handle: "testuser",
+        email: "test@example.com",
+        display_name: "Test User",
+        avatar_url: "https://avatars.example.com/test.png",
+      },
+      { onConflict: "handle", ignoreDuplicates: false },
+    );
+  });
+
+  it("sets ignoreDuplicates true when displayName is explicitly null", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+
+    await dbUpsertUser("TestUser", { displayName: null });
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { handle: "testuser", display_name: null },
       { onConflict: "handle", ignoreDuplicates: false },
     );
   });
@@ -140,8 +189,8 @@ describe("dbUpsertUser", () => {
 describe("dbGetUsers", () => {
   it("returns mapped user rows ordered by registered_at desc", async () => {
     const rows = [
-      { handle: "alice", registered_at: "2025-06-15T10:00:00Z" },
-      { handle: "bob", registered_at: "2025-06-14T10:00:00Z" },
+      { handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
+      { handle: "bob", registered_at: "2025-06-14T10:00:00Z", display_name: null, avatar_url: null },
     ];
 
     listResolve = { data: rows, error: null };
@@ -149,10 +198,10 @@ describe("dbGetUsers", () => {
     const result = await dbGetUsers();
 
     expect(result).toEqual([
-      { handle: "alice", registeredAt: "2025-06-15T10:00:00Z" },
-      { handle: "bob", registeredAt: "2025-06-14T10:00:00Z" },
+      { handle: "alice", registeredAt: "2025-06-15T10:00:00Z", displayName: "Alice", avatarUrl: "https://example.com/alice.png" },
+      { handle: "bob", registeredAt: "2025-06-14T10:00:00Z", displayName: null, avatarUrl: null },
     ]);
-    expect(mockSelect).toHaveBeenCalledWith("handle, registered_at");
+    expect(mockSelect).toHaveBeenCalledWith("handle, registered_at, display_name, avatar_url");
     expect(mockOrder).toHaveBeenCalledWith("registered_at", {
       ascending: false,
     });
@@ -174,7 +223,7 @@ describe("dbGetUsers", () => {
 
   it("applies limit and offset via .range() when provided", async () => {
     listResolve = {
-      data: [{ handle: "alice", registered_at: "2025-06-15T10:00:00Z" }],
+      data: [{ handle: "alice", registered_at: "2025-06-15T10:00:00Z", display_name: null, avatar_url: null }],
       error: null,
     };
 

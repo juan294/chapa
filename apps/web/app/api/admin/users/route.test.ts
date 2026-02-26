@@ -11,80 +11,62 @@ vi.mock("@/lib/auth/admin", () => ({
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheMGet: vi.fn(),
   rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 10 }),
-}));
-
-vi.mock("@/lib/db/users", () => ({
-  dbGetUsers: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: vi.fn(),
-}));
-
-vi.mock("@/lib/impact/smoothing", () => ({
-  applyEMA: vi.fn(),
-}));
-
-vi.mock("@/lib/impact/utils", () => ({
-  getTier: vi.fn(),
-}));
-
-vi.mock("@/lib/db/snapshots", () => ({
-  dbGetLatestSnapshotBatch: vi.fn(),
+vi.mock("@/lib/db/admin-users", () => ({
+  dbGetAdminUsers: vi.fn(),
 }));
 
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { cacheMGet, rateLimit } from "@/lib/cache/redis";
-import { dbGetUsers } from "@/lib/db/users";
-import { computeImpactV4 } from "@/lib/impact/v4";
-import { applyEMA } from "@/lib/impact/smoothing";
-import { getTier } from "@/lib/impact/utils";
-import { dbGetLatestSnapshotBatch } from "@/lib/db/snapshots";
+import { rateLimit } from "@/lib/cache/redis";
+import { dbGetAdminUsers } from "@/lib/db/admin-users";
 
-const MOCK_STATS = {
-  handle: "testuser",
-  displayName: "Test User",
-  avatarUrl: "https://avatars.githubusercontent.com/u/1",
-  commitsTotal: 100,
-  prsMergedCount: 20,
-  prsMergedWeight: 40,
-  reviewsSubmittedCount: 15,
-  issuesClosedCount: 5,
-  linesAdded: 5000,
-  linesDeleted: 2000,
-  reposContributed: 8,
-  topRepoShare: 0.4,
-  maxCommitsIn10Min: 3,
-  totalStars: 50,
-  totalForks: 10,
-  totalWatchers: 5,
-  activeDays: 180,
-  heatmapData: [{ date: "2025-01-01", count: 5 }],
-  fetchedAt: "2025-06-01T00:00:00Z",
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const MOCK_ADMIN_RESULT = {
+  users: [
+    {
+      handle: "testuser",
+      displayName: "Test User",
+      avatarUrl: "https://avatars.githubusercontent.com/u/1",
+      registeredAt: "2025-06-01T00:00:00Z",
+      lastSnapshotDate: "2025-06-01",
+      fetchedAt: "2025-06-01T12:00:00Z",
+      commitsTotal: 100,
+      prsMergedCount: 20,
+      reviewsSubmittedCount: 15,
+      activeDays: 180,
+      reposContributed: 8,
+      totalStars: 50,
+      archetype: "Builder",
+      tier: "Solid",
+      adjustedComposite: 65,
+      rawScore: 60,
+      confidence: 85,
+    },
+  ],
+  total: 1,
+  page: 1,
+  limit: 25,
+  totalPages: 1,
 };
 
-const MOCK_IMPACT = {
-  handle: "testuser",
-  profileType: "collaborative" as const,
-  dimensions: { delivery: 70, quality: 60, consistency: 80, breadth: 50 },
-  archetype: "Builder" as const,
-  compositeScore: 65,
-  confidence: 85,
-  confidencePenalties: [],
-  adjustedComposite: 65,
-  tier: "Solid" as const,
-  computedAt: "2025-06-01T00:00:00Z",
-};
-
-function makeRequest(): NextRequest {
-  return new NextRequest("https://chapa.thecreativetoken.com/api/admin/users", {
+function makeRequest(params?: Record<string, string>): NextRequest {
+  const url = new URL("https://chapa.thecreativetoken.com/api/admin/users");
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v);
+    }
+  }
+  return new NextRequest(url, {
     headers: { cookie: "chapa_session=encrypted-value" },
   });
 }
@@ -101,36 +83,15 @@ beforeEach(() => {
   });
   vi.mocked(isAdminHandle).mockReturnValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-  // dbGetUsers returns user handles from Supabase
-  vi.mocked(dbGetUsers).mockResolvedValue([
-    { handle: "testuser", registeredAt: "2025-06-01T00:00:00Z" },
-  ]);
-  // cacheMGet is called twice: primary keys, stale keys
-  vi.mocked(cacheMGet)
-    .mockResolvedValueOnce([MOCK_STATS])            // primary stats
-    .mockResolvedValueOnce([null]);                  // stale stats (not needed)
-  vi.mocked(computeImpactV4).mockReturnValue(MOCK_IMPACT);
-  // EMA smoothing: by default, batch returns empty map → raw score passes through
-  vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(new Map());
-  vi.mocked(applyEMA).mockImplementation((current) => Math.round(current));
-  vi.mocked(getTier).mockReturnValue("Solid");
+  vi.mocked(dbGetAdminUsers).mockResolvedValue(MOCK_ADMIN_RESULT);
 });
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 describe("GET /api/admin/users", () => {
-  it("returns user list for admin", async () => {
-    const res = await GET(makeRequest());
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.users).toHaveLength(1);
-    expect(body.users[0].handle).toBe("testuser");
-    expect(body.users[0].archetype).toBe("Builder");
-    expect(body.users[0].tier).toBe("Solid");
-    expect(body.users[0].adjustedComposite).toBe(65);
-    // heatmapData should NOT be in the response (too large)
-    expect(body.users[0].heatmapData).toBeUndefined();
-  });
-
+  // Auth & rate limit (unchanged)
   it("returns 401 when session is missing", async () => {
     vi.mocked(readSessionCookie).mockReturnValue(null);
     const res = await GET(makeRequest());
@@ -155,76 +116,118 @@ describe("GET /api/admin/users", () => {
     expect(res.status).toBe(429);
   });
 
-  it("returns empty list when no users in Supabase", async () => {
-    vi.mocked(dbGetUsers).mockResolvedValue([]);
+  // Data layer — dbGetAdminUsers
+  it("returns paginated users from Supabase", async () => {
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.users).toHaveLength(1);
+    expect(body.users[0].handle).toBe("testuser");
+    expect(body.users[0].archetype).toBe("Builder");
+    expect(body.users[0].tier).toBe("Solid");
+    expect(body.users[0].adjustedComposite).toBe(65);
+  });
+
+  it("passes default query params when none provided", async () => {
+    await GET(makeRequest());
+
+    expect(dbGetAdminUsers).toHaveBeenCalledWith({
+      page: 1,
+      limit: 25,
+      sort: "adjustedComposite",
+      dir: "desc",
+      search: undefined,
+      tier: undefined,
+      archetype: undefined,
+    });
+  });
+
+  it("passes custom query params from URL", async () => {
+    await GET(makeRequest({
+      page: "2",
+      limit: "50",
+      sort: "handle",
+      dir: "asc",
+      search: "juan",
+    }));
+
+    expect(dbGetAdminUsers).toHaveBeenCalledWith({
+      page: 2,
+      limit: 50,
+      sort: "handle",
+      dir: "asc",
+      search: "juan",
+      tier: undefined,
+      archetype: undefined,
+    });
+  });
+
+  it("returns 400 for invalid sort field", async () => {
+    const res = await GET(makeRequest({ sort: "invalidField" }));
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/sort/i);
+  });
+
+  it("passes tier filter", async () => {
+    await GET(makeRequest({ tier: "Elite" }));
+
+    expect(dbGetAdminUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: "Elite" }),
+    );
+  });
+
+  it("passes archetype filter", async () => {
+    await GET(makeRequest({ archetype: "Builder" }));
+
+    expect(dbGetAdminUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ archetype: "Builder" }),
+    );
+  });
+
+  it("returns empty result when no users exist", async () => {
+    vi.mocked(dbGetAdminUsers).mockResolvedValue({
+      users: [],
+      total: 0,
+      page: 1,
+      limit: 25,
+      totalPages: 0,
+    });
+
     const res = await GET(makeRequest());
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.users).toEqual([]);
+    expect(body.total).toBe(0);
   });
 
-  it("discovers users from Supabase via dbGetUsers", async () => {
-    vi.mocked(dbGetUsers).mockResolvedValue([
-      { handle: "user1", registeredAt: "2025-06-01T00:00:00Z" },
-      { handle: "user2", registeredAt: "2025-05-01T00:00:00Z" },
-    ]);
-    vi.mocked(cacheMGet)
-      .mockReset()
-      .mockResolvedValueOnce([MOCK_STATS, { ...MOCK_STATS, handle: "user2" }])   // primary
-      .mockResolvedValueOnce([null, null]);                                        // stale
+  it("includes pagination metadata in response", async () => {
+    vi.mocked(dbGetAdminUsers).mockResolvedValue({
+      users: [],
+      total: 150,
+      page: 3,
+      limit: 25,
+      totalPages: 6,
+    });
 
-    const res = await GET(makeRequest());
+    const res = await GET(makeRequest({ page: "3" }));
     const body = await res.json();
 
-    expect(body.users).toHaveLength(2);
-    expect(dbGetUsers).toHaveBeenCalledTimes(1);
+    expect(body.total).toBe(150);
+    expect(body.page).toBe(3);
+    expect(body.limit).toBe(25);
+    expect(body.totalPages).toBe(6);
   });
 
-  it("uses stale stats as fallback when primary cache expired", async () => {
-    const staleUser = { ...MOCK_STATS, handle: "staleuser" };
-    vi.mocked(dbGetUsers).mockResolvedValue([
-      { handle: "staleuser", registeredAt: "2025-06-01T00:00:00Z" },
-    ]);
-    vi.mocked(cacheMGet)
-      .mockReset()
-      .mockResolvedValueOnce([null])         // primary miss
-      .mockResolvedValueOnce([staleUser]);   // stale hit
-
+  it("sets Cache-Control: no-store header", async () => {
     const res = await GET(makeRequest());
-    const body = await res.json();
-
-    expect(body.users).toHaveLength(1);
-    expect(body.users[0].handle).toBe("staleuser");
-    expect(body.users[0].statsExpired).toBe(false);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 
-  it("shows statsExpired when all caches expired", async () => {
-    vi.mocked(dbGetUsers).mockResolvedValue([
-      { handle: "expireduser", registeredAt: "2025-06-01T00:00:00Z" },
-    ]);
-    vi.mocked(cacheMGet)
-      .mockReset()
-      .mockResolvedValueOnce([null])   // primary miss
-      .mockResolvedValueOnce([null]);  // stale miss
-
-    const res = await GET(makeRequest());
-    const body = await res.json();
-
-    expect(body.users).toHaveLength(1);
-    expect(body.users[0].handle).toBe("expireduser");
-    expect(body.users[0].statsExpired).toBe(true);
-    expect(body.users[0].archetype).toBeNull();
-  });
-
-  it("returns statsExpired false for users with stats", async () => {
-    const res = await GET(makeRequest());
-    const body = await res.json();
-
-    expect(body.users[0].statsExpired).toBe(false);
-  });
-
-  it("includes selected stats fields in response", async () => {
+  it("includes all expected user fields in response", async () => {
     const res = await GET(makeRequest());
     const body = await res.json();
     const user = body.users[0];
@@ -232,6 +235,8 @@ describe("GET /api/admin/users", () => {
     expect(user).toHaveProperty("handle");
     expect(user).toHaveProperty("displayName");
     expect(user).toHaveProperty("avatarUrl");
+    expect(user).toHaveProperty("registeredAt");
+    expect(user).toHaveProperty("lastSnapshotDate");
     expect(user).toHaveProperty("fetchedAt");
     expect(user).toHaveProperty("commitsTotal");
     expect(user).toHaveProperty("prsMergedCount");
@@ -240,67 +245,41 @@ describe("GET /api/admin/users", () => {
     expect(user).toHaveProperty("reposContributed");
     expect(user).toHaveProperty("totalStars");
     expect(user).toHaveProperty("confidence");
+    expect(user).toHaveProperty("archetype");
+    expect(user).toHaveProperty("tier");
+    expect(user).toHaveProperty("adjustedComposite");
+    expect(user).toHaveProperty("rawScore");
   });
 
-  describe("EMA smoothing", () => {
-    it("applies EMA smoothing using previous snapshot from batch", async () => {
-      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(
-        new Map([["testuser", { adjustedComposite: 50 } as never]]),
-      );
-      // applyEMA(65, 50) with alpha=0.15 → round(0.15*65 + 0.85*50) = round(52.25) = 52
-      vi.mocked(applyEMA).mockReturnValue(52);
-      vi.mocked(getTier).mockReturnValue("Emerging");
+  it("does not include statsExpired in response", async () => {
+    const res = await GET(makeRequest());
+    const body = await res.json();
 
-      const res = await GET(makeRequest());
-      const body = await res.json();
+    expect(body.users[0]).not.toHaveProperty("statsExpired");
+  });
 
-      expect(applyEMA).toHaveBeenCalledWith(65, 50);
-      expect(getTier).toHaveBeenCalledWith(52);
-      expect(body.users[0].adjustedComposite).toBe(52);
-      expect(body.users[0].tier).toBe("Emerging");
-    });
+  it("accepts all valid sort fields", async () => {
+    const validFields = [
+      "handle", "adjustedComposite", "rawScore", "confidence",
+      "commitsTotal", "prsMergedCount", "reviewsSubmittedCount",
+      "activeDays", "totalStars", "tier", "archetype",
+      "registeredAt", "lastSnapshotDate",
+    ];
 
-    it("passes null to applyEMA when handle absent from batch Map", async () => {
-      vi.mocked(dbGetLatestSnapshotBatch).mockResolvedValue(new Map());
-      vi.mocked(applyEMA).mockReturnValue(65);
-      vi.mocked(getTier).mockReturnValue("Solid");
+    for (const field of validFields) {
+      vi.clearAllMocks();
+      vi.mocked(readSessionCookie).mockReturnValue({
+        login: "admin1",
+        name: "Admin One",
+        avatar_url: "https://example.com/avatar.png",
+        token: "gho_fake",
+      });
+      vi.mocked(isAdminHandle).mockReturnValue(true);
+      vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+      vi.mocked(dbGetAdminUsers).mockResolvedValue(MOCK_ADMIN_RESULT);
 
-      const res = await GET(makeRequest());
-      const body = await res.json();
-
-      expect(applyEMA).toHaveBeenCalledWith(65, null);
-      expect(body.users[0].adjustedComposite).toBe(65);
-    });
-
-    it("calls batch once with all stat-having handles", async () => {
-      vi.mocked(dbGetUsers).mockResolvedValue([
-        { handle: "user1", registeredAt: "2025-06-01T00:00:00Z" },
-        { handle: "user2", registeredAt: "2025-05-01T00:00:00Z" },
-      ]);
-      vi.mocked(cacheMGet)
-        .mockReset()
-        .mockResolvedValueOnce([MOCK_STATS, { ...MOCK_STATS, handle: "user2" }])
-        .mockResolvedValueOnce([null, null]);
-
-      await GET(makeRequest());
-
-      expect(dbGetLatestSnapshotBatch).toHaveBeenCalledTimes(1);
-      expect(dbGetLatestSnapshotBatch).toHaveBeenCalledWith(["user1", "user2"]);
-    });
-
-    it("does not include handles without stats in batch call", async () => {
-      vi.mocked(dbGetUsers).mockResolvedValue([
-        { handle: "nostats", registeredAt: "2025-06-01T00:00:00Z" },
-      ]);
-      vi.mocked(cacheMGet)
-        .mockReset()
-        .mockResolvedValueOnce([null])
-        .mockResolvedValueOnce([null]);
-
-      await GET(makeRequest());
-
-      // Batch is still called but with empty array (short-circuits internally)
-      expect(dbGetLatestSnapshotBatch).toHaveBeenCalledWith([]);
-    });
+      const res = await GET(makeRequest({ sort: field }));
+      expect(res.status).toBe(200);
+    }
   });
 });

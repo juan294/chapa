@@ -6,6 +6,8 @@ export interface AdminUser {
   handle: string;
   displayName: string | null;
   avatarUrl: string | null;
+  registeredAt: string;
+  lastSnapshotDate: string | null;
   fetchedAt: string | null;
   commitsTotal: number | null;
   prsMergedCount: number | null;
@@ -18,7 +20,14 @@ export interface AdminUser {
   adjustedComposite: number | null;
   rawScore: number | null;
   confidence: number | null;
-  statsExpired: boolean;
+}
+
+export interface PaginatedResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export type SortField =
@@ -33,7 +42,8 @@ export type SortField =
   | "reviewsSubmittedCount"
   | "activeDays"
   | "totalStars"
-  | "fetchedAt";
+  | "registeredAt"
+  | "lastSnapshotDate";
 
 export type SortDir = "asc" | "desc";
 
@@ -90,27 +100,3 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function sortUsers(
-  users: AdminUser[],
-  field: SortField,
-  dir: SortDir,
-): AdminUser[] {
-  return [...users].sort((a, b) => {
-    // Expired users always sort to the bottom
-    if (a.statsExpired !== b.statsExpired) return a.statsExpired ? 1 : -1;
-
-    let cmp = 0;
-    if (field === "handle") {
-      cmp = a.handle.localeCompare(b.handle);
-    } else if (field === "tier") {
-      cmp = (TIER_ORDER[a.tier ?? ""] ?? 0) - (TIER_ORDER[b.tier ?? ""] ?? 0);
-    } else if (field === "archetype") {
-      cmp = (a.archetype ?? "").localeCompare(b.archetype ?? "");
-    } else if (field === "fetchedAt") {
-      cmp = new Date(a.fetchedAt ?? 0).getTime() - new Date(b.fetchedAt ?? 0).getTime();
-    } else {
-      cmp = ((a[field] as number) ?? 0) - ((b[field] as number) ?? 0);
-    }
-    return dir === "asc" ? cmp : -cmp;
-  });
-}

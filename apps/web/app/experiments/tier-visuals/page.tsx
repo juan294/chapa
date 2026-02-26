@@ -542,11 +542,11 @@ function EscalationSummary() {
           <defs>
             <linearGradient id="arrow-grad" x1="0" y1="6" x2="120" y2="6" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#9AA4B2" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#7C6AEF" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="var(--color-amber)" stopOpacity="0.8" />
             </linearGradient>
           </defs>
           <line x1="0" y1="6" x2="112" y2="6" stroke="url(#arrow-grad)" strokeWidth="1.5" />
-          <polygon points="112,2 120,6 112,10" fill="#7C6AEF" fillOpacity="0.8" />
+          <polygon points="112,2 120,6 112,10" fill="var(--color-amber)" fillOpacity="0.8" />
         </svg>
         <span className="text-amber text-xs font-semibold">Aspirational</span>
       </div>
@@ -579,7 +579,7 @@ export default function TierVisualsExperimentPage() {
 
 /* High: static gold gradient text */
 .tier-score-high {
-  background: linear-gradient(135deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
+  background: linear-gradient(135deg, var(--color-amber-dark), var(--color-amber), var(--color-amber-light), var(--color-amber), var(--color-amber-dark));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -589,13 +589,13 @@ export default function TierVisualsExperimentPage() {
 .tier-score-elite {
   background: linear-gradient(
     90deg,
-    #5E4FCC,
-    #7C6AEF,
+    var(--color-amber-dark),
+    var(--color-amber),
     #A99BFF,
     #D0C9FF,
     #A99BFF,
-    #7C6AEF,
-    #5E4FCC
+    var(--color-amber),
+    var(--color-amber-dark)
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -623,15 +623,15 @@ export default function TierVisualsExperimentPage() {
 
 /* High: amber glow border */
 .tier-card-high {
-  border: 1px solid rgba(124,106,239,0.18);
-  box-shadow: 0 0 20px rgba(124,106,239,0.10), 0 0 40px rgba(124,106,239,0.04);
+  border: 1px solid color-mix(in srgb, var(--color-amber) 18%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-amber) 10%, transparent), 0 0 40px color-mix(in srgb, var(--color-amber) 4%, transparent);
 }
 
 /* Elite: outer glow only (border handled by pseudo-element) */
 .tier-card-elite {
   box-shadow:
-    0 0 40px rgba(124,106,239,0.15),
-    0 0 80px rgba(124,106,239,0.05);
+    0 0 40px color-mix(in srgb, var(--color-amber) 15%, transparent),
+    0 0 80px color-mix(in srgb, var(--color-amber) 5%, transparent);
 }
 
 /* ── Elite animated gradient border ───────────── */
@@ -645,15 +645,15 @@ export default function TierVisualsExperimentPage() {
 .elite-border-glow {
   background: conic-gradient(
     from var(--elite-angle),
-    #5E4FCC,
-    #7C6AEF,
-    #9D8FFF,
-    #7C6AEF,
-    #5E4FCC,
-    #7C6AEF,
-    #9D8FFF,
-    #7C6AEF,
-    #5E4FCC
+    var(--color-amber-dark),
+    var(--color-amber),
+    var(--color-amber-light),
+    var(--color-amber),
+    var(--color-amber-dark),
+    var(--color-amber),
+    var(--color-amber-light),
+    var(--color-amber),
+    var(--color-amber-dark)
   );
   animation: elite-border-rotate 4s linear infinite;
   filter: blur(3px);
@@ -668,7 +668,7 @@ export default function TierVisualsExperimentPage() {
 /* Fallback for browsers without @property */
 @supports not (background: conic-gradient(from var(--elite-angle), red, blue)) {
   .elite-border-glow {
-    background: linear-gradient(90deg, #5E4FCC, #7C6AEF, #9D8FFF, #7C6AEF, #5E4FCC);
+    background: linear-gradient(90deg, var(--color-amber-dark), var(--color-amber), var(--color-amber-light), var(--color-amber), var(--color-amber-dark));
     background-size: 300% 300%;
     animation: elite-border-fallback 3s ease infinite;
     filter: blur(3px);
@@ -685,7 +685,7 @@ export default function TierVisualsExperimentPage() {
 /* ── Elite tier pill gradient ─────────────────── */
 
 .tier-elite-pill {
-  background: linear-gradient(135deg, #5E4FCC, #7C6AEF, #9D8FFF);
+  background: linear-gradient(135deg, var(--color-amber-dark), var(--color-amber), var(--color-amber-light));
 }
 
 /* ── Sparkle dots ─────────────────────────────── */
@@ -717,11 +717,11 @@ export default function TierVisualsExperimentPage() {
     animation: none !important;
     background: conic-gradient(
       from 45deg,
-      #5E4FCC,
-      #7C6AEF,
-      #9D8FFF,
-      #7C6AEF,
-      #5E4FCC
+      var(--color-amber-dark),
+      var(--color-amber),
+      var(--color-amber-light),
+      var(--color-amber),
+      var(--color-amber-dark)
     );
   }
 

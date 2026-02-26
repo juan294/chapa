@@ -5,7 +5,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import PostHogProvider from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
+import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getBaseUrl } from "@/lib/env";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -118,13 +118,14 @@ export default function RootLayout({
         />
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-full focus:border focus:border-amber/20 focus:bg-amber/10 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-amber"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:rounded-lg focus:bg-amber focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg focus:shadow-amber/25"
         >
-          Skip to content
+          Skip to main content
         </a>
         <ThemeProvider>
           <PostHogProvider>
-            <KeyboardShortcutsProvider>{children}</KeyboardShortcutsProvider>
+            <KeyboardShortcutsListener />
+            {children}
           </PostHogProvider>
         </ThemeProvider>
         <Analytics />

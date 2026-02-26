@@ -22,7 +22,7 @@ export const AdminUserTableRow = memo(function AdminUserTableRow({
 }: AdminUserTableRowProps) {
   return (
     <tr
-      className={`transition-colors hover:bg-amber/[0.03] ${user.statsExpired ? "opacity-60" : ""}`}
+      className={`transition-colors hover:bg-amber/[0.03] ${user.lastSnapshotDate === null ? "opacity-60" : ""}`}
     >
       {/* Developer */}
       <td className="px-3 py-2.5">
@@ -48,8 +48,8 @@ export const AdminUserTableRow = memo(function AdminUserTableRow({
             <p className="truncate font-heading text-sm text-text-primary group-hover:text-amber transition-colors">
               {user.handle}
             </p>
-            {user.statsExpired ? (
-              <p className="text-xs text-terminal-yellow">data expired</p>
+            {user.lastSnapshotDate === null ? (
+              <p className="text-xs text-text-secondary">no data yet</p>
             ) : user.displayName ? (
               <p className="truncate text-xs text-text-secondary">
                 {user.displayName}
@@ -107,7 +107,14 @@ export const AdminUserTableRow = memo(function AdminUserTableRow({
       <td className="hidden md:table-cell px-3 py-2.5">
         {user.confidence != null ? (
           <div className="flex items-center gap-1.5">
-            <div className="h-1 w-10 rounded-full bg-stroke overflow-hidden">
+            <div
+              className="h-1 w-10 rounded-full bg-stroke overflow-hidden"
+              role="progressbar"
+              aria-valuenow={user.confidence}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Confidence score"
+            >
               <div
                 className="h-full rounded-full bg-amber/60"
                 style={{ width: `${user.confidence}%` }}
@@ -191,7 +198,7 @@ export function AdminUserTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" aria-label="Registered users">
         <thead>
           <tr className="border-b border-stroke">
             <AdminSortableHeader field="handle" label="Developer" sortField={sortField} sortDir={sortDir} onSort={onSort} />
@@ -205,7 +212,7 @@ export function AdminUserTable({
             <AdminSortableHeader field="reviewsSubmittedCount" label="Reviews" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="activeDays" label="Days" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
             <AdminSortableHeader field="totalStars" label="Stars" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden xl:table-cell" />
-            <AdminSortableHeader field="fetchedAt" label="Updated" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
+            <AdminSortableHeader field="lastSnapshotDate" label="Updated" sortField={sortField} sortDir={sortDir} onSort={onSort} className="hidden md:table-cell" />
             <AdminHeaderCell className="w-10">
               <span className="sr-only">Actions</span>
             </AdminHeaderCell>

@@ -1,5 +1,12 @@
 # Bundle Size Analysis
 #
+# Two jobs:
+# 1. `analyze` — Standard build, measures aggregate directory sizes, comments
+#    on PRs with a size table.
+# 2. `bundle-analyzer` — Runs @next/bundle-analyzer (ANALYZE=true), uploads
+#    interactive HTML treemap reports as CI artifacts, and enforces a 500 KB
+#    per-file budget on JS bundles.
+#
 # NOTE: Turbopack limitation (see GitHub issue #303)
 #
 # Next.js builds with Turbopack (the default in dev and increasingly in
@@ -10,13 +17,19 @@
 #   /                                  5.2 kB         89 kB
 #   /u/[handle]                        3.1 kB         87 kB
 #
-# Turbopack omits this entirely. As a result, this workflow measures
+# Turbopack omits this entirely. As a result, the `analyze` job measures
 # aggregate directory sizes (.next/static, .next/server, total) and lists
 # the largest individual JS files — but cannot report per-route First Load
 # JS budgets.
 #
+# The `bundle-analyzer` job runs with ANALYZE=true which triggers the
+# @next/bundle-analyzer Webpack plugin. When Turbopack is the bundler this
+# may not produce the interactive treemap. In that case the job still
+# uploads whatever .next/analyze/ output exists and falls back to
+# per-file size checks.
+#
 # For detailed per-route analysis, run locally with Webpack:
-#   ANALYZE=true pnpm --filter web build
+#   ANALYZE=true pnpm --filter @chapa/web build
 # This requires @next/bundle-analyzer to be configured in next.config.ts.
 #
 # Turbopack tracking: https://github.com/vercel/next.js/issues/49887
@@ -142,3 +155,104 @@ jobs:
                 body,
               });
             }
+
+  bundle-analyzer:
+    name: Bundle Analyzer Report
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build with bundle analyzer
+        run: pnpm --filter @chapa/web build
+        env:
+          ANALYZE: "true"
+          GITHUB_CLIENT_ID: dummy
+          GITHUB_CLIENT_SECRET: dummy
+          NEXTAUTH_SECRET: dummy-secret-for-ci
+          UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
+          UPSTASH_REDIS_REST_TOKEN: dummy
+
+      - name: Upload analyzer report
+        uses: actions/upload-artifact@v6
+        with:
+          name: bundle-analyzer-report
+          path: |
+            apps/web/.next/analyze/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Check JS bundle sizes (500 KB budget)
+        working-directory: apps/web
+        run: |
+          BUDGET_KB=500
+          BUDGET_BYTES=$((BUDGET_KB * 1024))
+          FAILED=0
+
+          echo "## Bundle Analyzer — Size Budget Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Budget: **${BUDGET_KB} KB** per JS file in \`.next/static/\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Check .next/static JS files (client bundles delivered to browsers)
+          if [ -d ".next/static" ]; then
+            OVER_BUDGET=""
+            while IFS=$'\t' read -r SIZE_BYTES FILE; do
+              SIZE_KB=$((SIZE_BYTES / 1024))
+              if [ "$SIZE_BYTES" -gt "$BUDGET_BYTES" ]; then
+                OVER_BUDGET="${OVER_BUDGET}\n| \`${FILE}\` | ${SIZE_KB} KB | :red_circle: OVER |"
+                FAILED=1
+              fi
+            done < <(find .next/static -name "*.js" -type f -print0 | xargs -0 -I{} sh -c 'printf "%s\t%s\n" "$(wc -c < "$1")" "$1"' _ {})
+
+            if [ -n "$OVER_BUDGET" ]; then
+              echo "| File | Size | Status |" >> "$GITHUB_STEP_SUMMARY"
+              echo "|------|------|--------|" >> "$GITHUB_STEP_SUMMARY"
+              echo -e "$OVER_BUDGET" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo ":white_check_mark: All client JS files are under ${BUDGET_KB} KB." >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            echo "### Top 15 client JS files by size" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            find .next/static -name "*.js" -type f -exec du -h {} + | sort -rh | head -15 >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo ":warning: \`.next/static\` not found — Turbopack may structure output differently." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Report on analyzer HTML output
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -d ".next/analyze" ]; then
+            FILE_COUNT=$(find .next/analyze -name "*.html" -type f | wc -l | tr -d ' ')
+            echo ":bar_chart: Bundle analyzer generated **${FILE_COUNT}** HTML report(s)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Download the **bundle-analyzer-report** artifact to view interactive treemaps." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo ":warning: No \`.next/analyze/\` directory found." >> "$GITHUB_STEP_SUMMARY"
+            echo "Turbopack may not support \`@next/bundle-analyzer\` treemap generation." >> "$GITHUB_STEP_SUMMARY"
+            echo "See [Next.js #49887](https://github.com/vercel/next.js/issues/49887) for tracking." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "::error::One or more JS files in .next/static/ exceed the ${BUDGET_KB} KB budget."
+            exit 1
+          fi

@@ -5,7 +5,7 @@ import { SharePageShortcuts } from "./SharePageShortcuts";
 
 const mockRegister = vi.fn(() => vi.fn());
 
-vi.mock("./KeyboardShortcutsProvider", () => ({
+vi.mock("./KeyboardShortcutsListener", () => ({
   useKeyboardShortcutsContext: () => ({
     registerPageShortcuts: mockRegister,
   }),

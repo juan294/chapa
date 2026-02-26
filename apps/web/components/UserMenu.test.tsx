@@ -142,6 +142,22 @@ describe("UserMenu — Codeberg integration", () => {
   });
 });
 
+describe("UserMenu — #520 aria-label on dropdown menu", () => {
+  it("dropdown menu has aria-label 'User menu options'", () => {
+    expect(SOURCE).toContain('aria-label="User menu options"');
+  });
+});
+
+describe("UserMenu — #521 distinguishing aria-labels on Unlink buttons", () => {
+  it("Bitbucket Unlink button has aria-label 'Unlink Bitbucket account'", () => {
+    expect(SOURCE).toContain('aria-label="Unlink Bitbucket account"');
+  });
+
+  it("Codeberg Unlink button has aria-label 'Unlink Codeberg account'", () => {
+    expect(SOURCE).toContain('aria-label="Unlink Codeberg account"');
+  });
+});
+
 describe("UserMenu — linked platform profile links", () => {
   it("renders Bitbucket username as a clickable link to bitbucket.org profile", () => {
     expect(SOURCE).toContain("https://bitbucket.org/");
@@ -193,5 +209,45 @@ describe("UserMenu — page refresh after unlink", () => {
     const fnEnd = SOURCE.indexOf("const fallbackLetter");
     const fnBody = SOURCE.slice(fnStart, fnEnd);
     expect(fnBody).toContain("router.refresh()");
+  });
+});
+
+describe("UserMenu — platform status cache", () => {
+  it("declares a module-level platformStatusCache object outside the component", () => {
+    // Cache must be outside the component function so it persists across mounts
+    const componentStart = SOURCE.indexOf("export function UserMenu");
+    const beforeComponent = SOURCE.slice(0, componentStart);
+    expect(beforeComponent).toContain("platformStatusCache");
+  });
+
+  it("cache has fetched, bitbucket, and codeberg fields", () => {
+    expect(SOURCE).toContain("fetched");
+    // The cache type should track platform statuses
+    expect(SOURCE).toMatch(/platformStatusCache\b/);
+  });
+
+  it("useEffect checks cache before fetching", () => {
+    // The effect body should check if already fetched
+    const effectStart = SOURCE.indexOf("useEffect(");
+    const effectEnd = SOURCE.indexOf("}, [])");
+    const effectBody = SOURCE.slice(effectStart, effectEnd);
+    expect(effectBody).toContain("platformStatusCache.fetched");
+  });
+
+  it("unlink handlers invalidate the cache", () => {
+    // Both unlink handlers should call clearPlatformStatusCache
+    const bbUnlinkStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
+    const bbUnlinkEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const bbBody = SOURCE.slice(bbUnlinkStart, bbUnlinkEnd);
+    expect(bbBody).toContain("clearPlatformStatusCache()");
+
+    const cbUnlinkStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const cbUnlinkEnd = SOURCE.indexOf("const fallbackLetter");
+    const cbBody = SOURCE.slice(cbUnlinkStart, cbUnlinkEnd);
+    expect(cbBody).toContain("clearPlatformStatusCache()");
+  });
+
+  it("exports a clearPlatformStatusCache function for external invalidation", () => {
+    expect(SOURCE).toContain("export function clearPlatformStatusCache");
   });
 });

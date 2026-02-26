@@ -320,14 +320,9 @@ describe("AdminDashboardClient", () => {
       expect(HOOK_SOURCE).toMatch(/useDeferredValue\(search\)/);
     });
 
-    it("uses deferredSearch in the filter useMemo dependency array", () => {
-      // The filtered memo should depend on deferredSearch, not search
-      const filteredMemo = HOOK_SOURCE.match(
-        /const filtered = useMemo\(\(\) => \{[\s\S]*?\}, \[([^\]]+)\]\)/,
-      );
-      expect(filteredMemo).not.toBeNull();
-      expect(filteredMemo![1]).toContain("deferredSearch");
-      expect(filteredMemo![1]).not.toMatch(/(?<![dD]eferred)search/);
+    it("uses deferredSearch in server-side fetch params", () => {
+      // After server-side migration, deferredSearch is sent as a query param
+      expect(HOOK_SOURCE).toContain("deferredSearch");
     });
   });
 
@@ -373,10 +368,19 @@ describe("AdminDashboardClient", () => {
       expect(HOOK_SOURCE).toContain("chapa:admin-sort");
     });
 
-    it("computes filtered, sorted, and tierCounts", () => {
-      expect(HOOK_SOURCE).toContain("const filtered = useMemo");
-      expect(HOOK_SOURCE).toContain("const sorted = useMemo");
+    it("computes tierCounts from current page users", () => {
       expect(HOOK_SOURCE).toContain("const tierCounts = useMemo");
+    });
+
+    it("does not use client-side filtered or sorted memos", () => {
+      expect(HOOK_SOURCE).not.toContain("const filtered = useMemo");
+      expect(HOOK_SOURCE).not.toContain("const sorted = useMemo");
+    });
+
+    it("manages pagination state", () => {
+      expect(HOOK_SOURCE).toContain("useState(1)"); // page
+      expect(HOOK_SOURCE).toContain("setTotal");
+      expect(HOOK_SOURCE).toContain("setTotalPages");
     });
 
     it("returns all necessary state and handlers", () => {
@@ -384,7 +388,8 @@ describe("AdminDashboardClient", () => {
       expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*activeTab[\s\S]*\}/);
       expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*fetchUsers[\s\S]*\}/);
       expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*handleSort[\s\S]*\}/);
-      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*sorted[\s\S]*\}/);
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*page[\s\S]*\}/);
+      expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*total[\s\S]*\}/);
       expect(HOOK_SOURCE).toMatch(/return\s*\{[\s\S]*tierCounts[\s\S]*\}/);
     });
   });

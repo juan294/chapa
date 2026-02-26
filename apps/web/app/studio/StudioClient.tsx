@@ -17,7 +17,7 @@ import {
   type OutputLine,
   type CommandAction,
 } from "@/components/terminal/command-registry";
-import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsProvider";
+import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;

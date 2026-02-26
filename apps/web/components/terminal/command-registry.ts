@@ -80,7 +80,8 @@ const SORT_FIELD_ALIASES: Record<string, string> = {
   reviews: "reviewsSubmittedCount",
   days: "activeDays",
   stars: "totalStars",
-  updated: "fetchedAt",
+  updated: "lastSnapshotDate",
+  registered: "registeredAt",
 };
 
 /** Admin-only commands for the admin dashboard. */

@@ -351,7 +351,11 @@ describe("GET /api/auth/callback — OAuth flow", () => {
     );
 
     expect(mockFetchGitHubUserEmail).toHaveBeenCalledWith("gho_valid_token");
-    expect(mockDbUpsertUser).toHaveBeenCalledWith("octocat", "octocat@github.com");
+    expect(mockDbUpsertUser).toHaveBeenCalledWith("octocat", {
+      email: "octocat@github.com",
+      displayName: "The Octocat",
+      avatarUrl: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
   });
 
   it("upserts user without email when email fetch fails", async () => {
@@ -370,7 +374,11 @@ describe("GET /api/auth/callback — OAuth flow", () => {
       makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
     );
 
-    expect(mockDbUpsertUser).toHaveBeenCalledWith("octocat", undefined);
+    expect(mockDbUpsertUser).toHaveBeenCalledWith("octocat", {
+      email: undefined,
+      displayName: "The Octocat",
+      avatarUrl: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
   });
 
   it("ignores malicious redirect cookie and falls back to profile page", async () => {

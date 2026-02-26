@@ -70,22 +70,36 @@ globalThis.fetch = mockFetch;
 /* ------------------------------------------------------------------ */
 
 import {
-  KeyboardShortcutsProvider,
+  KeyboardShortcutsListener,
   useKeyboardShortcutsContext,
-} from "./KeyboardShortcutsProvider";
+} from "./KeyboardShortcutsListener";
 import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { useEffect } from "react";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function ContextConsumer({
+/**
+ * A consumer that reads context inside useEffect (the real usage pattern).
+ * The store is published in the listener's useLayoutEffect, which fires
+ * before sibling useEffect hooks.
+ *
+ * Note: onContext may be called multiple times if the store value changes
+ * (e.g., first with no-op fallback, then with real store). The last call
+ * wins, which is the real store.
+ */
+function EffectContextConsumer({
   onContext,
 }: {
   onContext: (ctx: ReturnType<typeof useKeyboardShortcutsContext>) => void;
 }) {
   const ctx = useKeyboardShortcutsContext();
-  onContext(ctx);
+
+  useEffect(() => {
+    onContext(ctx);
+  }, [ctx, onContext]);
+
   return <div data-testid="consumer">consumer</div>;
 }
 
@@ -93,7 +107,7 @@ function ContextConsumer({
 /* Tests                                                              */
 /* ------------------------------------------------------------------ */
 
-describe("KeyboardShortcutsProvider", () => {
+describe("KeyboardShortcutsListener", () => {
   beforeEach(() => {
     capturedOnShortcut = null;
     capturedActiveScopes = [];
@@ -107,51 +121,62 @@ describe("KeyboardShortcutsProvider", () => {
   /* ── Rendering ────────────────────────────────────────────────── */
 
   describe("rendering", () => {
-    it("renders children", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div data-testid="child">Hello</div>
-        </KeyboardShortcutsProvider>,
-      );
-      expect(screen.getByTestId("child")).toBeDefined();
-      expect(screen.getByTestId("child").textContent).toBe("Hello");
+    it("renders without wrapping children (no children prop)", () => {
+      render(<KeyboardShortcutsListener />);
+      // The component renders only the cheat sheet (hidden by default) — no children
+      expect(screen.queryByTestId("child")).toBeNull();
     });
 
     it("initialises useKeyboardShortcuts with navigation scope", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
       expect(capturedActiveScopes).toContain("navigation");
+    });
+
+    it("does not accept a children prop", () => {
+      // TypeScript should prevent passing children, but verify at runtime
+      // that the component signature has no children
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const Listener = KeyboardShortcutsListener as any;
+      render(
+        <Listener>
+          <div data-testid="should-not-render">child</div>
+        </Listener>,
+      );
+      // Even if children are passed, they should not be rendered
+      expect(screen.queryByTestId("should-not-render")).toBeNull();
     });
   });
 
   /* ── Context availability ─────────────────────────────────────── */
 
   describe("context availability", () => {
-    it("provides registerPageShortcuts and openCheatSheet to children", () => {
+    it("provides registerPageShortcuts and openCheatSheet via useKeyboardShortcutsContext", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
       expect(ctx).not.toBeNull();
       expect(typeof ctx!.registerPageShortcuts).toBe("function");
       expect(typeof ctx!.openCheatSheet).toBe("function");
     });
 
-    it("throws when useKeyboardShortcutsContext is used outside provider", () => {
-      function Orphan() {
-        useKeyboardShortcutsContext();
-        return null;
+    it("returns no-op fallback when KeyboardShortcutsListener is not mounted", () => {
+      // Without the Listener, the hook returns a no-op fallback (does not throw).
+      // This is a graceful degradation — shortcuts just don't work.
+      function OrphanConsumer() {
+        const ctx = useKeyboardShortcutsContext();
+        // The no-op registerPageShortcuts returns a no-op unregister function
+        const unregister = ctx.registerPageShortcuts("share", vi.fn());
+        expect(typeof unregister).toBe("function");
+        // The no-op openCheatSheet does nothing
+        ctx.openCheatSheet();
+        return <div data-testid="orphan">orphan</div>;
       }
-      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-      expect(() => render(<Orphan />)).toThrow(
-        "useKeyboardShortcutsContext must be used within KeyboardShortcutsProvider",
-      );
-      spy.mockRestore();
+      render(<OrphanConsumer />);
+      expect(screen.getByTestId("orphan")).toBeDefined();
     });
   });
 
@@ -161,9 +186,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("registerScope adds the scope to active scopes", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const handler = vi.fn();
@@ -178,9 +204,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("unregister function removes the scope from active scopes", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const handler = vi.fn();
@@ -201,9 +228,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("does not duplicate scope when registering the same scope twice", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const handler1 = vi.fn();
@@ -226,11 +254,7 @@ describe("KeyboardShortcutsProvider", () => {
 
   describe("navigation shortcuts", () => {
     it("go-home navigates to /", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       act(() => {
         capturedOnShortcut!("go-home");
@@ -244,11 +268,7 @@ describe("KeyboardShortcutsProvider", () => {
         json: () => Promise.resolve({ user: { login: "testuser" } }),
       });
 
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       await act(async () => {
         capturedOnShortcut!("go-profile");
@@ -262,11 +282,7 @@ describe("KeyboardShortcutsProvider", () => {
     it("go-profile does not navigate when session fetch fails", async () => {
       mockFetch.mockRejectedValueOnce(new Error("network error"));
 
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       await act(async () => {
         capturedOnShortcut!("go-profile");
@@ -281,11 +297,7 @@ describe("KeyboardShortcutsProvider", () => {
         json: () => Promise.resolve({ user: null }),
       });
 
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       await act(async () => {
         capturedOnShortcut!("go-profile");
@@ -298,11 +310,7 @@ describe("KeyboardShortcutsProvider", () => {
     it("go-studio navigates to /studio when studio is enabled", () => {
       vi.mocked(isStudioEnabledSync).mockReturnValue(true);
 
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       act(() => {
         capturedOnShortcut!("go-studio");
@@ -314,11 +322,7 @@ describe("KeyboardShortcutsProvider", () => {
     it("go-studio does NOT navigate when studio is disabled", () => {
       vi.mocked(isStudioEnabledSync).mockReturnValue(false);
 
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       act(() => {
         capturedOnShortcut!("go-studio");
@@ -332,10 +336,12 @@ describe("KeyboardShortcutsProvider", () => {
 
   describe("focus command bar", () => {
     it("focus-command-bar focuses the terminal input element", () => {
+      // Render the input separately (as a sibling, not as a child)
       render(
-        <KeyboardShortcutsProvider>
+        <>
+          <KeyboardShortcutsListener />
           <input aria-label="Terminal command input" data-testid="cmd-input" />
-        </KeyboardShortcutsProvider>,
+        </>,
       );
 
       const input = screen.getByTestId("cmd-input") as HTMLInputElement;
@@ -349,11 +355,7 @@ describe("KeyboardShortcutsProvider", () => {
     });
 
     it("focus-command-bar does nothing when terminal input is not in DOM", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       // Should not throw
       act(() => {
@@ -366,11 +368,7 @@ describe("KeyboardShortcutsProvider", () => {
 
   describe("cheat sheet toggle", () => {
     it("open-cheatsheet toggles the cheat sheet open", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       expect(screen.queryByTestId("cheat-sheet")).toBeNull();
 
@@ -382,11 +380,7 @@ describe("KeyboardShortcutsProvider", () => {
     });
 
     it("open-cheatsheet toggles the cheat sheet closed on second press", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       act(() => {
         capturedOnShortcut!("open-cheatsheet");
@@ -402,9 +396,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("openCheatSheet context method opens the cheat sheet", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       expect(screen.queryByTestId("cheat-sheet")).toBeNull();
@@ -417,11 +412,7 @@ describe("KeyboardShortcutsProvider", () => {
     });
 
     it("cheat sheet onClose callback closes the sheet", () => {
-      render(
-        <KeyboardShortcutsProvider>
-          <div />
-        </KeyboardShortcutsProvider>,
-      );
+      render(<KeyboardShortcutsListener />);
 
       act(() => {
         capturedOnShortcut!("open-cheatsheet");
@@ -442,9 +433,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("delegates unknown shortcut IDs to registered page handlers", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const handler = vi.fn();
@@ -462,9 +454,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("does not dispatch to handler after unregistration", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const handler = vi.fn();
@@ -487,9 +480,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("dispatches to multiple registered page handlers", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const shareHandler = vi.fn();
@@ -510,9 +504,10 @@ describe("KeyboardShortcutsProvider", () => {
     it("navigation shortcuts are NOT dispatched to page handlers", () => {
       let ctx: ReturnType<typeof useKeyboardShortcutsContext> | null = null;
       render(
-        <KeyboardShortcutsProvider>
-          <ContextConsumer onContext={(c) => (ctx = c)} />
-        </KeyboardShortcutsProvider>,
+        <>
+          <KeyboardShortcutsListener />
+          <EffectContextConsumer onContext={(c) => (ctx = c)} />
+        </>,
       );
 
       const handler = vi.fn();
