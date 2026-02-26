@@ -141,3 +141,26 @@ describe("UserMenu — Codeberg integration", () => {
     expect(SOURCE).toContain("setCbUnlinkLoading");
   });
 });
+
+describe("UserMenu — page refresh after unlink", () => {
+  it("imports useRouter from next/navigation", () => {
+    expect(SOURCE).toContain("useRouter");
+    expect(SOURCE).toContain("next/navigation");
+  });
+
+  it("calls router.refresh() after successful Bitbucket unlink", () => {
+    // Extract the handleUnlinkBitbucket function body
+    const fnStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
+    const fnEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const fnBody = SOURCE.slice(fnStart, fnEnd);
+    expect(fnBody).toContain("router.refresh()");
+  });
+
+  it("calls router.refresh() after successful Codeberg unlink", () => {
+    // Extract the handleUnlinkCodeberg function body
+    const fnStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const fnEnd = SOURCE.indexOf("const fallbackLetter");
+    const fnBody = SOURCE.slice(fnStart, fnEnd);
+    expect(fnBody).toContain("router.refresh()");
+  });
+});

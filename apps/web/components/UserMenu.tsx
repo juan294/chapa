@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync } from "@/lib/feature-flags";
@@ -15,6 +16,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
+  const router = useRouter();
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -59,6 +61,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       if (res.ok) {
         setBbStatus({ linked: false, remoteLogin: null });
         setShowUnlinkConfirm(false);
+        router.refresh();
       }
     } catch {
       // Graceful failure — user can try again
@@ -74,6 +77,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       if (res.ok) {
         setCbStatus({ linked: false, remoteLogin: null });
         setShowCbUnlinkConfirm(false);
+        router.refresh();
       }
     } catch {
       // Graceful failure
