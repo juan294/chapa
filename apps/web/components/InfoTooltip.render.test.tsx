@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { InfoTooltip } from "./InfoTooltip";
 
@@ -29,7 +29,7 @@ describe("InfoTooltip", () => {
   });
 
   it("toggles open state on click", () => {
-    const { container } = render(
+    render(
       <InfoTooltip id="test-tip" content="Test content" />,
     );
     const btn = screen.getByLabelText("More info");

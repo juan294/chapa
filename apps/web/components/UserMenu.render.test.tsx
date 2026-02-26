@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/image", () => ({
   default: ({ src, alt, onError, ...props }: { src: string; alt: string; onError?: () => void; width: number; height: number; className?: string }) =>
+    // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={alt} data-testid="avatar" onError={onError} {...props} />,
 }));
 
