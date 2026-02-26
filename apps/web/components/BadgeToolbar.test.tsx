@@ -79,6 +79,16 @@ describe("BadgeToolbar", () => {
         expect(SOURCE).toContain('platform: "linkedin"');
       });
     });
+
+    describe("bluesky share", () => {
+      it("links to Bluesky compose intent URL", () => {
+        expect(SOURCE).toContain("bsky.app/intent/compose");
+      });
+
+      it("tracks share event with bluesky platform", () => {
+        expect(SOURCE).toContain('platform: "bluesky"');
+      });
+    });
   });
 
   describe("customize link", () => {
