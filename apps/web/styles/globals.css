@@ -285,6 +285,28 @@ html {
   animation: bar-fill 0.8s ease-out both;
 }
 
+/* ── Sparkline trace ───────────────────────────────────── */
+
+@keyframes sparkline-trace {
+  from {
+    stroke-dashoffset: var(--sparkline-length);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.sparkline-animated polyline {
+  animation: sparkline-trace 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkline-animated polyline {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
 /* ── Animation utilities ─────────────────────────────────── */
 
 .animate-float-slow {
