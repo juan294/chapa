@@ -48,13 +48,16 @@ describe("SharePage", () => {
     });
   });
 
-  describe("archetype header", () => {
-    it("renders the archetype name from impact data", () => {
-      expect(SOURCE).toContain("impact.archetype");
+  describe("dashboard integration", () => {
+    it("delegates to ImpactDashboard component", () => {
+      expect(SOURCE).toContain("ImpactDashboard");
     });
 
-    it("renders the archetype description", () => {
-      expect(SOURCE).toContain("getArchetypeProfile");
+    it("passes impact, stats, handle, and heroVariant to ImpactDashboard", () => {
+      expect(SOURCE).toContain("impact={impact}");
+      expect(SOURCE).toContain("stats={stats}");
+      expect(SOURCE).toContain("handle={handle}");
+      expect(SOURCE).toContain("heroVariant={heroVariant}");
     });
   });
 
@@ -83,19 +86,11 @@ describe("SharePage", () => {
     });
   });
 
-  // #234 — archetype name must be h3 (sub-section under "Impact Breakdown" h2)
-  describe("archetype heading level", () => {
-    it("renders archetype name as h3, not h2", () => {
-      // Find the heading tag that directly wraps {impact.archetype}
-      // It should be <h3 ...>{impact.archetype}</h3>
-      const archetypeLineMatch = SOURCE.match(/<(h\d)[^>]*>\s*\{impact\.archetype\}\s*<\/\1>/);
-      expect(archetypeLineMatch).not.toBeNull();
-      expect(archetypeLineMatch![1]).toBe("h3");
-    });
-
-    it("does not use h2 for archetype name", () => {
-      // There should be no <h2> that contains impact.archetype
-      expect(SOURCE).not.toMatch(/<h2[^>]*>\s*\{impact\.archetype\}\s*<\/h2>/);
+  // #234 — archetype heading is now rendered inside ImpactDashboard (HeroScoreZone)
+  describe("archetype heading delegation", () => {
+    it("does not render archetype heading directly (delegated to ImpactDashboard)", () => {
+      // The archetype heading was moved into HeroScoreZone via ImpactDashboard
+      expect(SOURCE).not.toMatch(/<h3[^>]*>\s*\{impact\.archetype\}\s*<\/h3>/);
     });
   });
 

@@ -4,8 +4,8 @@ import { computeImpactV4 } from "@/lib/impact/v4";
 import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { ImpactBreakdown, getArchetypeProfile, DataSources } from "@/components/ImpactBreakdown";
-import { HeroScoreZone } from "@/components/dashboard/HeroScoreZone";
+import { DataSources } from "@/components/ImpactBreakdown";
+import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -317,53 +317,29 @@ export default async function SharePage({ params, searchParams }: SharePageProps
               Impact Breakdown
             </h2>
 
-            {/* ── Hero Score Zone (experiment) ───────────────────── */}
+            {/* Experiment selector — temporary toggle for comparing hero variants */}
             {impact && (
-              <section className="mb-12 animate-fade-in-up [animation-delay:290ms]">
-                <HeroScoreZone variant={heroVariant} impact={impact} />
-
-                {/* Experiment selector — temporary toggle for comparing hero variants */}
-                <div className="mt-6 flex justify-center gap-2">
-                  {(["ring", "bold", "rings"] as const).map((v) => (
-                    <a
-                      key={v}
-                      href={`?hero=${v}`}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-heading transition-colors ${
-                        heroVariant === v
-                          ? "border-amber bg-amber/10 text-amber"
-                          : "border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
-                      }`}
-                    >
-                      {v === "ring" ? "Ring" : v === "bold" ? "Bold" : "Rings"}
-                    </a>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* ── Archetype Header ──────────────────────────────── */}
-            {impact && (
-              <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
-                <div className="flex items-baseline gap-3 mb-2">
-                  <h3 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
-                    {impact.archetype}
-                  </h3>
-                  {impact.tier !== impact.archetype && (
-                    <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
-                      {impact.tier}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-text-secondary leading-relaxed">
-                  {getArchetypeProfile(impact)}
-                </p>
+              <div className="mb-8 flex justify-center gap-2 animate-fade-in-up [animation-delay:290ms]">
+                {(["ring", "bold", "rings"] as const).map((v) => (
+                  <a
+                    key={v}
+                    href={`?hero=${v}`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-heading transition-colors ${
+                      heroVariant === v
+                        ? "border-amber bg-amber/10 text-amber"
+                        : "border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
+                    }`}
+                  >
+                    {v === "ring" ? "Ring" : v === "bold" ? "Bold" : "Rings"}
+                  </a>
+                ))}
               </div>
             )}
 
             {/* ── Impact Dashboard ──────────────────────────────── */}
             {impact && stats ? (
               <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-                <ImpactBreakdown impact={impact} stats={stats} />
+                <ImpactDashboard impact={impact} stats={stats} handle={handle} heroVariant={heroVariant} />
               </section>
             ) : (
               <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
