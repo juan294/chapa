@@ -169,6 +169,9 @@ vi.mock("@/components/ImpactBreakdown", () => ({
 vi.mock("@/components/CopyButton", () => ({
   CopyButton: () => "<button>copy</button>",
 }));
+vi.mock("@/components/dashboard/HeroScoreZone", () => ({
+  HeroScoreZone: () => "<div>hero</div>",
+}));
 
 // ---------------------------------------------------------------------------
 // Import the page after all mocks
@@ -206,7 +209,10 @@ const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="6
 const FAKE_SNAPSHOT = { adjustedComposite: 60, date: "2026-01-01" };
 
 async function renderPage(handle = "testuser") {
-  return SharePage({ params: Promise.resolve({ handle }) });
+  return SharePage({
+    params: Promise.resolve({ handle }),
+    searchParams: Promise.resolve({}),
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import { applyEMA } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { ImpactBreakdown, getArchetypeProfile, DataSources } from "@/components/ImpactBreakdown";
+import { HeroScoreZone } from "@/components/dashboard/HeroScoreZone";
 import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -33,8 +34,11 @@ import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 
 const BASE_URL = getBaseUrl();
 
+type HeroVariant = "ring" | "bold" | "rings";
+
 interface SharePageProps {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({
@@ -86,8 +90,11 @@ function hasCustomConfig(config: BadgeConfig | null): config is BadgeConfig {
   );
 }
 
-export default async function SharePage({ params }: SharePageProps) {
+export default async function SharePage({ params, searchParams }: SharePageProps) {
   const { handle } = await params;
+  const query = await searchParams;
+  const heroVariant: HeroVariant =
+    query.hero === "bold" || query.hero === "rings" ? query.hero : "ring";
 
   if (!isValidHandle(handle)) {
     notFound();
@@ -309,6 +316,30 @@ export default async function SharePage({ params }: SharePageProps) {
             <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up [animation-delay:280ms]">
               Impact Breakdown
             </h2>
+
+            {/* ── Hero Score Zone (experiment) ───────────────────── */}
+            {impact && (
+              <section className="mb-12 animate-fade-in-up [animation-delay:290ms]">
+                <HeroScoreZone variant={heroVariant} impact={impact} />
+
+                {/* Experiment selector — temporary toggle for comparing hero variants */}
+                <div className="mt-6 flex justify-center gap-2">
+                  {(["ring", "bold", "rings"] as const).map((v) => (
+                    <a
+                      key={v}
+                      href={`?hero=${v}`}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-heading transition-colors ${
+                        heroVariant === v
+                          ? "border-amber bg-amber/10 text-amber"
+                          : "border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
+                      }`}
+                    >
+                      {v === "ring" ? "Ring" : v === "bold" ? "Bold" : "Rings"}
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* ── Archetype Header ──────────────────────────────── */}
             {impact && (
