@@ -51,7 +51,7 @@ const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   Commits: { id: "stat-commits", tip: "Commits pushed across all repos in the last 365 days." },
   "PRs Merged": { id: "stat-prs-merged", tip: "Pull requests you authored that were merged in the last 365 days." },
   Reviews: { id: "stat-reviews", tip: "Code reviews submitted on others\u2019 PRs in the last 365 days." },
-  Repos: { id: "stat-repos", tip: "Distinct repositories you contributed to in the last 365 days." },
+  Repos: { id: "stat-repos", tip: "Repos with 3+ commits in the last 365 days. Shallow one-commit contributions are excluded." },
 };
 
 const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewBox: string }> = {

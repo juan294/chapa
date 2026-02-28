@@ -11,34 +11,19 @@ vi.mock("@/lib/hooks/use-trend-data", () => ({
   useTrendData: vi.fn(),
 }));
 
-vi.mock("./HeroScoreZone", () => ({
-  HeroScoreZone: () => <div data-testid="hero-score-zone" />,
+vi.mock("@/components/ImpactBreakdown", () => ({
+  getArchetypeProfile: () => "Mock archetype profile text",
 }));
 
 vi.mock("./DimensionCardsRow", () => ({
   DimensionCardsRow: (props: {
     trend?: unknown;
     diff?: unknown;
-    activeDimension?: unknown;
   }) => (
     <div
       data-testid="dimension-cards-row"
       data-trend={props.trend === null ? "null" : props.trend === undefined ? "undefined" : "present"}
       data-diff={props.diff === null ? "null" : props.diff === undefined ? "undefined" : "present"}
-      data-active-dimension={String(props.activeDimension ?? "null")}
-    />
-  ),
-}));
-
-vi.mock("./RadarChartInteractive", () => ({
-  RadarChartInteractive: (props: {
-    activeDimension?: unknown;
-    onDimensionHover?: unknown;
-  }) => (
-    <div
-      data-testid="radar-chart-interactive"
-      data-active-dimension={String(props.activeDimension ?? "null")}
-      data-has-hover-handler={typeof props.onDimensionHover === "function" ? "true" : "false"}
     />
   ),
 }));
@@ -169,9 +154,9 @@ const mockDiff: SnapshotDiff = {
 
 describe("ImpactDashboard", () => {
   // ----------------------------------------------------------------
-  // 1. Renders all 6 sections
+  // 1. Renders all sections including archetype header
   // ----------------------------------------------------------------
-  it("renders all 6 sections", () => {
+  it("renders all sections including archetype header", () => {
     mockUseTrendData.mockReturnValue({
       trend: null,
       diff: null,
@@ -187,9 +172,13 @@ describe("ImpactDashboard", () => {
       />,
     );
 
-    expect(screen.getByTestId("hero-score-zone")).toBeTruthy();
+    // Archetype header
+    expect(screen.getByText("Builder")).toBeTruthy();
+    expect(screen.getByText("Mock archetype profile text")).toBeTruthy();
+
+    // Dashboard sections
     expect(screen.getByTestId("dimension-cards-row")).toBeTruthy();
-    expect(screen.getByTestId("radar-chart-interactive")).toBeTruthy();
+
     expect(screen.getByTestId("coaching-insights")).toBeTruthy();
     expect(screen.getByTestId("activity-heatmap")).toBeTruthy();
     expect(screen.getByTestId("stats-grid")).toBeTruthy();
@@ -249,9 +238,8 @@ describe("ImpactDashboard", () => {
     );
 
     // All sections should still render
-    expect(screen.getByTestId("hero-score-zone")).toBeTruthy();
     expect(screen.getByTestId("dimension-cards-row")).toBeTruthy();
-    expect(screen.getByTestId("radar-chart-interactive")).toBeTruthy();
+
     expect(screen.getByTestId("coaching-insights")).toBeTruthy();
     expect(screen.getByTestId("activity-heatmap")).toBeTruthy();
     expect(screen.getByTestId("stats-grid")).toBeTruthy();
@@ -289,9 +277,8 @@ describe("ImpactDashboard", () => {
     );
 
     // All sections should still render despite error
-    expect(screen.getByTestId("hero-score-zone")).toBeTruthy();
     expect(screen.getByTestId("dimension-cards-row")).toBeTruthy();
-    expect(screen.getByTestId("radar-chart-interactive")).toBeTruthy();
+
     expect(screen.getByTestId("coaching-insights")).toBeTruthy();
     expect(screen.getByTestId("activity-heatmap")).toBeTruthy();
     expect(screen.getByTestId("stats-grid")).toBeTruthy();

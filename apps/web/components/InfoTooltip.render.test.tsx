@@ -11,14 +11,17 @@ describe("InfoTooltip", () => {
     expect(screen.getByLabelText("More info")).toBeDefined();
   });
 
-  it("renders tooltip content", () => {
+  it("shows tooltip on click", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
+    const btn = screen.getByLabelText("More info");
+    fireEvent.click(btn);
     expect(screen.getByRole("tooltip")).toBeDefined();
     expect(screen.getByText("Test content")).toBeDefined();
   });
 
-  it("tooltip has correct id", () => {
+  it("tooltip has correct id when visible", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
+    fireEvent.click(screen.getByLabelText("More info"));
     expect(screen.getByRole("tooltip").id).toBe("test-tip");
   });
 
@@ -28,33 +31,21 @@ describe("InfoTooltip", () => {
     expect(btn.getAttribute("aria-describedby")).toBe("test-tip");
   });
 
-  it("toggles open state on click", () => {
-    render(
-      <InfoTooltip id="test-tip" content="Test content" />,
-    );
-    const btn = screen.getByLabelText("More info");
-    fireEvent.click(btn);
-    // When open, tooltip should have opacity-100 class applied
-    const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.className).toContain("!opacity-100");
-  });
-
-  it("closes on second click", () => {
+  it("hides tooltip on second click", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
     const btn = screen.getByLabelText("More info");
     fireEvent.click(btn);
+    expect(screen.getByRole("tooltip")).toBeDefined();
     fireEvent.click(btn);
-    const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.className).not.toContain("!opacity-100");
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("closes on Escape key", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    const btn = screen.getByLabelText("More info");
-    fireEvent.click(btn);
-    expect(screen.getByRole("tooltip").className).toContain("!opacity-100");
+    fireEvent.click(screen.getByLabelText("More info"));
+    expect(screen.getByRole("tooltip")).toBeDefined();
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.getByRole("tooltip").className).not.toContain("!opacity-100");
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("closes on outside click", () => {
@@ -64,11 +55,10 @@ describe("InfoTooltip", () => {
         <button data-testid="outside">Outside</button>
       </div>,
     );
-    const btn = screen.getByLabelText("More info");
-    fireEvent.click(btn);
-    expect(screen.getByRole("tooltip").className).toContain("!opacity-100");
+    fireEvent.click(screen.getByLabelText("More info"));
+    expect(screen.getByRole("tooltip")).toBeDefined();
     fireEvent.mouseDown(screen.getByTestId("outside"));
-    expect(screen.getByRole("tooltip").className).not.toContain("!opacity-100");
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("applies custom className", () => {
@@ -78,19 +68,16 @@ describe("InfoTooltip", () => {
     expect(container.querySelector(".custom-class")).not.toBeNull();
   });
 
-  it("positions tooltip below when position=bottom", () => {
-    render(
-      <InfoTooltip id="test-tip" content="Test content" position="bottom" />,
-    );
+  it("renders tooltip with fixed positioning via portal", () => {
+    render(<InfoTooltip id="test-tip" content="Test content" />);
+    fireEvent.click(screen.getByLabelText("More info"));
     const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.className).toContain("top-full");
+    expect(tooltip.className).toContain("fixed");
+    expect(tooltip.className).toContain("z-[9999]");
   });
 
-  it("positions tooltip above when position=top", () => {
-    render(
-      <InfoTooltip id="test-tip" content="Test content" position="top" />,
-    );
-    const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.className).toContain("bottom-full");
+  it("tooltip not visible before interaction", () => {
+    render(<InfoTooltip id="test-tip" content="Test content" />);
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });

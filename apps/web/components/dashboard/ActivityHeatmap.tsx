@@ -25,7 +25,7 @@ export function ActivityHeatmap({ heatmapData, activeDays }: ActivityHeatmapProp
         {activeDays} active days in the last year
       </p>
 
-      <div className="rounded-xl border border-stroke bg-card p-4 overflow-hidden overflow-x-auto">
+      <div className="rounded-xl border border-stroke bg-card p-4">
         <HeatmapGrid data={heatmapData} animation="ripple" />
       </div>
     </section>

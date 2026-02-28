@@ -37,7 +37,7 @@ const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   },
   Repos: {
     id: "stat-repos",
-    tip: "Distinct repositories you contributed to in the last 365 days.",
+    tip: "Repos with 3+ commits in the last 365 days. Shallow one-commit contributions are excluded.",
   },
 };
 

@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import type { ImpactV4Result, StatsData, DimensionScores } from "@chapa/shared";
+import type { ImpactV4Result, StatsData } from "@chapa/shared";
 import { useTrendData } from "@/lib/hooks/use-trend-data";
-import { HeroScoreZone } from "./HeroScoreZone";
+import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
-import { RadarChartInteractive } from "./RadarChartInteractive";
 import { CoachingInsights } from "./CoachingInsights";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { StatsGrid } from "./StatsGrid";
@@ -31,26 +29,25 @@ export function ImpactDashboard({
 }: ImpactDashboardProps) {
   const { trend, diff } = useTrendData(handle);
 
-  const [activeDimension, setActiveDimension] = useState<
-    keyof DimensionScores | null
-  >(null);
+  const profileText = getArchetypeProfile(impact);
 
   return (
     <div className="space-y-12">
-      <HeroScoreZone impact={impact} />
+      <div className="animate-fade-in-up">
+        <p className="font-heading text-xl text-amber tracking-tight">
+          {impact.archetype}
+        </p>
+        <div className="border-t border-stroke my-4" />
+        <p className="text-sm text-text-secondary leading-relaxed">
+          {profileText}
+        </p>
+      </div>
 
       <DimensionCardsRow
         impact={impact}
         stats={stats}
         trend={trend}
         diff={diff}
-        activeDimension={activeDimension}
-      />
-
-      <RadarChartInteractive
-        dimensions={impact.dimensions}
-        activeDimension={activeDimension}
-        onDimensionHover={setActiveDimension}
       />
 
       <CoachingInsights impact={impact} trend={trend} diff={diff} />

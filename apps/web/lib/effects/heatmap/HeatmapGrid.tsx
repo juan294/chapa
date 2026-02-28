@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback, useRef } from "react";
 import { getDelayFn, INTENSITY_COLORS, WEEKS, DAYS } from "./animations";
 import type { AnimationVariant } from "./animations";
 import type { HeatmapDay } from "@chapa/shared";
@@ -21,6 +22,28 @@ export function getIntensityLevel(count: number, max: number): number {
   return 4;
 }
 
+/** Human-friendly intensity label for tooltip. */
+function getIntensityLabel(level: number): string {
+  switch (level) {
+    case 0: return "No activity";
+    case 1: return "Light activity";
+    case 2: return "Active day";
+    case 3: return "High output";
+    case 4: return "Peak performance";
+    default: return "";
+  }
+}
+
+/** Format ISO date string as "Fri, Mar 15" */
+function formatDate(iso: string): string {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 /**
  * Animated 13×7 contribution heatmap grid.
  *
@@ -35,36 +58,92 @@ export function HeatmapGrid({ data, animation, maxValue }: HeatmapGridProps) {
   const max = maxValue ?? Math.max(1, ...sliced.map((d) => d.count));
   const delayFn = getDelayFn(animation);
 
-  return (
-    <div
-      className="grid gap-[3px]"
-      style={{
-        gridTemplateRows: `repeat(${DAYS}, 1fr)`,
-        gridAutoFlow: "column",
-      }}
-      role="img"
-      aria-label="Contribution heatmap"
-    >
-      {Array.from({ length: WEEKS * DAYS }, (_, i) => {
-        const week = Math.floor(i / DAYS);
-        const day = i % DAYS;
-        const idx = week * DAYS + day;
-        const count = idx < sliced.length ? sliced[idx]!.count : 0;
-        const level = getIntensityLevel(count, max);
-        const delay = delayFn(week, day);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const gridRef = useRef<HTMLDivElement>(null);
 
-        return (
-          <div
-            key={`${week}-${day}`}
-            className="aspect-square rounded-[3px] opacity-0"
-            style={{
-              backgroundColor: INTENSITY_COLORS[level],
-              animation: `heatmap-cell-in 0.4s ease-out ${delay}ms forwards`,
-            }}
-            aria-hidden="true"
-          />
-        );
-      })}
+  const handleMouseEnter = useCallback(
+    (idx: number, e: React.MouseEvent<HTMLDivElement>) => {
+      setHoveredIdx(idx);
+      if (gridRef.current) {
+        const gridRect = gridRef.current.getBoundingClientRect();
+        const cellRect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({
+          x: cellRect.left - gridRect.left + cellRect.width / 2,
+          y: cellRect.top - gridRect.top,
+        });
+      }
+    },
+    [],
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredIdx(null);
+  }, []);
+
+  const hoveredDay = hoveredIdx !== null && hoveredIdx < sliced.length ? sliced[hoveredIdx] : null;
+  const hoveredLevel = hoveredDay ? getIntensityLevel(hoveredDay.count, max) : 0;
+
+  return (
+    <div ref={gridRef} className="relative">
+      <div
+        className="grid gap-[3px]"
+        style={{
+          gridTemplateRows: `repeat(${DAYS}, 1fr)`,
+          gridAutoFlow: "column",
+        }}
+        role="img"
+        aria-label="Contribution heatmap"
+      >
+        {Array.from({ length: WEEKS * DAYS }, (_, i) => {
+          const week = Math.floor(i / DAYS);
+          const day = i % DAYS;
+          const idx = week * DAYS + day;
+          const entry = idx < sliced.length ? sliced[idx] : null;
+          const count = entry?.count ?? 0;
+          const level = getIntensityLevel(count, max);
+          const delay = delayFn(week, day);
+
+          return (
+            <div
+              key={`${week}-${day}`}
+              className="aspect-square rounded-[3px] opacity-0 cursor-pointer transition-transform duration-100 hover:scale-125 hover:z-10"
+              style={{
+                backgroundColor: INTENSITY_COLORS[level],
+                animation: `heatmap-cell-in 0.4s ease-out ${delay}ms forwards`,
+              }}
+              onMouseEnter={(e) => handleMouseEnter(idx, e)}
+              onMouseLeave={handleMouseLeave}
+              aria-hidden="true"
+            />
+          );
+        })}
+      </div>
+
+      {/* Tooltip */}
+      {hoveredDay && (
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute z-50 -translate-x-1/2 rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg px-3 py-2 text-xs font-body transition-opacity duration-150"
+          style={{
+            left: tooltipPos.x,
+            top: tooltipPos.y - 8,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <p className="font-medium text-text-primary whitespace-nowrap">
+            {formatDate(hoveredDay.date)}
+          </p>
+          <p className="text-text-secondary whitespace-nowrap">
+            {hoveredDay.count === 0
+              ? "No contributions"
+              : `${hoveredDay.count} contribution${hoveredDay.count !== 1 ? "s" : ""}`}
+          </p>
+          <p className="text-amber font-medium whitespace-nowrap">
+            {getIntensityLabel(hoveredLevel)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

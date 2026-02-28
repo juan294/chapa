@@ -143,7 +143,7 @@ export function DimensionCard({
       ref={containerRef}
       role="article"
       aria-label={`${label} dimension score: ${score}`}
-      className={`rounded-xl border border-stroke bg-card overflow-hidden transition-colors duration-200 hover:border-amber/20 animate-fade-in-up ${className}`}
+      className={`rounded-xl border border-stroke bg-card transition-colors duration-200 hover:border-amber/20 animate-fade-in-up ${className}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       {/* Header row */}
