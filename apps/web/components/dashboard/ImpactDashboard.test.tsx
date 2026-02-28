@@ -12,9 +12,7 @@ vi.mock("@/lib/hooks/use-trend-data", () => ({
 }));
 
 vi.mock("./HeroScoreZone", () => ({
-  HeroScoreZone: ({ variant }: { variant: string }) => (
-    <div data-testid="hero-score-zone" data-variant={variant} />
-  ),
+  HeroScoreZone: () => <div data-testid="hero-score-zone" />,
 }));
 
 vi.mock("./DimensionCardsRow", () => ({
@@ -299,47 +297,4 @@ describe("ImpactDashboard", () => {
     expect(screen.getByTestId("stats-grid")).toBeTruthy();
   });
 
-  // ----------------------------------------------------------------
-  // 5. Passes heroVariant to HeroScoreZone
-  // ----------------------------------------------------------------
-  it("passes default heroVariant 'ring' to HeroScoreZone", () => {
-    mockUseTrendData.mockReturnValue({
-      trend: null,
-      diff: null,
-      isLoading: false,
-      error: null,
-    });
-
-    render(
-      <ImpactDashboard
-        impact={mockImpact}
-        stats={mockStats}
-        handle="testuser"
-      />,
-    );
-
-    const hero = screen.getByTestId("hero-score-zone");
-    expect(hero.getAttribute("data-variant")).toBe("ring");
-  });
-
-  it("passes custom heroVariant to HeroScoreZone", () => {
-    mockUseTrendData.mockReturnValue({
-      trend: null,
-      diff: null,
-      isLoading: false,
-      error: null,
-    });
-
-    render(
-      <ImpactDashboard
-        impact={mockImpact}
-        stats={mockStats}
-        handle="testuser"
-        heroVariant="bold"
-      />,
-    );
-
-    const hero = screen.getByTestId("hero-score-zone");
-    expect(hero.getAttribute("data-variant")).toBe("bold");
-  });
 });

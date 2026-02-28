@@ -34,11 +34,9 @@ import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 
 const BASE_URL = getBaseUrl();
 
-type HeroVariant = "ring" | "bold" | "rings";
-
 interface SharePageProps {
   params: Promise<{ handle: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({
@@ -90,11 +88,8 @@ function hasCustomConfig(config: BadgeConfig | null): config is BadgeConfig {
   );
 }
 
-export default async function SharePage({ params, searchParams }: SharePageProps) {
+export default async function SharePage({ params }: SharePageProps) {
   const { handle } = await params;
-  const query = await searchParams;
-  const heroVariant: HeroVariant =
-    query.hero === "bold" || query.hero === "rings" ? query.hero : "ring";
 
   if (!isValidHandle(handle)) {
     notFound();
@@ -317,29 +312,10 @@ export default async function SharePage({ params, searchParams }: SharePageProps
               Impact Breakdown
             </h2>
 
-            {/* Experiment selector — temporary toggle for comparing hero variants */}
-            {impact && (
-              <div className="mb-8 flex justify-center gap-2 animate-fade-in-up [animation-delay:290ms]">
-                {(["ring", "bold", "rings"] as const).map((v) => (
-                  <a
-                    key={v}
-                    href={`?hero=${v}`}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-heading transition-colors ${
-                      heroVariant === v
-                        ? "border-amber bg-amber/10 text-amber"
-                        : "border-stroke text-text-secondary hover:border-amber/20 hover:text-text-primary"
-                    }`}
-                  >
-                    {v === "ring" ? "Ring" : v === "bold" ? "Bold" : "Rings"}
-                  </a>
-                ))}
-              </div>
-            )}
-
             {/* ── Impact Dashboard ──────────────────────────────── */}
             {impact && stats ? (
               <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-                <ImpactDashboard impact={impact} stats={stats} handle={handle} heroVariant={heroVariant} />
+                <ImpactDashboard impact={impact} stats={stats} handle={handle} />
               </section>
             ) : (
               <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">

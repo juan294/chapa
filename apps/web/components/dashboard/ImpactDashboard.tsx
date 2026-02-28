@@ -18,7 +18,6 @@ interface ImpactDashboardProps {
   impact: ImpactV4Result;
   stats: StatsData;
   handle: string;
-  heroVariant?: "ring" | "bold" | "rings";
 }
 
 // ---------------------------------------------------------------------------
@@ -29,7 +28,6 @@ export function ImpactDashboard({
   impact,
   stats,
   handle,
-  heroVariant = "ring",
 }: ImpactDashboardProps) {
   const { trend, diff } = useTrendData(handle);
 
@@ -39,7 +37,7 @@ export function ImpactDashboard({
 
   return (
     <div className="space-y-12">
-      <HeroScoreZone variant={heroVariant} impact={impact} />
+      <HeroScoreZone impact={impact} />
 
       <DimensionCardsRow
         impact={impact}

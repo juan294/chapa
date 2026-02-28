@@ -53,11 +53,10 @@ describe("SharePage", () => {
       expect(SOURCE).toContain("ImpactDashboard");
     });
 
-    it("passes impact, stats, handle, and heroVariant to ImpactDashboard", () => {
+    it("passes impact, stats, and handle to ImpactDashboard", () => {
       expect(SOURCE).toContain("impact={impact}");
       expect(SOURCE).toContain("stats={stats}");
       expect(SOURCE).toContain("handle={handle}");
-      expect(SOURCE).toContain("heroVariant={heroVariant}");
     });
   });
 
