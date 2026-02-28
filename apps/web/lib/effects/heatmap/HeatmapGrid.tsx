@@ -51,9 +51,13 @@ const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /**
  * Compute month labels for each week column.
  * Returns an array of length WEEKS where non-empty entries mark the first week of a new month.
+ * Requires a minimum gap of MIN_LABEL_GAP columns between labels to avoid crowding.
  */
 export function computeMonthLabels(sliced: HeatmapDay[]): string[] {
-  const labels: string[] = [];
+  const MIN_LABEL_GAP = 2;
+
+  // First pass: find all month boundaries
+  const boundaries: { week: number; label: string; month: number }[] = [];
   let lastMonth = -1;
 
   for (let week = 0; week < WEEKS; week++) {
@@ -63,11 +67,35 @@ export function computeMonthLabels(sliced: HeatmapDay[]): string[] {
       const d = new Date(entry.date + "T12:00:00");
       const month = d.getMonth();
       if (month !== lastMonth) {
-        labels.push(d.toLocaleDateString("en-US", { month: "short" }));
+        boundaries.push({
+          week,
+          label: d.toLocaleDateString("en-US", { month: "short" }),
+          month,
+        });
         lastMonth = month;
-      } else {
-        labels.push("");
       }
+    }
+  }
+
+  // Second pass: drop labels that are too close to their successor.
+  // When two labels are crowded, keep the later one (it has more weeks visible).
+  const kept = new Set<number>();
+  for (let i = 0; i < boundaries.length; i++) {
+    const cur = boundaries[i]!;
+    const next = boundaries[i + 1];
+    if (next && next.week - cur.week < MIN_LABEL_GAP) {
+      // Skip the current label — it only has 1 column of space
+      continue;
+    }
+    kept.add(cur.week);
+  }
+
+  // Build final array
+  const labels: string[] = [];
+  const boundaryMap = new Map(boundaries.map((b) => [b.week, b.label]));
+  for (let week = 0; week < WEEKS; week++) {
+    if (kept.has(week)) {
+      labels.push(boundaryMap.get(week) ?? "");
     } else {
       labels.push("");
     }

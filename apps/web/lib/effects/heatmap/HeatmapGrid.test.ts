@@ -96,6 +96,15 @@ describe("computeMonthLabels", () => {
     expect(nonEmpty.length).toBeGreaterThan(0);
   });
 
+  it("drops labels that are too close together (< 2 columns apart)", () => {
+    // Start on Nov 30 (Sun) — Nov only gets 1 column before Dec starts
+    const data = makeWeekAlignedDays(91, "2024-11-24");
+    const labels = computeMonthLabels(data);
+    // Nov should be dropped (only 1 column) and Dec should be kept
+    expect(labels).not.toContain("Nov");
+    expect(labels).toContain("Dec");
+  });
+
   it("handles empty data", () => {
     const labels = computeMonthLabels([]);
     expect(labels).toHaveLength(WEEKS);
