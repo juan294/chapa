@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
 import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
 import { computeActivityInsights } from "./activity-insights";
+import { formatIsoDate } from "@/lib/utils/date";
+import { hexToRgba } from "@/lib/utils/color";
+import { seededRandom } from "@/lib/utils/prng";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -94,14 +97,6 @@ interface HexDay extends HeatmapDay {
   dimensionWeights: Record<Dimension, number>;
 }
 
-/** Simple deterministic pseudo-random from seed. */
-function seededRandom(seed: number): number {
-  const s = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(s ^ (s >>> 15), 1 | s);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
-
 /**
  * Derive per-day dimension weights from the profile-level scores + date-based variation.
  * The profile dimensions set the base proportions; per-day variation adds realism.
@@ -176,23 +171,6 @@ function enrichDays(
     );
 
     return { ...day, intensity, dominant, dimensionWeights: weights };
-  });
-}
-
-// ── Color helpers ────────────────────────────────────────────────────
-
-function hexToRgba(hex: string, alpha: number): string {
-  return `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${alpha})`;
-}
-
-// ── Format helpers ───────────────────────────────────────────────────
-
-/** Format ISO date string as "Fri, Mar 15". */
-function formatIsoDate(iso: string): string {
-  return new Date(iso + "T12:00:00").toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
   });
 }
 

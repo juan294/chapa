@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { getDelayFn, INTENSITY_COLORS, WEEKS, DAYS } from "./animations";
 import type { AnimationVariant } from "./animations";
 import type { HeatmapDay } from "@chapa/shared";
+import { formatIsoDate } from "@/lib/utils/date";
 
 export interface HeatmapGridProps {
   data: HeatmapDay[];
@@ -34,16 +35,6 @@ function getIntensityLabel(level: number): string {
     case 4: return "Peak performance";
     default: return "";
   }
-}
-
-/** Format ISO date string as "Fri, Mar 15" */
-function formatDate(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -288,7 +279,7 @@ export function HeatmapGrid({ data, animation, maxValue, showLabels = false }: H
           }}
         >
           <p className="font-medium text-text-primary whitespace-nowrap">
-            {formatDate(hoveredDay.date)}
+            {formatIsoDate(hoveredDay.date)}
           </p>
           <p className="text-text-secondary whitespace-nowrap">
             {hoveredDay.count === 0

@@ -1,5 +1,6 @@
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
 import type { MetricsSnapshot } from "./types";
+import { toDateString } from "@/lib/utils/date";
 
 /**
  * Build a compact MetricsSnapshot from stats + impact data.
@@ -14,7 +15,7 @@ export function buildSnapshot(
 ): MetricsSnapshot {
   const now = new Date();
   const snapshot: MetricsSnapshot = {
-    date: now.toISOString().slice(0, 10),
+    date: toDateString(now),
     capturedAt: now.toISOString(),
 
     commitsTotal: stats.commitsTotal,

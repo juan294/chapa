@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
+import { hexToRgba } from "@/lib/utils/color";
+import { mulberry32 } from "@/lib/utils/prng";
 
 /* ------------------------------------------------------------------ */
 /*  Hexagonal Heatmap Experiments                                      */
@@ -114,16 +116,6 @@ function hexGridDimensions(
 
 // ── Mock data generator ──────────────────────────────────────────────
 
-function mulberry32(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function generateHexmapData(): HexDay[] {
   const days: HexDay[] = [];
   const start = new Date("2024-09-15");
@@ -208,12 +200,6 @@ function generateHexmapData(): HexDay[] {
   }
 
   return days;
-}
-
-// ── Color helpers ────────────────────────────────────────────────────
-
-function hexToRgba(hex: string, alpha: number): string {
-  return `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${alpha})`;
 }
 
 // ── Intensity → opacity mapping ──────────────────────────────────────

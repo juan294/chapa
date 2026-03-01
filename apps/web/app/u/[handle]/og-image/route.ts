@@ -7,6 +7,7 @@ import { isValidHandle } from "@/lib/validation";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { svgToPng } from "@/lib/render/svg-to-png";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { toDateString } from "@/lib/utils/date";
 
 const OG_CACHE_TTL = 86400; // 24 hours
 
@@ -29,7 +30,7 @@ export async function GET(
     return new NextResponse("Invalid handle", { status: 400 });
   }
 
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = toDateString(new Date());
   const ogCacheKey = `og-image:v1:${handle}:${today}`;
 
   // Try cached PNG first

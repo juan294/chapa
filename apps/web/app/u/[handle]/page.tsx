@@ -22,6 +22,7 @@ import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { getBaseUrl } from "@/lib/env";
+import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { generateVerificationCode } from "@/lib/verification/hmac";
@@ -49,7 +50,7 @@ export async function generateMetadata({
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   // Daily cache buster forces social platforms to re-fetch the OG image
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateString(new Date());
   const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${today}`;
   return {
     title: `@${handle} — Developer Impact, Decoded`,

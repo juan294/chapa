@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import { toDateString } from "@/lib/utils/date";
 
 /**
  * Build a deterministic pipe-delimited payload string from badge data.
@@ -45,7 +46,7 @@ export function generateVerificationCode(
   const secret = process.env.CHAPA_VERIFICATION_SECRET?.trim();
   if (!secret) return null;
 
-  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const date = toDateString(new Date());
   const payload = buildPayload(stats, impact, date);
   const hash = computeHash(payload, secret);
 

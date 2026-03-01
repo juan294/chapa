@@ -1,4 +1,5 @@
 import type { StatsData, ImpactV4Result, HeatmapDay } from "@chapa/shared";
+import { toDateString } from "@/lib/utils/date";
 
 const LEVEL_TO_COUNT: Record<number, number> = {
   0: 0,
@@ -17,7 +18,7 @@ function buildHeatmap(grid: number[][]): HeatmapDay[] {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + idx);
       days.push({
-        date: d.toISOString().slice(0, 10),
+        date: toDateString(d),
         count: LEVEL_TO_COUNT[grid[week]![day]!] ?? 0,
       });
     }
