@@ -32,7 +32,7 @@ unload_agents() {
   for plist in "${PLISTS[@]}"; do
     local target="${LAUNCH_AGENTS_DIR}/${plist}.plist"
     if [ -f "${target}" ]; then
-      launchctl unload "${target}" 2>/dev/null || true
+      launchctl bootout "gui/$(id -u)/${plist}" 2>/dev/null || true
       rm -f "${target}"
       echo "  Removed ${plist}"
     else
@@ -60,14 +60,14 @@ install_agents() {
 
     # Unload if already loaded
     if [ -f "${target}" ]; then
-      launchctl unload "${target}" 2>/dev/null || true
+      launchctl bootout "gui/$(id -u)/${plist}" 2>/dev/null || true
     fi
 
     # Copy and replace placeholder with actual project path
     sed "s|CHAPA_PROJECT_DIR|${PROJECT_DIR}|g" "${source}" > "${target}"
 
     # Load the agent
-    launchctl load "${target}"
+    launchctl bootstrap "gui/$(id -u)" "${target}"
     echo "  Installed and loaded ${plist}"
   done
 
