@@ -111,6 +111,9 @@ export interface RawContributionData {
       deletions: number;
       changedFiles: number;
       merged: boolean;
+      body: string | null;
+      headRefName: string;
+      closingIssuesCount: number;
     }[];
   };
   reviews: { totalCount: number };

@@ -23,9 +23,9 @@ function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionD
     pullRequests: {
       totalCount: 3,
       nodes: [
-        { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-        { additions: 50, deletions: 10, changedFiles: 3, merged: true },
-        { additions: 200, deletions: 50, changedFiles: 8, merged: false },
+        { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: null, headRefName: "feat/a", closingIssuesCount: 0 },
+        { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: null, headRefName: "feat/b", closingIssuesCount: 0 },
+        { additions: 200, deletions: 50, changedFiles: 8, merged: false, body: null, headRefName: "feat/c", closingIssuesCount: 0 },
       ],
     },
     reviews: { totalCount: 15 },
@@ -172,7 +172,7 @@ describe("buildStatsFromRaw", () => {
       pullRequests: {
         totalCount: 1,
         nodes: [
-          { additions: 1000, deletions: 500, changedFiles: 20, merged: true },
+          { additions: 1000, deletions: 500, changedFiles: 20, merged: true, body: null, headRefName: "feat/big", closingIssuesCount: 0 },
         ],
       },
     });
@@ -187,7 +187,10 @@ describe("buildStatsFromRaw", () => {
       additions: 5000,
       deletions: 5000,
       changedFiles: 100,
-      merged: true,
+      merged: true as const,
+      body: null as string | null,
+      headRefName: "feat/big",
+      closingIssuesCount: 0,
     }));
     const raw = makeRaw({
       pullRequests: { totalCount: 60, nodes },
@@ -201,8 +204,8 @@ describe("buildStatsFromRaw", () => {
       pullRequests: {
         totalCount: 2,
         nodes: [
-          { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-          { additions: 999, deletions: 999, changedFiles: 50, merged: false },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: null, headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 999, deletions: 999, changedFiles: 50, merged: false, body: null, headRefName: "feat/b", closingIssuesCount: 0 },
         ],
       },
     });
@@ -219,8 +222,8 @@ describe("buildStatsFromRaw", () => {
       pullRequests: {
         totalCount: 2,
         nodes: [
-          { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-          { additions: 50, deletions: 10, changedFiles: 3, merged: true },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: null, headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: null, headRefName: "feat/b", closingIssuesCount: 0 },
         ],
       },
     });
