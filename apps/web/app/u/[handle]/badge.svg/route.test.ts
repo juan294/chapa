@@ -87,7 +87,7 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
 }));
 
 vi.mock("@/lib/impact/smoothing", () => ({
-  applyEMA: vi.fn((score: number) => score),
+  smoothScore: vi.fn((score: number) => score),
 }));
 
 vi.mock("@/lib/impact/utils", () => ({

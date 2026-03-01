@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockGetStats,
   mockComputeImpactV4,
-  mockApplyEMA,
+  mockSmoothScore,
   mockGetTier,
   mockGetCachedLatestSnapshot,
   mockUpdateSnapshotCache,
@@ -27,7 +27,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetStats: vi.fn(),
   mockComputeImpactV4: vi.fn(),
-  mockApplyEMA: vi.fn((score: number) => score),
+  mockSmoothScore: vi.fn((score: number) => score),
   mockGetTier: vi.fn((score: number) => {
     if (score >= 85) return "Elite";
     if (score >= 70) return "High";
@@ -60,7 +60,7 @@ vi.mock("@/lib/impact/v4", () => ({
 }));
 
 vi.mock("@/lib/impact/smoothing", () => ({
-  applyEMA: mockApplyEMA,
+  smoothScore: mockSmoothScore,
 }));
 
 vi.mock("@/lib/impact/utils", () => ({
@@ -258,13 +258,13 @@ describe("SharePage /u/[handle]", () => {
 
     it("uses snapshot data for EMA smoothing", async () => {
       await renderPage();
-      expect(mockApplyEMA).toHaveBeenCalledWith(65, 60);
+      expect(mockSmoothScore).toHaveBeenCalledWith(65, FAKE_SNAPSHOT);
     });
 
     it("handles null snapshot gracefully", async () => {
       mockGetCachedLatestSnapshot.mockResolvedValue(null);
       await renderPage();
-      expect(mockApplyEMA).toHaveBeenCalledWith(65, null);
+      expect(mockSmoothScore).toHaveBeenCalledWith(65, null);
     });
   });
 

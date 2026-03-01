@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
-import { applyEMA } from "@/lib/impact/smoothing";
+import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { DataSources } from "@/components/ImpactBreakdown";
@@ -125,10 +125,10 @@ export default async function SharePage({ params }: SharePageProps) {
     ? getAvatarBase64(handle, stats.avatarUrl)
     : Promise.resolve(undefined);
 
-  // V5: Apply EMA smoothing using previous day's snapshot
+  // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
+  // on same-day repeated requests (smoothScore returns cached value for today).
   if (impact) {
-    const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
-    impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
+    impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
     impact.tier = getTier(impact.adjustedComposite);
   }
 

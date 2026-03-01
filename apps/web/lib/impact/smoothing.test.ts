@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyEMA } from "./smoothing";
+import { applyEMA, smoothScore } from "./smoothing";
 
 // ---------------------------------------------------------------------------
 // applyEMA(currentScore, previousSmoothedScore?)
@@ -75,5 +75,54 @@ describe("applyEMA(currentScore, previousSmoothedScore)", () => {
 
   it("stays at 100 when both are 100", () => {
     expect(applyEMA(100, 100)).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// smoothScore(currentAdjusted, latestSnapshot, today?)
+// ---------------------------------------------------------------------------
+
+describe("smoothScore(currentAdjusted, latestSnapshot, today?)", () => {
+  it("passes through raw score when no snapshot exists", () => {
+    expect(smoothScore(60, null)).toBe(60);
+    expect(smoothScore(60, undefined)).toBe(60);
+  });
+
+  it("applies EMA when snapshot is from a previous day", () => {
+    const snapshot = { date: "2026-02-28", adjustedComposite: 70 };
+    // 0.15 * 60 + 0.85 * 70 = 9 + 59.5 = 68.5 → 69
+    expect(smoothScore(60, snapshot, "2026-03-01")).toBe(69);
+  });
+
+  it("returns snapshot score directly when snapshot is from today (prevents feedback loop)", () => {
+    const snapshot = { date: "2026-03-01", adjustedComposite: 58 };
+    // Raw is 45 but snapshot from today already has EMA applied → use 58
+    expect(smoothScore(45, snapshot, "2026-03-01")).toBe(58);
+  });
+
+  it("does NOT re-apply EMA on same-day repeated calls", () => {
+    // Simulates the feedback loop bug: raw=45, first call applied EMA → 58
+    // Subsequent calls must return 58, not spiral downward
+    const snapshot = { date: "2026-03-01", adjustedComposite: 58 };
+    const first = smoothScore(45, snapshot, "2026-03-01");
+    const second = smoothScore(45, { ...snapshot, adjustedComposite: first }, "2026-03-01");
+    const third = smoothScore(45, { ...snapshot, adjustedComposite: second }, "2026-03-01");
+    expect(first).toBe(58);
+    expect(second).toBe(58);
+    expect(third).toBe(58);
+  });
+
+  it("applies EMA on day boundary (snapshot from yesterday)", () => {
+    const snapshot = { date: "2026-02-28", adjustedComposite: 58 };
+    // New day → apply EMA: 0.15 * 45 + 0.85 * 58 = 6.75 + 49.3 = 56.05 → 56
+    expect(smoothScore(45, snapshot, "2026-03-01")).toBe(56);
+  });
+
+  it("uses current date when today param is omitted", () => {
+    // Snapshot from far in the past → always applies EMA
+    const snapshot = { date: "2020-01-01", adjustedComposite: 70 };
+    const result = smoothScore(60, snapshot);
+    // Should apply EMA: 0.15 * 60 + 0.85 * 70 = 68.5 → 69
+    expect(result).toBe(69);
   });
 });

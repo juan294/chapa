@@ -16,7 +16,7 @@ import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
-import { applyEMA } from "@/lib/impact/smoothing";
+import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 
 const CACHE_HEADERS = {
@@ -108,9 +108,9 @@ export async function GET(
       : Promise.resolve(undefined),
   ]);
 
-  // V5: Apply EMA smoothing using previous day's snapshot (Redis-cached)
-  const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
-  impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
+  // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
+  // on same-day repeated requests (smoothScore returns cached value for today).
+  impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
   impact.tier = getTier(impact.adjustedComposite);
 
   // Generate verification code (returns null if secret is unset)
