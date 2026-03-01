@@ -11,9 +11,20 @@ function makeDays(
   return counts.map((count, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
-    const iso = d.toISOString().split("T")[0] ?? startDate;
-    return { date: iso, count };
+    return { date: localDateStr(d), count };
   });
+}
+
+/** Format a Date as YYYY-MM-DD using local calendar (not UTC). */
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Get a local calendar date string offset by N days from now. */
+function relativeDateStr(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return localDateStr(d);
 }
 
 describe("computeActivityInsights", () => {
@@ -23,8 +34,30 @@ describe("computeActivityInsights", () => {
       expect(computeActivityInsights(data).currentStreak).toBe(3);
     });
 
-    it("returns 0 when the last day is inactive", () => {
-      const data = makeDays("2025-03-01", [5, 3, 2, 0]);
+    it("skips today if it has zero count and counts from yesterday", () => {
+      // Last entry is "today" with 0 — day isn't over yet, shouldn't break streak
+      const data: HeatmapDay[] = [
+        { date: relativeDateStr(-2), count: 5 },
+        { date: relativeDateStr(-1), count: 3 },
+        { date: relativeDateStr(0), count: 0 },
+      ];
+      expect(computeActivityInsights(data).currentStreak).toBe(2);
+    });
+
+    it("counts today if it has activity", () => {
+      const data: HeatmapDay[] = [
+        { date: relativeDateStr(-1), count: 3 },
+        { date: relativeDateStr(0), count: 7 },
+      ];
+      expect(computeActivityInsights(data).currentStreak).toBe(2);
+    });
+
+    it("returns 0 when yesterday and today are both inactive", () => {
+      const data: HeatmapDay[] = [
+        { date: relativeDateStr(-2), count: 5 },
+        { date: relativeDateStr(-1), count: 0 },
+        { date: relativeDateStr(0), count: 0 },
+      ];
       expect(computeActivityInsights(data).currentStreak).toBe(0);
     });
 

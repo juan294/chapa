@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
+import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
 import { computeActivityInsights } from "./activity-insights";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ const INTENSITY_ALPHA: Record<number, number> = {
 const HEX_CLIP_PATH =
   "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
 
+const SQRT3 = Math.sqrt(3);
+
 // ── Hex geometry (flat-top) ──────────────────────────────────────────
 
 function hexPosition(
@@ -61,7 +65,7 @@ function hexPosition(
   gap: number
 ): { x: number; y: number } {
   const w = size * 2;
-  const h = size * Math.sqrt(3);
+  const h = size * SQRT3;
   const colStep = w * 0.75 + gap * 0.75;
   const rowStep = h + gap;
   const offset = col % 2 === 1 ? (h + gap) / 2 : 0;
@@ -75,7 +79,7 @@ function hexGridDimensions(
   const lastCol = hexPosition(WEEKS - 1, 0, size, gap);
   const lastRow = hexPosition(0, DAYS - 1, size, gap);
   const w = size * 2;
-  const h = size * Math.sqrt(3);
+  const h = size * SQRT3;
   return {
     width: lastCol.x + w,
     height: lastRow.y + h + (h + gap) / 2,
@@ -88,16 +92,6 @@ interface HexDay extends HeatmapDay {
   intensity: number;
   dominant: Dimension;
   dimensionWeights: Record<Dimension, number>;
-}
-
-/** Map a count to an intensity level (0–4). */
-function getIntensityLevel(count: number, max: number): number {
-  if (count === 0) return 0;
-  const ratio = count / max;
-  if (ratio <= 0.25) return 1;
-  if (ratio <= 0.5) return 2;
-  if (ratio <= 0.75) return 3;
-  return 4;
 }
 
 /** Simple deterministic pseudo-random from seed. */
@@ -120,44 +114,61 @@ function enrichDays(
   const sliced = data.length > displaySize ? data.slice(-displaySize) : data;
   const max = Math.max(1, ...sliced.map((d) => d.count));
 
-  // Base weights from profile (normalized to 0-1 range)
-  const base = profileDimensions ?? {
+  // Compress profile scores so non-zero dimensions can win on some days.
+  // Raw proportions (e.g. 86/168=51%) leave the top dimension dominant on every
+  // single day. Instead, apply a sqrt transform: sqrt(86)≈9.3, sqrt(37)≈6.1,
+  // sqrt(45)≈6.7 — much closer together, giving realistic daily variation.
+  // Zero stays zero so absent dimensions never appear.
+  const raw = profileDimensions ?? {
     delivery: 70,
     quality: 70,
     consistency: 70,
     breadth: 70,
   };
-  const baseTotal =
-    base.delivery + base.quality + base.consistency + base.breadth;
+  const compressed: Record<Dimension, number> = {
+    delivery: Math.sqrt(raw.delivery),
+    quality: Math.sqrt(raw.quality),
+    consistency: Math.sqrt(raw.consistency),
+    breadth: Math.sqrt(raw.breadth),
+  };
+  const compressedTotal =
+    compressed.delivery + compressed.quality + compressed.consistency + compressed.breadth;
+
+  // Pre-compute base weights once (stable across all days)
+  const baseWeights: Record<Dimension, number> =
+    compressedTotal > 0
+      ? {
+          delivery: compressed.delivery / compressedTotal,
+          quality: compressed.quality / compressedTotal,
+          consistency: compressed.consistency / compressedTotal,
+          breadth: compressed.breadth / compressedTotal,
+        }
+      : { delivery: 0.25, quality: 0.25, consistency: 0.25, breadth: 0.25 };
 
   return sliced.map((day) => {
     const intensity = getIntensityLevel(day.count, max);
 
-    // Date-based seed for deterministic variation
-    const dateSeed =
-      new Date(day.date + "T12:00:00").getTime() / 86400000;
-    const dow = new Date(day.date + "T12:00:00").getDay();
+    // Date-based seed for deterministic variation (single Date parse per day)
+    const d = new Date(day.date + "T12:00:00");
+    const dateSeed = d.getTime() / 86400000;
+    const dow = d.getDay();
 
-    // Start with profile proportions
-    const weights: Record<Dimension, number> = {
-      delivery: base.delivery / baseTotal,
-      quality: base.quality / baseTotal,
-      consistency: base.consistency / baseTotal,
-      breadth: base.breadth / baseTotal,
-    };
+    // Start with base weights, then apply per-day variation
+    const weights: Record<Dimension, number> = { ...baseWeights };
 
-    // Add day-of-week variation (subtle — ±15%)
-    const variation = 0.15;
-    weights.delivery += (dow <= 2 ? variation : -variation * 0.3) * seededRandom(dateSeed * 7);
-    weights.quality += (dow >= 3 && dow <= 4 ? variation : -variation * 0.3) * seededRandom(dateSeed * 13);
-    weights.consistency += (dow === 0 || dow === 6 ? variation : -variation * 0.2) * seededRandom(dateSeed * 19);
-    weights.breadth += (dow === 5 ? variation : -variation * 0.3) * seededRandom(dateSeed * 23);
+    // Add day-based variation (±25% — enough to flip the winner on many days)
+    const variation = 0.25;
+    weights.delivery += (dow <= 2 ? variation : -variation * 0.5) * seededRandom(dateSeed * 7);
+    weights.quality += (dow >= 3 && dow <= 4 ? variation : -variation * 0.5) * seededRandom(dateSeed * 13);
+    weights.consistency += (dow === 0 || dow === 6 ? variation : -variation * 0.4) * seededRandom(dateSeed * 19);
+    weights.breadth += (dow === 5 ? variation : -variation * 0.5) * seededRandom(dateSeed * 23);
 
-    // Normalize
+    // Normalize (clamp negatives to zero — keeps absent dimensions absent)
     const total =
-      weights.delivery + weights.quality + weights.consistency + weights.breadth;
+      Math.max(0, weights.delivery) + Math.max(0, weights.quality) +
+      Math.max(0, weights.consistency) + Math.max(0, weights.breadth);
     for (const dim of ALL_DIMENSIONS) {
-      weights[dim] = Math.max(0, weights[dim] / total);
+      weights[dim] = total > 0 ? Math.max(0, weights[dim]) / total : 0;
     }
 
     const dominant = ALL_DIMENSIONS.reduce((a, b) =>
@@ -176,16 +187,8 @@ function hexToRgba(hex: string, alpha: number): string {
 
 // ── Format helpers ───────────────────────────────────────────────────
 
-function formatPeakDate(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatTooltipDate(iso: string): string {
+/** Format ISO date string as "Fri, Mar 15". */
+function formatIsoDate(iso: string): string {
   return new Date(iso + "T12:00:00").toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -292,7 +295,7 @@ export function ActivityHeatmap({
           <span className="text-amber font-medium">
             {insights.peakDay.count} contributions
           </span>{" "}
-          on {formatPeakDate(insights.peakDay.date)}
+          on {formatIsoDate(insights.peakDay.date)}
         </p>
       )}
     </section>
@@ -303,10 +306,12 @@ export function ActivityHeatmap({
 
 const HEX_SIZE = 12;
 const HEX_GAP = 2;
+const HEX_H = HEX_SIZE * SQRT3;
+const CENTER_COL = Math.floor(WEEKS / 2);
+const CENTER_ROW = Math.floor(DAYS / 2);
 
 function HexHeatmapGrid({ data }: { data: HexDay[] }) {
   const gridDims = hexGridDimensions(HEX_SIZE, HEX_GAP);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{
     day: HexDay;
     screenX: number;
@@ -334,123 +339,126 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
   const totalCells = WEEKS * DAYS;
 
   return (
-    <div
-      ref={containerRef}
-      className="relative mx-auto"
-      style={{ width: gridDims.width, height: gridDims.height }}
-      role="img"
-      aria-label="Hexagonal activity heatmap"
-    >
-      {Array.from({ length: totalCells }, (_, i) => {
-        const col = Math.floor(i / DAYS);
-        const row = i % DAYS;
-        const pos = hexPosition(col, row, HEX_SIZE, HEX_GAP);
-        const day = i < cells ? data[i] : null;
+    <>
+      <div
+        className="relative mx-auto"
+        style={{ width: gridDims.width, height: gridDims.height }}
+        role="img"
+        aria-label="Hexagonal activity heatmap"
+      >
+        {Array.from({ length: totalCells }, (_, i) => {
+          const col = Math.floor(i / DAYS);
+          const row = i % DAYS;
+          const pos = hexPosition(col, row, HEX_SIZE, HEX_GAP);
+          const day = i < cells ? data[i] : null;
 
-        const alpha = day ? (INTENSITY_ALPHA[day.intensity] ?? 0.07) : 0.07;
-        const background =
-          day && day.count > 0
-            ? hexToRgba(DIMENSION_COLORS[day.dominant], alpha)
-            : "var(--color-amber, rgba(124,106,239,0.06))";
-        const emptyBg =
-          !day || day.count === 0;
+          const alpha = day ? (INTENSITY_ALPHA[day.intensity] ?? 0.07) : 0.07;
+          const background =
+            day && day.count > 0
+              ? hexToRgba(DIMENSION_COLORS[day.dominant], alpha)
+              : "var(--color-amber, rgba(124,106,239,0.06))";
+          const emptyBg =
+            !day || day.count === 0;
 
-        // Ripple delay from center
-        const centerCol = Math.floor(WEEKS / 2);
-        const centerRow = Math.floor(DAYS / 2);
-        const dist = Math.sqrt(
-          (col - centerCol) ** 2 + (row - centerRow) ** 2
-        );
-        const delay = Math.round(dist * 55);
+          // Ripple delay from center
+          const dist = Math.sqrt(
+            (col - CENTER_COL) ** 2 + (row - CENTER_ROW) ** 2
+          );
+          const delay = Math.round(dist * 55);
 
-        return (
+          return (
+            <div
+              key={`${col}-${row}`}
+              className="absolute cursor-pointer opacity-0 transition-transform duration-100 hover:scale-125 hover:z-10"
+              style={{
+                left: pos.x,
+                top: pos.y,
+                width: HEX_SIZE * 2,
+                height: HEX_H,
+                clipPath: HEX_CLIP_PATH,
+                backgroundColor: emptyBg
+                  ? "rgba(124,106,239,0.06)"
+                  : undefined,
+                background: emptyBg ? undefined : background,
+                animation: `hex-cell-in 0.45s ease-out ${delay}ms forwards`,
+              }}
+              onMouseEnter={(e) => day && handleHover(day, e)}
+              onMouseLeave={handleLeave}
+              aria-hidden="true"
+            />
+          );
+        })}
+      </div>
+
+      {/* Tooltip — portaled to document.body to escape ancestor transforms/overflow.
+          Uses position: fixed with viewport coordinates and z-index: 99999.
+          Flips below when cell is within 120px of viewport top. */}
+      {tooltip &&
+        createPortal(
           <div
-            key={`${col}-${row}`}
-            className="absolute cursor-pointer opacity-0 transition-transform duration-100 hover:scale-125 hover:z-10"
+            role="tooltip"
+            className="pointer-events-none fixed rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
             style={{
-              left: pos.x,
-              top: pos.y,
-              width: HEX_SIZE * 2,
-              height: HEX_SIZE * Math.sqrt(3),
-              clipPath: HEX_CLIP_PATH,
-              backgroundColor: emptyBg
-                ? "rgba(124,106,239,0.06)"
-                : undefined,
-              background: emptyBg ? undefined : background,
-              animation: `hex-cell-in 0.45s ease-out ${delay}ms forwards`,
+              zIndex: 99999,
+              left: tooltip.screenX,
+              ...(tooltip.screenY < 120
+                ? {
+                    top: tooltip.cellBottom + 8,
+                    transform: "translateX(-50%)",
+                  }
+                : {
+                    top: tooltip.screenY - 8,
+                    transform: "translate(-50%, -100%)",
+                  }),
             }}
-            onMouseEnter={(e) => day && handleHover(day, e)}
-            onMouseLeave={handleLeave}
-            aria-hidden="true"
-          />
-        );
-      })}
-
-      {/* Tooltip — fixed position, always on top, flips below when near viewport top */}
-      {tooltip && (
-        <div
-          role="tooltip"
-          className="pointer-events-none fixed rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
-          style={{
-            zIndex: 99999,
-            left: tooltip.screenX,
-            ...(tooltip.screenY < 120
-              ? {
-                  top: tooltip.cellBottom + 8,
-                  transform: "translateX(-50%)",
-                }
-              : {
-                  top: tooltip.screenY - 8,
-                  transform: "translate(-50%, -100%)",
-                }),
-          }}
-        >
-          <p className="font-medium text-text-primary whitespace-nowrap">
-            {formatTooltipDate(tooltip.day.date)}
-          </p>
-          {tooltip.day.count > 0 ? (
-            <>
-              <p className="text-text-secondary whitespace-nowrap">
-                {tooltip.day.count} contribution
-                {tooltip.day.count !== 1 ? "s" : ""}
-              </p>
-              <div className="mt-1.5 flex flex-col gap-0.5">
-                {ALL_DIMENSIONS.map((dim) => {
-                  const pct = Math.round(
-                    tooltip.day.dimensionWeights[dim] * 100
-                  );
-                  return (
-                    <div key={dim} className="flex items-center gap-1.5">
-                      <div
-                        className="h-1.5 w-1.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: DIMENSION_COLORS[dim],
-                        }}
-                      />
-                      <span
-                        className="whitespace-nowrap"
-                        style={{
-                          color:
-                            dim === tooltip.day.dominant
-                              ? DIMENSION_COLORS[dim]
-                              : undefined,
-                          fontWeight:
-                            dim === tooltip.day.dominant ? 600 : 400,
-                        }}
-                      >
-                        {DIMENSION_LABELS[dim]} {pct}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <p className="text-text-secondary">No activity</p>
-          )}
-        </div>
-      )}
-    </div>
+          >
+            <p className="font-medium text-text-primary whitespace-nowrap">
+              {formatIsoDate(tooltip.day.date)}
+            </p>
+            {tooltip.day.count > 0 ? (
+              <>
+                <p className="text-text-secondary whitespace-nowrap">
+                  {tooltip.day.count} contribution
+                  {tooltip.day.count !== 1 ? "s" : ""}
+                </p>
+                <div className="mt-1.5 flex flex-col gap-0.5">
+                  {ALL_DIMENSIONS.map((dim) => {
+                    const pct = Math.round(
+                      tooltip.day.dimensionWeights[dim] * 100
+                    );
+                    return (
+                      <div key={dim} className="flex items-center gap-1.5">
+                        <div
+                          className="h-1.5 w-1.5 rounded-full shrink-0"
+                          style={{
+                            backgroundColor: DIMENSION_COLORS[dim],
+                          }}
+                        />
+                        <span
+                          className="whitespace-nowrap"
+                          style={{
+                            color:
+                              dim === tooltip.day.dominant
+                                ? DIMENSION_COLORS[dim]
+                                : undefined,
+                            fontWeight:
+                              dim === tooltip.day.dominant ? 600 : 400,
+                          }}
+                        >
+                          {DIMENSION_LABELS[dim]} {pct}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <p className="text-text-secondary">No activity</p>
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 

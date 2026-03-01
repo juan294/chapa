@@ -21,9 +21,21 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
     };
   }
 
-  // Current streak: count from the end backwards while count > 0
+  // Current streak: count from the end backwards while count > 0.
+  // If the last entry is today with zero activity, skip it — the day isn't over yet.
+  let startIdx = data.length - 1;
+  const lastEntry = data[startIdx];
+  if (lastEntry && lastEntry.count === 0) {
+    // Use local calendar date (not UTC) to match GitHub's date format
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    if (lastEntry.date === today) {
+      startIdx--;
+    }
+  }
+
   let currentStreak = 0;
-  for (let i = data.length - 1; i >= 0; i--) {
+  for (let i = startIdx; i >= 0; i--) {
     const entry = data[i];
     if (entry && entry.count > 0) currentStreak++;
     else break;
