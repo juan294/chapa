@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
+import { DIMENSION_KEYS } from "@chapa/shared";
 import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
 import { computeActivityInsights } from "./activity-insights";
 import { formatIsoDate } from "@/lib/utils/date";
@@ -39,12 +40,7 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
   breadth: "Breadth",
 };
 
-const ALL_DIMENSIONS: Dimension[] = [
-  "delivery",
-  "quality",
-  "consistency",
-  "breadth",
-];
+const ALL_DIMENSIONS = DIMENSION_KEYS as Dimension[];
 
 const INTENSITY_ALPHA: Record<number, number> = {
   0: 0.07,
@@ -334,7 +330,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
           const background =
             day && day.count > 0
               ? hexToRgba(DIMENSION_COLORS[day.dominant], alpha)
-              : "var(--color-amber, rgba(124,106,239,0.06))";
+              : "var(--color-purple-tint)";
           const emptyBg =
             !day || day.count === 0;
 
@@ -355,7 +351,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                 height: HEX_H,
                 clipPath: HEX_CLIP_PATH,
                 backgroundColor: emptyBg
-                  ? "rgba(124,106,239,0.06)"
+                  ? "var(--color-purple-tint)"
                   : undefined,
                 background: emptyBg ? undefined : background,
                 animation: `hex-cell-in 0.45s ease-out ${delay}ms forwards`,

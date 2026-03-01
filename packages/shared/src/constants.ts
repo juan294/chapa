@@ -26,3 +26,24 @@ export const SCORING_CAPS = {
  * to many repos. `topRepoShare` still uses ALL active repos (1+ commits).
  */
 export const REPO_DEPTH_THRESHOLD = 3;
+
+/**
+ * All four scoring dimension keys in canonical order.
+ * Used by v4 scoring, heatmap coloring, and archetype derivation.
+ */
+export const DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
+  "delivery",
+  "quality",
+  "consistency",
+  "breadth",
+];
+
+/**
+ * Dimension keys used for solo profile scoring (excludes "quality").
+ * Solo developers don't have PR review data, so quality is skipped.
+ */
+export const SOLO_DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
+  "delivery",
+  "consistency",
+  "breadth",
+];

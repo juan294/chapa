@@ -5,7 +5,7 @@ import type {
   ImpactV4Result,
   ProfileType,
 } from "@chapa/shared";
-import { SCORING_CAPS, SCORING_WINDOW_DAYS } from "@chapa/shared";
+import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS } from "@chapa/shared";
 import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness } from "./heatmap-evenness";
 import { computeRecencyRatio, applyRecencyWeight } from "./recency";
@@ -124,19 +124,6 @@ export function detectProfileType(stats: StatsData): ProfileType {
 // ---------------------------------------------------------------------------
 // Archetype derivation
 // ---------------------------------------------------------------------------
-
-const DIMENSION_KEYS: (keyof DimensionScores)[] = [
-  "delivery",
-  "quality",
-  "consistency",
-  "breadth",
-];
-
-const SOLO_DIMENSION_KEYS: (keyof DimensionScores)[] = [
-  "delivery",
-  "consistency",
-  "breadth",
-];
 
 // Tie-breaking priority: Polymath > Quality Champion > Marathoner > Builder
 const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype }[] = [

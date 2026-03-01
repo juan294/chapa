@@ -4,6 +4,8 @@ import {
   PR_WEIGHT_AGG_CAP,
   SCORING_CAPS,
   REPO_DEPTH_THRESHOLD,
+  DIMENSION_KEYS,
+  SOLO_DIMENSION_KEYS,
 } from "./constants";
 
 describe("shared/constants", () => {
@@ -127,6 +129,32 @@ describe("shared/constants", () => {
 
     it("is less than commits cap (sanity)", () => {
       expect(REPO_DEPTH_THRESHOLD).toBeLessThan(SCORING_CAPS.commits);
+    });
+  });
+
+  describe("DIMENSION_KEYS", () => {
+    it("contains all four dimensions", () => {
+      expect(DIMENSION_KEYS).toEqual(["delivery", "quality", "consistency", "breadth"]);
+    });
+
+    it("has no duplicates", () => {
+      expect(new Set(DIMENSION_KEYS).size).toBe(DIMENSION_KEYS.length);
+    });
+  });
+
+  describe("SOLO_DIMENSION_KEYS", () => {
+    it("contains three dimensions (excludes quality)", () => {
+      expect(SOLO_DIMENSION_KEYS).toEqual(["delivery", "consistency", "breadth"]);
+    });
+
+    it("is a subset of DIMENSION_KEYS", () => {
+      for (const key of SOLO_DIMENSION_KEYS) {
+        expect(DIMENSION_KEYS).toContain(key);
+      }
+    });
+
+    it("does not include quality", () => {
+      expect(SOLO_DIMENSION_KEYS).not.toContain("quality");
     });
   });
 });
