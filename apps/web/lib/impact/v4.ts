@@ -31,8 +31,9 @@ export function computeDelivery(stats: StatsData): number {
 }
 
 // ---------------------------------------------------------------------------
-// Quality: reviewing & quality gatekeeping
-// reviewsSubmittedCount (60%), review-to-PR ratio (25%), inverse microCommitRatio (15%)
+// Quality: engineering discipline (adapts to profile type)
+// Collaborative: reviewsSubmittedCount (60%), review-to-PR ratio (25%), inverse microCommitRatio (15%)
+// Solo: delegates to computeSoloQuality() when reviewsSubmittedCount === 0
 // ---------------------------------------------------------------------------
 
 export function computeQuality(stats: StatsData): number {

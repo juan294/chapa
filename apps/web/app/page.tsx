@@ -53,7 +53,7 @@ const STEPS = [
 
 const DIMENSIONS = [
   { title: "DELIVERY", description: "Shipping meaningful changes \u2014 PRs merged, issues closed, code shipped." },
-  { title: "QUALITY", description: "Reviewing and quality gatekeeping \u2014 how much time you spend on others\u2019 code." },
+  { title: "QUALITY", description: "Engineering discipline \u2014 code reviews on teams, PR hygiene and structured workflow when solo." },
   { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
   { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
 ];

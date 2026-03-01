@@ -246,8 +246,15 @@ export default function ScoringMethodologyPage() {
 
             {/* Quality */}
             <SubHeading>
-              Quality — reviewing and quality gatekeeping
+              Quality — engineering discipline
             </SubHeading>
+            <p>
+              Quality is measured differently depending on your profile type.
+              Collaborative developers (those with code reviews) are scored on
+              review behavior. Solo developers (zero reviews) are scored on
+              engineering discipline signals visible in their PR workflow.
+            </p>
+            <SubHeading>Collaborative Quality</SubHeading>
             <Table
               headers={["Signal", "Weight", "Rationale"]}
               rows={[
@@ -268,10 +275,37 @@ export default function ScoringMethodologyPage() {
                 ],
               ]}
             />
+            <SubHeading>Solo Quality</SubHeading>
+            <Table
+              headers={["Signal", "Weight", "Rationale"]}
+              rows={[
+                [
+                  "PR Description Rate",
+                  "40%",
+                  "Percentage of merged PRs with a non-empty description — the strongest solo discipline signal",
+                ],
+                [
+                  "Feature Branch Rate",
+                  "25%",
+                  "Percentage of PRs from a feature branch (not main/master/develop) — shows structured development workflow",
+                ],
+                [
+                  "Issue Linkage Rate",
+                  "20%",
+                  "Percentage of PRs that close at least one issue — connects code to tracked work",
+                ],
+                [
+                  "Inverse Micro-commit Ratio",
+                  "15%",
+                  "Low micro-commit ratio indicates thoughtful, well-structured changes",
+                ],
+              ]}
+            />
             <p>
-              Returns 0 if you have zero reviews. Solo developers who never
-              review are not penalized — their composite score excludes Quality
-              entirely and averages the remaining three dimensions.
+              Solo developers are never penalized for working alone. Instead of
+              skipping Quality entirely, Chapa evaluates the engineering habits
+              visible in their PR workflow. All four dimensions are always scored
+              for every developer.
             </p>
 
             {/* Consistency */}
@@ -381,7 +415,7 @@ export default function ScoringMethodologyPage() {
                 [
                   "Quality Champion",
                   "Quality is highest AND >= 60",
-                  "You spend significant time reviewing and gatekeeping quality",
+                  "Your strongest trait is engineering discipline — through reviews (collaborative) or PR hygiene (solo)",
                 ],
                 [
                   "Marathoner",
@@ -406,10 +440,9 @@ export default function ScoringMethodologyPage() {
             {/* ---------------------------------------------------------- */}
             <SectionHeading>Composite score and tiers</SectionHeading>
             <p>
-              The composite score is the average of all four dimensions (or
-              three for solo developers who have zero reviews), rounded to an
-              integer. It then passes through recency weighting and confidence
-              adjustment:
+              The composite score is the average of all four dimensions,
+              rounded to an integer. It then passes through recency weighting
+              and confidence adjustment:
             </p>
             <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
               <p>recencyWeighted = composite × recencyMultiplier</p>

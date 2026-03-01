@@ -80,11 +80,11 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 | Dimension | What it measures | Signals & weights |
 |-----------|-----------------|-------------------|
 | **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
-| **Quality** | Reviewing & quality gatekeeping | Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%) |
+| **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), inverse micro-commit ratio (15%) |
 | **Consistency** | Reliable, sustained contributions | Active days / 365 (50%), heatmap evenness (35%), inverse burst activity (15%) |
 | **Breadth** | Cross-project influence | Repos contributed (35%), inverse top-repo share (25%), stars (15%), forks (10%), watchers (5%), docs-only PR ratio (10%) |
 
-Each dimension returns 0 when the primary signal is absent (e.g., Quality = 0 if no reviews).
+Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers (zero reviews) are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Solo Quality returns 0 only if you have zero merged PRs.
 
 ### Developer archetypes
 
@@ -472,4 +472,4 @@ A: Linear scoring rewards volume -- 200 commits would score 2x higher than 100. 
 A: Multiple layers. (1) **Log normalization** makes volume-based gaming impractical. (2) **PR size multiplier** means empty/trivial PRs contribute zero weight. (3) **Repo depth threshold** requires 3+ commits per repo to count toward Breadth. (4) **Confidence penalties** detect patterns like review spam, burst commits, and thin activity profiles. (5) **Caps** on every metric mean there's a ceiling — you can't just do more of one thing to inflate your score.
 
 **Q: What are the four dimensions?**
-A: Delivery (shipping code), Quality (reviewing others), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.
+A: Delivery (shipping code), Quality (engineering discipline — code reviews on teams, PR hygiene when solo), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.

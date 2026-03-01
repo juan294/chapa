@@ -119,10 +119,12 @@ Each dimension is computed from weighted sub-components:
 - All normalized via logarithmic curve: `ln(1 + min(x, cap)) / ln(1 + cap)`
 - Caps: PRs=60, Issues=40, Commits=300
 
-**Quality** = `0.6 × reviews + 0.25 × review_ratio + 0.15 × inverse_micro`
+**Quality (collaborative)** = `0.6 × reviews + 0.25 × review_ratio + 0.15 × inverse_micro`
 - Review ratio: reviews/PRs, capped at 5:1
 - Inverse micro: `1 - microCommitRatio` (defaults 0.3)
-- Returns 0 if no reviews (solo profile)
+
+**Quality (solo)** = `0.40 × prDescriptionRate + 0.25 × featureBranchRate + 0.20 × issueLinkageRate + 0.15 × inverse_micro`
+- Solo path used when reviewsSubmittedCount === 0; returns 0 if no merged PRs
 
 **Consistency** = `0.45 × streak + 0.40 × evenness + 0.15 × inverse_burst`
 - Streak: `sqrt(activeDays / 365)` — concave curve
