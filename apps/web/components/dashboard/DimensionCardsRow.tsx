@@ -53,6 +53,7 @@ export function DimensionCardsRow({
                   ? "opacity-70 transition-opacity duration-200"
                   : ""
               }
+              profileType={impact.profileType}
             />
           );
         })}

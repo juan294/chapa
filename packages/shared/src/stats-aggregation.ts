@@ -2,6 +2,9 @@ import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
 import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
 
+/** Branch names that indicate a direct push (not a feature branch). */
+const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "trunk"]);
+
 /**
  * Transform raw GitHub GraphQL contribution data into a StatsData object.
  *
@@ -37,6 +40,17 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // 5. Lines added/deleted from merged PRs
   const linesAdded = mergedPRs.reduce((sum, pr) => sum + pr.additions, 0);
   const linesDeleted = mergedPRs.reduce((sum, pr) => sum + pr.deletions, 0);
+
+  // 5b. Solo quality signals from merged PRs
+  const prDescriptionRate = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => (pr.body ?? "").trim().length > 0).length / prsMergedCount
+    : undefined;
+  const featureBranchRate = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => !DEFAULT_BRANCH_NAMES.has(pr.headRefName)).length / prsMergedCount
+    : undefined;
+  const issueLinkageRate = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => pr.closingIssuesCount > 0).length / prsMergedCount
+    : undefined;
 
   // 6. Reviews and issues
   const reviewsSubmittedCount = raw.reviews.totalCount;
@@ -97,6 +111,9 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     reposContributed,
     topRepoShare,
     maxCommitsIn10Min,
+    ...(prDescriptionRate !== undefined && { prDescriptionRate }),
+    ...(featureBranchRate !== undefined && { featureBranchRate }),
+    ...(issueLinkageRate !== undefined && { issueLinkageRate }),
     totalStars,
     totalForks,
     totalWatchers,

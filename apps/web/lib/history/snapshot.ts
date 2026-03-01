@@ -35,6 +35,9 @@ export function buildSnapshot(
     maxCommitsIn10Min: stats.maxCommitsIn10Min,
     ...(stats.microCommitRatio !== undefined && { microCommitRatio: stats.microCommitRatio }),
     ...(stats.docsOnlyPrRatio !== undefined && { docsOnlyPrRatio: stats.docsOnlyPrRatio }),
+    ...(stats.prDescriptionRate !== undefined && { prDescriptionRate: stats.prDescriptionRate }),
+    ...(stats.featureBranchRate !== undefined && { featureBranchRate: stats.featureBranchRate }),
+    ...(stats.issueLinkageRate !== undefined && { issueLinkageRate: stats.issueLinkageRate }),
 
     delivery: impact.dimensions.delivery,
     quality: impact.dimensions.quality,

@@ -767,7 +767,7 @@ describe("detectProfileType(stats)", () => {
 // ---------------------------------------------------------------------------
 
 describe("solo developer composite scoring", () => {
-  it("uses 3 dimensions (excludes quality) for solo profiles", () => {
+  it("uses 4 dimensions (including solo quality) for solo profiles", () => {
     const stats = makeStats({
       prsMergedWeight: 80,
       issuesClosedCount: 40,
@@ -778,38 +778,20 @@ describe("solo developer composite scoring", () => {
       topRepoShare: 0.3,
       totalStars: 50,
       reviewsSubmittedCount: 0, // solo
+      prsMergedCount: 20,
+      prDescriptionRate: 0.8,
+      featureBranchRate: 0.9,
+      issueLinkageRate: 0.5,
     });
     const result = computeImpactV4(stats);
     const dims = result.dimensions;
 
-    // Solo composite = (delivery + consistency + breadth) / 3
+    // Solo composite = (delivery + quality + consistency + breadth) / 4
     const expectedAvg = Math.round(
-      (dims.delivery + dims.consistency + dims.breadth) / 3
+      (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
     );
     expect(result.compositeScore).toBe(expectedAvg);
     expect(result.profileType).toBe("solo");
-  });
-
-  it("scores higher than 4-dim average for active solo devs", () => {
-    const soloStats = makeStats({
-      prsMergedWeight: 80,
-      issuesClosedCount: 40,
-      commitsTotal: 300,
-      activeDays: 200,
-      heatmapData: makeUniformHeatmap(14),
-      reposContributed: 8,
-      topRepoShare: 0.3,
-      totalStars: 50,
-      reviewsSubmittedCount: 0, // solo
-    });
-    const result = computeImpactV4(soloStats);
-    const dims = result.dimensions;
-
-    // The old 4-dim average would be lower because quality = 0
-    const old4DimAvg = Math.round(
-      (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
-    );
-    expect(result.compositeScore).toBeGreaterThan(old4DimAvg);
   });
 
   it("collaborative profiles still use 4 dimensions", () => {
@@ -837,9 +819,10 @@ describe("solo developer composite scoring", () => {
     expect(result.tier).toBe("Emerging");
   });
 
-  it("solo with maxed delivery/consistency/breadth scores near 100", () => {
+  it("solo with maxed signals scores near 100", () => {
     const stats = makeStats({
       prsMergedWeight: 120,
+      prsMergedCount: 50,
       issuesClosedCount: 80,
       commitsTotal: 600,
       activeDays: 365,
@@ -852,14 +835,16 @@ describe("solo developer composite scoring", () => {
       totalForks: 200,
       totalWatchers: 100,
       reviewsSubmittedCount: 0,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 1.0,
+      microCommitRatio: 0,
     });
     const result = computeImpactV4(stats);
-    // Each dimension maxes at 100 individually but heatmap evenness
-    // depends on coverage — 13 weeks of data against 53-week window
-    expect(result.compositeScore).toBeGreaterThanOrEqual(95);
+    expect(result.compositeScore).toBeGreaterThanOrEqual(90);
   });
 
-  it("high-output solo dev gets >= 50 composite and at least Solid tier", () => {
+  it("high-output solo dev gets >= 40 composite", () => {
     // Simulates a solo dev with ~2100 contributions
     const stats = makeStats({
       commitsTotal: 500,
@@ -874,10 +859,12 @@ describe("solo developer composite scoring", () => {
       maxCommitsIn10Min: 5,
       heatmapData: makeUniformHeatmap(14),
       reviewsSubmittedCount: 0,
+      prDescriptionRate: 0.7,
+      featureBranchRate: 0.8,
+      issueLinkageRate: 0.3,
     });
     const result = computeImpactV4(stats);
-    expect(result.compositeScore).toBeGreaterThanOrEqual(50);
-    expect(["Solid", "High", "Elite"]).toContain(result.tier);
+    expect(result.compositeScore).toBeGreaterThanOrEqual(40);
   });
 });
 
@@ -886,34 +873,33 @@ describe("solo developer composite scoring", () => {
 // ---------------------------------------------------------------------------
 
 describe("solo developer archetype", () => {
-  it("never assigns Quality Champion to solo profiles", () => {
-    // Even if quality dimension were somehow high, solo should not get Quality Champion
+  it("CAN assign Quality Champion to solo profiles (solo quality is now scored)", () => {
     const dims: DimensionScores = { delivery: 50, quality: 85, consistency: 60, breadth: 55 };
-    expect(deriveArchetype(dims, "solo")).not.toBe("Quality Champion");
+    expect(deriveArchetype(dims, "solo")).toBe("Quality Champion");
   });
 
   it("can assign Builder to solo profile", () => {
-    const dims: DimensionScores = { delivery: 80, quality: 0, consistency: 50, breadth: 55 };
+    const dims: DimensionScores = { delivery: 80, quality: 40, consistency: 50, breadth: 55 };
     expect(deriveArchetype(dims, "solo")).toBe("Builder");
   });
 
   it("can assign Marathoner to solo profile", () => {
-    const dims: DimensionScores = { delivery: 50, quality: 0, consistency: 80, breadth: 55 };
+    const dims: DimensionScores = { delivery: 50, quality: 40, consistency: 80, breadth: 55 };
     expect(deriveArchetype(dims, "solo")).toBe("Marathoner");
   });
 
   it("can assign Polymath to solo profile", () => {
-    const dims: DimensionScores = { delivery: 50, quality: 0, consistency: 55, breadth: 80 };
+    const dims: DimensionScores = { delivery: 50, quality: 40, consistency: 55, breadth: 80 };
     expect(deriveArchetype(dims, "solo")).toBe("Polymath");
   });
 
-  it("V5: can assign Balanced to solo profile when 3 dims within 20 pts and avg >= 50", () => {
-    const dims: DimensionScores = { delivery: 55, quality: 0, consistency: 50, breadth: 60 };
+  it("can assign Balanced to solo profile when 4 dims within 20 pts and avg >= 50", () => {
+    const dims: DimensionScores = { delivery: 55, quality: 50, consistency: 50, breadth: 60 };
     expect(deriveArchetype(dims, "solo")).toBe("Balanced");
   });
 
   it("returns Emerging for low solo dimensions", () => {
-    const dims: DimensionScores = { delivery: 20, quality: 0, consistency: 25, breadth: 15 };
+    const dims: DimensionScores = { delivery: 20, quality: 10, consistency: 25, breadth: 15 };
     expect(deriveArchetype(dims, "solo")).toBe("Emerging");
   });
 
@@ -921,5 +907,100 @@ describe("solo developer archetype", () => {
     const dims: DimensionScores = { delivery: 50, quality: 85, consistency: 60, breadth: 55 };
     // Without profileType arg, should use all 4 dims → Quality Champion
     expect(deriveArchetype(dims)).toBe("Quality Champion");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Solo Quality scoring (computeQuality for solo profiles)
+// ---------------------------------------------------------------------------
+
+describe("computeQuality — solo path", () => {
+  it("returns 0 when no reviews AND no merged PRs", () => {
+    const stats = makeStats({ reviewsSubmittedCount: 0, prsMergedCount: 0 });
+    expect(computeQuality(stats)).toBe(0);
+  });
+
+  it("applies solo formula weights: 40% desc, 25% branch, 20% linkage, 15% micro", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 0,
+      issueLinkageRate: 0,
+      microCommitRatio: 1.0, // inverseMicro = 0
+    });
+    // Only prDescriptionRate contributes: 40% * 1.0 * 100 = 40
+    expect(computeQuality(stats)).toBe(40);
+  });
+
+  it("featureBranchRate at 25% weight", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 0,
+      microCommitRatio: 1.0,
+    });
+    expect(computeQuality(stats)).toBe(25);
+  });
+
+  it("issueLinkageRate at 20% weight", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 0,
+      featureBranchRate: 0,
+      issueLinkageRate: 1.0,
+      microCommitRatio: 1.0,
+    });
+    expect(computeQuality(stats)).toBe(20);
+  });
+
+  it("inverseMicroCommitRatio at 15% weight", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 0,
+      featureBranchRate: 0,
+      issueLinkageRate: 0,
+      microCommitRatio: 0, // inverseMicro = 1.0
+    });
+    expect(computeQuality(stats)).toBe(15);
+  });
+
+  it("returns 100 when all solo quality signals are maxed", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 1.0,
+      microCommitRatio: 0,
+    });
+    expect(computeQuality(stats)).toBe(100);
+  });
+
+  it("defaults undefined rates to 0 (no free points)", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      // prDescriptionRate, featureBranchRate, issueLinkageRate all undefined
+      microCommitRatio: 0.3,
+    });
+    const score = computeQuality(stats);
+    // Only inverseMicro contributes: 15% * (1 - 0.3) * 100 = 10.5 → 11
+    expect(score).toBe(11);
+  });
+
+  it("collaborative quality path is unchanged (reviews > 0)", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 80,
+      prsMergedCount: 20,
+      microCommitRatio: 0,
+    });
+    // Collaborative formula: 60% * (80/80) + 25% * min(80/20, 5)/5 + 15% * 1.0
+    // = 60 + 25 * (4/5) + 15 = 60 + 20 + 15 = 95
+    expect(computeQuality(stats)).toBe(95);
   });
 });

@@ -143,8 +143,8 @@ describe("shared/constants", () => {
   });
 
   describe("SOLO_DIMENSION_KEYS", () => {
-    it("contains three dimensions (excludes quality)", () => {
-      expect(SOLO_DIMENSION_KEYS).toEqual(["delivery", "consistency", "breadth"]);
+    it("contains all four dimensions (quality included for solo)", () => {
+      expect(SOLO_DIMENSION_KEYS).toEqual(["delivery", "quality", "consistency", "breadth"]);
     });
 
     it("is a subset of DIMENSION_KEYS", () => {
@@ -153,8 +153,8 @@ describe("shared/constants", () => {
       }
     });
 
-    it("does not include quality", () => {
-      expect(SOLO_DIMENSION_KEYS).not.toContain("quality");
+    it("includes quality (solo quality uses engineering discipline signals)", () => {
+      expect(SOLO_DIMENSION_KEYS).toContain("quality");
     });
   });
 });

@@ -16,6 +16,10 @@ const DIMENSION_SUBTITLES: Record<string, string> = {
   breadth: "Repos contributed \u00b7 community reach",
 };
 
+const SOLO_DIMENSION_SUBTITLES: Partial<Record<string, string>> = {
+  quality: "PR descriptions \u00b7 branch discipline \u00b7 issue linkage",
+};
+
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   delivery: { from: "var(--color-dimension-delivery)", to: "var(--color-dimension-delivery-light)" },
   quality: { from: "var(--color-dimension-quality)", to: "var(--color-dimension-quality-light)" },
@@ -40,6 +44,13 @@ const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   breadth: {
     id: "dim-breadth",
     tip: "Measures cross-project reach: repos contributed to, project diversity, and community metrics (stars, forks, watchers).",
+  },
+};
+
+const SOLO_DIMENSION_TOOLTIPS: Partial<Record<string, { id: string; tip: string }>> = {
+  quality: {
+    id: "dim-quality",
+    tip: "Measures engineering discipline: PR descriptions, feature branch usage, issue linkage, and commit cleanliness.",
   },
 };
 
@@ -172,6 +183,10 @@ const DIMENSION_TIPS: Record<string, string> = {
   breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
 };
 
+const SOLO_DIMENSION_TIPS: Partial<Record<string, string>> = {
+  quality: "To strengthen Quality, write PR descriptions, use feature branches, and link PRs to issues \u2014 even as a solo dev, these habits protect your codebase.",
+};
+
 /**
  * Generate a rich profile description with archetype context and an
  * actionable tip for the developer\u2019s weakest dimension.
@@ -187,7 +202,8 @@ export function getArchetypeProfile(impact: ImpactV4Result): string {
 
   const entries = Object.entries(dims) as [string, number][];
   const weakest = entries.reduce((min, curr) => (curr[1] < min[1] ? curr : min));
-  const tip = DIMENSION_TIPS[weakest[0]];
+  const isSolo = impact.profileType === "solo";
+  const tip = (isSolo ? SOLO_DIMENSION_TIPS[weakest[0]] : undefined) ?? DIMENSION_TIPS[weakest[0]];
 
   return `${profile} ${tip}`;
 }
@@ -199,6 +215,7 @@ interface ImpactBreakdownProps {
 
 export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
   const dims = impact.dimensions;
+  const isSolo = impact.profileType === "solo";
 
   return (
     <div className="space-y-10">
@@ -219,8 +236,8 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   <span className="text-xs text-text-secondary uppercase tracking-wider flex items-center gap-1">
                     {DIMENSION_LABELS[key]}
                     <InfoTooltip
-                      id={DIMENSION_TOOLTIPS[key]!.id}
-                      content={DIMENSION_TOOLTIPS[key]!.tip}
+                      id={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.id : undefined) ?? DIMENSION_TOOLTIPS[key]!.id}
+                      content={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.tip : undefined) ?? DIMENSION_TOOLTIPS[key]!.tip}
                     />
                   </span>
                   <span className="font-heading text-3xl font-extrabold text-text-primary leading-none">
@@ -243,7 +260,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   />
                 </div>
                 <p className="text-xs text-text-secondary/50 mt-2.5 leading-relaxed">
-                  {DIMENSION_SUBTITLES[key]}
+                  {(isSolo ? SOLO_DIMENSION_SUBTITLES[key] : undefined) ?? DIMENSION_SUBTITLES[key]}
                 </p>
               </div>
             ),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { DimensionScores, StatsData } from "@chapa/shared";
+import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 
 interface SubMetric {
   label: string;
@@ -15,6 +15,7 @@ export interface SubMetricPanelProps {
   stats: StatsData;
   isOpen: boolean;
   onClose: () => void;
+  profileType?: ProfileType;
 }
 
 const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
@@ -33,7 +34,8 @@ const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
 
 function getSubMetrics(
   dimension: keyof DimensionScores,
-  stats: StatsData
+  stats: StatsData,
+  profileType: ProfileType = "collaborative",
 ): SubMetric[] {
   switch (dimension) {
     case "delivery":
@@ -59,6 +61,40 @@ function getSubMetrics(
       ];
 
     case "quality": {
+      if (profileType === "solo") {
+        const descRate = stats.prDescriptionRate ?? 0;
+        const branchRate = stats.featureBranchRate ?? 0;
+        const linkageRate = stats.issueLinkageRate ?? 0;
+        const microRatio = stats.microCommitRatio ?? 0.3;
+
+        return [
+          {
+            label: "PR Descriptions",
+            weight: "40%",
+            normalizedValue: descRate,
+            rawLabel: `${(descRate * 100).toFixed(0)}% of PRs have descriptions`,
+          },
+          {
+            label: "Feature Branches",
+            weight: "25%",
+            normalizedValue: branchRate,
+            rawLabel: `${(branchRate * 100).toFixed(0)}% from feature branches`,
+          },
+          {
+            label: "Issue Linkage",
+            weight: "20%",
+            normalizedValue: linkageRate,
+            rawLabel: `${(linkageRate * 100).toFixed(0)}% linked to issues`,
+          },
+          {
+            label: "Commit Cleanliness",
+            weight: "15%",
+            normalizedValue: 1 - microRatio,
+            rawLabel: `${((1 - microRatio) * 100).toFixed(0)}% clean commits`,
+          },
+        ];
+      }
+
       const reviewRatio =
         stats.prsMergedCount > 0
           ? Math.min(stats.reviewsSubmittedCount / stats.prsMergedCount, 5) / 5
@@ -160,6 +196,7 @@ export function SubMetricPanel({
   stats,
   isOpen,
   onClose,
+  profileType = "collaborative",
 }: SubMetricPanelProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -176,7 +213,7 @@ export function SubMetricPanel({
 
   if (!isOpen) return null;
 
-  const subMetrics = getSubMetrics(dimension, stats);
+  const subMetrics = getSubMetrics(dimension, stats, profileType);
   const color = DIMENSION_COLORS[dimension];
   const label = DIMENSION_LABELS[dimension];
 

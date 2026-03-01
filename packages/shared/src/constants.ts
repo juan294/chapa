@@ -39,11 +39,13 @@ export const DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
 ];
 
 /**
- * Dimension keys used for solo profile scoring (excludes "quality").
- * Solo developers don't have PR review data, so quality is skipped.
+ * Dimension keys used for solo profile scoring.
+ * Solo quality uses engineering discipline signals (PR descriptions, branch
+ * strategy, issue linkage) instead of code review metrics.
  */
 export const SOLO_DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
   "delivery",
+  "quality",
   "consistency",
   "breadth",
 ];

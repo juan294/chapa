@@ -74,11 +74,24 @@ export async function fetchContributionData(
         nodes: cc.pullRequestContributions.nodes
           .filter((n: { pullRequest: unknown } | null) => n != null && n.pullRequest != null)
           .map(
-            (n: { pullRequest: { additions: number; deletions: number; changedFiles: number; merged: boolean } }) => ({
+            (n: {
+              pullRequest: {
+                additions: number;
+                deletions: number;
+                changedFiles: number;
+                merged: boolean;
+                body: string | null;
+                headRefName: string;
+                closingIssuesReferences?: { totalCount: number };
+              };
+            }) => ({
               additions: n.pullRequest.additions,
               deletions: n.pullRequest.deletions,
               changedFiles: n.pullRequest.changedFiles,
               merged: n.pullRequest.merged,
+              body: n.pullRequest.body,
+              headRefName: n.pullRequest.headRefName,
+              closingIssuesCount: n.pullRequest.closingIssuesReferences?.totalCount ?? 0,
             }),
           ),
       },

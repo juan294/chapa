@@ -36,7 +36,9 @@ export function computeDelivery(stats: StatsData): number {
 // ---------------------------------------------------------------------------
 
 export function computeQuality(stats: StatsData): number {
-  if (stats.reviewsSubmittedCount === 0) return 0;
+  if (stats.reviewsSubmittedCount === 0) {
+    return computeSoloQuality(stats);
+  }
 
   const reviews = normalize(stats.reviewsSubmittedCount, CAPS.reviews);
 
@@ -57,6 +59,25 @@ export function computeQuality(stats: StatsData): number {
   const inverseMicro = 1 - microRatio;
 
   const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * inverseMicro);
+  return clampScore(raw);
+}
+
+// ---------------------------------------------------------------------------
+// Solo Quality: engineering discipline signals for developers without reviews
+// prDescriptionRate (40%), featureBranchRate (25%), issueLinkageRate (20%),
+// inverseMicroCommitRatio (15%)
+// ---------------------------------------------------------------------------
+
+function computeSoloQuality(stats: StatsData): number {
+  if (stats.prsMergedCount === 0) return 0;
+
+  const descRate = stats.prDescriptionRate ?? 0;
+  const branchRate = stats.featureBranchRate ?? 0;
+  const linkageRate = stats.issueLinkageRate ?? 0;
+  const microRatio = stats.microCommitRatio ?? 0.3;
+  const inverseMicro = 1 - microRatio;
+
+  const raw = 100 * (0.40 * descRate + 0.25 * branchRate + 0.20 * linkageRate + 0.15 * inverseMicro);
   return clampScore(raw);
 }
 
@@ -156,12 +177,7 @@ export function deriveArchetype(
   }
 
   // V5 Specific archetypes: highest dimension >= 60 (was 70), with tie-breaking priority
-  // Solo profiles skip Quality Champion
-  const candidates = isSolo
-    ? ARCHETYPE_MAP.filter((a) => a.archetype !== "Quality Champion")
-    : ARCHETYPE_MAP;
-
-  for (const { key, archetype } of candidates) {
+  for (const { key, archetype } of ARCHETYPE_MAP) {
     if (dimensions[key] >= 60 && dimensions[key] === max) {
       return archetype;
     }
@@ -180,18 +196,13 @@ export function computeImpactV4(stats: StatsData): ImpactV4Result {
   const dimensions = computeDimensions(stats);
   const archetype = deriveArchetype(dimensions, profileType);
 
-  const compositeScore =
-    profileType === "solo"
-      ? Math.round(
-          (dimensions.delivery + dimensions.consistency + dimensions.breadth) / 3
-        )
-      : Math.round(
-          (dimensions.delivery +
-            dimensions.quality +
-            dimensions.consistency +
-            dimensions.breadth) /
-            4
-        );
+  const compositeScore = Math.round(
+    (dimensions.delivery +
+      dimensions.quality +
+      dimensions.consistency +
+      dimensions.breadth) /
+      4
+  );
 
   // V5: Apply recency weighting before confidence adjustment
   const recencyRatio = computeRecencyRatio(stats.heatmapData);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { DimensionScores, StatsData } from "@chapa/shared";
+import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 import type { DimensionTrend } from "@/lib/history/trend";
 import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter";
 import { useInView } from "@/lib/effects/counters/use-in-view";
@@ -72,6 +72,13 @@ const DIMENSION_TOOLTIPS: Record<
   },
 };
 
+// Solo quality overrides — shared with ImpactBreakdown.tsx (keep in sync)
+const SOLO_QUALITY_SUBTITLE = "PR descriptions \u00B7 branch discipline \u00B7 issue linkage";
+const SOLO_QUALITY_TOOLTIP = {
+  id: "dim-quality",
+  tip: "Measures engineering discipline: PR descriptions, feature branch usage, issue linkage, and commit cleanliness.",
+};
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -84,6 +91,7 @@ export interface DimensionCardProps {
   delta?: number | null;
   animationDelay?: number;
   className?: string;
+  profileType?: ProfileType;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +106,7 @@ export function DimensionCard({
   delta,
   animationDelay = 0,
   className = "",
+  profileType = "collaborative",
 }: DimensionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -131,9 +140,14 @@ export function DimensionCard({
   );
 
   const label = DIMENSION_LABELS[dimension];
-  const subtitle = DIMENSION_SUBTITLES[dimension];
+  const isSoloQuality = dimension === "quality" && profileType === "solo";
+  const subtitle = isSoloQuality
+    ? SOLO_QUALITY_SUBTITLE
+    : DIMENSION_SUBTITLES[dimension];
   const colors = DIMENSION_COLORS[dimension];
-  const tooltip = DIMENSION_TOOLTIPS[dimension];
+  const tooltip = isSoloQuality
+    ? SOLO_QUALITY_TOOLTIP
+    : DIMENSION_TOOLTIPS[dimension];
 
   const hasTrendRow =
     (trend != null && trend.values.length > 0) || delta != null;
@@ -231,6 +245,7 @@ export function DimensionCard({
           stats={stats}
           isOpen={isExpanded}
           onClose={toggle}
+          profileType={profileType}
         />
       </div>
     </div>

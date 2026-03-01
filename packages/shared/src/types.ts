@@ -24,6 +24,9 @@ export interface StatsData {
   maxCommitsIn10Min: number; // derived from commit timestamps
   microCommitRatio?: number; // optional, 0..1
   docsOnlyPrRatio?: number; // optional, 0..1
+  prDescriptionRate?: number; // optional, 0..1 — fraction of merged PRs with non-empty body
+  featureBranchRate?: number; // optional, 0..1 — fraction of merged PRs from feature branches
+  issueLinkageRate?: number; // optional, 0..1 — fraction of merged PRs linked to issues
   totalStars: number; // sum of stargazerCount across owned repos
   totalForks: number; // sum of forkCount across owned repos
   totalWatchers: number; // sum of watchers.totalCount across owned repos
@@ -82,7 +85,7 @@ export interface ImpactV4Result {
   profileType: ProfileType;
   dimensions: DimensionScores;
   archetype: DeveloperArchetype;
-  compositeScore: number; // 0..100 — avg of dimensions (3 for solo, 4 for collaborative)
+  compositeScore: number; // 0..100 — avg of 4 dimensions
   confidence: number; // 50..100
   confidencePenalties: ConfidencePenalty[];
   adjustedComposite: number; // 0..100
@@ -187,6 +190,9 @@ export interface MetricsSnapshot {
   maxCommitsIn10Min: number;
   microCommitRatio?: number;
   docsOnlyPrRatio?: number;
+  prDescriptionRate?: number;
+  featureBranchRate?: number;
+  issueLinkageRate?: number;
 
   // Impact dimensions + classification
   delivery: number;

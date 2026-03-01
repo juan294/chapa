@@ -266,4 +266,92 @@ describe("SubMetricPanel", () => {
 
     expect(container.innerHTML).toBe("");
   });
+
+  // ----------------------------------------------------------------
+  // Solo profile quality sub-metrics
+  // ----------------------------------------------------------------
+  describe("Quality dimension — solo profile", () => {
+    const soloStats: StatsData = {
+      ...mockStats,
+      reviewsSubmittedCount: 0,
+      prDescriptionRate: 0.75,
+      featureBranchRate: 0.9,
+      issueLinkageRate: 0.4,
+      microCommitRatio: 0.15,
+    };
+
+    it("renders PR Descriptions, Feature Branches, Issue Linkage, and Commit Cleanliness", () => {
+      render(
+        <SubMetricPanel
+          dimension="quality"
+          stats={soloStats}
+          isOpen={true}
+          onClose={() => {}}
+          profileType="solo"
+        />
+      );
+
+      expect(screen.getByText("PR Descriptions")).toBeTruthy();
+      expect(screen.getByText("Feature Branches")).toBeTruthy();
+      expect(screen.getByText("Issue Linkage")).toBeTruthy();
+      expect(screen.getByText("Commit Cleanliness")).toBeTruthy();
+    });
+
+    it("shows solo weight percentages", () => {
+      render(
+        <SubMetricPanel
+          dimension="quality"
+          stats={soloStats}
+          isOpen={true}
+          onClose={() => {}}
+          profileType="solo"
+        />
+      );
+
+      expect(screen.getByText("40%")).toBeTruthy();
+      expect(screen.getByText("25%")).toBeTruthy();
+      expect(screen.getByText("20%")).toBeTruthy();
+      expect(screen.getByText("15%")).toBeTruthy();
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // Collaborative profile quality (unchanged)
+  // ----------------------------------------------------------------
+  describe("Quality dimension — collaborative profile", () => {
+    it("renders Reviews, Review Ratio, and Code Cleanliness when profileType is collaborative", () => {
+      render(
+        <SubMetricPanel
+          dimension="quality"
+          stats={mockStats}
+          isOpen={true}
+          onClose={() => {}}
+          profileType="collaborative"
+        />
+      );
+
+      expect(screen.getByText("Reviews")).toBeTruthy();
+      expect(screen.getByText("Review Ratio")).toBeTruthy();
+      expect(screen.getByText("Code Cleanliness")).toBeTruthy();
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // Default profileType is collaborative
+  // ----------------------------------------------------------------
+  describe("Quality dimension — default profileType", () => {
+    it("defaults to collaborative (shows Reviews) when profileType is not specified", () => {
+      render(
+        <SubMetricPanel
+          dimension="quality"
+          stats={mockStats}
+          isOpen={true}
+          onClose={() => {}}
+        />
+      );
+
+      expect(screen.getByText("Reviews")).toBeTruthy();
+      expect(screen.getByText("Review Ratio")).toBeTruthy();
+    });
+  });
 });
