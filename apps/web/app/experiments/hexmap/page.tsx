@@ -235,7 +235,7 @@ interface HexCellProps {
   size: number;
   variant: HexVariant;
   animDelay: number;
-  onHover: (day: HexDay, x: number, y: number) => void;
+  onHover: (day: HexDay, x: number, y: number, bottom: number) => void;
   onLeave: () => void;
 }
 
@@ -314,7 +314,7 @@ function HexCell({
       }}
       onMouseEnter={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        onHover(day, rect.left + rect.width / 2, rect.top);
+        onHover(day, rect.left + rect.width / 2, rect.top, rect.bottom);
       }}
       onMouseLeave={onLeave}
       aria-hidden="true"
@@ -337,19 +337,14 @@ function HexGrid({ data, variant, size, gap, className = "" }: HexGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{
     day: HexDay;
-    x: number;
-    y: number;
+    screenX: number;
+    screenY: number;
+    cellBottom: number;
   } | null>(null);
 
   const handleHover = useCallback(
-    (day: HexDay, screenX: number, screenY: number) => {
-      if (!containerRef.current) return;
-      const containerRect = containerRef.current.getBoundingClientRect();
-      setTooltip({
-        day,
-        x: screenX - containerRect.left,
-        y: screenY - containerRect.top,
-      });
+    (day: HexDay, screenX: number, screenY: number, cellBottom: number) => {
+      setTooltip({ day, screenX, screenY, cellBottom });
     },
     []
   );
@@ -394,15 +389,17 @@ function HexGrid({ data, variant, size, gap, className = "" }: HexGridProps) {
         );
       })}
 
-      {/* Tooltip */}
+      {/* Tooltip — fixed position, always on top, flips below when near viewport top */}
       {tooltip && (
         <div
           role="tooltip"
-          className="pointer-events-none absolute z-50 rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
+          className="pointer-events-none fixed rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
           style={{
-            left: tooltip.x,
-            top: tooltip.y - 8,
-            transform: "translate(-50%, -100%)",
+            zIndex: 99999,
+            left: tooltip.screenX,
+            ...(tooltip.screenY < 120
+              ? { top: tooltip.cellBottom + 8, transform: "translateX(-50%)" }
+              : { top: tooltip.screenY - 8, transform: "translate(-50%, -100%)" }),
           }}
         >
           <p className="font-medium text-text-primary whitespace-nowrap">
