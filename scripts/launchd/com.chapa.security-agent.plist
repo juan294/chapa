@@ -23,10 +23,10 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/security-agent-launchd.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/security-agent.log</string>
 
   <key>StandardErrorPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/security-agent-launchd-error.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/security-agent.error.log</string>
 
   <key>HardResourceLimits</key>
   <dict>

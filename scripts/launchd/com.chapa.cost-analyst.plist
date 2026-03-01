@@ -21,10 +21,10 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/cost-analyst-launchd.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/cost-analyst.log</string>
 
   <key>StandardErrorPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/cost-analyst-launchd-error.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/cost-analyst.error.log</string>
 
   <key>HardResourceLimits</key>
   <dict>

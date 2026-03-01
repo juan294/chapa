@@ -1,122 +1,112 @@
-The report file write is being blocked by permissions. Let me also update the shared context file. Here's the complete coverage report:
-
----
-
 # Coverage Report
-> Generated: 2026-02-18 | Health status: green
+> Generated: 2026-03-01 | Health status: **green**
 
 ## Executive Summary
 
-Overall statement coverage is **78.6%** across all measured files, with **2,554 tests across 156 test files** — all passing consistently across 3 consecutive runs (zero flaky tests). All critical paths (scoring, API routes, database, auth, GitHub, cache, history) are at or above 86% coverage. The only significant gaps are in visual effects/UI components that are inherently difficult to unit-test (canvas rendering, React hooks with browser APIs).
+All 272 test files (4,232 tests) pass consistently across 3 runs with zero flaky tests. Corrected overall coverage is **78.4% statements** (excluding a config bug that scans `packages/shared/node_modules.nosync/`). All 8 critical path modules (impact, render, API routes, db, github, auth, cache, history) have 88–100% statement coverage and 100% test file coverage — every source file has a corresponding `.test.ts`.
 
 ## Coverage by Module
 
-| Module | % Stmts | % Branch | % Funcs | % Lines | Status |
-|--------|---------|----------|---------|---------|--------|
-| **lib/impact/** (scoring) | 99.39 | 96.66 | 100 | 100 | GREEN |
-| **lib/auth/** (authentication) | 93.28 | 89.18 | 100 | 97.56 | GREEN |
-| **lib/db/** (database) | 95.45 | 88.88 | 100 | 97.90 | GREEN |
-| **lib/github/** (data fetching) | 95.29 | 97.50 | 77.77 | 97.36 | GREEN |
-| **lib/history/** (lifetime history) | 97.50 | 93.75 | 100 | 98.59 | GREEN |
-| **lib/email/** | 97.70 | 96.66 | 100 | 98.76 | GREEN |
-| **lib/cache/** (Redis) | 86.84 | 85.71 | 81.81 | 89.23 | GREEN |
-| **lib/render/** (SVG rendering) | 84.61 | 87.50 | 93.10 | 83.91 | YELLOW |
-| **lib/http/** | 100 | 83.33 | 100 | 100 | GREEN |
-| **lib/verification/** | 100 | 100 | 100 | 100 | GREEN |
-| **lib/agents/** | 100 | 100 | 100 | 100 | GREEN |
-| **lib/analytics/** | 100 | 100 | 100 | 100 | GREEN |
-| **lib/** (root: env, flags, validation) | 98.11 | 97.56 | 100 | 100 | GREEN |
-| **lib/keyboard/** | 49.41 | 64.38 | 30.76 | 44.59 | RED |
-| **lib/effects/celebrations/** | 19.04 | 44.44 | 18.18 | 21.62 | RED |
-| **lib/effects/heatmap/** | 73.46 | 72.72 | 78.57 | 72.72 | YELLOW |
-| **lib/effects/counters/** | 75.86 | 80.76 | 76.47 | 77.77 | YELLOW |
-| **lib/effects/interactions/** | 25.64 | 0 | 12.50 | 27.02 | RED |
-| **lib/effects/backgrounds/** | 0 | 0 | 0 | 0 | RED |
-| **lib/effects/borders/** | 0 | 0 | 0 | 0 | RED |
-| **lib/effects/cards/** | 0 | 0 | 0 | 0 | RED |
-| **lib/effects/text/** | 0 | 0 | 0 | 0 | RED |
-| **lib/effects/tier/** | 85.71 | 100 | 50 | 85.71 | GREEN |
-| **packages/shared/src/** | 100 | 100 | 100 | 100 | GREEN |
+| Module | Files | Stmts | Branch | Funcs | Status |
+|--------|-------|-------|--------|-------|--------|
+| lib/impact | 5 | 99.4% | 97.0% | 100.0% | GREEN |
+| lib/render | 15 | 100.0% | 94.7% | 100.0% | GREEN |
+| lib/auth | 7 | 94.1% | 88.3% | 100.0% | GREEN |
+| lib/github | 4 | 97.1% | 89.6% | 95.7% | GREEN |
+| lib/email | 3 | 98.3% | 88.3% | 100.0% | GREEN |
+| lib/history | 6 | 97.8% | 90.3% | 100.0% | GREEN |
+| lib/db | 9 | 93.0% | 87.6% | 100.0% | GREEN |
+| lib/cache | 2 | 88.9% | 87.2% | 80.0% | GREEN |
+| app/api | 32 | 95.5% | 91.0% | 89.5% | GREEN |
+| lib/agents | 2 | 100.0% | 100.0% | 100.0% | GREEN |
+| lib/other | 24 | 96.7% | 93.0% | 98.1% | GREEN |
+| lib/hooks | 1 | 87.1% | 72.2% | 75.0% | GREEN |
+| lib/effects | 17 | 65.9% | 67.2% | 77.6% | YELLOW |
+| components | 41 | 74.4% | 68.3% | 72.2% | YELLOW |
+| app/pages | 86 | 53.6% | 52.1% | 47.1% | YELLOW |
+| packages/shared | 8* | 85.0%* | 79.2%* | 92.3%* | GREEN* |
+| **TOTAL (corrected)** | **264** | **78.4%** | **74.4%** | **70.3%** | |
 
-## Critical Path Assessment
+> *packages/shared: corrected values exclude `node_modules.nosync/typescript/` (165K stmts of TS compiler), which is a coverage config bug — `packages/shared/**` glob picks up the symlinked node_modules directory.
 
-All 8 critical paths have test files for every source file:
+## Critical Path Test File Coverage
 
-| Critical Path | Source Files | Tested | Coverage | Verdict |
-|---------------|-------------|--------|----------|---------|
-| `lib/impact/` | 5 | 5/5 | 99.39% stmts | Excellent |
-| `lib/render/` | 11 | 10/11 | 84.61% stmts | Good (1 untested data file) |
-| `app/api/` | 21 | 21/21 | 100% file coverage | Complete |
-| `lib/db/` | 6 | 6/6 | 95.45% stmts | Excellent |
-| `lib/github/` | 4 | 4/4 | 95.29% stmts | Excellent |
-| `lib/cache/` | 1 | 1/1 | 86.84% stmts | Good |
-| `lib/history/` | 5 | 4/4 logic files | 97.50% stmts | Excellent |
-| `lib/auth/` | 5 | 5/5 | 93.28% stmts | Excellent |
+All critical modules have **100% test file coverage** (every source file has a `.test.ts`):
+
+| Critical Path | Source Files | Test Files | Coverage |
+|---------------|-------------|------------|----------|
+| lib/impact | 6 | 6 | 100% |
+| lib/render | 11 | 11 | 100% |
+| app/api routes | 32 | 32 | 100% |
+| lib/db | 9 | 9 | 100% |
+| lib/github | 4 | 4 | 100% |
+| lib/auth | 7 | 7 | 100% |
+| lib/cache | 2 | 2 | 100% |
+| lib/history | 5 | 5 | 100% |
+| **Total** | **76** | **76** | **100%** |
 
 ## Gaps & Recommendations
 
-### Untested files (0% coverage)
+### Config Bug (fix first)
 
-- **`lib/render/archetypeDemoData.ts`** — Static fixture data + `buildHeatmap()` helper for 6 archetypes. Low risk but only untested file in a critical path. **Recommend: add basic shape/type validation tests.**
-- **`lib/effects/backgrounds/GridBackground.tsx`** — Canvas-based grid rendering
-- **`lib/effects/backgrounds/RadarBackground.tsx`** — Canvas-based radar rendering
-- **`lib/effects/backgrounds/ParticleCanvas.tsx`** — Canvas particle system
-- **`lib/effects/borders/GradientBorder.tsx`** — CSS gradient border component
-- **`lib/effects/borders/gradient-border-css.ts`** — CSS string generator
-- **`lib/effects/cards/glass-presets.ts`** — Glassmorphism preset configs
-- **`lib/effects/text/GlitchEffectText.tsx`** — Text animation component
-- **`lib/effects/interactions/HolographicOverlay.tsx`** — Holographic CSS overlay
-- **`lib/effects/interactions/holographic-css.ts`** — CSS string generator
-- **`lib/keyboard/use-keyboard-shortcuts.ts`** — React hook, 0% coverage
+- **`packages/shared/node_modules.nosync/`** is being scanned by v8 coverage. Add `**/node_modules.nosync/**` to `vitest.config.ts` coverage excludes. This is why overall coverage reports ~3% instead of ~78%.
 
-### Below 80% coverage (non-zero)
+### Components with <80% coverage (8 files)
 
-- **`lib/effects/celebrations/confetti.ts`** — 19% stmts. Canvas logic untested.
-- **`lib/effects/interactions/use-tilt.ts`** — 47.6% stmts. Mouse event handlers untested.
-- **`lib/effects/heatmap/HeatmapGrid.tsx`** — 45.8% stmts. React rendering untested.
-- **`lib/effects/counters/use-in-view.ts`** — 71.4% stmts. IntersectionObserver untested.
-- **`lib/render/VerificationStrip.ts`** — 66.7% stmts. Lines 38-42 uncovered.
+These are UI-heavy components where test coverage is harder but still beneficial:
 
-### Specific uncovered lines in well-tested files
+- `components/AuthorTypewriter.tsx` — 20% (84 stmts) — animation/interaction heavy
+- `components/BadgeToolbar.tsx` — 21% (91 stmts) — toolbar interactions
+- `components/PostHogProvider.tsx` — 24% (29 stmts) — analytics wrapper
+- `components/UserMenu.tsx` — 55% (71 stmts) — dropdown menu states
+- `components/GlobalCommandBar.tsx` — 67% (51 stmts) — command palette
+- `components/MobileNav.tsx` — 68% (38 stmts) — mobile navigation
+- `components/ShortcutCheatSheet.tsx` — 69% (48 stmts) — keyboard shortcuts dialog
+- `components/terminal/TerminalInput.tsx` — 77% (57 stmts) — close to threshold
 
-| File | Uncovered Lines | Nature |
-|------|----------------|--------|
-| `lib/auth/github.ts` | 123, 222 | Edge-case error branches |
-| `lib/auth/cli-token.ts` | 59 | Error fallback |
-| `lib/cache/redis.ts` | 76, 256-263 | Redis connection failure paths |
-| `lib/db/snapshots.ts` | 292-296 | Edge-case error handling |
-| `lib/render/BadgeSvg.tsx` | 46, 49, 106, 144-148 | Conditional rendering branches |
-| `lib/github/queries.ts` | 93-94 | Fallback path |
-| `lib/impact/v4.ts` | 49 | Branch guard |
-| `lib/history/trend.ts` | 81-84 | Edge-case branch |
+### App pages with 0% coverage (high-value targets)
+
+- `app/page.tsx` — 0% (17 stmts) — **landing page**, highest user impact
+- `app/studio/StudioClient.tsx` — 0% (119 stmts) — **Creator Studio**, core feature
+- `app/studio/BadgePreviewCard.tsx` — 0% (37 stmts)
+- `app/studio/page.tsx` — 0% (18 stmts)
+- `app/admin/AdminDashboardClient.tsx` — 0% (26 stmts)
+- `app/admin/agents/agents-dashboard.tsx` — 0% (55 stmts)
+- `app/admin/agents/overall-health-banner.tsx` — 0% (17 stmts)
+- `app/admin/agents/agent-toggles-table.tsx` — 0% (12 stmts)
+- `app/cli/authorize/page.tsx` — 0% (14 stmts)
+- `app/verify/VerifyForm.tsx` — 0% (13 stmts)
+- `app/verify/[hash]/page.tsx` — 0% (12 stmts)
+- `app/experiments/hexmap/page.tsx` — 0% (132 stmts) — largest untested experiment
+
+### lib/effects — 65.9% overall
+
+- `lib/effects/backgrounds/ParticleBackground.tsx` — 1% (113 stmts) — canvas-heavy, hard to unit test
+- `lib/effects/interactions/HolographicOverlay.tsx` — 47% (17 stmts)
+
+### Priority recommendations
+
+1. **Fix coverage config** — add `**/node_modules.nosync/**` to excludes in `vitest.config.ts`
+2. **Studio pages** — `StudioClient.tsx` (119 stmts at 0%) is the biggest untested feature
+3. **Landing page** — `app/page.tsx` should have basic render tests
+4. **Admin dashboard** — several 0% admin components need at least smoke tests
+5. **Components** — `BadgeToolbar.tsx` and `AuthorTypewriter.tsx` are the largest uncovered components
 
 ## Flaky Tests
 
-**None detected.** All 3 consecutive runs produced identical results:
-- Run 1: 156 passed, 2554 tests (4.88s)
-- Run 2: 156 passed, 2554 tests (3.75s)
-- Run 3: 156 passed, 2554 tests (4.36s)
+**None detected.** All 3 runs produced identical results:
+- Run 1: 272 passed, 4,232 tests, 0 failures
+- Run 2: 272 passed, 4,232 tests, 0 failures
+- Run 3: 272 passed, 4,232 tests, 0 failures
 
-## Priority Recommendations
+## Test Suite Metrics
 
-1. **Low effort, high value**: Add tests for `archetypeDemoData.ts` — only untested file in a critical rendering path.
-2. **Medium effort**: Add tests for `VerificationStrip.ts` lines 38-42 — badge rendering pipeline at 66.7%.
-3. **Accept as-is**: The `lib/effects/*` modules are visual-only canvas/CSS components — consider Storybook visual regression tests instead.
-4. **Accept as-is**: `use-keyboard-shortcuts.ts` at 0% — the logic layer (`shortcuts.ts`) it wraps is at 89%.
-
----
-
-### Shared Context Entry
-
-**Coverage Agent — 2026-02-18**
-- **Status**: GREEN
-- Overall coverage: 78.6% statements
-- Critical path coverage: all 8 paths >86%, scoring at 99.4%
-- 156 test files, 2,554 tests, zero failures
-- Flaky tests: 0 (3 consecutive clean runs)
-- Only untested critical-path file: `lib/render/archetypeDemoData.ts`
-- Main coverage gaps: `lib/effects/*` (visual components, 0-45%) and `lib/keyboard/use-keyboard-shortcuts.ts` (0%)
-
-**Cross-agent recommendations:**
-- **[Security]**: `lib/cache/redis.ts` lines 256-263 (Redis failure paths) and `lib/auth/github.ts` lines 123, 222 (error branches) lack test coverage — review these for security implications of untested error handling.
-- **[QA]**: All API routes have 100% file-level test coverage. The `VerificationStrip.ts` at 66.7% is the weakest link in the badge rendering pipeline — prioritize testing lines 38-42.
+| Metric | Value |
+|--------|-------|
+| Test files | 272 |
+| Total tests | 4,232 |
+| Pass rate | 100% |
+| Suite duration | ~110–120s |
+| Flaky tests | 0 |
+| Coverage thresholds | 75% stmts, 70% branch, 65% funcs, 75% lines |
+| Threshold met (corrected) | stmts 78.4% YES, branch 74.4% YES, funcs 70.3% YES |
