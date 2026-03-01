@@ -9,9 +9,9 @@
   --color-text-secondary: #6B7280;
   --color-stroke: #00000014;
 
-  --color-amber: #7C6AEF;
-  --color-amber-light: #9D8FFF;
-  --color-amber-dark: #5E4FCC;
+  --color-amber: #8B5CF6;
+  --color-amber-light: #A78BFA;
+  --color-amber-dark: #7C3AED;
 
   --color-warm-bg: #FFFFFF;
   --color-warm-card: #F9FAFB;
@@ -35,17 +35,17 @@
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
-  --color-dimension-delivery-light: #86efac;
-  --color-dimension-quality-light: #fdba74;
-  --color-dimension-consistency-light: #67e8f9;
-  --color-dimension-breadth-light: #f9a8d4;
+  --color-dimension-delivery-light: #4ADE80;
+  --color-dimension-quality-light: #FB923C;
+  --color-dimension-consistency-light: #22D3EE;
+  --color-dimension-breadth-light: #F472B6;
 
   /* Archetype colors — accent color per developer archetype */
-  --color-archetype-builder: #7C6AEF;
-  --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #16A34A;
-  --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #64748B;
+  --color-archetype-builder: #8B5CF6;
+  --color-archetype-guardian: #EC4899;
+  --color-archetype-marathoner: #22C55E;
+  --color-archetype-polymath: #EAB308;
+  --color-archetype-balanced: #0EA5E9;
   --color-archetype-emerging: #F97316;
 
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
@@ -84,16 +84,16 @@
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
-  --color-dimension-delivery-light: #86efac;
-  --color-dimension-quality-light: #fdba74;
-  --color-dimension-consistency-light: #67e8f9;
-  --color-dimension-breadth-light: #f9a8d4;
+  --color-dimension-delivery-light: #4ADE80;
+  --color-dimension-quality-light: #FB923C;
+  --color-dimension-consistency-light: #22D3EE;
+  --color-dimension-breadth-light: #F472B6;
 
-  --color-archetype-builder: #7C6AEF;
-  --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #16A34A;
-  --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #64748B;
+  --color-archetype-builder: #8B5CF6;
+  --color-archetype-guardian: #EC4899;
+  --color-archetype-marathoner: #22C55E;
+  --color-archetype-polymath: #EAB308;
+  --color-archetype-balanced: #0EA5E9;
   --color-archetype-emerging: #F97316;
 }
 
@@ -102,15 +102,15 @@
   --color-card: #111118;
   --color-text-primary: #E2E4E9;
   --color-text-secondary: #8B8FA0;
-  --color-stroke: rgba(124, 106, 239, 0.10);
+  --color-stroke: rgba(139, 92, 246, 0.10);
 
   --color-warm-bg: #0A0A0F;
   --color-warm-card: #111118;
-  --color-warm-stroke: rgba(124, 106, 239, 0.10);
+  --color-warm-stroke: rgba(139, 92, 246, 0.10);
 
   --color-dark-section: #06060A;
   --color-dark-card: #0E0E16;
-  --color-purple-tint: rgba(124, 106, 239, 0.06);
+  --color-purple-tint: rgba(139, 92, 246, 0.06);
   --color-complement-light: rgba(16, 185, 129, 0.15);
 
   --color-terminal-green: #4ADE80;
@@ -124,16 +124,16 @@
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
-  --color-dimension-delivery-light: #86efac;
-  --color-dimension-quality-light: #fdba74;
-  --color-dimension-consistency-light: #67e8f9;
-  --color-dimension-breadth-light: #f9a8d4;
+  --color-dimension-delivery-light: #4ADE80;
+  --color-dimension-quality-light: #FB923C;
+  --color-dimension-consistency-light: #22D3EE;
+  --color-dimension-breadth-light: #F472B6;
 
-  --color-archetype-builder: #7C6AEF;
-  --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #16A34A;
-  --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #64748B;
+  --color-archetype-builder: #8B5CF6;
+  --color-archetype-guardian: #EC4899;
+  --color-archetype-marathoner: #22C55E;
+  --color-archetype-polymath: #EAB308;
+  --color-archetype-balanced: #0EA5E9;
   --color-archetype-emerging: #F97316;
 }
 
@@ -188,10 +188,10 @@ html {
 @keyframes pulse-glow-amber {
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(124, 106, 239, 0.1);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
   }
   50% {
-    box-shadow: 0 0 40px rgba(124, 106, 239, 0.18);
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.18);
   }
 }
 
@@ -365,10 +365,10 @@ html {
 
 [data-theme="dark"] .bg-grid-warm {
   background-image: linear-gradient(
-      rgba(124, 106, 239, 0.04) 1px,
+      rgba(139, 92, 246, 0.04) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, rgba(124, 106, 239, 0.04) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
 }
 
 /* ── Focus indicators (accessibility) ────────────────────── */
@@ -418,8 +418,8 @@ html {
 }
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(124, 106, 239, 0.15);
+  background: rgba(139, 92, 246, 0.15);
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 106, 239, 0.25);
+  background: rgba(139, 92, 246, 0.25);
 }

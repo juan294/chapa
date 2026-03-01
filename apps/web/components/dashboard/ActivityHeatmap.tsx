@@ -43,11 +43,11 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
 const ALL_DIMENSIONS = DIMENSION_KEYS as Dimension[];
 
 const INTENSITY_ALPHA: Record<number, number> = {
-  0: 0.07,
-  1: 0.3,
-  2: 0.5,
-  3: 0.72,
-  4: 0.92,
+  0: 0.12,
+  1: 0.35,
+  2: 0.55,
+  3: 0.78,
+  4: 0.95,
 };
 
 const HEX_CLIP_PATH =

@@ -15,14 +15,14 @@ export const WARM_AMBER: BadgeTheme = {
   card: "#13141E",
   textPrimary: "#E6EDF3",
   textSecondary: "#9AA4B2",
-  accent: "#7C6AEF",
-  stroke: "rgba(124,106,239,0.12)",
+  accent: "#8B5CF6",
+  stroke: "rgba(139,92,246,0.12)",
   heatmap: [
-    "rgba(124,106,239,0.06)", // 0: none
-    "rgba(124,106,239,0.20)", // 1: low
-    "rgba(124,106,239,0.38)", // 2: medium
-    "rgba(124,106,239,0.58)", // 3: high
-    "rgba(124,106,239,0.85)", // 4: intense
+    "rgba(139,92,246,0.12)", // 0: none
+    "rgba(139,92,246,0.30)", // 1: low
+    "rgba(139,92,246,0.48)", // 2: medium
+    "rgba(139,92,246,0.68)", // 3: high
+    "rgba(139,92,246,0.92)", // 4: intense
   ],
 };
 
@@ -37,8 +37,8 @@ export function getHeatmapColor(count: number): string {
 const TIER_COLORS: Record<ImpactTier, string> = {
   Emerging: "#9AA4B2",
   Solid: "#E6EDF3",
-  High: "#9D8FFF",
-  Elite: "#7C6AEF",
+  High: "#A78BFA",
+  Elite: "#8B5CF6",
 };
 
 export function getTierColor(tier: ImpactTier): string {
@@ -46,12 +46,12 @@ export function getTierColor(tier: ImpactTier): string {
 }
 
 const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
-  Builder: "#7C6AEF",   // signature purple
-  "Quality Champion": "#F472B6",  // pink
-  Marathoner: "#4ADE80", // green
-  Polymath: "#FBBF24",  // amber/gold
-  Balanced: "#94A3B8",  // steel blue (lighter for dark badge bg)
-  Emerging: "#FB923C",  // warm orange (lighter for dark badge bg)
+  Builder: "#8B5CF6",   // signature violet
+  "Quality Champion": "#EC4899",  // pink
+  Marathoner: "#22C55E", // green
+  Polymath: "#EAB308",  // amber/gold
+  Balanced: "#0EA5E9",  // sky blue
+  Emerging: "#F97316",  // warm orange
 };
 
 export function getArchetypeColor(archetype: DeveloperArchetype): string {

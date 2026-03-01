@@ -17,7 +17,7 @@ describe("Sparkline", () => {
   describe("dimensions", () => {
     it("renders SVG with default width=80 and height=24", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" />,
       );
       const svg = container.querySelector("svg");
       expect(svg).not.toBeNull();
@@ -27,7 +27,7 @@ describe("Sparkline", () => {
 
     it("respects custom width and height props", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" width={120} height={40} />,
+        <Sparkline values={sampleValues} color="#8B5CF6" width={120} height={40} />,
       );
       const svg = container.querySelector("svg");
       expect(svg?.getAttribute("width")).toBe("120");
@@ -36,7 +36,7 @@ describe("Sparkline", () => {
 
     it("sets viewBox matching width and height", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" width={100} height={30} />,
+        <Sparkline values={sampleValues} color="#8B5CF6" width={100} height={30} />,
       );
       const svg = container.querySelector("svg");
       expect(svg?.getAttribute("viewBox")).toBe("0 0 100 30");
@@ -46,7 +46,7 @@ describe("Sparkline", () => {
   describe("polyline rendering", () => {
     it("renders a polyline with points matching the number of values", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" />,
       );
       const polyline = container.querySelector("polyline");
       expect(polyline).not.toBeNull();
@@ -65,7 +65,7 @@ describe("Sparkline", () => {
 
     it("polyline has fill=none", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" />,
       );
       const polyline = container.querySelector("polyline");
       expect(polyline?.getAttribute("fill")).toBe("none");
@@ -73,7 +73,7 @@ describe("Sparkline", () => {
 
     it("polyline has rounded line joins and caps", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" />,
       );
       const polyline = container.querySelector("polyline");
       expect(polyline?.getAttribute("stroke-linejoin")).toBe("round");
@@ -84,7 +84,7 @@ describe("Sparkline", () => {
   describe("fill polygon", () => {
     it("renders a polygon below the line with reduced opacity fill", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" />,
       );
       const polygon = container.querySelector("polygon");
       expect(polygon).not.toBeNull();
@@ -103,7 +103,7 @@ describe("Sparkline", () => {
       const width = 80;
       const height = 24;
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" width={width} height={height} />,
+        <Sparkline values={sampleValues} color="#8B5CF6" width={width} height={height} />,
       );
       const polygon = container.querySelector("polygon");
       const points = polygon!.getAttribute("points")!.trim();
@@ -124,7 +124,7 @@ describe("Sparkline", () => {
   describe("edge cases", () => {
     it("renders nothing when values has fewer than 2 data points", () => {
       const { container } = render(
-        <Sparkline values={[{ date: "2025-01-01", value: 50 }]} color="#7C6AEF" />,
+        <Sparkline values={[{ date: "2025-01-01", value: 50 }]} color="#8B5CF6" />,
       );
       const svg = container.querySelector("svg");
       expect(svg).toBeNull();
@@ -132,7 +132,7 @@ describe("Sparkline", () => {
 
     it("renders nothing for empty values array", () => {
       const { container } = render(
-        <Sparkline values={[]} color="#7C6AEF" />,
+        <Sparkline values={[]} color="#8B5CF6" />,
       );
       const svg = container.querySelector("svg");
       expect(svg).toBeNull();
@@ -145,7 +145,7 @@ describe("Sparkline", () => {
         { date: "2025-01-03", value: 50 },
       ];
       const { container } = render(
-        <Sparkline values={flatValues} color="#7C6AEF" height={24} />,
+        <Sparkline values={flatValues} color="#8B5CF6" height={24} />,
       );
       const polyline = container.querySelector("polyline");
       expect(polyline).not.toBeNull();
@@ -164,7 +164,7 @@ describe("Sparkline", () => {
         { date: "2025-01-02", value: 70 },
       ];
       const { container } = render(
-        <Sparkline values={twoValues} color="#7C6AEF" />,
+        <Sparkline values={twoValues} color="#8B5CF6" />,
       );
       const polyline = container.querySelector("polyline");
       expect(polyline).not.toBeNull();
@@ -176,7 +176,7 @@ describe("Sparkline", () => {
   describe("accessibility", () => {
     it("has aria-hidden=true since it is decorative", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" />,
       );
       const svg = container.querySelector("svg");
       expect(svg?.getAttribute("aria-hidden")).toBe("true");
@@ -186,7 +186,7 @@ describe("Sparkline", () => {
   describe("className prop", () => {
     it("passes className to the SVG element", () => {
       const { container } = render(
-        <Sparkline values={sampleValues} color="#7C6AEF" className="my-sparkline" />,
+        <Sparkline values={sampleValues} color="#8B5CF6" className="my-sparkline" />,
       );
       const svg = container.querySelector("svg");
       expect(svg?.classList.contains("my-sparkline")).toBe(true);

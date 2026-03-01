@@ -109,7 +109,7 @@ Low-level SVG ring primitive used by hero variants.
 //   size: number — diameter in px
 //   strokeWidth?: number — default 8
 //   color: string — stroke color for the filled arc
-//   trackColor?: string — default "rgba(124,106,239,0.08)"
+//   trackColor?: string — default "rgba(139,92,246,0.08)"
 //   animated?: boolean — default true
 //   className?: string
 //   children?: React.ReactNode — rendered centered inside the ring

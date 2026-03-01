@@ -245,7 +245,7 @@ function HexCell({
   switch (variant) {
     case "dominant": {
       if (day.count === 0) {
-        background = "rgba(124, 106, 239, 0.06)";
+        background = "rgba(139, 92, 246, 0.06)";
       } else {
         background = hexToRgba(DIMENSION_COLORS[day.dominant], alpha);
       }
@@ -253,7 +253,7 @@ function HexCell({
     }
     case "blend": {
       if (day.count === 0) {
-        background = "rgba(124, 106, 239, 0.06)";
+        background = "rgba(139, 92, 246, 0.06)";
       } else {
         const center = hexToRgba(DIMENSION_COLORS[day.dominant], alpha);
         const edge = hexToRgba(
@@ -486,7 +486,7 @@ function IntensityLegend() {
           style={{
             clipPath: HEX_CLIP_PATH,
             backgroundColor: hexToRgba(
-              "#7C6AEF",
+              "#8B5CF6",
               INTENSITY_ALPHA[level] ?? 0.07
             ),
           }}

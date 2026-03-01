@@ -74,7 +74,7 @@ Three exports:
 **Archetype Colors** (from `theme.ts`):
 | Archetype | Color |
 |-----------|-------|
-| Builder | `#7C6AEF` (purple) |
+| Builder | `#8B5CF6` (purple) |
 | Quality Champion | `#F472B6` (pink) |
 | Marathoner | `#16A34A` (green) |
 | Polymath | `#FCD34D` (gold) |
@@ -86,8 +86,8 @@ Three exports:
 |------|-------|
 | Emerging | `#9AA4B2` (muted gray) |
 | Solid | `#E6EDF3` (light gray) |
-| High | `#9D8FFF` (light purple) |
-| Elite | `#7C6AEF` (signature purple) |
+| High | `#A78BFA` (light purple) |
+| Elite | `#8B5CF6` (signature purple) |
 
 ### Existing Visualization Primitives (available for reuse)
 

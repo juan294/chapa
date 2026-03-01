@@ -43,7 +43,7 @@ interface ParticleConfig {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { r: 124, g: 106, b: 239 }; // fallback to amber
+  if (!result) return { r: 139, g: 92, b: 246 }; // fallback to amber
   return {
     r: parseInt(result[1]!, 16),
     g: parseInt(result[2]!, 16),
@@ -178,7 +178,7 @@ function useParticles(
         }
 
         // Draw particle
-        const rgb = colorRgbMap.get(p.color) ?? { r: 124, g: 106, b: 239 };
+        const rgb = colorRgbMap.get(p.color) ?? { r: 139, g: 92, b: 246 };
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${p.opacity})`;
@@ -198,7 +198,7 @@ function useParticles(
               ctx.beginPath();
               ctx.moveTo(particles[i]!.x, particles[i]!.y);
               ctx.lineTo(particles[j]!.x, particles[j]!.y);
-              ctx.strokeStyle = `rgba(124, 106, 239, ${opacity})`;
+              ctx.strokeStyle = `rgba(139, 92, 246, ${opacity})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
             }
@@ -220,7 +220,7 @@ function useParticles(
       // Draw particles once, static
       const particles = particlesRef.current;
       for (const p of particles) {
-        const rgb = colorRgbMap.get(p.color) ?? { r: 124, g: 106, b: 239 };
+        const rgb = colorRgbMap.get(p.color) ?? { r: 139, g: 92, b: 246 };
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${p.opacity})`;
@@ -300,9 +300,9 @@ function ParticleSection({
 type ColorPreset = "amber" | "gold" | "mixed";
 
 const COLOR_PRESETS: Record<ColorPreset, string[]> = {
-  amber: ["#7C6AEF"],
-  gold: ["#9D8FFF", "#7C6AEF"],
-  mixed: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+  amber: ["#8B5CF6"],
+  gold: ["#A78BFA", "#8B5CF6"],
+  mixed: ["#8B5CF6", "#A78BFA", "#7C3AED"],
 };
 
 function PlaygroundSection() {
@@ -570,7 +570,7 @@ function DetailRow({ title, text }: { title: string; text: string }) {
 
 const DOTS_CONFIG: ParticleConfig = {
   count: 60,
-  colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+  colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
   minRadius: 1,
   maxRadius: 3,
   speed: 0.3,
@@ -585,7 +585,7 @@ const DOTS_CONFIG: ParticleConfig = {
 
 const CONSTELLATION_CONFIG: ParticleConfig = {
   count: 40,
-  colors: ["#7C6AEF", "#9D8FFF"],
+  colors: ["#8B5CF6", "#A78BFA"],
   minRadius: 1,
   maxRadius: 2.5,
   speed: 0.25,
@@ -600,7 +600,7 @@ const CONSTELLATION_CONFIG: ParticleConfig = {
 
 const DUST_CONFIG: ParticleConfig = {
   count: 25,
-  colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+  colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
   minRadius: 2,
   maxRadius: 5,
   speed: 0.1,
@@ -615,7 +615,7 @@ const DUST_CONFIG: ParticleConfig = {
 
 const SPARKLE_CONFIG: ParticleConfig = {
   count: 80,
-  colors: ["#7C6AEF", "#9D8FFF", "#E6EDF3"],
+  colors: ["#8B5CF6", "#A78BFA", "#E6EDF3"],
   minRadius: 0.5,
   maxRadius: 1.5,
   speed: 0.2,
@@ -630,7 +630,7 @@ const SPARKLE_CONFIG: ParticleConfig = {
 
 const INTERACTIVE_CONFIG: ParticleConfig = {
   count: 50,
-  colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+  colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
   minRadius: 1,
   maxRadius: 3,
   speed: 0.3,

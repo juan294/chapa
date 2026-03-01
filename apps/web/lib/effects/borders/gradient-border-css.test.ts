@@ -40,8 +40,8 @@ describe("gradient-border-css", () => {
   });
 
   it("uses the project accent colors", () => {
-    expect(GRADIENT_BORDER_CSS).toContain("#5E4FCC");
-    expect(GRADIENT_BORDER_CSS).toContain("#7C6AEF");
-    expect(GRADIENT_BORDER_CSS).toContain("#9D8FFF");
+    expect(GRADIENT_BORDER_CSS).toContain("#7C3AED");
+    expect(GRADIENT_BORDER_CSS).toContain("#8B5CF6");
+    expect(GRADIENT_BORDER_CSS).toContain("#A78BFA");
   });
 });

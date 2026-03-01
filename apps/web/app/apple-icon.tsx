@@ -31,12 +31,12 @@ export default function AppleIcon() {
           <path
             d="M16 1 L29 6 L29 15 C29 23 23 29 16 31 C9 29 3 23 3 15 L3 6 Z"
             fill="#0C0D14"
-            stroke="#7C6AEF"
+            stroke="#8B5CF6"
             strokeWidth="1.5"
           />
           <path
             d="M10 20 L16 12 L22 20"
-            stroke="#7C6AEF"
+            stroke="#8B5CF6"
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"

@@ -8,7 +8,7 @@
 - Rendering method: JSX `<svg>` template rendered server-side to string.
 
 ## Layout goals
-- Premium dark card with purple accents (`#7C6AEF`)
+- Premium dark card with purple accents (`#8B5CF6`)
 - Strong hierarchy: header > archetype + metrics > heatmap + radar + score > footer
 - Readable at small size
 - Subtle animation only
@@ -17,7 +17,7 @@
 
 ### 1) Background frame
 - Rounded rect with subtle gradient
-- Border stroke (low opacity purple): `rgba(124,106,239,0.12)`
+- Border stroke (low opacity purple): `rgba(139,92,246,0.12)`
 
 ### 2) Header row (top)
 - Avatar circle (30px radius, left-aligned)
@@ -39,11 +39,11 @@
 - 13 weeks x 7 days grid (91 cells)
 - Cell size ~14px with ~3px gap
 - 5 intensity colors from theme (purple-based):
-  - 0: `rgba(124,106,239,0.06)` (none)
-  - 1: `rgba(124,106,239,0.20)` (low)
-  - 2: `rgba(124,106,239,0.38)` (medium)
-  - 3: `rgba(124,106,239,0.58)` (high)
-  - 4: `rgba(124,106,239,0.85)` (intense)
+  - 0: `rgba(139,92,246,0.06)` (none)
+  - 1: `rgba(139,92,246,0.20)` (low)
+  - 2: `rgba(139,92,246,0.38)` (medium)
+  - 3: `rgba(139,92,246,0.58)` (high)
+  - 4: `rgba(139,92,246,0.85)` (intense)
 - Animation: fade-in by week group
 
 **Center column: Radar chart**
@@ -88,35 +88,35 @@ Defined in `apps/web/lib/render/theme.ts`:
 | card | `#13141E` |
 | textPrimary | `#E6EDF3` |
 | textSecondary | `#9AA4B2` |
-| accent | `#7C6AEF` |
-| stroke | `rgba(124,106,239,0.12)` |
+| accent | `#8B5CF6` |
+| stroke | `rgba(139,92,246,0.12)` |
 
 ### Heatmap palette (0..4)
 | Level | Color |
 |-------|-------|
-| 0 (none) | `rgba(124,106,239,0.06)` |
-| 1 (low) | `rgba(124,106,239,0.20)` |
-| 2 (medium) | `rgba(124,106,239,0.38)` |
-| 3 (high) | `rgba(124,106,239,0.58)` |
-| 4 (intense) | `rgba(124,106,239,0.85)` |
+| 0 (none) | `rgba(139,92,246,0.12)` |
+| 1 (low) | `rgba(139,92,246,0.30)` |
+| 2 (medium) | `rgba(139,92,246,0.48)` |
+| 3 (high) | `rgba(139,92,246,0.68)` |
+| 4 (intense) | `rgba(139,92,246,0.92)` |
 
 ### Tier colors
 | Tier | Color |
 |------|-------|
 | Emerging | `#9AA4B2` (muted gray) |
 | Solid | `#E6EDF3` (light) |
-| High | `#9D8FFF` (light purple) |
-| Elite | `#7C6AEF` (signature purple) |
+| High | `#A78BFA` (light purple) |
+| Elite | `#8B5CF6` (signature purple) |
 
 ### Archetype colors
 | Archetype | Color |
 |-----------|-------|
-| Builder | `#7C6AEF` (purple) |
-| Quality Champion | `#F472B6` (pink) |
-| Marathoner | `#4ADE80` (green) |
-| Polymath | `#FBBF24` (amber/gold) |
-| Balanced | `#E6EDF3` (light gray) |
-| Emerging | `#9AA4B2` (muted gray) |
+| Builder | `#8B5CF6` (violet) |
+| Quality Champion | `#EC4899` (pink) |
+| Marathoner | `#22C55E` (green) |
+| Polymath | `#EAB308` (amber/gold) |
+| Balanced | `#0EA5E9` (sky blue) |
+| Emerging | `#F97316` (warm orange) |
 
 ## Typography
 - All text uses system-safe fonts embedded in SVG

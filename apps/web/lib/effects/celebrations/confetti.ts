@@ -1,8 +1,8 @@
 import type confetti from "canvas-confetti";
 
-const AMBER_COLORS = ["#7C6AEF", "#9D8FFF", "#5E4FCC", "#1A1A2E"];
-const GOLD_COLORS = ["#7C6AEF", "#9D8FFF", "#5E4FCC", "#7268D4", "#B8ADFF"];
-const RAINBOW_COLORS = ["#7C6AEF", "#9D8FFF", "#E86B6B", "#6BE8C4", "#8B9CF0", "#F0A06B"];
+const AMBER_COLORS = ["#8B5CF6", "#A78BFA", "#7C3AED", "#1A1A2E"];
+const GOLD_COLORS = ["#8B5CF6", "#A78BFA", "#7C3AED", "#7268D4", "#B8ADFF"];
+const RAINBOW_COLORS = ["#8B5CF6", "#A78BFA", "#E86B6B", "#6BE8C4", "#8B9CF0", "#F0A06B"];
 
 export type ConfettiPalette = "amber" | "gold" | "rainbow";
 

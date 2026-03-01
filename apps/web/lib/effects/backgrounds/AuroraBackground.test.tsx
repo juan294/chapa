@@ -105,7 +105,7 @@ describe("AuroraBackground", () => {
     it("applies amber colors by default", () => {
       const { container } = render(<AuroraBackground />);
       const blobs = container.querySelectorAll(".aurora-blob");
-      // First blob uses c1 = "#7C6AEF" for amber variant
+      // First blob uses c1 = "#8B5CF6" for amber variant
       expect((blobs[0] as HTMLElement).style.backgroundColor).toBeTruthy();
     });
 

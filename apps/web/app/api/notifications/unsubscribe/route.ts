@@ -53,11 +53,11 @@ export async function GET(request: NextRequest) {
   <title>Unsubscribed — Chapa</title>
   <style>
     body { margin:0; padding:0; background:#0A0A0F; color:#E2E4E9; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-    .card { background:#111118; border:1px solid rgba(124,106,239,0.15); border-radius:12px; padding:48px 40px; text-align:center; max-width:420px; }
-    h1 { font-family:'Courier New',monospace; font-size:24px; color:#7C6AEF; margin:0 0 16px; }
+    .card { background:#111118; border:1px solid rgba(139,92,246,0.15); border-radius:12px; padding:48px 40px; text-align:center; max-width:420px; }
+    h1 { font-family:'Courier New',monospace; font-size:24px; color:#8B5CF6; margin:0 0 16px; }
     p { font-size:15px; color:#9AA4B2; margin:0 0 24px; line-height:1.6; }
-    .handle { color:#7C6AEF; font-weight:600; }
-    a { color:#7C6AEF; text-decoration:none; }
+    .handle { color:#8B5CF6; font-weight:600; }
+    a { color:#8B5CF6; text-decoration:none; }
     a:hover { text-decoration:underline; }
   </style>
 </head>

@@ -7,7 +7,7 @@ describe("hexToRgba", () => {
   });
 
   it("converts a hex color to rgba with partial opacity", () => {
-    expect(hexToRgba("#7C6AEF", 0.5)).toBe("rgba(124, 106, 239, 0.5)");
+    expect(hexToRgba("#8B5CF6", 0.5)).toBe("rgba(139, 92, 246, 0.5)");
   });
 
   it("handles black", () => {

@@ -10,7 +10,7 @@ vi.mock("./ParticleBackground", () => ({
   PARTICLE_PRESETS: {
     sparkle: {
       count: 80,
-      colors: ["#7C6AEF", "#9D8FFF", "#E6EDF3"],
+      colors: ["#8B5CF6", "#A78BFA", "#E6EDF3"],
       minRadius: 0.5,
       maxRadius: 1.5,
       speed: 0.2,

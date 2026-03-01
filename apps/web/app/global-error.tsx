@@ -64,12 +64,12 @@ export default function GlobalError({
               onClick={reset}
               style={{
                 borderRadius: "8px",
-                border: "1px solid rgba(124, 106, 239, 0.3)",
-                backgroundColor: "rgba(124, 106, 239, 0.08)",
+                border: "1px solid rgba(139, 92, 246, 0.3)",
+                backgroundColor: "rgba(139, 92, 246, 0.08)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,
-                color: "#7C6AEF",
+                color: "#8B5CF6",
                 cursor: "pointer",
               }}
             >
@@ -80,7 +80,7 @@ export default function GlobalError({
               href="/"
               style={{
                 borderRadius: "8px",
-                border: "1px solid rgba(124, 106, 239, 0.10)",
+                border: "1px solid rgba(139, 92, 246, 0.10)",
                 padding: "0.625rem 1.5rem",
                 fontSize: "0.875rem",
                 fontWeight: 500,

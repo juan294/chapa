@@ -355,7 +355,7 @@ describe("renderBadgeSvg", () => {
     it("contains a score ring track circle", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       // Background track: circle with dim stroke, no fill
-      expect(svg).toMatch(/stroke="rgba\(124,106,239,0\.10\)"[^/]*stroke-width="4"/);
+      expect(svg).toMatch(/stroke="rgba\(139,92,246,0\.10\)"[^/]*stroke-width="4"/);
     });
 
     it("contains a score ring arc with stroke-dasharray", () => {

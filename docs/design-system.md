@@ -4,7 +4,7 @@ This is the single source of truth for visual design decisions. All agents worki
 
 ## Theme: Terminal Dark + Purple Accent (with Light Mode)
 
-Bold, developer-tool aesthetic inspired by terminal UIs. The dark theme is the signature brand look, with purple (`#7C6AEF`) used sparingly for CTAs, highlights, and active states. Terminal-specific colors (green, red, yellow) for output types. A light theme is supported as an alternative, toggled via the `ThemeToggle` component in the nav bar. Badge SVG always renders in dark theme as an independent embeddable asset.
+Bold, developer-tool aesthetic inspired by terminal UIs. The dark theme is the signature brand look, with purple (`#8B5CF6`) used sparingly for CTAs, highlights, and active states. Terminal-specific colors (green, red, yellow) for output types. A light theme is supported as an alternative, toggled via the `ThemeToggle` component in the nav bar. Badge SVG always renders in dark theme as an independent embeddable asset.
 
 ### Theme switching
 
@@ -23,16 +23,16 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-card` | `#111118` | `#F9FAFB` | `bg-card` | Card/panel surfaces |
 | `--color-text-primary` | `#E2E4E9` | `#1A1A2E` | `text-text-primary` | Headings, body text |
 | `--color-text-secondary` | `#8B8FA0` | `#6B7280` | `text-text-secondary` | Muted text, labels |
-| `--color-amber` | `#7C6AEF` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
-| `--color-amber-light` | `#9D8FFF` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
-| `--color-amber-dark` | `#5E4FCC` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
-| `--color-stroke` | `rgba(124,106,239,0.10)` | `border-stroke` | Borders, dividers (purple-tinted) |
+| `--color-amber` | `#8B5CF6` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
+| `--color-amber-light` | `#A78BFA` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
+| `--color-amber-dark` | `#7C3AED` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
+| `--color-stroke` | `rgba(139,92,246,0.10)` | `border-stroke` | Borders, dividers (purple-tinted) |
 | `--color-warm-bg` | `#0A0A0F` | `bg-warm-bg` | Alias for page background |
 | `--color-warm-card` | `#111118` | `bg-warm-card` | Alias for card background |
-| `--color-warm-stroke` | `rgba(124,106,239,0.10)` | `border-warm-stroke` | Alias for borders |
+| `--color-warm-stroke` | `rgba(139,92,246,0.10)` | `border-warm-stroke` | Alias for borders |
 | `--color-dark-section` | `#06060A` | `bg-dark-section` | Deeper emphasis band backgrounds |
 | `--color-dark-card` | `#0E0E16` | `bg-dark-card` | Cards inside dark sections |
-| `--color-purple-tint` | `rgba(124,106,239,0.06)` | `bg-purple-tint` | Subtle purple section tint |
+| `--color-purple-tint` | `rgba(139,92,246,0.06)` | `bg-purple-tint` | Subtle purple section tint |
 | `--color-terminal-green` | `#4ADE80` | `text-terminal-green` | Success messages, checkmarks |
 | `--color-terminal-red` | `#F87171` | `text-terminal-red` | Error messages |
 | `--color-terminal-yellow` | `#FBBF24` | `text-terminal-yellow` | Warning messages |
@@ -42,7 +42,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 
 ### Color rules
 
-- Purple (`#7C6AEF`) is the signature accent. Use sparingly — CTAs, active states, key data points.
+- Purple (`#8B5CF6`) is the signature accent. Use sparingly — CTAs, active states, key data points.
 - Use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, etc.) — they resolve correctly in both themes.
 - Never hardcode hex colors in components; always use the CSS variable tokens so theme switching works.
 - Purple-tinted borders (`border-stroke`) are the default for all dividers.

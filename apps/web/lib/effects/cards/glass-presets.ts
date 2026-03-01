@@ -50,11 +50,11 @@ export function glassStyle(variant: GlassVariant): React.CSSProperties {
   const base: React.CSSProperties = {
     backdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     WebkitBackdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
-    border: `1px solid rgba(124, 106, 239, ${p.borderOpacity})`,
+    border: `1px solid rgba(139, 92, 246, ${p.borderOpacity})`,
   };
 
   if (variant === "aurora-glass") {
-    base.background = `rgba(124, 106, 239, ${p.bgOpacity})`;
+    base.background = `rgba(139, 92, 246, ${p.bgOpacity})`;
   } else {
     base.background = `rgba(19, 20, 30, ${p.bgOpacity})`;
   }

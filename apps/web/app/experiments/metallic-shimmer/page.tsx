@@ -215,13 +215,13 @@ export default function MetallicShimmerPage() {
 .metallic-gold {
   background: linear-gradient(
     90deg,
-    #5E4FCC 0%,
-    #7C6AEF 20%,
+    #7C3AED 0%,
+    #8B5CF6 20%,
     #A99BFF 40%,
     #D0C9FF 50%,   /* bright highlight */
     #A99BFF 60%,
-    #7C6AEF 80%,
-    #5E4FCC 100%
+    #8B5CF6 80%,
+    #7C3AED 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;

@@ -43,7 +43,7 @@
 | Border radius (outer rect) | `20` |
 | Background fill | `#0C0D14` |
 | Inner stroke rect | `x="1" y="1" width="1198" height="628" rx="19"` |
-| Inner stroke color | `rgba(124,106,239,0.12)` |
+| Inner stroke color | `rgba(139,92,246,0.12)` |
 | Inner stroke width | `2` |
 | Inner stroke fill | `none` |
 
@@ -72,8 +72,8 @@
 | Center X (`avatarCX`) | `PAD + 30` = `90` |
 | Center Y (`avatarCY`) | `80` |
 | Radius (`avatarR`) | `30` |
-| Background circle fill | `rgba(124,106,239,0.10)` |
-| Background circle stroke | `rgba(124,106,239,0.25)` |
+| Background circle fill | `rgba(139,92,246,0.10)` |
+| Background circle stroke | `rgba(139,92,246,0.25)` |
 | Background circle stroke-width | `2` |
 | Clip path | `<clipPath id="avatar-clip"><circle cx="90" cy="80" r="30"/></clipPath>` |
 
@@ -115,7 +115,7 @@ M14 0C6.27 0 0 6.27 0 14c0 6.19 4.01 11.43 9.57 13.28.7.13.96-.3.96-.67 0-.34-.0
 | Group transform | `translate(132, 86)` (i.e., `PAD + 72`, `headerY + 6`) |
 | Group opacity | `0.4` |
 | Path scale | `scale(0.7)` — effective size ~17×17 |
-| Path fill | `#7C6AEF` (accent) |
+| Path fill | `#8B5CF6` (accent) |
 
 Shield path:
 ```
@@ -145,7 +145,7 @@ M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm-1.5 14.5l-4-4 
 | Opacity | `0.7` |
 | Text anchor | `end` |
 | Letter spacing | `-0.5` |
-| Content | `Chapa` + `<tspan fill="#7C6AEF">_</tspan>` |
+| Content | `Chapa` + `<tspan fill="#8B5CF6">_</tspan>` |
 
 ---
 
@@ -203,8 +203,8 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 
 | Property | Value |
 |----------|-------|
-| Fill | `rgba(124,106,239,0.10)` |
-| Stroke | `rgba(124,106,239,0.25)` |
+| Fill | `rgba(139,92,246,0.10)` |
+| Stroke | `rgba(139,92,246,0.25)` |
 | Stroke width | `1` |
 
 **Code-brackets icon** (inside pill, offset `translate(14, 8)`):
@@ -255,8 +255,8 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 
 | Property | Value |
 |----------|-------|
-| Fill | `rgba(124,106,239,0.06)` |
-| Stroke | `rgba(124,106,239,0.15)` |
+| Fill | `rgba(139,92,246,0.06)` |
+| Stroke | `rgba(139,92,246,0.15)` |
 | Stroke width | `1` |
 
 **Label text (all four):**
@@ -273,7 +273,7 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 - Repos: `"{count} Repos"` — e.g., `4 Repos`
 - Watch: `"{count} Watch"` — e.g., `3 Watch`
 - Fork: `"{count} Fork"` — e.g., `1 Fork`
-- Star: `"★ {count} Star"` — the star character `\u2605` is a `<tspan fill="#7C6AEF">` prefix
+- Star: `"★ {count} Star"` — the star character `\u2605` is a `<tspan fill="#8B5CF6">` prefix
 
 **Icons** (all at `translate(12, 9)` within their pill group):
 
@@ -313,7 +313,7 @@ All pills are vertically centered at `metaRowY` via `translate(x, metaRowY - pil
 ```
 </details>
 
-**Star pill** has no separate icon — the `\u2605` character is inline in the text with `tspan fill="#7C6AEF"`.
+**Star pill** has no separate icon — the `\u2605` character is inline in the text with `tspan fill="#8B5CF6"`.
 
 ### 3f. Number Formatting
 
@@ -366,11 +366,11 @@ Grid extent:
 
 | Level | Count range | Fill |
 |-------|-------------|------|
-| 0 — none | `count === 0` | `rgba(124,106,239,0.06)` |
-| 1 — low | `count 1–2` | `rgba(124,106,239,0.20)` |
-| 2 — medium | `count 3–5` | `rgba(124,106,239,0.38)` |
-| 3 — high | `count 6–10` | `rgba(124,106,239,0.58)` |
-| 4 — intense | `count > 10` | `rgba(124,106,239,0.85)` |
+| 0 — none | `count === 0` | `rgba(139,92,246,0.12)` |
+| 1 — low | `count 1–2` | `rgba(139,92,246,0.30)` |
+| 2 — medium | `count 3–5` | `rgba(139,92,246,0.48)` |
+| 3 — high | `count 6–10` | `rgba(139,92,246,0.68)` |
+| 4 — intense | `count > 10` | `rgba(139,92,246,0.92)` |
 
 ### 4d. Data Mapping
 
@@ -466,7 +466,7 @@ Diamond polygons at `25%`, `50%`, `75%`, `100%` of radius:
 | `0.75` | `63.75` | `1` | `0.2` |
 | `1.00` | `85` | `2` | `0.5` |
 
-All guides: `fill="none" stroke="#7C6AEF"`.
+All guides: `fill="none" stroke="#8B5CF6"`.
 
 ### 5e. Axis Lines
 
@@ -474,15 +474,15 @@ From center `(905, 275)` to each axis endpoint:
 
 ```xml
 <line x1="905" y1="275" x2="{endpoint.x}" y2="{endpoint.y}"
-      stroke="#7C6AEF" stroke-width="0.8" opacity="0.2"/>
+      stroke="#8B5CF6" stroke-width="0.8" opacity="0.2"/>
 ```
 
 ### 5f. Data Polygon
 
 ```xml
 <polygon points="{p1.x},{p1.y} {p2.x},{p2.y} {p3.x},{p3.y} {p4.x},{p4.y}"
-         fill="#7C6AEF" fill-opacity="0.15"
-         stroke="#7C6AEF" stroke-width="2" stroke-opacity="0.8"/>
+         fill="#8B5CF6" fill-opacity="0.15"
+         stroke="#8B5CF6" stroke-width="2" stroke-opacity="0.8"/>
 ```
 
 ### 5g. Vertex Dots
@@ -490,7 +490,7 @@ From center `(905, 275)` to each axis endpoint:
 One dot per data point:
 
 ```xml
-<circle cx="{x}" cy="{y}" r="4" fill="#7C6AEF" stroke="#0C0D14" stroke-width="2"/>
+<circle cx="{x}" cy="{y}" r="4" fill="#8B5CF6" stroke="#0C0D14" stroke-width="2"/>
 ```
 
 ### 5h. Axis Labels
@@ -548,7 +548,7 @@ Labels offset `20px` beyond the radius, with dynamic anchoring:
 
 ```xml
 <circle cx="905" cy="460" r="46" fill="none"
-        stroke="rgba(124,106,239,0.10)" stroke-width="4"/>
+        stroke="rgba(139,92,246,0.10)" stroke-width="4"/>
 ```
 
 ### 6c. Foreground Arc (tier-colored)
@@ -605,7 +605,7 @@ The `rotate(-90)` makes the arc start from the top (12 o'clock position).
 ### 8a. Divider Line
 
 ```xml
-<line x1="60" y1="560" x2="1140" y2="560" stroke="rgba(124,106,239,0.12)" stroke-width="1"/>
+<line x1="60" y1="560" x2="1140" y2="560" stroke="rgba(139,92,246,0.12)" stroke-width="1"/>
 ```
 
 ### 8b. GitHub Branding (left side)
@@ -721,18 +721,18 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
 | `card` | `#13141E` | Card surfaces (unused in SVG badge) |
 | `textPrimary` | `#E6EDF3` | Headings, score number |
 | `textSecondary` | `#9AA4B2` | Subtitle, labels, pills, branding |
-| `accent` | `#7C6AEF` | Purple accent — radar, heatmap, pills |
-| `stroke` | `rgba(124,106,239,0.12)` | Border, dividers |
+| `accent` | `#8B5CF6` | Purple accent — radar, heatmap, pills |
+| `stroke` | `rgba(139,92,246,0.12)` | Border, dividers |
 
 ### 10b. Heatmap Colors (5 levels)
 
 | Level | Alpha | Full value |
 |-------|-------|-----------|
-| `heatmap[0]` — none | `0.06` | `rgba(124,106,239,0.06)` |
-| `heatmap[1]` — low | `0.20` | `rgba(124,106,239,0.20)` |
-| `heatmap[2]` — medium | `0.38` | `rgba(124,106,239,0.38)` |
-| `heatmap[3]` — high | `0.58` | `rgba(124,106,239,0.58)` |
-| `heatmap[4]` — intense | `0.85` | `rgba(124,106,239,0.85)` |
+| `heatmap[0]` — none | `0.12` | `rgba(139,92,246,0.12)` |
+| `heatmap[1]` — low | `0.30` | `rgba(139,92,246,0.30)` |
+| `heatmap[2]` — medium | `0.48` | `rgba(139,92,246,0.48)` |
+| `heatmap[3]` — high | `0.68` | `rgba(139,92,246,0.68)` |
+| `heatmap[4]` — intense | `0.92` | `rgba(139,92,246,0.92)` |
 
 ### 10c. Tier Colors
 
@@ -740,19 +740,19 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
 |------|-----|--------|
 | `Emerging` | `#9AA4B2` | Muted gray |
 | `Solid` | `#E6EDF3` | Light (near-white) |
-| `High` | `#9D8FFF` | Lighter purple |
-| `Elite` | `#7C6AEF` | Signature purple |
+| `High` | `#A78BFA` | Lighter purple |
+| `Elite` | `#8B5CF6` | Signature purple |
 
 ### 10d. Archetype Colors
 
 | Archetype | Hex | Visual |
 |-----------|-----|--------|
-| `Builder` | `#7C6AEF` | Signature purple |
-| `Quality Champion` | `#F472B6` | Pink |
-| `Marathoner` | `#4ADE80` | Green |
-| `Polymath` | `#FBBF24` | Amber/gold |
-| `Balanced` | `#E6EDF3` | Light gray |
-| `Emerging` | `#9AA4B2` | Muted gray |
+| `Builder` | `#8B5CF6` | Signature violet |
+| `Quality Champion` | `#EC4899` | Pink |
+| `Marathoner` | `#22C55E` | Green |
+| `Polymath` | `#EAB308` | Amber/gold |
+| `Balanced` | `#0EA5E9` | Sky blue |
+| `Emerging` | `#F97316` | Warm orange |
 
 ### 10e. Verification Strip Color
 
@@ -764,13 +764,13 @@ Conditional — only rendered when `verificationHash` and `verificationDate` are
 
 | Usage | Value |
 |-------|-------|
-| Avatar placeholder fill | `rgba(124,106,239,0.10)` |
-| Avatar placeholder stroke | `rgba(124,106,239,0.25)` |
-| Archetype pill fill | `rgba(124,106,239,0.10)` |
-| Archetype pill stroke | `rgba(124,106,239,0.25)` |
-| Metric pill fill | `rgba(124,106,239,0.06)` |
-| Metric pill stroke | `rgba(124,106,239,0.15)` |
-| Ring track stroke | `rgba(124,106,239,0.10)` |
+| Avatar placeholder fill | `rgba(139,92,246,0.10)` |
+| Avatar placeholder stroke | `rgba(139,92,246,0.25)` |
+| Archetype pill fill | `rgba(139,92,246,0.10)` |
+| Archetype pill stroke | `rgba(139,92,246,0.25)` |
+| Metric pill fill | `rgba(139,92,246,0.06)` |
+| Metric pill stroke | `rgba(139,92,246,0.15)` |
+| Ring track stroke | `rgba(139,92,246,0.10)` |
 | Vertex dot stroke | `#0C0D14` (= bg, creates cutout effect) |
 
 ---

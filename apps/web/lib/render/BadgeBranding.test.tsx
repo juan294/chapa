@@ -75,7 +75,7 @@ describe("renderBadgeBranding", () => {
   it("renders grouped pill container around logos", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github", "bitbucket"]);
     // Pill is a rounded rect with purple tint
-    expect(svg).toContain('fill="rgba(124,106,239,0.08)"');
-    expect(svg).toContain('stroke="rgba(124,106,239,0.15)"');
+    expect(svg).toContain('fill="rgba(139,92,246,0.08)"');
+    expect(svg).toContain('stroke="rgba(139,92,246,0.15)"');
   });
 });

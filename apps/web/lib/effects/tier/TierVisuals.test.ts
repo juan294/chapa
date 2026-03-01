@@ -10,13 +10,13 @@ const SOURCE = fs.readFileSync(
 
 describe("TierVisuals (#247)", () => {
   describe("design system compliance (#233)", () => {
-    it("uses bg-amber-light instead of bg-[#9D8FFF]", () => {
-      expect(SOURCE).not.toContain("bg-[#9D8FFF]");
+    it("uses bg-amber-light instead of bg-[#A78BFA]", () => {
+      expect(SOURCE).not.toContain("bg-[#A78BFA]");
       expect(SOURCE).toContain("bg-amber-light");
     });
 
-    it("uses bg-amber instead of bg-[#7C6AEF]", () => {
-      expect(SOURCE).not.toContain("bg-[#7C6AEF]");
+    it("uses bg-amber instead of bg-[#8B5CF6]", () => {
+      expect(SOURCE).not.toContain("bg-[#8B5CF6]");
       expect(SOURCE).toContain("bg-amber");
     });
   });
@@ -143,9 +143,9 @@ describe("TierVisuals (#247)", () => {
 
     it("uses project accent colors in gradients", () => {
       // All gradients should use the project's purple palette
-      expect(TIER_VISUALS_CSS).toContain("#5E4FCC"); // amber-dark
-      expect(TIER_VISUALS_CSS).toContain("#7C6AEF"); // amber
-      expect(TIER_VISUALS_CSS).toContain("#9D8FFF"); // amber-light
+      expect(TIER_VISUALS_CSS).toContain("#7C3AED"); // amber-dark
+      expect(TIER_VISUALS_CSS).toContain("#8B5CF6"); // amber
+      expect(TIER_VISUALS_CSS).toContain("#A78BFA"); // amber-light
     });
 
     it("applies box-shadow glow to high and elite card tiers", () => {

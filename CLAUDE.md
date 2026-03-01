@@ -59,7 +59,7 @@ Shared types live in: `packages/shared/src/types.ts`
 
 ## Design system (MANDATORY for UI work)
 - Full spec: @docs/design-system.md
-- Accent color: `#7C6AEF` (cool indigo/violet). Use `text-amber`, `bg-amber`.
+- Accent color: `#8B5CF6` (saturated violet). Use `text-amber`, `bg-amber`.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
 - Light/dark theme support via `next-themes`. Light is the default; dark (`#0A0A0F`) is the signature brand look. Badge SVG always renders dark.

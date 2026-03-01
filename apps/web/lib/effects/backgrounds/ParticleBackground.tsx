@@ -31,7 +31,7 @@ export interface ParticleConfig {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { r: 124, g: 106, b: 239 };
+  if (!result) return { r: 139, g: 92, b: 246 };
   return {
     r: parseInt(result[1]!, 16),
     g: parseInt(result[2]!, 16),
@@ -145,7 +145,7 @@ export function useParticles(
             p.baseOpacity * (0.3 + 0.7 * Math.abs(Math.sin(t * 1.5 + p.phase)));
         }
 
-        const rgb = colorRgbMap.get(p.color) ?? { r: 124, g: 106, b: 239 };
+        const rgb = colorRgbMap.get(p.color) ?? { r: 139, g: 92, b: 246 };
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${p.opacity})`;
@@ -163,7 +163,7 @@ export function useParticles(
               ctx.beginPath();
               ctx.moveTo(particles[i]!.x, particles[i]!.y);
               ctx.lineTo(particles[j]!.x, particles[j]!.y);
-              ctx.strokeStyle = `rgba(124, 106, 239, ${opacity})`;
+              ctx.strokeStyle = `rgba(139, 92, 246, ${opacity})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
             }
@@ -183,7 +183,7 @@ export function useParticles(
     } else {
       const particles = particlesRef.current;
       for (const p of particles) {
-        const rgb = colorRgbMap.get(p.color) ?? { r: 124, g: 106, b: 239 };
+        const rgb = colorRgbMap.get(p.color) ?? { r: 139, g: 92, b: 246 };
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${p.opacity})`;
@@ -203,27 +203,27 @@ export function useParticles(
 /** Preset particle configs */
 export const PARTICLE_PRESETS = {
   dots: {
-    count: 60, colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+    count: 60, colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
     minRadius: 1, maxRadius: 3, speed: 0.3, minOpacity: 0.1, maxOpacity: 0.35,
     connections: false, connectionDistance: 0, mouseRepulsion: false, mouseRadius: 0, sparkle: false,
   },
   constellation: {
-    count: 40, colors: ["#7C6AEF", "#9D8FFF"],
+    count: 40, colors: ["#8B5CF6", "#A78BFA"],
     minRadius: 1, maxRadius: 2.5, speed: 0.25, minOpacity: 0.15, maxOpacity: 0.4,
     connections: true, connectionDistance: 150, mouseRepulsion: false, mouseRadius: 0, sparkle: false,
   },
   dust: {
-    count: 25, colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+    count: 25, colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
     minRadius: 2, maxRadius: 5, speed: 0.1, minOpacity: 0.05, maxOpacity: 0.15,
     connections: false, connectionDistance: 0, mouseRepulsion: false, mouseRadius: 0, sparkle: false,
   },
   sparkle: {
-    count: 80, colors: ["#7C6AEF", "#9D8FFF", "#E6EDF3"],
+    count: 80, colors: ["#8B5CF6", "#A78BFA", "#E6EDF3"],
     minRadius: 0.5, maxRadius: 1.5, speed: 0.2, minOpacity: 0.1, maxOpacity: 0.5,
     connections: false, connectionDistance: 0, mouseRepulsion: false, mouseRadius: 0, sparkle: true,
   },
   interactive: {
-    count: 50, colors: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
+    count: 50, colors: ["#8B5CF6", "#A78BFA", "#7C3AED"],
     minRadius: 1, maxRadius: 3, speed: 0.3, minOpacity: 0.1, maxOpacity: 0.35,
     connections: true, connectionDistance: 120, mouseRepulsion: true, mouseRadius: 120, sparkle: false,
   },

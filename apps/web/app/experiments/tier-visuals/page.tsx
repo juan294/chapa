@@ -101,11 +101,11 @@ function heatmapColor(level: number, tier: TierName): string {
   }
   // High and Elite use amber
   const colors = [
-    "rgba(124,106,239,0.04)",
-    "rgba(124,106,239,0.18)",
-    "rgba(124,106,239,0.35)",
-    "rgba(124,106,239,0.60)",
-    "rgba(124,106,239,0.90)",
+    "rgba(139,92,246,0.04)",
+    "rgba(139,92,246,0.18)",
+    "rgba(139,92,246,0.35)",
+    "rgba(139,92,246,0.60)",
+    "rgba(139,92,246,0.90)",
   ];
   return colors[level] ?? colors[0]!;
 }
