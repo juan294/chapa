@@ -1,48 +1,41 @@
-# cc-rpi Update Report
-> Generated: 2026-02-25 | Blueprint: v1.2.0 → v1.2.1 | Commit: `25ec671`
+# cc-rpi Sync Report — 2026-03-01
 
-## Summary
+**Blueprint version:** v1.3.0 (`23c0b72`)
+**Previous sync:** v1.2.1 (`25ec671`) on 2026-02-25
+**Commit:** `2042cf0`
 
-Synced from cc-rpi v1.2.0 to v1.2.1. **No project file changes required** — all updates were to blueprint-internal files (patterns, CI, README).
+## Blueprint Changes (7 commits since last sync)
 
-## Blueprint Changes Since Last Sync (7 commits)
+- `23c0b72` release: v1.3.0 — /simplify and /batch integration
+- `4454ad8` docs: add post-adoption /pre-launch recommendation to /adopt command
+- `0c77adc` docs: add errors #39-#43 — gh deprecation, venv bypass, Python escaping, module imports, JSON indexing
+- `c4abb20` feat: integrate /simplify and /batch into RPI workflow
+- `4f3c1d6` fix: quote $(whoami) in shell templates to pass shellcheck SC2046
+- `4866803` fix: launchd plist must use bash -c exec wrapper (error #37/#38)
+- `a3b3e34` docs: add errors #32-#36 — merge policy, unstaged rebase, 403 retry, pending checks, mega one-liners
 
-| Commit | Description |
-|--------|-------------|
-| `25ec671` | fix: don't default to open-source license badge in templates |
-| `c8efd94` | docs: add CI status badge to README |
-| `6bc51d1` | fix: skip fenced code blocks in CI link checker |
-| `f8a72c3` | docs: add errors #30-#31, expand #1 scope to all tool types |
-| `3274424` | docs: add errors #28-#29 — linter auto-fix and uv Python version |
-| `30ab298` | docs: add errors #26-#27 and expand #25 with git push variant |
-| `30fb65b` | release: add v1.2.1 version badge to README |
+## Commands Updated
 
-## Changed Blueprint Files
+| Command | Change |
+|---------|--------|
+| `/implement` | Added `/batch` eligibility check (step 4), `/simplify` code quality pass (step 5e), reviewer now focused on plan compliance |
+| `/plan` | Added batch-eligible phase identification (step 11), renumbered steps 12-13 |
+| `/pre-launch` | Added "After the Audit" section recommending `/simplify` for code quality findings |
+| `/validate` | Added step 5: recommend `/simplify` for code quality issues |
 
-- `patterns/agent-errors.md` — 6 new error patterns (#26-#31)
-- `patterns/quick-reference.md` — 6 new rules (#26-#31), Error #1 expanded to all tool types
-- `.github/workflows/validate.yml` — CI link checker fix
-- `README.md` — version badge
-- `templates/README-header.md` — license badge fix
-- `templates/setup-checklist.md` — setup checklist update
+## CLAUDE.md Sections Updated
 
-## Project File Status
+| Section | Change |
+|---------|--------|
+| Rules for Implementation | Expanded atomic loop with `/simplify` and plan compliance annotations; added `/batch` eligible phase check |
 
-| Area | Status | Details |
-|------|--------|---------|
-| Slash commands (6) | No changes needed | All 6 match blueprint templates |
-| CLAUDE.md blueprint sections (7) | No changes needed | All match template |
-| settings.json | No changes needed | Has all template entries + project additions |
-| Sync metadata | Updated | v1.2.0 → v1.2.1 |
+## settings.json
 
-## New Knowledge Internalized
+No changes needed — project permissions are a superset of the template.
 
-New error patterns added to the blueprint (not requiring project file changes, but useful for agents):
+## Notable New Content in Blueprint
 
-- **#26**: Don't build complex regex pipelines in shell — use dedicated tools
-- **#27**: Only pass correct file types to linters — don't fight intentional patterns
-- **#28**: Use `--fix` for auto-fixable linter issues — don't manually edit
-- **#29**: Specify Python version for `uv sync` — system default may be too new
-- **#30**: Always `git push -u` before `gh pr create`
-- **#31**: Don't guess CLI flags on unfamiliar tools — run `--help` first
-- **#1 expanded**: Sibling tool call error now documents all tool types (Bash, TaskOutput, Read), not just Bash
+- **New error patterns (#32-#43):** merge policy checks, unstaged rebase failures, 403 retry strategy, pending CI check detection, mega one-liner avoidance, gh CLI deprecation, venv bypass, Python escaping, module imports, JSON indexing
+- **`/simplify` integration:** New native skill that spawns 3 specialized agents (code reuse, code quality, efficiency) — now woven into `/implement`, `/validate`, and `/pre-launch`
+- **`/batch` integration:** New parallel execution mode for independent plan phases — one worktree per phase, each opens a PR
+- **launchd fixes:** ProgramArguments must use `/bin/bash -c exec` wrapper (errors #37/#38)
