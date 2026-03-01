@@ -29,9 +29,9 @@ function makeContribData(
     pullRequests: {
       totalCount: 8,
       nodes: [
-        { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-        { additions: 50, deletions: 10, changedFiles: 3, merged: true },
-        { additions: 200, deletions: 50, changedFiles: 8, merged: true },
+        { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: null, headRefName: "feat/a", closingIssuesCount: 0 },
+        { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: null, headRefName: "feat/b", closingIssuesCount: 0 },
+        { additions: 200, deletions: 50, changedFiles: 8, merged: true, body: null, headRefName: "feat/c", closingIssuesCount: 0 },
       ],
     },
     reviews: { totalCount: 15 },
@@ -81,7 +81,7 @@ describe("fetchStats", () => {
       pullRequests: {
         totalCount: 1,
         nodes: [
-          { additions: 1000, deletions: 500, changedFiles: 20, merged: true },
+          { additions: 1000, deletions: 500, changedFiles: 20, merged: true, body: null, headRefName: "feat/big", closingIssuesCount: 0 },
         ],
       },
     });
@@ -97,8 +97,8 @@ describe("fetchStats", () => {
       pullRequests: {
         totalCount: 2,
         nodes: [
-          { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-          { additions: 200, deletions: 50, changedFiles: 10, merged: false },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: null, headRefName: "feat/x", closingIssuesCount: 0 },
+          { additions: 200, deletions: 50, changedFiles: 10, merged: false, body: null, headRefName: "feat/y", closingIssuesCount: 0 },
         ],
       },
     });

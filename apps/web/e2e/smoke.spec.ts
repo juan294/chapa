@@ -3,10 +3,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Smoke tests — core routes", () => {
   test("landing page loads", async ({ page }) => {
     await page.goto("/");
-    // The landing page should render meaningful content — wait for either element
-    const main = page.locator("main");
-    const h1 = page.locator("h1").first();
-    await expect(main.or(h1)).toBeVisible();
+    // The landing page should render meaningful content
+    await expect(page.locator("#main-content")).toBeVisible();
   });
 
   test("health API returns JSON with status field", async ({ request }) => {
