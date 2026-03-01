@@ -55,6 +55,7 @@ export function ImpactDashboard({
       <ActivityHeatmap
         heatmapData={stats.heatmapData}
         activeDays={stats.activeDays}
+        dimensions={impact.dimensions}
       />
 
       <StatsGrid stats={stats} diff={diff} />

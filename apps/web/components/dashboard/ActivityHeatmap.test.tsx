@@ -1,16 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
-
-vi.mock("@/lib/effects/heatmap/HeatmapGrid", () => ({
-  HeatmapGrid: (props: { data: { date: string; count: number }[]; animation: string; showLabels?: boolean }) => (
-    <div data-testid="heatmap-grid" data-animation={props.animation} data-count={props.data.length} data-labels={props.showLabels}>
-      mock-heatmap
-    </div>
-  ),
-  HEATMAP_GRID_CSS: "/* mock css */",
-}));
 
 afterEach(cleanup);
 
@@ -25,6 +16,13 @@ const mockHeatmapData: HeatmapDay[] = [
   { date: "2025-03-02", count: 3 },
   { date: "2025-03-03", count: 0 },
 ];
+
+const mockDimensions = {
+  delivery: 85,
+  quality: 72,
+  consistency: 91,
+  breadth: 68,
+};
 
 /** Generate consecutive days with specific counts for insight testing. */
 function makeDays(startDate: string, counts: number[]): HeatmapDay[] {
@@ -42,22 +40,30 @@ function makeDays(startDate: string, counts: number[]): HeatmapDay[] {
 
 describe("ActivityHeatmap", () => {
   // ----------------------------------------------------------------
-  // 1. Renders HeatmapGrid with provided data
+  // 1. Renders hexagonal heatmap grid
   // ----------------------------------------------------------------
-  it("renders HeatmapGrid with provided data", () => {
-    render(<ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />);
+  it("renders hexagonal heatmap grid", () => {
+    render(
+      <ActivityHeatmap
+        heatmapData={mockHeatmapData}
+        activeDays={42}
+        dimensions={mockDimensions}
+      />
+    );
 
-    const grid = screen.getByTestId("heatmap-grid");
+    const grid = screen.getByRole("img", {
+      name: "Hexagonal activity heatmap",
+    });
     expect(grid).toBeTruthy();
-    expect(grid.getAttribute("data-animation")).toBe("ripple");
-    expect(grid.getAttribute("data-count")).toBe("3");
   });
 
   // ----------------------------------------------------------------
   // 2. Shows active days count in subheader
   // ----------------------------------------------------------------
   it("shows active days count in subheader", () => {
-    render(<ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />);
+    render(
+      <ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />
+    );
 
     expect(screen.getByText("42 active days in the last year")).toBeTruthy();
   });
@@ -65,21 +71,31 @@ describe("ActivityHeatmap", () => {
   // ----------------------------------------------------------------
   // 3. Has correct ARIA label
   // ----------------------------------------------------------------
-  it("has correct ARIA label", () => {
-    render(<ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />);
+  it("has correct ARIA label on section", () => {
+    render(
+      <ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />
+    );
 
     const section = screen.getByLabelText("Contribution activity heatmap");
     expect(section).toBeTruthy();
   });
 
   // ----------------------------------------------------------------
-  // 4. Passes showLabels to HeatmapGrid
+  // 4. Shows dimension legend
   // ----------------------------------------------------------------
-  it("passes showLabels to HeatmapGrid", () => {
-    render(<ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />);
+  it("shows dimension color legend", () => {
+    render(
+      <ActivityHeatmap
+        heatmapData={mockHeatmapData}
+        activeDays={42}
+        dimensions={mockDimensions}
+      />
+    );
 
-    const grid = screen.getByTestId("heatmap-grid");
-    expect(grid.getAttribute("data-labels")).toBe("true");
+    expect(screen.getByText("Delivery")).toBeTruthy();
+    expect(screen.getByText("Quality")).toBeTruthy();
+    expect(screen.getByText("Consistency")).toBeTruthy();
+    expect(screen.getByText("Breadth")).toBeTruthy();
   });
 
   // ----------------------------------------------------------------
@@ -124,5 +140,19 @@ describe("ActivityHeatmap", () => {
     render(<ActivityHeatmap heatmapData={[]} activeDays={0} />);
 
     expect(screen.queryByText(/Peak:/)).toBeNull();
+  });
+
+  // ----------------------------------------------------------------
+  // 9. Works without dimensions prop (graceful fallback)
+  // ----------------------------------------------------------------
+  it("renders without dimensions prop", () => {
+    render(
+      <ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />
+    );
+
+    const grid = screen.getByRole("img", {
+      name: "Hexagonal activity heatmap",
+    });
+    expect(grid).toBeTruthy();
   });
 });
