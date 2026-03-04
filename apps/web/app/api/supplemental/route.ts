@@ -89,8 +89,8 @@ export async function POST(request: Request): Promise<Response> {
   await cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL);
 
   // 6. Invalidate primary stats cache (forces re-merge on next badge request)
-  // Key must match lib/github/client.ts cache key: "stats:v2:<handle>"
-  await cacheDel(`stats:v2:${targetHandle.toLowerCase()}`);
+  // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>"
+  await cacheDel(`stats:v2:merged:${targetHandle.toLowerCase()}`);
 
   return NextResponse.json({ success: true });
 }

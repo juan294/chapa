@@ -50,8 +50,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     // Clear cached stats so getStats fetches fresh from GitHub
-    // Key must match lib/github/client.ts cache key: "stats:v2:<handle>" (lowercase)
-    await cacheDel(`stats:v2:${normalizedHandle}`);
+    // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>" (lowercase)
+    await cacheDel(`stats:v2:merged:${normalizedHandle}`);
 
     // Fetch fresh stats with the user's OAuth token for better rate limits
     const stats = await getStats(handle, session.token);
