@@ -19,7 +19,12 @@ export default defineConfig({
         "apps/web/components/**",
         "packages/shared/**",
       ],
-      exclude: ["**/*.test.*", "**/*.d.ts", "**/*.md"],
+      exclude: [
+        "**/*.test.*",
+        "**/*.d.ts",
+        "**/*.md",
+        "**/node_modules.nosync/**",
+      ],
       thresholds: {
         statements: 75,
         branches: 70,
