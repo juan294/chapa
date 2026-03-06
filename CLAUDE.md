@@ -328,20 +328,33 @@ Reference issues in commits with `Fixes #N` or `Refs #N`.
 - Never use `~` in file tool paths — use full absolute paths starting with `/`
 - Always pass `{ encoding: 'utf-8' }` to `execSync`/`spawnSync`
 
+### Git Recipes (use these exact sequences — hooks enforce critical steps)
+```bash
+# Push sequence — ALWAYS commit before pulling (Error #33, hook enforced)
+git add <files> && git commit -m "msg" && git pull --rebase && git push
+
+# First push — set upstream tracking
+git add <files> && git commit -m "msg" && git push -u origin <branch>
+
+# Push with tag — NEVER use --tags (Error #44, hook enforced)
+git push origin main && git push origin v1.0.0
+# Or: git push origin main --follow-tags
+
+# Worktree cleanup
+git worktree remove --force <path>; git branch -D <branch>
+```
+
 ### Git Operations
 - Run typecheck/lint BEFORE committing (pre-commit hooks run the same checks)
-- `git pull --rebase` before every push
 - Remove worktrees BEFORE merging PRs with `--delete-branch`
-- `git worktree remove --force` (always use --force)
-- `git branch -D` (uppercase) for worktree branch cleanup
-- Use `;` not `&&` for multiple cleanup operations
+- Never fabricate filesystem paths — use the working directory or discover with `ls`
 
 ### GitHub CLI
 - Don't guess `gh --json` field names — query available fields first
 - Check CI per-PR with `--json`, not chained human-readable output
 - `review: fail` means "needs approval", NOT a CI failure
 
-### Sub-Agents & Agent Teams
+### Sub-agents & Agent Teams
 - Verify tool permissions before spawning sub-agents for write operations
 - If a sub-agent fails due to permissions, take over manually immediately
 - Monitor context size when running many parallel agents
