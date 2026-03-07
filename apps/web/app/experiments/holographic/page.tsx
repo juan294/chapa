@@ -330,7 +330,7 @@ export default function HolographicExperimentPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-bg px-6 py-16">
+      <div id="main-content" className="min-h-screen bg-bg px-6 py-16">
         <div className="mx-auto max-w-5xl">
           {/* Page header */}
           <header className="mb-4">

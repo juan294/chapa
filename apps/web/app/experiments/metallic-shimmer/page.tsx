@@ -28,7 +28,7 @@ export default function MetallicShimmerPage() {
   const highlightColor = `rgba(246, 242, 192, ${intensity / 100})`;
 
   return (
-    <main className="min-h-screen bg-bg bg-grid-warm">
+    <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
       {/* Ambient glow */}
       <div
         className="pointer-events-none fixed left-1/2 top-1/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber/[0.04] blur-[150px]"
