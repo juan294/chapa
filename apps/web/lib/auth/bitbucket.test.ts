@@ -432,6 +432,84 @@ describe("isTokenExpired", () => {
 });
 
 // ---------------------------------------------------------------------------
+// AbortSignal timeout on all fetch calls
+// ---------------------------------------------------------------------------
+
+describe("Bitbucket OAuth fetch AbortSignal timeout", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("exchangeBitbucketCode passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "tok",
+          refresh_token: "ref",
+          expires_in: 7200,
+          token_type: "bearer",
+          scopes: "account",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await exchangeBitbucketCode("code", "cid", "csecret", "http://localhost:3001/cb");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("refreshBitbucketToken passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "tok",
+          refresh_token: "ref",
+          expires_in: 7200,
+          token_type: "bearer",
+          scopes: "account",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await refreshBitbucketToken("refresh_tok", "cid", "csecret");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("fetchBitbucketUser passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          username: "bb-user",
+          display_name: "BB User",
+          links: { avatar: { href: "https://example.com/avatar.png" } },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchBitbucketUser("access_tok");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null when fetch aborts due to timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await exchangeBitbucketCode("code", "cid", "csecret", "http://localhost:3001/cb");
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Cookie Secure flag (conditional on HTTPS)
 // ---------------------------------------------------------------------------
 

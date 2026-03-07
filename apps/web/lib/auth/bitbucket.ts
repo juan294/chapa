@@ -26,6 +26,9 @@ const BB_AUTHORIZE_URL = "https://bitbucket.org/site/oauth2/authorize";
 const BB_TOKEN_URL = "https://bitbucket.org/site/oauth2/access_token";
 const BB_API_URL = "https://api.bitbucket.org/2.0";
 
+/** 10-second timeout for all external OAuth fetches */
+const FETCH_TIMEOUT_MS = 10_000;
+
 /** 5-minute buffer before token expiry — refresh proactively */
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
@@ -125,6 +128,7 @@ export async function exchangeBitbucketCode(
         Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       },
       body,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -161,6 +165,7 @@ export async function refreshBitbucketToken(
         Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       },
       body,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -187,6 +192,7 @@ export async function fetchBitbucketUser(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json();

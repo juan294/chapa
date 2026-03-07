@@ -387,6 +387,78 @@ describe("clearCodebergStateCookie", () => {
 });
 
 // ---------------------------------------------------------------------------
+// AbortSignal timeout on all fetch calls
+// ---------------------------------------------------------------------------
+
+describe("Codeberg OAuth fetch AbortSignal timeout", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("exchangeCodebergCode passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "tok",
+          token_type: "bearer",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await exchangeCodebergCode("code", "cid", "csecret", "http://localhost:3001/cb");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("refreshCodebergToken passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "tok",
+          token_type: "bearer",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await refreshCodebergToken("refresh_tok", "cid", "csecret");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("fetchCodebergUser passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          login: "cb-user",
+          full_name: "CB User",
+          avatar_url: "https://codeberg.org/avatars/12345",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchCodebergUser("access_tok");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null when fetch aborts due to timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await exchangeCodebergCode("code", "cid", "csecret", "http://localhost:3001/cb");
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Cookie Secure flag (conditional on HTTPS)
 // ---------------------------------------------------------------------------
 
