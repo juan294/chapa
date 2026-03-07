@@ -2,6 +2,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+import fs from "fs";
+import { resolve } from "path";
+
+const SOURCE = fs.readFileSync(
+  resolve(__dirname, "ActivityHeatmap.tsx"),
+  "utf-8"
+);
 
 afterEach(cleanup);
 
@@ -154,5 +161,25 @@ describe("ActivityHeatmap", () => {
       name: "Hexagonal activity heatmap",
     });
     expect(grid).toBeTruthy();
+  });
+
+  // ----------------------------------------------------------------
+  // 10. Uses CSS variables instead of hardcoded hex colors
+  // ----------------------------------------------------------------
+  it("uses CSS variables for dimension colors, not hardcoded hex", () => {
+    // Static analysis: DIMENSION_COLORS must use var(--color-dimension-*) CSS variables
+    expect(SOURCE).toContain("var(--color-dimension-delivery)");
+    expect(SOURCE).toContain("var(--color-dimension-quality)");
+    expect(SOURCE).toContain("var(--color-dimension-consistency)");
+    expect(SOURCE).toContain("var(--color-dimension-breadth)");
+
+    // Must NOT contain hardcoded hex values for dimension colors
+    const dimColorsBlock = SOURCE.match(
+      /DIMENSION_COLORS[\s\S]*?};/
+    )?.[0] ?? "";
+    expect(dimColorsBlock).not.toContain('"#22c55e"');
+    expect(dimColorsBlock).not.toContain('"#f97316"');
+    expect(dimColorsBlock).not.toContain('"#06b6d4"');
+    expect(dimColorsBlock).not.toContain('"#ec4899"');
   });
 });

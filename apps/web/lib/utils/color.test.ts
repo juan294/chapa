@@ -1,20 +1,29 @@
 import { describe, it, expect } from "vitest";
-import { hexToRgba } from "./color";
+import { cssVarAlpha } from "./color";
 
-describe("hexToRgba", () => {
-  it("converts a hex color to rgba with full opacity", () => {
-    expect(hexToRgba("#FF0000", 1)).toBe("rgba(255, 0, 0, 1)");
+describe("cssVarAlpha", () => {
+  it("converts a CSS variable and alpha to color-mix()", () => {
+    expect(cssVarAlpha("var(--color-dimension-delivery)", 0.5)).toBe(
+      "color-mix(in srgb, var(--color-dimension-delivery) 50%, transparent)"
+    );
   });
 
-  it("converts a hex color to rgba with partial opacity", () => {
-    expect(hexToRgba("#8B5CF6", 0.5)).toBe("rgba(139, 92, 246, 0.5)");
+  it("converts alpha 1 to 100%", () => {
+    expect(cssVarAlpha("var(--color-amber)", 1)).toBe(
+      "color-mix(in srgb, var(--color-amber) 100%, transparent)"
+    );
   });
 
-  it("handles black", () => {
-    expect(hexToRgba("#000000", 0.1)).toBe("rgba(0, 0, 0, 0.1)");
+  it("converts alpha 0 to 0%", () => {
+    expect(cssVarAlpha("var(--color-dimension-quality)", 0)).toBe(
+      "color-mix(in srgb, var(--color-dimension-quality) 0%, transparent)"
+    );
   });
 
-  it("handles white", () => {
-    expect(hexToRgba("#FFFFFF", 1)).toBe("rgba(255, 255, 255, 1)");
+  it("rounds percentage to avoid floating-point artifacts", () => {
+    // 0.333... * 100 = 33.3... → should round to 33%
+    expect(cssVarAlpha("var(--color-dimension-breadth)", 0.333)).toBe(
+      "color-mix(in srgb, var(--color-dimension-breadth) 33%, transparent)"
+    );
   });
 });

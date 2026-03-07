@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
-import { hexToRgba } from "@/lib/utils/color";
+import { cssVarAlpha } from "@/lib/utils/color";
 import { mulberry32 } from "@/lib/utils/prng";
 
 /* ------------------------------------------------------------------ */
@@ -29,10 +29,10 @@ const WEEKS = 13;
 const DAYS = 7;
 
 const DIMENSION_COLORS: Record<Dimension, string> = {
-  delivery: "#22c55e",
-  quality: "#f97316",
-  consistency: "#06b6d4",
-  breadth: "#ec4899",
+  delivery: "var(--color-dimension-delivery)",
+  quality: "var(--color-dimension-quality)",
+  consistency: "var(--color-dimension-consistency)",
+  breadth: "var(--color-dimension-breadth)",
 };
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
@@ -245,18 +245,18 @@ function HexCell({
   switch (variant) {
     case "dominant": {
       if (day.count === 0) {
-        background = "rgba(139, 92, 246, 0.06)";
+        background = "var(--color-purple-tint)";
       } else {
-        background = hexToRgba(DIMENSION_COLORS[day.dominant], alpha);
+        background = cssVarAlpha(DIMENSION_COLORS[day.dominant], alpha);
       }
       break;
     }
     case "blend": {
       if (day.count === 0) {
-        background = "rgba(139, 92, 246, 0.06)";
+        background = "var(--color-purple-tint)";
       } else {
-        const center = hexToRgba(DIMENSION_COLORS[day.dominant], alpha);
-        const edge = hexToRgba(
+        const center = cssVarAlpha(DIMENSION_COLORS[day.dominant], alpha);
+        const edge = cssVarAlpha(
           DIMENSION_COLORS[day.secondary],
           alpha * 0.6
         );
@@ -268,12 +268,12 @@ function HexCell({
       if (day.count === 0) {
         background = "rgba(255, 255, 255, 0.03)";
       } else {
-        background = hexToRgba(
+        background = cssVarAlpha(
           DIMENSION_COLORS[day.dominant],
           alpha * 0.9
         );
         if (day.intensity >= 3) {
-          const glowColor = hexToRgba(
+          const glowColor = cssVarAlpha(
             DIMENSION_COLORS[day.dominant],
             0.4 + day.intensity * 0.1
           );
@@ -485,8 +485,8 @@ function IntensityLegend() {
           className="w-3 h-3"
           style={{
             clipPath: HEX_CLIP_PATH,
-            backgroundColor: hexToRgba(
-              "#8B5CF6",
+            backgroundColor: cssVarAlpha(
+              "var(--color-amber)",
               INTENSITY_ALPHA[level] ?? 0.07
             ),
           }}
