@@ -113,16 +113,19 @@ async function _fetchAndCache(
     return null;
   }
 
-  // Fetch Bitbucket data (from cache or live)
-  const bbStats = await _fetchBitbucketIfLinked(handle, lowerHandle);
+  // Fetch Bitbucket + Codeberg in parallel — error in one must not block the other
+  const [bbResult, cbResult] = await Promise.allSettled([
+    _fetchBitbucketIfLinked(handle, lowerHandle),
+    _fetchCodebergIfLinked(handle, lowerHandle),
+  ]);
+
+  const bbStats = bbResult.status === "fulfilled" ? bbResult.value : null;
+  const cbStats = cbResult.status === "fulfilled" ? cbResult.value : null;
 
   // Merge Bitbucket into primary (markAsSupplemental: false — linked platform, not EMU)
   let stats: StatsData = bbStats
     ? mergeStats(primary, bbStats, { markAsSupplemental: false })
     : primary;
-
-  // Fetch Codeberg data (from cache or live)
-  const cbStats = await _fetchCodebergIfLinked(handle, lowerHandle);
 
   // Merge Codeberg into current stats
   if (cbStats) {

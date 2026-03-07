@@ -1142,6 +1142,191 @@ describe("getStats", () => {
       });
     });
 
+    it("fetches Bitbucket and Codeberg in parallel (not sequentially)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 20 });
+      const cb = makeStats({ commitsTotal: 15 });
+
+      // Track the order in which fetches start and complete
+      const events: string[] = [];
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          if (platform === "bitbucket") {
+            return Promise.resolve({
+              remoteLogin: "bb-user",
+              tokens: {
+                accessToken: "bb-token",
+                refreshToken: "bb-refresh",
+                expiresAt: new Date("2027-12-31"),
+              },
+            });
+          }
+          if (platform === "codeberg") {
+            return Promise.resolve({
+              remoteLogin: "cb-user",
+              tokens: {
+                accessToken: "cb-token",
+                refreshToken: null,
+                expiresAt: null,
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+      mockIsTokenExpired
+        .mockReturnValueOnce(false) // bitbucket
+        .mockReturnValueOnce(true); // codeberg (null → true)
+
+      // Make BB fetch take "longer" — use a deferred promise so we can observe
+      // that CB fetch doesn't wait for BB to complete.
+      let resolveBb!: (value: StatsData) => void;
+      mockFetchBitbucketStats.mockReturnValue(
+        new Promise<StatsData>((resolve) => {
+          resolveBb = resolve;
+          events.push("bb:started");
+        }),
+      );
+      mockFetchCodebergStats.mockImplementation(() => {
+        events.push("cb:started");
+        return Promise.resolve(cb);
+      });
+
+      const resultPromise = getStats("test-user");
+
+      // Give microtasks a chance to settle — both fetches should have started
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Both fetches should have started BEFORE bb resolves
+      expect(events).toContain("bb:started");
+      expect(events).toContain("cb:started");
+
+      // Now resolve BB
+      resolveBb(bb);
+      const result = await resultPromise;
+
+      expect(result).not.toBeNull();
+      expect(result!.commitsTotal).toBe(85); // 50 + 20 + 15
+    });
+
+    it("Bitbucket error does not block Codeberg fetch", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const cb = makeStats({ commitsTotal: 15 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          if (platform === "bitbucket") {
+            return Promise.resolve({
+              remoteLogin: "bb-user",
+              tokens: {
+                accessToken: "bb-token",
+                refreshToken: "bb-refresh",
+                expiresAt: new Date("2027-12-31"),
+              },
+            });
+          }
+          if (platform === "codeberg") {
+            return Promise.resolve({
+              remoteLogin: "cb-user",
+              tokens: {
+                accessToken: "cb-token",
+                refreshToken: null,
+                expiresAt: null,
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+      mockIsTokenExpired
+        .mockReturnValueOnce(false) // bitbucket
+        .mockReturnValueOnce(true); // codeberg (null → true)
+
+      // BB fetch throws an error
+      mockFetchBitbucketStats.mockRejectedValue(new Error("BB API down"));
+      mockFetchCodebergStats.mockResolvedValue(cb);
+
+      const result = await getStats("test-user");
+
+      // Should still return GitHub + Codeberg stats (BB error is swallowed)
+      expect(result).not.toBeNull();
+      expect(result!.commitsTotal).toBe(65); // 50 + 15
+      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+    });
+
+    it("Codeberg error does not block Bitbucket fetch", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 20 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          if (platform === "bitbucket") {
+            return Promise.resolve({
+              remoteLogin: "bb-user",
+              tokens: {
+                accessToken: "bb-token",
+                refreshToken: "bb-refresh",
+                expiresAt: new Date("2027-12-31"),
+              },
+            });
+          }
+          if (platform === "codeberg") {
+            return Promise.resolve({
+              remoteLogin: "cb-user",
+              tokens: {
+                accessToken: "cb-token",
+                refreshToken: null,
+                expiresAt: null,
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+      mockIsTokenExpired
+        .mockReturnValueOnce(false) // bitbucket
+        .mockReturnValueOnce(true); // codeberg (null → true)
+
+      mockFetchBitbucketStats.mockResolvedValue(bb);
+      // CB fetch throws an error
+      mockFetchCodebergStats.mockRejectedValue(new Error("CB API down"));
+
+      const result = await getStats("test-user");
+
+      // Should still return GitHub + Bitbucket stats (CB error is swallowed)
+      expect(result).not.toBeNull();
+      expect(result!.commitsTotal).toBe(70); // 50 + 20
+      expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+    });
+
     it("handles Codeberg fetch failure gracefully (returns GitHub-only)", async () => {
       const github = makeStats({ commitsTotal: 50 });
 
