@@ -1,95 +1,64 @@
-The QA audit is complete. Here's the full report:
-
----
-
 # QA Report
-> Generated: 2026-02-18 | Health status: **GREEN**
+> Generated: 2026-03-04 | Health status: GREEN
 
 ## Executive Summary
-
-All 2,554 tests pass across 156 test files with zero failures. TypeScript type checking and ESLint are both clean. Accessibility and design system audits found 9 accessibility issues (2 high, 4 medium, 3 low) and 3 design system violations in production code (all minor button rounding), with additional violations isolated to feature-flagged experiment pages.
+All 4,238 tests pass across 272 files. TypeScript and ESLint are clean. Accessibility is excellent with comprehensive ARIA, focus indicators, and keyboard navigation. Two minor design system violations found (hardcoded hex colors in dimension color constants).
 
 ## Test Results
-- **Total:** 2,554 tests across 156 files
-- **Passed:** 2,554 | **Failed:** 0 | **Skipped:** 0
-- **Duration:** 7.61s
-- **Slow tests (>300ms):** `TerminalOutput.test.tsx` (320ms), `ThemeToggle.test.tsx` (393ms), `email/notifications.test.ts` (607ms)
+- Total: **4,238** tests across **272** files
+- Passed: **4,238** | Failed: **0** | Skipped: **0**
+- Duration: 11.34s
+- Flaky tests: 0 (confirmed by coverage agent across 3 consecutive runs)
 
 ## TypeScript
-Clean — 0 type errors across all workspace packages.
+Clean — zero type errors across both `packages/shared` and `apps/web`.
 
 ## Linting
-Clean — 0 warnings, 0 errors.
+Clean — zero ESLint warnings or errors.
 
 ## Accessibility
+**Status: EXCELLENT** — no violations found.
 
-### High Priority
+| Category | Status | Notes |
+|----------|--------|-------|
+| Alt text on images | PASS | All `<img>` tags have descriptive `alt` attributes |
+| Heading hierarchy | PASS | Proper h1 > h2 > h3, no skipped levels |
+| ARIA labels | PASS | Comprehensive `aria-label`, `aria-describedby`, `aria-hidden` |
+| Focus indicators | PASS | All interactive elements use `focus-visible:ring-2 focus-visible:ring-amber` |
+| Keyboard navigation | PASS | Focus traps in modals/menus, Escape key handling, Tab wrapping |
+| Semantic HTML | PASS | `<button>`, `<dialog>`, `<nav>`, `<main>` used correctly |
+| Dynamic content | PASS | `aria-live="polite"` on terminal output and status updates |
+| Interactive divs | PASS | All have proper `role`, `tabIndex`, and keyboard handlers |
 
-| # | File | Line(s) | Issue |
-|---|------|---------|-------|
-| A1 | `app/admin/AdminDashboardClient.tsx` | 147–148, 201–203 | Tab buttons lack `role="tab"`, `aria-selected`, `role="tablist"`, `role="tabpanel"` — screen readers can't identify tab widget |
-| A2 | `components/BadgeOverlay.tsx` | 311–327 | `aria-describedby` references panel elements that don't exist on mobile (`hidden md:contents`) and only exist for the active hotspot — broken ARIA reference |
+## Error Handling
+**Status: COMPREHENSIVE**
 
-### Medium Priority
-
-| # | File | Line(s) | Issue |
-|---|------|---------|-------|
-| A3 | `app/admin/AdminSearchBar.tsx` | 22 | `outline-none` with no replacement focus indicator |
-| A4 | `app/studio/QuickControls.tsx` | 89–100 | Collapse buttons lack `aria-expanded` |
-| A5 | `app/u/[handle]/loading.tsx`, `app/studio/loading.tsx` | — | Loading skeletons have no sr-only text for screen readers |
-| A6 | `components/AuthorTypewriter.tsx` | 196–210 | `tabIndex={0}` div with no keyboard event handler |
-
-### Low Priority
-
-| # | File | Line(s) | Issue |
-|---|------|---------|-------|
-| A7 | `components/BadgeOverlay.tsx` | 310–327 | Hotspot `div`s should be `<button>` elements for keyboard activation |
-| A8 | `app/verify/VerifyForm.tsx` | 44 | Very low-opacity replacement focus ring (`ring-complement/20`) |
-| A9 | `components/InfoTooltip.tsx` | 67 | Weaker replacement ring (`ring-1 ring-amber/50`) vs global default |
-
-### Positives
-- Global `*:focus-visible` amber outline, skip-to-content link, `prefers-reduced-motion` support
-- `aria-live="polite"` on terminal output, all images have `alt` text
-- Heading hierarchy correct, error boundaries at app + root level, loading states for all routes
+- **Error boundaries**: `error.tsx` at root, `/admin`, `/u/[handle]` + `global-error.tsx`
+- **Loading states**: All major routes have `loading.tsx` with `role="status"` and `aria-label="Loading"`
+- **404 page**: `not-found.tsx` exists with home link
+- **API routes**: Consistent try/catch pattern with proper HTTP status codes (400, 401, 403, 429, 502, 503, 500)
+- **SVG fallback**: Badge endpoint returns SVG with error message (not error page) on data failure
+- **Cache fail-open**: Redis rate limiter intentionally allows requests during outages (documented accepted risk)
+- **Empty states**: Share page conditionally renders sections with fallback message when data unavailable
 
 ## Design System Compliance
+**Status: PASS (2 minor violations)**
 
-### Production Code (3 minor violations)
+### Violations
 
-| # | File | Issue |
-|---|------|-------|
-| D1 | `components/ErrorBanner.tsx:46` | `<button>` uses `rounded-full` (dismiss icon) |
-| D2 | `components/InfoTooltip.tsx:67` | `<button>` uses `rounded-full` (info trigger) |
-| D3 | `components/UserMenu.tsx:31` | `<button>` uses `rounded-full` (avatar pill) |
+1. **Hardcoded dimension colors** in `apps/web/components/dashboard/ActivityHeatmap.tsx:30-33` — uses `#22c55e`, `#f97316`, etc. instead of `var(--color-dimension-*)` CSS variables.
+2. **Same pattern** in `apps/web/app/experiments/hexmap/page.tsx:31-35` (experiments page, lower priority).
 
-- **No hardcoded hex colors** in production components
-- **No font violations** — correct JetBrains Mono / Plus Jakarta Sans usage
-- **Spacing consistent** — `max-w-7xl` nav, `max-w-4xl` content, `max-w-3xl` prose
-
-### Experiment Pages (feature-flagged)
-Extensive hardcoded hex in 8+ experiment files + `rounded-full` on CTA buttons. Must be cleaned before promotion to production.
+### Passed Areas
+- Semantic tokens (`bg-bg`, `text-text-primary`, `border-stroke`) used throughout
+- No forbidden fonts (Inter, Roboto, Arial)
+- No icon library imports (all inline SVGs)
+- `rounded-full` only on icon-only buttons and avatars (no text/CTA buttons)
+- No arbitrary Tailwind color syntax (`bg-[#...]`)
+- CSS variables defined for both light and dark themes
 
 ## Recommendations
 
-**Priority 1** (before next release):
-1. Add ARIA tab widget semantics to `AdminDashboardClient.tsx`
-2. Fix broken `aria-describedby` in `BadgeOverlay.tsx`
-3. Add focus indicator to `AdminSearchBar.tsx`
-4. Add `aria-expanded` to `QuickControls.tsx`
-
-**Priority 2** (accessibility improvements):
-5. Add sr-only loading text to skeleton loading pages
-6. Add keyboard handler to `AuthorTypewriter.tsx`
-7. Convert hotspot divs to `<button>` in `BadgeOverlay.tsx`
-
-**Priority 3** (design system):
-8. Decide on `rounded-full` exception for icon-only buttons
-9. Document `max-w-3xl` for prose pages in `docs/design-system.md`
-10. Clean up experiment pages before promoting to production
-
----
-
-**Cross-agent notes:**
-- **Coverage**: Loading skeleton files have no tests; `email/notifications.test.ts` is the slowest at 607ms
-- **Security**: SVG XSS properly escaped, OAuth callback has 15 test cases, no secrets in `NEXT_PUBLIC_*`
-- **Performance**: 3 test files >300ms may indicate heavy DOM setup worth profiling
+1. **Low priority**: Update `DIMENSION_COLORS` in `ActivityHeatmap.tsx:30-33` and `hexmap/page.tsx:31-35` to use `var(--color-dimension-*)` CSS variables instead of hardcoded hex values. The correct pattern exists in `RadarChartInteractive.tsx`, `SubMetricPanel.tsx`, and `DimensionCard.tsx`.
+2. **Informational**: Cache key mismatch bug persists per cost-analyst report (`refresh/route.ts:54`, `supplemental/route.ts:93` delete wrong key `stats:v2:${handle}` vs actual `stats:v2:merged:${handle}`). Tests mask the bug.
+3. **Informational**: Share pages lack ISR (`revalidate`) per cost-analyst recommendation — SSR on every request.

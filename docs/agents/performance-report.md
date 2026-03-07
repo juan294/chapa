@@ -1,134 +1,114 @@
----
-
 # Performance Report
-> Generated: 2026-02-19 | Branch: `develop` | Health status: **GREEN**
+> Generated: 2026-03-05 | Branch: `develop` | Health status: GREEN
 
 ## Executive Summary
 
-The Chapa build is healthy with **no routes exceeding the 500KB threshold**. Total client-side static JS is ~1.6MB across 46 chunks, with the largest individual chunk at 220KB. The badge SVG route has excellent caching (6h CDN + 7d stale-while-revalidate) and in-flight request deduplication. One optimization opportunity: `dbGetLatestSnapshot()` has no application-level cache, adding ~50-150ms to every badge request.
+Build compiles cleanly in 2.3s (Turbopack). Total client-side static JS is **1.3 MB** across 52 chunks with no single chunk exceeding 500 KB. The largest chunk is 219 KB (Next.js framework internals). PostHog (~173 KB) is the biggest third-party library but is already lazy-loaded on first user interaction. The main actionable finding is that share pages (`/u/[handle]`) lack ISR, causing unnecessary SSR on every request.
 
 ## Build Output
 
-**Next.js 16.1.6 (Turbopack)** — compiled in 2.0s, 50 static pages generated in 256ms.
+Next.js 16.1.6 with Turbopack does **not** emit per-route First Load JS sizes in the build output. Analysis is based on the static chunk directory instead.
 
-> Note: Turbopack does not emit per-route First Load JS sizes. Analysis based on `.next/static/chunks/` inspection.
+| Chunk | Size | Contents | Status |
+|-------|------|----------|--------|
+| `484c69...` | 219 KB | Next.js framework (router, hydration) | GREEN |
+| `9ff022...` | 173 KB | `posthog-js` (analytics) | YELLOW |
+| `a6dad9...` | 110 KB | Framework chunk | GREEN |
+| `70c742...` | 108 KB | Framework chunk | GREEN |
+| `f26a8d...` | 58 KB | App code | GREEN |
+| `2b6d58...` | 56 KB | App code | GREEN |
+| `4a281c...` | 51 KB | App code | GREEN |
+| All others | <43 KB each | Various | GREEN |
 
-### Client-Side Chunks (Top 10)
-
-| Chunk | Size (KB) | Status |
-|-------|-----------|--------|
-| `484c69dcd7684692.js` | 220 | OK |
-| `17a702d48c913fd1.js` | 172 | OK |
-| `a6dad97d9634a72d.js` | 112 | OK |
-| `70c742eba8ce1834.js` | 112 | OK |
-| `71dff01ff7365d49.js` | 56 | OK |
-| `9a4a8216d25f87ef.js` | 52 | OK |
-| `bfe46c5d29a814b5.js` | 48 | OK |
-| `3732fecc719825d8.js` | 48 | OK |
-| `bf2f904e5eb87d6a.js` | 44 | OK |
-| `b4b6098f1fc48502.js` | 44 | OK |
-
-### Server-Side Chunks (Top 5)
-
-| Chunk | Size (KB) | Notes |
-|-------|-----------|-------|
-| `_99edbd10._.js` | 356 | Shared server runtime |
-| `posthog-js (SSR)` | 168 | PostHog SDK |
-| `supabase (SSR)` | 156 | Supabase client |
-| `supabase (server)` | 156 | Supabase client |
-| `server entrypoint` | 100 | Root server module |
+**No route or chunk exceeds 500 KB.** Largest is 219 KB.
 
 ## Bundle Analysis
 
-- **Total client static JS**: ~1.6MB (46 chunks)
-- **Total static output**: ~1.8MB (includes CSS, manifests)
-- **Largest client chunk**: 220KB — well under 500KB threshold
-- **Routes > 500KB**: **0**
-- **Routes > 300KB**: **0**
-- **Unused exports (knip)**: **0** — only 4 stale `knip.json` ignore entries to clean up
+- **Total static JS**: 1,376 KB (1.3 MB) across 52 chunks
+- **Total static CSS**: 90 KB (single file)
+- **Total `.next/` directory**: 333 MB (includes dev artifacts, server chunks, cache)
+- **Largest third-party**: `posthog-js` at ~173 KB — mitigated by lazy-loading (interaction-triggered `import()` with 5s fallback in `PostHogProvider.tsx:18`)
+- **Unused exports (knip)**: 0 — clean
+- **Unused dependencies (knip)**: 0 — clean
 
 ## Client/Server Boundary
 
-**30 files** with `"use client"` — **27 correctly placed**, 3 minor candidates:
+34 files use `"use client"`. 30 legitimately need it (hooks, browser APIs). **4 files could be server components:**
 
-| File | Assessment | Impact |
-|------|-----------|--------|
-| `SharePageShortcuts.tsx` | Renderless (returns `null`). Could be a hook | Low |
-| `CrossAgentInsights.tsx` | `useState` only for tab selection; markdown is pure | Low |
-| `UserMenu.tsx` | Could split server shell + client dropdown | Very Low |
+| File | Location | Reason |
+|------|----------|--------|
+| `OverallHealthBanner.tsx` | `admin/agents/` | Pure presentation, no hooks |
+| `AgentCard.tsx` | `admin/agents/` | Pure presentation, no hooks |
+| `ShareBadgePreview.tsx` | `components/` | Wrapper around client child, no hooks |
+| Error pages (`error.tsx`, `u/[handle]/error.tsx`, `admin/error.tsx`) | Various | Pure presentation (but Next.js error boundaries require `"use client"` — **keep as-is**) |
 
-**Verdict**: Well-optimized. No heavy server modules in client bundles. Not worth refactoring.
-
-## Font Loading — All PASS
-
-- `next/font/google` with `display: "swap"` for both JetBrains Mono and Plus Jakarta Sans
-- No external `@import` or `<link>` font requests — zero render-blocking
-- System font fallbacks defined
-
-## CLS Risk — Very Low
-
-All images have explicit dimensions (`next/image` with width/height). One minor: embed snippet suggests `width="600"` without height — adding `height="315"` would help downstream sites.
+**Impact**: Removing `"use client"` from `OverallHealthBanner.tsx`, `AgentCard.tsx`, and `ShareBadgePreview.tsx` would reduce the client bundle marginally — these are small components. Low priority.
 
 ## Caching & Headers
 
-### Badge Route (`/u/[handle]/badge.svg`)
+### Badge SVG Route (`/u/[handle]/badge.svg`)
+- **Success**: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800` (6h CDN cache, 7d stale)
+- **Fallback (error)**: `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` (5m CDN cache)
+- **CSP**: Allows `frame-ancestors *` (intentional — badge is embeddable)
+- **I/O**: `Promise.all()` parallelizes avatar + snapshot fetch. Post-response work via `after()`.
+- **Verdict**: Well-optimized. No blocking concerns.
 
-| Header | Value |
-|--------|-------|
-| `Cache-Control` | `public, s-maxage=21600, stale-while-revalidate=604800` |
-| Error fallback | `s-maxage=300, stale-while-revalidate=600` |
+### OG Image Route (`/u/[handle]/og-image`)
+- `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
+- Uses `@resvg/resvg-js` (~20-30 MB memory per concurrent render). Monitor during social share spikes.
 
-### Application Caching
+### Share Pages (`/u/[handle]`) — WARNING
+- **No ISR configured.** Every request triggers full SSR (stats fetch, impact compute, SVG render).
+- Pages like `/`, `/about`, `/about/scoring`, `/about/verification` already have `revalidate = 3600`.
+- **Adding `export const revalidate = 3600` to `/u/[handle]/page.tsx` would cut function invocations by 80-90%** for popular profiles.
 
-| Layer | TTL | Status |
-|-------|-----|--------|
-| Stats (primary) | 6h | Good |
-| Stats (stale fallback) | 7d | Excellent |
-| Avatar (base64) | 6h | Good |
-| Rate limit | 60s/100req | Good |
-| **DB snapshot** | **none** | **Missing** |
+### API Routes
+- No API routes export `revalidate` — expected for dynamic endpoints.
+- Rate limiting is fail-open by design (availability-first).
 
-### Badge Response Times
+## Font Loading
 
-| Scenario | Estimated |
-|----------|-----------|
-| All caches hit | ~94ms |
-| Stats miss | ~540ms |
-| All misses | ~1040ms |
+- **Status**: GREEN — optimal
+- Both fonts (`JetBrains Mono`, `Plus Jakarta Sans`) loaded via `next/font/google` with `display: "swap"` (`layout.tsx:11-23`)
+- Subsets limited to `latin`
+- No external `@import` or `<link>` tags — zero render-blocking font requests
+- CSP allows `font-src 'self' https://fonts.gstatic.com` for Next.js font proxy
 
-Key optimizations already in place: in-flight request deduplication, fail-open rate limiting, async `after()` writes.
+## CLS Risks
+
+- **Status**: GREEN — no major risks
+- Share page badge `<img>` has explicit `width={1200} height={630}` dimensions
+- Demo badge on landing page is rendered server-side at build time
+- All animations use CSS classes (`animate-fade-in-up`) with staggered delays
+- `prefers-reduced-motion` media query is respected
+
+## Dynamic Import Strategy
+
+Heavy components are properly code-split with `next/dynamic`:
+- `LazyAuroraBackground`, `LazyParticleCanvas`, `LazyGradientBorder`, `LazyHolographicOverlay` — `ssr: false` (`BadgePreviewCard.tsx:22-40`)
+- `ShareBadgePreview` — `ssr: false` with skeleton loader (`ShareBadgePreviewLazy.tsx:6-9`)
+- `AgentsDashboard`, `EngagementDashboard` — `ssr: false` (`AdminDashboardClient.tsx:12-19`)
+- `posthog-js` — interaction-triggered `import()` (`PostHogProvider.tsx:18`)
+
+No render-blocking imports of heavy libraries found.
 
 ## Recommendations
 
-| # | Issue | Impact | Effort |
-|---|-------|--------|--------|
-| **1** | Cache `dbGetLatestSnapshot()` in Redis (24h TTL) | Medium — saves 50-150ms/req | Low |
-| **2** | Clean up 4 stale knip.json ignore entries | Low — config hygiene | Low |
-| **3** | Add `height="315"` to embed snippet | Low — prevents CLS downstream | Low |
-| **4** | Add `@next/bundle-analyzer` for monitoring | Info — catch future regressions | Low |
+### Priority 1 — High Impact
+1. **Add ISR to share pages**: Add `export const revalidate = 3600` to `apps/web/app/u/[handle]/page.tsx`. This is the single highest-impact change — reduces SSR invocations by 80-90% for popular profiles without sacrificing data freshness (badge data is cached daily anyway).
 
-### Not Recommended
+### Priority 2 — Medium Impact
+2. **Monitor PostHog bundle size**: At 173 KB, `posthog-js` is the largest third-party chunk. The lazy-loading strategy (interaction + 5s timeout) is effective, but monitor for growth. Consider `posthog-js/lite` if it becomes available.
+3. **Monitor resvg memory during spikes**: OG image generation uses ~20-30 MB per concurrent render. If social sharing causes concurrent spikes, consider a queue or concurrency limiter.
 
-- Splitting the 3 `"use client"` files — marginal gains, not worth complexity
-- Dynamic imports in badge route — all imports already lightweight
-- Avatar lazy-loading — 6h Redis cache is sufficient
+### Priority 3 — Low Impact
+4. **Remove unnecessary `"use client"` from 3 components**: `OverallHealthBanner.tsx`, `AgentCard.tsx`, `ShareBadgePreview.tsx`. Marginal bundle savings.
+5. **Enable bundle analyzer with webpack**: The `ANALYZE=true` flag doesn't produce visual output with Turbopack. Consider temporarily switching to webpack build for detailed bundle analysis if size regressions appear. Alternatively, use `npx @next/bundle-analyzer` standalone.
 
----
-
-## Shared Context Entry
-
-```
-## Performance Agent — 2026-02-19
-- **Status**: GREEN
-- Total client static JS: ~1.6MB across 46 chunks
-- Largest chunk: 220KB (well under 500KB threshold)
-- Routes >500KB: 0
-- Unused exports: 0
-- Badge route: ~94ms cached, ~1040ms worst-case
-- Missing cache: dbGetLatestSnapshot() (Supabase hit every request)
-
-**Cross-agent recommendations:**
-- [Coverage]: Badge route EMA smoothing path (dbGetLatestSnapshot) should have integration tests
-- [Security]: Fail-open rate limiting is an accepted risk — document in security review
-- [QA]: Embed snippet missing height attr could cause CLS on downstream sites
-```
+### No Action Required
+- Knip: clean (0 unused exports/deps)
+- Font loading: optimal (next/font with swap)
+- CLS: no risks detected
+- Badge route: well-cached with proper headers
+- Dynamic imports: properly code-split
+- Build time: 2.3s (fast)
