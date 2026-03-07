@@ -38,7 +38,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/verify/:hash` Badge verification endpoint
 - GET `/api/admin/users` Admin user list (session auth + admin check)
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
-- POST `/api/studio/config` Save/load badge customization config
+- GET|PUT `/api/studio/config` Load/save badge customization config
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
 - GET `/api/history/:handle` Score history, trend, and diff (public, rate-limited)
 
