@@ -1,21 +1,62 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock Supabase client
+// Mock Supabase client — tracks arguments for all chain methods
 // ---------------------------------------------------------------------------
 
 const mockInsert = vi.fn();
-const mockFrom = vi.fn(() => ({ insert: mockInsert }));
+const mockDelete = vi.fn();
+const mockSelect = vi.fn();
+const mockLt = vi.fn();
+const mockLimit = vi.fn();
+
+let terminalResolve: { data: unknown; error: unknown };
 
 const { mockGetSupabase } = vi.hoisted(() => ({
   mockGetSupabase: vi.fn(),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockFrom = vi.fn((): any => {
+  const chain: Record<string, unknown> = {};
+  chain.insert = mockInsert;
+  chain.select = (...args: unknown[]) => {
+    mockSelect(...args);
+    return chain;
+  };
+  chain.lt = (...args: unknown[]) => {
+    mockLt(...args);
+    return chain;
+  };
+  chain.limit = (...args: unknown[]) => {
+    mockLimit(...args);
+    return chain;
+  };
+  chain.delete = () => {
+    mockDelete();
+    return chain;
+  };
+  // Terminal .then for delete().lt().limit().select() chain
+  chain.then = (
+    resolve: (v: unknown) => void,
+    reject: (e: unknown) => void,
+  ) => {
+    if (terminalResolve.error) reject(terminalResolve.error);
+    else resolve(terminalResolve);
+  };
+  return chain;
+});
+
 vi.mock("./supabase", () => ({
   getSupabase: mockGetSupabase,
 }));
 
-import { dbInsertTelemetry } from "./telemetry";
+import {
+  dbInsertTelemetry,
+  dbCleanExpiredMergeOperations,
+  MERGE_OPS_RETENTION_DAYS,
+  MERGE_OPS_CLEANUP_BATCH_SIZE,
+} from "./telemetry";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -42,12 +83,13 @@ const validPayload = {
 };
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests — dbInsertTelemetry
 // ---------------------------------------------------------------------------
 
 describe("dbInsertTelemetry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    terminalResolve = { data: null, error: null };
   });
 
   it("returns false when Supabase is unavailable", async () => {
@@ -128,5 +170,117 @@ describe("dbInsertTelemetry", () => {
     expect(mockInsert).toHaveBeenCalledWith(
       expect.objectContaining({ target_handle: "juan294" }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — dbCleanExpiredMergeOperations
+// ---------------------------------------------------------------------------
+
+describe("dbCleanExpiredMergeOperations", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    terminalResolve = { data: null, error: null };
+  });
+
+  it("exports MERGE_OPS_RETENTION_DAYS as 90", () => {
+    expect(MERGE_OPS_RETENTION_DAYS).toBe(90);
+  });
+
+  it("exports MERGE_OPS_CLEANUP_BATCH_SIZE as 1000", () => {
+    expect(MERGE_OPS_CLEANUP_BATCH_SIZE).toBe(1000);
+  });
+
+  it("returns count of deleted rows", async () => {
+    terminalResolve = { data: [{ id: 1 }, { id: 2 }, { id: 3 }], error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbCleanExpiredMergeOperations();
+
+    expect(result).toBe(3);
+    expect(mockFrom).toHaveBeenCalledWith("merge_operations");
+    expect(mockDelete).toHaveBeenCalled();
+  });
+
+  it("filters rows older than 90 days using .lt(created_at, ...)", async () => {
+    terminalResolve = { data: [], error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbCleanExpiredMergeOperations();
+
+    expect(mockLt).toHaveBeenCalledWith(
+      "created_at",
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    );
+
+    // Verify the cutoff date is approximately 90 days ago
+    const cutoffArg = mockLt.mock.calls[0]![1] as string;
+    const cutoffDate = new Date(cutoffArg);
+    const expectedCutoff = new Date();
+    expectedCutoff.setDate(expectedCutoff.getDate() - 90);
+    // Allow 5 seconds of drift for test execution time
+    expect(Math.abs(cutoffDate.getTime() - expectedCutoff.getTime())).toBeLessThan(5000);
+  });
+
+  it("applies MERGE_OPS_CLEANUP_BATCH_SIZE limit", async () => {
+    terminalResolve = { data: [], error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbCleanExpiredMergeOperations();
+
+    expect(mockLimit).toHaveBeenCalledWith(MERGE_OPS_CLEANUP_BATCH_SIZE);
+  });
+
+  it("selects id column to get deleted count", async () => {
+    terminalResolve = { data: [], error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbCleanExpiredMergeOperations();
+
+    expect(mockSelect).toHaveBeenCalledWith("id");
+  });
+
+  it("returns 0 when Supabase is unavailable", async () => {
+    mockGetSupabase.mockReturnValue(null);
+
+    const result = await dbCleanExpiredMergeOperations();
+
+    expect(result).toBe(0);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("returns 0 on Supabase error without throwing (fail-open)", async () => {
+    terminalResolve = { data: null, error: new Error("delete failed") };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbCleanExpiredMergeOperations();
+
+    expect(result).toBe(0);
+  });
+
+  it("returns 0 when data is null (no rows deleted)", async () => {
+    terminalResolve = { data: null, error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbCleanExpiredMergeOperations();
+
+    expect(result).toBe(0);
+  });
+
+  it("does not delete recent rows (cutoff is 90 days, not more)", async () => {
+    terminalResolve = { data: [], error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbCleanExpiredMergeOperations();
+
+    // The .lt() filter ensures only rows with created_at < cutoff are deleted.
+    // Rows created within the last 90 days have created_at >= cutoff, so they
+    // won't match the filter. We verify the cutoff is exactly 90 days ago.
+    const cutoffArg = mockLt.mock.calls[0]![1] as string;
+    const cutoffDate = new Date(cutoffArg);
+    const now = new Date();
+    const diffDays = (now.getTime() - cutoffDate.getTime()) / (1000 * 60 * 60 * 24);
+    expect(diffDays).toBeGreaterThanOrEqual(89.9);
+    expect(diffDays).toBeLessThanOrEqual(90.1);
   });
 });

@@ -13,6 +13,7 @@ import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
@@ -157,6 +158,14 @@ export async function GET(request: NextRequest) {
     // Non-critical — don't fail the cron response
   }
 
+  // Clean merge_operations rows older than 90 days (fire-and-forget safe)
+  let expiredMergeOpsDeleted = 0;
+  try {
+    expiredMergeOpsDeleted = await dbCleanExpiredMergeOperations();
+  } catch {
+    // Non-critical — don't fail the cron response
+  }
+
   return NextResponse.json(
     {
       warmed,
@@ -164,6 +173,7 @@ export async function GET(request: NextRequest) {
       snapshots,
       notifications,
       expiredVerificationsDeleted,
+      expiredMergeOpsDeleted,
       total: toWarm.length,
       handles: toWarm,
       rotation: {
