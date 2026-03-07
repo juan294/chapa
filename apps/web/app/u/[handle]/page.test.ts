@@ -138,6 +138,13 @@ describe("SharePage", () => {
     });
   });
 
+  // #532 — ISR revalidation for share pages (cuts serverless invocations 80-90%)
+  describe("ISR revalidation", () => {
+    it("exports revalidate = 3600 for Incremental Static Regeneration", () => {
+      expect(SOURCE).toContain("export const revalidate = 3600");
+    });
+  });
+
   // Data Sources section — rendered before Impact Breakdown
   describe("data sources section", () => {
     it("imports DataSources component", () => {
