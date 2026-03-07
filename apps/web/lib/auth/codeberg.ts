@@ -25,6 +25,9 @@ const CB_AUTHORIZE_URL = "https://codeberg.org/login/oauth/authorize";
 const CB_TOKEN_URL = "https://codeberg.org/login/oauth/access_token";
 const CB_API_URL = "https://codeberg.org/api/v1";
 
+/** 10-second timeout for all external OAuth fetches */
+const FETCH_TIMEOUT_MS = 10_000;
+
 // ---------------------------------------------------------------------------
 // OAuth URL
 // ---------------------------------------------------------------------------
@@ -120,6 +123,7 @@ export async function exchangeCodebergCode(
         grant_type: "authorization_code",
         redirect_uri: redirectUri,
       }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -156,6 +160,7 @@ export async function refreshCodebergToken(
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -183,6 +188,7 @@ export async function fetchCodebergUser(
       headers: {
         Authorization: `token ${accessToken}`,
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json();
