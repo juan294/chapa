@@ -37,8 +37,27 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-terminal-red` | `#F87171` | `text-terminal-red` | Error messages |
 | `--color-terminal-yellow` | `#FBBF24` | `text-terminal-yellow` | Warning messages |
 | `--color-terminal-dim` | `#4A4A5E` | `text-terminal-dim` | Dim text, prefixes, decorative |
-| `--color-complement` | `#10B981` | `text-complement` | Soft teal accent (sparingly) |
-| `--color-complement-light` | `rgba(16,185,129,0.15)` | `bg-complement-light` | Teal tint |
+| `--color-complement` | `#10B981` | `#10B981` | `text-complement`, `bg-complement` | Soft teal accent (sparingly) — verification, secondary CTAs |
+| `--color-complement-light` | `rgba(16,185,129,0.15)` | `#D1FAE5` | `bg-complement-light` | Teal tint |
+| `--color-track` | `rgba(255,255,255,0.06)` | `rgba(0,0,0,0.06)` | `bg-track` | Progress bar/gauge track background |
+| | | | | |
+| **Dimension colors** | | | | **Data visualization accents for the 4 impact dimensions** |
+| `--color-dimension-delivery` | `#22c55e` | `#22c55e` | `text-dimension-delivery`, `bg-dimension-delivery` | Delivery dimension (green) |
+| `--color-dimension-quality` | `#f97316` | `#f97316` | `text-dimension-quality`, `bg-dimension-quality` | Quality dimension (orange) |
+| `--color-dimension-consistency` | `#06b6d4` | `#06b6d4` | `text-dimension-consistency`, `bg-dimension-consistency` | Consistency dimension (cyan) |
+| `--color-dimension-breadth` | `#ec4899` | `#ec4899` | `text-dimension-breadth`, `bg-dimension-breadth` | Breadth dimension (pink) |
+| `--color-dimension-delivery-light` | `#4ADE80` | `#4ADE80` | `text-dimension-delivery-light` | Lighter delivery accent |
+| `--color-dimension-quality-light` | `#FB923C` | `#FB923C` | `text-dimension-quality-light` | Lighter quality accent |
+| `--color-dimension-consistency-light` | `#22D3EE` | `#22D3EE` | `text-dimension-consistency-light` | Lighter consistency accent |
+| `--color-dimension-breadth-light` | `#F472B6` | `#F472B6` | `text-dimension-breadth-light` | Lighter breadth accent |
+| | | | | |
+| **Archetype colors** | | | | **Accent color per developer archetype** |
+| `--color-archetype-builder` | `#8B5CF6` | `#8B5CF6` | `text-archetype-builder`, `bg-archetype-builder` | Builder archetype (purple) |
+| `--color-archetype-guardian` | `#EC4899` | `#EC4899` | `text-archetype-guardian`, `bg-archetype-guardian` | Quality Champion archetype (pink) |
+| `--color-archetype-marathoner` | `#22C55E` | `#22C55E` | `text-archetype-marathoner`, `bg-archetype-marathoner` | Marathoner archetype (green) |
+| `--color-archetype-polymath` | `#EAB308` | `#EAB308` | `text-archetype-polymath`, `bg-archetype-polymath` | Polymath archetype (yellow) |
+| `--color-archetype-balanced` | `#0EA5E9` | `#0EA5E9` | `text-archetype-balanced`, `bg-archetype-balanced` | Balanced archetype (sky blue) |
+| `--color-archetype-emerging` | `#F97316` | `#F97316` | `text-archetype-emerging`, `bg-archetype-emerging` | Emerging archetype (orange) |
 
 ### Color rules
 
@@ -59,6 +78,9 @@ Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
 |------|------|----------------|-------------|---------|
 | Headings | **JetBrains Mono** | `font-heading` | `--font-jetbrains-mono` | 400, 500, 700, 800 |
 | Body/UI | **Plus Jakarta Sans** | `font-body` | `--font-plus-jakarta` | 400, 500, 600, 700 |
+| Terminal UI | **JetBrains Mono** | `font-terminal` | `--font-terminal` | (inherits heading weights) |
+
+`--font-terminal` is an alias for JetBrains Mono with `ui-monospace` fallback, defined in `globals.css` `@theme`. Use `font-terminal` on terminal-specific components (`TerminalInput`, `TerminalOutput`, `AutocompleteDropdown`) for semantic clarity — it resolves to the same typeface as `font-heading` but signals "this is terminal chrome" to other developers.
 
 ### Typography rules
 
@@ -149,10 +171,19 @@ Defined in `globals.css`:
 | `animate-fade-in-up` | Fade in + slide up 30px | 0.8s ease-out |
 | `animate-cursor-blink` | Step cursor blink | 1s infinite |
 | `animate-terminal-fade-in` | Fade in + slide up 8px | 0.3s ease-out |
-| `animate-pulse-glow-amber` | Soft pulsing indigo shadow | 3s infinite |
-| `animate-float-slow` | Gentle vertical float | 6s infinite |
-| `animate-shimmer` | Horizontal shimmer gradient | 3s linear infinite |
+| `animate-pulse-glow-amber` | Soft pulsing purple shadow | 3s infinite |
+| `animate-float-slow` | Gentle vertical float + slight rotation | 6s infinite |
+| `animate-float-medium` | Medium vertical float + counter-rotation | 7.5s infinite |
+| `animate-float-fast` | Faster vertical float + stronger rotation | 5s infinite |
+| `animate-drift` | Multi-axis drift with 4 waypoints | 8s infinite |
+| `animate-shimmer` | Horizontal shimmer gradient (left to right) | 3s linear infinite |
+| `animate-shimmer-sweep` | Horizontal shimmer gradient (right to left) | 3s linear infinite |
 | `animate-scale-in` | Scale from 0.92 + fade in | 0.6s ease-out |
+| `animate-gauge-fill` | SVG circular gauge stroke fill | 1.5s ease-out |
+| `animate-bar-fill` | Horizontal bar scale from 0 to target | 0.8s ease-out |
+| `animate-terminal-type` | Typewriter width expansion (0 to 100%) | (set per-element) |
+| `.sparkline-animated polyline` | SVG polyline stroke trace via `--sparkline-length` | 0.6s ease-out |
+| `radar-expand` (keyframe only) | Scale from 0 + fade in (for radar chart polygons) | (set per-element) |
 
 ## Icons
 
