@@ -1,3 +1,5 @@
+export const revalidate = 3600;
+
 import { after } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
