@@ -735,7 +735,7 @@ export default function TierVisualsExperimentPage() {
         }}
       />
 
-      <div className="min-h-screen bg-bg bg-grid-warm">
+      <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
           <div className="absolute top-1/4 -left-32 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]" />

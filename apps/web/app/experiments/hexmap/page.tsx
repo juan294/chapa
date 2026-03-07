@@ -513,7 +513,7 @@ export default function HexmapExperimentPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-bg bg-grid-warm">
+    <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
       <div className="relative mx-auto max-w-6xl px-6 py-20">
         {/* ── Header ─────────────────────────────────────────── */}
         <p className="mb-4 text-sm font-medium tracking-widest uppercase text-amber">

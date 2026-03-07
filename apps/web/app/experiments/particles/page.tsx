@@ -649,7 +649,7 @@ const INTERACTIVE_CONFIG: ParticleConfig = {
 
 export default function ParticlesExperimentPage() {
   return (
-    <div className="min-h-screen bg-bg">
+    <div id="main-content" className="min-h-screen bg-bg">
       <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
