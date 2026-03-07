@@ -41,6 +41,10 @@ vi.mock("@/lib/db/verification", () => ({
   dbCleanExpiredVerifications: vi.fn(() => Promise.resolve(0)),
 }));
 
+vi.mock("@/lib/db/telemetry", () => ({
+  dbCleanExpiredMergeOperations: vi.fn(() => Promise.resolve(0)),
+}));
+
 vi.mock("@/lib/cache/snapshot-cache", () => ({
   updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
@@ -74,6 +78,7 @@ import {
 } from "@/lib/db/snapshots";
 import { getStats } from "@/lib/github/client";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
@@ -681,6 +686,41 @@ describe("GET /api/cron/warm-cache", () => {
 
       expect(body.rotation.coversAll).toBe(true);
       expect(body.rotation.totalUsers).toBe(30);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Merge operations cleanup
+  // ---------------------------------------------------------------------------
+
+  describe("merge operations cleanup", () => {
+    it("calls dbCleanExpiredMergeOperations", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(dbCleanExpiredMergeOperations)).toHaveBeenCalled();
+    });
+
+    it("includes expiredMergeOpsDeleted in response", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
+      vi.mocked(dbCleanExpiredMergeOperations).mockResolvedValue(42);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.expiredMergeOpsDeleted).toBe(42);
+    });
+
+    it("does not fail if merge ops cleanup throws", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
+      vi.mocked(dbCleanExpiredMergeOperations).mockRejectedValue(
+        new Error("Supabase down"),
+      );
+
+      const res = await GET(makeRequest("test-cron-secret"));
+
+      expect(res.status).toBe(200);
     });
   });
 });
