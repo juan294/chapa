@@ -48,7 +48,7 @@ export function DimensionCardsRow({
             <DimensionCard
               key={dim}
               dimension={dim}
-              score={impact.dimensions[dim] as number}
+              score={impact.dimensions[dim] ?? 0}
               stats={stats}
               trend={trend?.dimensions[dim] ?? null}
               delta={diff?.dimensions[dim] ?? null}
