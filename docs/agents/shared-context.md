@@ -9,27 +9,28 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-07T06:00:00Z -->
-## Cost Analyst — 2026-03-07
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-08T06:00:00Z -->
+## Cost Analyst — 2026-03-08
 - **Status**: GREEN
 - Estimated monthly cost at 10K users: ~$56 (Vercel $26, Redis $20, Resend $10, Supabase free).
 - Redis TTL coverage: 100% per-user keys. 3 global keys without TTL — intentional, combined <16 KB.
 - Per-user Redis: ~60–210 KB (with avatar) / ~8–15 KB (without). Avatar cache is #1 per-user cost driver.
 - GitHub API headroom: 35x over estimated usage (100K calls/month vs 3.6M limit). Request dedup reduces concurrent calls 40–60%.
 - CDN caching blocks ~90% of badge requests at edge (zero serverless invocations for cached).
-- Resource management: zero leaks. Lazy singletons (Redis, Supabase), self-cleaning `_inflight` Map, `Promise.allSettled` in `after()` hooks, fire-and-forget with `void`.
-- Supabase: 6 tables + 2 views, singleton client, zero N+1 queries, batch snapshots (50/query), RLS on all tables.
-- **RECURRING: Share pages still lack ISR** (`/u/[handle]/page.tsx`) — 3rd consecutive audit. `revalidate=3600` would cut invocations 80–90%.
-- **RECURRING: 9 OAuth fetch calls lack `AbortSignal.timeout()`** — BB/CB auth routes can hang to Vercel 31s max.
-- **RECURRING: Sequential platform fetches** — `lib/github/client.ts` BB then CB (worst-case 60s). Should `Promise.all()`.
-- **RECURRING: `merge_operations` write-only** — no cleanup, unbounded growth. Needs retention policy.
-- `svgToPng()` in `og-image/route.ts` still has no timeout guard.
+- Resource management: zero leaks. Lazy singletons (Redis, Supabase), self-cleaning `_inflight` Map, `Promise.allSettled` in `after()` hooks.
+- Supabase: 6 tables + 2 views, singleton client, 1 minor N+1 (`isAgentEnabled` — 2 flag queries), batch snapshots (50/query), RLS on all tables.
+- **RESOLVED: Share page ISR** — `revalidate=3600` now set on `/u/[handle]/page.tsx:1`. Cuts invocations 80–90%. 3-audit recurring item closed.
+- **RESOLVED: `merge_operations` retention** — 90-day cleanup via `dbCleanExpiredMergeOperations()` (telemetry.ts:81), called from warm-cache cron.
+- **RESOLVED: `svgToPng()` timeout** — `Promise.race()` with 10s timeout in og-image/route.ts:81-86.
+- **RESOLVED: Platform fetch parallelization** — BB+CB now parallel via `Promise.allSettled()` (client.ts:117).
+- **OPEN: 3 GitHub OAuth functions lack `AbortSignal.timeout()`** — `exchangeCodeForToken`, `fetchGitHubUser`, `fetchGitHubUserEmail` in `lib/auth/github.ts`. BB/CB equivalents have 10s timeouts.
+- `metrics_snapshots` grows ~3.6M rows/year at 10K users — monitor for Supabase free tier limits.
 
 **Cross-agent recommendations:**
-- [Performance]: Share page ISR is #1 optimization — 3rd audit confirming. Sequential platform fetches add 60s worst-case. Avatar base64 embedding inflates SVG ~33%.
-- [Security]: Fail-open rate limiting intact. 9 OAuth fetches without timeout risk connection leak. Token encryption verified. RLS policies correct on all 6 tables.
-- [Coverage]: `merge_operations` cleanup needs tests once implemented. OAuth timeout behavior untested. Share page ISR integration test needed once added.
-- [QA]: `merge_operations` needs retention policy. Platform fetch parallelization would benefit from integration test coverage.
+- [Performance]: All 3 previously recurring items resolved. Avatar base64 embedding still inflates SVG ~33% but is cached. Per-repo BB/CB sequential calls capped by pagination (low impact).
+- [Security]: Fail-open rate limiting intact. 3 GitHub OAuth fetches without timeout risk connection hang (down from 9 — BB/CB now have 10s timeouts). Token encryption verified. RLS correct on all 6 tables.
+- [Coverage]: `merge_operations` cleanup now implemented — needs test coverage for retention logic. GitHub OAuth timeout behavior still untested. `isAgentEnabled()` minor N+1 could use test if optimized.
+- [QA]: Share page ISR resolved. Monitor `metrics_snapshots` row count as user base grows — may need retention policy at scale.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-05T09:05:00Z -->
@@ -108,22 +109,22 @@
 - [Performance]: `ActivityHeatmap.tsx` hardcodes dimension colors — should use CSS vars for theme consistency.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-07T09:10:00Z -->
-## Coverage Agent — 2026-03-07
+<!-- ENTRY:START agent=coverage timestamp=2026-03-08T02:05:00Z -->
+## Coverage Agent — 2026-03-08
 - **Status**: GREEN
-- Overall coverage: 78.5% stmts (5,111/6,514), 74.4% branch, 70.4% funcs, 79.7% lines
-- Test suite: 272 files, 4,238 tests, 100% pass rate, 0 flaky (3 consecutive runs)
+- Overall coverage: 78.54% stmts (5,141/6,545), 74.48% branch, 70.47% funcs, 79.74% lines
+- Test suite: 273 files, 4,280 tests, 100% pass rate, 0 flaky (3 consecutive runs)
+- Delta vs 2026-03-07: +42 tests, +1 test file, +30 covered stmts, +0.04% stmts — stable
 - Critical paths: all 8 critical modules at 88–100% stmts — `lib/render` 100%, `lib/impact` 99.4%, `lib/history` 97.8%, `lib/github` 97.1%, `app/api` 95.5%, `lib/auth` 94.1%, `lib/db` 93.0%, `lib/cache` 88.9%
-- Coverage STABLE vs 2026-03-06: identical percentages, same test count, zero regressions
 - Largest untested: `hexmap/page.tsx` (132 stmts, 0%), `StudioClient.tsx` (119 stmts, 0%), `ParticleBackground.tsx` (112 stmts, 0.9%)
-- RED modules: `app/studio` 27.1%, `app/admin` 56.5%, `app/experiments` 57.4% — all UI-heavy, non-critical paths
+- RED modules: `app/studio` ~27%, `app/admin` ~57%, `app/experiments` ~57% — all UI-heavy, non-critical
 - Only critical-path file below 80%: `app/api/auth/login/route.ts` at 76.9% (6 uncovered stmts — OAuth redirect edge cases)
-- Stderr noise from 3 error-handling tests (generate, verify, refresh routes) is intentional — not flaky
+- NEW: Intermittent `window is not defined` error in `use-animated-counter.test.ts` (1 of 3 runs) — React DOM cleanup in jsdom, does not affect test outcomes
 
 **Cross-agent recommendations:**
 - [Security]: No security-relevant test gaps. All auth routes, OAuth callbacks, session handling at 88%+. SVG XSS tests in `lib/render/escape.test.ts`. HMAC verification at 100%. `login/route.ts` at 76.9% — OAuth redirect edge cases, low security risk.
-- [QA]: Priority test additions remain unchanged: `StudioClient.tsx` (119 stmts, 0%), `BadgeToolbar.tsx` (72 uncovered stmts), `AuthorTypewriter.tsx` (67 uncovered stmts). These are UI-heavy, non-critical. `UserMenu.tsx` (54.9%) is user-facing and worth prioritizing.
+- [QA]: Priority test additions unchanged: `StudioClient.tsx` (119 stmts, 0%), `BadgeToolbar.tsx` (72 uncovered stmts), `UserMenu.tsx` (54.9%). Intermittent jsdom error in `use-animated-counter.test.ts` worth investigating — add explicit jsdom environment declaration or cleanup guard.
 - [Performance]: `ParticleBackground.tsx` (112 stmts, 0.9%) still canvas-heavy and untested — smoke test recommended.
-- [Cost Analyst]: Feature flag caching (`lib/feature-flags.ts`) at 100% coverage. `merge_operations` cleanup needs tests once retention policy is implemented. OAuth timeout behavior untested.
-- [DevOps]: All API routes at 95.5% coverage. No CI-affecting issues. node_modules.nosync contamination remains fixed.
+- [Cost Analyst]: Feature flag caching at 100%. `merge_operations` cleanup needs tests once retention policy is implemented. OAuth timeout behavior untested.
+- [DevOps]: All API routes at 95.5% coverage. No CI-affecting issues. 42 new tests added since last report — healthy growth.
 <!-- ENTRY:END -->
