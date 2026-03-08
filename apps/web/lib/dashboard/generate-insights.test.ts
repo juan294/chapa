@@ -235,4 +235,30 @@ describe("generateInsights", () => {
     expect(breadthInsights.length).toBe(1);
     expect(breadthInsights[0]!.id).toBe("trend-breadth");
   });
+
+  it("has Artificer archetype profile text", () => {
+    const artificerImpact: ImpactV4Result = {
+      ...mockImpact,
+      archetype: "Artificer",
+    };
+    const insights = generateInsights(artificerImpact, null, null);
+    const archetype = insights.find((i) => i.id === "tip-archetype");
+    expect(archetype).toBeDefined();
+    expect(archetype!.headline).toBe("You're a Artificer");
+    expect(archetype!.body).toMatch(/craft/i);
+  });
+
+  it("has craft dimension tip text", () => {
+    // When craft is the weakest dimension, generate-insights should provide a tip
+    const craftImpact: ImpactV4Result = {
+      ...mockImpact,
+      archetype: "Builder",
+      dimensions: { delivery: 85, quality: 60, consistency: 70, breadth: 50, craft: 20 },
+    };
+    const insights = generateInsights(craftImpact, null, null);
+    const craftTip = insights.find((i) => i.id === "tip-craft");
+    expect(craftTip).toBeDefined();
+    expect(craftTip!.dimension).toBe("craft");
+    expect(craftTip!.body).toBeTruthy();
+  });
 });

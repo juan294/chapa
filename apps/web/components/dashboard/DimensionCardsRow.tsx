@@ -5,16 +5,15 @@ import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
 
-/** Core GitHub dimensions displayed as cards (craft is shown separately when present). */
-const DIMENSIONS = ["delivery", "quality", "consistency", "breadth"] as const;
-type CoreDimension = (typeof DIMENSIONS)[number];
+/** Core dimensions — always shown. */
+const CORE_DIMENSIONS = ["delivery", "quality", "consistency", "breadth"] as const;
 
 export interface DimensionCardsRowProps {
   impact: ImpactV4Result;
   stats: StatsData;
   trend?: TrendSummary | null;
   diff?: SnapshotDiff | null;
-  activeDimension?: CoreDimension | keyof DimensionScores | null;
+  activeDimension?: keyof DimensionScores | null;
   className?: string;
 }
 
@@ -26,13 +25,22 @@ export function DimensionCardsRow({
   activeDimension,
   className,
 }: DimensionCardsRowProps) {
+  const hasCraft = impact.dimensions.craft != null;
+  const dimensions: (keyof DimensionScores)[] = hasCraft
+    ? [...CORE_DIMENSIONS, "craft"]
+    : [...CORE_DIMENSIONS];
+
+  const gridCols = hasCraft
+    ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
+
   return (
     <section className={className}>
       <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-3">
         Performance Dimensions
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {DIMENSIONS.map((dim, i) => {
+      <div className={`grid ${gridCols} gap-3`}>
+        {dimensions.map((dim, i) => {
           const isInactive =
             activeDimension != null && activeDimension !== dim;
 

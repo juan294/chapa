@@ -51,8 +51,8 @@ const DIMENSION_COLORS: Record<
     to: "var(--color-dimension-breadth-light)",
   },
   craft: {
-    from: "#F59E0B",
-    to: "#FBBF24",
+    from: "var(--color-dimension-craft)",
+    to: "var(--color-dimension-craft-light)",
   },
 };
 

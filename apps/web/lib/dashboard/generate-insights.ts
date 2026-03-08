@@ -43,6 +43,8 @@ const ARCHETYPE_PROFILES: Record<string, string> = {
     "Your profile is impressively well-rounded — no single dimension dominates because you invest across delivery, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
   Emerging:
     "Your profile is still taking shape — with more contributions over the coming months, your strongest dimensions will emerge and reveal your developer identity. Every commit, review, and repo you touch sharpens the picture.",
+  Artificer:
+    "Your profile is defined by craft — you leverage AI coding tools with exceptional skill and sophistication, turning them into force multipliers for your development workflow. Craft is your dominant dimension, showcasing mastery of modern AI-assisted development.",
 };
 
 const DIMENSION_TIPS: Record<string, string> = {
@@ -54,6 +56,8 @@ const DIMENSION_TIPS: Record<string, string> = {
     "To strengthen Consistency, aim for regular contributions across more days — even small commits on consecutive days build this dimension faster than occasional bursts.",
   breadth:
     "To strengthen Breadth, contribute to repos outside your main project — opening issues, submitting PRs, or reviewing code in other repositories all count.",
+  craft:
+    "To strengthen Craft, explore AI coding tools more deeply — use them for complex refactoring, test generation, and code review to build proficiency and sophistication.",
 };
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -61,6 +65,7 @@ const DIMENSION_LABELS: Record<string, string> = {
   quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
+  craft: "Craft",
 };
 
 /** Ordered tier list (lowest to highest) for comparison */
@@ -143,10 +148,12 @@ export function generateInsights(
   // Rule 3: Dimension improvement (priority 3)
   // -----------------------------------------------------------------------
   if (diff) {
-    const dimKeys = ["delivery", "quality", "consistency", "breadth"] as const;
+    const dimKeys: (keyof DimensionScores)[] = diff.dimensions.craft != null
+      ? ["delivery", "quality", "consistency", "breadth", "craft"]
+      : ["delivery", "quality", "consistency", "breadth"];
     for (const key of dimKeys) {
       const delta = diff.dimensions[key];
-      if (delta > 5) {
+      if (delta != null && delta > 5) {
         improvementDimensions.add(key);
         insights.push({
           id: `trend-${key}`,

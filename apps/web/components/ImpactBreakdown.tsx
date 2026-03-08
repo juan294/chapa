@@ -1,4 +1,4 @@
-import type { ImpactV4Result, DeveloperArchetype, StatsData, Platform } from "@chapa/shared";
+import type { ImpactV4Result, DeveloperArchetype, StatsData, Platform, DimensionScores } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 
@@ -7,6 +7,7 @@ const DIMENSION_LABELS: Record<string, string> = {
   quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
+  craft: "Craft",
 };
 
 const DIMENSION_SUBTITLES: Record<string, string> = {
@@ -14,6 +15,7 @@ const DIMENSION_SUBTITLES: Record<string, string> = {
   quality: "Code reviews \u00b7 quality gatekeeping",
   consistency: "Active days \u00b7 sustained contributions",
   breadth: "Repos contributed \u00b7 community reach",
+  craft: "AI tool proficiency \u00b7 effectiveness \u00b7 sophistication",
 };
 
 const SOLO_DIMENSION_SUBTITLES: Partial<Record<string, string>> = {
@@ -25,6 +27,7 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   quality: { from: "var(--color-dimension-quality)", to: "var(--color-dimension-quality-light)" },
   consistency: { from: "var(--color-dimension-consistency)", to: "var(--color-dimension-consistency-light)" },
   breadth: { from: "var(--color-dimension-breadth)", to: "var(--color-dimension-breadth-light)" },
+  craft: { from: "var(--color-dimension-craft)", to: "var(--color-dimension-craft-light)" },
 };
 
 
@@ -44,6 +47,10 @@ const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   breadth: {
     id: "dim-breadth",
     tip: "Measures cross-project reach: repos contributed to, project diversity, and community metrics (stars, forks, watchers).",
+  },
+  craft: {
+    id: "dim-craft",
+    tip: "Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.",
   },
 };
 
@@ -183,6 +190,7 @@ const DIMENSION_TIPS: Record<string, string> = {
   quality: "To strengthen Quality, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
   consistency: "To strengthen Consistency, aim for regular contributions across more days \u2014 even small commits on consecutive days build this dimension faster than occasional bursts.",
   breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
+  craft: "To strengthen Craft, explore AI coding tools more deeply \u2014 use them for complex refactoring, test generation, and code review to build proficiency and sophistication.",
 };
 
 const SOLO_DIMENSION_TIPS: Partial<Record<string, string>> = {
@@ -218,6 +226,10 @@ interface ImpactBreakdownProps {
 export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
   const dims = impact.dimensions;
   const isSolo = impact.profileType === "solo";
+  const hasCraft = dims.craft != null;
+  const activeDimensions: (keyof DimensionScores)[] = hasCraft
+    ? ["delivery", "quality", "consistency", "breadth", "craft"]
+    : ["delivery", "quality", "consistency", "breadth"];
 
   return (
     <div className="space-y-10">
@@ -227,7 +239,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           Performance Dimensions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {(["delivery", "quality", "consistency", "breadth"] as const).map(
+          {activeDimensions.map(
             (key, i) => (
               <div
                 key={key}

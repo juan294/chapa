@@ -274,4 +274,54 @@ describe("DimensionCardsRow", () => {
     expect(screen.getByTestId("dimension-card-consistency").getAttribute("data-delta")).toBe("none");
     expect(screen.getByTestId("dimension-card-breadth").getAttribute("data-delta")).toBe("none");
   });
+
+  // 12. Renders only 4 cards when craft is absent
+  it("renders 4 cards when craft dimension is absent", () => {
+    const impactWithoutCraft = {
+      ...mockImpact,
+      dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68 },
+    } as ImpactV4Result;
+
+    render(<DimensionCardsRow impact={impactWithoutCraft} stats={mockStats} />);
+
+    expect(screen.getByTestId("dimension-card-delivery")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-quality")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-consistency")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-breadth")).toBeTruthy();
+    expect(screen.queryByTestId("dimension-card-craft")).toBeNull();
+  });
+
+  // 13. Renders 5 cards when craft is present
+  it("renders 5 cards when craft dimension is present", () => {
+    const impactWithCraft = {
+      ...mockImpact,
+      dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 45 },
+    } as ImpactV4Result;
+
+    render(<DimensionCardsRow impact={impactWithCraft} stats={mockStats} />);
+
+    expect(screen.getByTestId("dimension-card-delivery")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-quality")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-consistency")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-breadth")).toBeTruthy();
+    expect(screen.getByTestId("dimension-card-craft")).toBeTruthy();
+  });
+
+  // 14. Uses responsive 5-column grid when craft is present
+  it("uses 5-column grid when craft is present", () => {
+    const impactWithCraft = {
+      ...mockImpact,
+      dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 45 },
+    } as ImpactV4Result;
+
+    const { container } = render(
+      <DimensionCardsRow impact={impactWithCraft} stats={mockStats} />,
+    );
+
+    const grid = container.querySelector(".grid");
+    expect(grid).toBeTruthy();
+    expect(grid!.classList.contains("grid-cols-2")).toBe(true);
+    expect(grid!.classList.contains("sm:grid-cols-3")).toBe(true);
+    expect(grid!.classList.contains("lg:grid-cols-5")).toBe(true);
+  });
 });

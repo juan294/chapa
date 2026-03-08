@@ -227,4 +227,22 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).not.toContain('"#ec4899"');
     });
   });
+
+  describe("craft dimension (Impact v6)", () => {
+    it("iterates only active dimensions — 4 when craft absent", () => {
+      // The dimension iteration must filter based on craft presence.
+      // When craft is absent, only delivery/quality/consistency/breadth render.
+      // Source should NOT hardcode the 4 keys without a filter mechanism.
+      const fnBody = SOURCE.slice(SOURCE.indexOf("export function ImpactBreakdown"));
+      // Must have craft label and color entries
+      expect(SOURCE).toContain('"craft"');
+      // Must have a filtering mechanism for active dimensions
+      expect(fnBody).toMatch(/filter|dimensions\.craft|craft\s*!=|craft\s*!==|hasCraft/);
+    });
+
+    it("has craft entries in dimension labels, colors, and tooltips", () => {
+      expect(SOURCE).toContain('"Craft"');
+      expect(SOURCE).toContain("var(--color-dimension-craft)");
+    });
+  });
 });

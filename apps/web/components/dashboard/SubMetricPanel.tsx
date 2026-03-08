@@ -23,7 +23,7 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   quality: "var(--color-dimension-quality)",
   consistency: "var(--color-dimension-consistency)",
   breadth: "var(--color-dimension-breadth)",
-  craft: "#F59E0B",
+  craft: "var(--color-dimension-craft)",
 };
 
 const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {

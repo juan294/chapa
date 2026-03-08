@@ -8,7 +8,8 @@ import { useInView } from "@/lib/effects/counters/use-in-view";
 // Constants
 // ---------------------------------------------------------------------------
 
-const AXES: {
+/** Diamond axes (90° spacing) — 4 dimensions */
+const AXES_4: {
   key: keyof DimensionScores;
   label: string;
   angle: number;
@@ -19,12 +20,25 @@ const AXES: {
   { key: "breadth", label: "Breadth", angle: Math.PI }, // left
 ];
 
+/** Pentagon axes (72° spacing) — 5 dimensions including craft */
+const AXES_5: {
+  key: keyof DimensionScores;
+  label: string;
+  angle: number;
+}[] = [
+  { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
+  { key: "quality", label: "Quality", angle: -Math.PI / 2 + (2 * Math.PI) / 5 },
+  { key: "consistency", label: "Consistency", angle: -Math.PI / 2 + (4 * Math.PI) / 5 },
+  { key: "breadth", label: "Breadth", angle: -Math.PI / 2 + (6 * Math.PI) / 5 },
+  { key: "craft", label: "Craft", angle: -Math.PI / 2 + (8 * Math.PI) / 5 },
+];
+
 const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   delivery: "var(--color-dimension-delivery)",
   quality: "var(--color-dimension-quality)",
   consistency: "var(--color-dimension-consistency)",
   breadth: "var(--color-dimension-breadth)",
-  craft: "#F59E0B",
+  craft: "var(--color-dimension-craft)",
 };
 
 const RING_LEVELS = [0.25, 0.5, 0.75, 1.0];
@@ -71,6 +85,10 @@ export function RadarChartInteractive({
 }: RadarChartInteractiveProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inView = useInView(containerRef, 0.3);
+
+  // Select diamond (4 axes) or pentagon (5 axes) based on craft presence
+  const hasCraft = dimensions.craft != null;
+  const AXES = hasCraft ? AXES_5 : AXES_4;
 
   // Internal active state (uncontrolled) — overridden by prop when provided
   const [internalActive, setInternalActive] = useState<
