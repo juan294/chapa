@@ -22,7 +22,10 @@ import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
-import { isStudioEnabled } from "@/lib/feature-flags";
+import { isStudioEnabled, isInsightsEnabled } from "@/lib/feature-flags";
+import { InsightsImporter } from "@/components/InsightsImporter";
+import { CraftBreakdown } from "@/components/CraftBreakdown";
+import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { getBaseUrl } from "@/lib/env";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
@@ -113,11 +116,14 @@ export default async function SharePage({ params }: SharePageProps) {
     }
   }
 
-  // Fetch stats, config, and snapshot in parallel (snapshot was previously sequential)
-  const [stats, savedConfig, latestSnapshot] = await Promise.all([
+  // Fetch stats, config, snapshot, craft score, and feature flags in parallel
+  const [stats, savedConfig, latestSnapshot, craftResult, studioEnabled, insightsEnabled] = await Promise.all([
     getStats(handle, token),
     cacheGet<BadgeConfig>(`config:${handle}`),
     getCachedLatestSnapshot(handle),
+    dbGetToolInsights(handle),
+    isStudioEnabled(),
+    isInsightsEnabled(),
   ]);
 
   const impact = stats ? computeImpactV4(stats) : null;
@@ -148,6 +154,7 @@ export default async function SharePage({ params }: SharePageProps) {
         avatarDataUri,
         verificationHash: verification?.hash,
         verificationDate: verification?.date,
+        craftScore: craftResult?.craftScore ?? null,
       })
     : null;
 
@@ -272,9 +279,19 @@ export default async function SharePage({ params }: SharePageProps) {
           <BadgeToolbar
             handle={handle}
             isOwner={isOwner}
-            studioEnabled={await isStudioEnabled()}
+            studioEnabled={studioEnabled}
           />
         </div>
+
+        {/* ── AI Insights Import (owner only) ────────────────── */}
+        {isOwner && insightsEnabled && (
+          <section
+            id="insights"
+            className="mb-10 animate-fade-in-up [animation-delay:270ms]"
+          >
+            <InsightsImporter />
+          </section>
+        )}
 
         {/* ── Visitor CTA (non-owners) ───────────────────────── */}
         {!isOwner && (
@@ -327,6 +344,13 @@ export default async function SharePage({ params }: SharePageProps) {
                     Could not load impact data for this user. Try again later.
                   </p>
                 </div>
+              </section>
+            )}
+
+            {/* ── Craft Breakdown (if insights uploaded) ──────────── */}
+            {craftResult && (
+              <section className="mb-12 animate-fade-in-up [animation-delay:400ms]">
+                <CraftBreakdown craftResult={craftResult} />
               </section>
             )}
 

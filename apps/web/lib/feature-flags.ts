@@ -29,6 +29,10 @@ export function isCodebergEnabledSync(): boolean {
   return process.env.NEXT_PUBLIC_CODEBERG_ENABLED?.trim() === "true";
 }
 
+export function isInsightsEnabledSync(): boolean {
+  return process.env.NEXT_PUBLIC_INSIGHTS_ENABLED?.trim() === "true";
+}
+
 // ---------------------------------------------------------------------------
 // Async (DB-backed + env-var fallback) — for server components / API routes
 // ---------------------------------------------------------------------------
@@ -67,6 +71,13 @@ export async function isCodebergEnabled(): Promise<boolean> {
   return checkFlag(
     "codeberg_integration",
     process.env.NEXT_PUBLIC_CODEBERG_ENABLED,
+  );
+}
+
+export async function isInsightsEnabled(): Promise<boolean> {
+  return checkFlag(
+    "insights_integration",
+    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED,
   );
 }
 

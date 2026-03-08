@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -236,6 +236,30 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
                 </svg>
                 Creator Studio
+              </Link>
+            )}
+            {isInsightsEnabledSync() && (
+              <Link
+                href={`/u/${login}#insights`}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+              >
+                <svg
+                  className="h-4 w-4 text-text-secondary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Import AI Insights
               </Link>
             )}
             {isBitbucketEnabledSync() && bbStatus && (

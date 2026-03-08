@@ -115,6 +115,11 @@ vi.mock("@/lib/db/snapshots", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabled: mockIsStudioEnabled,
+  isInsightsEnabled: vi.fn(() => Promise.resolve(false)),
+}));
+
+vi.mock("@/lib/db/tool-insights", () => ({
+  dbGetToolInsights: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -171,6 +176,12 @@ vi.mock("@/components/CopyButton", () => ({
 }));
 vi.mock("@/components/dashboard/HeroScoreZone", () => ({
   HeroScoreZone: () => "<div>hero</div>",
+}));
+vi.mock("@/components/InsightsImporter", () => ({
+  InsightsImporter: () => "<div>importer</div>",
+}));
+vi.mock("@/components/CraftBreakdown", () => ({
+  CraftBreakdown: () => "<div>craft</div>",
 }));
 
 // ---------------------------------------------------------------------------
@@ -283,6 +294,7 @@ describe("SharePage /u/[handle]", () => {
           avatarDataUri: "data:image/png;base64,abc123",
           verificationHash: undefined,
           verificationDate: undefined,
+          craftScore: null,
         },
       );
     });
@@ -323,6 +335,7 @@ describe("SharePage /u/[handle]", () => {
           avatarDataUri: "data:image/png;base64,abc123",
           verificationHash: "abc12345",
           verificationDate: "2026-01-15",
+          craftScore: null,
         },
       );
     });

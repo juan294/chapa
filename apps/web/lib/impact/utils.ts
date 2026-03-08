@@ -19,7 +19,7 @@ export function clampScore(raw: number): number {
 // ---------------------------------------------------------------------------
 
 export function normalize(x: number, cap: number): number {
-  if (x <= 0) return 0;
+  if (x <= 0 || cap <= 0) return 0;
   const clamped = Math.min(x, cap);
   return Math.log(1 + clamped) / Math.log(1 + cap);
 }

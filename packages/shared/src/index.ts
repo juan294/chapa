@@ -23,6 +23,11 @@ export type {
   BadgeCelebration,
   BadgeConfig,
   FeatureFlag,
+  InsightsTool,
+  InsightsUpload,
+  CraftDimensions,
+  CraftTier,
+  CraftResult,
 } from "./types";
 
 export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";

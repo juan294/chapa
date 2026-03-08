@@ -276,3 +276,79 @@ export interface FeatureFlag {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// AI Tool Insights — Craft Score
+// ---------------------------------------------------------------------------
+
+/** Supported AI coding tools */
+export type InsightsTool = "claude-code";
+
+/** Structured data extracted from an AI tool usage report */
+export interface InsightsUpload {
+  tool: InsightsTool;
+  reportPeriod: {
+    start: string; // ISO date
+    end: string; // ISO date
+  };
+  volume: {
+    messages: number;
+    linesAdded: number;
+    linesDeleted: number;
+    files: number;
+    days: number;
+    msgsPerDay: number;
+  };
+  toolUsage: Record<string, number>;
+  sessionTypes: Record<string, number>;
+  outcomes: {
+    fullyAchieved: number;
+    mostlyAchieved: number;
+    partiallyAchieved: number;
+  };
+  friction: {
+    buggyCode: number;
+    wrongApproach: number;
+    misunderstoodRequest: number;
+  };
+  satisfaction: {
+    dissatisfied: number;
+    likelySatisfied: number;
+    satisfied: number;
+  };
+  multiClauding: {
+    overlapEvents: number;
+    sessionsInvolved: number;
+    messagePercent: number; // 0-100
+  };
+  responseTime: {
+    medianSeconds: number;
+    averageSeconds: number;
+  };
+  toolErrors: Record<string, number>;
+  totalSessions: number;
+  totalToolCalls: number;
+}
+
+/** Three craft sub-dimensions (each 0-100) */
+export interface CraftDimensions {
+  proficiency: number;
+  effectiveness: number;
+  sophistication: number;
+}
+
+/** Craft score tier */
+export type CraftTier = "Novice" | "Practitioner" | "Expert" | "Master";
+
+/** Full craft score result */
+export interface CraftResult {
+  tool: InsightsTool;
+  dimensions: CraftDimensions;
+  craftScore: number; // 0-100, avg of 3 dimensions
+  tier: CraftTier;
+  reportPeriod: {
+    start: string;
+    end: string;
+  };
+  computedAt: string; // ISO timestamp
+}
