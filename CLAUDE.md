@@ -1,13 +1,13 @@
 # Chapa — Dev Impact Badge
 
 ## One-liner
-Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v4 Profile** (4 dimensions + archetype + confidence) from GitHub activity, with a Creator Studio for badge customization, a share page, and one-click sharing.
+Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v6 Profile** (4–5 dimensions + archetype + confidence) from GitHub activity and optional AI tool insights, with a Creator Studio for badge customization, a share page, and one-click sharing.
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
 2. Compute **Impact v4 Profile** from last 12 months (365 days):
-   - 4 dimensions (Delivery, Quality, Consistency, Breadth), each 0–100
-   - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
+   - 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional 5th (Craft), each 0–100
+   - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
    - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 
 3. Serve **Creator Studio**: `/studio` (badge customization with 9 visual categories).
@@ -45,7 +45,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
 - `StatsData` — aggregated GitHub stats (23 fields)
-- `ImpactV4Result` — 4 dimensions, archetype, composite score, confidence, tier
+- `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
@@ -96,11 +96,11 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
-- Badge shows: heatmap, radar chart (4 dimensions), archetype label, stars/forks/watchers, Impact tier, adjusted score.
+- Badge shows: heatmap, radar chart (4 or 5 dimensions — pentagon when Craft is present, diamond fallback), archetype label, stars/forks/watchers, Impact tier, adjusted score.
 - `/u/:handle` shows badge + breakdown + embed snippet. Confidence is computed internally but not shown to users.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
-- Repo contains `docs/impact-v4.md` and `docs/svg-design.md` as spec truth.
+- Repo contains `docs/impact-v6.md` (current spec truth), `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
 - Creator Studio at `/studio` allows badge visual customization (9 categories).
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).

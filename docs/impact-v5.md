@@ -1,3 +1,5 @@
+> **Superseded by v6:** Impact v5 recalibrations remain in effect. v6 adds the 5th "Craft" dimension on top of v5. See `docs/impact-v6.md` for the current spec.
+
 # Impact V5 Scoring Specification
 
 > Source of truth for the V5 scoring system. Supersedes V4 calibration values.

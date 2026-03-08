@@ -128,6 +128,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 | Polymath | `#EAB308` (amber/gold) |
 | Balanced | `#0EA5E9` (sky blue) |
 | Emerging | `#F97316` (warm orange) |
+| Artificer | `#F59E0B` (amber) |
 
 ## Typography
 - All text uses system-safe fonts embedded in SVG
