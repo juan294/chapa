@@ -117,7 +117,7 @@ export function InsightsImporter({
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <h3 className="font-heading text-sm font-medium text-text-primary">
-            Import AI Insights
+            Import Claude Code Insights
           </h3>
         </div>
         {onClose && (

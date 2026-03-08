@@ -3,29 +3,24 @@
 import { useState, useRef, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
-import { InsightsImporter } from "./InsightsImporter";
 import Link from "next/link";
 
 interface BadgeToolbarProps {
   handle: string;
   isOwner: boolean;
   studioEnabled: boolean;
-  insightsEnabled?: boolean;
 }
 
 export function BadgeToolbar({
   handle,
   isOwner,
   studioEnabled,
-  insightsEnabled = false,
 }: BadgeToolbarProps) {
   const [refreshStatus, setRefreshStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
   const shareRef = useRef<HTMLDivElement>(null);
   const { isOpen: shareOpen, setIsOpen: setShareOpen } = useDropdownMenu(shareRef);
-  const importRef = useRef<HTMLDivElement>(null);
-  const { isOpen: importOpen, setIsOpen: setImportOpen } = useDropdownMenu(importRef);
 
   async function handleRefresh() {
     setRefreshStatus("loading");
@@ -140,47 +135,6 @@ export function BadgeToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {/* Import AI Insights (owner + insights enabled) */}
-      {isOwner && insightsEnabled && (
-        <div className="relative" ref={importRef}>
-          <button
-            onClick={() => setImportOpen(!importOpen)}
-            aria-expanded={importOpen}
-            aria-haspopup="dialog"
-            aria-label="Import AI Insights"
-            className={btnClass}
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            Import
-          </button>
-
-          {importOpen && (
-            <div className="absolute top-full right-0 mt-2 w-[340px] sm:w-[400px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 z-20 animate-terminal-fade-in">
-              <InsightsImporter
-                onSuccess={() => {
-                  setImportOpen(false);
-                  setTimeout(() => window.location.reload(), 800);
-                }}
-                onClose={() => setImportOpen(false)}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Refresh (owner only) */}
       {isOwner && (
         <button

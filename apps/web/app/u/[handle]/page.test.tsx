@@ -177,6 +177,9 @@ vi.mock("@/components/CopyButton", () => ({
 vi.mock("@/components/dashboard/HeroScoreZone", () => ({
   HeroScoreZone: () => "<div>hero</div>",
 }));
+vi.mock("@/components/InsightsImporter", () => ({
+  InsightsImporter: () => "<div>importer</div>",
+}));
 vi.mock("@/components/CraftBreakdown", () => ({
   CraftBreakdown: () => "<div>craft</div>",
 }));

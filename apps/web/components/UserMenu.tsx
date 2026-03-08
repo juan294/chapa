@@ -259,7 +259,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                Import AI Insights
+                Import Claude Code Insights
               </Link>
             )}
             {isBitbucketEnabledSync() && bbStatus && (

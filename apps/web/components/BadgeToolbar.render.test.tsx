@@ -19,10 +19,6 @@ vi.mock("next/link", () => ({
     <a href={href} className={className}>{children}</a>,
 }));
 
-vi.mock("./InsightsImporter", () => ({
-  InsightsImporter: () => <div data-testid="insights-importer">importer</div>,
-}));
-
 afterEach(cleanup);
 
 describe("BadgeToolbar", () => {
@@ -60,23 +56,6 @@ describe("BadgeToolbar", () => {
   it("Download button text says Download by default", () => {
     render(<BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />);
     expect(screen.getByText("Download")).toBeDefined();
-  });
-
-  describe("import button", () => {
-    it("shows Import button when isOwner and insightsEnabled", () => {
-      render(<BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} insightsEnabled={true} />);
-      expect(screen.getByLabelText("Import AI Insights")).toBeDefined();
-    });
-
-    it("hides Import button when not owner", () => {
-      render(<BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} insightsEnabled={true} />);
-      expect(screen.queryByLabelText("Import AI Insights")).toBeNull();
-    });
-
-    it("hides Import button when insightsEnabled is false", () => {
-      render(<BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} insightsEnabled={false} />);
-      expect(screen.queryByLabelText("Import AI Insights")).toBeNull();
-    });
   });
 
   describe("refresh flow", () => {

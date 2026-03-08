@@ -91,20 +91,6 @@ describe("BadgeToolbar", () => {
     });
   });
 
-  describe("import button", () => {
-    it("is gated behind insightsEnabled", () => {
-      expect(SOURCE).toContain("insightsEnabled");
-    });
-
-    it("has aria-label for accessibility", () => {
-      expect(SOURCE).toContain('aria-label="Import AI Insights"');
-    });
-
-    it("renders InsightsImporter in dropdown", () => {
-      expect(SOURCE).toContain("InsightsImporter");
-    });
-  });
-
   describe("customize link", () => {
     it("links to /studio", () => {
       expect(SOURCE).toContain('href="/studio"');
