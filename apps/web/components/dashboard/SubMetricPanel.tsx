@@ -23,6 +23,7 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   quality: "var(--color-dimension-quality)",
   consistency: "var(--color-dimension-consistency)",
   breadth: "var(--color-dimension-breadth)",
+  craft: "#F59E0B",
 };
 
 const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
@@ -30,6 +31,7 @@ const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
   quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
+  craft: "Craft",
 };
 
 function getSubMetrics(
@@ -188,6 +190,28 @@ function getSubMetrics(
         },
       ];
     }
+
+    case "craft":
+      return [
+        {
+          label: "AI Tool Proficiency",
+          weight: "34%",
+          normalizedValue: 0,
+          rawLabel: "Upload insights report to compute",
+        },
+        {
+          label: "Effectiveness",
+          weight: "33%",
+          normalizedValue: 0,
+          rawLabel: "Upload insights report to compute",
+        },
+        {
+          label: "Sophistication",
+          weight: "33%",
+          normalizedValue: 0,
+          rawLabel: "Upload insights report to compute",
+        },
+      ];
   }
 }
 

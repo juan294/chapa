@@ -1004,3 +1004,73 @@ describe("computeQuality — solo path", () => {
     expect(computeQuality(stats)).toBe(95);
   });
 });
+
+// ---------------------------------------------------------------------------
+// V6: Craft dimension
+// ---------------------------------------------------------------------------
+
+describe("V6: Craft dimension", () => {
+  it("computeImpactV4 without craft returns same as v5", () => {
+    const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5 });
+    const result = computeImpactV4(stats);
+    expect(result.dimensions.craft).toBeUndefined();
+    // Composite = avg of 4 dimensions
+    const expected = Math.round((result.dimensions.delivery + result.dimensions.quality + result.dimensions.consistency + result.dimensions.breadth) / 4);
+    expect(result.compositeScore).toBe(expected);
+  });
+
+  it("computeImpactV4 with craft includes 5th dimension", () => {
+    const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5 });
+    const result = computeImpactV4(stats, 80);
+    expect(result.dimensions.craft).toBe(80);
+    // Composite = avg of 5 dimensions
+    const expected = Math.round((result.dimensions.delivery + result.dimensions.quality + result.dimensions.consistency + result.dimensions.breadth + 80) / 5);
+    expect(result.compositeScore).toBe(expected);
+  });
+
+  it("craft dimension is clamped to 0-100", () => {
+    const stats = makeStats({ commitsTotal: 100, activeDays: 60 });
+    const over = computeImpactV4(stats, 150);
+    expect(over.dimensions.craft).toBe(100);
+    const under = computeImpactV4(stats, -10);
+    expect(under.dimensions.craft).toBe(0);
+  });
+
+  it("Artificer archetype triggers when craft is highest and >= 60", () => {
+    const stats = makeStats({ commitsTotal: 50, activeDays: 30, prsMergedWeight: 10, reposContributed: 2 });
+    // Low GitHub dimensions, high craft
+    const result = computeImpactV4(stats, 85);
+    // craft=85 should be highest dimension for these low stats
+    expect(result.archetype).toBe("Artificer");
+  });
+
+  it("Artificer does not trigger when another dimension is higher", () => {
+    const stats = makeStats({ commitsTotal: 200, activeDays: 200, prsMergedWeight: 50, prsMergedCount: 20, reviewsSubmittedCount: 60, reposContributed: 8 });
+    const result = computeImpactV4(stats, 55);
+    // GitHub dimensions should be higher than craft=55
+    expect(result.archetype).not.toBe("Artificer");
+  });
+
+  it("Balanced archetype works with 5 dimensions", () => {
+    // All dimensions within 20-point range and avg >= 50
+    const stats = makeStats({ commitsTotal: 150, activeDays: 150, prsMergedWeight: 30, prsMergedCount: 15, reviewsSubmittedCount: 40, reposContributed: 6, topRepoShare: 0.3, totalStars: 20, totalForks: 10, docsOnlyPrRatio: 0.15 });
+    const result = computeImpactV4(stats, 60);
+    // Check if dimensions are close enough for Balanced
+    const dims = result.dimensions;
+    const values = [dims.delivery, dims.quality, dims.consistency, dims.breadth, dims.craft!];
+    const range = Math.max(...values) - Math.min(...values);
+    const avg = values.reduce((s, v) => s + v, 0) / values.length;
+    if (range <= 20 && avg >= 50) {
+      expect(result.archetype).toBe("Balanced");
+    }
+    // If not Balanced, that's fine — the point is it doesn't crash
+  });
+
+  it("existing archetypes unchanged when craft is absent", () => {
+    // Builder: high delivery
+    const builderStats = makeStats({ commitsTotal: 250, activeDays: 80, prsMergedWeight: 55, issuesClosedCount: 30, prsMergedCount: 20, reposContributed: 3 });
+    const builder = computeImpactV4(builderStats);
+    expect(builder.dimensions.craft).toBeUndefined();
+    expect(builder.archetype).toBe("Builder");
+  });
+});

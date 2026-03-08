@@ -62,12 +62,13 @@ export type ImpactTier = "Emerging" | "Solid" | "High" | "Elite";
 /** Developer profile type — determines scoring behavior */
 export type ProfileType = "solo" | "collaborative";
 
-/** Four independent dimension scores (each 0..100) */
+/** Four independent dimension scores (each 0..100), plus optional craft */
 export interface DimensionScores {
   delivery: number;
   quality: number;
   consistency: number;
   breadth: number;
+  craft?: number;
 }
 
 /** Developer archetype derived from dimension profile shape */
@@ -77,7 +78,8 @@ export type DeveloperArchetype =
   | "Marathoner"
   | "Polymath"
   | "Balanced"
-  | "Emerging";
+  | "Emerging"
+  | "Artificer";
 
 /** Full Impact v4 result */
 export interface ImpactV4Result {
@@ -199,6 +201,7 @@ export interface MetricsSnapshot {
   quality: number;
   consistency: number;
   breadth: number;
+  craft?: number;
   archetype: DeveloperArchetype;
   profileType: ProfileType;
   compositeScore: number;

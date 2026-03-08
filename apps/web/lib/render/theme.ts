@@ -52,6 +52,7 @@ const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
   Polymath: "#EAB308",  // amber/gold
   Balanced: "#0EA5E9",  // sky blue
   Emerging: "#F97316",  // warm orange
+  Artificer: "#F59E0B", // amber
 };
 
 export function getArchetypeColor(archetype: DeveloperArchetype): string {

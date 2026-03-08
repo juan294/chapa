@@ -24,6 +24,7 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   quality: "var(--color-dimension-quality)",
   consistency: "var(--color-dimension-consistency)",
   breadth: "var(--color-dimension-breadth)",
+  craft: "#F59E0B",
 };
 
 const RING_LEVELS = [0.25, 0.5, 0.75, 1.0];
@@ -123,6 +124,7 @@ export function RadarChartInteractive({
     quality: Math.round(dimensions.quality * progress),
     consistency: Math.round(dimensions.consistency * progress),
     breadth: Math.round(dimensions.breadth * progress),
+    ...(dimensions.craft != null ? { craft: Math.round(dimensions.craft * progress) } : {}),
   };
 
   // ---------------------------------------------------------------------------
@@ -136,7 +138,7 @@ export function RadarChartInteractive({
 
   // Data points for the shape polygon
   const dataPoints = AXES.map((axis) => {
-    const val = displayValues[axis.key] / 100;
+    const val = (displayValues[axis.key] ?? 0) / 100;
     return toPoint(axis.angle, val * radius, cx, cy);
   });
   const dataPointsStr = dataPoints.map(([x, y]) => `${x},${y}`).join(" ");

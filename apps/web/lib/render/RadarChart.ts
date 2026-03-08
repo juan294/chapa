@@ -55,7 +55,7 @@ export function renderRadarChart(
 
   // Data shape
   const dataPoints = axes.map((a) => {
-    const val = dimensions[a.key] / 100;
+    const val = (dimensions[a.key] ?? 0) / 100;
     const dist = val * radius;
     return toPoint(a.angle, dist);
   });

@@ -133,18 +133,22 @@ describe("shared/constants", () => {
   });
 
   describe("DIMENSION_KEYS", () => {
-    it("contains all four dimensions", () => {
-      expect(DIMENSION_KEYS).toEqual(["delivery", "quality", "consistency", "breadth"]);
+    it("contains all five dimensions including craft", () => {
+      expect(DIMENSION_KEYS).toEqual(["delivery", "quality", "consistency", "breadth", "craft"]);
     });
 
     it("has no duplicates", () => {
       expect(new Set(DIMENSION_KEYS).size).toBe(DIMENSION_KEYS.length);
     });
+
+    it("has 5 elements", () => {
+      expect(DIMENSION_KEYS).toHaveLength(5);
+    });
   });
 
   describe("SOLO_DIMENSION_KEYS", () => {
-    it("contains all four dimensions (quality included for solo)", () => {
-      expect(SOLO_DIMENSION_KEYS).toEqual(["delivery", "quality", "consistency", "breadth"]);
+    it("contains all five dimensions including craft", () => {
+      expect(SOLO_DIMENSION_KEYS).toEqual(["delivery", "quality", "consistency", "breadth", "craft"]);
     });
 
     it("is a subset of DIMENSION_KEYS", () => {
@@ -155,6 +159,14 @@ describe("shared/constants", () => {
 
     it("includes quality (solo quality uses engineering discipline signals)", () => {
       expect(SOLO_DIMENSION_KEYS).toContain("quality");
+    });
+
+    it("includes craft", () => {
+      expect(SOLO_DIMENSION_KEYS).toContain("craft");
+    });
+
+    it("has 5 elements", () => {
+      expect(SOLO_DIMENSION_KEYS).toHaveLength(5);
     });
   });
 });

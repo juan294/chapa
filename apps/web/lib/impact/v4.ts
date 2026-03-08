@@ -126,13 +126,17 @@ export function computeBreadth(stats: StatsData): number {
 // Compute all dimensions
 // ---------------------------------------------------------------------------
 
-export function computeDimensions(stats: StatsData): DimensionScores {
-  return {
+export function computeDimensions(stats: StatsData, craftScore?: number): DimensionScores {
+  const dims: DimensionScores = {
     delivery: computeDelivery(stats),
     quality: computeQuality(stats),
     consistency: computeConsistency(stats),
     breadth: computeBreadth(stats),
   };
+  if (craftScore != null) {
+    dims.craft = clampScore(craftScore);
+  }
+  return dims;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,12 +151,13 @@ export function detectProfileType(stats: StatsData): ProfileType {
 // Archetype derivation
 // ---------------------------------------------------------------------------
 
-// Tie-breaking priority: Polymath > Quality Champion > Marathoner > Builder
+// Tie-breaking priority: Polymath > Quality Champion > Marathoner > Builder > Artificer
 const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype }[] = [
   { key: "breadth", archetype: "Polymath" },
   { key: "quality", archetype: "Quality Champion" },
   { key: "consistency", archetype: "Marathoner" },
   { key: "delivery", archetype: "Builder" },
+  { key: "craft", archetype: "Artificer" },
 ];
 
 export function deriveArchetype(
@@ -161,7 +166,7 @@ export function deriveArchetype(
 ): DeveloperArchetype {
   const isSolo = profileType === "solo";
   const keys = isSolo ? SOLO_DIMENSION_KEYS : DIMENSION_KEYS;
-  const values = keys.map((k) => dimensions[k]);
+  const values = keys.map((k) => dimensions[k]).filter((v): v is number => v != null);
   const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
   const max = Math.max(...values);
   const min = Math.min(...values);
@@ -179,7 +184,8 @@ export function deriveArchetype(
 
   // V5 Specific archetypes: highest dimension >= 60 (was 70), with tie-breaking priority
   for (const { key, archetype } of ARCHETYPE_MAP) {
-    if (dimensions[key] >= 60 && dimensions[key] === max) {
+    const val = dimensions[key];
+    if (val != null && val >= 60 && val === max) {
       return archetype;
     }
   }
@@ -192,17 +198,16 @@ export function deriveArchetype(
 // Public entry point
 // ---------------------------------------------------------------------------
 
-export function computeImpactV4(stats: StatsData): ImpactV4Result {
+export function computeImpactV4(stats: StatsData, craftScore?: number): ImpactV4Result {
   const profileType = detectProfileType(stats);
-  const dimensions = computeDimensions(stats);
+  const dimensions = computeDimensions(stats, craftScore);
   const archetype = deriveArchetype(dimensions, profileType);
 
+  const activeDims = [dimensions.delivery, dimensions.quality,
+    dimensions.consistency, dimensions.breadth];
+  if (dimensions.craft != null) activeDims.push(dimensions.craft);
   const compositeScore = Math.round(
-    (dimensions.delivery +
-      dimensions.quality +
-      dimensions.consistency +
-      dimensions.breadth) /
-      4
+    activeDims.reduce((sum, v) => sum + v, 0) / activeDims.length
   );
 
   // V5: Apply recency weighting before confidence adjustment

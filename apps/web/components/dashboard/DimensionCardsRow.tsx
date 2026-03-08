@@ -5,19 +5,16 @@ import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
 
-const DIMENSIONS: (keyof DimensionScores)[] = [
-  "delivery",
-  "quality",
-  "consistency",
-  "breadth",
-];
+/** Core GitHub dimensions displayed as cards (craft is shown separately when present). */
+const DIMENSIONS = ["delivery", "quality", "consistency", "breadth"] as const;
+type CoreDimension = (typeof DIMENSIONS)[number];
 
 export interface DimensionCardsRowProps {
   impact: ImpactV4Result;
   stats: StatsData;
   trend?: TrendSummary | null;
   diff?: SnapshotDiff | null;
-  activeDimension?: keyof DimensionScores | null;
+  activeDimension?: CoreDimension | keyof DimensionScores | null;
   className?: string;
 }
 
@@ -43,7 +40,7 @@ export function DimensionCardsRow({
             <DimensionCard
               key={dim}
               dimension={dim}
-              score={impact.dimensions[dim]}
+              score={impact.dimensions[dim] as number}
               stats={stats}
               trend={trend?.dimensions[dim] ?? null}
               delta={diff?.dimensions[dim] ?? null}

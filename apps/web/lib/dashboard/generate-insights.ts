@@ -143,12 +143,7 @@ export function generateInsights(
   // Rule 3: Dimension improvement (priority 3)
   // -----------------------------------------------------------------------
   if (diff) {
-    const dimKeys: (keyof DimensionScores)[] = [
-      "delivery",
-      "quality",
-      "consistency",
-      "breadth",
-    ];
+    const dimKeys = ["delivery", "quality", "consistency", "breadth"] as const;
     for (const key of dimKeys) {
       const delta = diff.dimensions[key];
       if (delta > 5) {

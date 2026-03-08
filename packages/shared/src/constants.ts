@@ -36,6 +36,7 @@ export const DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
   "quality",
   "consistency",
   "breadth",
+  "craft",
 ];
 
 /**
@@ -48,4 +49,5 @@ export const SOLO_DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = 
   "quality",
   "consistency",
   "breadth",
+  "craft",
 ];

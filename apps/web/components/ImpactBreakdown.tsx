@@ -174,6 +174,8 @@ const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
     "Your profile is impressively well-rounded \u2014 no single dimension dominates because you invest across delivery, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
   Emerging:
     "Your profile is still taking shape \u2014 with more contributions over the coming months, your strongest dimensions will emerge and reveal your developer identity. Every commit, review, and repo you touch sharpens the picture.",
+  Artificer:
+    "Your profile is defined by craft \u2014 you leverage AI coding tools with exceptional skill and sophistication, turning them into force multipliers for your development workflow. Craft is your dominant dimension, showcasing mastery of modern AI-assisted development.",
 };
 
 const DIMENSION_TIPS: Record<string, string> = {

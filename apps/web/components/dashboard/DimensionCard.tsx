@@ -19,6 +19,7 @@ const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
   quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
+  craft: "Craft",
 };
 
 const DIMENSION_SUBTITLES: Record<keyof DimensionScores, string> = {
@@ -26,6 +27,7 @@ const DIMENSION_SUBTITLES: Record<keyof DimensionScores, string> = {
   quality: "Code reviews \u00B7 quality gatekeeping",
   consistency: "Active days \u00B7 sustained contributions",
   breadth: "Repos contributed \u00B7 community reach",
+  craft: "AI tool proficiency \u00B7 effectiveness \u00B7 sophistication",
 };
 
 const DIMENSION_COLORS: Record<
@@ -48,6 +50,10 @@ const DIMENSION_COLORS: Record<
     from: "var(--color-dimension-breadth)",
     to: "var(--color-dimension-breadth-light)",
   },
+  craft: {
+    from: "#F59E0B",
+    to: "#FBBF24",
+  },
 };
 
 const DIMENSION_TOOLTIPS: Record<
@@ -69,6 +75,10 @@ const DIMENSION_TOOLTIPS: Record<
   breadth: {
     id: "dim-breadth",
     tip: "Measures breadth of impact: repos contributed to, contribution spread, stars, forks, and docs PRs. High score = wide cross-project influence.",
+  },
+  craft: {
+    id: "dim-craft",
+    tip: "Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.",
   },
 };
 
