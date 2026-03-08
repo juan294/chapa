@@ -22,8 +22,7 @@ import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
-import { isStudioEnabled, isInsightsEnabled } from "@/lib/feature-flags";
-import { InsightsImporter } from "@/components/InsightsImporter";
+import { isStudioEnabled } from "@/lib/feature-flags";
 import { CraftBreakdown } from "@/components/CraftBreakdown";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { getBaseUrl } from "@/lib/env";
@@ -117,13 +116,12 @@ export default async function SharePage({ params }: SharePageProps) {
   }
 
   // Fetch stats, config, snapshot, craft score, and feature flags in parallel
-  const [stats, savedConfig, latestSnapshot, craftResult, studioEnabled, insightsEnabled] = await Promise.all([
+  const [stats, savedConfig, latestSnapshot, craftResult, studioEnabled] = await Promise.all([
     getStats(handle, token),
     cacheGet<BadgeConfig>(`config:${handle}`),
     getCachedLatestSnapshot(handle),
     dbGetToolInsights(handle),
     isStudioEnabled(),
-    isInsightsEnabled(),
   ]);
 
   const impact = stats ? computeImpactV4(stats) : null;
@@ -341,16 +339,6 @@ export default async function SharePage({ params }: SharePageProps) {
             {craftResult && (
               <section className="mb-12 animate-fade-in-up [animation-delay:400ms]">
                 <CraftBreakdown craftResult={craftResult} />
-              </section>
-            )}
-
-            {/* ── Import Claude Code Insights (owner only) ────────── */}
-            {isOwner && insightsEnabled && (
-              <section
-                id="insights"
-                className="mb-12 animate-fade-in-up [animation-delay:450ms]"
-              >
-                <InsightsImporter />
               </section>
             )}
 

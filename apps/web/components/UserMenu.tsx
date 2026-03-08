@@ -53,6 +53,48 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
 
+  // Insights import — file picker triggered directly from menu
+  const insightsFileRef = useRef<HTMLInputElement>(null);
+  const [insightsStatus, setInsightsStatus] = useState<
+    "idle" | "processing" | "success" | "error"
+  >("idle");
+
+  async function handleInsightsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+
+    if (file.size > 10 * 1024 * 1024) {
+      setInsightsStatus("error");
+      setTimeout(() => setInsightsStatus("idle"), 3000);
+      return;
+    }
+
+    setInsightsStatus("processing");
+    setOpen(false);
+
+    try {
+      const html = await file.text();
+      const { parseInsightsHtml } = await import("@/lib/insights/parser");
+      const data = parseInsightsHtml(html);
+
+      const res = await fetch("/api/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+
+      setInsightsStatus("success");
+      setTimeout(() => window.location.reload(), 800);
+    } catch {
+      setInsightsStatus("error");
+      setTimeout(() => setInsightsStatus("idle"), 3000);
+    }
+  }
+
   useEffect(() => {
     if (platformStatusCache.fetched) {
       if (platformStatusCache.bitbucket) setBbStatus(platformStatusCache.bitbucket);
@@ -239,11 +281,16 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </Link>
             )}
             {isInsightsEnabledSync() && (
-              <Link
-                href={`/u/${login}#insights`}
+              <label
                 role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    insightsFileRef.current?.click();
+                  }
+                }}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06] cursor-pointer"
               >
                 <svg
                   className="h-4 w-4 text-text-secondary"
@@ -259,8 +306,19 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                Import Claude Code Insights
-              </Link>
+                {insightsStatus === "idle" && "Import Claude Code Insights"}
+                {insightsStatus === "processing" && "Processing…"}
+                {insightsStatus === "success" && "Uploaded!"}
+                {insightsStatus === "error" && "Import failed — try again"}
+                <input
+                  ref={insightsFileRef}
+                  type="file"
+                  accept=".html"
+                  onChange={handleInsightsFile}
+                  className="sr-only"
+                  aria-label="Select Claude Code insights HTML report"
+                />
+              </label>
             )}
             {isBitbucketEnabledSync() && bbStatus && (
               bbStatus.linked ? (

@@ -115,7 +115,6 @@ vi.mock("@/lib/db/snapshots", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabled: mockIsStudioEnabled,
-  isInsightsEnabled: vi.fn(() => Promise.resolve(false)),
 }));
 
 vi.mock("@/lib/db/tool-insights", () => ({
@@ -176,9 +175,6 @@ vi.mock("@/components/CopyButton", () => ({
 }));
 vi.mock("@/components/dashboard/HeroScoreZone", () => ({
   HeroScoreZone: () => "<div>hero</div>",
-}));
-vi.mock("@/components/InsightsImporter", () => ({
-  InsightsImporter: () => "<div>importer</div>",
 }));
 vi.mock("@/components/CraftBreakdown", () => ({
   CraftBreakdown: () => "<div>craft</div>",
