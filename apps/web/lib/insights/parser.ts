@@ -306,8 +306,4 @@ export {
   parseNumeric as _parseNumeric,
   parseSubtitle as _parseSubtitle,
   parseLinesStat as _parseLinesStat,
-  extractBarChart as _extractBarChart,
-  extractVolumeStats as _extractVolumeStats,
-  parseMultiClauding as _parseMultiClauding,
-  parseResponseTime as _parseResponseTime,
 };
