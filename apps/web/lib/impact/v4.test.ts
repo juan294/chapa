@@ -767,7 +767,7 @@ describe("detectProfileType(stats)", () => {
 // ---------------------------------------------------------------------------
 
 describe("solo developer composite scoring", () => {
-  it("uses 4 dimensions (including solo quality) for solo profiles", () => {
+  it("uses 3 dimensions (excluding quality) for solo profiles without craft", () => {
     const stats = makeStats({
       prsMergedWeight: 80,
       issuesClosedCount: 40,
@@ -786,12 +786,42 @@ describe("solo developer composite scoring", () => {
     const result = computeImpactV4(stats);
     const dims = result.dimensions;
 
-    // Solo composite = (delivery + quality + consistency + breadth) / 4
+    // Solo composite = (delivery + consistency + breadth) / 3 — quality excluded
     const expectedAvg = Math.round(
-      (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
+      (dims.delivery + dims.consistency + dims.breadth) / 3
     );
     expect(result.compositeScore).toBe(expectedAvg);
     expect(result.profileType).toBe("solo");
+    // Quality is still computed (for display), just not in composite
+    expect(dims.quality).toBeGreaterThan(0);
+  });
+
+  it("uses 4 dimensions (excluding quality, including craft) for solo profiles with craft", () => {
+    const stats = makeStats({
+      prsMergedWeight: 80,
+      issuesClosedCount: 40,
+      commitsTotal: 300,
+      activeDays: 200,
+      heatmapData: makeUniformHeatmap(14),
+      reposContributed: 8,
+      topRepoShare: 0.3,
+      totalStars: 50,
+      reviewsSubmittedCount: 0, // solo
+      prsMergedCount: 20,
+      prDescriptionRate: 0.8,
+      featureBranchRate: 0.9,
+      issueLinkageRate: 0.5,
+    });
+    const result = computeImpactV4(stats, 75); // craft score = 75
+    const dims = result.dimensions;
+
+    // Solo composite = (delivery + consistency + breadth + craft) / 4
+    const expectedAvg = Math.round(
+      (dims.delivery + dims.consistency + dims.breadth + dims.craft!) / 4
+    );
+    expect(result.compositeScore).toBe(expectedAvg);
+    expect(result.profileType).toBe("solo");
+    expect(dims.craft).toBe(75);
   });
 
   it("collaborative profiles still use 4 dimensions", () => {
@@ -873,9 +903,11 @@ describe("solo developer composite scoring", () => {
 // ---------------------------------------------------------------------------
 
 describe("solo developer archetype", () => {
-  it("CAN assign Quality Champion to solo profiles (solo quality is now scored)", () => {
+  it("CANNOT assign Quality Champion to solo profiles", () => {
+    // Even if quality is highest, solo profiles can't be Quality Champion
     const dims: DimensionScores = { delivery: 50, quality: 85, consistency: 60, breadth: 55 };
-    expect(deriveArchetype(dims, "solo")).toBe("Quality Champion");
+    // Quality is excluded from SOLO_DIMENSION_KEYS → not considered for archetype
+    expect(deriveArchetype(dims, "solo")).not.toBe("Quality Champion");
   });
 
   it("can assign Builder to solo profile", () => {
@@ -893,8 +925,9 @@ describe("solo developer archetype", () => {
     expect(deriveArchetype(dims, "solo")).toBe("Polymath");
   });
 
-  it("can assign Balanced to solo profile when 4 dims within 20 pts and avg >= 50", () => {
-    const dims: DimensionScores = { delivery: 55, quality: 50, consistency: 50, breadth: 60 };
+  it("can assign Balanced to solo profile when solo dims within 20 pts and avg >= 50", () => {
+    // Solo uses only delivery, consistency, breadth (+ craft if present) — quality excluded
+    const dims: DimensionScores = { delivery: 55, quality: 30, consistency: 50, breadth: 60 };
     expect(deriveArchetype(dims, "solo")).toBe("Balanced");
   });
 
@@ -1010,20 +1043,22 @@ describe("computeQuality — solo path", () => {
 // ---------------------------------------------------------------------------
 
 describe("V6: Craft dimension", () => {
-  it("computeImpactV4 without craft returns same as v5", () => {
-    const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5 });
+  it("computeImpactV4 without craft returns same as v5 (collaborative)", () => {
+    const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5, reviewsSubmittedCount: 10 });
     const result = computeImpactV4(stats);
     expect(result.dimensions.craft).toBeUndefined();
-    // Composite = avg of 4 dimensions
+    expect(result.profileType).toBe("collaborative");
+    // Composite = avg of 4 dimensions (collaborative includes quality)
     const expected = Math.round((result.dimensions.delivery + result.dimensions.quality + result.dimensions.consistency + result.dimensions.breadth) / 4);
     expect(result.compositeScore).toBe(expected);
   });
 
-  it("computeImpactV4 with craft includes 5th dimension", () => {
-    const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5 });
+  it("computeImpactV4 with craft includes 5th dimension (collaborative)", () => {
+    const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5, reviewsSubmittedCount: 10 });
     const result = computeImpactV4(stats, 80);
     expect(result.dimensions.craft).toBe(80);
-    // Composite = avg of 5 dimensions
+    expect(result.profileType).toBe("collaborative");
+    // Composite = avg of 5 dimensions (collaborative includes quality + craft)
     const expected = Math.round((result.dimensions.delivery + result.dimensions.quality + result.dimensions.consistency + result.dimensions.breadth + 80) / 5);
     expect(result.compositeScore).toBe(expected);
   });

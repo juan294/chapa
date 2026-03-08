@@ -135,6 +135,20 @@ Badge SVG (pentagon or diamond radar) + Share page
 - All UI components render 4 or 5 dimensions dynamically
 - `computeImpactV4(stats)` without craft returns identical results to V5
 
+## Solo Profile Exception
+
+Solo developers (zero code reviews) receive a modified composite calculation:
+
+- **Composite**: `avg(Delivery, Consistency, Breadth [, Craft])` — Quality excluded
+- **Quality dimension**: Computed via `computeSoloQuality()` (PR descriptions, branch strategy,
+  issue linkage, micro-commit ratio) — displayed on radar/cards for informational purposes
+- **Archetype**: Quality Champion is excluded for solo profiles
+- **Rationale**: Solo quality is a proxy metric based on engineering discipline signals,
+  not peer review activity. Including it in the composite would unfairly penalize solo
+  developers who lack the opportunity for code reviews.
+
+This preserves v5 scoring parity for solo developers while adding v6 craft integration.
+
 ## Expected Score Distribution
 
 | Profile | V5 Score | V6 w/o craft | V6 w/ craft (60) | V6 w/ craft (80) |

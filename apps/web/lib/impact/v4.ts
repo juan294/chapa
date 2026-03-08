@@ -183,7 +183,12 @@ export function deriveArchetype(
   }
 
   // V5 Specific archetypes: highest dimension >= 60 (was 70), with tie-breaking priority
-  for (const { key, archetype } of ARCHETYPE_MAP) {
+  // Solo profiles skip Quality Champion — can't earn review-based archetype without reviews
+  const candidates = isSolo
+    ? ARCHETYPE_MAP.filter((a) => a.archetype !== "Quality Champion")
+    : ARCHETYPE_MAP;
+
+  for (const { key, archetype } of candidates) {
     const val = dimensions[key];
     if (val != null && val >= 60 && val === max) {
       return archetype;
@@ -203,8 +208,10 @@ export function computeImpactV4(stats: StatsData, craftScore?: number): ImpactV4
   const dimensions = computeDimensions(stats, craftScore);
   const archetype = deriveArchetype(dimensions, profileType);
 
-  const activeDims = [dimensions.delivery, dimensions.quality,
-    dimensions.consistency, dimensions.breadth];
+  // Solo profiles exclude quality from composite (quality is display-only for solo)
+  const activeDims = profileType === "solo"
+    ? [dimensions.delivery, dimensions.consistency, dimensions.breadth]
+    : [dimensions.delivery, dimensions.quality, dimensions.consistency, dimensions.breadth];
   if (dimensions.craft != null) activeDims.push(dimensions.craft);
   const compositeScore = Math.round(
     activeDims.reduce((sum, v) => sum + v, 0) / activeDims.length

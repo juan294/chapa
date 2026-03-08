@@ -40,13 +40,13 @@ export const DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
 ];
 
 /**
- * Dimension keys used for solo profile scoring.
- * Solo quality uses engineering discipline signals (PR descriptions, branch
- * strategy, issue linkage) instead of code review metrics.
+ * Dimension keys used for solo profile composite scoring and archetype derivation.
+ * Quality is excluded — solo quality (computed from PR descriptions, branch strategy,
+ * issue linkage) is displayed on radar/cards but does not count toward the composite.
+ * Craft is included when present (v6).
  */
 export const SOLO_DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
   "delivery",
-  "quality",
   "consistency",
   "breadth",
   "craft",
