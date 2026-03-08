@@ -152,7 +152,6 @@ export default async function SharePage({ params }: SharePageProps) {
         avatarDataUri,
         verificationHash: verification?.hash,
         verificationDate: verification?.date,
-        craftScore: craftResult?.craftScore ?? null,
       })
     : null;
 

@@ -253,7 +253,6 @@ describe("GET /u/[handle]/badge.svg", () => {
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: undefined,
         verificationDate: undefined,
-        craftScore: null,
       });
     });
 
@@ -274,7 +273,6 @@ describe("GET /u/[handle]/badge.svg", () => {
         avatarDataUri: undefined,
         verificationHash: undefined,
         verificationDate: undefined,
-        craftScore: null,
       });
     });
 
@@ -286,7 +284,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
         { ...FAKE_STATS, avatarUrl: undefined },
         FAKE_IMPACT,
-        { avatarDataUri: undefined, verificationHash: undefined, verificationDate: undefined, craftScore: null },
+        { avatarDataUri: undefined, verificationHash: undefined, verificationDate: undefined },
       );
     });
   });
@@ -427,7 +425,6 @@ describe("GET /u/[handle]/badge.svg", () => {
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2025-06-15",
-        craftScore: null,
       });
     });
 

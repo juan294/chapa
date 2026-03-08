@@ -2,6 +2,14 @@
 
 > Implementation: `apps/web/lib/render/BadgeSvg.tsx`
 
+## Badge version history
+
+| Version | Changes |
+|---------|---------|
+| **v1** | Initial badge: 4-axis diamond radar, heatmap, score ring, archetype pill |
+| **v2** | Added craft score pill (AI Craft indicator) in footer area |
+| **v3** | Pentagon radar (5 axes) when craft dimension is present; removed standalone craft pill. Graceful fallback to 4-axis diamond when craft is absent. |
+
 ## Output formats
 - Default: 1200x630 (wide)
 - Theme: Warm Amber (dark card with purple/indigo accent)
@@ -47,11 +55,14 @@
 - Animation: fade-in by week group
 
 **Center column: Radar chart**
-- 4-point radar/spider chart showing dimension scores
-- Axes: Delivery (top), Quality (right), Consistency (bottom), Breadth (left)
+- Dynamic radar/spider chart showing dimension scores
+- **Pentagon mode** (5 axes, 72° spacing): When craft dimension is present in `DimensionScores`. Axes: Delivery (top), Quality, Consistency, Breadth, Craft (clockwise).
+- **Diamond mode** (4 axes, 90° spacing): When craft is absent. Axes: Delivery (top), Quality (right), Consistency (bottom), Breadth (left). Identical to v1/v2 layout.
 - Filled polygon with purple accent fill at low opacity
-- Axis labels at each corner
-- Grid rings at 25%, 50%, 75%, 100%
+- Axis labels at each vertex
+- Guide rings at 25%, 50%, 75%, 100% (shape matches axis count: pentagon or diamond)
+- Data point dots at each axis vertex
+- Implementation: `apps/web/lib/render/RadarChart.ts`
 
 **Right column: Score ring**
 - Large circular score display (hero element)
@@ -145,7 +156,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 
 **From `ImpactV4Result`:**
 - `archetype` (archetype pill)
-- `dimensions` (radar chart: delivery, quality, consistency, breadth)
+- `dimensions` (radar chart: delivery, quality, consistency, breadth, and optionally craft)
 - `adjustedComposite` (score ring)
 - `tier` (tier label)
 
@@ -153,6 +164,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 - `includeBranding` (footer)
 - `avatarDataUri` (inline avatar)
 - `verificationHash`, `verificationDate` (verification strip)
+- ~~`craftScore`~~ — removed in v3 (craft is now a radar axis, not a separate pill)
 
 ## Accessibility
 - Ensure contrast is high enough for legibility

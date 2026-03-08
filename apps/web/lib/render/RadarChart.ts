@@ -2,12 +2,17 @@ import type { DimensionScores } from "@chapa/shared";
 import { WARM_AMBER } from "./theme";
 
 /**
- * Renders a 4-point diamond/radar chart as SVG markup.
+ * Renders a radar chart as SVG markup.
  *
- * Axes (clockwise from top): Delivery, Quality, Consistency, Breadth.
+ * When all 5 dimensions are present (including craft), renders a 5-axis pentagon.
+ * When craft is absent, falls back to the original 4-axis diamond layout.
+ *
+ * Pentagon axes (72° spacing from top): Delivery, Quality, Consistency, Breadth, Craft.
+ * Diamond axes (90° spacing from top): Delivery, Quality, Consistency, Breadth.
+ *
  * Each dimension (0-100) maps to distance from center (0 = center, 100 = edge).
  *
- * @param dimensions - Four dimension scores
+ * @param dimensions - Four or five dimension scores
  * @param cx - Center X coordinate
  * @param cy - Center Y coordinate
  * @param radius - Maximum radius from center to edge
@@ -21,13 +26,23 @@ export function renderRadarChart(
 ): string {
   const t = WARM_AMBER;
 
-  // Original diamond: Delivery=top, Quality=right, Consistency=bottom, Breadth=left
-  const axes: { key: keyof DimensionScores; label: string; angle: number }[] = [
-    { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
-    { key: "quality", label: "Quality", angle: 0 },
-    { key: "consistency", label: "Consistency", angle: Math.PI / 2 },
-    { key: "breadth", label: "Breadth", angle: Math.PI },
-  ];
+  const hasCraft = dimensions.craft != null;
+
+  // Pentagon (72° spacing) when craft present; diamond (90° spacing) when absent
+  const axes: { key: keyof DimensionScores; label: string; angle: number }[] = hasCraft
+    ? [
+        { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
+        { key: "quality", label: "Quality", angle: -Math.PI / 2 + (2 * Math.PI) / 5 },
+        { key: "consistency", label: "Consistency", angle: -Math.PI / 2 + (4 * Math.PI) / 5 },
+        { key: "breadth", label: "Breadth", angle: -Math.PI / 2 + (6 * Math.PI) / 5 },
+        { key: "craft", label: "Craft", angle: -Math.PI / 2 + (8 * Math.PI) / 5 },
+      ]
+    : [
+        { key: "delivery", label: "Delivery", angle: -Math.PI / 2 },
+        { key: "quality", label: "Quality", angle: 0 },
+        { key: "consistency", label: "Consistency", angle: Math.PI / 2 },
+        { key: "breadth", label: "Breadth", angle: Math.PI },
+      ];
 
   const toPoint = (angle: number, dist: number): [number, number] => [
     Math.round(cx + dist * Math.cos(angle)),

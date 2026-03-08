@@ -18,7 +18,6 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -102,12 +101,11 @@ export async function GET(
   // Fetch snapshot (for EMA smoothing) and avatar in parallel — both are
   // independent I/O operations that previously ran sequentially (~50-200ms saving).
   // Pattern matches the share page (apps/web/app/u/[handle]/page.tsx).
-  const [latestSnapshot, avatarDataUri, craftResult] = await Promise.all([
+  const [latestSnapshot, avatarDataUri] = await Promise.all([
     getCachedLatestSnapshot(handle),
     stats.avatarUrl
       ? getAvatarBase64(handle, stats.avatarUrl)
       : Promise.resolve(undefined),
-    dbGetToolInsights(handle),
   ]);
 
   // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
@@ -170,7 +168,6 @@ export async function GET(
     avatarDataUri,
     verificationHash: verification?.hash,
     verificationDate: verification?.date,
-    craftScore: craftResult?.craftScore ?? null,
   });
 
   return new NextResponse(svg, { headers: CACHE_HEADERS });

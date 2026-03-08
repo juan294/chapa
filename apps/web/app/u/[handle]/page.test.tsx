@@ -290,7 +290,6 @@ describe("SharePage /u/[handle]", () => {
           avatarDataUri: "data:image/png;base64,abc123",
           verificationHash: undefined,
           verificationDate: undefined,
-          craftScore: null,
         },
       );
     });
@@ -331,7 +330,6 @@ describe("SharePage /u/[handle]", () => {
           avatarDataUri: "data:image/png;base64,abc123",
           verificationHash: "abc12345",
           verificationDate: "2026-01-15",
-          craftScore: null,
         },
       );
     });

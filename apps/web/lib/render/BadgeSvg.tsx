@@ -6,8 +6,6 @@ import { renderBadgeBranding } from "./BadgeBranding";
 import { renderRadarChart } from "./RadarChart";
 import { escapeXml } from "./escape";
 import { renderVerificationStrip, renderDemoVerificationStrip } from "./VerificationStrip";
-import { renderBadgeCraft } from "./BadgeCraft";
-
 interface BadgeOptions {
   includeBranding?: boolean;
   avatarDataUri?: string;
@@ -15,8 +13,6 @@ interface BadgeOptions {
   verificationDate?: string;
   /** Render as a demo/sample badge — shows "Simulated metrics" and a sample verification strip */
   demoMode?: boolean;
-  /** Craft score (0-100) from AI tool insights — renders indicator pill when set */
-  craftScore?: number | null;
 }
 
 export function renderBadgeSvg(
@@ -24,7 +20,7 @@ export function renderBadgeSvg(
   impact: ImpactV4Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, craftScore = null } = options;
+  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false } = options;
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
@@ -107,10 +103,6 @@ export function renderBadgeSvg(
   const brandingSvg = includeBranding
     ? renderBadgeBranding(PAD, footerY, W - PAD, brandingPlatforms)
     : "";
-
-  // Craft score pill (above branding, bottom-left)
-  const craftY = footerDividerY - 30;
-  const craftSvg = renderBadgeCraft(PAD, craftY, craftScore);
 
   // Verification strip (right edge)
   const verificationSvg = demoMode
@@ -231,9 +223,6 @@ export function renderBadgeSvg(
   <!-- ─── Footer ─────────────────────────────────────────── -->
   <!-- Divider line -->
   <line x1="${PAD}" y1="${footerDividerY}" x2="${W - PAD}" y2="${footerDividerY}" stroke="${t.stroke}" stroke-width="1"/>
-
-  <!-- Craft score pill (when insights uploaded) -->
-  ${craftSvg}
 
   <!-- Branding: left = GitHub, right = domain -->
   ${brandingSvg}
