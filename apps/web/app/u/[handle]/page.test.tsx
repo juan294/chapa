@@ -23,6 +23,7 @@ const {
   mockBuildSnapshot,
   mockDbInsertSnapshot,
   mockIsStudioEnabled,
+  mockDbGetToolInsights,
   mockAfter,
 } = vi.hoisted(() => ({
   mockGetStats: vi.fn(),
@@ -48,6 +49,7 @@ const {
   mockBuildSnapshot: vi.fn(),
   mockDbInsertSnapshot: vi.fn(),
   mockIsStudioEnabled: vi.fn(),
+  mockDbGetToolInsights: vi.fn(),
   mockAfter: vi.fn(),
 }));
 
@@ -118,7 +120,7 @@ vi.mock("@/lib/feature-flags", () => ({
 }));
 
 vi.mock("@/lib/db/tool-insights", () => ({
-  dbGetToolInsights: vi.fn(() => Promise.resolve(null)),
+  dbGetToolInsights: mockDbGetToolInsights,
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -176,9 +178,7 @@ vi.mock("@/components/CopyButton", () => ({
 vi.mock("@/components/dashboard/HeroScoreZone", () => ({
   HeroScoreZone: () => "<div>hero</div>",
 }));
-vi.mock("@/components/CraftBreakdown", () => ({
-  CraftBreakdown: () => "<div>craft</div>",
-}));
+// CraftBreakdown removed in Phase 4 — no longer imported by share page
 
 // ---------------------------------------------------------------------------
 // Import the page after all mocks
@@ -245,6 +245,7 @@ describe("SharePage /u/[handle]", () => {
     mockDbInsertSnapshot.mockResolvedValue(true);
     mockUpdateSnapshotCache.mockResolvedValue(undefined);
     mockIsStudioEnabled.mockResolvedValue(false);
+    mockDbGetToolInsights.mockResolvedValue(null);
     mockReadSessionCookie.mockReturnValue(null);
   });
 
@@ -399,6 +400,45 @@ describe("SharePage /u/[handle]", () => {
       await afterCallback();
 
       expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 4: Craft score integration
+  // -------------------------------------------------------------------------
+
+  describe("craft score integration", () => {
+    it("passes craft score to computeImpactV4 when tool insights exist", async () => {
+      mockDbGetToolInsights.mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 68,
+        tier: "Practitioner",
+        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+        computedAt: "2025-03-01T00:00:00Z",
+      });
+      await renderPage();
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, 68);
+    });
+
+    it("passes undefined craft score when no tool insights exist", async () => {
+      await renderPage();
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+    });
+
+    it("does not render CraftBreakdown component", async () => {
+      // CraftBreakdown was removed in Phase 4 — verify it's not imported
+      mockDbGetToolInsights.mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 68,
+        tier: "Practitioner",
+        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+        computedAt: "2025-03-01T00:00:00Z",
+      });
+      // Should still render without errors — CraftBreakdown section is gone
+      const result = await renderPage();
+      expect(result).toBeDefined();
     });
   });
 

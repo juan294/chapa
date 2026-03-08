@@ -78,6 +78,7 @@ export const DEMO_IMPACT: ImpactV4Result = {
     quality: 72,
     consistency: 80,
     breadth: 65,
+    craft: 72,
   },
   archetype: "Builder",
   compositeScore: 76,

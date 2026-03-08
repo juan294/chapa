@@ -16,6 +16,7 @@ import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
+import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 
@@ -95,18 +96,18 @@ export async function GET(
     });
   }
 
-  // Compute impact
-  const impact = computeImpactV4(stats);
-
-  // Fetch snapshot (for EMA smoothing) and avatar in parallel — both are
-  // independent I/O operations that previously ran sequentially (~50-200ms saving).
-  // Pattern matches the share page (apps/web/app/u/[handle]/page.tsx).
-  const [latestSnapshot, avatarDataUri] = await Promise.all([
+  // Fetch craft score, snapshot, and avatar in parallel — all are independent
+  // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
+  const [craftResult, latestSnapshot, avatarDataUri] = await Promise.all([
+    dbGetToolInsights(handle),
     getCachedLatestSnapshot(handle),
     stats.avatarUrl
       ? getAvatarBase64(handle, stats.avatarUrl)
       : Promise.resolve(undefined),
   ]);
+
+  // Compute impact (craft score feeds into the 5th pentagon dimension)
+  const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
 
   // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
   // on same-day repeated requests (smoothScore returns cached value for today).

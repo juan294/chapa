@@ -240,10 +240,25 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
     });
 
-    it("passes stats to computeImpactV4", async () => {
+    it("passes stats to computeImpactV4 without craft score when no insights exist", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+    });
+
+    it("passes craft score to computeImpactV4 when tool insights exist", async () => {
+      const { dbGetToolInsights } = await import("@/lib/db/tool-insights");
+      vi.mocked(dbGetToolInsights).mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 75,
+        tier: "Expert",
+        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+        computedAt: "2025-03-01T00:00:00Z",
+      });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, 75);
     });
 
     it("passes stats, impact, and options to renderBadgeSvg", async () => {

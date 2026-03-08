@@ -23,7 +23,6 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import { CraftBreakdown } from "@/components/CraftBreakdown";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { getBaseUrl } from "@/lib/env";
 import { toDateString } from "@/lib/utils/date";
@@ -124,7 +123,7 @@ export default async function SharePage({ params }: SharePageProps) {
     isStudioEnabled(),
   ]);
 
-  const impact = stats ? computeImpactV4(stats) : null;
+  const impact = stats ? computeImpactV4(stats, craftResult?.craftScore ?? undefined) : null;
 
   // Start avatar fetch immediately (runs concurrently with EMA computation)
   const avatarPromise = stats?.avatarUrl
@@ -331,13 +330,6 @@ export default async function SharePage({ params }: SharePageProps) {
                     Could not load impact data for this user. Try again later.
                   </p>
                 </div>
-              </section>
-            )}
-
-            {/* ── Craft Breakdown (if insights uploaded) ──────────── */}
-            {craftResult && (
-              <section className="mb-12 animate-fade-in-up [animation-delay:400ms]">
-                <CraftBreakdown craftResult={craftResult} />
               </section>
             )}
 
