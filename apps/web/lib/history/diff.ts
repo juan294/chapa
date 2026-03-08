@@ -29,6 +29,7 @@ export interface SnapshotDiff {
     quality: number;
     consistency: number;
     breadth: number;
+    craft?: number;
   };
 
   stats: {
@@ -111,6 +112,9 @@ export function compareSnapshots(
       quality: current.quality - previous.quality,
       consistency: current.consistency - previous.consistency,
       breadth: current.breadth - previous.breadth,
+      ...(current.craft != null && previous.craft != null && {
+        craft: current.craft - previous.craft,
+      }),
     },
 
     stats: {
@@ -196,7 +200,7 @@ export function explainDiff(diff: SnapshotDiff): string[] {
   // Significant dimension changes
   for (const [key, label] of Object.entries(DIMENSION_LABELS)) {
     const delta = diff.dimensions[key as keyof typeof diff.dimensions];
-    if (Math.abs(delta) >= SIGNIFICANT_DIMENSION_CHANGE) {
+    if (delta != null && Math.abs(delta) >= SIGNIFICANT_DIMENSION_CHANGE) {
       const sign = delta > 0 ? "+" : "";
       lines.push(`${label} ${sign}${delta} points.`);
     }

@@ -189,6 +189,22 @@ describe("compareSnapshots", () => {
     expect(prev).toEqual(prevCopy);
     expect(curr).toEqual(currCopy);
   });
+
+  it("includes craft delta when both snapshots have craft", () => {
+    const prev = makeSnapshot({ craft: 30, date: "2025-06-14" });
+    const curr = makeSnapshot({ craft: 45, date: "2025-06-15" });
+    const diff = compareSnapshots(prev, curr);
+
+    expect(diff.dimensions.craft).toBe(15);
+  });
+
+  it("excludes craft delta when one snapshot lacks craft", () => {
+    const prev = makeSnapshot({ date: "2025-06-14" });
+    const curr = makeSnapshot({ craft: 45, date: "2025-06-15" });
+    const diff = compareSnapshots(prev, curr);
+
+    expect(diff.dimensions.craft).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

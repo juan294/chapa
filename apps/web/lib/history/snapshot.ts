@@ -43,6 +43,7 @@ export function buildSnapshot(
     quality: impact.dimensions.quality,
     consistency: impact.dimensions.consistency,
     breadth: impact.dimensions.breadth,
+    ...(impact.dimensions.craft != null && { craft: impact.dimensions.craft }),
     archetype: impact.archetype,
     profileType: impact.profileType,
     compositeScore: impact.compositeScore,

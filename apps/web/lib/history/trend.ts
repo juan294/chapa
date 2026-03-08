@@ -23,6 +23,7 @@ export interface TrendSummary {
     quality: DimensionTrend;
     consistency: DimensionTrend;
     breadth: DimensionTrend;
+    craft?: DimensionTrend;
   };
 }
 
@@ -60,16 +61,23 @@ export function computeTrend(
     direction = "stable";
   }
 
+  const latest = recent[recent.length - 1]!;
+  const dimensions: TrendSummary["dimensions"] = {
+    delivery: dimensionTrend(recent, "delivery"),
+    quality: dimensionTrend(recent, "quality"),
+    consistency: dimensionTrend(recent, "consistency"),
+    breadth: dimensionTrend(recent, "breadth"),
+  };
+
+  if (latest.craft != null) {
+    dimensions.craft = dimensionTrend(recent, "craft");
+  }
+
   return {
     direction,
     avgDelta,
     compositeValues,
-    dimensions: {
-      delivery: dimensionTrend(recent, "delivery"),
-      quality: dimensionTrend(recent, "quality"),
-      consistency: dimensionTrend(recent, "consistency"),
-      breadth: dimensionTrend(recent, "breadth"),
-    },
+    dimensions,
   };
 }
 
@@ -88,11 +96,11 @@ function averageDelta(values: number[]): number {
 
 function dimensionTrend(
   snapshots: MetricsSnapshot[],
-  key: "delivery" | "quality" | "consistency" | "breadth",
+  key: "delivery" | "quality" | "consistency" | "breadth" | "craft",
 ): DimensionTrend {
-  const values = snapshots.map((s) => ({ date: s.date, value: s[key] }));
+  const values = snapshots.map((s) => ({ date: s.date, value: s[key] ?? 0 }));
   return {
-    avgDelta: averageDelta(snapshots.map((s) => s[key])),
+    avgDelta: averageDelta(snapshots.map((s) => s[key] ?? 0)),
     values,
   };
 }
