@@ -1,5 +1,8 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 
+/** 10-second timeout for all external OAuth fetches */
+const FETCH_TIMEOUT_MS = 10_000;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -112,6 +115,7 @@ export async function exchangeCodeForToken(
         client_secret: clientSecret,
         code,
       }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     const data = await res.json();
@@ -135,6 +139,7 @@ export async function fetchGitHubUser(
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -172,6 +177,7 @@ export async function fetchGitHubUserEmail(
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
 

@@ -368,6 +368,101 @@ describe("token encryption", () => {
 // readSessionCookie — shape validation
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// AbortSignal timeout on all fetch calls
+// ---------------------------------------------------------------------------
+
+describe("GitHub OAuth fetch AbortSignal timeout", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("exchangeCodeForToken passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "gho_abc123",
+          token_type: "bearer",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await exchangeCodeForToken("code123", "cid", "csecret");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("fetchGitHubUser passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          login: "juan294",
+          name: "Juan",
+          avatar_url: "https://avatars.githubusercontent.com/u/123",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchGitHubUser("gho_abc123");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("fetchGitHubUserEmail passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve([
+          { email: "primary@example.com", primary: true, verified: true },
+        ]),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchGitHubUserEmail("gho_abc123");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("exchangeCodeForToken returns null when fetch aborts due to timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await exchangeCodeForToken("code", "cid", "csecret");
+    expect(result).toBeNull();
+  });
+
+  it("fetchGitHubUser returns null when fetch aborts due to timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await fetchGitHubUser("gho_abc123");
+    expect(result).toBeNull();
+  });
+
+  it("fetchGitHubUserEmail returns null when fetch aborts due to timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await fetchGitHubUserEmail("gho_abc123");
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readSessionCookie — shape validation
+// ---------------------------------------------------------------------------
+
 describe("readSessionCookie — shape validation", () => {
   const secret = "secret-key-for-test-32-chars!!!!";
 
