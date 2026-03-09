@@ -49,6 +49,47 @@ export const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
     "Includes verified data from a linked platform account.",
 };
 
+/**
+ * Compute a confidence score (50--100) for a developer's Impact profile.
+ *
+ * Confidence reflects how reliable the scoring data is -- not the developer's
+ * skill. A lower confidence means less signal was available, not that the
+ * developer did anything wrong. The messaging must remain non-accusatory.
+ *
+ * Starts at 100 and subtracts penalties for detected patterns:
+ *
+ * | Flag                        | Penalty | Condition (collaborative)                      |
+ * |-----------------------------|---------|------------------------------------------------|
+ * | `burst_activity`            | -15     | >= 20 commits in a 10-minute window            |
+ * | `micro_commit_pattern`      | -10     | >= 60% of commits are micro-commits            |
+ * | `generated_change_pattern`  | -15     | >= 20k lines changed with <= 2 reviews         |
+ * | `low_collaboration_signal`  | -10     | >= 10 PRs merged with <= 1 review submitted    |
+ * | `single_repo_concentration` | -5      | >= 95% activity in 1 repo, <= 1 repo total     |
+ * | `supplemental_unverified`   | -5      | Includes unverified supplemental account data   |
+ * | `low_activity_signal`       | -10     | < 30 active days AND < 50 total commits        |
+ * | `review_volume_imbalance`   | -10     | >= 50 reviews submitted with < 3 PRs merged    |
+ * | `platform_linked`           | 0       | Verified linked platform (informational only)   |
+ *
+ * The `generated_change_pattern` and `low_collaboration_signal` penalties are
+ * skipped for `"solo"` profile types, since solo developers are not expected
+ * to have review activity.
+ *
+ * The final score is clamped to a minimum of 50 -- confidence never drops
+ * below that floor regardless of how many penalties apply.
+ *
+ * @param stats - Aggregated GitHub activity statistics for the scoring period.
+ * @param profileType - Whether the developer works collaboratively (default) or
+ *   solo. Solo profiles skip collaboration-dependent penalties.
+ * @returns An object with `confidence` (50--100, integer) and `penalties` (an
+ *   array of {@link ConfidencePenalty} objects describing each applied deduction).
+ *
+ * @example
+ * ```ts
+ * const { confidence, penalties } = computeConfidence(stats, "solo");
+ * // confidence: 85
+ * // penalties: [{ flag: "burst_activity", penalty: 15, reason: "..." }]
+ * ```
+ */
 export function computeConfidence(
   stats: StatsData,
   profileType: ProfileType = "collaborative",

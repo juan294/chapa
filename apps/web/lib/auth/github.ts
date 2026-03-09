@@ -46,6 +46,30 @@ export function createStateCookie(): { state: string; cookie: string } {
   return { state, cookie };
 }
 
+/**
+ * Validate the OAuth CSRF state parameter against the value stored in the
+ * `chapa_oauth_state` cookie.
+ *
+ * Uses `crypto.timingSafeEqual` for constant-time comparison to prevent
+ * timing-based side-channel attacks on the state token. Both buffers are
+ * compared only when their lengths match; a length mismatch returns `false`
+ * immediately (safe because length is not secret).
+ *
+ * @param cookieHeader - Raw `Cookie` header string from the incoming request.
+ *   The state cookie is extracted by name from this semicolon-delimited string.
+ * @param queryState - The `state` query parameter returned by GitHub's OAuth
+ *   redirect. Must match the cookie value exactly.
+ * @returns `true` if both values are present and identical; `false` otherwise.
+ *
+ * @example
+ * ```ts
+ * const isValid = validateState(
+ *   request.headers.get("cookie"),
+ *   url.searchParams.get("state"),
+ * );
+ * if (!isValid) return new Response("CSRF validation failed", { status: 403 });
+ * ```
+ */
 export function validateState(
   cookieHeader: string | null,
   queryState: string | null,
@@ -167,6 +191,27 @@ function deriveKey(secret: string): Buffer {
   return createHash("sha256").update(secret).digest();
 }
 
+/**
+ * Encrypt a plaintext token using AES-256-GCM with authenticated encryption.
+ *
+ * The encryption key is derived by SHA-256 hashing the provided secret.
+ * A fresh 12-byte random IV is generated for every call, ensuring that
+ * encrypting the same token twice produces different ciphertexts.
+ *
+ * **Output format:** `iv:authTag:ciphertext` — three colon-separated hex strings.
+ * The 16-byte GCM authentication tag provides tamper detection on decryption.
+ *
+ * @param token - The plaintext string to encrypt (typically a GitHub OAuth access token).
+ * @param secret - The secret used to derive the AES-256 key via SHA-256.
+ *   In production this comes from `NEXTAUTH_SECRET`.
+ * @returns A hex-encoded string in the format `iv:authTag:ciphertext`.
+ *
+ * @example
+ * ```ts
+ * const encrypted = encryptToken(accessToken, process.env.NEXTAUTH_SECRET!);
+ * // "a1b2c3...:d4e5f6...:789abc..."
+ * ```
+ */
 export function encryptToken(token: string, secret: string): string {
   const key = deriveKey(secret);
   const iv = randomBytes(12);
@@ -180,6 +225,26 @@ export function encryptToken(token: string, secret: string): string {
   return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
 }
 
+/**
+ * Decrypt a token previously encrypted by {@link encryptToken}.
+ *
+ * Parses the `iv:authTag:ciphertext` hex format, derives the AES-256 key
+ * from the secret via SHA-256, and decrypts using AES-256-GCM. The GCM
+ * authentication tag is verified during decryption — if the ciphertext or
+ * tag has been tampered with, decryption fails and `null` is returned.
+ *
+ * @param encrypted - The encrypted string in `iv:authTag:ciphertext` hex format
+ *   as produced by {@link encryptToken}.
+ * @param secret - The same secret used during encryption (derives the AES-256 key).
+ * @returns The decrypted plaintext string, or `null` if decryption fails for any
+ *   reason (malformed input, wrong secret, tampered ciphertext, or invalid auth tag).
+ *
+ * @example
+ * ```ts
+ * const token = decryptToken(encrypted, process.env.NEXTAUTH_SECRET!);
+ * if (!token) return new Response("Invalid session", { status: 401 });
+ * ```
+ */
 export function decryptToken(
   encrypted: string,
   secret: string,
@@ -236,6 +301,39 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
   return true;
 }
 
+/**
+ * Read and decrypt the `chapa_session` cookie from a raw `Cookie` header.
+ *
+ * Extracts the session cookie by name, decrypts it via {@link decryptToken}
+ * (AES-256-GCM), parses the resulting JSON, and validates the payload shape
+ * before returning. Any failure at any stage (missing cookie, decryption error,
+ * malformed JSON, invalid payload shape) returns `null` — never throws.
+ *
+ * The session payload contains the user's encrypted GitHub OAuth token,
+ * login handle, display name, and avatar URL.
+ *
+ * **Cookie flags:** `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (when
+ * served over HTTPS). Max-Age is 86400 (24 hours), set at creation time by
+ * {@link createSessionCookie}.
+ *
+ * @param cookieHeader - Raw `Cookie` header string from the incoming request,
+ *   or `null` if no cookies are present.
+ * @param secret - The secret used to decrypt the session (same secret passed
+ *   to {@link createSessionCookie} / {@link encryptToken}).
+ * @returns The decrypted {@link SessionPayload} containing `token`, `login`,
+ *   `name`, and `avatar_url`; or `null` if the cookie is absent, cannot be
+ *   decrypted, or fails shape validation.
+ *
+ * @example
+ * ```ts
+ * const session = readSessionCookie(
+ *   request.headers.get("cookie"),
+ *   process.env.NEXTAUTH_SECRET!,
+ * );
+ * if (!session) return new Response("Unauthorized", { status: 401 });
+ * // session.login, session.token, etc.
+ * ```
+ */
 export function readSessionCookie(
   cookieHeader: string | null,
   secret: string,
