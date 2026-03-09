@@ -7,6 +7,16 @@ vi.mock("./supabase", () => ({
   getSupabase: vi.fn(() => mockSupabase),
 }));
 
+// Mock Redis cache layer
+const mockCacheGet = vi.fn();
+const mockCacheSet = vi.fn();
+const mockCacheDel = vi.fn();
+vi.mock("../cache/redis", () => ({
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
+  cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
+}));
+
 import { getSupabase } from "./supabase";
 import {
   dbGetFeatureFlags,
@@ -64,9 +74,12 @@ function mockUpdate(error: unknown = null) {
 describe("dbGetFeatureFlags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCacheGet.mockResolvedValue(null); // default: cache miss
+    mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(undefined);
   });
 
-  it("returns all flags from the database", async () => {
+  it("returns all flags from the database on cache miss", async () => {
     const rows = [
       makeRow("automated_agents", false),
       makeRow("coverage_agent", true),
@@ -82,6 +95,33 @@ describe("dbGetFeatureFlags", () => {
     // Verify camelCase transformation
     expect(result[0]!.createdAt).toBe("2026-01-01T00:00:00Z");
     expect(result[0]!.updatedAt).toBe("2026-01-01T00:00:00Z");
+  });
+
+  it("caches result in Redis with 1h TTL after fetching from Supabase", async () => {
+    const rows = [makeRow("studio_enabled", true)];
+    mockSelectAll(rows);
+
+    await dbGetFeatureFlags();
+
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "ff:all",
+      expect.arrayContaining([
+        expect.objectContaining({ key: "studio_enabled", enabled: true }),
+      ]),
+      3600,
+    );
+  });
+
+  it("returns cached flags from Redis without hitting Supabase", async () => {
+    const cachedFlags = [
+      { id: "uuid-1", key: "cached_flag", enabled: true, description: null, config: {}, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+    ];
+    mockCacheGet.mockResolvedValue(cachedFlags);
+
+    const result = await dbGetFeatureFlags();
+
+    expect(result).toEqual(cachedFlags);
+    expect(mockFrom).not.toHaveBeenCalled(); // No Supabase call
   });
 
   it("returns empty array when DB is unavailable", async () => {
@@ -107,6 +147,16 @@ describe("dbGetFeatureFlags", () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.key).toBe("valid_flag");
   });
+
+  it("falls through to Supabase when Redis throws (fail-open)", async () => {
+    mockCacheGet.mockRejectedValue(new Error("Redis connection refused"));
+    const rows = [makeRow("fallback_flag", true)];
+    mockSelectAll(rows);
+
+    const result = await dbGetFeatureFlags();
+    expect(result).toHaveLength(1);
+    expect(result[0]!.key).toBe("fallback_flag");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -116,9 +166,12 @@ describe("dbGetFeatureFlags", () => {
 describe("dbGetFeatureFlag", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCacheGet.mockResolvedValue(null); // default: cache miss
+    mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(undefined);
   });
 
-  it("returns a single flag by key", async () => {
+  it("returns a single flag by key on cache miss", async () => {
     const row = makeRow("studio_enabled", true);
     mockSelectSingle(row);
 
@@ -126,6 +179,37 @@ describe("dbGetFeatureFlag", () => {
     expect(result).not.toBeNull();
     expect(result!.key).toBe("studio_enabled");
     expect(result!.enabled).toBe(true);
+  });
+
+  it("caches result in Redis with 1h TTL after fetching from Supabase", async () => {
+    const row = makeRow("studio_enabled", true);
+    mockSelectSingle(row);
+
+    await dbGetFeatureFlag("studio_enabled");
+
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "ff:key:studio_enabled",
+      expect.objectContaining({ key: "studio_enabled", enabled: true }),
+      3600,
+    );
+  });
+
+  it("returns cached flag from Redis without hitting Supabase", async () => {
+    const cachedFlag = {
+      id: "uuid-1",
+      key: "cached_flag",
+      enabled: false,
+      description: null,
+      config: {},
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+    mockCacheGet.mockResolvedValue(cachedFlag);
+
+    const result = await dbGetFeatureFlag("cached_flag");
+
+    expect(result).toEqual(cachedFlag);
+    expect(mockFrom).not.toHaveBeenCalled(); // No Supabase call
   });
 
   it("returns null when flag not found", async () => {
@@ -146,6 +230,16 @@ describe("dbGetFeatureFlag", () => {
     const result = await dbGetFeatureFlag("any_key");
     expect(result).toBeNull();
   });
+
+  it("falls through to Supabase when Redis throws (fail-open)", async () => {
+    mockCacheGet.mockRejectedValue(new Error("Redis connection refused"));
+    const row = makeRow("fallback_flag", true);
+    mockSelectSingle(row);
+
+    const result = await dbGetFeatureFlag("fallback_flag");
+    expect(result).not.toBeNull();
+    expect(result!.key).toBe("fallback_flag");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -155,6 +249,9 @@ describe("dbGetFeatureFlag", () => {
 describe("dbUpdateFeatureFlag", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(undefined);
   });
 
   it("updates a flag and returns true on success", async () => {
@@ -165,6 +262,23 @@ describe("dbUpdateFeatureFlag", () => {
     });
     expect(result).toBe(true);
     expect(mockFrom).toHaveBeenCalledWith("feature_flags");
+  });
+
+  it("invalidates both single-key and all-keys cache on successful update", async () => {
+    mockUpdate(null);
+
+    await dbUpdateFeatureFlag("coverage_agent", { enabled: false });
+
+    expect(mockCacheDel).toHaveBeenCalledWith("ff:key:coverage_agent");
+    expect(mockCacheDel).toHaveBeenCalledWith("ff:all");
+  });
+
+  it("does not invalidate cache when update fails", async () => {
+    mockUpdate({ message: "permission denied" });
+
+    await dbUpdateFeatureFlag("any_key", { enabled: true });
+
+    expect(mockCacheDel).not.toHaveBeenCalled();
   });
 
   it("returns false when DB is unavailable", async () => {
