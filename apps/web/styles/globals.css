@@ -249,6 +249,17 @@ html {
   }
 }
 
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+}
+
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -353,6 +364,9 @@ html {
 }
 .animate-scale-in {
   animation: scale-in 0.6s ease-out both;
+}
+.animate-toast-out {
+  animation: toast-out 0.3s ease-in forwards;
 }
 .animate-cursor-blink {
   animation: cursor-blink 1s step-end infinite;

@@ -10,7 +10,7 @@
  */
 
 import type { MetricsSnapshot } from "@/lib/history/types";
-import { cacheGet, cacheSet } from "./redis";
+import { cacheGet, cacheSet, cacheDel } from "./redis";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 
 const SNAPSHOT_TTL = 86400; // 24 hours
@@ -68,5 +68,25 @@ export async function updateSnapshotCache(
     await cacheSet(key, snapshot, SNAPSHOT_TTL);
   } catch {
     // Fire-and-forget — cache update is non-critical
+  }
+}
+
+/**
+ * Delete the cached latest snapshot for a user.
+ *
+ * Call this after any action that changes the user's score mid-day
+ * (insights upload, platform connect, recalculate) so the next
+ * badge/share-page request fetches a fresh snapshot from DB.
+ *
+ * Fire-and-forget safe — silently no-ops on Redis failure.
+ */
+export async function invalidateSnapshotCache(
+  handle: string,
+): Promise<void> {
+  const key = snapshotCacheKey(handle);
+  try {
+    await cacheDel(key);
+  } catch {
+    // Fire-and-forget — cache invalidation is non-critical
   }
 }

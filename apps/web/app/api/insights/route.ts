@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit, cacheDel } from "@/lib/cache/redis";
+import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { isInsightsEnabled } from "@/lib/feature-flags";
 import { isValidInsightsUpload } from "@/lib/insights/validation";
 import { computeCraftScore } from "@/lib/insights/scoring";
@@ -56,7 +57,13 @@ export async function POST(request: NextRequest): Promise<Response> {
   const stored = await dbUpsertToolInsights(session.login, data, scores);
 
   // Defer cache invalidation to post-response (non-blocking)
-  after(() => cacheDel(`stats:v2:merged:${session.login.toLowerCase()}`));
+  after(async () => {
+    const handle = session.login.toLowerCase();
+    await Promise.all([
+      cacheDel(`stats:v2:merged:${handle}`),
+      invalidateSnapshotCache(handle),
+    ]);
+  });
 
   return NextResponse.json({
     success: true,

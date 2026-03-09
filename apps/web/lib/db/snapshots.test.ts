@@ -91,6 +91,7 @@ vi.mock("./supabase", () => ({
 import { getSupabase } from "./supabase";
 import {
   dbInsertSnapshot,
+  dbReplaceSnapshot,
   dbGetSnapshots,
   dbGetLatestSnapshot,
   dbGetLatestSnapshotBatch,
@@ -185,6 +186,56 @@ describe("dbInsertSnapshot", () => {
     });
     const result = await dbInsertSnapshot("testuser", makeSnapshot());
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbReplaceSnapshot
+// ---------------------------------------------------------------------------
+
+describe("dbReplaceSnapshot", () => {
+  it("inserts a new snapshot when none exists for today", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(true);
+  });
+
+  it("replaces existing same-day snapshot (returns true)", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 200 });
+    const result = await dbReplaceSnapshot(
+      "testuser",
+      makeSnapshot({ adjustedComposite: 65 }),
+    );
+    expect(result).toBe(true); // true even on "update" (status 200)
+  });
+
+  it("does NOT use ignoreDuplicates", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    await dbReplaceSnapshot("testuser", makeSnapshot());
+    const upsertArgs = mockUpsert.mock.calls[0]!;
+    expect(upsertArgs[1]).toEqual({ onConflict: "handle,date" });
+    expect(upsertArgs[1]).not.toHaveProperty("ignoreDuplicates");
+  });
+
+  it("returns false when Supabase is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(false);
+  });
+
+  it("returns false on error", async () => {
+    mockUpsert.mockResolvedValue({
+      error: new Error("DB error"),
+      status: 500,
+    });
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(false);
+  });
+
+  it("lowercases handle", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    await dbReplaceSnapshot("TestUser", makeSnapshot());
+    expect(mockUpsert.mock.calls[0]![0].handle).toBe("testuser");
   });
 });
 

@@ -8,17 +8,19 @@ import { makeSnapshot } from "../test-helpers/fixtures";
 vi.mock("./redis", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
+  cacheDel: vi.fn(),
 }));
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbGetLatestSnapshot: vi.fn(),
 }));
 
-import { cacheGet, cacheSet } from "./redis";
+import { cacheGet, cacheSet, cacheDel } from "./redis";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import {
   getCachedLatestSnapshot,
   updateSnapshotCache,
+  invalidateSnapshotCache,
 } from "./snapshot-cache";
 
 // ---------------------------------------------------------------------------
@@ -143,6 +145,31 @@ describe("updateSnapshotCache", () => {
 
     await expect(
       updateSnapshotCache("testuser", makeSnapshot()),
+    ).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// invalidateSnapshotCache
+// ---------------------------------------------------------------------------
+
+describe("invalidateSnapshotCache", () => {
+  it("deletes the snapshot cache key", async () => {
+    vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
+    await invalidateSnapshotCache("testuser");
+    expect(cacheDel).toHaveBeenCalledWith("snapshot:latest:testuser");
+  });
+
+  it("lowercases handle", async () => {
+    vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
+    await invalidateSnapshotCache("TestUser");
+    expect(cacheDel).toHaveBeenCalledWith("snapshot:latest:testuser");
+  });
+
+  it("does not throw on Redis failure", async () => {
+    vi.mocked(cacheDel).mockRejectedValueOnce(new Error("Redis down"));
+    await expect(
+      invalidateSnapshotCache("testuser"),
     ).resolves.toBeUndefined();
   });
 });
