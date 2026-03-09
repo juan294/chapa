@@ -266,7 +266,7 @@ function HexCell({
     }
     case "glow": {
       if (day.count === 0) {
-        background = "rgba(255, 255, 255, 0.03)";
+        background = "var(--color-purple-tint)";
       } else {
         background = cssVarAlpha(
           DIMENSION_COLORS[day.dominant],
@@ -596,7 +596,7 @@ export default function HexmapExperimentPage() {
           <div
             className={`rounded-2xl border border-stroke overflow-hidden p-8 transition-colors duration-300 ${
               activeVariant === "glow"
-                ? "bg-[#06060A]"
+                ? "bg-dark-section"
                 : "bg-card/50"
             }`}
           >
@@ -639,7 +639,7 @@ export default function HexmapExperimentPage() {
                 activeVariant === v.id
                   ? "border-amber/30"
                   : "border-stroke"
-              } ${v.id === "glow" ? "bg-[#06060A]" : "bg-card/50"}`}
+              } ${v.id === "glow" ? "bg-dark-section" : "bg-card/50"}`}
             >
               <h3 className="font-heading text-base font-bold text-text-primary">
                 {v.label}
