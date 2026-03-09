@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Toast } from "./Toast";
 
 /** Module-level cache for platform status fetches — persists across mounts */
 const platformStatusCache: {
@@ -55,43 +56,73 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
   // Insights import — file picker triggered directly from menu
   const insightsFileRef = useRef<HTMLInputElement>(null);
-  const [insightsStatus, setInsightsStatus] = useState<
-    "idle" | "processing" | "success" | "error"
-  >("idle");
+  const handleToastDismiss = useCallback(() => setToast(null), []);
+  const [toast, setToast] = useState<{
+    message: string;
+    detail?: string;
+    type: "loading" | "success" | "error" | "info";
+  } | null>(null);
 
   async function handleInsightsFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Reset input so the same file can be re-selected
     e.target.value = "";
 
     if (file.size > 10 * 1024 * 1024) {
-      setInsightsStatus("error");
-      setTimeout(() => setInsightsStatus("idle"), 3000);
+      setToast({ message: "File too large", detail: "Maximum size is 10 MB", type: "error" });
       return;
     }
 
-    setInsightsStatus("processing");
     setOpen(false);
+    setToast({ message: "Processing report…", type: "loading" });
 
     try {
       const html = await file.text();
       const { parseInsightsHtml } = await import("@/lib/insights/parser");
       const data = parseInsightsHtml(html);
 
-      const res = await fetch("/api/insights", {
+      const uploadRes = await fetch("/api/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
-      if (!res.ok) throw new Error("Upload failed");
+      if (!uploadRes.ok) throw new Error("Upload failed");
 
-      setInsightsStatus("success");
-      setTimeout(() => window.location.reload(), 800);
+      setToast({ message: "Recalculating score…", type: "loading" });
+
+      // Parse upload response and start recalculate in parallel
+      const [uploadData, recalcRes] = await Promise.all([
+        uploadRes.json(),
+        fetch("/api/recalculate", { method: "POST" }),
+      ]);
+
+      if (recalcRes.ok) {
+        const recalcData = await recalcRes.json();
+        const craftScore = uploadData.craftScore?.craftScore ?? recalcData.craftScore;
+        const craftTier = uploadData.craftScore?.tier ?? recalcData.craftTier;
+        const newScore = recalcData.adjustedComposite;
+
+        setToast({
+          message: `Craft: ${craftScore} ${craftTier}`,
+          detail: `Score updated to ${newScore}`,
+          type: "success",
+        });
+      } else {
+        const craftScore = uploadData.craftScore?.craftScore;
+        const craftTier = uploadData.craftScore?.tier;
+        setToast({
+          message: craftScore
+            ? `Craft: ${craftScore} ${craftTier}`
+            : "Insights uploaded",
+          detail: "Score will update on next badge view",
+          type: "success",
+        });
+      }
+
+      setTimeout(() => window.location.reload(), 2500);
     } catch {
-      setInsightsStatus("error");
-      setTimeout(() => setInsightsStatus("idle"), 3000);
+      setToast({ message: "Import failed", detail: "Please try again", type: "error" });
     }
   }
 
@@ -306,10 +337,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                {insightsStatus === "idle" && "Import Claude Code Insights"}
-                {insightsStatus === "processing" && "Processing…"}
-                {insightsStatus === "success" && "Uploaded!"}
-                {insightsStatus === "error" && "Import failed — try again"}
+                Import Claude Code Insights
                 <input
                   ref={insightsFileRef}
                   type="file"
@@ -526,6 +554,15 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         onConfirm={handleUnlinkCodeberg}
         onCancel={() => setShowCbUnlinkConfirm(false)}
       />
+      {toast && (
+        <Toast
+          message={toast.message}
+          detail={toast.detail}
+          type={toast.type}
+          duration={toast.type === "loading" ? 0 : toast.type === "error" ? 5000 : 4000}
+          onDismiss={handleToastDismiss}
+        />
+      )}
     </div>
   );
 }

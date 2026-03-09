@@ -231,6 +231,42 @@ export async function dbInsertSnapshot(
 }
 
 /**
+ * Replace today's snapshot for a user. Uses ON CONFLICT DO UPDATE
+ * instead of DO NOTHING — overwrites all columns if a same-day row exists.
+ *
+ * Use this for deliberate user actions (insights upload, recalculate)
+ * where the score has legitimately changed mid-day and the new snapshot
+ * should be the reference for EMA smoothing.
+ *
+ * Returns true if the row was written (inserted or updated), false on error.
+ */
+export async function dbReplaceSnapshot(
+  handle: string,
+  snapshot: MetricsSnapshot,
+): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const row = snapshotToRow(handle, snapshot);
+    const { error } = await db
+      .from("metrics_snapshots")
+      .upsert(row, {
+        onConflict: "handle,date",
+      });
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error(
+      "[db] dbReplaceSnapshot failed:",
+      (error as Error).message,
+    );
+    return false;
+  }
+}
+
+/**
  * Get snapshots for a user, optionally filtered by date range.
  * Ordered by date ascending (oldest first) — matches Redis ZRANGE behavior.
  */

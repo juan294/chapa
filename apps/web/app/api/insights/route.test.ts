@@ -14,6 +14,7 @@ const {
   mockDbUpsert,
   mockDbGet,
   mockGetClientIp,
+  mockInvalidateSnapshotCache,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockRateLimit: vi.fn(),
@@ -22,6 +23,7 @@ const {
   mockDbUpsert: vi.fn(),
   mockDbGet: vi.fn(),
   mockGetClientIp: vi.fn(),
+  mockInvalidateSnapshotCache: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -31,6 +33,10 @@ vi.mock("@/lib/auth/require-session", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
   cacheDel: mockCacheDel,
+}));
+
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  invalidateSnapshotCache: mockInvalidateSnapshotCache,
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -131,6 +137,7 @@ beforeEach(() => {
   mockRequireSession.mockReturnValue({ session: SESSION });
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   mockCacheDel.mockResolvedValue(undefined);
+  mockInvalidateSnapshotCache.mockResolvedValue(undefined);
   mockDbUpsert.mockResolvedValue(null); // null = fallback to computed scores
   mockDbGet.mockResolvedValue(null);
   mockGetClientIp.mockReturnValue("127.0.0.1");
@@ -187,6 +194,11 @@ describe("POST /api/insights", () => {
   it("invalidates badge cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
+  });
+
+  it("invalidates snapshot cache after successful upload", async () => {
+    await POST(makePostRequest(makeValidUpload()));
+    expect(mockInvalidateSnapshotCache).toHaveBeenCalledWith("juan294");
   });
 
   it("calls dbUpsert with correct arguments", async () => {

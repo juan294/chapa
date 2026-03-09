@@ -128,6 +128,32 @@ EMA smoothing (0.15 current + 0.85 previous)
 Badge SVG (pentagon or diamond radar) + Share page
 ```
 
+## Score Recalculation
+
+Deliberate user actions (insights upload, platform connect) trigger immediate score recalculation via `POST /api/recalculate`. This endpoint:
+
+1. Fetches stats (cache-first)
+2. Reads craft score from DB (latest uploaded insights)
+3. Computes fresh impact with `computeImpactV4(stats, craftScore)`
+4. Uses the raw `adjustedComposite` — NO EMA smoothing (deliberate action bypass)
+5. Replaces today's snapshot via `dbReplaceSnapshot` (upsert, not ignore-duplicate)
+6. Updates the Redis snapshot cache
+
+This ensures that after an insights upload, the badge and share page immediately reflect the new score. EMA smoothing continues to apply for passive badge views where GitHub stats change organically.
+
+### Upload Flow
+
+```
+File selected → Toast: "Processing report…"
+             → POST /api/insights (craft score computed + stored)
+             → Toast: "Recalculating score…"
+             → POST /api/recalculate (fresh impact, snapshot replaced)
+             → Toast: "Craft: 69 Expert · Score updated to 61"
+             → Page reloads (2.5s delay for user to read toast)
+```
+
+Rate limits: insights upload 10/day, recalculate 20/hour.
+
 ## Type Compatibility
 
 - `DimensionScores.craft` is optional (`craft?: number`) — zero migration needed

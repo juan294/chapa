@@ -251,3 +251,71 @@ describe("UserMenu — platform status cache", () => {
     expect(SOURCE).toContain("export function clearPlatformStatusCache");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Upload flow with Toast + recalculate
+// ---------------------------------------------------------------------------
+
+describe("UserMenu — insights upload with Toast", () => {
+  it("imports Toast component", () => {
+    expect(SOURCE).toContain('import { Toast } from "./Toast"');
+  });
+
+  it("renders Toast component conditionally on toast state", () => {
+    expect(SOURCE).toContain("{toast && (");
+    expect(SOURCE).toContain("<Toast");
+  });
+
+  it("Toast receives message, detail, type, duration, and onDismiss props", () => {
+    expect(SOURCE).toContain("message={toast.message}");
+    expect(SOURCE).toContain("detail={toast.detail}");
+    expect(SOURCE).toContain("type={toast.type}");
+    expect(SOURCE).toContain("onDismiss={");
+  });
+
+  it("loading toast has duration=0 (persistent until state changes)", () => {
+    expect(SOURCE).toContain('toast.type === "loading" ? 0');
+  });
+
+  it("calls /api/recalculate after successful upload", () => {
+    expect(SOURCE).toContain('"/api/recalculate"');
+    expect(SOURCE).toContain('method: "POST"');
+  });
+
+  it("shows craft score and tier in success toast", () => {
+    const fnStart = SOURCE.indexOf("async function handleInsightsFile");
+    const fnEnd = SOURCE.indexOf("setTimeout(() => window.location.reload()");
+    const fnBody = SOURCE.slice(fnStart, fnEnd);
+    expect(fnBody).toContain("craftScore");
+    expect(fnBody).toContain("craftTier");
+  });
+
+  it("reloads page after showing success toast", () => {
+    expect(SOURCE).toContain("window.location.reload()");
+  });
+
+  it("does NOT use insightsStatus state (replaced by toast state)", () => {
+    expect(SOURCE).not.toContain("insightsStatus");
+    expect(SOURCE).not.toContain("setInsightsStatus");
+  });
+
+  it("menu label always shows 'Import Claude Code Insights' (no inline status)", () => {
+    expect(SOURCE).not.toContain('"Processing…"');
+    expect(SOURCE).not.toContain('"Uploaded!"');
+  });
+
+  it("shows error toast for oversized files", () => {
+    const fnStart = SOURCE.indexOf("async function handleInsightsFile");
+    const fnEnd = SOURCE.indexOf("setOpen(false)", SOURCE.indexOf("async function handleInsightsFile"));
+    const fnBody = SOURCE.slice(fnStart, fnEnd);
+    expect(fnBody).toContain("File too large");
+  });
+
+  it("shows error toast when upload fails", () => {
+    expect(SOURCE).toContain("Import failed");
+  });
+
+  it("handles recalculate failure gracefully (still shows upload success)", () => {
+    expect(SOURCE).toContain("Score will update on next badge view");
+  });
+});
