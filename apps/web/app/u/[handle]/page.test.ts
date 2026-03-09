@@ -48,14 +48,14 @@ describe("SharePage", () => {
     });
   });
 
-  describe("dashboard integration", () => {
-    it("delegates to ImpactDashboard component", () => {
-      expect(SOURCE).toContain("ImpactDashboard");
+  describe("owner content delegation", () => {
+    it("delegates owner/visitor sections to SharePageOwnerContent", () => {
+      expect(SOURCE).toContain("SharePageOwnerContent");
     });
 
-    it("passes impact, stats, and handle to ImpactDashboard", () => {
-      expect(SOURCE).toContain("impact={impact}");
+    it("passes stats, impact, and handle to SharePageOwnerContent", () => {
       expect(SOURCE).toContain("stats={stats}");
+      expect(SOURCE).toContain("impact={impact}");
       expect(SOURCE).toContain("handle={handle}");
     });
   });
@@ -93,22 +93,6 @@ describe("SharePage", () => {
     });
   });
 
-  describe("visitor CTA for non-owners", () => {
-    it("shows a 'Discover your impact' CTA for non-owners", () => {
-      expect(SOURCE).toContain("!isOwner");
-      expect(SOURCE).toContain("Discover your impact");
-    });
-
-    it("CTA links to the homepage using Next.js Link", () => {
-      expect(SOURCE).toContain('import Link from "next/link"');
-      expect(SOURCE).toMatch(/href="\/"/);
-    });
-
-    it("uses curiosity-driven copy that focuses on the reader", () => {
-      expect(SOURCE).toContain("Curious what your developer impact looks like");
-    });
-  });
-
   describe("OG image cache busting", () => {
     it("appends a daily version parameter to og-image URL", () => {
       expect(SOURCE).toContain("og-image?v=");
@@ -121,14 +105,6 @@ describe("SharePage", () => {
     });
   });
 
-  // #440 — embed snippet includes both width and height for proper aspect ratio
-  describe("embed snippet dimensions", () => {
-    it("embed HTML includes width=\"600\" and height=\"315\"", () => {
-      expect(SOURCE).toContain('width="600"');
-      expect(SOURCE).toContain('height="315"');
-    });
-  });
-
   // #120 — JSON-LD script injection prevention
   describe("JSON-LD security", () => {
     it("escapes < characters in JSON-LD to prevent script injection", () => {
@@ -138,34 +114,33 @@ describe("SharePage", () => {
     });
   });
 
-  // #532 — ISR revalidation for share pages (cuts serverless invocations 80-90%)
+  // #555 — ISR revalidation for share pages (cuts serverless invocations 80-90%)
   describe("ISR revalidation", () => {
     it("exports revalidate = 3600 for Incremental Static Regeneration", () => {
       expect(SOURCE).toContain("export const revalidate = 3600");
     });
-  });
 
-  // Data Sources section — rendered before Impact Breakdown
-  describe("data sources section", () => {
-    it("imports DataSources component", () => {
-      expect(SOURCE).toContain("DataSources");
+    it("does NOT import headers from next/headers (ISR incompatible)", () => {
+      expect(SOURCE).not.toContain('from "next/headers"');
+      expect(SOURCE).not.toContain("from 'next/headers'");
     });
 
-    it("renders DataSources before Impact Breakdown heading", () => {
-      const dsIndex = SOURCE.indexOf("DataSources");
-      const breakdownIndex = SOURCE.indexOf("Impact Breakdown");
-      expect(dsIndex).toBeGreaterThan(-1);
-      expect(breakdownIndex).toBeGreaterThan(-1);
-      expect(dsIndex).toBeLessThan(breakdownIndex);
+    it("does NOT call headers() anywhere (ISR incompatible)", () => {
+      // Ensure no headers() call that would force dynamic rendering
+      expect(SOURCE).not.toMatch(/\bheaders\(\)/);
     });
 
-    it("passes stats and handle to DataSources", () => {
-      expect(SOURCE).toContain("stats={stats}");
-      expect(SOURCE).toContain("handle={handle}");
+    it("does NOT import readSessionCookie (session is client-side)", () => {
+      expect(SOURCE).not.toContain("readSessionCookie");
     });
 
-    it("does not render standalone '+ Bitbucket' indicator", () => {
-      expect(SOURCE).not.toContain("+ Bitbucket");
+    it("uses NavbarClient instead of server-side Navbar", () => {
+      expect(SOURCE).toContain("NavbarClient");
+      expect(SOURCE).not.toMatch(/from ["']@\/components\/Navbar["']/);
+    });
+
+    it("uses SharePageOwnerContent for client-side owner detection", () => {
+      expect(SOURCE).toContain("SharePageOwnerContent");
     });
   });
 });
