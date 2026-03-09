@@ -11,7 +11,6 @@ const {
   mockGetTier,
   mockGetCachedLatestSnapshot,
   mockUpdateSnapshotCache,
-  mockReadSessionCookie,
   mockIsValidHandle,
   mockCacheGet,
   mockTrackBadgeGenerated,
@@ -37,7 +36,6 @@ const {
   }),
   mockGetCachedLatestSnapshot: vi.fn(),
   mockUpdateSnapshotCache: vi.fn(),
-  mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockCacheGet: vi.fn(),
   mockTrackBadgeGenerated: vi.fn(),
@@ -72,10 +70,6 @@ vi.mock("@/lib/impact/utils", () => ({
 vi.mock("@/lib/cache/snapshot-cache", () => ({
   getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
   updateSnapshotCache: mockUpdateSnapshotCache,
-}));
-
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: mockReadSessionCookie,
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -136,13 +130,6 @@ vi.mock("next/server", async (importOriginal) => {
   };
 });
 
-// Mock next/headers
-vi.mock("next/headers", () => ({
-  headers: () => Promise.resolve({
-    get: () => null,
-  }),
-}));
-
 // Mock next/navigation
 const mockNotFound = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -155,8 +142,8 @@ vi.mock("@/components/GlobalCommandBarLazy", () => ({
 }));
 
 // Mock components to return simple elements
-vi.mock("@/components/Navbar", () => ({
-  Navbar: () => "<nav />",
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => "<nav />",
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
@@ -167,18 +154,12 @@ vi.mock("@/components/ShareBadgePreviewLazy", () => ({
 vi.mock("@/components/BadgeToolbar", () => ({
   BadgeToolbar: () => "<div>toolbar</div>",
 }));
-vi.mock("@/components/ImpactBreakdown", () => ({
-  ImpactBreakdown: () => "<div>breakdown</div>",
-  getArchetypeProfile: () => "A builder profile",
-  DataSources: () => "<div>sources</div>",
-}));
-vi.mock("@/components/CopyButton", () => ({
-  CopyButton: () => "<button>copy</button>",
+vi.mock("@/components/SharePageOwnerContent", () => ({
+  SharePageOwnerContent: () => "<div>owner-content</div>",
 }));
 vi.mock("@/components/dashboard/HeroScoreZone", () => ({
   HeroScoreZone: () => "<div>hero</div>",
 }));
-// CraftBreakdown removed in Phase 4 — no longer imported by share page
 
 // ---------------------------------------------------------------------------
 // Import the page after all mocks
@@ -229,7 +210,6 @@ async function renderPage(handle = "testuser") {
 describe("SharePage /u/[handle]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
     mockIsValidHandle.mockReturnValue(true);
     mockGetStats.mockResolvedValue(FAKE_STATS);
     mockCacheGet.mockResolvedValue(null); // no saved config
@@ -246,7 +226,19 @@ describe("SharePage /u/[handle]", () => {
     mockUpdateSnapshotCache.mockResolvedValue(undefined);
     mockIsStudioEnabled.mockResolvedValue(false);
     mockDbGetToolInsights.mockResolvedValue(null);
-    mockReadSessionCookie.mockReturnValue(null);
+  });
+
+  // -------------------------------------------------------------------------
+  // ISR compatibility — no headers() call
+  // -------------------------------------------------------------------------
+
+  describe("ISR compatibility", () => {
+    it("calls getStats without user token (ISR has no request context)", async () => {
+      await renderPage();
+      // With ISR, no per-user OAuth token is available — getStats is called
+      // with handle only, relying on env GITHUB_TOKEN fallback.
+      expect(mockGetStats).toHaveBeenCalledWith("testuser");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -259,7 +251,7 @@ describe("SharePage /u/[handle]", () => {
 
       // All three should be called — the key assertion is that snapshot
       // is called BEFORE stats resolves (i.e., in parallel, not sequential)
-      expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined);
+      expect(mockGetStats).toHaveBeenCalledWith("testuser");
       expect(mockCacheGet).toHaveBeenCalledWith("config:testuser");
       expect(mockGetCachedLatestSnapshot).toHaveBeenCalledWith("testuser");
     });
