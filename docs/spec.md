@@ -32,8 +32,8 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
   - Badge verification endpoint (proves data integrity via HMAC-SHA256)
 - POST `/api/supplemental`
   - Upload EMU supplemental stats (CLI tool)
-- POST `/api/studio/config`
-  - Save/load Creator Studio badge customization
+- GET|PUT `/api/studio/config`
+  - Load/save Creator Studio badge customization (GET to load, PUT to save)
 - GET `/api/history/:handle`
   - Score history, trend analysis, and snapshot diffs (public, rate-limited)
 

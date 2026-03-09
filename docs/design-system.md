@@ -50,6 +50,8 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-dimension-quality-light` | `#FB923C` | `#FB923C` | `text-dimension-quality-light` | Lighter quality accent |
 | `--color-dimension-consistency-light` | `#22D3EE` | `#22D3EE` | `text-dimension-consistency-light` | Lighter consistency accent |
 | `--color-dimension-breadth-light` | `#F472B6` | `#F472B6` | `text-dimension-breadth-light` | Lighter breadth accent |
+| `--color-dimension-craft` | `#F59E0B` | `#F59E0B` | `text-dimension-craft`, `bg-dimension-craft` | Craft dimension (amber) |
+| `--color-dimension-craft-light` | `#FBBF24` | `#FBBF24` | `text-dimension-craft-light` | Lighter craft accent |
 | | | | | |
 | **Archetype colors** | | | | **Accent color per developer archetype** |
 | `--color-archetype-builder` | `#8B5CF6` | `#8B5CF6` | `text-archetype-builder`, `bg-archetype-builder` | Builder archetype (purple) |
@@ -58,6 +60,7 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-archetype-polymath` | `#EAB308` | `#EAB308` | `text-archetype-polymath`, `bg-archetype-polymath` | Polymath archetype (yellow) |
 | `--color-archetype-balanced` | `#0EA5E9` | `#0EA5E9` | `text-archetype-balanced`, `bg-archetype-balanced` | Balanced archetype (sky blue) |
 | `--color-archetype-emerging` | `#F97316` | `#F97316` | `text-archetype-emerging`, `bg-archetype-emerging` | Emerging archetype (orange) |
+| `--color-archetype-artificer` | `#F59E0B` | `#F59E0B` | `text-archetype-artificer`, `bg-archetype-artificer` | Artificer archetype (amber) |
 
 ### Color rules
 
@@ -179,6 +182,7 @@ Defined in `globals.css`:
 | `animate-shimmer` | Horizontal shimmer gradient (left to right) | 3s linear infinite |
 | `animate-shimmer-sweep` | Horizontal shimmer gradient (right to left) | 3s linear infinite |
 | `animate-scale-in` | Scale from 0.92 + fade in | 0.6s ease-out |
+| `animate-toast-out` | Scale to 0.95 + fade out + slide up 8px | 0.3s ease-in forwards |
 | `animate-gauge-fill` | SVG circular gauge stroke fill | 1.5s ease-out |
 | `animate-bar-fill` | Horizontal bar scale from 0 to target | 0.8s ease-out |
 | `animate-terminal-type` | Typewriter width expansion (0 to 100%) | (set per-element) |
