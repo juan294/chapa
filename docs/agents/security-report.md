@@ -1,85 +1,109 @@
 # Security Report
-> Generated: 2026-03-02 | Health status: green
+> Generated: 2026-03-09 | Health status: GREEN
 
 ## Executive Summary
 
-The Chapa codebase demonstrates strong security practices across all audited domains. Two high-severity ReDoS vulnerabilities exist in `minimatch` (transitive via eslint, dev-only), and one LGPL-3.0 dependency (`@img/sharp-libvips-darwin-arm64`) is present but acceptable as a dynamically-linked native binary. No hardcoded secrets, no XSS vectors, no client-side secret leaks, and full RLS coverage on all Supabase tables.
+The Chapa codebase maintains a strong security posture with zero dependency vulnerabilities, no hardcoded secrets, comprehensive XSS protection in the SVG pipeline, proper secret isolation, and full Supabase RLS coverage across all 6 tables. No blockers or regressions since the last audit (2026-03-02).
 
 ## Dependency Vulnerabilities
 
-| Severity | Package | Issue | Fix |
-|----------|---------|-------|-----|
-| high | `minimatch` >=10.0.0 <10.2.3 | ReDoS via matchOne() combinatorial backtracking (GHSA-7r86-cg39-jmmj) | Upgrade to >=10.2.3 |
-| high | `minimatch` >=10.0.0 <10.2.3 | ReDoS via nested *() extglobs (GHSA-23c5-xmqv-rm74) | Upgrade to >=10.2.3 |
+| Severity | Count | Details |
+|----------|-------|---------|
+| Critical | 0 | — |
+| High | 0 | — |
+| Medium | 0 | — |
+| Low | 0 | — |
 
-**Mitigating factors:** Both vulnerabilities are in `minimatch` pulled transitively by `eslint`. This is a **dev-only dependency** — it does not ship in the production bundle and cannot be triggered by user input at runtime.
+`pnpm audit` reports **no known vulnerabilities**. The previous `minimatch` ReDoS (dev-only, via eslint) has been resolved since the 2026-03-02 audit.
 
-**Unused dependencies (knip):** Clean — no unused dependencies detected.
+## Unused Dependencies (Attack Surface)
+
+`npx knip` reports **clean** — no unused files, exports, or dependencies detected.
 
 ## Code Findings
 
-### Hardcoded Secrets
-- **CLEAN** — No hardcoded API keys, tokens, passwords, or credentials found in source code
-- All sensitive values sourced from environment variables with `.trim()` applied
-- `.env` and `.env.local` properly gitignored
-- Test files use obviously fake credentials (`ghp_ci_fallback`, `Bearer re_test_123`, `Bearer mytoken`)
+### Hardcoded Secrets — CLEAR
 
-### SVG XSS Protection
-- **CLEAN** — All user-controlled strings escaped via `escapeXml()` before SVG interpolation
-- Escape function at `apps/web/lib/render/escape.ts` handles all 5 XML entities (&, <, >, ', ")
-- User input entry points verified:
-  - `BadgeSvg.tsx:26` — handle via `escapeXml(stats.handle)`
-  - `BadgeSvg.tsx:27-29` — displayName via `escapeXml(stats.displayName)`
-  - `BadgeSvg.tsx:57,165` — archetype via `escapeXml(archetypeText)`
-  - `BadgeSvg.tsx:222` — tier via `escapeXml(impact.tier)`
-  - `BadgeSvg.tsx:141` — avatar data URI via `escapeXml(avatarDataUri)`
-  - `VerificationStrip.ts:12-14` — hash and date via `escapeXml()`
-  - `badge.svg/route.ts:33-42` — fallback SVG escapes handle and message
-- No event handlers (`onclick`, `onload`) in SVG markup
-- No `style` attributes with user input
-- XSS tests with malicious payloads (`<script>`, `onload="alert(1)"`) in `BadgeSvg.test.tsx:553-577`
-- Input validation: `isValidHandle()` regex restricts handle to alphanumeric + hyphen
+- All 10 server-side secrets stored in `.env.local` (gitignored, never committed)
+- All env var reads use `.trim()` to prevent whitespace-induced auth failures
+- No secrets in `NEXT_PUBLIC_*` variables — only public analytics keys and feature flags
+- Test files use properly-mocked credentials (`gho_test`, `sk-test`, etc.)
+- Git history clean of accidentally-committed credentials
 
-### Client-Side Secret Exposure
-- **CLEAN** — No server secrets in `NEXT_PUBLIC_*` variables
-- 7 NEXT_PUBLIC_ vars, all non-sensitive: base URL, PostHog analytics, feature flags
-- All 10 server-only secrets verified isolated to server-side code paths
+### SVG XSS Prevention — SECURE
 
-### CORS Configuration
-- **CLEAN** — Only 1 route has CORS: `/api/verify/[hash]` with `Access-Control-Allow-Origin: *`
-- This is intentional — badge verification must work cross-origin for embedded badges
-- Endpoint is rate-limited (30 req/60s per IP) and read-only
-- All other routes: no CORS headers (blocked by default)
-- Security headers in `next.config.ts:46-90`: HSTS, X-Content-Type-Options, X-XSS-Protection, Permissions-Policy, X-Frame-Options: DENY (except badge SVG)
+All user-controlled input is escaped via `escapeXml()` (`apps/web/lib/render/escape.ts:11-18`) before SVG rendering:
 
-### Supabase RLS
-- **CLEAN** — All 6 tables have RLS enabled with explicit deny policies for `anon` role
-- Tables: `users`, `metrics_snapshots`, `verification_records`, `merge_operations`, `feature_flags`, `user_platforms`
-- Defense-in-depth: `USING (false)` policies on all tables for anon (migration `008_add_rls_deny_policies.sql`)
-- `feature_flags` has an additional permissive SELECT policy (non-sensitive boolean toggles)
-- Service role key used only server-side via singleton client (`lib/db/supabase.ts`)
-- No anon key exposed to client
+| Entry Point | File:Line | Escaped |
+|-------------|-----------|---------|
+| User handle | `BadgeSvg.tsx:25` | `escapeXml(stats.handle)` |
+| Display name | `BadgeSvg.tsx:27` | `escapeXml(stats.displayName)` |
+| Avatar data URI | `BadgeSvg.tsx:140` | `escapeXml(avatarDataUri)` |
+| Archetype label | `BadgeSvg.tsx:164` | `escapeXml(archetypeText)` |
+| Tier label | `BadgeSvg.tsx:221` | `escapeXml(impact.tier)` |
+| Verification hash | `VerificationStrip.ts:13-14` | `escapeXml()` |
+| Fallback SVG | `badge.svg/route.ts:35,41` | `escapeXml()` |
+
+XSS tests exist at `BadgeSvg.test.tsx:600-626` covering `<script>`, `onload=`, and event handler injection.
+
+### Secret Leakage — CLEAR
+
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only (`lib/db/supabase.ts:16`)
+- `GITHUB_CLIENT_SECRET` — server-only (`api/auth/callback/route.ts:84`)
+- `NEXTAUTH_SECRET` — server-only (session creation, admin auth, badge route)
+- `CHAPA_VERIFICATION_SECRET` — server-only (`lib/verification/hmac.ts:46`)
+- OAuth tokens encrypted at rest with AES-256-GCM before storage in `user_platforms` table
+
+### CORS Configuration — APPROPRIATE
+
+| Route | CORS | Justification |
+|-------|------|---------------|
+| `/api/verify/[hash]` | `Access-Control-Allow-Origin: *` | Intentional — public verification endpoint, read-only, rate-limited (30 req/60s) |
+| All other routes | Same-origin (default) | No CORS headers set |
+
+CSP headers in `next.config.ts:17-88`: badge SVG allows `frame-ancestors *` (embeddable), all other routes set `frame-ancestors 'none'` + `X-Frame-Options: DENY`.
+
+### Supabase RLS — COMPLETE
+
+| Table | RLS Enabled | Policy |
+|-------|-------------|--------|
+| `users` | Yes | `deny_anon_all` (ALL ops denied for anon) |
+| `metrics_snapshots` | Yes | `deny_anon_all` |
+| `verification_records` | Yes | `deny_anon_all` |
+| `merge_operations` | Yes | `deny_anon_all` |
+| `feature_flags` | Yes | `feature_flags_read_all` (SELECT only) + `deny_anon_all` (write-protected) |
+| `user_platforms` | Yes | `deny_anon_user_platforms` |
+
+- Views use `security_invoker = true` to prevent privilege escalation
+- Service role key used exclusively server-side — no anon key in codebase
+- All DB wrapper functions fail gracefully when Supabase is unavailable
+
+### OAuth Security — SECURE
+
+- All 3 GitHub OAuth fetches now have `AbortSignal.timeout(10000)` — resolves the previously flagged indefinite hang risk (`lib/auth/github.ts:118,142,180`)
+- Bitbucket and Codeberg OAuth equivalents already had timeouts
+- Token exchange uses server-side fetch only
+- State parameter validated with timing-safe comparison
 
 ## License Compliance
 
 | Package | License | Risk |
 |---------|---------|------|
-| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0-or-later | Low |
+| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | **None** — dynamically linked native binary, no source modification, no compliance action needed |
 
-**Assessment:** LGPL-3.0 applies to `libvips`, a dynamically-linked native image processing library used by `sharp`. Under LGPL-3.0, dynamic linking is permitted without requiring the host application to be open-sourced. The `sharp` package itself is Apache-2.0. No GPL or AGPL dependencies found. **No compliance action required.**
+All other dependencies use MIT, Apache-2.0, BSD, or ISC licenses. No copyleft violations.
 
-All other dependencies use permissive licenses (MIT, Apache-2.0, BSD, ISC).
+## Resolved Since Last Audit (2026-03-02)
+
+1. **`minimatch` ReDoS (high, dev-only)** — No longer reported by `pnpm audit`. Resolved via dependency updates.
+2. **GitHub OAuth timeout gap** — All 3 functions (`exchangeCodeForToken`, `fetchGitHubUser`, `fetchGitHubUserEmail`) now have `AbortSignal.timeout(10000)`.
+3. **`badge:notified:*` indefinite TTL concern** — Confirmed 365-day TTL (not indefinite) by cost analyst.
 
 ## Recommendations
 
-### Priority 1 (Low urgency — dev-only)
-- **Update eslint** to resolve `minimatch` ReDoS vulnerabilities. While dev-only and not exploitable in production, keeping dependencies clean reduces noise in future audits.
+| Priority | Item | Status |
+|----------|------|--------|
+| Low | Monitor `@img/sharp-libvips-darwin-arm64` LGPL-3.0 on future updates | Ongoing |
+| Low | Consider periodic audit of `user_platforms` encrypted token format if key rotation is implemented | Future |
 
-### Priority 2 (Informational)
-- **Monitor `badge:notified:*` Redis keys** — These grow indefinitely (1 byte each per unique handle). Currently negligible but could accumulate at scale. Consider periodic cleanup or TTL.
-- **Feature flag queries lack caching** — `isStudioEnabled()`, `isBitbucketEnabled()`, `isCodebergEnabled()` hit Supabase directly on every call. Not a security risk but increases surface area. (Cross-ref: Cost Analyst finding)
-
-### No Action Required
-- Fail-open rate limiting is intentional and documented in `docs/accepted-risks.md`
-- Token encryption at rest in `user_platforms` table is properly implemented
-- All security-critical code paths have 88%+ test coverage (Cross-ref: Coverage Agent finding)
+No blocking or high-priority security items.

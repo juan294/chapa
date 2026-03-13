@@ -1,64 +1,95 @@
 # QA Report
-> Generated: 2026-03-04 | Health status: GREEN
+> Generated: 2026-03-11 | Health status: GREEN
 
 ## Executive Summary
-All 4,238 tests pass across 272 files. TypeScript and ESLint are clean. Accessibility is excellent with comprehensive ARIA, focus indicators, and keyboard navigation. Two minor design system violations found (hardcoded hex colors in dimension color constants).
+All 4,541 tests pass across 283 files with zero type errors and zero lint issues. Accessibility is excellent (WCAG 2.1 AA compliant). Design system compliance is now 100% — the previous hardcoded hex violations in `ActivityHeatmap.tsx` and `hexmap/page.tsx` have been resolved. Two medium-priority gaps remain: missing error boundaries on secondary routes and no structured error monitoring.
 
 ## Test Results
-- Total: **4,238** tests across **272** files
-- Passed: **4,238** | Failed: **0** | Skipped: **0**
-- Duration: 11.34s
-- Flaky tests: 0 (confirmed by coverage agent across 3 consecutive runs)
+- Total: **4,541 tests** across **283 files**
+- Passed: **4,541** | Failed: **0** | Skipped: **0**
+- Duration: 10.47s
+- Delta vs last QA (2026-03-04): +303 tests, +11 files
 
 ## TypeScript
-Clean — zero type errors across both `packages/shared` and `apps/web`.
+**Clean** — 0 errors across both `packages/shared` and `apps/web`.
 
 ## Linting
-Clean — zero ESLint warnings or errors.
+**Clean** — 0 errors, 0 warnings.
 
 ## Accessibility
-**Status: EXCELLENT** — no violations found.
 
-| Category | Status | Notes |
-|----------|--------|-------|
-| Alt text on images | PASS | All `<img>` tags have descriptive `alt` attributes |
-| Heading hierarchy | PASS | Proper h1 > h2 > h3, no skipped levels |
-| ARIA labels | PASS | Comprehensive `aria-label`, `aria-describedby`, `aria-hidden` |
-| Focus indicators | PASS | All interactive elements use `focus-visible:ring-2 focus-visible:ring-amber` |
-| Keyboard navigation | PASS | Focus traps in modals/menus, Escape key handling, Tab wrapping |
-| Semantic HTML | PASS | `<button>`, `<dialog>`, `<nav>`, `<main>` used correctly |
-| Dynamic content | PASS | `aria-live="polite"` on terminal output and status updates |
-| Interactive divs | PASS | All have proper `role`, `tabIndex`, and keyboard handlers |
+**Status: EXCELLENT — 0 blockers**
 
-## Error Handling
-**Status: COMPREHENSIVE**
+| Area | Status | Notes |
+|------|--------|-------|
+| Images/alt text | PASS | No `<img>` tags; all SVGs use `aria-hidden="true"` or `role="img"` with `aria-label` |
+| Heading hierarchy | PASS | All pages follow h1 → h2 → h3 without skipping levels |
+| ARIA labels | PASS | All interactive elements have proper labels, roles, and state attributes |
+| Focus indicators | PASS | Global `*:focus-visible` style in `globals.css:399-402`; terminal input intentionally suppresses outline |
+| Keyboard navigation | PASS | Focus trapping in `MobileNav.tsx:29-52`, Escape handlers on dialogs/tooltips, `onKeyDown` on SVG interactives |
+| prefers-reduced-motion | PASS | Global blanket rule in `globals.css:416-425` + `useReducedMotion()` hook in `StudioClient.tsx:29-49` |
+| Semantic HTML | PASS | `<main>`, `<nav>`, `<footer>`, `<section>` used throughout; `role="log"` on terminal output |
 
-- **Error boundaries**: `error.tsx` at root, `/admin`, `/u/[handle]` + `global-error.tsx`
-- **Loading states**: All major routes have `loading.tsx` with `role="status"` and `aria-label="Loading"`
-- **404 page**: `not-found.tsx` exists with home link
-- **API routes**: Consistent try/catch pattern with proper HTTP status codes (400, 401, 403, 429, 502, 503, 500)
-- **SVG fallback**: Badge endpoint returns SVG with error message (not error page) on data failure
-- **Cache fail-open**: Redis rate limiter intentionally allows requests during outages (documented accepted risk)
-- **Empty states**: Share page conditionally renders sections with fallback message when data unavailable
+**Minor observations (non-blocking):**
+- `UserMenu.tsx:315-324` — `<label>` element used as `role="menuitem"` (functional but semantically unusual; could be `<button>` in future)
+- Terminal input `outline: none` is intentional — always-focused element where standard focus ring would be distracting
+
+## Error Handling & Resilience
+
+| Category | Coverage | Quality |
+|----------|----------|---------|
+| Error boundaries | 3 routes (`/`, `/admin`, `/u/[handle]`) | Strong UX with reset + go-home buttons |
+| Loading states | 8/8 main routes | All use `role="status"` + `sr-only` text + skeleton screens |
+| Empty states | ~70% | Badge SVG has fallback, Studio builds empty stats, Verify shows 3 distinct states |
+| API error handling | 9/9 routes | Consistent try/catch, proper HTTP status codes, rate limit headers |
+| 404 page | Present | User-friendly with go-home CTA |
+| SVG fallback | Present | `fallbackSvg()` with XSS-safe escaping and short cache TTL |
+
+**Gaps:**
+1. `/studio`, `/about`, `/verify`, `/generating`, `/experiments` routes lack dedicated `error.tsx` — fall back to root boundary
+2. No structured error monitoring (Sentry/PostHog) — all errors logged to console only
+3. No correlation IDs in 500 responses
+4. `ImpactBreakdown` component assumes data is always present (no null guard)
 
 ## Design System Compliance
-**Status: PASS (2 minor violations)**
 
-### Violations
+**Status: PASS — 0 violations**
 
-1. **Hardcoded dimension colors** in `apps/web/components/dashboard/ActivityHeatmap.tsx:30-33` — uses `#22c55e`, `#f97316`, etc. instead of `var(--color-dimension-*)` CSS variables.
-2. **Same pattern** in `apps/web/app/experiments/hexmap/page.tsx:31-35` (experiments page, lower priority).
+| Check | Status |
+|-------|--------|
+| No hardcoded hex colors in components | PASS — all colors use semantic tokens |
+| Semantic token usage (no raw Tailwind colors) | PASS — `bg-bg`, `bg-card`, `text-text-primary` etc. used throughout |
+| Font compliance | PASS — `font-heading` (JetBrains Mono) on headings, `font-body` (Plus Jakarta Sans) on body |
+| Button styling (`rounded-lg`, not `rounded-full`) | PASS — `rounded-full` only on icon-only buttons (exception allowed) |
+| Inline SVG icons (no icon libraries) | PASS — zero lucide/heroicons imports |
+| Card styling (`bg-card` + `border-stroke`) | PASS — consistent across all card components |
 
-### Passed Areas
-- Semantic tokens (`bg-bg`, `text-text-primary`, `border-stroke`) used throughout
-- No forbidden fonts (Inter, Roboto, Arial)
-- No icon library imports (all inline SVGs)
-- `rounded-full` only on icon-only buttons and avatars (no text/CTA buttons)
-- No arbitrary Tailwind color syntax (`bg-[#...]`)
-- CSS variables defined for both light and dark themes
+**RESOLVED since last QA:** Hardcoded hex colors in `ActivityHeatmap.tsx:30-33` and `hexmap/page.tsx:31-35` (previously flagged) — now using CSS variable tokens.
+
+## Cross-Agent Findings Addressed
+
+From shared context recommendations directed at QA:
+- **Cost Analyst**: Process stream leak in `/api/admin/agents/run/route.ts` — CONFIRMED still present. Needs `.destroy()`, `removeAllListeners()`, and 5-min timeout.
+- **Cost Analyst**: `/api/insights` `after()` hook should use `Promise.allSettled()` — CONFIRMED, still uses `Promise.all()`.
+- **Cost Analyst**: `metrics_snapshots` retention (`dbCleanOldSnapshots()`) — CONFIRMED not implemented.
+- **Documentation**: `/api/studio/config` method mismatch (POST in docs vs GET+PUT in code) — CONFIRMED, docs should be updated.
+- **Security**: `minimatch` ReDoS — RESOLVED per security agent (no longer in audit output).
+- **Performance**: `ActivityHeatmap.tsx` hardcoded colors — RESOLVED.
 
 ## Recommendations
 
-1. **Low priority**: Update `DIMENSION_COLORS` in `ActivityHeatmap.tsx:30-33` and `hexmap/page.tsx:31-35` to use `var(--color-dimension-*)` CSS variables instead of hardcoded hex values. The correct pattern exists in `RadarChartInteractive.tsx`, `SubMetricPanel.tsx`, and `DimensionCard.tsx`.
-2. **Informational**: Cache key mismatch bug persists per cost-analyst report (`refresh/route.ts:54`, `supplemental/route.ts:93` delete wrong key `stats:v2:${handle}` vs actual `stats:v2:merged:${handle}`). Tests mask the bug.
-3. **Informational**: Share pages lack ISR (`revalidate`) per cost-analyst recommendation — SSR on every request.
+### High Priority
+1. **Add error boundaries** to `/studio`, `/about`, `/verify`, `/generating` routes — prevents white-screen crashes on these pages
+2. **Fix process stream leak** in `app/api/admin/agents/run/route.ts` — add `.destroy()` on stdout/stderr, `removeAllListeners()`, and 5-minute process timeout
+3. **Use `Promise.allSettled()`** in `/api/insights` `after()` hook — prevents silent rejection on cache invalidation failure
+
+### Medium Priority
+4. **Add null guard** to `ImpactBreakdown` component — if `stats` or `impact` is null, render graceful fallback instead of crashing
+5. **Implement `dbCleanOldSnapshots()`** — `metrics_snapshots` grows ~3.65M rows/year at 10K users
+6. **Update CLAUDE.md** — `/api/studio/config` documents POST but code exports GET + PUT
+7. **Add test coverage** for priority files per coverage agent: `login/route.ts` (76.9%), `StudioClient.tsx` (0%), `BadgeToolbar.tsx`, `UserMenu.tsx` (38.9%)
+
+### Low Priority
+8. **Add error monitoring** — integrate PostHog error tracking or similar for 5xx alerts
+9. **Enhance root `loading.tsx`** — currently minimal (single pulsing dot); add contextual skeleton
+10. **Refactor `UserMenu.tsx:315`** — replace `<label role="menuitem">` with `<button>` for semantic correctness
