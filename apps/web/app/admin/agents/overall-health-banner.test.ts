@@ -13,8 +13,8 @@ describe("OverallHealthBanner", () => {
       expect(SOURCE).toContain("export function OverallHealthBanner");
     });
 
-    it("is a client component", () => {
-      expect(SOURCE).toContain('"use client"');
+    it("is a server component (no 'use client' directive)", () => {
+      expect(SOURCE).not.toContain('"use client"');
     });
   });
 

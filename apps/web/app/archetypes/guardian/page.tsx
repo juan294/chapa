@@ -1,3 +1,5 @@
+export const revalidate = 604800;
+
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";

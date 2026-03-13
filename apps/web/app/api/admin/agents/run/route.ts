@@ -27,6 +27,8 @@ interface RunState {
 }
 
 const MAX_LOG_LINES = 500;
+/** Hard timeout for spawned agent processes (2 minutes). */
+const PROCESS_TIMEOUT_MS = 120_000;
 
 let currentRun: RunState | null = null;
 
@@ -179,11 +181,34 @@ export async function POST(request: NextRequest) {
   child.on("close", (code) => {
     if (run.status === "stopped") return; // already stopped via DELETE
     run.status = code === 0 ? "completed" : "failed";
+    child.stdout?.destroy();
+    child.stderr?.destroy();
   });
 
   child.on("error", () => {
     run.status = "failed";
+    child.stdout?.destroy();
+    child.stderr?.destroy();
   });
+
+  // Hard timeout — kill the process if it runs too long
+  setTimeout(() => {
+    if (run.status === "running") {
+      run.status = "failed";
+      run.lines.push({
+        timestamp: new Date().toISOString(),
+        text: `Process killed after ${PROCESS_TIMEOUT_MS / 1000}s timeout`,
+        stream: "stderr",
+      });
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // Process may have already exited
+      }
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+    }
+  }, PROCESS_TIMEOUT_MS);
 
   currentRun = run;
 

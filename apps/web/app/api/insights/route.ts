@@ -59,7 +59,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   // Defer cache invalidation to post-response (non-blocking)
   after(async () => {
     const handle = session.login.toLowerCase();
-    await Promise.all([
+    await Promise.allSettled([
       cacheDel(`stats:v2:merged:${handle}`),
       invalidateSnapshotCache(handle),
     ]);

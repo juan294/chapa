@@ -126,6 +126,7 @@ export async function fetchReceivedEmail(
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!res.ok) {
