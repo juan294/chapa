@@ -87,4 +87,4 @@ Log notably smooth completions to identify repeatable patterns.
 <!-- Update this section as new logs are added -->
 
 ### Key Lessons
-_No entries yet. Add one-line lessons here as logs accumulate._
+- **2026-03-13** — Bootstrap early + sync daily = zero adoption gaps at audit time.

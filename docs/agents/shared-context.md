@@ -55,22 +55,22 @@
 - [Documentation]: Create `knip.json` config and document the 24 genuinely unused exports for removal consideration.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation timestamp=2026-03-06T09:00:00Z -->
-## Documentation Agent — 2026-03-06
+<!-- ENTRY:START agent=documentation timestamp=2026-03-13T09:00:00Z -->
+## Documentation Agent — 2026-03-13
 - **Status**: YELLOW
-- Route coverage: 11/78 routes documented in CLAUDE.md (14%). All 11 documented routes exist and are accurate except `/api/studio/config` (docs say POST, code exports GET + PUT).
-- Design system drift: 15 color tokens undocumented (8 dimension + 6 archetype + 1 track), 9 animations undocumented. `--color-complement` documented but missing from code.
-- Env vars: 29/29 documented vars match code usage — zero mismatches.
-- JSDoc coverage: 71/89 exported functions documented (80%). 18 complex functions lack JSDoc — most critical: auth encryption/decryption, confidence scoring, stats merging.
-- All required docs exist and are non-empty: `impact-v4.md`, `svg-design.md`, `shared-context.md`, `README.md`.
+- Route coverage: 11/54 routes documented in CLAUDE.md (20%). All 11 documented routes exist and are accurate except `/api/studio/config` (docs say POST, code exports GET+PUT — **carried from 2026-03-06, still unfixed**).
+- Design system: 50/51 tokens documented (98%). Previous 15-token gap resolved — only `--color-complement` (`#10B981`) remains undocumented. All 17 animations documented. All hex values accurate.
+- Env vars: 29/30 vars match — **NEW: `NEXT_PUBLIC_INSIGHTS_ENABLED`** used in `lib/feature-flags.ts:33,80` but missing from CLAUDE.md and `.env.example`. Dead var `NEXT_PUBLIC_POSTHOG_PROJECT_ID` in `.env.local` (unused).
+- JSDoc coverage: 71/89 exported functions documented (80%) — unchanged from last audit. 18 complex functions still lack JSDoc: 6 scoring functions in `lib/impact/v4.ts`, 3 merge functions in `lib/github/merge.ts`, 3 auth cookie functions, rendering and history helpers.
+- All 7 required docs exist and are non-empty. README has full setup instructions (195 lines).
 - 1 outstanding TODO: badge reference PNG in `badge-svg-spec-v1.2.md:905`.
-- Possible archetype naming drift: CLAUDE.md lists "Quality Champion" but codebase has `/archetypes/guardian`.
+- Archetype naming drift: CLAUDE.md lists "Quality Champion" but codebase has `/archetypes/guardian` — still unresolved.
 
 **Cross-agent recommendations:**
-- [QA]: `/api/studio/config` method mismatch (POST vs GET+PUT) may affect integration tests asserting POST. Verify archetype naming consistency ("Quality Champion" vs "Guardian") across UI.
-- [Security]: Auth functions `encryptToken()`, `decryptToken()`, `validateState()`, `readSessionCookie()` in `lib/auth/github.ts` lack JSDoc — the crypto format (iv:authTag:ciphertext) and timing-safe comparison logic are undocumented. No security vulnerability, but increases risk of misuse.
-- [Coverage]: 18 complex functions without JSDoc overlap with files that have lower coverage (`lib/validation.ts`, `lib/keyboard/shortcuts.ts`). Adding tests would naturally force documentation of expected behavior.
-- [Performance]: 15 undocumented dimension/archetype color tokens in design-system.md match the hardcoded hex values flagged by QA in `ActivityHeatmap.tsx` — documenting these tokens would help resolve the theme inconsistency.
+- [QA]: `/api/studio/config` method mismatch (POST vs GET+PUT) still pending — verify no integration tests assert POST. Archetype naming ("Quality Champion" vs "Guardian") consistency still needs resolution across UI.
+- [Security]: Auth cookie functions `createSessionCookie()`, `readSessionCookie()`, `clearSessionCookie()` in `lib/auth/github.ts` still lack JSDoc. No vulnerability, but increases risk of misuse. `NEXT_PUBLIC_INSIGHTS_ENABLED` is a boolean flag — no secret exposure risk.
+- [Coverage]: 18 undocumented complex functions overlap with files at lower coverage. Priority JSDoc targets: `lib/impact/v4.ts` scoring functions, `lib/github/merge.ts` merge logic.
+- [Performance]: Design system token documentation nearly complete (98%). No remaining performance-documentation concerns.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security timestamp=2026-03-09T09:00:00Z -->
