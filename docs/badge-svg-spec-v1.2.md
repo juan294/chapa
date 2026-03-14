@@ -902,14 +902,15 @@ Uses SMIL `<animate>` elements (not CSS):
 
 ## 14. Reference Screenshot
 
-> **TODO**: Capture a reference PNG from `/u/juan294/badge.svg` and commit as `docs/badge-svg-spec-v1.0-reference.png`.
->
-> To generate: visit `http://localhost:3001/u/juan294/badge.svg` in a browser and take a screenshot, or use a headless browser:
-> ```bash
-> npx playwright screenshot --viewport-size=1200,630 \
->   "http://localhost:3001/u/juan294/badge.svg" \
->   docs/badge-svg-spec-v1.0-reference.png
-> ```
+![Badge reference](assets/badge-reference.png)
+
+Rendered at 1200×630 from demo data (`DEMO_STATS` / `DEMO_IMPACT` in `apps/web/lib/render/demoData.ts`) using the production `renderBadgeSvg()` + `svgToPng()` pipeline.
+
+To regenerate after visual changes:
+
+```bash
+pnpm run test -- --run scripts/generate-badge-reference.test.ts
+```
 
 ---
 
