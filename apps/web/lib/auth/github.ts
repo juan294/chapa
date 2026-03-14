@@ -288,6 +288,7 @@ interface SessionPayload {
   avatar_url: string;
 }
 
+/** Encrypt a session payload into a Set-Cookie header value (AES-256-GCM, HttpOnly, Secure, SameSite=Lax, 24h Max-Age). */
 export function createSessionCookie(
   payload: SessionPayload,
   secret: string,
@@ -362,6 +363,7 @@ export function readSessionCookie(
   }
 }
 
+/** Return a Set-Cookie header value that immediately expires the session cookie. */
 export function clearSessionCookie(): string {
   return `${COOKIE_NAME}=; ${cookieFlags()}; Max-Age=0`;
 }

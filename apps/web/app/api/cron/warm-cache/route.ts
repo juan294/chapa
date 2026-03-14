@@ -4,6 +4,7 @@ import { dbGetUsers } from "@/lib/db/users";
 import {
   dbInsertSnapshot,
   dbGetLatestSnapshotBatch,
+  dbCleanOldSnapshots,
 } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
@@ -166,6 +167,14 @@ export async function GET(request: NextRequest) {
     // Non-critical — don't fail the cron response
   }
 
+  // Clean metrics_snapshots older than retention period (fire-and-forget safe)
+  let expiredSnapshotsDeleted = 0;
+  try {
+    expiredSnapshotsDeleted = await dbCleanOldSnapshots();
+  } catch {
+    // Non-critical — don't fail the cron response
+  }
+
   return NextResponse.json(
     {
       warmed,
@@ -174,6 +183,7 @@ export async function GET(request: NextRequest) {
       notifications,
       expiredVerificationsDeleted,
       expiredMergeOpsDeleted,
+      expiredSnapshotsDeleted,
       total: toWarm.length,
       handles: toWarm,
       rotation: {

@@ -8,6 +8,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 2. Compute **Impact v4 Profile** from last 12 months (365 days):
    - 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional 5th (Craft), each 0–100
    - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
+     - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
    - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 
 3. Serve **Creator Studio**: `/studio` (badge customization with 9 visual categories).
@@ -30,17 +31,63 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - Domain: chapa.thecreativetoken.com
 
 ## Key routes
+
+### Pages
 - GET `/` Landing + GitHub login (terminal-first UI)
 - GET `/studio` Creator Studio (badge customization, requires auth)
 - GET `/admin` Admin dashboard (requires auth + admin handle, see `ADMIN_HANDLES`)
 - GET `/u/:handle` Share page (badge preview, breakdown, embed snippet, share CTA)
 - GET `/u/:handle/badge.svg` Embeddable badge SVG (cacheable)
+- GET `/verify/:hash` Badge verification page (public)
+- GET `/about` About page (scoring explainer, archetype showcase)
+- GET `/about/scoring` Scoring methodology detail
+- GET `/about/verification` Badge verification explainer
+- GET `/archetypes/:type` Archetype guide pages (builder, guardian, marathoner, polymath, balanced, emerging)
+- GET `/generating/:handle` Badge generation loading screen
+- GET `/cli/authorize` CLI device authorization flow
+- GET `/privacy` Privacy policy
+- GET `/terms` Terms of service
+
+### Auth API
+- GET `/api/auth/login` GitHub OAuth login redirect
+- GET `/api/auth/callback` GitHub OAuth callback (token exchange)
+- GET `/api/auth/session` Current session info (login, name, avatar_url)
+- POST `/api/auth/logout` Clear session cookie
+- GET `/api/auth/bitbucket/login` Bitbucket OAuth login redirect
+- GET `/api/auth/bitbucket/callback` Bitbucket OAuth callback
+- GET `/api/auth/codeberg/login` Codeberg OAuth login redirect
+- GET `/api/auth/codeberg/callback` Codeberg OAuth callback
+
+### Public API
 - GET `/api/verify/:hash` Badge verification endpoint
-- GET `/api/admin/users` Admin user list (session auth + admin check)
+- GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
+- GET `/api/health` Health check (Redis + Supabase ping, rate-limited)
+- GET `/api/feature-flags` Public feature flag values
+
+### Authenticated API
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
 - GET|PUT `/api/studio/config` Load/save badge customization config
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
-- GET `/api/history/:handle` Score history, trend, and diff (public, rate-limited)
+- POST `/api/generate` Generate badge for authenticated user
+- POST `/api/recalculate` Recalculate impact scores
+- GET `/api/insights/:handle` AI tool insights for a user
+- POST `/api/insights` Submit tool insights data
+- GET|POST `/api/cli/auth/poll` CLI device auth polling
+- POST `/api/cli/auth/approve` CLI device auth approval
+
+### Admin API
+- GET `/api/admin/users` Admin user list (session auth + admin check)
+- GET `/api/admin/stats` Admin stats (bearer token auth via `ADMIN_SECRET`)
+- POST `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
+- GET `/api/admin/agents-summary` Agent run summaries
+- GET|PUT `/api/admin/feature-flags` Manage feature flags
+- GET|PUT `/api/admin/engagement-flags` Manage engagement flags
+- POST `/api/notifications/unsubscribe` Email unsubscribe
+
+### Webhooks & Cron
+- POST `/api/webhooks/resend` Resend email webhook (HMAC verified)
+- GET `/api/cron/warm-cache` Daily cache warming (bearer auth via `CRON_SECRET`)
+- POST `/api/telemetry` Client telemetry ingestion
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
@@ -276,6 +323,8 @@ GITHUB_TOKEN=              # GitHub personal access token (optional — fallback
 CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation (required for /api/verify)
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
 NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (optional, disabled by default)
+
+NEXT_PUBLIC_INSIGHTS_ENABLED=  # Set to "true" to enable AI Insights integration (optional, disabled by default)
 
 BITBUCKET_CLIENT_ID=           # Bitbucket OAuth consumer key (optional — Bitbucket integration disabled without it)
 BITBUCKET_CLIENT_SECRET=       # Bitbucket OAuth consumer secret (optional — server-side only)

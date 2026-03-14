@@ -289,14 +289,14 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { value: stats.totalStars, label: "Stars" },
-            { value: stats.totalForks, label: "Forks" },
-            { value: stats.totalWatchers, label: "Watchers" },
-            { value: stats.activeDays, label: "Active Days" },
-            { value: stats.commitsTotal, label: "Commits" },
-            { value: stats.prsMergedCount, label: "PRs Merged" },
-            { value: stats.reviewsSubmittedCount, label: "Reviews" },
-            { value: stats.reposContributed, label: "Repos" },
+            { value: stats.totalStars ?? 0, label: "Stars" },
+            { value: stats.totalForks ?? 0, label: "Forks" },
+            { value: stats.totalWatchers ?? 0, label: "Watchers" },
+            { value: stats.activeDays ?? 0, label: "Active Days" },
+            { value: stats.commitsTotal ?? 0, label: "Commits" },
+            { value: stats.prsMergedCount ?? 0, label: "PRs Merged" },
+            { value: stats.reviewsSubmittedCount ?? 0, label: "Reviews" },
+            { value: stats.reposContributed ?? 0, label: "Repos" },
           ].map((stat, i) => (
             <div
               key={stat.label}

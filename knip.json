@@ -11,20 +11,14 @@
         "postcss",
         "postcss-load-config"
       ],
-      "ignore": [
-        "**/*.test.ts",
-        "**/*.test.tsx"
-      ],
       "entry": [
         "app/**/page.tsx",
         "app/**/layout.tsx",
         "app/**/route.ts",
         "app/**/error.tsx",
         "app/**/loading.tsx",
-        "app/**/not-found.tsx",
-        "app/global-error.tsx"
-      ],
-      "ignoreBinaries": ["vitest"]
+        "app/**/not-found.tsx"
+      ]
     }
   }
 }

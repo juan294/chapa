@@ -12,6 +12,7 @@ vi.mock("@/lib/db/users", () => ({
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
   dbGetLatestSnapshotBatch: vi.fn(() => Promise.resolve(new Map())),
+  dbCleanOldSnapshots: vi.fn(() => Promise.resolve(0)),
 }));
 
 vi.mock("@/lib/github/client", () => ({
@@ -75,6 +76,7 @@ import { dbGetUsers } from "@/lib/db/users";
 import {
   dbInsertSnapshot,
   dbGetLatestSnapshotBatch,
+  dbCleanOldSnapshots,
 } from "@/lib/db/snapshots";
 import { getStats } from "@/lib/github/client";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
@@ -715,6 +717,41 @@ describe("GET /api/cron/warm-cache", () => {
     it("does not fail if merge ops cleanup throws", async () => {
       mockedDbGetUsers.mockResolvedValue([]);
       vi.mocked(dbCleanExpiredMergeOperations).mockRejectedValue(
+        new Error("Supabase down"),
+      );
+
+      const res = await GET(makeRequest("test-cron-secret"));
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Snapshot cleanup
+  // ---------------------------------------------------------------------------
+
+  describe("snapshot cleanup", () => {
+    it("calls dbCleanOldSnapshots", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(dbCleanOldSnapshots)).toHaveBeenCalled();
+    });
+
+    it("includes expiredSnapshotsDeleted in response", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
+      vi.mocked(dbCleanOldSnapshots).mockResolvedValue(17);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.expiredSnapshotsDeleted).toBe(17);
+    });
+
+    it("does not fail if snapshot cleanup throws", async () => {
+      mockedDbGetUsers.mockResolvedValue([]);
+      vi.mocked(dbCleanOldSnapshots).mockRejectedValue(
         new Error("Supabase down"),
       );
 

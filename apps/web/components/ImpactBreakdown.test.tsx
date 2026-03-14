@@ -228,6 +228,26 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  describe("null safety (#QA-4)", () => {
+    it("guards stats values with ?? 0 fallback for formatCompact", () => {
+      // formatCompact(undefined) would produce "NaNM" — stats fields must
+      // default to 0 when absent. Each stat.value must use ?? 0 or similar.
+      const statFields = [
+        "stats.totalStars",
+        "stats.totalForks",
+        "stats.totalWatchers",
+        "stats.activeDays",
+        "stats.commitsTotal",
+        "stats.prsMergedCount",
+        "stats.reviewsSubmittedCount",
+        "stats.reposContributed",
+      ];
+      for (const field of statFields) {
+        expect(SOURCE).toContain(`${field} ?? 0`);
+      }
+    });
+  });
+
   describe("craft dimension (Impact v6)", () => {
     it("iterates only active dimensions — 4 when craft absent", () => {
       // The dimension iteration must filter based on craft presence.

@@ -21,6 +21,7 @@ const CAPS = SCORING_CAPS;
 // prsMergedWeight (70%), issuesClosedCount (20%), commitsTotal (10%)
 // ---------------------------------------------------------------------------
 
+/** Compute Delivery dimension (0–100): measures shipping throughput via PR weight, issues closed, and commits. */
 export function computeDelivery(stats: StatsData): number {
   const pr = normalize(stats.prsMergedWeight, CAPS.prWeight);
   const issues = normalize(stats.issuesClosedCount, CAPS.issues);
@@ -36,6 +37,7 @@ export function computeDelivery(stats: StatsData): number {
 // Solo: delegates to computeSoloQuality() when reviewsSubmittedCount === 0
 // ---------------------------------------------------------------------------
 
+/** Compute Quality dimension (0–100): measures engineering discipline via reviews, review-to-PR ratio, and inverse micro-commit ratio. Delegates to solo quality signals when no reviews exist. */
 export function computeQuality(stats: StatsData): number {
   if (stats.reviewsSubmittedCount === 0) {
     return computeSoloQuality(stats);
@@ -69,6 +71,7 @@ export function computeQuality(stats: StatsData): number {
 // inverseMicroCommitRatio (15%)
 // ---------------------------------------------------------------------------
 
+/** Solo quality fallback (0–100): uses PR descriptions, feature branches, issue linkage, and inverse micro-commit ratio when no code reviews exist. */
 function computeSoloQuality(stats: StatsData): number {
   if (stats.prsMergedCount === 0) return 0;
 
@@ -88,6 +91,7 @@ function computeSoloQuality(stats: StatsData): number {
 // sqrt curve: easier to start, harder to climb — 120 days ≈ 57% (was 33% linear)
 // ---------------------------------------------------------------------------
 
+/** Compute Consistency dimension (0–100): measures sustained contribution via sqrt-curved active days, heatmap evenness, and inverse burst activity. */
 export function computeConsistency(stats: StatsData): number {
   if (stats.activeDays === 0) return 0;
 
@@ -109,6 +113,7 @@ export function computeConsistency(stats: StatsData): number {
 //     docsOnlyPrRatio (15%), reserved 5% (zeros for now). Watchers dropped.
 // ---------------------------------------------------------------------------
 
+/** Compute Breadth dimension (0–100): measures cross-project influence via repos contributed, inverse concentration, stars, forks, and docs-only PR ratio. */
 export function computeBreadth(stats: StatsData): number {
   if (stats.reposContributed === 0) return 0;
 
@@ -126,6 +131,7 @@ export function computeBreadth(stats: StatsData): number {
 // Compute all dimensions
 // ---------------------------------------------------------------------------
 
+/** Compute all 4 core dimensions (+ optional Craft) and return as a DimensionScores object. */
 export function computeDimensions(stats: StatsData, craftScore?: number): DimensionScores {
   const dims: DimensionScores = {
     delivery: computeDelivery(stats),
@@ -143,6 +149,7 @@ export function computeDimensions(stats: StatsData, craftScore?: number): Dimens
 // Profile type detection
 // ---------------------------------------------------------------------------
 
+/** Detect whether a developer is "solo" (no reviews) or "collaborative" (has reviews). Affects quality scoring and archetype eligibility. */
 export function detectProfileType(stats: StatsData): ProfileType {
   return stats.reviewsSubmittedCount === 0 ? "solo" : "collaborative";
 }
@@ -160,6 +167,7 @@ const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype
   { key: "craft", archetype: "Artificer" },
 ];
 
+/** Derive developer archetype from dimension scores. Returns Emerging (low activity), Balanced (even scores), or the dominant dimension's archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer). Solo profiles cannot earn Quality Champion. */
 export function deriveArchetype(
   dimensions: DimensionScores,
   profileType: ProfileType = "collaborative",
