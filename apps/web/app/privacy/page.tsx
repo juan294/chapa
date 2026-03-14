@@ -1,3 +1,5 @@
+export const revalidate = 86400;
+
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import type { Metadata } from "next";
