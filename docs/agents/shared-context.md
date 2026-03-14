@@ -9,27 +9,28 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-13T06:00:00Z -->
-## Cost Analyst — 2026-03-13
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-14T06:00:00Z -->
+## Cost Analyst — 2026-03-14
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: ~$56 (Vercel $26, Redis $20, Resend $10, Supabase free). At 50K users: ~$151/mo.
-- Redis: 19 key pattern families audited (+2 vs last: `stats:badges_generated`, `stats:unique_badges` HLL). TTL coverage 100% per-user keys. 3 global keys without TTL — intentional, combined <13 KB.
-- **Total estimated Redis memory @10K users: ~5.2 GB** — OG image cache is 96% (~5 GB, 7d TTL, 200-400 KB/key). At 15K+ DAU will exceed Upstash Pro 10 GB limit.
+- Estimated monthly cost at 10K users: ~$56 (Vercel $26, Redis $20, Resend $10, Supabase free). At 50K users: ~$190/mo.
+- Redis: 19 key pattern families audited. TTL coverage 100% per-user keys. 3 global keys without TTL — intentional singletons, combined <13 KB.
+- **Estimated Redis memory @10K users: ~3.4-5.4 GB** — OG image cache is 60-80% (~3-5 GB, 7d TTL, 150-300 KB/key base64 PNG). At 15K+ DAU will exceed Upstash Pro 10 GB limit.
 - GitHub API budget: ~2,200–4,150 calls/month vs 5,000/hr limit. 35x headroom. In-flight dedup reduces concurrent calls 40–60%.
-- Supabase: 7 tables + 2 views. Singleton client, PostgREST REST API. No N+1 patterns. Batch queries correct. RLS on all tables. Views use `security_invoker = true`.
-- **CARRIED: Admin agent process management** in `app/api/admin/agents/run/route.ts` — no timeout on spawned process, no explicit `.destroy()` on streams. Buffer bounded at 500 lines. Medium severity.
-- **CARRIED: `metrics_snapshots` retention** — 3.65M rows/year at 10K users (~1.5 GB/year). `dbCleanOldSnapshots()` still not implemented.
-- **CARRIED: Resend API calls** lack explicit timeout — `fetchReceivedEmail()` and `forwardEmail()` in `lib/email/resend.ts` have no `AbortSignal.timeout()`. High severity for webhook reliability.
-- **CARRIED: 6 archetype pages missing ISR** — static content, should have `revalidate=604800`.
+- Supabase: 7 tables + 2 views. Singleton client, PostgREST REST API. No N+1 patterns. Batch queries correct. RLS on all tables with `deny_anon_all`. Views use `security_invoker = true`.
+- Fetch timeout coverage: **100%** — all external fetch calls have `AbortSignal.timeout()` or `AbortController`. Resend `forwardEmail()` uses SDK (manages own HTTP lifecycle).
+- **RESOLVED: Admin agent process management** — 120s timeout, stream `.destroy()`, `SIGTERM` all in place.
+- **RESOLVED: Resend API timeouts** — `fetchReceivedEmail()` now has `AbortSignal.timeout(5000)`.
+- **RESOLVED: 6 archetype pages missing ISR** — all 6 now have `revalidate=604800`.
+- **RESOLVED: `/api/insights` after() hook** — now uses `Promise.allSettled()`.
+- **CARRIED: `metrics_snapshots` retention** — `dbCleanOldSnapshots()` exists at `snapshots.ts:397` with tests, but NOT wired to cron. 3.65M rows/year at 10K users (~1.5 GB/year).
 - **CARRIED: `tool_insights` table missing from migration system** — not reproducible on rebuild.
-- **NEW: `/api/insights` after() hook** uses `Promise.all()` for cache invalidation — should use `Promise.allSettled()` for consistency with badge route.
-- Vercel: 5 static, 5 ISR, 6 missing ISR (archetype), ~30 dynamic API, 11 force-dynamic (experiments). No edge runtime. 1 cron job.
+- Vercel: 5 static, 11 ISR, ~30 dynamic API, 11 force-dynamic (experiments). No edge runtime. 1 cron job. `/privacy` and `/terms` could benefit from ISR.
 
 **Cross-agent recommendations:**
-- [Performance]: OG image cache dominates Redis at ~5 GB @10K users (96%). Plan blob storage migration before 15K DAU. 6 archetype pages should add ISR. Reduce OG TTL 7d → 48h as interim measure.
-- [Security]: Fail-open rate limiting intact. No cost-security concerns. Resend timeout gap is availability, not security.
-- [Coverage]: Admin agent process timeout/cleanup needs test coverage. `user-platforms.ts` at 81.8% — multi-platform edge cases untested. Resend timeout fix should include test for `AbortSignal.timeout()`.
-- [QA]: 4 carried issues: (1) admin agent process timeout, (2) `metrics_snapshots` retention, (3) Resend API timeouts, (4) `/api/insights` `Promise.all()` → `Promise.allSettled()`. `/api/studio/config` docs mismatch (POST vs GET+PUT) still pending.
+- [Performance]: OG image cache dominates Redis at ~3-5 GB @10K users (60-80%). Plan blob storage migration before 15K DAU. Reduce OG TTL 7d → 48h as interim measure (~70% memory reduction).
+- [Security]: Fail-open rate limiting intact. All fetch timeouts now in place (100% coverage). No cost-security concerns.
+- [Coverage]: `user-platforms.ts` still at 81.8% — multi-platform token edge cases untested. Resend `AbortSignal.timeout(5000)` has test assertion at `resend.test.ts:168`. Process management tests recommended for admin agent route.
+- [QA]: 1 carried issue: `dbCleanOldSnapshots()` not wired to cron (function + tests exist, just needs wiring). `/api/studio/config` docs mismatch (POST vs GET+PUT) still pending.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
@@ -114,22 +115,22 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update. All 15 dimension/archetype color tokens now used correctly via semantic classes.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-13T02:00:00Z -->
-## Coverage Agent — 2026-03-13
+<!-- ENTRY:START agent=coverage timestamp=2026-03-14T07:05:00Z -->
+## Coverage Agent — 2026-03-14
 - **Status**: GREEN
-- Overall coverage: 78.74% stmts (5,517/7,006), 74.88% branch, 70.48% funcs, 79.87% lines
-- Test suite: 283 files, 4,541 tests, 100% pass rate, 0 flaky (3 consecutive runs)
-- Delta vs 2026-03-12: -0.10% stmts — marginal dip, no structural regression. All thresholds pass.
-- Critical paths: all 14 critical modules at 89–100% stmts — `lib/render` 100%, `lib/impact` 99.5%, `lib/email` 98.3%, `lib/history` 97.9%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `lib/keyboard` 96.5%, `lib/auth` 94.5%, `lib/db` 93.5%, `lib/bitbucket` 93.1%, `lib/insights` 93.0%, `lib/cache` 89.2%, `lib/verification` 100%, `packages/shared` 100%
+- Overall coverage: 78.66% stmts (5,541/7,044), 74.85% branch, 70.35% funcs, 79.78% lines
+- Test suite: 289 files, 4,581 tests, 100% pass rate, 0 flaky (3 consecutive runs)
+- Delta vs 2026-03-13: -0.08% stmts — marginal dip from +38 new source stmts vs +24 newly covered. All thresholds pass.
+- Critical paths: all 16 critical modules at 89–100% stmts — `lib/render` 100%, `lib/verification` 100%, `lib/utils` 100%, `lib/impact` 99.5%, `lib/email` 98.3%, `lib/history` 97.9%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `lib/keyboard` 96.5%, `app/api` 94.7%, `lib/auth` 94.5%, `lib/db` 93.5%, `lib/bitbucket` 93.1%, `lib/insights` 93.0%, `lib/cache` 89.2%, `packages/shared` 100%
 - Largest untested: `hexmap/page.tsx` (132 stmts, 0%), `StudioClient.tsx` (119 stmts, 0%), `ParticleBackground.tsx` (112 stmts, 0.9%)
-- RED modules: `app/studio` 27%, `app/verify` 0%, `app/archetypes` 0%, `components` (top-level) 54%
+- RED modules: `app/studio` 27%, `app/verify` 0%, `app/archetypes` 0%, `app/cli` 0%, `app/about` 0%
 - Only critical-path file below 80%: `app/api/auth/login/route.ts` at 76.9% (6 uncovered stmts — OAuth redirect edge cases)
-- Previous flaky `window is not defined` — NOT reproduced in 7 days of runs, considered resolved
+- Previous flaky `window is not defined` — NOT reproduced in 9 days of runs, considered resolved
 
 **Cross-agent recommendations:**
 - [Security]: All security-critical paths at 89%+. XSS tests at `BadgeSvg.test.tsx:600-626`. HMAC verification at 100%. `login/route.ts` at 76.9% — OAuth redirect edge cases, low security risk.
-- [QA]: Priority test additions unchanged: (1) `login/route.ts` (76.9% — only critical file <80%), (2) `StudioClient.tsx` (119 stmts, 0%), (3) `BadgeToolbar.tsx` (72 uncovered stmts), (4) `UserMenu.tsx` (38.9%). No flaky tests detected.
+- [QA]: Priority test additions unchanged: (1) `login/route.ts` (76.9% — only critical file <80%), (2) `StudioClient.tsx` (119 stmts, 0%), (3) `BadgeToolbar.tsx` (72 uncovered stmts), (4) `UserMenu.tsx` (38.9%, 66 uncovered). No flaky tests detected. +40 tests, +6 test files since last report.
 - [Performance]: `ParticleBackground.tsx` (112 stmts, 0.9%) still canvas-heavy and untested — smoke test recommended. `hexmap/page.tsx` (132 stmts, 0%) also canvas-heavy.
-- [Cost Analyst]: `lib/db` stable at 93.5%. `user-platforms.ts` still at 81.8% — multi-platform token edge cases untested. Feature flag caching at 100%.
-- [DevOps]: All API routes at 95%+ coverage except `login/route.ts` (76.9%). No CI-affecting issues.
+- [Cost Analyst]: `lib/db` stable at 93.5%. `user-platforms.ts` multi-platform edge cases still untested. Feature flag caching at 100%.
+- [DevOps]: All API routes at 94.7% aggregate coverage. Only `login/route.ts` (76.9%) below 80%. No CI-affecting issues.
 <!-- ENTRY:END -->
