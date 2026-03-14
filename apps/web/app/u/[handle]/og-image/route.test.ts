@@ -138,13 +138,13 @@ describe("GET /u/[handle]/og-image", () => {
       expect(res.headers.get("Content-Type")).toBe("image/png");
     });
 
-    it("stores the generated PNG as base64 in Redis with 7d TTL", async () => {
+    it("stores the generated PNG as base64 in Redis with 48h TTL", async () => {
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
       expect(mockCacheSet).toHaveBeenCalledWith(
         "og-image:v1:testuser:2026-02-14",
         FAKE_PNG_BASE64,
-        604800,
+        172800, // 48 hours
       );
     });
 

@@ -9,7 +9,7 @@ import { svgToPng } from "@/lib/render/svg-to-png";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { toDateString } from "@/lib/utils/date";
 
-const OG_CACHE_TTL = 604800; // 7 days
+const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000; // 10 seconds
 
 class SvgToPngTimeoutError extends Error {
@@ -85,7 +85,7 @@ export async function GET(
       ),
     ]);
 
-    // Cache the PNG as base64 for 7d (fire-and-forget — don't block response)
+    // Cache the PNG as base64 for 48h (fire-and-forget — don't block response)
     cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL).catch(() => {});
 
     return new NextResponse(Buffer.from(png), {
