@@ -10,13 +10,13 @@ Spawn 6 parallel specialist agents — all read-only. Each investigates their do
 
 Launch all 6 as parallel background Task agents:
 
-1. **architect** — Run `pnpm run typecheck`, check for outdated/conflicting dependencies (`pnpm outdated`), circular dependencies, dead code detection (`pnpm dlx knip`), duplicate code patterns.
+1. **architect** — Run `$TYPECHECK_CMD`, check for outdated/conflicting dependencies (`$PKG_MANAGER outdated`), circular dependencies, dead code detection, duplicate code patterns.
 
-2. **qa-lead** — Run `pnpm run test && pnpm run typecheck && pnpm run lint`. Report total test count, pass rate, failures. Check coverage for critical paths. Verify graceful degradation. Identify high-risk untested files.
+2. **qa-lead** — Run `$TEST_CMD && $TYPECHECK_CMD && $LINT_CMD`. Report total test count, pass rate, failures. Check coverage for critical paths. Verify graceful degradation. Identify high-risk untested files.
 
-3. **security-reviewer** — Run `pnpm audit`. Search for hardcoded secrets (API keys, tokens, passwords). Verify auth implementation. Check for injection vectors (XSS, SQL). Verify no secrets in client-visible env vars. Check CORS configuration. Check dependency licenses.
+3. **security-reviewer** — Run `$PKG_MANAGER audit`. Search for hardcoded secrets (API keys, tokens, passwords). Verify auth implementation. Check for injection vectors (XSS, SQL). Verify no secrets in client-visible env vars. Check CORS configuration. Check dependency licenses.
 
-4. **performance-eng** — Run `pnpm run build` and parse output for bundle/artifact sizes. Flag oversized artifacts. Check for unused exports bloating the bundle. Assess code splitting. Check for performance anti-patterns.
+4. **performance-eng** — Run `$BUILD_CMD` and parse output for bundle/artifact sizes. Flag oversized artifacts. Check for unused exports bloating the bundle. Assess code splitting. Check for performance anti-patterns.
 
 5. **ux-reviewer** — Check heading hierarchy, ARIA labels, focus indicators, `prefers-reduced-motion` support, alt text, keyboard navigation, error/empty/loading states, design consistency.
 
