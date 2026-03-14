@@ -7,6 +7,7 @@ import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
+import { invalidateHistoryCache } from "@/lib/history/history";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Clear cached stats so getStats fetches fresh from GitHub
     // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>" (lowercase)
     await cacheDel(`stats:v2:merged:${normalizedHandle}`);
+
+    // Invalidate history cache so next /api/history/:handle request fetches fresh data
+    await invalidateHistoryCache(handle);
 
     // Fetch fresh stats with the user's OAuth token for better rate limits
     const stats = await getStats(handle, session.token);
