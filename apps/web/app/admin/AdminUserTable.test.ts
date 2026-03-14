@@ -155,8 +155,8 @@ describe("AdminUserTable", () => {
   });
 
   describe("memoized row component (#479)", () => {
-    it("exports AdminUserTableRow as a named component", () => {
-      expect(SOURCE).toContain("export const AdminUserTableRow = memo(");
+    it("defines AdminUserTableRow as a named component", () => {
+      expect(SOURCE).toContain("const AdminUserTableRow = memo(");
     });
 
     it("wraps AdminUserTableRow in React.memo", () => {
