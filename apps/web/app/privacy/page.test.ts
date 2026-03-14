@@ -2,22 +2,26 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "page.tsx"),
-  "utf-8",
-);
+const LEGAL_PAGES = ["privacy", "terms"] as const;
 
-describe("/privacy page — ISR", () => {
-  it("exports revalidate = 86400 for Incremental Static Regeneration", () => {
-    expect(SOURCE).toContain("export const revalidate = 86400");
-  });
+describe("legal pages — ISR", () => {
+  for (const page of LEGAL_PAGES) {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "..", page, "page.tsx"),
+      "utf-8",
+    );
 
-  it("does NOT import headers from next/headers (ISR incompatible)", () => {
-    expect(SOURCE).not.toContain('from "next/headers"');
-    expect(SOURCE).not.toContain("from 'next/headers'");
-  });
+    it(`/${page} exports revalidate = 86400`, () => {
+      expect(source).toContain("export const revalidate = 86400");
+    });
 
-  it("does NOT call headers() anywhere (ISR incompatible)", () => {
-    expect(SOURCE).not.toMatch(/\bheaders\(\)/);
-  });
+    it(`/${page} does NOT import headers from next/headers`, () => {
+      expect(source).not.toContain('from "next/headers"');
+      expect(source).not.toContain("from 'next/headers'");
+    });
+
+    it(`/${page} does NOT call headers()`, () => {
+      expect(source).not.toMatch(/\bheaders\(\)/);
+    });
+  }
 });
