@@ -19,6 +19,7 @@ import { notifyFirstBadge } from "@/lib/email/notifications";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -81,95 +82,109 @@ export async function GET(
     if (session) token = session.token;
   }
 
-  // Fetch stats (cache-first)
-  const stats = await getStats(handle, token);
-  if (!stats) {
-    const svg = fallbackSvg(
-      handle,
-      "Could not load data — try again later.",
-    );
+  try {
+    // Fetch stats (cache-first)
+    const stats = await getStats(handle, token);
+    if (!stats) {
+      const svg = fallbackSvg(
+        handle,
+        "Could not load data — try again later.",
+      );
+      return new NextResponse(svg, {
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
+    // Fetch craft score, snapshot, and avatar in parallel — all are independent
+    // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
+    const [craftResult, latestSnapshot, avatarDataUri] = await Promise.all([
+      dbGetToolInsights(handle),
+      getCachedLatestSnapshot(handle),
+      stats.avatarUrl
+        ? getAvatarBase64(handle, stats.avatarUrl)
+        : Promise.resolve(undefined),
+    ]);
+
+    // Compute impact (craft score feeds into the 5th pentagon dimension)
+    const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
+
+    // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
+    // on same-day repeated requests (smoothScore returns cached value for today).
+    impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
+    impact.tier = getTier(impact.adjustedComposite);
+
+    // Generate verification code (returns null if secret is unset)
+    const verification = generateVerificationCode(stats, impact);
+
+    // Post-response work: use after() to guarantee completion on Vercel
+    // (void promises may be killed when the serverless function freezes).
+    // Operations run in parallel via allSettled — each has its own try/catch
+    // so individual failures don't block others.
+    after(() => {
+      const ops: Promise<void>[] = [];
+
+      if (verification) {
+        const record: VerificationRecord = {
+          handle: stats.handle.toLowerCase(),
+          displayName: stats.displayName,
+          adjustedComposite: impact.adjustedComposite,
+          confidence: impact.confidence,
+          tier: impact.tier,
+          archetype: impact.archetype,
+          dimensions: impact.dimensions,
+          commitsTotal: stats.commitsTotal,
+          prsMergedCount: stats.prsMergedCount,
+          reviewsSubmittedCount: stats.reviewsSubmittedCount,
+          generatedAt: verification.date,
+          profileType: impact.profileType,
+        };
+        ops.push(storeVerificationRecord(verification.hash, record));
+      }
+
+      ops.push(trackBadgeGenerated(handle));
+      ops.push(notifyFirstBadge(handle, impact));
+      const snapshot = buildSnapshot(stats, impact);
+      ops.push(
+        dbInsertSnapshot(handle, snapshot).then((inserted) => {
+          if (inserted) updateSnapshotCache(handle, snapshot);
+        }),
+      );
+
+      // Persist profile fields so admin dashboard always has latest data
+      if (stats.displayName || stats.avatarUrl) {
+        ops.push(
+          dbUpsertUser(handle, {
+            displayName: stats.displayName ?? undefined,
+            avatarUrl: stats.avatarUrl ?? undefined,
+          }).catch(() => {}),
+        );
+      }
+
+      return Promise.allSettled(ops);
+    });
+
+    // Render full badge
+    const svg = renderBadgeSvg(stats, impact, {
+      avatarDataUri,
+      verificationHash: verification?.hash,
+      verificationDate: verification?.date,
+    });
+
+    return new NextResponse(svg, { headers: CACHE_HEADERS });
+  } catch (err) {
+    void captureServerError({
+      route: `/u/${handle}/badge.svg`,
+      statusCode: 500,
+      error: err,
+    });
+
+    const svg = fallbackSvg(handle, "Something went wrong — try again later.");
     return new NextResponse(svg, {
-      headers: {
-        "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-      },
+      status: 500,
+      headers: { "Content-Type": "image/svg+xml" },
     });
   }
-
-  // Fetch craft score, snapshot, and avatar in parallel — all are independent
-  // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
-  const [craftResult, latestSnapshot, avatarDataUri] = await Promise.all([
-    dbGetToolInsights(handle),
-    getCachedLatestSnapshot(handle),
-    stats.avatarUrl
-      ? getAvatarBase64(handle, stats.avatarUrl)
-      : Promise.resolve(undefined),
-  ]);
-
-  // Compute impact (craft score feeds into the 5th pentagon dimension)
-  const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
-
-  // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
-  // on same-day repeated requests (smoothScore returns cached value for today).
-  impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
-  impact.tier = getTier(impact.adjustedComposite);
-
-  // Generate verification code (returns null if secret is unset)
-  const verification = generateVerificationCode(stats, impact);
-
-  // Post-response work: use after() to guarantee completion on Vercel
-  // (void promises may be killed when the serverless function freezes).
-  // Operations run in parallel via allSettled — each has its own try/catch
-  // so individual failures don't block others.
-  after(() => {
-    const ops: Promise<void>[] = [];
-
-    if (verification) {
-      const record: VerificationRecord = {
-        handle: stats.handle.toLowerCase(),
-        displayName: stats.displayName,
-        adjustedComposite: impact.adjustedComposite,
-        confidence: impact.confidence,
-        tier: impact.tier,
-        archetype: impact.archetype,
-        dimensions: impact.dimensions,
-        commitsTotal: stats.commitsTotal,
-        prsMergedCount: stats.prsMergedCount,
-        reviewsSubmittedCount: stats.reviewsSubmittedCount,
-        generatedAt: verification.date,
-        profileType: impact.profileType,
-      };
-      ops.push(storeVerificationRecord(verification.hash, record));
-    }
-
-    ops.push(trackBadgeGenerated(handle));
-    ops.push(notifyFirstBadge(handle, impact));
-    const snapshot = buildSnapshot(stats, impact);
-    ops.push(
-      dbInsertSnapshot(handle, snapshot).then((inserted) => {
-        if (inserted) updateSnapshotCache(handle, snapshot);
-      }),
-    );
-
-    // Persist profile fields so admin dashboard always has latest data
-    if (stats.displayName || stats.avatarUrl) {
-      ops.push(
-        dbUpsertUser(handle, {
-          displayName: stats.displayName ?? undefined,
-          avatarUrl: stats.avatarUrl ?? undefined,
-        }).catch(() => {}),
-      );
-    }
-
-    return Promise.allSettled(ops);
-  });
-
-  // Render full badge
-  const svg = renderBadgeSvg(stats, impact, {
-    avatarDataUri,
-    verificationHash: verification?.hash,
-    verificationDate: verification?.date,
-  });
-
-  return new NextResponse(svg, { headers: CACHE_HEADERS });
 }
