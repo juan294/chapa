@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { buildAuthUrl, createStateCookie } from "@/lib/auth/github";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
@@ -40,6 +41,11 @@ export async function GET(request: NextRequest) {
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();
   if (!clientId) {
+    void captureServerError({
+      route: "/api/auth/login",
+      statusCode: 500,
+      error: new Error("GitHub OAuth not configured: GITHUB_CLIENT_ID missing"),
+    });
     return NextResponse.json(
       { error: "GitHub OAuth not configured" },
       { status: 500 },

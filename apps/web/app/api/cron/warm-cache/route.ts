@@ -16,6 +16,7 @@ import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -210,6 +211,11 @@ async function warmHandle(
   try {
     const stats = await getStats(handle, githubToken);
     if (!stats) {
+      void captureServerError({
+        route: "/api/cron/warm-cache",
+        statusCode: 502,
+        error: new Error(`Stats fetch returned null for handle: ${handle}`),
+      });
       return { warmed: false, snapshotRecorded: false, notified: false };
     }
 
@@ -251,7 +257,12 @@ async function warmHandle(
     }
 
     return { warmed: true, snapshotRecorded, notified };
-  } catch {
+  } catch (err) {
+    void captureServerError({
+      route: "/api/cron/warm-cache",
+      statusCode: 500,
+      error: err,
+    });
     return { warmed: false, snapshotRecorded: false, notified: false };
   }
 }
