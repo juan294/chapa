@@ -67,6 +67,24 @@ const DIRECTION_THRESHOLD = 2;
 // compareSnapshots — pure function
 // ---------------------------------------------------------------------------
 
+/**
+ * Compare two metric snapshots and produce a structured diff.
+ *
+ * Pure function — deterministic for a given pair of snapshots. Computes:
+ * - Overall direction: "improving" if adjusted composite delta > {@link DIRECTION_THRESHOLD},
+ *   "declining" if < negative threshold, "stable" otherwise.
+ * - Numeric deltas for composite score, adjusted composite, confidence, all dimensions, and raw stats.
+ * - Categorical changes for archetype, tier, and profile type (null when unchanged).
+ * - Penalty changes: which confidence flags were added or removed between snapshots
+ *   (null if either snapshot lacks penalty data, for backwards compatibility).
+ * - Calendar distance in days between the two snapshot dates.
+ *
+ * The craft dimension delta is only included when both snapshots have a craft score.
+ *
+ * @param previous - The earlier (baseline) snapshot
+ * @param current - The later (comparison) snapshot
+ * @returns A {@link SnapshotDiff} containing all deltas and categorical changes
+ */
 export function compareSnapshots(
   previous: MetricsSnapshot,
   current: MetricsSnapshot,
@@ -168,8 +186,18 @@ const SIGNIFICANT_DIMENSION_CHANGE = 5;
 /**
  * Produce human-readable explanation lines for a snapshot diff.
  *
+ * Generates an array of plain-text sentences describing what changed between
+ * two snapshots. Includes:
+ * - Direction summary with point delta
+ * - Tier and archetype changes (if any)
+ * - Significant dimension changes (absolute delta >= {@link SIGNIFICANT_DIMENSION_CHANGE})
+ * - Confidence penalty additions and removals
+ *
  * @prebuilt Part of the pre-built history API surface — intended for
  * future consumers (share page, admin dashboard). Not yet imported.
+ *
+ * @param diff - The structured diff produced by {@link compareSnapshots}
+ * @returns Array of human-readable explanation strings (one sentence per notable change)
  */
 export function explainDiff(diff: SnapshotDiff): string[] {
   const lines: string[] = [];

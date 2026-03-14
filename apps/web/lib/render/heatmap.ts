@@ -13,6 +13,23 @@ interface HeatmapCell {
   delay: number;
 }
 
+/**
+ * Build a grid of heatmap cells from contribution data for badge SVG rendering.
+ *
+ * Displays the most recent 13 weeks (91 days) of activity. If the input
+ * contains more than 91 days, only the last 91 are used (the scoring window
+ * may cover up to 365 days, but the badge shows a compact view).
+ *
+ * Cells are laid out in a column-major grid: 13 columns (weeks) x 7 rows (days),
+ * with each cell sized at {@link CELL_SIZE}px and spaced by {@link CELL_GAP}px.
+ * Animation delays are staggered per column (60ms per week) for a left-to-right
+ * fade-in effect.
+ *
+ * @param heatmapData - Array of daily contribution counts (may exceed 91 entries)
+ * @param offsetX - Horizontal offset for positioning within the SVG (default: 0)
+ * @param offsetY - Vertical offset for positioning within the SVG (default: 0)
+ * @returns Array of {@link HeatmapCell} objects ready for {@link renderHeatmapSvg}
+ */
 export function buildHeatmapCells(
   heatmapData: HeatmapDay[],
   offsetX: number = 0,
@@ -41,6 +58,17 @@ export function buildHeatmapCells(
   return cells;
 }
 
+/**
+ * Render an array of heatmap cells as SVG `<rect>` elements with fade-in animation.
+ *
+ * Each cell is rendered as a rounded rectangle (`rx="4"`) that starts fully
+ * transparent (`opacity="0"`) and animates to full opacity via an SVG
+ * `<animate>` element. The animation delay per cell is set by {@link HeatmapCell.delay},
+ * producing a staggered column-by-column reveal.
+ *
+ * @param cells - Pre-computed heatmap cells from {@link buildHeatmapCells}
+ * @returns SVG markup string containing all `<rect>` elements, separated by newlines
+ */
 export function renderHeatmapSvg(cells: HeatmapCell[]): string {
   return cells
     .map(
