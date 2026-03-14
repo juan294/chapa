@@ -165,12 +165,19 @@ All significant changes go through four phases:
 - If you can verify it with a command or tool, do so automatically.
 - Don't use Claude for linting/formatting — use automated tools and hooks instead.
 
-## Research Documents
-Store in: `docs/research/YYYY-MM-DD-description.md`
+## Project File Locations
 
-## Implementation Plans
-Store in: `docs/plans/YYYY-MM-DD-description.md`
-Phase files: `docs/plans/YYYY-MM-DD-description-phases/phase-N.md`
+Go directly to these paths — never search the codebase for them.
+
+| Topic | Path | Notes |
+|-------|------|-------|
+| Agent reports | `docs/agents/*-report.md` | Flag YELLOW/RED items. Cross-agent context in `shared-context.md` |
+| Agent logs | `logs/<name>.log`, `<name>.error.log` | Read alongside reports to diagnose failures |
+| Agent scripts | `scripts/agents/` | Standalone bash files invoking Claude CLI headless |
+| ADRs | `docs/decisions/` | Architecture decision records |
+| PR descriptions | `docs/prs/{number}_description.md` | |
+| Research docs | `docs/research/YYYY-MM-DD-description.md` | |
+| Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 
 ---
 
