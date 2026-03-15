@@ -1,16 +1,16 @@
 {
-  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": ["scripts/**"],
   "workspaces": {
-    "apps/web": {
+    ".": {
+      "entry": ["scripts/**/*.ts"],
       "ignoreDependencies": [
-        "eslint-plugin-import",
-        "eslint-plugin-jsx-a11y",
-        "eslint-plugin-react-hooks",
-        "postcss",
-        "postcss-load-config"
-      ],
+        "@chapa/shared",
+        "@upstash/redis",
+        "@supabase/supabase-js"
+      ]
+    },
+    "apps/web": {
       "entry": [
         "app/**/page.tsx",
         "app/**/layout.tsx",
@@ -18,7 +18,16 @@
         "app/**/error.tsx",
         "app/**/loading.tsx",
         "app/**/not-found.tsx"
+      ],
+      "project": ["**/*.{ts,tsx}"],
+      "ignoreDependencies": [
+        "tailwindcss",
+        "postcss"
       ]
+    },
+    "packages/shared": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
     }
   }
 }
