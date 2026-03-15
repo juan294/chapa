@@ -21,7 +21,15 @@ const CAPS = SCORING_CAPS;
 // prsMergedWeight (70%), issuesClosedCount (20%), commitsTotal (10%)
 // ---------------------------------------------------------------------------
 
-/** Compute Delivery dimension (0–100): measures shipping throughput via PR weight, issues closed, and commits. */
+/**
+ * Compute Delivery dimension (0–100): measures shipping throughput.
+ *
+ * Weighted formula: prsMergedWeight (70%) + issuesClosedCount (20%) + commitsTotal (10%).
+ * Each input is normalized against its cap before weighting.
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @returns Clamped score between 0 and 100
+ */
 export function computeDelivery(stats: StatsData): number {
   const pr = normalize(stats.prsMergedWeight, CAPS.prWeight);
   const issues = normalize(stats.issuesClosedCount, CAPS.issues);
@@ -37,7 +45,16 @@ export function computeDelivery(stats: StatsData): number {
 // Solo: delegates to computeSoloQuality() when reviewsSubmittedCount === 0
 // ---------------------------------------------------------------------------
 
-/** Compute Quality dimension (0–100): measures engineering discipline via reviews, review-to-PR ratio, and inverse micro-commit ratio. Delegates to solo quality signals when no reviews exist. */
+/**
+ * Compute Quality dimension (0–100): measures engineering discipline.
+ *
+ * Collaborative profile: reviewsSubmittedCount (60%) + review-to-PR ratio (25%) +
+ * inverse microCommitRatio (15%). Delegates to {@link computeSoloQuality} when
+ * `reviewsSubmittedCount` is 0.
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @returns Clamped score between 0 and 100
+ */
 export function computeQuality(stats: StatsData): number {
   if (stats.reviewsSubmittedCount === 0) {
     return computeSoloQuality(stats);
@@ -71,7 +88,16 @@ export function computeQuality(stats: StatsData): number {
 // inverseMicroCommitRatio (15%)
 // ---------------------------------------------------------------------------
 
-/** Solo quality fallback (0–100): uses PR descriptions, feature branches, issue linkage, and inverse micro-commit ratio when no code reviews exist. */
+/**
+ * Solo quality fallback (0–100): used when no code reviews exist.
+ *
+ * Weighted formula: prDescriptionRate (40%) + featureBranchRate (25%) +
+ * issueLinkageRate (20%) + inverse microCommitRatio (15%).
+ * Returns 0 when no PRs have been merged.
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @returns Clamped score between 0 and 100
+ */
 function computeSoloQuality(stats: StatsData): number {
   if (stats.prsMergedCount === 0) return 0;
 
@@ -91,7 +117,16 @@ function computeSoloQuality(stats: StatsData): number {
 // sqrt curve: easier to start, harder to climb — 120 days ≈ 57% (was 33% linear)
 // ---------------------------------------------------------------------------
 
-/** Compute Consistency dimension (0–100): measures sustained contribution via sqrt-curved active days, heatmap evenness, and inverse burst activity. */
+/**
+ * Compute Consistency dimension (0–100): measures sustained contribution.
+ *
+ * Weighted formula: sqrt(activeDays/365) (45%) + heatmap evenness (40%) +
+ * inverse burst activity (15%). The sqrt curve makes early days count more
+ * and later days harder to climb — 120 active days yields ~57%.
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @returns Clamped score between 0 and 100; returns 0 when activeDays is 0
+ */
 export function computeConsistency(stats: StatsData): number {
   if (stats.activeDays === 0) return 0;
 
@@ -113,7 +148,15 @@ export function computeConsistency(stats: StatsData): number {
 //     docsOnlyPrRatio (15%), reserved 5% (zeros for now). Watchers dropped.
 // ---------------------------------------------------------------------------
 
-/** Compute Breadth dimension (0–100): measures cross-project influence via repos contributed, inverse concentration, stars, forks, and docs-only PR ratio. */
+/**
+ * Compute Breadth dimension (0–100): measures cross-project influence.
+ *
+ * Weighted formula: repos contributed (40%) + inverse concentration (25%) +
+ * stars (10%) + forks (5%) + docs-only PR ratio (15%).
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @returns Clamped score between 0 and 100; returns 0 when reposContributed is 0
+ */
 export function computeBreadth(stats: StatsData): number {
   if (stats.reposContributed === 0) return 0;
 
@@ -131,7 +174,13 @@ export function computeBreadth(stats: StatsData): number {
 // Compute all dimensions
 // ---------------------------------------------------------------------------
 
-/** Compute all 4 core dimensions (+ optional Craft) and return as a DimensionScores object. */
+/**
+ * Compute all 4 core dimensions (+ optional Craft) and return as a DimensionScores object.
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @param craftScore - Optional pre-computed Craft dimension score (from AI tool insights)
+ * @returns A {@link DimensionScores} object with delivery, quality, consistency, breadth, and optionally craft
+ */
 export function computeDimensions(stats: StatsData, craftScore?: number): DimensionScores {
   const dims: DimensionScores = {
     delivery: computeDelivery(stats),
@@ -149,7 +198,15 @@ export function computeDimensions(stats: StatsData, craftScore?: number): Dimens
 // Profile type detection
 // ---------------------------------------------------------------------------
 
-/** Detect whether a developer is "solo" (no reviews) or "collaborative" (has reviews). Affects quality scoring and archetype eligibility. */
+/**
+ * Detect whether a developer is "solo" (no reviews) or "collaborative" (has reviews).
+ *
+ * Affects quality scoring (solo uses PR description signals instead of reviews)
+ * and archetype eligibility (solo profiles cannot earn Quality Champion).
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window
+ * @returns `"solo"` when reviewsSubmittedCount is 0, `"collaborative"` otherwise
+ */
 export function detectProfileType(stats: StatsData): ProfileType {
   return stats.reviewsSubmittedCount === 0 ? "solo" : "collaborative";
 }
@@ -167,7 +224,21 @@ const ARCHETYPE_MAP: { key: keyof DimensionScores; archetype: DeveloperArchetype
   { key: "craft", archetype: "Artificer" },
 ];
 
-/** Derive developer archetype from dimension scores. Returns Emerging (low activity), Balanced (even scores), or the dominant dimension's archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer). Solo profiles cannot earn Quality Champion. */
+/**
+ * Derive developer archetype from dimension scores.
+ *
+ * Decision tree:
+ * 1. **Emerging** — avg < 25 or no dimension >= 40
+ * 2. **Balanced** — all dimensions within 20 pts AND avg >= 50
+ * 3. **Specific** — highest dimension >= 60, mapped by tie-breaking priority:
+ *    Polymath > Quality Champion > Marathoner > Builder > Artificer
+ *
+ * Solo profiles cannot earn Quality Champion (review-based archetype requires reviews).
+ *
+ * @param dimensions - The 4–5 dimension scores to analyze
+ * @param profileType - `"solo"` or `"collaborative"` (default: `"collaborative"`)
+ * @returns The derived {@link DeveloperArchetype} label
+ */
 export function deriveArchetype(
   dimensions: DimensionScores,
   profileType: ProfileType = "collaborative",
@@ -211,6 +282,17 @@ export function deriveArchetype(
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/**
+ * Compute the full Impact v4 profile from aggregated GitHub stats.
+ *
+ * Orchestrates the scoring pipeline: detects profile type, computes all
+ * dimensions, derives archetype, calculates composite score (with recency
+ * weighting), applies confidence adjustment, and assigns a tier.
+ *
+ * @param stats - Aggregated GitHub stats for the scoring window (365 days)
+ * @param craftScore - Optional pre-computed Craft dimension score (from AI tool insights)
+ * @returns Complete {@link ImpactV4Result} with dimensions, archetype, composite, confidence, and tier
+ */
 export function computeImpactV4(stats: StatsData, craftScore?: number): ImpactV4Result {
   const profileType = detectProfileType(stats);
   const dimensions = computeDimensions(stats, craftScore);
