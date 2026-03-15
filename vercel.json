@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/warm-cache",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-audience",
+      "schedule": "30 3 * * *"
     }
   ]
 }

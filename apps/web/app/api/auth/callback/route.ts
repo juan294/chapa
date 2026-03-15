@@ -10,6 +10,7 @@ import {
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
+import { addContact } from "@/lib/email/audience";
 import { captureServerError } from "@/lib/analytics/server-errors";
 
 function isSecureOrigin(): boolean {
@@ -121,6 +122,14 @@ export async function GET(request: NextRequest) {
     displayName: user.name ?? null,
     avatarUrl: user.avatar_url ?? null,
   }).catch(() => {});
+
+  // Sync to Resend audience (fire-and-forget, non-blocking)
+  if (email) {
+    void addContact(email, {
+      firstName: user.name ?? undefined,
+      handle: user.login,
+    }).catch(() => {});
+  }
 
   const cookie = createSessionCookie(
     {

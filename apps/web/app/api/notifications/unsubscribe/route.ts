@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { dbUpdateEmailNotifications } from "@/lib/db/users";
+import { dbUpdateEmailNotifications, dbGetUserEmail } from "@/lib/db/users";
 import { escapeHtml } from "@/lib/email/resend";
+import { markUnsubscribed } from "@/lib/email/audience";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 
@@ -34,14 +35,20 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Best-effort DB update — fail-open for UX
-  try {
-    await dbUpdateEmailNotifications(handle, false);
-  } catch (error) {
-    console.error(
-      "[unsubscribe] failed to update preferences:",
-      (error as Error).message,
-    );
+  // Best-effort DB update + Resend sync — fail-open for UX
+  const [emailInfo] = await Promise.all([
+    dbGetUserEmail(handle).catch(() => null),
+    dbUpdateEmailNotifications(handle, false).catch((error: Error) => {
+      console.error(
+        "[unsubscribe] failed to update preferences:",
+        error.message,
+      );
+    }),
+  ]);
+
+  // Sync unsubscribe to Resend (fire-and-forget)
+  if (emailInfo?.email) {
+    void markUnsubscribed(emailInfo.email).catch(() => {});
   }
 
   // Return a simple confirmation page
