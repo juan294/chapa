@@ -18,7 +18,7 @@ vi.mock("@/lib/db/feature-flags", () => ({
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 10 }),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -28,6 +28,7 @@ vi.mock("@/lib/http/client-ip", () => ({
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
+import { rateLimit } from "@/lib/cache/redis";
 import { GET } from "./route";
 
 beforeEach(() => {
@@ -35,6 +36,7 @@ beforeEach(() => {
   vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
   vi.mocked(readSessionCookie).mockReturnValue({ login: "admin", token: "tok", name: "Admin", avatar_url: "" });
   vi.mocked(isAdminHandle).mockReturnValue(true);
+  vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
 });
 
 function makeRequest(): NextRequest {
@@ -86,5 +88,73 @@ describe("GET /api/admin/engagement-flags", () => {
     const res = await GET(makeRequest());
     const body = await res.json();
     expect(body.flags).toHaveLength(0);
+  });
+
+  describe("branch coverage: rate limiting", () => {
+    it("returns 429 when rate limited", async () => {
+      vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+
+      const res = await GET(makeRequest());
+      expect(res.status).toBe(429);
+
+      const body = await res.json();
+      expect(body.error).toContain("Too many requests");
+      expect(res.headers.get("Retry-After")).toBe("60");
+    });
+  });
+
+  describe("branch coverage: missing NEXTAUTH_SECRET", () => {
+    it("returns 401 when NEXTAUTH_SECRET is not set", async () => {
+      vi.stubEnv("NEXTAUTH_SECRET", "");
+
+      const res = await GET(makeRequest());
+      expect(res.status).toBe(401);
+
+      const body = await res.json();
+      expect(body.error).toBe("Unauthorized");
+    });
+
+    it("returns 401 when NEXTAUTH_SECRET is undefined", async () => {
+      delete process.env.NEXTAUTH_SECRET;
+
+      const res = await GET(makeRequest());
+      expect(res.status).toBe(401);
+
+      const body = await res.json();
+      expect(body.error).toBe("Unauthorized");
+    });
+  });
+
+  describe("branch coverage: flag description fallback", () => {
+    it("uses empty string when flag description is null", async () => {
+      vi.mocked(dbGetFeatureFlags).mockResolvedValue([
+        { id: "1", key: "score_notifications", enabled: true, description: null, config: {}, createdAt: "", updatedAt: "" },
+      ]);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+      expect(body.flags).toHaveLength(1);
+      expect(body.flags[0].description).toBe("");
+    });
+
+    it("preserves flag description when present", async () => {
+      vi.mocked(dbGetFeatureFlags).mockResolvedValue([
+        { id: "1", key: "score_notifications", enabled: true, description: "Notify on score change", config: {}, createdAt: "", updatedAt: "" },
+      ]);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+      expect(body.flags[0].description).toBe("Notify on score change");
+    });
+  });
+
+  describe("branch coverage: NEXTAUTH_SECRET with whitespace", () => {
+    it("trims NEXTAUTH_SECRET whitespace before checking", async () => {
+      vi.stubEnv("NEXTAUTH_SECRET", "  test-secret  ");
+
+      const res = await GET(makeRequest());
+      // Should succeed — the trimmed secret is non-empty
+      expect(res.status).toBe(200);
+    });
   });
 });
