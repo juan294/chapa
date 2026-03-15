@@ -24,6 +24,7 @@ interface RunState {
   status: "running" | "completed" | "failed" | "stopped";
   lines: LogLine[];
   process: ChildProcess;
+  cleanup?: () => void;
 }
 
 const MAX_LOG_LINES = 500;
@@ -177,14 +178,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  /** Destroy streams and remove all listeners to prevent leaks. */
+  let processTimer: ReturnType<typeof setTimeout> | null = null;
+  let killTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Destroy streams, remove listeners, and clear pending timers. */
   function cleanupProcess() {
+    if (processTimer) { clearTimeout(processTimer); processTimer = null; }
+    if (killTimer) { clearTimeout(killTimer); killTimer = null; }
     child.stdout?.removeAllListeners();
     child.stderr?.removeAllListeners();
     child.stdout?.destroy();
     child.stderr?.destroy();
     child.removeAllListeners();
   }
+
+  // Store cleanup on run state so the DELETE handler can call it
+  run.cleanup = cleanupProcess;
 
   child.stdout!.on("data", (data: Buffer) => addLines(data, "stdout"));
   child.stderr!.on("data", (data: Buffer) => addLines(data, "stderr"));
@@ -201,7 +210,7 @@ export async function POST(request: NextRequest) {
   });
 
   // Hard timeout — kill the process if it runs too long
-  setTimeout(() => {
+  processTimer = setTimeout(() => {
     if (run.status === "running") {
       run.status = "failed";
       run.lines.push({
@@ -215,7 +224,7 @@ export async function POST(request: NextRequest) {
         // Process may have already exited
       }
       // Escalate to SIGKILL if SIGTERM doesn't terminate within grace period
-      setTimeout(() => {
+      killTimer = setTimeout(() => {
         try {
           child.kill("SIGKILL");
         } catch {
@@ -308,19 +317,14 @@ export async function DELETE(request: NextRequest) {
   }
 
   currentRun.status = "stopped";
-  const proc = currentRun.process;
   try {
     // Kill the process group
-    proc.kill("SIGTERM");
+    currentRun.process.kill("SIGTERM");
   } catch {
     // Process may have already exited
   }
-  // Clean up streams and listeners to prevent leaks
-  proc.stdout?.removeAllListeners();
-  proc.stderr?.removeAllListeners();
-  proc.stdout?.destroy();
-  proc.stderr?.destroy();
-  proc.removeAllListeners();
+  // Clean up streams, listeners, and timers
+  currentRun.cleanup?.();
 
   const result = {
     status: "stopped" as const,

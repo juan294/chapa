@@ -4,7 +4,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "@/lib/async/with-timeout";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /** Feature flag keys that belong to the Engagement section. */
 const ENGAGEMENT_KEYS = new Set(["score_notifications"]);
@@ -40,18 +40,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let allFlags;
-  try {
-    allFlags = await withTimeout(dbGetFeatureFlags(), DB_TIMEOUT_MS, "dbGetFeatureFlags");
-  } catch (err) {
-    if (err instanceof TimeoutError) {
-      return NextResponse.json(
-        { error: "Database request timeout" },
-        { status: 504 },
-      );
-    }
-    throw err;
-  }
+  const allFlags = await dbTimeoutOr504(dbGetFeatureFlags(), "dbGetFeatureFlags");
+  if (allFlags instanceof NextResponse) return allFlags;
   const engagementFlags = allFlags
     .filter((f) => ENGAGEMENT_KEYS.has(f.key))
     .map((f) => ({

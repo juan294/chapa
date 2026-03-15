@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "./with-timeout";
+import { describe, it, expect, vi } from "vitest";
+import { NextResponse } from "next/server";
+import { withTimeout, dbTimeoutOr504, TimeoutError, DB_TIMEOUT_MS } from "./with-timeout";
 
 describe("withTimeout", () => {
   it("resolves when the promise completes within the timeout", async () => {
@@ -47,5 +48,35 @@ describe("withTimeout", () => {
 
   it("exports DB_TIMEOUT_MS as 10_000", () => {
     expect(DB_TIMEOUT_MS).toBe(10_000);
+  });
+
+  it("clears the internal timer when the promise resolves before timeout", async () => {
+    const clearSpy = vi.spyOn(globalThis, "clearTimeout");
+    await withTimeout(Promise.resolve("fast"), 60_000);
+    expect(clearSpy).toHaveBeenCalled();
+    clearSpy.mockRestore();
+  });
+});
+
+describe("dbTimeoutOr504", () => {
+  it("returns the resolved value on success", async () => {
+    const result = await dbTimeoutOr504(Promise.resolve("data"), "test");
+    expect(result).toBe("data");
+  });
+
+  it("returns a 504 NextResponse on timeout", async () => {
+    vi.useFakeTimers();
+    const never = new Promise<string>(() => {});
+    const resultPromise = dbTimeoutOr504(never, "test");
+    await vi.advanceTimersByTimeAsync(DB_TIMEOUT_MS + 1);
+    const result = await resultPromise;
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(504);
+    vi.useRealTimers();
+  });
+
+  it("re-throws non-timeout errors", async () => {
+    const failing = Promise.reject(new Error("db crash"));
+    await expect(dbTimeoutOr504(failing, "test")).rejects.toThrow("db crash");
   });
 });

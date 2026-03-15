@@ -4,7 +4,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { dbUpdateFeatureFlag } from "@/lib/db/feature-flags";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "@/lib/async/with-timeout";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /**
  * PATCH /api/admin/feature-flags
@@ -68,22 +68,8 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  let success;
-  try {
-    success = await withTimeout(
-      dbUpdateFeatureFlag(body.key, updates),
-      DB_TIMEOUT_MS,
-      "dbUpdateFeatureFlag",
-    );
-  } catch (err) {
-    if (err instanceof TimeoutError) {
-      return NextResponse.json(
-        { error: "Database request timeout" },
-        { status: 504 },
-      );
-    }
-    throw err;
-  }
+  const success = await dbTimeoutOr504(dbUpdateFeatureFlag(body.key, updates), "dbUpdateFeatureFlag");
+  if (success instanceof NextResponse) return success;
   if (!success) {
     return NextResponse.json(
       { error: "Failed to update feature flag" },

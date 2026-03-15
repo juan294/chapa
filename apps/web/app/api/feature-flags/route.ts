@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "@/lib/async/with-timeout";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /**
  * GET /api/feature-flags
@@ -20,18 +20,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let flags;
-  try {
-    flags = await withTimeout(dbGetFeatureFlags(), DB_TIMEOUT_MS, "dbGetFeatureFlags");
-  } catch (err) {
-    if (err instanceof TimeoutError) {
-      return NextResponse.json(
-        { error: "Database request timeout" },
-        { status: 504 },
-      );
-    }
-    throw err;
-  }
+  const flags = await dbTimeoutOr504(dbGetFeatureFlags(), "dbGetFeatureFlags");
+  if (flags instanceof NextResponse) return flags;
 
   return NextResponse.json(
     { flags },

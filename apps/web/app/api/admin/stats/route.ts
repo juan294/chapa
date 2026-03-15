@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { getBadgeStats, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "@/lib/async/with-timeout";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /**
  * GET /api/admin/stats
@@ -34,18 +34,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let badges;
-  try {
-    badges = await withTimeout(getBadgeStats(), DB_TIMEOUT_MS, "getBadgeStats");
-  } catch (err) {
-    if (err instanceof TimeoutError) {
-      return NextResponse.json(
-        { error: "Database request timeout" },
-        { status: 504 },
-      );
-    }
-    throw err;
-  }
+  const badges = await dbTimeoutOr504(getBadgeStats(), "getBadgeStats");
+  if (badges instanceof NextResponse) return badges;
 
   return NextResponse.json(
     { badges },
