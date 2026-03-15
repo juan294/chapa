@@ -170,8 +170,8 @@ export function DimensionCard({
       className={`rounded-xl border border-stroke bg-card transition-colors duration-200 hover:border-amber/20 animate-fade-in-up ${className}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      {/* Header row */}
-      <div className="flex items-start justify-between p-4 pb-0">
+      {/* Header */}
+      <div className="p-4 pb-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium uppercase tracking-wider text-text-secondary font-body">
             {label}
