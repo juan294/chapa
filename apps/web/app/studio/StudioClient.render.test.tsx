@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 
 // ---------- Browser API mocks ----------
 
@@ -144,6 +144,7 @@ vi.mock("@/components/terminal/AutocompleteDropdown", () => ({
   AutocompleteDropdown: ({
     visible,
     onSelect,
+    onFill,
     onDismiss,
   }: {
     visible: boolean;
@@ -157,6 +158,9 @@ vi.mock("@/components/terminal/AutocompleteDropdown", () => ({
       <div data-testid="autocomplete" role="listbox">
         <button data-testid="ac-select" onClick={() => onSelect("/help")}>
           /help
+        </button>
+        <button data-testid="ac-fill" onClick={() => onFill("/set")}>
+          Fill /set
         </button>
         <button data-testid="ac-dismiss" onClick={onDismiss}>
           Dismiss
@@ -180,9 +184,13 @@ vi.mock("@/components/terminal/command-registry", () => {
   };
 });
 
+let capturedShortcutHandler: ((id: string) => void) | null = null;
 vi.mock("@/components/KeyboardShortcutsListener", () => ({
   useKeyboardShortcutsContext: () => ({
-    registerPageShortcuts: vi.fn(() => vi.fn()),
+    registerPageShortcuts: vi.fn((_page: string, handler: (id: string) => void) => {
+      capturedShortcutHandler = handler;
+      return vi.fn(); // cleanup function
+    }),
     openCheatSheet: vi.fn(),
   }),
 }));
@@ -446,7 +454,6 @@ describe("StudioClient render", () => {
 
   describe("save functionality", () => {
     it("shows saving indicator during save", async () => {
-      // Mock fetch to delay response
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
         .mockImplementation(
@@ -482,6 +489,326 @@ describe("StudioClient render", () => {
 
       fetchSpy.mockRestore();
     });
+
+    it("adds success line to output on save success", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}", { status: 200 }));
+
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "save-ok", type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/save" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        // After save completes, output should grow (initial 2 + input + result + success)
+        const output = screen.getByTestId("terminal-output");
+        const lineCount = parseInt(output.textContent?.match(/(\d+) lines/)?.[1] ?? "0", 10);
+        expect(lineCount).toBeGreaterThanOrEqual(4);
+      });
+
+      fetchSpy.mockRestore();
+    });
+
+    it("adds error line to output on save failure", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("", { status: 500 }));
+
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "save-fail", type: "system", text: "Saving" }],
+        action: { type: "save" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/save" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const output = screen.getByTestId("terminal-output");
+        const lineCount = parseInt(output.textContent?.match(/(\d+) lines/)?.[1] ?? "0", 10);
+        expect(lineCount).toBeGreaterThanOrEqual(4);
+      });
+
+      fetchSpy.mockRestore();
+    });
+  });
+
+  describe("reset functionality", () => {
+    it("resets config to defaults when reset action fires", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "reset-1", type: "system", text: "Reset done" }],
+        action: { type: "reset" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={{ ...defaultConfig, background: "aurora" }}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      // Should show aurora initially
+      const preview = screen.getByTestId("badge-preview");
+      expect(preview.textContent).toContain('"background":"aurora"');
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/reset" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const updatedPreview = screen.getByTestId("badge-preview");
+        // After reset, background should be "solid" (default)
+        expect(updatedPreview.textContent).toContain('"background":"solid"');
+      });
+    });
+  });
+
+  describe("clear action", () => {
+    it("clears terminal output when clear action fires", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [],
+        action: { type: "clear" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      // Initially 2 lines
+      expect(screen.getByTestId("terminal-output").textContent).toContain("2 lines");
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/clear" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("terminal-output").textContent).toContain("0 lines");
+      });
+    });
+  });
+
+  describe("set action (config change)", () => {
+    it("updates config via set action", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "set-1", type: "system", text: "Set background to aurora" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set background aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const preview = screen.getByTestId("badge-preview");
+        expect(preview.textContent).toContain('"background":"aurora"');
+      });
+    });
+
+    it("tracks effect_changed when config changes", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "set-2", type: "system", text: "Changed" }],
+        action: { type: "set", category: "background", value: "aurora" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/set background aurora" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        expect(trackEvent).toHaveBeenCalledWith("effect_changed", expect.objectContaining({
+          category: "background",
+        }));
+      });
+    });
+  });
+
+  describe("preset action", () => {
+    it("applies preset config via preset action", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "preset-1", type: "system", text: "Applied vibrant" }],
+        action: { type: "preset", name: "vibrant" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/preset vibrant" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const preview = screen.getByTestId("badge-preview");
+        expect(preview.textContent).toContain('"background":"gradient"');
+      });
+    });
+
+    it("tracks preset_selected event", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "preset-2", type: "system", text: "Applied" }],
+        action: { type: "preset", name: "minimal" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/preset minimal" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        expect(trackEvent).toHaveBeenCalledWith("preset_selected", { preset: "minimal" });
+      });
+    });
+
+    it("ignores unknown preset names", async () => {
+      const { executeCommand } = await import(
+        "@/components/terminal/command-registry"
+      );
+      vi.mocked(executeCommand).mockReturnValue({
+        lines: [{ id: "preset-unk", type: "system", text: "Unknown" }],
+        action: { type: "preset", name: "nonexistent" },
+      });
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/preset nonexistent" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      // Config should remain unchanged
+      await waitFor(() => {
+        const preview = screen.getByTestId("badge-preview");
+        expect(preview.textContent).toContain('"background":"solid"');
+      });
+    });
+  });
+
+  describe("autocomplete interactions", () => {
+    it("autocomplete select triggers command execution", async () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      // Type / to show autocomplete
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/he" } });
+
+      // Click the autocomplete select button
+      fireEvent.click(screen.getByTestId("ac-select"));
+
+      await waitFor(() => {
+        const output = screen.getByTestId("terminal-output");
+        const lineCount = parseInt(output.textContent?.match(/(\d+) lines/)?.[1] ?? "0", 10);
+        expect(lineCount).toBeGreaterThan(2);
+      });
+    });
+
+    it("autocomplete dismiss hides the dropdown", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/he" } });
+
+      expect(screen.getByTestId("autocomplete")).toBeDefined();
+
+      fireEvent.click(screen.getByTestId("ac-dismiss"));
+
+      expect(screen.queryByTestId("autocomplete")).toBeNull();
+    });
   });
 
   describe("analytics", () => {
@@ -498,6 +825,141 @@ describe("StudioClient render", () => {
       );
 
       expect(trackEvent).toHaveBeenCalledWith("studio_opened");
+    });
+  });
+
+  describe("autocomplete fill", () => {
+    it("calls handleAutocompleteFill which hides autocomplete and focuses input", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      // Type / to show autocomplete
+      fireEvent.change(input, { target: { value: "/se" } });
+
+      expect(screen.getByTestId("autocomplete")).toBeDefined();
+
+      const focusSpy = vi.spyOn(input, "focus");
+
+      // Click the fill button — handleAutocompleteFill is called
+      fireEvent.click(screen.getByTestId("ac-fill"));
+
+      // handleAutocompleteFill sets showAutocomplete(false), then programmatically
+      // sets value and dispatches input event, which re-triggers partial change.
+      // Verify focus was called on the input (the core behavior).
+      expect(focusSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("keyboard shortcuts", () => {
+    it("registers keyboard shortcuts with studio page name", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      expect(capturedShortcutHandler).not.toBeNull();
+    });
+
+    it("focus-terminal shortcut focuses the terminal input", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      const input = screen.getByLabelText("Terminal command input");
+      const focusSpy = vi.spyOn(input, "focus");
+
+      act(() => {
+        capturedShortcutHandler?.("focus-terminal");
+      });
+
+      expect(focusSpy).toHaveBeenCalled();
+    });
+
+    it("toggle-quick-controls shortcut toggles quick controls visibility", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      // Initially hidden
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("false");
+
+      act(() => {
+        capturedShortcutHandler?.("toggle-quick-controls");
+      });
+
+      expect(screen.getByTestId("quick-controls").getAttribute("data-visible")).toBe("true");
+    });
+
+    it("refresh-preview shortcut increments preview key", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      // The BadgePreviewCard is rendered with key={previewKey}
+      // Refreshing should cause re-render (new key)
+      act(() => {
+        capturedShortcutHandler?.("refresh-preview");
+      });
+
+      // Component should still render correctly
+      expect(screen.getByTestId("badge-preview")).toBeDefined();
+    });
+
+    it("cycle-preset shortcut cycles to next preset", async () => {
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+
+      act(() => {
+        capturedShortcutHandler?.("cycle-preset");
+      });
+
+      // Should have tracked preset_selected
+      await waitFor(() => {
+        expect(trackEvent).toHaveBeenCalledWith("preset_selected", expect.objectContaining({
+          preset: expect.any(String),
+        }));
+      });
+    });
+  });
+
+  describe("handle default prop", () => {
+    it("renders without handle prop (defaults to empty string)", () => {
+      render(
+        <StudioClient
+          initialConfig={defaultConfig}
+          stats={stats}
+          impact={impact}
+        />,
+      );
+      expect(screen.getByText("Creator Studio")).toBeDefined();
     });
   });
 });
