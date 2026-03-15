@@ -72,8 +72,6 @@ export async function ensureSegment(): Promise<string | null> {
   }
 }
 
-/** Convenience alias for `ensureSegment()`. */
-export const getSegmentId = ensureSegment;
 
 // ---------------------------------------------------------------------------
 // Contact management
