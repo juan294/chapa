@@ -27,8 +27,10 @@ interface RunState {
 }
 
 const MAX_LOG_LINES = 500;
-/** Hard timeout for spawned agent processes (2 minutes). */
-const PROCESS_TIMEOUT_MS = 120_000;
+/** Hard timeout for spawned agent processes (5 minutes). */
+const PROCESS_TIMEOUT_MS = 300_000;
+/** Grace period after SIGTERM before escalating to SIGKILL. */
+const SIGKILL_GRACE_MS = 5_000;
 
 let currentRun: RunState | null = null;
 
@@ -175,20 +177,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  /** Destroy streams and remove all listeners to prevent leaks. */
+  function cleanupProcess() {
+    child.stdout?.removeAllListeners();
+    child.stderr?.removeAllListeners();
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+    child.removeAllListeners();
+  }
+
   child.stdout!.on("data", (data: Buffer) => addLines(data, "stdout"));
   child.stderr!.on("data", (data: Buffer) => addLines(data, "stderr"));
 
   child.on("close", (code) => {
     if (run.status === "stopped") return; // already stopped via DELETE
     run.status = code === 0 ? "completed" : "failed";
-    child.stdout?.destroy();
-    child.stderr?.destroy();
+    cleanupProcess();
   });
 
   child.on("error", () => {
     run.status = "failed";
-    child.stdout?.destroy();
-    child.stderr?.destroy();
+    cleanupProcess();
   });
 
   // Hard timeout — kill the process if it runs too long
@@ -205,8 +214,15 @@ export async function POST(request: NextRequest) {
       } catch {
         // Process may have already exited
       }
-      child.stdout?.destroy();
-      child.stderr?.destroy();
+      // Escalate to SIGKILL if SIGTERM doesn't terminate within grace period
+      setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // Process may have already exited
+        }
+        cleanupProcess();
+      }, SIGKILL_GRACE_MS);
     }
   }, PROCESS_TIMEOUT_MS);
 
@@ -292,12 +308,19 @@ export async function DELETE(request: NextRequest) {
   }
 
   currentRun.status = "stopped";
+  const proc = currentRun.process;
   try {
     // Kill the process group
-    currentRun.process.kill("SIGTERM");
+    proc.kill("SIGTERM");
   } catch {
     // Process may have already exited
   }
+  // Clean up streams and listeners to prevent leaks
+  proc.stdout?.removeAllListeners();
+  proc.stderr?.removeAllListeners();
+  proc.stdout?.destroy();
+  proc.stderr?.destroy();
+  proc.removeAllListeners();
 
   const result = {
     status: "stopped" as const,

@@ -6,6 +6,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
+import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import { AGENTS } from "@/lib/agents/agent-config";
 import {
   parseHealthStatus,
@@ -52,7 +53,18 @@ export async function GET(request: NextRequest) {
   }
 
   // Load feature flags to determine enabled state
-  const flags = await dbGetFeatureFlags();
+  let flags;
+  try {
+    flags = await withTimeout(dbGetFeatureFlags(), DB_TIMEOUT_MS, "dbGetFeatureFlags");
+  } catch (err) {
+    if (err instanceof TimeoutError) {
+      return NextResponse.json(
+        { error: "Database request timeout" },
+        { status: 504 },
+      );
+    }
+    throw err;
+  }
   const flagMap = new Map(flags.map((f) => [f.key, f.enabled]));
 
   // Build agent statuses

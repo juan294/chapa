@@ -129,4 +129,22 @@ describe("PATCH /api/admin/feature-flags", () => {
     const res = await PATCH(makeRequest({ key: "test", enabled: true }));
     expect(res.status).toBe(500);
   });
+
+  it("returns 504 when Supabase call times out", async () => {
+    vi.useFakeTimers();
+
+    mockDbUpdateFeatureFlag.mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    const resPromise = PATCH(makeRequest({ key: "test", enabled: true }));
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    const res = await resPromise;
+    expect(res.status).toBe(504);
+    const body = await res.json();
+    expect(body.error).toMatch(/timeout/i);
+
+    vi.useRealTimers();
+  });
 });

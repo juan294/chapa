@@ -258,6 +258,27 @@ describe("GET /api/admin/users", () => {
     expect(body.users[0]).not.toHaveProperty("statsExpired");
   });
 
+  it("returns 504 when Supabase call times out", async () => {
+    vi.useFakeTimers();
+
+    // Mock a promise that never resolves
+    vi.mocked(dbGetAdminUsers).mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    const resPromise = GET(makeRequest());
+
+    // Advance past the 10s timeout
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    const res = await resPromise;
+    expect(res.status).toBe(504);
+    const body = await res.json();
+    expect(body.error).toMatch(/timeout/i);
+
+    vi.useRealTimers();
+  });
+
   it("accepts all valid sort fields", async () => {
     const validFields = [
       "handle", "adjustedComposite", "rawScore", "confidence",
