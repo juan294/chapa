@@ -3,7 +3,6 @@
 import { useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
-import { DIMENSION_KEYS } from "@chapa/shared";
 import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
 import { computeActivityInsights } from "./activity-insights";
 import { formatIsoDate } from "@/lib/utils/date";
@@ -40,7 +39,12 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
   breadth: "Breadth",
 };
 
-const ALL_DIMENSIONS = DIMENSION_KEYS as Dimension[];
+const HEATMAP_DIMENSIONS: Dimension[] = [
+  "delivery",
+  "quality",
+  "consistency",
+  "breadth",
+];
 
 const INTENSITY_ALPHA: Record<number, number> = {
   0: 0.12,
@@ -158,11 +162,11 @@ function enrichDays(
     const total =
       Math.max(0, weights.delivery) + Math.max(0, weights.quality) +
       Math.max(0, weights.consistency) + Math.max(0, weights.breadth);
-    for (const dim of ALL_DIMENSIONS) {
+    for (const dim of HEATMAP_DIMENSIONS) {
       weights[dim] = total > 0 ? Math.max(0, weights[dim]) / total : 0;
     }
 
-    const dominant = ALL_DIMENSIONS.reduce((a, b) =>
+    const dominant = HEATMAP_DIMENSIONS.reduce((a, b) =>
       weights[a] >= weights[b] ? a : b
     );
 
@@ -230,7 +234,7 @@ export function ActivityHeatmap({
 
       {/* Dimension legend */}
       <div className="flex flex-wrap items-center gap-4 mt-3">
-        {ALL_DIMENSIONS.map((dim) => (
+        {HEATMAP_DIMENSIONS.map((dim) => (
           <div key={dim} className="flex items-center gap-1.5">
             <div
               className="h-2 w-2 rounded-full"
@@ -324,7 +328,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
           return (
             <div
               key={`${col}-${row}`}
-              className="absolute cursor-pointer transition-transform duration-100 hover:scale-125 hover:z-10"
+              className="absolute cursor-pointer animate-hex-cell-in transition-transform duration-100 hover:scale-125 hover:z-10"
               style={{
                 left: pos.x,
                 top: pos.y,
@@ -335,7 +339,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                   ? "var(--color-purple-tint)"
                   : undefined,
                 background: emptyBg ? undefined : background,
-                animation: `hex-cell-in 0.45s ease-out ${delay}ms both`,
+                animationDelay: `${delay}ms`,
               }}
               onMouseEnter={(e) => day && handleHover(day, e)}
               onMouseLeave={handleLeave}
@@ -377,7 +381,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                   {tooltip.day.count !== 1 ? "s" : ""}
                 </p>
                 <div className="mt-1.5 flex flex-col gap-0.5">
-                  {ALL_DIMENSIONS.map((dim) => {
+                  {HEATMAP_DIMENSIONS.map((dim) => {
                     const pct = Math.round(
                       tooltip.day.dimensionWeights[dim] * 100
                     );

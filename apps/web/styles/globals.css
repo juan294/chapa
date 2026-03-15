@@ -391,6 +391,9 @@ html {
 .animate-terminal-fade-in {
   animation: terminal-fade-in 0.3s ease-out both;
 }
+.animate-hex-cell-in {
+  animation: hex-cell-in 0.45s ease-out both;
+}
 
 /* ── Background grid pattern ─────────────────────────────── */
 
