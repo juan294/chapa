@@ -312,16 +312,11 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </Link>
             )}
             {isInsightsEnabledSync() && (
-              <label
+              <button
+                type="button"
                 role="menuitem"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    insightsFileRef.current?.click();
-                  }
-                }}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06] cursor-pointer"
+                onClick={() => insightsFileRef.current?.click()}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
               >
                 <svg
                   className="h-4 w-4 text-text-secondary"
@@ -346,7 +341,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   className="sr-only"
                   aria-label="Select Claude Code insights HTML report"
                 />
-              </label>
+              </button>
             )}
             {isBitbucketEnabledSync() && bbStatus && (
               bbStatus.linked ? (
