@@ -109,6 +109,59 @@ export async function dbGetUsers(
 }
 
 // ---------------------------------------------------------------------------
+// Bulk email query
+// ---------------------------------------------------------------------------
+
+export interface UserWithEmail {
+  handle: string;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+/**
+ * Get all users who have an email AND have notifications enabled.
+ * Used for campaign audience targeting.
+ * Returns empty array when DB is unavailable.
+ */
+export async function dbGetUsersWithEmail(): Promise<UserWithEmail[]> {
+  const db = getSupabase();
+  if (!db) return [];
+
+  try {
+    const { data, error } = await db
+      .from("users")
+      .select("handle, email, display_name, avatar_url")
+      .not("email", "is", null)
+      .eq("email_notifications", true)
+      .order("registered_at", { ascending: false });
+
+    if (error) throw error;
+    if (!data) return [];
+
+    return (
+      data as {
+        handle: string;
+        email: string;
+        display_name: string | null;
+        avatar_url: string | null;
+      }[]
+    ).map((row) => ({
+      handle: row.handle,
+      email: row.email,
+      displayName: row.display_name ?? null,
+      avatarUrl: row.avatar_url ?? null,
+    }));
+  } catch (error) {
+    console.error(
+      "[db] dbGetUsersWithEmail failed:",
+      (error as Error).message,
+    );
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Email + notification preferences
 // ---------------------------------------------------------------------------
 

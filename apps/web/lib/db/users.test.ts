@@ -11,10 +11,26 @@ const mockRange = vi.fn();
 const mockEq = vi.fn();
 const mockUpdate = vi.fn();
 const mockMaybeSingle = vi.fn();
+const mockNot = vi.fn();
 
 let listResolve: { data: unknown; error: unknown };
 let singleResolve: { data: unknown; error: unknown };
 let updateResolve: { error: unknown };
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const buildOrderable = (): any => ({
+  range: (...rangeArgs: unknown[]) => {
+    mockRange(...rangeArgs);
+    return Promise.resolve(listResolve);
+  },
+  then: (
+    resolve: (v: unknown) => void,
+    reject: (e: unknown) => void,
+  ) => {
+    if (listResolve.error) reject(listResolve.error);
+    else resolve(listResolve);
+  },
+});
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 const mockFrom = vi.fn((_table: string): any => ({
@@ -30,7 +46,6 @@ const mockFrom = vi.fn((_table: string): any => ({
   },
   select: (...args: unknown[]) => {
     mockSelect(...args);
-    // List query (.select("handle, registered_at"))
     return {
       eq: (...eqArgs: unknown[]) => {
         mockEq(...eqArgs);
@@ -41,21 +56,23 @@ const mockFrom = vi.fn((_table: string): any => ({
           },
         };
       },
-      order: (...orderArgs: unknown[]) => {
-        mockOrder(...orderArgs);
+      not: (...notArgs: unknown[]) => {
+        mockNot(...notArgs);
         return {
-          range: (...rangeArgs: unknown[]) => {
-            mockRange(...rangeArgs);
-            return Promise.resolve(listResolve);
-          },
-          then: (
-            resolve: (v: unknown) => void,
-            reject: (e: unknown) => void,
-          ) => {
-            if (listResolve.error) reject(listResolve.error);
-            else resolve(listResolve);
+          eq: (...eqArgs: unknown[]) => {
+            mockEq(...eqArgs);
+            return {
+              order: (...orderArgs: unknown[]) => {
+                mockOrder(...orderArgs);
+                return buildOrderable();
+              },
+            };
           },
         };
+      },
+      order: (...orderArgs: unknown[]) => {
+        mockOrder(...orderArgs);
+        return buildOrderable();
       },
     };
   },
@@ -71,6 +88,7 @@ import {
   dbGetUsers,
   dbGetUserEmail,
   dbUpdateEmailNotifications,
+  dbGetUsersWithEmail,
 } from "./users";
 
 beforeEach(() => {
@@ -349,6 +367,59 @@ describe("dbUpdateEmailNotifications", () => {
     await expect(
       dbUpdateEmailNotifications("testuser", false),
     ).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbGetUsersWithEmail
+// ---------------------------------------------------------------------------
+
+describe("dbGetUsersWithEmail", () => {
+  it("returns users with email and notifications enabled", async () => {
+    const rows = [
+      { handle: "alice", email: "alice@example.com", display_name: "Alice", avatar_url: "https://example.com/alice.png" },
+      { handle: "bob", email: "bob@example.com", display_name: null, avatar_url: null },
+    ];
+    listResolve = { data: rows, error: null };
+
+    const result = await dbGetUsersWithEmail();
+
+    expect(result).toEqual([
+      { handle: "alice", email: "alice@example.com", displayName: "Alice", avatarUrl: "https://example.com/alice.png" },
+      { handle: "bob", email: "bob@example.com", displayName: null, avatarUrl: null },
+    ]);
+    expect(mockSelect).toHaveBeenCalledWith("handle, email, display_name, avatar_url");
+    expect(mockNot).toHaveBeenCalledWith("email", "is", null);
+    expect(mockEq).toHaveBeenCalledWith("email_notifications", true);
+    expect(mockOrder).toHaveBeenCalledWith("registered_at", { ascending: false });
+  });
+
+  it("returns empty array when DB is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    const result = await dbGetUsersWithEmail();
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array on query error", async () => {
+    listResolve = { data: null, error: new Error("query failed") };
+
+    const result = await dbGetUsersWithEmail();
+    expect(result).toEqual([]);
+  });
+
+  it("maps snake_case to camelCase correctly", async () => {
+    const rows = [
+      { handle: "alice", email: "alice@example.com", display_name: "Alice W", avatar_url: "https://a.com/a.png" },
+    ];
+    listResolve = { data: rows, error: null };
+
+    const result = await dbGetUsersWithEmail();
+
+    expect(result[0]).toHaveProperty("displayName", "Alice W");
+    expect(result[0]).toHaveProperty("avatarUrl", "https://a.com/a.png");
+    expect(result[0]).not.toHaveProperty("display_name");
+    expect(result[0]).not.toHaveProperty("avatar_url");
   });
 });
 
