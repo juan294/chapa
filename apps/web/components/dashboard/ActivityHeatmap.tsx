@@ -194,25 +194,6 @@ export function ActivityHeatmap({
       className="animate-fade-in-up"
       style={{ animationDelay: "2000ms" }}
     >
-      {/* SAFETY: CSS-only string literal with no user input */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            @keyframes hex-cell-in {
-              from { opacity: 0; transform: scale(0.3); }
-              to { opacity: 1; transform: scale(1); }
-            }
-            @media (prefers-reduced-motion: reduce) {
-              [role="img"][aria-label="Hexagonal activity heatmap"] div {
-                animation: none !important;
-                opacity: 1 !important;
-                transform: none !important;
-              }
-            }
-          `,
-        }}
-      />
-
       <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-4">
         Activity
       </h3>
@@ -343,7 +324,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
           return (
             <div
               key={`${col}-${row}`}
-              className="absolute cursor-pointer opacity-0 transition-transform duration-100 hover:scale-125 hover:z-10"
+              className="absolute cursor-pointer transition-transform duration-100 hover:scale-125 hover:z-10"
               style={{
                 left: pos.x,
                 top: pos.y,
@@ -354,7 +335,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                   ? "var(--color-purple-tint)"
                   : undefined,
                 background: emptyBg ? undefined : background,
-                animation: `hex-cell-in 0.45s ease-out ${delay}ms forwards`,
+                animation: `hex-cell-in 0.45s ease-out ${delay}ms both`,
               }}
               onMouseEnter={(e) => day && handleHover(day, e)}
               onMouseLeave={handleLeave}
