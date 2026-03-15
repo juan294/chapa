@@ -32,6 +32,7 @@ vi.mock("@/lib/db/campaigns", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
+  cacheIncr: vi.fn().mockResolvedValue(1),
 }));
 
 import { getResend } from "./resend";

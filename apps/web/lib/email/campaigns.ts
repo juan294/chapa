@@ -6,8 +6,13 @@
  */
 
 import { getResend } from "./resend";
-import { buildAnnouncementHtml, buildAnnouncementText } from "./templates/announcement";
+import {
+  buildAnnouncementHtml,
+  buildAnnouncementText,
+  type AnnouncementData,
+} from "./templates/announcement";
 import { dbGetUsersWithEmail } from "@/lib/db/users";
+import type { Campaign } from "@/lib/db/campaigns";
 import {
   dbGetCampaign,
   dbUpdateCampaign,
@@ -17,7 +22,7 @@ import {
   dbMarkSendsFailed,
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheGet, cacheIncr } from "@/lib/cache/redis";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -31,6 +36,29 @@ export const BATCH_SIZE = 50;
 
 /** Redis key prefix for daily send counter. */
 const DAILY_QUOTA_KEY = "campaign:daily-sends";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build announcement data from a campaign + per-recipient handle. */
+export function buildEmailContent(
+  campaign: Pick<
+    Campaign,
+    "headline" | "bodyText" | "features" | "ctaText" | "ctaUrl" | "previewText"
+  >,
+  handle: string,
+): AnnouncementData {
+  return {
+    handle,
+    headline: campaign.headline,
+    bodyText: campaign.bodyText,
+    features: campaign.features,
+    ctaText: campaign.ctaText,
+    ctaUrl: campaign.ctaUrl,
+    previewText: campaign.previewText ?? undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Daily quota tracking
@@ -48,8 +76,7 @@ export async function getDailyQuota(): Promise<number> {
 
 async function incrementDailyQuota(count: number): Promise<void> {
   const key = `${DAILY_QUOTA_KEY}:${todayDateString()}`;
-  const current = (await cacheGet<number>(key)) ?? 0;
-  await cacheSet(key, current + count, 86400);
+  await cacheIncr(key, count, 86400);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,67 +156,48 @@ export async function processCampaignBatch(
     return { sent: 0, failed: pending.length, remaining: 0 };
   }
 
-  // Build emails
-  const emails = pending.map((send) => ({
-    from: "Chapa <notifications@chapa.thecreativetoken.com>",
-    to: send.email,
-    subject: campaign.subject,
-    html: buildAnnouncementHtml({
-      handle: send.handle,
-      headline: campaign.headline,
-      bodyText: campaign.bodyText,
-      features: campaign.features,
-      ctaText: campaign.ctaText,
-      ctaUrl: campaign.ctaUrl,
-      previewText: campaign.previewText ?? undefined,
-    }),
-    text: buildAnnouncementText({
-      handle: send.handle,
-      headline: campaign.headline,
-      bodyText: campaign.bodyText,
-      features: campaign.features,
-      ctaText: campaign.ctaText,
-      ctaUrl: campaign.ctaUrl,
-    }),
-  }));
+  // Build emails using shared content helper
+  const emails = pending.map((send) => {
+    const content = buildEmailContent(campaign, send.handle);
+    return {
+      from: "Chapa <notifications@chapa.thecreativetoken.com>",
+      to: send.email,
+      subject: campaign.subject,
+      html: buildAnnouncementHtml(content),
+      text: buildAnnouncementText(content),
+    };
+  });
+
+  let batchSent = 0;
+  let batchFailed = 0;
+  const sendIds = pending.map((s) => s.id);
 
   try {
     const { error } = await resend.batch.send(emails);
 
     if (error) {
-      await dbMarkSendsFailed(
-        pending.map((s) => s.id),
-        error.message,
-      );
-      const stats = await dbGetCampaignStats(campaignId);
-      await dbUpdateCampaign(campaignId, {
-        sentCount: stats.sent,
-        failedCount: stats.failed,
-      });
-      return { sent: 0, failed: pending.length, remaining: stats.pending };
+      await dbMarkSendsFailed(sendIds, error.message);
+      batchFailed = pending.length;
+    } else {
+      await dbMarkSendsSent(sendIds);
+      await incrementDailyQuota(pending.length);
+      batchSent = pending.length;
     }
-
-    // Mark successful
-    await dbMarkSendsSent(pending.map((s) => s.id));
-    await incrementDailyQuota(pending.length);
-
-    // Update campaign counts
-    const stats = await dbGetCampaignStats(campaignId);
-    await dbUpdateCampaign(campaignId, {
-      sentCount: stats.sent,
-      failedCount: stats.failed,
-    });
-
-    return { sent: pending.length, failed: 0, remaining: stats.pending };
   } catch (error) {
     console.error(
       "[campaigns] processCampaignBatch error:",
       (error as Error).message,
     );
-    await dbMarkSendsFailed(
-      pending.map((s) => s.id),
-      (error as Error).message,
-    );
-    return { sent: 0, failed: pending.length, remaining: 0 };
+    await dbMarkSendsFailed(sendIds, (error as Error).message);
+    batchFailed = pending.length;
   }
+
+  // Single stats query at the end
+  const stats = await dbGetCampaignStats(campaignId);
+  await dbUpdateCampaign(campaignId, {
+    sentCount: stats.sent,
+    failedCount: stats.failed,
+  });
+
+  return { sent: batchSent, failed: batchFailed, remaining: stats.pending };
 }

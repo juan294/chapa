@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { safeEqual } from "@/lib/crypto/safe-equal";
 import { dbGetCampaigns } from "@/lib/db/campaigns";
 import { processCampaignBatch } from "@/lib/email/campaigns";
 
 export const maxDuration = 300;
-
-function safeEqual(a: string, b: string): boolean {
-  try {
-    const bufA = Buffer.from(a, "utf-8");
-    const bufB = Buffer.from(b, "utf-8");
-    if (bufA.length !== bufB.length) return false;
-    return timingSafeEqual(bufA, bufB);
-  } catch {
-    return false;
-  }
-}
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { safeEqual } from "@/lib/crypto/safe-equal";
 import { dbGetUsersWithEmail } from "@/lib/db/users";
 import { getResend } from "@/lib/email/resend";
 import {
@@ -7,39 +7,11 @@ import {
   addContact,
   markUnsubscribed,
 } from "@/lib/email/audience";
+import { processInBatches } from "@/lib/async/process-in-batches";
 
 export const maxDuration = 300;
 
 const BATCH_SIZE = 5;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function safeEqual(a: string, b: string): boolean {
-  try {
-    const bufA = Buffer.from(a, "utf-8");
-    const bufB = Buffer.from(b, "utf-8");
-    if (bufA.length !== bufB.length) return false;
-    return timingSafeEqual(bufA, bufB);
-  } catch {
-    return false;
-  }
-}
-
-async function processInBatches<T>(
-  items: T[],
-  batchSize: number,
-  fn: (item: T) => Promise<unknown>,
-): Promise<PromiseSettledResult<unknown>[]> {
-  const results: PromiseSettledResult<unknown>[] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.allSettled(batch.map(fn));
-    results.push(...batchResults);
-  }
-  return results;
-}
 
 interface Contact {
   id: string;

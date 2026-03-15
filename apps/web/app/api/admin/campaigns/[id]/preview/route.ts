@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { buildAnnouncementHtml } from "@/lib/email/templates/announcement";
+import { buildEmailContent } from "@/lib/email/campaigns";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -42,15 +43,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const html = buildAnnouncementHtml({
-    handle: "your-handle",
-    headline: campaign.headline,
-    bodyText: campaign.bodyText,
-    features: campaign.features,
-    ctaText: campaign.ctaText,
-    ctaUrl: campaign.ctaUrl,
-    previewText: campaign.previewText ?? undefined,
-  });
+  const html = buildAnnouncementHtml(buildEmailContent(campaign, "your-handle"));
 
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },

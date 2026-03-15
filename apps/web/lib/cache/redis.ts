@@ -265,6 +265,36 @@ export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
 }
 
 // ---------------------------------------------------------------------------
+// Atomic increment (used for daily campaign send quota)
+// ---------------------------------------------------------------------------
+
+/**
+ * Atomically increment a Redis counter by `amount`.
+ * Sets TTL on the key if it's new (first increment returns `amount`).
+ * Returns the new counter value, or 0 if Redis is unavailable (fail-open).
+ */
+export async function cacheIncr(
+  key: string,
+  amount: number = 1,
+  ttlSeconds?: number,
+): Promise<number> {
+  const redis = getRedis();
+  if (!redis) return 0;
+
+  try {
+    const newVal = await redis.incrby(key, amount);
+    // Set expiry only when the key was just created (value equals amount)
+    if (ttlSeconds && newVal === amount) {
+      await redis.expire(key, ttlSeconds);
+    }
+    return newVal;
+  } catch (error) {
+    console.error("[cache] cacheIncr failed:", (error as Error).message);
+    return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Test helper — reset the cached client (only used by tests)
 // ---------------------------------------------------------------------------
 

@@ -143,13 +143,8 @@ export function CampaignsDashboard() {
       }
       const data = await res.json();
       setSendResult(data.message);
-      fetchCampaigns();
-      // Refresh selected campaign
-      const updated = await fetch(`/api/admin/campaigns/${campaignId}`);
-      if (updated.ok) {
-        const d = await updated.json();
-        setSelectedCampaign(d.campaign);
-      }
+      // Refresh list — the updated campaign will be in the response
+      await fetchCampaigns();
     } catch (err) {
       setError((err as Error).message);
     } finally {
