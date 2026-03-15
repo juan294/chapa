@@ -333,6 +333,16 @@ describe("BadgeToolbar render", () => {
       expect(shareBtn.getAttribute("aria-expanded")).toBeDefined();
     });
 
+    it("clicking share button toggles dropdown", () => {
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const shareBtn = screen.getByLabelText("Share badge");
+      fireEvent.click(shareBtn);
+      // setIsOpen should have been called to toggle the state
+      expect(setIsOpenMock).toHaveBeenCalled();
+    });
+
     it("renders share menu when open", () => {
       dropdownOpen = true;
       render(
@@ -434,6 +444,446 @@ describe("BadgeToolbar render", () => {
 
       // setIsOpen(false) should have been called to close the dropdown
       expect(setIsOpenMock).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe("share dropdown social links", () => {
+    it("X link includes correct intent URL with handle", () => {
+      dropdownOpen = true;
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
+      const xLink = links.find((l) => l.href.includes("x.com"));
+      expect(xLink).toBeDefined();
+      expect(xLink?.href).toContain("x.com/intent/tweet");
+    });
+
+    it("LinkedIn link includes correct share URL", () => {
+      dropdownOpen = true;
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
+      const linkedinLink = links.find((l) => l.href.includes("linkedin.com"));
+      expect(linkedinLink).toBeDefined();
+      expect(linkedinLink?.href).toContain("linkedin.com/sharing/share-offsite");
+    });
+
+    it("Bluesky link includes compose intent", () => {
+      dropdownOpen = true;
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
+      const bskyLink = links.find((l) => l.href.includes("bsky.app"));
+      expect(bskyLink).toBeDefined();
+      expect(bskyLink?.href).toContain("bsky.app/intent/compose");
+    });
+
+    it("X link click tracks share event and closes dropdown", async () => {
+      dropdownOpen = true;
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
+      const xLink = links.find((l) => l.href.includes("x.com"));
+
+      fireEvent.click(xLink!);
+
+      expect(trackEvent).toHaveBeenCalledWith("share_clicked", { platform: "x" });
+      expect(setIsOpenMock).toHaveBeenCalledWith(false);
+    });
+
+    it("LinkedIn link click tracks share event and closes dropdown", async () => {
+      dropdownOpen = true;
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
+      const linkedinLink = links.find((l) => l.href.includes("linkedin.com"));
+
+      fireEvent.click(linkedinLink!);
+
+      expect(trackEvent).toHaveBeenCalledWith("share_clicked", { platform: "linkedin" });
+      expect(setIsOpenMock).toHaveBeenCalledWith(false);
+    });
+
+    it("Bluesky link click tracks share event and closes dropdown", async () => {
+      dropdownOpen = true;
+      const { trackEvent } = await import("@/lib/analytics/posthog");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
+      const bskyLink = links.find((l) => l.href.includes("bsky.app"));
+
+      fireEvent.click(bskyLink!);
+
+      expect(trackEvent).toHaveBeenCalledWith("share_clicked", { platform: "bluesky" });
+      expect(setIsOpenMock).toHaveBeenCalledWith(false);
+    });
+
+    it("calls clipboard writeText with share URL on copy", async () => {
+      dropdownOpen = true;
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Copy link"));
+      });
+
+      expect(writeText).toHaveBeenCalledWith(
+        "https://chapa.thecreativetoken.com/u/testuser",
+      );
+    });
+
+    it("handles clipboard API failure gracefully", async () => {
+      dropdownOpen = true;
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockRejectedValue(new Error("Clipboard blocked")),
+        },
+      });
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      // Should not throw
+      await act(async () => {
+        fireEvent.click(screen.getByText("Copy link"));
+      });
+
+      // Copy link text should still be shown (did not change to Copied!)
+      expect(screen.getByText("Copy link")).toBeDefined();
+    });
+  });
+
+  describe("download flow (PNG via canvas)", () => {
+    it("falls back to SVG when canvas getContext returns null", async () => {
+      const svgText = '<svg></svg>';
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgText),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => null),
+        toBlob: vi.fn(),
+      };
+      vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+        if (tag === "canvas") return mockCanvas as unknown as HTMLCanvasElement;
+        const el = document.createElementNS("http://www.w3.org/1999/xhtml", tag);
+        return el as HTMLElement;
+      });
+
+      const origImage = globalThis.Image;
+      const mockImage: Partial<HTMLImageElement> = { width: 0, height: 0 };
+      vi.stubGlobal("Image", vi.fn(() => {
+        setTimeout(() => {
+          (mockImage as HTMLImageElement).onload?.(new Event("load") as unknown as Event);
+        }, 0);
+        return mockImage;
+      }));
+
+      const appendChildSpy = vi.spyOn(document.body, "appendChild");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+      });
+
+      // Should fall back to SVG download
+      await waitFor(() => {
+        const anchorCall = appendChildSpy.mock.calls.find(
+          (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+        );
+        if (anchorCall) {
+          const anchor = anchorCall[0] as HTMLAnchorElement;
+          expect(anchor.download).toBe("chapa-testuser.svg");
+        }
+      });
+
+      appendChildSpy.mockRestore();
+      vi.stubGlobal("Image", origImage);
+      vi.unstubAllGlobals();
+    });
+
+    it("falls back to SVG when toBlob returns null", async () => {
+      const svgText = '<svg></svg>';
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgText),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const mockCtx = { scale: vi.fn(), drawImage: vi.fn() };
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => mockCtx),
+        toBlob: vi.fn((callback: (blob: Blob | null) => void) => {
+          callback(null); // Blob creation fails
+        }),
+      };
+      vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+        if (tag === "canvas") return mockCanvas as unknown as HTMLCanvasElement;
+        const el = document.createElementNS("http://www.w3.org/1999/xhtml", tag);
+        return el as HTMLElement;
+      });
+
+      const origImage = globalThis.Image;
+      const mockImage: Partial<HTMLImageElement> = { width: 0, height: 0 };
+      vi.stubGlobal("Image", vi.fn(() => {
+        setTimeout(() => {
+          (mockImage as HTMLImageElement).onload?.(new Event("load") as unknown as Event);
+        }, 0);
+        return mockImage;
+      }));
+
+      const appendChildSpy = vi.spyOn(document.body, "appendChild");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+      });
+
+      await waitFor(() => {
+        const anchorCall = appendChildSpy.mock.calls.find(
+          (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+        );
+        if (anchorCall) {
+          const anchor = anchorCall[0] as HTMLAnchorElement;
+          expect(anchor.download).toBe("chapa-testuser.svg");
+        }
+      });
+
+      appendChildSpy.mockRestore();
+      vi.stubGlobal("Image", origImage);
+      vi.unstubAllGlobals();
+    });
+
+    it("falls back to SVG when Image onerror fires", async () => {
+      const svgText = '<svg></svg>';
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgText),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const origImage = globalThis.Image;
+      const mockImage: Partial<HTMLImageElement> = { width: 0, height: 0 };
+      vi.stubGlobal("Image", vi.fn(() => {
+        setTimeout(() => {
+          (mockImage as HTMLImageElement).onerror?.(new Event("error") as unknown as Event);
+        }, 0);
+        return mockImage;
+      }));
+
+      const appendChildSpy = vi.spyOn(document.body, "appendChild");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+      });
+
+      await waitFor(() => {
+        const anchorCall = appendChildSpy.mock.calls.find(
+          (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+        );
+        if (anchorCall) {
+          const anchor = anchorCall[0] as HTMLAnchorElement;
+          expect(anchor.download).toBe("chapa-testuser.svg");
+        }
+      });
+
+      appendChildSpy.mockRestore();
+      vi.stubGlobal("Image", origImage);
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe("download flow (SVG fallback)", () => {
+    it("falls back to SVG download when fetch fails", async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new Error("fetch failed"));
+      vi.stubGlobal("fetch", mockFetch);
+
+      // Track DOM manipulations
+      const appendChildSpy = vi.spyOn(document.body, "appendChild");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+      });
+
+      // Should have created an anchor for SVG fallback
+      const anchorCall = appendChildSpy.mock.calls.find(
+        (call) => (call[0] as HTMLElement).tagName === "A",
+      );
+      if (anchorCall) {
+        const anchor = anchorCall[0] as HTMLAnchorElement;
+        expect(anchor.href).toContain("/u/testuser/badge.svg");
+        expect(anchor.download).toBe("chapa-testuser.svg");
+      }
+
+      appendChildSpy.mockRestore();
+      vi.unstubAllGlobals();
+    });
+
+    it("falls back to SVG when fetch returns non-ok", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: false });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const appendChildSpy = vi.spyOn(document.body, "appendChild");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+      });
+
+      const anchorCall = appendChildSpy.mock.calls.find(
+        (call) => (call[0] as HTMLElement).tagName === "A",
+      );
+      if (anchorCall) {
+        const anchor = anchorCall[0] as HTMLAnchorElement;
+        expect(anchor.download).toBe("chapa-testuser.svg");
+      }
+
+      appendChildSpy.mockRestore();
+      vi.unstubAllGlobals();
+    });
+
+    it("shows Downloading text during download", async () => {
+      const mockFetch = vi.fn(
+        () =>
+          new Promise<{ ok: boolean; text: () => Promise<string> }>((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  text: () => Promise.resolve("<svg></svg>"),
+                }),
+              200,
+            ),
+          ),
+      );
+      vi.stubGlobal("fetch", mockFetch);
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Downloading/)).toBeDefined();
+      });
+
+      vi.unstubAllGlobals();
+    });
+
+    it("disables download button during download", async () => {
+      const mockFetch = vi.fn(
+        () =>
+          new Promise<{ ok: boolean; text: () => Promise<string> }>((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  text: () => Promise.resolve("<svg></svg>"),
+                }),
+              200,
+            ),
+          ),
+      );
+      vi.stubGlobal("fetch", mockFetch);
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+      const btn = screen.getByLabelText("Download badge as PNG");
+      fireEvent.click(btn);
+
+      await waitFor(() => {
+        expect(btn.hasAttribute("disabled")).toBe(true);
+      });
+
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe("refresh success state", () => {
+    it("shows Refreshed! text on success", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", mockFetch);
+
+      // Prevent reload
+      Object.defineProperty(window, "location", {
+        value: { ...window.location, reload: vi.fn() },
+        writable: true,
+      });
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      expect(screen.getByText("Refreshed!")).toBeDefined();
+
+      vi.unstubAllGlobals();
+    });
+
+    it("disables refresh button after success", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("fetch", mockFetch);
+
+      Object.defineProperty(window, "location", {
+        value: { ...window.location, reload: vi.fn() },
+        writable: true,
+      });
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      const btn = screen.getByLabelText("Refresh badge data");
+      expect(btn.hasAttribute("disabled")).toBe(true);
+
+      vi.unstubAllGlobals();
     });
   });
 

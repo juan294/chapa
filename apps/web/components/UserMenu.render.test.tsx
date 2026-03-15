@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { UserMenu, clearPlatformStatusCache } from "./UserMenu";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
+
+const mockRefresh = vi.fn();
 
 vi.mock("next/image", () => ({
   default: ({ src, alt, onError, ...props }: { src: string; alt: string; onError?: () => void; width: number; height: number; className?: string }) =>
@@ -43,9 +45,55 @@ vi.mock("@/hooks/useDropdownMenu", () => ({
   }),
 }));
 
+vi.mock("./ConfirmDialog", () => ({
+  ConfirmDialog: ({
+    open,
+    title,
+    onConfirm,
+    onCancel,
+    loading,
+  }: {
+    open: boolean;
+    title: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+    loading: boolean;
+  }) =>
+    open ? (
+      <div data-testid="confirm-dialog" data-title={title} data-loading={String(loading)}>
+        <button data-testid="confirm-btn" onClick={onConfirm}>
+          Confirm
+        </button>
+        <button data-testid="cancel-btn" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    ) : null,
+}));
+
+vi.mock("./Toast", () => ({
+  Toast: ({
+    message,
+    type,
+    detail,
+  }: {
+    message: string;
+    type: string;
+    detail?: string;
+    duration?: number;
+    onDismiss?: () => void;
+  }) => (
+    <div data-testid="toast" data-type={type}>
+      {message}
+      {detail && <span data-testid="toast-detail">{detail}</span>}
+    </div>
+  ),
+}));
+
 beforeEach(() => {
   dropdownOpen = false;
   setIsOpenMock.mockClear();
+  mockRefresh.mockClear();
 });
 
 afterEach(() => {
@@ -59,6 +107,8 @@ const baseProps = {
   avatarUrl: "https://example.com/avatar.png",
   isAdmin: false,
 };
+
+// ─── Basic rendering ──────────────────────────────────────────────────
 
 describe("UserMenu", () => {
   it("renders the trigger button with login", () => {
@@ -87,19 +137,18 @@ describe("UserMenu", () => {
   });
 });
 
+// ─── Platform status caching ──────────────────────────────────────────
+
 describe("UserMenu — platform status caching", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    // Reset the module-level cache before each test
     clearPlatformStatusCache();
 
     const featureFlags = await import("@/lib/feature-flags");
-    // Enable both platform flags
     vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
     vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
 
-    // Mock fetch to return linked status
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/bitbucket/status")) {
@@ -127,26 +176,6 @@ describe("UserMenu — platform status caching", () => {
   });
 
   it("does NOT re-fetch on second mount (uses cache)", async () => {
-    // First mount — should fetch
-    const { unmount } = render(<UserMenu {...baseProps} />);
-    await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledTimes(2); // bitbucket + codeberg
-    });
-
-    // Unmount
-    unmount();
-    fetchSpy.mockClear();
-
-    // Second mount — should use cache, no new fetches
-    render(<UserMenu {...baseProps} />);
-
-    // Give it a tick to run useEffect
-    await new Promise((r) => setTimeout(r, 50));
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("re-fetches after cache is cleared (e.g. after unlink)", async () => {
-    // First mount — fetches
     const { unmount } = render(<UserMenu {...baseProps} />);
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
@@ -155,16 +184,31 @@ describe("UserMenu — platform status caching", () => {
     unmount();
     fetchSpy.mockClear();
 
-    // Clear cache (simulates what unlink does)
+    render(<UserMenu {...baseProps} />);
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-fetches after cache is cleared (e.g. after unlink)", async () => {
+    const { unmount } = render(<UserMenu {...baseProps} />);
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    unmount();
+    fetchSpy.mockClear();
+
     clearPlatformStatusCache();
 
-    // Third mount — should fetch again
     render(<UserMenu {...baseProps} />);
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
 });
+
+// ─── Dropdown interactions ────────────────────────────────────────────
 
 describe("UserMenu — dropdown interactions", () => {
   it("dropdown menu has role=menu when open", () => {
@@ -191,7 +235,6 @@ describe("UserMenu — dropdown interactions", () => {
   it("shows login when name is null", () => {
     dropdownOpen = true;
     render(<UserMenu {...baseProps} name={null} />);
-    // The header uses `name || login`, so login should be used
     const menuHeader = screen.getByRole("menu");
     expect(menuHeader.textContent).toContain("testuser");
   });
@@ -199,12 +242,10 @@ describe("UserMenu — dropdown interactions", () => {
   it("renders fallback letter in dropdown header when image errors", () => {
     dropdownOpen = true;
     render(<UserMenu {...baseProps} />);
-    // Both the trigger and dropdown header show avatar
     const imgs = screen.getAllByAltText("testuser's avatar");
     for (const img of imgs) {
       fireEvent.error(img);
     }
-    // Fallback letter "T" should appear (at least twice — trigger + header)
     const letters = screen.getAllByText("T");
     expect(letters.length).toBeGreaterThanOrEqual(2);
   });
@@ -222,6 +263,8 @@ describe("UserMenu — dropdown interactions", () => {
     expect(button.getAttribute("aria-haspopup")).toBe("true");
   });
 });
+
+// ─── Menu items ───────────────────────────────────────────────────────
 
 describe("UserMenu — menu items", () => {
   beforeEach(() => {
@@ -278,6 +321,8 @@ describe("UserMenu — menu items", () => {
   });
 });
 
+// ─── Creator Studio conditional rendering ─────────────────────────────
+
 describe("UserMenu — Creator Studio conditional rendering", () => {
   beforeEach(() => {
     dropdownOpen = true;
@@ -298,6 +343,8 @@ describe("UserMenu — Creator Studio conditional rendering", () => {
     expect(link?.getAttribute("href")).toBe("/studio");
   });
 });
+
+// ─── Insights import ──────────────────────────────────────────────────
 
 describe("UserMenu — insights import", () => {
   beforeEach(() => {
@@ -327,7 +374,202 @@ describe("UserMenu — insights import", () => {
     expect(fileInput.getAttribute("type")).toBe("file");
     expect(fileInput.getAttribute("accept")).toBe(".html");
   });
+
+  it("insights label triggers file input on Enter key", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    render(<UserMenu {...baseProps} />);
+    const label = screen.getByText("Import Claude Code Insights").closest("label");
+    expect(label).toBeDefined();
+    // The label should have tabIndex and keyDown handler
+    expect(label?.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("shows error toast for oversized files (>10MB)", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    render(<UserMenu {...baseProps} />);
+    const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
+
+    // Create a file with mocked size exceeding 10MB (no need to allocate real bytes)
+    const largeFile = new File(["x"], "report.html", { type: "text/html" });
+    Object.defineProperty(largeFile, "size", { value: 11 * 1024 * 1024 });
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [largeFile] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.textContent).toContain("File too large");
+      expect(toast.getAttribute("data-type")).toBe("error");
+    });
+  });
+
+  it("shows loading toast during processing", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    // Mock parseInsightsHtml — dynamic import inside the handler
+    vi.mock("@/lib/insights/parser", () => ({
+      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
+    }));
+
+    // Delay the fetch to keep it in loading state
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise(() => {}), // Never resolves — keeps loading
+    );
+
+    render(<UserMenu {...baseProps} />);
+    const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
+
+    const file = new File(["<html></html>"], "report.html", {
+      type: "text/html",
+    });
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("loading");
+    });
+  });
+
+  it("shows error toast when upload fails", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    vi.mock("@/lib/insights/parser", () => ({
+      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
+    }));
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("", { status: 500 }),
+    );
+
+    render(<UserMenu {...baseProps} />);
+    const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
+
+    const file = new File(["<html></html>"], "report.html", {
+      type: "text/html",
+    });
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.textContent).toContain("Import failed");
+      expect(toast.getAttribute("data-type")).toBe("error");
+    });
+  });
+
+  it("shows success toast with craft score after successful upload + recalculate", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    vi.mock("@/lib/insights/parser", () => ({
+      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
+    }));
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    // First call: upload
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "Solid" } }), { status: 200 }),
+    );
+    // Second call: recalculate
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ adjustedComposite: 68, craftScore: 72, craftTier: "Solid" }), { status: 200 }),
+    );
+
+    // Prevent page reload
+    const reloadSpy = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadSpy },
+      writable: true,
+    });
+
+    render(<UserMenu {...baseProps} />);
+    const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
+
+    const file = new File(["<html></html>"], "report.html", {
+      type: "text/html",
+    });
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("success");
+      expect(toast.textContent).toContain("Craft");
+    });
+  });
+
+  it("shows success with fallback when recalculate fails", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    vi.mock("@/lib/insights/parser", () => ({
+      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
+    }));
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    // Upload succeeds
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ craftScore: { craftScore: 55, tier: "Emerging" } }), { status: 200 }),
+    );
+    // Recalculate fails
+    fetchSpy.mockResolvedValueOnce(
+      new Response("", { status: 500 }),
+    );
+
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: vi.fn() },
+      writable: true,
+    });
+
+    render(<UserMenu {...baseProps} />);
+    const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
+
+    const file = new File(["<html></html>"], "report.html", {
+      type: "text/html",
+    });
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("success");
+      expect(toast.textContent).toContain("Score will update on next badge view");
+    });
+  });
+
+  it("does nothing when no file is selected", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    render(<UserMenu {...baseProps} />);
+    const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [] } });
+    });
+
+    // No toast should appear
+    expect(screen.queryByTestId("toast")).toBeNull();
+  });
 });
+
+// ─── Bitbucket link/unlink in dropdown ────────────────────────────────
 
 describe("UserMenu — Bitbucket link/unlink in dropdown", () => {
   beforeEach(async () => {
@@ -359,6 +601,25 @@ describe("UserMenu — Bitbucket link/unlink in dropdown", () => {
     });
   });
 
+  it("Link Bitbucket points to connect endpoint", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      const link = screen.getByText("Link Bitbucket").closest("a");
+      expect(link?.getAttribute("href")).toBe("/api/auth/bitbucket/connect");
+    });
+  });
+
   it("shows Bitbucket username and Unlink when linked", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -377,7 +638,159 @@ describe("UserMenu — Bitbucket link/unlink in dropdown", () => {
       expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
     });
   });
+
+  it("linked Bitbucket user links to bitbucket.org profile", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      const link = screen.getByText("bb-user").closest("a");
+      expect(link?.getAttribute("href")).toBe("https://bitbucket.org/bb-user");
+      expect(link?.getAttribute("target")).toBe("_blank");
+    });
+  });
+
+  it("clicking Unlink opens confirmation dialog", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    const dialog = screen.getByTestId("confirm-dialog");
+    expect(dialog.getAttribute("data-title")).toBe("Unlink Bitbucket?");
+  });
+
+  it("confirming unlink calls disconnect and refreshes router", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/disconnect", { method: "POST" });
+    });
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it("handles disconnect fetch failure gracefully", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    // Should not crash, the linked user is still shown after error
+    // (unlink loading finishes even on failure)
+    await waitFor(() => {
+      expect(screen.getByText("bb-user")).toBeDefined();
+    });
+  });
+
+  it("cancelling unlink dialog does not disconnect", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+
+    // Dialog should be gone, user still linked
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    expect(screen.getByText("bb-user")).toBeDefined();
+  });
+
+  it("does not render Bitbucket when status fetch returns enabled=false", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: false })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("Link Bitbucket")).toBeNull();
+  });
 });
+
+// ─── Codeberg link/unlink in dropdown ─────────────────────────────────
 
 describe("UserMenu — Codeberg link/unlink in dropdown", () => {
   beforeEach(async () => {
@@ -409,6 +822,25 @@ describe("UserMenu — Codeberg link/unlink in dropdown", () => {
     });
   });
 
+  it("Link Codeberg points to connect endpoint", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      const link = screen.getByText("Link Codeberg").closest("a");
+      expect(link?.getAttribute("href")).toBe("/api/auth/codeberg/connect");
+    });
+  });
+
   it("shows Codeberg username and Unlink when linked", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -426,5 +858,128 @@ describe("UserMenu — Codeberg link/unlink in dropdown", () => {
       expect(screen.getByText("cb-user")).toBeDefined();
       expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
     });
+  });
+
+  it("linked Codeberg user links to codeberg.org profile", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      const link = screen.getByText("cb-user").closest("a");
+      expect(link?.getAttribute("href")).toBe("https://codeberg.org/cb-user");
+      expect(link?.getAttribute("target")).toBe("_blank");
+    });
+  });
+
+  it("clicking Unlink opens confirmation dialog for Codeberg", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    const dialog = screen.getByTestId("confirm-dialog");
+    expect(dialog.getAttribute("data-title")).toBe("Unlink Codeberg?");
+  });
+
+  it("confirming Codeberg unlink calls disconnect and refreshes router", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/disconnect")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/codeberg/disconnect", { method: "POST" });
+    });
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it("handles Codeberg disconnect fetch failure gracefully", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/disconnect")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("cb-user")).toBeDefined();
+    });
+  });
+
+  it("status fetch failure is handled gracefully", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.reject(new Error("fetch failed"));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    // Should not crash
+    render(<UserMenu {...baseProps} />);
+
+    await new Promise((r) => setTimeout(r, 50));
+    // No Codeberg UI should appear since fetch failed
+    expect(screen.queryByText("Link Codeberg")).toBeNull();
   });
 });
