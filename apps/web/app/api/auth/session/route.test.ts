@@ -4,13 +4,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockReadSessionCookie, mockRateLimit } = vi.hoisted(() => ({
+const { mockReadSessionCookie, mockRateLimit, mockIsAdminHandle } = vi.hoisted(() => ({
   mockReadSessionCookie: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockIsAdminHandle: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/github", () => ({
   readSessionCookie: mockReadSessionCookie,
+}));
+
+vi.mock("@/lib/auth/admin", () => ({
+  isAdminHandle: mockIsAdminHandle,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -48,6 +53,7 @@ describe("GET /api/auth/session", () => {
     vi.clearAllMocks();
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret-key");
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
+    mockIsAdminHandle.mockReturnValue(false);
   });
 
   it("returns { user: null } when no session cookie is present", async () => {
@@ -78,6 +84,7 @@ describe("GET /api/auth/session", () => {
       login: "octocat",
       name: "The Octocat",
       avatar_url: "https://avatars.githubusercontent.com/u/583231",
+      isAdmin: false,
     });
   });
 
@@ -153,6 +160,7 @@ describe("GET /api/auth/session", () => {
       login: "anonymous-dev",
       name: null,
       avatar_url: "https://avatars.githubusercontent.com/u/1",
+      isAdmin: false,
     });
   });
 

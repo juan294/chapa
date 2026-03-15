@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
       login: session.login,
       name: session.name,
       avatar_url: session.avatar_url,
+      isAdmin: isAdminHandle(session.login),
     },
   });
   res.headers.set("Cache-Control", "no-store, private");

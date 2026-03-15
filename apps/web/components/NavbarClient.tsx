@@ -18,6 +18,7 @@ interface SessionUser {
   login: string;
   name: string | null;
   avatar_url: string;
+  isAdmin?: boolean;
 }
 
 export function NavbarClient() {
@@ -54,6 +55,7 @@ export function NavbarClient() {
               login={session.login}
               name={session.name}
               avatarUrl={session.avatar_url}
+              isAdmin={session.isAdmin}
             />
           ) : (
             <a
