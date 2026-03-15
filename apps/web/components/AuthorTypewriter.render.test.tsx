@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { AuthorTypewriter } from "./AuthorTypewriter";
 
 let matchMediaResult = true; // true = reduced motion (skip animation)
@@ -130,22 +130,32 @@ describe("AuthorTypewriter", () => {
       });
     });
 
-    it("starts erasing home text after HOME_HOLD (30s)", () => {
+    it("starts erasing home text after HOME_HOLD (30s)", async () => {
       matchMediaResult = false;
-      render(<AuthorTypewriter />);
+      const { container } = render(<AuthorTypewriter />);
 
       // Still HOME_TEXT at start
       expect(screen.getByText("</> JG")).toBeDefined();
 
-      // Advance past HOME_HOLD (30000ms) + some erase time
-      // Each character erased takes CHAR_DELAY (80ms), "</> JG" is 5 chars = 400ms
-      act(() => {
-        vi.advanceTimersByTime(30_000 + 400 + 100);
+      // The cycle uses chained awaits with setTimeout-backed promises.
+      // Each `await wait(ms)` creates a new setTimeout. With fake timers,
+      // we need to advance + flush microtasks for each step.
+      // HOME_HOLD (30000ms) -> eraseText loop (80ms per char, 5 chars)
+      await act(async () => {
+        vi.advanceTimersByTime(30_000);
       });
 
-      // After erasing, the text ref should have less than the full HOME_TEXT
-      // (or empty if fully erased). We just verify no crash and text changed.
-      // The textRef.textContent is set imperatively, so we check the span directly.
+      // Advance through erase steps — each one is a separate setTimeout
+      for (let i = 0; i < 4; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(80);
+        });
+      }
+
+      // After erasing several chars, the text should be shorter than full HOME_TEXT.
+      const textSpan = container.querySelector("button span span");
+      expect(textSpan).not.toBeNull();
+      expect(textSpan!.textContent!.length).toBeLessThan("</> JG".length);
     });
   });
 
@@ -176,22 +186,22 @@ describe("AuthorTypewriter", () => {
   });
 
   describe("click/keydown propagation", () => {
-    it("stops click propagation on wrapper", () => {
+    it("stops click propagation on wrapper via React synthetic events", () => {
       const outerHandler = vi.fn();
-      const { container } = render(
+      render(
         <div onClick={outerHandler}>
           <AuthorTypewriter />
         </div>,
       );
 
-      const wrapper = container.querySelector("[role='presentation']")!;
-      wrapper.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      // Use fireEvent.click which dispatches through React's synthetic event system
+      // where stopPropagation works as expected.
+      const wrapper = screen.getByRole("presentation");
+      fireEvent.click(wrapper);
 
       // The wrapper's onClick calls e.stopPropagation(), so outerHandler should
-      // NOT be called. Note: fireEvent.click in RTL creates a new event that
-      // goes through React's synthetic event system. For imperative dispatch,
-      // the native stopPropagation is checked differently. We verify the
-      // source code has stopPropagation via the source-reading test instead.
+      // NOT be called because the event doesn't bubble past the wrapper.
+      expect(outerHandler).not.toHaveBeenCalled();
     });
   });
 });

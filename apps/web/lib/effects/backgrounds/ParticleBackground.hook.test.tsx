@@ -80,6 +80,12 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  // Clear call counts on module-scoped mockCtx fns (not spies, so restoreAllMocks doesn't reset them)
+  for (const val of Object.values(mockCtx)) {
+    if (typeof val === "function" && "mockClear" in val) {
+      (val as ReturnType<typeof vi.fn>).mockClear();
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -140,10 +146,6 @@ describe("useParticles hook", () => {
 
   it("renders static frame when prefers-reduced-motion is true", () => {
     reducedMotionResult = true;
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation(mockMatchMedia),
-    });
 
     render(<TestHarness config={PARTICLE_PRESETS.dots} />);
 
@@ -179,11 +181,6 @@ describe("useParticles hook", () => {
 
   it("does nothing when getContext returns null", () => {
     getContextSpy.mockReturnValue(null);
-    // Clear any calls from prior tests
-    mockCtx.clearRect.mockClear();
-    mockCtx.beginPath.mockClear();
-    mockCtx.arc.mockClear();
-    mockCtx.fill.mockClear();
 
     render(<TestHarness config={PARTICLE_PRESETS.dots} />);
     // Should not crash — the effect returns early
