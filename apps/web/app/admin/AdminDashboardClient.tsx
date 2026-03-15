@@ -17,6 +17,10 @@ const EngagementDashboard = dynamic(
   () => import("./engagement/engagement-dashboard").then((m) => ({ default: m.EngagementDashboard })),
   { ssr: false, loading: () => <div className="animate-pulse p-8">Loading engagement...</div> },
 );
+const CampaignsDashboard = dynamic(
+  () => import("./campaigns/campaigns-dashboard").then((m) => ({ default: m.CampaignsDashboard })),
+  { ssr: false, loading: () => <div className="animate-pulse p-8">Loading campaigns...</div> },
+);
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -90,6 +94,16 @@ export function AdminDashboardClient() {
       >
         Engagement
       </button>
+      <button
+        id="tab-campaigns"
+        role="tab"
+        aria-selected={activeTab === "campaigns"}
+        aria-controls="tabpanel-campaigns"
+        className={tabClasses("campaigns")}
+        onClick={() => setActiveTab("campaigns")}
+      >
+        Campaigns
+      </button>
     </div>
   );
 
@@ -157,6 +171,10 @@ export function AdminDashboardClient() {
       ) : activeTab === "engagement" ? (
         <div role="tabpanel" id="tabpanel-engagement" aria-labelledby="tab-engagement">
           <EngagementDashboard />
+        </div>
+      ) : activeTab === "campaigns" ? (
+        <div role="tabpanel" id="tabpanel-campaigns" aria-labelledby="tab-campaigns">
+          <CampaignsDashboard />
         </div>
       ) : (
         <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users" className="space-y-6">
