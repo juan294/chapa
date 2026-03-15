@@ -7,6 +7,7 @@ import {
   dbGetAdminUsers,
   type AdminSortField,
 } from "@/lib/db/admin-users";
+import { withTimeout, TimeoutError, DB_TIMEOUT_MS } from "@/lib/async/with-timeout";
 
 const VALID_SORT_FIELDS: AdminSortField[] = [
   "handle",
@@ -85,15 +86,22 @@ export async function GET(request: NextRequest) {
   }
 
   // Single Supabase call replaces: dbGetUsers + cacheMGet + computeImpactV4 + EMA
-  const result = await dbGetAdminUsers({
-    page,
-    limit,
-    sort,
-    dir,
-    search,
-    tier,
-    archetype,
-  });
+  let result;
+  try {
+    result = await withTimeout(
+      dbGetAdminUsers({ page, limit, sort, dir, search, tier, archetype }),
+      DB_TIMEOUT_MS,
+      "dbGetAdminUsers",
+    );
+  } catch (err) {
+    if (err instanceof TimeoutError) {
+      return NextResponse.json(
+        { error: "Database request timeout" },
+        { status: 504 },
+      );
+    }
+    throw err;
+  }
 
   return NextResponse.json(result, {
     headers: { "Cache-Control": "no-store" },
