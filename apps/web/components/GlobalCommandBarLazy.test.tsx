@@ -7,9 +7,9 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
-describe("GlobalCommandBarLazy — use client removal (#579)", () => {
-  it("does not have a 'use client' directive", () => {
-    expect(SOURCE).not.toMatch(/^["']use client["']/m);
+describe("GlobalCommandBarLazy (#579)", () => {
+  it("has 'use client' directive (required for next/dynamic ssr:false)", () => {
+    expect(SOURCE).toMatch(/^["']use client["']/m);
   });
 
   it("uses next/dynamic for lazy loading", () => {
