@@ -66,6 +66,12 @@ function cookieFlags(): string {
   return `HttpOnly;${secure} SameSite=Lax; Path=/`;
 }
 
+/**
+ * Generate a cryptographically random CSRF state token for Codeberg OAuth
+ * and return it as a `Set-Cookie` header value (HttpOnly, SameSite=Lax, 10-minute Max-Age).
+ *
+ * @returns Object with `state` (hex token) and `cookie` (Set-Cookie header value)
+ */
 export function createCodebergStateCookie(): {
   state: string;
   cookie: string;
@@ -75,6 +81,15 @@ export function createCodebergStateCookie(): {
   return { state, cookie };
 }
 
+/**
+ * Validate the Codeberg OAuth CSRF state parameter against the cookie value.
+ *
+ * Uses `crypto.timingSafeEqual` for constant-time comparison.
+ *
+ * @param cookieHeader - Raw `Cookie` header string from the incoming request
+ * @param queryState - The `state` query parameter from Codeberg's OAuth redirect
+ * @returns `true` if both values are present and identical; `false` otherwise
+ */
 export function validateCodebergState(
   cookieHeader: string | null,
   queryState: string | null,
@@ -92,6 +107,11 @@ export function validateCodebergState(
   return timingSafeEqual(cookieBuf, queryBuf);
 }
 
+/**
+ * Return a `Set-Cookie` header value that immediately expires the Codeberg CSRF state cookie.
+ *
+ * @returns Set-Cookie header string with Max-Age=0
+ */
 export function clearCodebergStateCookie(): string {
   return `${CB_STATE_COOKIE_NAME}=; ${cookieFlags()}; Max-Age=0`;
 }

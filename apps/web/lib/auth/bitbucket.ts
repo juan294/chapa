@@ -70,6 +70,12 @@ function cookieFlags(): string {
   return `HttpOnly;${secure} SameSite=Lax; Path=/`;
 }
 
+/**
+ * Generate a cryptographically random CSRF state token for Bitbucket OAuth
+ * and return it as a `Set-Cookie` header value (HttpOnly, SameSite=Lax, 10-minute Max-Age).
+ *
+ * @returns Object with `state` (hex token) and `cookie` (Set-Cookie header value)
+ */
 export function createBitbucketStateCookie(): {
   state: string;
   cookie: string;
@@ -79,6 +85,15 @@ export function createBitbucketStateCookie(): {
   return { state, cookie };
 }
 
+/**
+ * Validate the Bitbucket OAuth CSRF state parameter against the cookie value.
+ *
+ * Uses `crypto.timingSafeEqual` for constant-time comparison.
+ *
+ * @param cookieHeader - Raw `Cookie` header string from the incoming request
+ * @param queryState - The `state` query parameter from Bitbucket's OAuth redirect
+ * @returns `true` if both values are present and identical; `false` otherwise
+ */
 export function validateBitbucketState(
   cookieHeader: string | null,
   queryState: string | null,
@@ -96,6 +111,11 @@ export function validateBitbucketState(
   return timingSafeEqual(cookieBuf, queryBuf);
 }
 
+/**
+ * Return a `Set-Cookie` header value that immediately expires the Bitbucket CSRF state cookie.
+ *
+ * @returns Set-Cookie header string with Max-Age=0
+ */
 export function clearBitbucketStateCookie(): string {
   return `${BB_STATE_COOKIE_NAME}=; ${cookieFlags()}; Max-Age=0`;
 }
@@ -211,15 +231,26 @@ export async function fetchBitbucketUser(
 // ---------------------------------------------------------------------------
 
 /**
- * Compute token expiry from `expires_in` seconds.
+ * Compute the absolute expiry timestamp from a relative `expires_in` value.
+ *
+ * Adds `expiresIn` seconds to `Date.now()` to produce an absolute `Date`.
+ *
+ * @param expiresIn - Token lifetime in seconds (typically 7200 = 2 hours for Bitbucket)
+ * @returns A `Date` representing when the token expires
  */
 export function computeTokenExpiry(expiresIn: number): Date {
   return new Date(Date.now() + expiresIn * 1000);
 }
 
 /**
- * Check if a token is expired (with 5-minute buffer).
- * Returns true if expiresAt is null (unknown) or within 5 minutes of now.
+ * Check if a token is expired or about to expire (with 5-minute buffer).
+ *
+ * Returns `true` if `expiresAt` is `null` (unknown expiry — treat as expired)
+ * or if the current time is within 5 minutes of the expiry timestamp.
+ * The buffer ensures proactive refresh before the token actually expires.
+ *
+ * @param expiresAt - The absolute expiry timestamp, or `null` if unknown
+ * @returns `true` if the token should be refreshed; `false` if still valid
  */
 export function isTokenExpired(expiresAt: Date | null): boolean {
   if (!expiresAt) return true;
