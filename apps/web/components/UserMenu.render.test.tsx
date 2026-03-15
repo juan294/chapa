@@ -375,15 +375,15 @@ describe("UserMenu — insights import", () => {
     expect(fileInput.getAttribute("accept")).toBe(".html");
   });
 
-  it("insights label triggers file input on Enter key", async () => {
+  it("insights button triggers file input on click", async () => {
     const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);
-    const label = screen.getByText("Import Claude Code Insights").closest("label");
-    expect(label).toBeDefined();
-    // The label should have tabIndex and keyDown handler
-    expect(label?.getAttribute("tabindex")).toBe("0");
+    const button = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(button).toBeDefined();
+    // Buttons are natively focusable — no tabindex needed
+    expect(button?.getAttribute("role")).toBe("menuitem");
   });
 
   it("shows error toast for oversized files (>10MB)", async () => {
