@@ -1,5 +1,3 @@
-"use client";
-
 import dynamic from "next/dynamic";
 import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
 

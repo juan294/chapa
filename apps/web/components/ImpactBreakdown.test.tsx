@@ -248,6 +248,20 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  describe("null guard for props (#577)", () => {
+    it("guards against null/undefined impact prop early", () => {
+      expect(SOURCE).toMatch(/if\s*\(\s*!impact/);
+    });
+
+    it("guards against null/undefined stats prop early", () => {
+      expect(SOURCE).toMatch(/!\s*stats\b/);
+    });
+
+    it("renders a fallback message when data is missing", () => {
+      expect(SOURCE).toContain("No impact data available");
+    });
+  });
+
   describe("craft dimension (Impact v6)", () => {
     it("iterates only active dimensions — 4 when craft absent", () => {
       // The dimension iteration must filter based on craft presence.

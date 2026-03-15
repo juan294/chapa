@@ -319,3 +319,18 @@ describe("UserMenu — insights upload with Toast", () => {
     expect(SOURCE).toContain("Score will update on next badge view");
   });
 });
+
+describe("UserMenu — semantic HTML (#578)", () => {
+  it("does not use <label> as a menu item", () => {
+    // <label role="menuitem"> is a semantic HTML anti-pattern — use <button> instead
+    expect(SOURCE).not.toMatch(/<label\s[^>]*role="menuitem"/);
+  });
+
+  it("insights import trigger is a <button> with role=menuitem", () => {
+    // The Import Claude Code Insights item should be a button
+    const insightsStart = SOURCE.indexOf("Import Claude Code Insights");
+    const blockStart = SOURCE.lastIndexOf("<button", insightsStart);
+    const block = SOURCE.slice(blockStart, insightsStart);
+    expect(block).toContain('role="menuitem"');
+  });
+});

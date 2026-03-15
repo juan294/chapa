@@ -224,6 +224,14 @@ interface ImpactBreakdownProps {
 }
 
 export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
+  if (!impact || !stats) {
+    return (
+      <div className="rounded-xl border border-stroke bg-card p-8 text-center">
+        <p className="text-sm text-text-secondary">No impact data available</p>
+      </div>
+    );
+  }
+
   const dims = impact.dimensions;
   const isSolo = impact.profileType === "solo";
   const hasCraft = dims.craft != null;
