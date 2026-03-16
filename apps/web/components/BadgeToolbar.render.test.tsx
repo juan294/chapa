@@ -896,4 +896,231 @@ describe("BadgeToolbar render", () => {
       expect(link?.getAttribute("href")).toBe("/studio");
     });
   });
+
+  describe("copy link — Copied! state", () => {
+    it("shows Copied! text after successful copy", async () => {
+      // Keep dropdown open even after setIsOpen(false) so we can see the Copied! text
+      dropdownOpen = true;
+      setIsOpenMock.mockImplementation(() => {
+        // Don't actually close the dropdown for this test
+      });
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+
+      const { rerender } = render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText("Copy link"));
+      });
+
+      // Force re-render with dropdown still open to see Copied! text
+      rerender(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      expect(screen.getByText("Copied!")).toBeDefined();
+    });
+  });
+
+  describe("refresh error resets to idle after timeout", () => {
+    it("returns to idle state after error timeout", async () => {
+      vi.useFakeTimers();
+      const mockFetch = vi.fn().mockResolvedValue({ ok: false });
+      vi.stubGlobal("fetch", mockFetch);
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      expect(screen.getByText("Failed")).toBeDefined();
+
+      // After 3000ms, status resets to idle
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      expect(screen.getByText("Refresh")).toBeDefined();
+
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it("returns to idle after network error timeout", async () => {
+      vi.useFakeTimers();
+      const mockFetch = vi.fn().mockRejectedValue(new Error("network"));
+      vi.stubGlobal("fetch", mockFetch);
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Refresh badge data"));
+      });
+
+      expect(screen.getByText("Failed")).toBeDefined();
+
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      expect(screen.getByText("Refresh")).toBeDefined();
+
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe("download strips SVG animations", () => {
+    it("strips @keyframes, animation properties, and SMIL animate elements", async () => {
+      const svgWithAnimations = `<svg>
+        <style>@keyframes fade{from{opacity:0}to{opacity:1}}
+        .cell{animation: fade 0.3s ease;}
+        </style>
+        <rect opacity="0" />
+        <animate attributeName="opacity" from="0" to="1" />
+      </svg>`;
+
+      let capturedSrc = "";
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgWithAnimations),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      // Use class-based Image mock to avoid vitest warning
+      class MockImage {
+        width = 0;
+        height = 0;
+        onload: ((e: Event) => void) | null = null;
+        onerror: ((e: Event) => void) | null = null;
+        private _src = "";
+        get src() { return this._src; }
+        set src(val: string) {
+          this._src = val;
+          capturedSrc = val;
+          // Trigger error to force SVG fallback
+          setTimeout(() => {
+            this.onerror?.(new Event("error"));
+          }, 0);
+        }
+      }
+      const origImage = globalThis.Image;
+      vi.stubGlobal("Image", MockImage);
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+      });
+
+      // The data URI src should have animations stripped
+      const decodedSvg = decodeURIComponent(capturedSrc.replace("data:image/svg+xml;charset=utf-8,", ""));
+      expect(decodedSvg).not.toContain("@keyframes");
+      expect(decodedSvg).not.toContain("<animate ");
+      expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
+
+      vi.stubGlobal("Image", origImage);
+      vi.unstubAllGlobals();
+    });
+  });
+
+  describe("successful PNG download (full canvas path)", () => {
+    it("creates a PNG blob and downloads it", async () => {
+      const svgText = '<svg><rect width="100" height="100"/></svg>';
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgText),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+
+      const mockBlob = new Blob(["png-data"], { type: "image/png" });
+      const mockCtx = { scale: vi.fn(), drawImage: vi.fn() };
+      const mockCanvas = {
+        width: 0,
+        height: 0,
+        getContext: vi.fn(() => mockCtx),
+        toBlob: vi.fn((callback: (blob: Blob | null) => void) => {
+          callback(mockBlob);
+        }),
+      };
+
+      const origCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+        if (tag === "canvas") return mockCanvas as unknown as HTMLCanvasElement;
+        return origCreateElement(tag);
+      });
+
+      const revokeObjectURL = vi.fn();
+      const createObjectURL = vi.fn(() => "blob:mock-url");
+      vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+
+      // Use class-based Image mock — trigger onload synchronously in the src setter
+      // so the canvas path runs within the same act() flush
+      class MockImage {
+        width = 0;
+        height = 0;
+        onload: ((e: Event) => void) | null = null;
+        onerror: ((e: Event) => void) | null = null;
+        private _src = "";
+        get src() { return this._src; }
+        set src(val: string) {
+          this._src = val;
+          // Fire synchronously so the Promise chain inside handleDownload
+          // resolves within the act() wrapper
+          queueMicrotask(() => {
+            this.onload?.(new Event("load"));
+          });
+        }
+      }
+      const origImage = globalThis.Image;
+      vi.stubGlobal("Image", MockImage);
+
+      const appendChildSpy = vi.spyOn(document.body, "appendChild");
+      const removeChildSpy = vi.spyOn(document.body, "removeChild");
+
+      render(
+        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+        // Let the microtask (onload) run within act
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      // Verify canvas was created with 2x scale
+      expect(mockCanvas.width).toBe(2400);
+      expect(mockCanvas.height).toBe(1260);
+      expect(mockCtx.scale).toHaveBeenCalledWith(2, 2);
+
+      // Verify the anchor was created, clicked, and cleaned up
+      const anchorCall = appendChildSpy.mock.calls.find(
+        (call) => (call[0] as HTMLElement).tagName === "A",
+      );
+      expect(anchorCall).toBeDefined();
+      const anchor = anchorCall![0] as HTMLAnchorElement;
+      expect(anchor.download).toBe("chapa-testuser.png");
+
+      // Verify cleanup
+      expect(removeChildSpy).toHaveBeenCalled();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+
+      appendChildSpy.mockRestore();
+      removeChildSpy.mockRestore();
+      vi.stubGlobal("Image", origImage);
+      vi.unstubAllGlobals();
+    });
+  });
 });
