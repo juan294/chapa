@@ -207,7 +207,7 @@ Admin routes and `/api/feature-flags` call Supabase without explicit timeouts. S
 - `/api/insights` after() hook: Uses `Promise.allSettled()`
 
 ### CARRIED (No Change)
-- **`tool_insights` table missing from migration system** — Not reproducible on rebuild. Monitoring only.
+- ~~**`tool_insights` table missing from migration system**~~ — **RESOLVED**: Migration `015_create_tool_insights.sql` exists and is complete (table + index + RLS + deny policy).
 
 ### NEW This Cycle
 - **Bitbucket/Codeberg per-user API volume**: Up to ~1,025 API calls per user per fetch (bounded by 30s timeout and pagination caps). Low risk at current scale, high risk if 10+ users link platforms simultaneously.

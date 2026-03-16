@@ -24,3 +24,6 @@ CREATE INDEX idx_tool_insights_handle
 
 -- RLS: server-side only (service role key bypasses RLS)
 ALTER TABLE tool_insights ENABLE ROW LEVEL SECURITY;
+
+-- Defense-in-depth: deny anon role all access (consistent with 008_add_rls_deny_policies)
+CREATE POLICY deny_anon_tool_insights ON tool_insights FOR ALL TO anon USING (false);

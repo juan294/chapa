@@ -38,3 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_email_campaigns_status
 
 ALTER TABLE email_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaign_sends ENABLE ROW LEVEL SECURITY;
+
+-- Defense-in-depth: deny anon role all access (consistent with 008_add_rls_deny_policies)
+CREATE POLICY deny_anon_email_campaigns ON email_campaigns FOR ALL TO anon USING (false);
+CREATE POLICY deny_anon_campaign_sends ON campaign_sends FOR ALL TO anon USING (false);
