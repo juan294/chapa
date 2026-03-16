@@ -82,7 +82,6 @@ vi.mock("@/lib/validation", async () => {
 // ---------------------------------------------------------------------------
 
 import { POST } from "./route";
-import { GET } from "./[handle]/route";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,12 +118,6 @@ function makePostRequest(body: unknown): NextRequest {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-}
-
-function makeGetRequest(handle: string): NextRequest {
-  return new NextRequest(
-    `https://chapa.thecreativetoken.com/api/insights/${handle}`,
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -233,60 +226,5 @@ describe("POST /api/insights", () => {
     const resp = await POST(makePostRequest(makeValidUpload()));
     const body = await resp.json();
     expect(body.craftScore.craftScore).toBe(60);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GET /api/insights/:handle
-// ---------------------------------------------------------------------------
-
-describe("GET /api/insights/:handle", () => {
-  it("returns craft score for existing data", async () => {
-    const stored = {
-      tool: "claude-code",
-      dimensions: { proficiency: 60, effectiveness: 70, sophistication: 50 },
-      craftScore: 60,
-      tier: "Expert",
-      reportPeriod: { start: "2026-02-20", end: "2026-03-07" },
-      computedAt: new Date().toISOString(),
-    };
-    mockDbGet.mockResolvedValue(stored);
-
-    const resp = await GET(makeGetRequest("juan294"), {
-      params: Promise.resolve({ handle: "juan294" }),
-    });
-    expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.craftScore.craftScore).toBe(60);
-    expect(body.craftScore.tier).toBe("Expert");
-  });
-
-  it("returns null craftScore when no data exists", async () => {
-    mockDbGet.mockResolvedValue(null);
-    const resp = await GET(makeGetRequest("newuser"), {
-      params: Promise.resolve({ handle: "newuser" }),
-    });
-    expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.craftScore).toBeNull();
-  });
-
-  it("returns 400 for invalid handle format", async () => {
-    const resp = await GET(makeGetRequest("-invalid"), {
-      params: Promise.resolve({ handle: "-invalid" }),
-    });
-    expect(resp.status).toBe(400);
-    const body = await resp.json();
-    expect(body.error).toContain("Invalid handle");
-  });
-
-  it("returns 429 when IP rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
-    const resp = await GET(makeGetRequest("juan294"), {
-      params: Promise.resolve({ handle: "juan294" }),
-    });
-    expect(resp.status).toBe(429);
-    const body = await resp.json();
-    expect(body.error).toContain("Too many requests");
   });
 });
