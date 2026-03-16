@@ -9,28 +9,28 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-15T06:00:00Z -->
-## Cost Analyst — 2026-03-15
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-16T06:00:00Z -->
+## Cost Analyst — 2026-03-16
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: ~$56 (Vercel $26, Redis $20, Resend $10, Supabase free). At 50K users: ~$176/mo.
-- Redis: 20 key pattern families audited. TTL coverage 100% per-user keys. 3 global keys without TTL — intentional singletons, combined <16 KB.
-- **Estimated Redis memory @10K users: ~590 MB** — OG image cache reduced to ~400 MB (48h TTL, down from ~3-5 GB at 7d). Well within Upstash Pro 10 GB.
+- Estimated monthly cost at 10K users: ~$66 (Vercel $26, Redis $20, Resend $20, Supabase free). At 50K users: ~$191/mo. +$10 vs last report (Resend campaign volume).
+- Redis: 22 key pattern families audited (up from 20). TTL coverage 100% per-user keys. 2 global keys without TTL — intentional singletons (`stats:badges_generated` counter + `stats:unique_badges` HyperLogLog), combined <16 KB.
+- **Estimated Redis memory @10K users: ~590 MB** — unchanged. OG images ~400 MB (48h TTL), stats/avatars ~150 MB, misc ~40 MB. Well within Upstash Pro 10 GB.
 - GitHub API budget: ~690 calls/hr peak vs 5,000/hr limit. 86% headroom. In-flight dedup reduces concurrent calls 40–60%.
-- Supabase: 7 tables + 2 views. Singleton client, PostgREST REST API. No N+1 patterns. Batch queries correct. RLS on all tables with `deny_anon_all`. Views use `security_invoker = true`. Runtime validation via `parseRow()` on all queries.
+- Supabase: 10 tables + 1 view (up from 7+2). **NEW: `email_campaigns` + `campaign_sends`**. Singleton client, PostgREST REST API. No N+1 patterns. Batch queries correct (upsert, `.in()` filters). RLS on all tables. Runtime validation via `parseRow()` on all queries.
 - Fetch timeout coverage: **100%** — all external fetch calls have `AbortSignal.timeout()` or `AbortController`.
-- **RESOLVED: `dbCleanOldSnapshots()` now wired to cron** — called at `warm-cache/route.ts:174`. 365d retention, 1000-row batches.
-- **RESOLVED: OG image TTL 7d → 48h** — `OG_CACHE_TTL=172800` at `og-image/route.ts:42`. Redis memory drops ~85%.
-- **RESOLVED: `/privacy` and `/terms` ISR** — both have `revalidate=86400`.
-- **NEW: Bitbucket/Codeberg per-user API volume** — up to ~1,025 API calls per user per fetch (50 repos × per-repo calls). Bounded by 30s timeout + MAX_REPOS=50/MAX_PRS=100/MAX_PAGES=5. Low risk now, high risk if 10+ linked platform users.
-- **NEW: Admin routes missing Supabase timeout** — 5 admin + 1 feature-flags route call Supabase without explicit timeout. Resilience gap (low traffic, low urgency).
+- Resource leaks: **0 detected** — process cleanup robust (`cleanupProcess()` destroys streams), `Promise.allSettled()` in badge route + cron + multi-platform fetch. Agent log buffer capped at 500 lines.
+- **NEW: Campaign email system** — 3 cron jobs (up from 1): warm-cache, process-campaigns, sync-audience. Daily send quota at 95 emails. Batch size 50. Redis counter tracks daily sends. No runaway cost risk.
+- **NEW: Avatar caching in place** — `avatar:{handle}` with 6h TTL. Resolves prior recommendation.
+- **CARRIED: Admin routes missing Supabase timeout** — 5 admin + 1 feature-flags route. Low traffic, low urgency.
 - **CARRIED: `tool_insights` table missing from migration system** — not reproducible on rebuild.
-- Vercel: ~5 static, 12 ISR, ~30 dynamic API, 1 force-dynamic (experiments). No edge runtime. 1 cron job.
+- **CARRIED: `/api/studio/config` docs mismatch** — POST vs GET+PUT per documentation agent.
+- Vercel: ~5 static, 12 ISR, ~30 dynamic API, 1 force-dynamic. No edge runtime. 3 cron jobs.
 
 **Cross-agent recommendations:**
-- [Performance]: OG image Redis concern resolved (48h TTL = ~400 MB @10K). Avatar fetches are uncached (~10 KB base64/request) — consider Redis cache (`avatar:<handle>`, 24h TTL) if badge traffic exceeds 100 req/s. Bitbucket/Codeberg fetch volume (~1K calls/user) is the next scaling bottleneck — add per-platform concurrency cap in warm-cache if >10 linked users.
-- [Security]: Fail-open rate limiting intact. All fetch timeouts in place (100% coverage). Bitbucket/Codeberg 30s timeout prevents runaway fetches. No cost-security concerns.
-- [Coverage]: `user-platforms.ts` still at 81.8% — multi-platform token edge cases untested. Bitbucket/Codeberg pagination cap behavior has test assertions (`queries.test.ts`). Admin Supabase timeout gap is untested but low risk.
-- [QA]: All previously carried items resolved. `/api/studio/config` docs mismatch (POST vs GET+PUT) still pending per documentation agent.
+- [Performance]: Redis memory stable at ~590 MB @10K. Bitbucket/Codeberg fetch volume (~1K calls/user) remains the next scaling bottleneck — add per-platform concurrency cap in warm-cache if >10 linked users. `dbGetCampaignStats()` aggregates in JS (could be SQL `GROUP BY`) — negligible at current scale.
+- [Security]: Fail-open rate limiting intact. All fetch timeouts in place (100% coverage). Campaign email quota prevents abuse. No cost-security concerns.
+- [Coverage]: `lib/db` at 86.6% (down from 93.5% due to new `campaigns.ts` at 66.7%). Campaign API routes at 77–78% — need error-path coverage. Admin Supabase timeout gap untested but low risk.
+- [QA]: Campaign send pipeline correctly uses batch operations and daily limits. `/api/studio/config` docs mismatch still pending. Process stream leak now resolved. Resend audience sync should be monitored if contacts exceed 5K.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
@@ -115,23 +115,22 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update. All 15 dimension/archetype color tokens now used correctly via semantic classes.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-15T02:05:00Z -->
-## Coverage Agent — 2026-03-15
+<!-- ENTRY:START agent=coverage timestamp=2026-03-16T02:05:00Z -->
+## Coverage Agent — 2026-03-16
 - **Status**: GREEN
-- Overall coverage: **80.10% stmts** (5,690/7,103), 76.05% branch, 72.17% funcs, 81.28% lines
-- Test suite: 294 files, 4,713 tests, 100% pass rate, 0 flaky (4 consecutive runs)
-- Delta vs 2026-03-14: **+1.44% stmts** (+149 newly covered stmts, +59 new source stmts). All thresholds pass. Strong positive trajectory.
-- Critical paths: all modules at 89–100% stmts — `lib/render` 100%, `lib/verification` 100%, `lib/utils` 100%, `lib/impact` 99.5%, `lib/email` 98.3%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `lib/keyboard` 96.5%, `lib` root 95.7%, `lib/auth` 94.5%, `lib/db` 93.5%, `lib/bitbucket` 93.1%, `lib/insights` 93.0%, `lib/cache` 89.2%, `packages/shared` 100%
-- **RESOLVED: `login/route.ts` now at 100% stmts** (was 76.9% — previous only critical-path file <80%)
-- Largest untested: `hexmap/page.tsx` (0%), `BadgePreviewCard.tsx` (0%), `ParticleBackground.tsx` (0.9%), `AuthorTypewriter.tsx` (20.23%)
-- RED modules: `app/studio` 50.6% (up from 27%), `app/verify` 0%, `app/archetypes` 0%, `app/cli` 0%, `app/about` 0%
-- Component coverage: `UserMenu.tsx` 39.8%, `StudioClient.tsx` 47.9%, `BadgeToolbar.tsx` 54.9% — all still below 80%
-- Previous flaky `window is not defined` — NOT reproduced in 10+ days, considered resolved
+- Overall coverage: **83.87% stmts** (6,532/7,788), 78.87% branch, 75.01% funcs, 85.42% lines
+- Test suite: 313 files, 5,298 tests, 100% pass rate, 0 flaky (4 consecutive runs)
+- Delta vs 2026-03-15: **+3.77% stmts** (+842 newly covered stmts, +685 new source stmts, +585 tests, +19 test files). All thresholds pass. Strong positive trajectory.
+- Critical paths: all modules at 86–100% stmts — `lib/render` 100%, `lib/verification` 100%, `lib/utils` 100%, `lib/impact` 99.5%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `lib/email` 94.7%, `lib/auth` 94.5%, `app/api` 94.5%, `lib/insights` 93.0%, `lib/bitbucket` 93.1%, `lib/db` 86.6%, `lib/cache` 80.6%, `packages/shared` 100%
+- **IMPROVED: `UserMenu.tsx` now 87.7%** (was 39.8%), **`StudioClient` module now 87.1%** (was 50.6%), **`BadgeToolbar.tsx` now 71.4%** (was 54.9%)
+- **NEW: Campaign code added** — `lib/db/campaigns.ts` at 66.7%, campaign API routes at 77–78%, `campaigns-dashboard.tsx` at 40.8%
+- Remaining below-80% components: `AuthorTypewriter.tsx` (60.7%), `BadgeToolbar.tsx` (71.4%), `TerminalInput.tsx` (77.2%)
+- `use-animated-counter.test.ts` throws 2 unhandled `window is not defined` errors (cosmetic, tests pass)
 
 **Cross-agent recommendations:**
-- [Security]: All security-critical paths at 89%+. XSS tests at `BadgeSvg.test.tsx:600-626`. HMAC verification at 100%. `login/route.ts` now at 100%. No security-coverage concerns.
-- [QA]: Priority test additions: (1) `UserMenu.tsx` (39.8%, 576 lines — largest low-coverage component), (2) `BadgeToolbar.tsx` (54.9%, 349 lines), (3) `StudioClient.tsx` (47.9%, 314 lines), (4) `BadgePreviewCard.tsx` (0%, 197 lines). +132 tests, +5 test files since last report. `login/route.ts` now fully covered.
-- [Performance]: `ParticleBackground.tsx` (112 stmts, 0.9%) and `hexmap/page.tsx` (0%) still canvas-heavy and untested — smoke tests recommended.
-- [Cost Analyst]: `lib/db` stable at 93.5%. `user-platforms.ts` at 81.8% — multi-platform token edge cases still untested. Feature flag caching at 100%.
-- [DevOps]: All API routes at 94.7%+ aggregate. All critical-path API routes at 80%+. No CI-affecting issues.
+- [Security]: All security-critical paths at 86%+. XSS tests at `BadgeSvg.test.tsx:600-626`. HMAC verification at 100%. No security-coverage concerns. New campaign API routes have auth checks but need more error-path coverage.
+- [QA]: Priority test additions: (1) `campaigns-dashboard.tsx` (40.8%, 120 stmts — newly added), (2) `lib/db/campaigns.ts` (66.7%, 147 stmts — data layer), (3) `AuthorTypewriter.tsx` (60.7%, 84 stmts), (4) `BadgeToolbar.tsx` (71.4%, 91 stmts). +585 tests, +19 test files since last report. Previous priorities `UserMenu.tsx` and `StudioClient` are now above 80%.
+- [Performance]: `ParticleBackground.tsx` and `hexmap/page.tsx` still canvas-heavy and untested — smoke tests recommended. No new performance-coverage concerns.
+- [Cost Analyst]: `lib/db` at 86.6% (down from 93.5% due to new campaigns.ts at 66.7%). New campaign code adds Supabase queries — verify timeout coverage. Feature flag caching at 100%.
+- [DevOps]: All API routes at 94.5% aggregate. Campaign API routes (77–78%) are the only API routes below 80%. No CI-affecting issues.
 <!-- ENTRY:END -->
