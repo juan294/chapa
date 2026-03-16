@@ -136,3 +136,14 @@
 - [Cost Analyst]: `lib/db` at 86.6% (down from 93.5% due to new campaigns.ts at 66.7%). New campaign code adds Supabase queries — verify timeout coverage. Feature flag caching at 100%.
 - [DevOps]: All API routes at 94.5% aggregate. Campaign API routes (77–78%) are the only API routes below 80%. No CI-affecting issues.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-03-16T17:00:00Z -->
+## Triage — 2026-03-16
+- **Reports processed**: 1 (security-report)
+- **Action items resolved**: 1 of 4 (3 already resolved by prior work)
+- **Summary**: Added 4 missing auth error-path tests (401/403/429/500) to campaign preview route. Admin Supabase timeouts already covered by `dbTimeoutOr504()`. Unused exports already cleaned (knip reports 0). Auth cookie JSDoc already comprehensive.
+**Cross-agent recommendations:**
+- [Coverage]: Campaign preview route now has full auth test coverage. Overall campaign API route coverage should improve above 78% with these additions.
+- [Security]: All 4 security recommendations confirmed resolved or already mitigated. No action items remain.
+- [QA]: Campaign preview route tests now match the coverage pattern of all other campaign routes (401/403/429/500 auth checks).
+<!-- ENTRY:END -->
