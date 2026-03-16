@@ -26,6 +26,15 @@ export const WARM_AMBER: BadgeTheme = {
   ],
 };
 
+/**
+ * Map a daily contribution count to a heatmap cell color (purple opacity ramp).
+ *
+ * Buckets: 0 = none (12%), 1--2 = low (30%), 3--5 = medium (48%),
+ * 6--10 = high (68%), 11+ = intense (92%).
+ *
+ * @param count - Number of contributions on a given day
+ * @returns An `rgba()` color string from the {@link WARM_AMBER} heatmap palette
+ */
 export function getHeatmapColor(count: number): string {
   if (count === 0) return WARM_AMBER.heatmap[0];
   if (count <= 2) return WARM_AMBER.heatmap[1];
@@ -41,6 +50,14 @@ const TIER_COLORS: Record<ImpactTier, string> = {
   Elite: "#8B5CF6",
 };
 
+/**
+ * Get the badge accent color for an Impact tier.
+ *
+ * Used in the score ring and tier label on the embeddable badge SVG.
+ *
+ * @param tier - The Impact tier (Emerging, Solid, High, or Elite)
+ * @returns A hex color string
+ */
 export function getTierColor(tier: ImpactTier): string {
   return TIER_COLORS[tier];
 }
@@ -55,6 +72,14 @@ const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
   Artificer: "#F59E0B", // amber
 };
 
+/**
+ * Get the badge accent color for a developer archetype.
+ *
+ * Used in the archetype pill and code-brackets icon on the embeddable badge SVG.
+ *
+ * @param archetype - The developer archetype label
+ * @returns A hex color string unique to the archetype
+ */
 export function getArchetypeColor(archetype: DeveloperArchetype): string {
   return ARCHETYPE_COLORS[archetype];
 }

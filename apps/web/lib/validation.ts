@@ -7,6 +7,16 @@
  */
 const GITHUB_HANDLE_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
 
+/**
+ * Validate a GitHub handle against GitHub's naming rules.
+ *
+ * Rules: 1--39 alphanumeric characters or hyphens, cannot start or end
+ * with a hyphen. Used to guard API endpoints and cache key construction
+ * from injection via malformed handles.
+ *
+ * @param handle - The candidate GitHub handle to validate
+ * @returns `true` if the handle matches GitHub's format requirements
+ */
 export function isValidHandle(handle: string): boolean {
   return GITHUB_HANDLE_RE.test(handle);
 }
@@ -20,6 +30,16 @@ export function isValidHandle(handle: string): boolean {
  */
 const EMU_HANDLE_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,98}[a-zA-Z0-9]$/;
 
+/**
+ * Validate a GitHub EMU (Enterprise Managed User) handle.
+ *
+ * EMU handles allow underscores in addition to the standard alphanumeric
+ * characters and hyphens (e.g. "Juan-GonzalezPonce_avoltagh"), with a
+ * maximum length of 100 characters.
+ *
+ * @param handle - The candidate EMU handle to validate
+ * @returns `true` if the handle matches EMU format requirements
+ */
 export function isValidEmuHandle(handle: string): boolean {
   if (handle.length === 1) return /^[a-zA-Z0-9]$/.test(handle);
   return EMU_HANDLE_RE.test(handle);
