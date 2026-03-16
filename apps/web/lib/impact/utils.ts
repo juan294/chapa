@@ -10,6 +10,15 @@ import type {
 // Clamp + round a raw score to 0–100 integer
 // ---------------------------------------------------------------------------
 
+/**
+ * Clamp and round a raw score to an integer in the 0--100 range.
+ *
+ * Every dimension, composite, and adjusted score passes through this
+ * function to guarantee consistent bounds across the scoring pipeline.
+ *
+ * @param raw - The unrounded score (may exceed 0--100)
+ * @returns An integer between 0 and 100 inclusive
+ */
 export function clampScore(raw: number): number {
   return Math.round(Math.max(0, Math.min(100, raw)));
 }
@@ -18,6 +27,17 @@ export function clampScore(raw: number): number {
 // Normalization: f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)
 // ---------------------------------------------------------------------------
 
+/**
+ * Logarithmic normalization: maps a raw count to 0--1 with diminishing returns.
+ *
+ * Formula: `ln(1 + min(x, cap)) / ln(1 + cap)`.
+ * This gives strong credit for early activity and progressively less credit
+ * as the value approaches the cap, preventing outliers from dominating.
+ *
+ * @param x - The raw metric value (e.g. commits, PRs merged)
+ * @param cap - The saturation point beyond which additional activity has no effect
+ * @returns A value between 0 and 1 inclusive; returns 0 when x or cap is non-positive
+ */
 export function normalize(x: number, cap: number): number {
   if (x <= 0 || cap <= 0) return 0;
   const clamped = Math.min(x, cap);
@@ -194,6 +214,18 @@ export function computeConfidence(
 // Adjusted score (0–100)
 // ---------------------------------------------------------------------------
 
+/**
+ * Apply confidence adjustment to a composite score.
+ *
+ * Formula: `base * (0.85 + 0.15 * confidence / 100)`.
+ * At 100% confidence the score is unchanged; at 50% confidence (the floor)
+ * the score is reduced by ~7.5%. This ensures low-signal profiles are
+ * penalised proportionally without zeroing them out.
+ *
+ * @param base - The raw composite score (0--100) before adjustment
+ * @param confidence - The confidence score (50--100) from {@link computeConfidence}
+ * @returns The adjusted composite score, clamped to 0--100
+ */
 export function computeAdjustedScore(
   base: number,
   confidence: number,
@@ -206,6 +238,14 @@ export function computeAdjustedScore(
 // Tier mapping
 // ---------------------------------------------------------------------------
 
+/**
+ * Map an adjusted composite score to an Impact tier label.
+ *
+ * Thresholds: Elite >= 85, High >= 70, Solid >= 30, Emerging < 30.
+ *
+ * @param adjustedScore - The confidence-adjusted composite score (0--100)
+ * @returns The corresponding {@link ImpactTier} label
+ */
 export function getTier(adjustedScore: number): ImpactTier {
   if (adjustedScore >= 85) return "Elite";
   if (adjustedScore >= 70) return "High";

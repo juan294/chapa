@@ -15,6 +15,21 @@ interface BadgeOptions {
   demoMode?: boolean;
 }
 
+/**
+ * Render the complete Chapa badge as an SVG markup string (1200x630).
+ *
+ * Composes header (avatar, handle, verified status), archetype + metric pills,
+ * heatmap grid, radar chart, score ring, footer branding, and verification strip
+ * into a single self-contained SVG. The output is embeddable as an `<img>` tag.
+ *
+ * All user-controlled text (handle, display name) is XML-escaped to prevent XSS.
+ * The badge always renders in dark theme regardless of the site's current theme.
+ *
+ * @param stats - Aggregated GitHub stats providing handle, metrics, and heatmap data
+ * @param impact - Computed Impact v4 result with dimensions, archetype, tier, and score
+ * @param options - Visual options: branding toggle, avatar data URI, verification hash/date, demo mode
+ * @returns A complete SVG document as a string, ready for HTTP response or embedding
+ */
 export function renderBadgeSvg(
   stats: StatsData,
   impact: ImpactV4Result,

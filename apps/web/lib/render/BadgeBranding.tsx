@@ -13,6 +13,19 @@ const PLATFORM_LOGOS: Record<Platform, string> = {
 /** Canonical platform ordering: GitHub first, then alphabetical */
 const PLATFORM_ORDER: Platform[] = ["github", "bitbucket", "codeberg"];
 
+/**
+ * Render the badge footer branding strip as SVG markup.
+ *
+ * Produces a pill containing platform logos (GitHub, Bitbucket, Codeberg)
+ * in canonical order, followed by the tagline and the chapa domain name.
+ * Personal badges show only connected platforms; demo badges show all three.
+ *
+ * @param x - Left edge X coordinate for the branding strip
+ * @param y - Baseline Y coordinate for text and logo placement
+ * @param rightX - Right edge X coordinate (used for right-aligned domain text)
+ * @param platforms - Array of platform identifiers whose logos should appear
+ * @returns SVG markup string containing the branding elements
+ */
 export function renderBadgeBranding(
   x: number,
   y: number,

@@ -18,6 +18,17 @@ interface CliTokenPayload {
 
 const TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
+/**
+ * Generate an HMAC-signed CLI authentication token for a user.
+ *
+ * The token embeds the user's handle, a creation timestamp, and a 90-day
+ * expiry. Format: `base64url(payload).base64url(hmac_sha256(payload, secret))`.
+ * This allows CLI authentication without requiring a GitHub PAT.
+ *
+ * @param handle - The GitHub handle to embed in the token payload
+ * @param secret - The HMAC signing secret (typically `NEXTAUTH_SECRET`)
+ * @returns A dot-separated signed token string
+ */
 export function generateCliToken(handle: string, secret: string): string {
   const payload: CliTokenPayload = {
     handle,
@@ -30,6 +41,17 @@ export function generateCliToken(handle: string, secret: string): string {
   return `${encoded}.${sig}`;
 }
 
+/**
+ * Verify and decode a CLI authentication token.
+ *
+ * Validates the HMAC signature using timing-safe comparison, checks the
+ * token type is `"cli"`, and verifies the token has not expired.
+ * Returns the embedded handle on success, or `null` on any validation failure.
+ *
+ * @param token - The dot-separated signed token to verify
+ * @param secret - The HMAC signing secret (must match the one used to generate)
+ * @returns An object with the `handle` on success, or `null` if invalid/expired
+ */
 export function verifyCliToken(
   token: string,
   secret: string,
