@@ -24,6 +24,7 @@ export default defineConfig({
         "**/*.d.ts",
         "**/*.md",
         "**/node_modules.nosync/**",
+        "**/__fixtures__/**",
       ],
       thresholds: {
         statements: 75,
