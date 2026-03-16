@@ -23,10 +23,14 @@ import {
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
 import { cacheGet, cacheIncr } from "@/lib/cache/redis";
+import { toDateString } from "@/lib/utils/date";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+/** Default sender address for campaign emails. */
+export const EMAIL_FROM = "Chapa <notifications@chapa.thecreativetoken.com>";
 
 /** Stay under 100 Free plan limit — leave 5 buffer for transactional emails. */
 export const DAILY_SEND_LIMIT = 95;
@@ -64,18 +68,14 @@ export function buildEmailContent(
 // Daily quota tracking
 // ---------------------------------------------------------------------------
 
-function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
 export async function getDailyQuota(): Promise<number> {
-  const key = `${DAILY_QUOTA_KEY}:${todayDateString()}`;
+  const key = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
   const count = await cacheGet<number>(key);
   return count ?? 0;
 }
 
 async function incrementDailyQuota(count: number): Promise<void> {
-  const key = `${DAILY_QUOTA_KEY}:${todayDateString()}`;
+  const key = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
   await cacheIncr(key, count, 86400);
 }
 
@@ -86,11 +86,15 @@ async function incrementDailyQuota(count: number): Promise<void> {
 /**
  * Populate campaign_sends from eligible users and set status to "sending".
  * Returns total recipient count, or null if campaign can't be initiated.
+ *
+ * Accepts an optional pre-fetched campaign to avoid a redundant DB query
+ * when the caller has already loaded the campaign (e.g. the send route).
  */
 export async function initiateCampaign(
   campaignId: string,
+  prefetched?: Campaign | null,
 ): Promise<{ totalRecipients: number } | null> {
-  const campaign = await dbGetCampaign(campaignId);
+  const campaign = prefetched ?? await dbGetCampaign(campaignId);
   if (!campaign || campaign.status !== "draft") return null;
 
   const users = await dbGetUsersWithEmail();
@@ -160,7 +164,7 @@ export async function processCampaignBatch(
   const emails = pending.map((send) => {
     const content = buildEmailContent(campaign, send.handle);
     return {
-      from: "Chapa <notifications@chapa.thecreativetoken.com>",
+      from: EMAIL_FROM,
       to: send.email,
       subject: campaign.subject,
       html: buildAnnouncementHtml(content),

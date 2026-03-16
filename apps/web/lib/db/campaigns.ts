@@ -82,15 +82,22 @@ function mapSendRow(row: any): CampaignSend {
 // Campaign CRUD
 // ---------------------------------------------------------------------------
 
-export async function dbGetCampaigns(): Promise<Campaign[]> {
+export async function dbGetCampaigns(
+  status?: Campaign["status"],
+): Promise<Campaign[]> {
   const db = getSupabase();
   if (!db) return [];
 
   try {
-    const { data, error } = await db
+    let query = db
       .from("email_campaigns")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*");
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) throw error;
     if (!data) return [];

@@ -182,6 +182,14 @@ describe("dbGetCampaigns", () => {
     expect(c.startedAt).toBeNull();
     expect(c.completedAt).toBeNull();
   });
+
+  it("accepts optional status filter", async () => {
+    queryResult = { data: [{ ...fullRow, status: "sending" }], error: null };
+
+    const result = await dbGetCampaigns("sending");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.status).toBe("sending");
+  });
 });
 
 describe("dbGetCampaign", () => {

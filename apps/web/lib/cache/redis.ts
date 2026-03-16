@@ -270,8 +270,16 @@ export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
 
 /**
  * Atomically increment a Redis counter by `amount`.
- * Sets TTL on the key if it's new (first increment returns `amount`).
- * Returns the new counter value, or 0 if Redis is unavailable (fail-open).
+ *
+ * When `ttlSeconds` is provided, `EXPIRE` is called unconditionally after
+ * `INCRBY`. This is idempotent (refreshes the same TTL) and avoids a race
+ * condition where concurrent callers could skip the expiry, leaving a key
+ * that never expires.
+ *
+ * Returns the new counter value, or `0` if Redis is unavailable (fail-open).
+ *
+ * **Note:** Callers should treat a return value of `0` as "zero or unknown"
+ * — it is indistinguishable from a genuine zero count when Redis is down.
  */
 export async function cacheIncr(
   key: string,
@@ -283,8 +291,8 @@ export async function cacheIncr(
 
   try {
     const newVal = await redis.incrby(key, amount);
-    // Set expiry only when the key was just created (value equals amount)
-    if (ttlSeconds && newVal === amount) {
+    // Always refresh TTL — idempotent and avoids race under concurrency
+    if (ttlSeconds) {
       await redis.expire(key, ttlSeconds);
     }
     return newVal;

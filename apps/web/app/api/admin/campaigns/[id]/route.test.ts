@@ -82,10 +82,10 @@ describe("GET /api/admin/campaigns/[id]", () => {
     expect(body.error).toBe("Too many requests");
   });
 
-  it("returns 401 when NEXTAUTH_SECRET is missing", async () => {
+  it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
     delete process.env.NEXTAUTH_SECRET;
     const res = await GET(makeRequest(), { params: mockParams });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
   });
 
   it("returns 401 without session", async () => {
@@ -221,10 +221,10 @@ describe("DELETE /api/admin/campaigns/[id]", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 401 when NEXTAUTH_SECRET is missing", async () => {
+  it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
     delete process.env.NEXTAUTH_SECRET;
     const res = await DELETE(makeRequest("DELETE"), { params: mockParams });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
   });
 
   it("passes the campaign id from params to dbDeleteCampaign", async () => {

@@ -1,8 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
-import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
-import { getClientIp } from "@/lib/http/client-ip";
+import { adminAuth } from "@/lib/auth/admin-route";
 import {
   dbGetCampaign,
   dbUpdateCampaign,
@@ -11,35 +8,6 @@ import {
 
 interface RouteParams {
   params: Promise<{ id: string }>;
-}
-
-async function adminAuth(request: NextRequest): Promise<NextResponse | null> {
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-campaigns:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const session = readSessionCookie(
-    request.headers.get("cookie"),
-    sessionSecret,
-  );
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!isAdminHandle(session.login)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  return null; // auth passed
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {

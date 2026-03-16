@@ -122,13 +122,14 @@ describe("cacheIncr", () => {
     expect(mockExpire).toHaveBeenCalledWith("quota:daily:emails", 86400);
   });
 
-  it("does not set TTL on subsequent increments", async () => {
+  it("always refreshes TTL on subsequent increments (idempotent)", async () => {
     mockIncrby.mockResolvedValueOnce(2);
+    mockExpire.mockResolvedValueOnce(1);
 
     const result = await cacheIncr("quota:daily:emails", 1, 86400);
 
     expect(result).toBe(2);
-    expect(mockExpire).not.toHaveBeenCalled();
+    expect(mockExpire).toHaveBeenCalledWith("quota:daily:emails", 86400);
   });
 
   it("does not set TTL when ttlSeconds is not provided", async () => {

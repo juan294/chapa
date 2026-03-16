@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { safeEqual } from "@/lib/crypto/safe-equal";
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbInsertSnapshot,
@@ -16,6 +16,7 @@ import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { processInBatches } from "@/lib/async/process-in-batches";
 import { captureServerError } from "@/lib/analytics/server-errors";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
@@ -29,25 +30,6 @@ const BATCH_SIZE = 5;
 
 /** Redis key storing the rotation offset for round-robin handle processing. */
 const ROTATION_KEY = "cron:warm-cache:offset";
-
-/**
- * Process items in parallel batches of a fixed size.
- * Uses Promise.allSettled for error isolation — individual failures
- * do not block other items in the batch.
- */
-async function processInBatches<T>(
-  items: T[],
-  batchSize: number,
-  fn: (item: T) => Promise<unknown>,
-): Promise<PromiseSettledResult<unknown>[]> {
-  const results: PromiseSettledResult<unknown>[] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.allSettled(batch.map(fn));
-    results.push(...batchResults);
-  }
-  return results;
-}
 
 /** Per-handle result from warmHandle, used to aggregate counters. */
 interface HandleResult {
@@ -267,8 +249,3 @@ async function warmHandle(
   }
 }
 
-/** Timing-safe string comparison to prevent timing attacks. */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}

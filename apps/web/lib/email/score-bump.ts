@@ -16,6 +16,7 @@
 import type { SnapshotDiff } from "@/lib/history/diff";
 import type { SignificantChange } from "@/lib/history/significant-change";
 import { getResend, escapeHtml } from "./resend";
+import { EMAIL_FROM } from "./campaigns";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { dbGetUserEmail } from "@/lib/db/users";
 import { dbGetFeatureFlag } from "@/lib/db/feature-flags";
@@ -75,7 +76,7 @@ export async function notifyScoreBump(
 
     // 6. Send
     const { error } = await resend.emails.send({
-      from: "Chapa <notifications@chapa.thecreativetoken.com>",
+      from: EMAIL_FROM,
       to: [userEmail.email],
       subject,
       html,

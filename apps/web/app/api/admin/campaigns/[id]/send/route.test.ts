@@ -119,10 +119,10 @@ describe("POST /api/admin/campaigns/[id]/send", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
   });
 
-  it("returns 401 when NEXTAUTH_SECRET is missing", async () => {
+  it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
     delete process.env.NEXTAUTH_SECRET;
     const res = await POST(makeRequest(), { params: mockParams });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
   });
 
   it("returns 401 without session", async () => {
@@ -148,14 +148,15 @@ describe("POST /api/admin/campaigns/[id]/send", () => {
     expect(body.firstBatch).toEqual({ sent: 50, failed: 0, remaining: 0 });
   });
 
-  it("passes campaign id from params to initiateCampaign", async () => {
-    vi.mocked(dbGetCampaign).mockResolvedValue({ status: "draft" } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+  it("passes campaign id and pre-fetched campaign to initiateCampaign", async () => {
+    const campaign = { status: "draft" };
+    vi.mocked(dbGetCampaign).mockResolvedValue(campaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(initiateCampaign).mockResolvedValue({ totalRecipients: 1 });
     vi.mocked(processCampaignBatch).mockResolvedValue({ sent: 1, failed: 0, remaining: 0 });
 
     await POST(makeRequest(), { params: mockParams });
 
-    expect(initiateCampaign).toHaveBeenCalledWith("c-1");
+    expect(initiateCampaign).toHaveBeenCalledWith("c-1", campaign);
     expect(processCampaignBatch).toHaveBeenCalledWith("c-1");
   });
 

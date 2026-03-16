@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { safeEqual } from "@/lib/crypto/safe-equal";
 import { getBadgeStats, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
@@ -43,8 +43,3 @@ export async function GET(request: NextRequest) {
   );
 }
 
-/** Timing-safe string comparison to prevent timing attacks on the secret. */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}

@@ -18,9 +18,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Find active campaigns
-  const campaigns = await dbGetCampaigns();
-  const active = campaigns.filter((c) => c.status === "sending");
+  // Find active campaigns (filter at DB level)
+  const active = await dbGetCampaigns("sending");
 
   if (active.length === 0) {
     return NextResponse.json({

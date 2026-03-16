@@ -80,10 +80,10 @@ describe("GET /api/admin/campaigns", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
   });
 
-  it("returns 401 when NEXTAUTH_SECRET is missing", async () => {
+  it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
     delete process.env.NEXTAUTH_SECRET;
     const res = await GET(makeRequest());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
   });
 
   it("returns empty campaigns array when DB returns empty", async () => {
@@ -179,10 +179,10 @@ describe("POST /api/admin/campaigns", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 401 when NEXTAUTH_SECRET is missing", async () => {
+  it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
     delete process.env.NEXTAUTH_SECRET;
     const res = await POST(makeRequest("POST", validBody));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
   });
 
   it("passes optional previewText and features to dbCreateCampaign", async () => {

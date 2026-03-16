@@ -36,7 +36,7 @@ const EMPTY_FORM: FormData = {
 // Status badge
 // ---------------------------------------------------------------------------
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: { status: Campaign["status"] }) {
   const classes: Record<string, string> = {
     draft: "bg-text-secondary/10 text-text-secondary",
     sending: "bg-amber/10 text-amber animate-pulse",
@@ -79,7 +79,12 @@ export function CampaignsDashboard() {
       const res = await fetch("/api/admin/campaigns");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setCampaigns(data.campaigns ?? []);
+      const newList: Campaign[] = data.campaigns ?? [];
+      setCampaigns(newList);
+      // Keep selectedCampaign in sync with refreshed data
+      setSelectedCampaign((prev) =>
+        prev ? (newList.find((c) => c.id === prev.id) ?? null) : null,
+      );
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -113,7 +118,7 @@ export function CampaignsDashboard() {
       }
       setForm(EMPTY_FORM);
       setMode("list");
-      fetchCampaigns();
+      await fetchCampaigns();
     } catch (err) {
       setError((err as Error).message);
     }
@@ -163,7 +168,7 @@ export function CampaignsDashboard() {
       }
       setMode("list");
       setSelectedCampaign(null);
-      fetchCampaigns();
+      await fetchCampaigns();
     } catch (err) {
       setError((err as Error).message);
     }
