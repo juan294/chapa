@@ -1,109 +1,134 @@
 # Security Report
-> Generated: 2026-03-09 | Health status: GREEN
+> Generated: 2026-03-16 | Health status: GREEN
 
 ## Executive Summary
 
-The Chapa codebase maintains a strong security posture with zero dependency vulnerabilities, no hardcoded secrets, comprehensive XSS protection in the SVG pipeline, proper secret isolation, and full Supabase RLS coverage across all 6 tables. No blockers or regressions since the last audit (2026-03-02).
+The Chapa codebase maintains a strong security posture with zero dependency vulnerabilities, no hardcoded secrets, comprehensive XSS protection in SVG rendering, and RLS enabled on all 10 Supabase tables. No regressions since the 2026-03-09 audit. New campaign email system (tables + API routes) follows existing security patterns correctly.
 
 ## Dependency Vulnerabilities
 
-| Severity | Count | Details |
-|----------|-------|---------|
-| Critical | 0 | — |
-| High | 0 | — |
-| Medium | 0 | — |
-| Low | 0 | — |
+| Severity | Package | Issue | Fix |
+|----------|---------|-------|-----|
+| — | — | No known vulnerabilities found | — |
 
-`pnpm audit` reports **no known vulnerabilities**. The previous `minimatch` ReDoS (dev-only, via eslint) has been resolved since the 2026-03-02 audit.
-
-## Unused Dependencies (Attack Surface)
-
-`npx knip` reports **clean** — no unused files, exports, or dependencies detected.
+`pnpm audit` reports clean across all workspaces. Previous `minimatch` ReDoS (dev-only) remains resolved.
 
 ## Code Findings
 
-### Hardcoded Secrets — CLEAR
+### Hardcoded Secrets: NONE
 
-- All 10 server-side secrets stored in `.env.local` (gitignored, never committed)
-- All env var reads use `.trim()` to prevent whitespace-induced auth failures
-- No secrets in `NEXT_PUBLIC_*` variables — only public analytics keys and feature flags
-- Test files use properly-mocked credentials (`gho_test`, `sk-test`, etc.)
-- Git history clean of accidentally-committed credentials
+- All 10 server-side secrets accessed via `process.env` with `.trim()` — no hardcoded values in source
+- Test files use placeholder tokens (`ghp_test`, `sk-test-key`) — expected and excluded from production builds
+- Error logging (`lib/analytics/server-errors.ts:16-30`) scrubs GitHub tokens, API keys, and Bearer tokens before sending to PostHog
+- `.env.example` contains only empty placeholders
 
-### SVG XSS Prevention — SECURE
+### Client-Side Secret Exposure: NONE
 
-All user-controlled input is escaped via `escapeXml()` (`apps/web/lib/render/escape.ts:11-18`) before SVG rendering:
+- `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `GITHUB_CLIENT_SECRET`, `ADMIN_SECRET`, `CRON_SECRET`, `CHAPA_VERIFICATION_SECRET`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET` — all server-only
+- 7 `NEXT_PUBLIC_*` vars are non-sensitive (PostHog key/host, feature flags, base URL)
+- `NEXT_PUBLIC_INSIGHTS_ENABLED` (new) is a boolean flag — no secret exposure risk
 
-| Entry Point | File:Line | Escaped |
-|-------------|-----------|---------|
-| User handle | `BadgeSvg.tsx:25` | `escapeXml(stats.handle)` |
-| Display name | `BadgeSvg.tsx:27` | `escapeXml(stats.displayName)` |
-| Avatar data URI | `BadgeSvg.tsx:140` | `escapeXml(avatarDataUri)` |
-| Archetype label | `BadgeSvg.tsx:164` | `escapeXml(archetypeText)` |
-| Tier label | `BadgeSvg.tsx:221` | `escapeXml(impact.tier)` |
-| Verification hash | `VerificationStrip.ts:13-14` | `escapeXml()` |
-| Fallback SVG | `badge.svg/route.ts:35,41` | `escapeXml()` |
+### SVG XSS Protection: COMPREHENSIVE
 
-XSS tests exist at `BadgeSvg.test.tsx:600-626` covering `<script>`, `onload=`, and event handler injection.
+- `escapeXml()` in `lib/render/escape.ts:18-25` covers all 5 XML entities (`&`, `<`, `>`, `'`, `"`)
+- All 7 user-input entry points escaped: handle, displayName, avatar data URI, archetype, tier, verification hash, date
+- Fallback SVG in `badge.svg/route.ts:36-42` also escapes handle and error message
+- Explicit XSS test vectors at `BadgeSvg.test.tsx:600-626` (script injection, event handler injection)
+- Unit tests for `escapeXml()` in `escape.test.ts` verify each entity individually and combined
 
-### Secret Leakage — CLEAR
+### CORS Configuration: INTENTIONAL & RESTRICTED
 
-- `SUPABASE_SERVICE_ROLE_KEY` — server-only (`lib/db/supabase.ts:16`)
-- `GITHUB_CLIENT_SECRET` — server-only (`api/auth/callback/route.ts:84`)
-- `NEXTAUTH_SECRET` — server-only (session creation, admin auth, badge route)
-- `CHAPA_VERIFICATION_SECRET` — server-only (`lib/verification/hmac.ts:46`)
-- OAuth tokens encrypted at rest with AES-256-GCM before storage in `user_platforms` table
+- `/api/verify/[hash]`: `Access-Control-Allow-Origin: *` — intentional, read-only, rate-limited (30 req/60s). Full OPTIONS preflight handling
+- Badge SVG endpoint: `frame-ancestors *` via CSP — allows embedding in READMEs/iframes
+- All other routes: `X-Frame-Options: DENY`, `frame-ancestors 'none'`
+- Global security headers: `X-Content-Type-Options: nosniff`, `X-XSS-Protection: 1; mode=block`, `Strict-Transport-Security: max-age=63072000`, `Referrer-Policy: strict-origin-when-cross-origin`
 
-### CORS Configuration — APPROPRIATE
+### RLS (Row Level Security): ALL 10 TABLES COVERED
 
-| Route | CORS | Justification |
-|-------|------|---------------|
-| `/api/verify/[hash]` | `Access-Control-Allow-Origin: *` | Intentional — public verification endpoint, read-only, rate-limited (30 req/60s) |
-| All other routes | Same-origin (default) | No CORS headers set |
+| Table | RLS Enabled | Deny Policy | Migration |
+|-------|-------------|-------------|-----------|
+| `users` | Yes | `deny_anon_all` | 002, 008 |
+| `metrics_snapshots` | Yes | `deny_anon_all` | 002, 008 |
+| `verification_records` | Yes | `deny_anon_all` | 002, 008 |
+| `feature_flags` | Yes | `deny_anon_all` + public SELECT | 003, 008 |
+| `merge_operations` | Yes | `deny_anon_all` | 007, 008 |
+| `user_platforms` | Yes | `deny_anon_user_platforms` | 010 |
+| `tool_insights` | Yes | deny policy | 015 |
+| `email_campaigns` | Yes | deny policy | 016 |
+| `campaign_sends` | Yes | deny policy | 016 |
 
-CSP headers in `next.config.ts:17-88`: badge SVG allows `frame-ancestors *` (embeddable), all other routes set `frame-ancestors 'none'` + `X-Frame-Options: DENY`.
+- 2 views (`latest_snapshots`, `admin_users`) use `security_invoker = true` (migration 014)
+- `feature_flags` has intentional public SELECT policy — flags are non-sensitive
+- All data access uses `SUPABASE_SERVICE_ROLE_KEY` (server-side only, bypasses RLS)
 
-### Supabase RLS — COMPLETE
+### OAuth & Authentication: SOLID
 
-| Table | RLS Enabled | Policy |
-|-------|-------------|--------|
-| `users` | Yes | `deny_anon_all` (ALL ops denied for anon) |
-| `metrics_snapshots` | Yes | `deny_anon_all` |
-| `verification_records` | Yes | `deny_anon_all` |
-| `merge_operations` | Yes | `deny_anon_all` |
-| `feature_flags` | Yes | `feature_flags_read_all` (SELECT only) + `deny_anon_all` (write-protected) |
-| `user_platforms` | Yes | `deny_anon_user_platforms` |
+- CSRF protection via state cookie validation on callback
+- Rate limiting on OAuth callback: 10 req/IP/15 min
+- Redirect URL validation prevents open redirects (`callback/route.ts:30-42`)
+- OAuth tokens encrypted with AES-256-GCM before storage in `user_platforms`
+- All 3 GitHub OAuth fetches have `AbortSignal.timeout(10000)` (`lib/auth/github.ts:118,142,180`)
+- Session cookies are HttpOnly, Secure, SameSite=Lax
 
-- Views use `security_invoker = true` to prevent privilege escalation
-- Service role key used exclusively server-side — no anon key in codebase
-- All DB wrapper functions fail gracefully when Supabase is unavailable
+### Rate Limiting: COMPREHENSIVE
 
-### OAuth Security — SECURE
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| Badge SVG | 100 req/IP | 60s |
+| Verify API | 30 req/IP | 60s |
+| OAuth callback | 10 req/IP | 15 min |
+| History API | 30 req/IP | 60s |
+| Refresh | 5 req/IP | 60s |
+| Health | 30 req/IP | 60s |
 
-- All 3 GitHub OAuth fetches now have `AbortSignal.timeout(10000)` — resolves the previously flagged indefinite hang risk (`lib/auth/github.ts:118,142,180`)
-- Bitbucket and Codeberg OAuth equivalents already had timeouts
-- Token exchange uses server-side fetch only
-- State parameter validated with timing-safe comparison
+- Fail-open design: when Redis is unavailable, requests are allowed (availability-first — documented in `redis.ts` and `docs/accepted-risks.md`)
+- Campaign email system: daily send quota capped at 95, batch size 50. Redis counter prevents abuse.
+
+### Knip (Unused Dependencies): CLEAN
+
+- 1 configuration hint only (redundant entry pattern in `knip.json`)
+- No unused dependencies flagged as security risk
+- Performance agent notes 24 genuinely unused exports — attack surface reduction opportunity but no active vulnerability
+
+### Fetch Timeout Coverage: 100%
+
+- All external fetch calls have `AbortSignal.timeout()` or `AbortController` — confirmed by cost analyst (2026-03-16)
+- Prevents hanging connections from becoming resource exhaustion vectors
 
 ## License Compliance
 
-| Package | License | Risk |
-|---------|---------|------|
-| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | **None** — dynamically linked native binary, no source modification, no compliance action needed |
+| Package | License | Risk | Action |
+|---------|---------|------|--------|
+| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | None | Dynamically linked — no copyleft obligation triggered |
 
-All other dependencies use MIT, Apache-2.0, BSD, or ISC licenses. No copyleft violations.
+All other dependencies are MIT, Apache-2.0, BSD, or ISC. No GPL or AGPL dependencies.
 
-## Resolved Since Last Audit (2026-03-02)
+## Delta vs Last Security Report (2026-03-09)
 
-1. **`minimatch` ReDoS (high, dev-only)** — No longer reported by `pnpm audit`. Resolved via dependency updates.
-2. **GitHub OAuth timeout gap** — All 3 functions (`exchangeCodeForToken`, `fetchGitHubUser`, `fetchGitHubUserEmail`) now have `AbortSignal.timeout(10000)`.
-3. **`badge:notified:*` indefinite TTL concern** — Confirmed 365-day TTL (not indefinite) by cost analyst.
+| Area | Change |
+|------|--------|
+| Vulnerabilities | Unchanged: 0 across all severities |
+| RLS tables | 6 → 10 (added `user_platforms`, `tool_insights`, `email_campaigns`, `campaign_sends`) — all with deny policies |
+| Secret leaks | Unchanged: none |
+| XSS coverage | Unchanged: 7 entry points, all escaped |
+| CORS | Unchanged: only verify endpoint allows `*` |
+| License | Unchanged: 1 LGPL-3.0 (dynamic link, no action) |
+| New code | Campaign email system follows existing security patterns (auth checks, rate limiting, RLS) |
 
 ## Recommendations
 
-| Priority | Item | Status |
-|----------|------|--------|
-| Low | Monitor `@img/sharp-libvips-darwin-arm64` LGPL-3.0 on future updates | Ongoing |
-| Low | Consider periodic audit of `user_platforms` encrypted token format if key rotation is implemented | Future |
+### Priority: LOW (Hardening — No Active Vulnerabilities)
 
-No blocking or high-priority security items.
+1. **Campaign API error-path coverage** — Campaign routes at 77–78% test coverage. Auth checks are in place but error paths need more test assertions. (Cross-ref: Coverage agent 2026-03-16)
+
+2. **Admin routes missing Supabase timeout** — 5 admin + 1 feature-flags route lack explicit query timeouts. Low traffic, low urgency, but worth adding for defense-in-depth. (Carried from cost analyst)
+
+3. **Unused export cleanup** — 24 genuinely unused exports identified by performance agent. While not a vulnerability, reducing unused code shrinks the attack surface.
+
+4. **Auth cookie JSDoc** — `createSessionCookie()`, `readSessionCookie()`, `clearSessionCookie()` in `lib/auth/github.ts` lack JSDoc. No vulnerability, but documentation reduces misuse risk. (Cross-ref: Documentation agent 2026-03-13)
+
+### No Action Required
+
+- `NEXT_PUBLIC_INSIGHTS_ENABLED` env var missing from CLAUDE.md — documentation gap, not a security issue (boolean flag)
+- Fail-open rate limiting — accepted risk, documented in `docs/accepted-risks.md`
+- `feature_flags` public SELECT policy — intentional, flags are non-sensitive

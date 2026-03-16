@@ -74,25 +74,27 @@
 - [Performance]: Design system token documentation nearly complete (98%). No remaining performance-documentation concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-03-09T09:00:00Z -->
-## Security Scanner — 2026-03-09
+<!-- ENTRY:START agent=security timestamp=2026-03-16T09:00:00Z -->
+## Security Scanner — 2026-03-16
 - **Status**: GREEN
-- Vulnerabilities: 0 critical, 0 high, 0 medium, 0 low — `pnpm audit` clean. Previous `minimatch` ReDoS (dev-only) resolved.
-- Secret leaks: none — all 10 server secrets isolated, 7 NEXT_PUBLIC_ vars are non-sensitive
-- License issues: 1 LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`) — dynamically linked, no compliance action needed
-- XSS: all 7 user-input entry points in SVG pipeline escaped via `escapeXml()`, explicit XSS tests exist at `BadgeSvg.test.tsx:600-626`
-- CORS: only `/api/verify/[hash]` allows `*` (intentional, rate-limited 30 req/60s, read-only). CSP properly configured in `next.config.ts`.
-- RLS: all 6 Supabase tables RLS-enabled with explicit `deny_anon_all` policies. Views use `security_invoker = true`.
-- Knip: clean — no unused dependencies detected
-- Hardcoded secrets: none found in source
-- OAuth timeouts: RESOLVED — all 3 GitHub OAuth fetches now have `AbortSignal.timeout(10000)` (`lib/auth/github.ts:118,142,180`)
-- Token encryption: AES-256-GCM for OAuth tokens in `user_platforms` table. Service role key server-only.
+- Vulnerabilities: 0 critical, 0 high, 0 medium, 0 low — `pnpm audit` clean.
+- Secret leaks: none — all 10 server secrets isolated, 7 NEXT_PUBLIC_ vars are non-sensitive. Error logging scrubs tokens via regex before PostHog.
+- License issues: 1 LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`) — dynamically linked, no compliance action needed.
+- XSS: all 7 user-input entry points in SVG pipeline escaped via `escapeXml()`, explicit XSS tests at `BadgeSvg.test.tsx:600-626`. Fallback SVG also escapes.
+- CORS: only `/api/verify/[hash]` allows `*` (intentional, rate-limited 30 req/60s, read-only). CSP properly configured in `next.config.ts`. Global headers: HSTS, nosniff, X-XSS-Protection.
+- RLS: **all 10 Supabase tables** RLS-enabled with explicit deny policies (up from 6). NEW: `email_campaigns`, `campaign_sends` added with deny policies in migration 016. Views use `security_invoker = true`.
+- Knip: clean — 1 config hint only (redundant entry pattern).
+- Hardcoded secrets: none found in source. All env vars `.trim()`ed.
+- OAuth: CSRF state validation, redirect URL validation, AES-256-GCM token encryption, 10s fetch timeouts.
+- Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`.
+- Campaign email system: auth checks, daily send quota (95), batch size 50, Redis counter. Follows existing security patterns.
 
 **Cross-agent recommendations:**
-- [Coverage]: All security-critical paths at 88%+. XSS tests at `BadgeSvg.test.tsx:600-626`. `tool-insights.ts` (0% coverage) has no auth-sensitive logic — low security risk but coverage recommended.
-- [QA]: `minimatch` ReDoS resolved — no longer in audit output. No security UX issues.
-- [Cost Analyst]: `badge:notified:*` confirmed 365d TTL (not indefinite). Fail-open rate limiting intact. No new cost-security concerns.
-- [Performance]: No security-related performance concerns. Rate limiting fail-open by design. CSP `connect-src` properly scoped for PostHog.
+- [Coverage]: All security-critical paths at 86%+. Campaign API routes at 77–78% need error-path coverage. XSS tests comprehensive. HMAC verification at 100%.
+- [QA]: No security UX issues. Campaign send pipeline uses batch operations and daily limits correctly. Process stream leak (admin agent route) is resource hygiene, not security.
+- [Cost Analyst]: Fail-open rate limiting intact. All fetch timeouts in place (100%). Campaign email quota prevents abuse. No cost-security concerns.
+- [Performance]: No security-related performance concerns. Rate limiting fail-open by design. CSP `connect-src` properly scoped.
+- [Documentation]: Auth cookie functions still lack JSDoc — documentation gap increases misuse risk, not a vulnerability.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-03-11T09:00:00Z -->
