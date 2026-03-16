@@ -194,14 +194,162 @@ describe("AuthorTypewriter", () => {
         </div>,
       );
 
-      // Use fireEvent.click which dispatches through React's synthetic event system
-      // where stopPropagation works as expected.
       const wrapper = screen.getByRole("presentation");
       fireEvent.click(wrapper);
 
-      // The wrapper's onClick calls e.stopPropagation(), so outerHandler should
-      // NOT be called because the event doesn't bubble past the wrapper.
       expect(outerHandler).not.toHaveBeenCalled();
+    });
+
+    it("stops keydown propagation for Enter key", () => {
+      const outerKeyDown = vi.fn();
+      render(
+        <div onKeyDown={outerKeyDown}>
+          <AuthorTypewriter />
+        </div>,
+      );
+
+      const wrapper = screen.getByRole("presentation");
+      fireEvent.keyDown(wrapper, { key: "Enter" });
+      expect(outerKeyDown).not.toHaveBeenCalled();
+    });
+
+    it("stops keydown propagation for Space key", () => {
+      const outerKeyDown = vi.fn();
+      render(
+        <div onKeyDown={outerKeyDown}>
+          <AuthorTypewriter />
+        </div>,
+      );
+
+      const wrapper = screen.getByRole("presentation");
+      fireEvent.keyDown(wrapper, { key: " " });
+      expect(outerKeyDown).not.toHaveBeenCalled();
+    });
+
+    it("does not stop keydown propagation for other keys", () => {
+      const outerKeyDown = vi.fn();
+      render(
+        <div onKeyDown={outerKeyDown}>
+          <AuthorTypewriter />
+        </div>,
+      );
+
+      const wrapper = screen.getByRole("presentation");
+      fireEvent.keyDown(wrapper, { key: "Tab" });
+      expect(outerKeyDown).toHaveBeenCalled();
+    });
+  });
+
+  describe("animation — full type/erase cycle", () => {
+    it("types a new message after erasing home text", async () => {
+      matchMediaResult = false;
+      const { container } = render(<AuthorTypewriter />);
+
+      // HOME_HOLD (30s)
+      await act(async () => {
+        vi.advanceTimersByTime(30_000);
+      });
+
+      // Erase HOME_TEXT: "</> JG" = 6 chars, each 80ms = 6 steps
+      for (let i = 0; i < 6; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(80);
+        });
+      }
+
+      // After erase completes, EMPTY_PAUSE (300ms)
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+
+      // Now typeText begins for the next message
+      // Advance a few chars to verify typing started
+      for (let i = 0; i < 5; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(80);
+        });
+      }
+
+      const textSpan = container.querySelector("button span span");
+      expect(textSpan).not.toBeNull();
+      // Text should be partially typed (non-empty, not HOME_TEXT)
+      expect(textSpan!.textContent!.length).toBeGreaterThan(0);
+    });
+
+    it("returns to HOME_TEXT after showing a message", async () => {
+      matchMediaResult = false;
+      const { container } = render(<AuthorTypewriter />);
+
+      // Step through a complete cycle:
+      // HOME_HOLD -> erase HOME -> pause -> type msg -> MSG_HOLD -> erase msg -> pause -> type HOME
+
+      // 1. HOME_HOLD
+      await act(async () => { vi.advanceTimersByTime(30_000); });
+
+      // 2. Erase HOME_TEXT (6 chars * 80ms)
+      for (let i = 0; i < 6; i++) {
+        await act(async () => { vi.advanceTimersByTime(80); });
+      }
+
+      // 3. EMPTY_PAUSE
+      await act(async () => { vi.advanceTimersByTime(300); });
+
+      // 4. Type next message (MESSAGES[1] = "built with ♥ in the EU" = 22 chars)
+      for (let i = 0; i < 22; i++) {
+        await act(async () => { vi.advanceTimersByTime(80); });
+      }
+
+      // 5. MSG_HOLD
+      await act(async () => { vi.advanceTimersByTime(4_000); });
+
+      // 6. Erase message (22 chars)
+      for (let i = 0; i < 22; i++) {
+        await act(async () => { vi.advanceTimersByTime(80); });
+      }
+
+      // 7. EMPTY_PAUSE
+      await act(async () => { vi.advanceTimersByTime(300); });
+
+      // 8. Type HOME_TEXT back (6 chars)
+      for (let i = 0; i < 6; i++) {
+        await act(async () => { vi.advanceTimersByTime(80); });
+      }
+
+      const textSpan = container.querySelector("button span span");
+      expect(textSpan?.textContent).toBe("</> JG");
+    });
+
+    it("handles unmount mid-erase without errors", async () => {
+      matchMediaResult = false;
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance into the erase phase
+      await act(async () => { vi.advanceTimersByTime(30_000); });
+      await act(async () => { vi.advanceTimersByTime(80); });
+      await act(async () => { vi.advanceTimersByTime(80); });
+
+      // Unmount mid-erase
+      unmount();
+
+      // Advance more timers — should not crash
+      await act(async () => { vi.advanceTimersByTime(60_000); });
+    });
+
+    it("handles unmount mid-type without errors", async () => {
+      matchMediaResult = false;
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance past erase into type phase
+      await act(async () => { vi.advanceTimersByTime(30_000); });
+      for (let i = 0; i < 6; i++) {
+        await act(async () => { vi.advanceTimersByTime(80); });
+      }
+      await act(async () => { vi.advanceTimersByTime(300); });
+      // Start typing
+      await act(async () => { vi.advanceTimersByTime(80); });
+
+      unmount();
+      await act(async () => { vi.advanceTimersByTime(60_000); });
     });
   });
 });

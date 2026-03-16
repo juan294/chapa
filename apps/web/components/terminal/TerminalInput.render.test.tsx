@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import { TerminalInput } from "./TerminalInput";
 
 afterEach(cleanup);
@@ -90,5 +90,151 @@ describe("TerminalInput", () => {
     fireEvent.change(input, { target: { value: "/about" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(input.value).toBe("");
+  });
+
+  describe("imperative handle via ref", () => {
+    it("clear() resets input value and history index", () => {
+      const ref = { current: null as import("./TerminalInput").TerminalInputHandle | null };
+      render(<TerminalInput onSubmit={vi.fn()} ref={ref} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "/test" } });
+      expect(input.value).toBe("/test");
+      act(() => {
+        ref.current?.clear();
+      });
+      expect(input.value).toBe("");
+    });
+
+    it("focus() sets focus on the input element", () => {
+      const ref = { current: null as import("./TerminalInput").TerminalInputHandle | null };
+      render(<TerminalInput onSubmit={vi.fn()} ref={ref} />);
+      const input = screen.getByLabelText("Terminal command input");
+      act(() => {
+        ref.current?.focus();
+      });
+      expect(document.activeElement).toBe(input);
+    });
+  });
+
+  describe("autoFocus behavior", () => {
+    it("focuses input after delay when autoFocus is true", () => {
+      vi.useFakeTimers();
+      render(<TerminalInput onSubmit={vi.fn()} autoFocus={true} />);
+      const input = screen.getByLabelText("Terminal command input");
+
+      // Input is focused after 300ms delay
+      vi.advanceTimersByTime(300);
+      expect(document.activeElement).toBe(input);
+      vi.useRealTimers();
+    });
+
+    it("does not auto-focus when autoFocus is false", () => {
+      render(<TerminalInput onSubmit={vi.fn()} autoFocus={false} />);
+      const input = screen.getByLabelText("Terminal command input");
+      expect(document.activeElement).not.toBe(input);
+    });
+  });
+
+  describe("history navigation edge cases", () => {
+    it("ArrowUp with empty history is a no-op", () => {
+      render(<TerminalInput onSubmit={vi.fn()} history={[]} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("");
+    });
+
+    it("ArrowUp at end of history stays at last item", () => {
+      const history = ["/first", "/second"];
+      render(<TerminalInput onSubmit={vi.fn()} history={history} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      // Navigate to the end of history
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("/second");
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("/first");
+      // One more ArrowUp should stay at the oldest item
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("/first");
+    });
+
+    it("ArrowDown from index 0 clears input", () => {
+      const history = ["/first", "/second"];
+      render(<TerminalInput onSubmit={vi.fn()} history={history} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      // Go up once
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("/second");
+      // Go down should clear
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(input.value).toBe("");
+    });
+
+    it("ArrowDown with no history index (-1) clears input", () => {
+      render(<TerminalInput onSubmit={vi.fn()} history={["/first"]} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      // ArrowDown without having navigated up first
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(input.value).toBe("");
+    });
+
+    it("ArrowUp calls onPartialChange with history value", () => {
+      const onChange = vi.fn();
+      const history = ["/first", "/second"];
+      render(<TerminalInput onSubmit={vi.fn()} history={history} onPartialChange={onChange} />);
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(onChange).toHaveBeenCalledWith("/second");
+    });
+
+    it("ArrowDown calls onPartialChange with history value", () => {
+      const onChange = vi.fn();
+      const history = ["/first", "/second"];
+      render(<TerminalInput onSubmit={vi.fn()} history={history} onPartialChange={onChange} />);
+      const input = screen.getByLabelText("Terminal command input");
+      // Go up twice
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      onChange.mockClear();
+      // Go down
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(onChange).toHaveBeenCalledWith("/second");
+    });
+
+    it("ArrowDown past beginning calls onPartialChange with empty string", () => {
+      const onChange = vi.fn();
+      render(<TerminalInput onSubmit={vi.fn()} history={["/first"]} onPartialChange={onChange} />);
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      onChange.mockClear();
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(onChange).toHaveBeenCalledWith("");
+    });
+
+    it("Escape calls onPartialChange with empty string", () => {
+      const onChange = vi.fn();
+      render(<TerminalInput onSubmit={vi.fn()} onPartialChange={onChange} />);
+      const input = screen.getByLabelText("Terminal command input");
+      fireEvent.change(input, { target: { value: "/test" } });
+      onChange.mockClear();
+      fireEvent.keyDown(input, { key: "Escape" });
+      expect(onChange).toHaveBeenCalledWith("");
+    });
+  });
+
+  describe("input change resets history index", () => {
+    it("typing after history navigation resets history position", () => {
+      const history = ["/first", "/second"];
+      render(<TerminalInput onSubmit={vi.fn()} history={history} />);
+      const input = screen.getByLabelText("Terminal command input") as HTMLInputElement;
+      // Navigate up
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("/second");
+      // Type something new
+      fireEvent.change(input, { target: { value: "/new" } });
+      expect(input.value).toBe("/new");
+      // ArrowUp should start from the beginning of history again
+      fireEvent.keyDown(input, { key: "ArrowUp" });
+      expect(input.value).toBe("/second");
+    });
   });
 });
