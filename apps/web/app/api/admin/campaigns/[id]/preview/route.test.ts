@@ -23,6 +23,7 @@ vi.mock("@/lib/email/templates/announcement", () => ({
 
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
+import { rateLimit } from "@/lib/cache/redis";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { buildAnnouncementHtml } from "@/lib/email/templates/announcement";
 import { GET } from "./route";
@@ -73,5 +74,29 @@ describe("GET /api/admin/campaigns/[id]/preview", () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(null);
     const res = await GET(makeRequest(), { params: mockParams });
     expect(res.status).toBe(404);
+  });
+
+  it("returns 401 without session", async () => {
+    vi.mocked(readSessionCookie).mockReturnValue(null);
+    const res = await GET(makeRequest(), { params: mockParams });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for non-admin", async () => {
+    vi.mocked(isAdminHandle).mockReturnValue(false);
+    const res = await GET(makeRequest(), { params: mockParams });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, current: 11, limit: 10 });
+    const res = await GET(makeRequest(), { params: mockParams });
+    expect(res.status).toBe(429);
+  });
+
+  it("returns 500 when NEXTAUTH_SECRET is missing", async () => {
+    delete process.env.NEXTAUTH_SECRET;
+    const res = await GET(makeRequest(), { params: mockParams });
+    expect(res.status).toBe(500);
   });
 });
