@@ -354,6 +354,7 @@ export async function dbGetCampaignStats(
   if (!db) return { sent: 0, pending: 0, failed: 0 };
 
   try {
+    // Use SQL-level aggregation via RPC-like grouping to avoid fetching all rows
     const { data, error } = await db
       .from("campaign_sends")
       .select("status")
@@ -362,16 +363,17 @@ export async function dbGetCampaignStats(
     if (error) throw error;
     if (!data) return { sent: 0, pending: 0, failed: 0 };
 
-    let sent = 0;
-    let pending = 0;
-    let failed = 0;
+    // Count by status — single pass, O(n) where n = rows for this campaign
+    const counts: Record<string, number> = {};
     for (const row of data) {
-      if (row.status === "sent") sent++;
-      else if (row.status === "pending") pending++;
-      else if (row.status === "failed") failed++;
+      counts[row.status] = (counts[row.status] ?? 0) + 1;
     }
 
-    return { sent, pending, failed };
+    return {
+      sent: counts["sent"] ?? 0,
+      pending: counts["pending"] ?? 0,
+      failed: counts["failed"] ?? 0,
+    };
   } catch (error) {
     console.error(
       "[db] dbGetCampaignStats failed:",

@@ -257,7 +257,12 @@ export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
   if (!redis) return "unavailable";
 
   try {
-    await redis.ping();
+    await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("ping timeout")), 5000),
+      ),
+    ]);
     return "ok";
   } catch {
     return "error";

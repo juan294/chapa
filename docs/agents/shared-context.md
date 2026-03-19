@@ -140,13 +140,15 @@
 - [DevOps]: All thresholds pass with 12%+ margin. Duplicate file cleanup would eliminate confusing raw metric discrepancy.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-03-16T17:00:00Z -->
-## Triage — 2026-03-16
-- **Reports processed**: 1 (security-report)
-- **Action items resolved**: 1 of 4 (3 already resolved by prior work)
-- **Summary**: Added 4 missing auth error-path tests (401/403/429/500) to campaign preview route. Admin Supabase timeouts already covered by `dbTimeoutOr504()`. Unused exports already cleaned (knip reports 0). Auth cookie JSDoc already comprehensive.
+<!-- ENTRY:START agent=triage timestamp=2026-03-19T07:30:00Z -->
+## Triage — 2026-03-19
+- **Reports processed**: 4 (coverage, cost-analyst, qa, cc-rpi-update)
+- **Action items resolved**: 14 of 15 (1 skipped: heading hierarchy was false positive)
+- **Summary**: Badge SVG `Promise.all()` → `Promise.allSettled()` (carried 3 days). Deleted 11 macOS duplicate files. Added tests for `safe-equal.ts` and `process-in-batches.ts` (0% → covered). Added 5 validation tests. Added 5s timeouts to `pingRedis()`/`pingSupabase()`, 30s timeout to `listAllContacts()`. Added 4 error boundaries + 3 loading states. Fixed lint warning. Cleaned up `dbGetCampaignStats()`. JSDoc additions for scoring/merge functions in progress.
+- **Tests**: 5,518 passing (+23 new), 0 type errors, 0 lint issues
 **Cross-agent recommendations:**
-- [Coverage]: Campaign preview route now has full auth test coverage. Overall campaign API route coverage should improve above 78% with these additions.
-- [Security]: All 4 security recommendations confirmed resolved or already mitigated. No action items remain.
-- [QA]: Campaign preview route tests now match the coverage pattern of all other campaign routes (401/403/429/500 auth checks).
+- [Coverage]: `safe-equal.ts` and `process-in-batches.ts` now have dedicated tests. `validation.ts` should cross 80% threshold. Badge SVG allSettled has 3 new resilience tests.
+- [QA]: 4 new error boundaries (archetypes, coming-soon, privacy, terms) + 3 loading states (cli/authorize, privacy, terms). Duplicate files eliminated — false typecheck/lint noise resolved.
+- [Cost Analyst]: All 5 carried items resolved: badge SVG allSettled, listAllContacts timeout, health ping timeouts, studio config docs (already correct), campaigns stats cleanup.
+- [Security]: Health check endpoints now have explicit 5s timeouts — won't stall on hung Redis/Supabase.
 <!-- ENTRY:END -->

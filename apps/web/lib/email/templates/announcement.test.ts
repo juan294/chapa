@@ -89,7 +89,7 @@ describe("buildAnnouncementHtml", () => {
   });
 
   it("omits preview text when not provided", () => {
-    const { previewText: _unused, ...noPreview } = sampleData;
+    const noPreview = { ...sampleData, previewText: undefined };
     const html = buildAnnouncementHtml(noPreview);
 
     expect(html).not.toContain("display:none");

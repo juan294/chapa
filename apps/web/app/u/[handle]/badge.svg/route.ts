@@ -100,13 +100,17 @@ export async function GET(
 
     // Fetch craft score, snapshot, and avatar in parallel — all are independent
     // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
-    const [craftResult, latestSnapshot, avatarDataUri] = await Promise.all([
+    // Uses allSettled so a single DB/network error doesn't crash the entire badge.
+    const [craftSettled, snapshotSettled, avatarSettled] = await Promise.allSettled([
       dbGetToolInsights(handle),
       getCachedLatestSnapshot(handle),
       stats.avatarUrl
         ? getAvatarBase64(handle, stats.avatarUrl)
         : Promise.resolve(undefined),
     ]);
+    const craftResult = craftSettled.status === "fulfilled" ? craftSettled.value : null;
+    const latestSnapshot = snapshotSettled.status === "fulfilled" ? snapshotSettled.value : null;
+    const avatarDataUri = avatarSettled.status === "fulfilled" ? avatarSettled.value : undefined;
 
     // Compute impact (craft score feeds into the 5th pentagon dimension)
     const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);

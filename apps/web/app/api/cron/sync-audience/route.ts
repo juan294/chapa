@@ -19,38 +19,53 @@ interface Contact {
   unsubscribed: boolean;
 }
 
+const LIST_CONTACTS_TIMEOUT_MS = 30_000;
+
 async function listAllContacts(): Promise<Contact[]> {
   const resend = getResend();
   if (!resend) return [];
 
-  const all: Contact[] = [];
-  let cursor: string | undefined;
-
-  try {
-    for (;;) {
-      const opts: { limit: number; after?: string } = { limit: 100 };
-      if (cursor) opts.after = cursor;
-
-      const { data, error } = await resend.contacts.list(opts);
-      if (error || !data) break;
-
-      for (const c of data.data) {
-        all.push({
-          id: c.id,
-          email: c.email,
-          unsubscribed: c.unsubscribed,
-        });
-      }
-
-      if (!data.has_more) break;
-      cursor = data.data[data.data.length - 1]?.id;
-      if (!cursor) break;
-    }
-  } catch (error) {
+  return Promise.race([
+    listAllContactsInner(resend),
+    new Promise<Contact[]>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("listAllContacts timed out")),
+        LIST_CONTACTS_TIMEOUT_MS,
+      ),
+    ),
+  ]).catch((error) => {
     console.error(
       "[sync-audience] listAllContacts error:",
       (error as Error).message,
     );
+    return [];
+  });
+}
+
+async function listAllContactsInner(
+  resend: ReturnType<typeof getResend> & object,
+): Promise<Contact[]> {
+  const all: Contact[] = [];
+  let cursor: string | undefined;
+
+  for (;;) {
+    const opts: { limit: number; after?: string } = { limit: 100 };
+    if (cursor) opts.after = cursor;
+
+    const { data, error } = await resend.contacts.list(opts);
+    if (error || !data) break;
+
+    for (const c of data.data) {
+      all.push({
+        id: c.id,
+        email: c.email,
+        unsubscribed: c.unsubscribed,
+      });
+    }
+
+    if (!data.has_more) break;
+    cursor = data.data[data.data.length - 1]?.id;
+    if (!cursor) break;
   }
 
   return all;

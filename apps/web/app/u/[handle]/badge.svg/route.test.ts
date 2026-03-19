@@ -531,6 +531,39 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
       expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
     });
+
+    it("renders badge when dbGetToolInsights throws (allSettled resilience)", async () => {
+      const { dbGetToolInsights } = await import("@/lib/db/tool-insights");
+      vi.mocked(dbGetToolInsights).mockRejectedValue(new Error("Supabase error"));
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toBe(FAKE_SVG);
+      // craft score falls back to undefined
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+    });
+
+    it("renders badge when getCachedLatestSnapshot throws (allSettled resilience)", async () => {
+      mockGetCachedLatestSnapshot.mockRejectedValue(new Error("Redis error"));
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toBe(FAKE_SVG);
+    });
+
+    it("renders badge when getAvatarBase64 throws (allSettled resilience)", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("Network error"));
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: undefined,
+        verificationHash: undefined,
+        verificationDate: undefined,
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

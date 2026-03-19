@@ -103,4 +103,47 @@ describe("isValidInsightsUpload", () => {
     const result = isValidInsightsUpload(data);
     expect(result.valid).toBe(false);
   });
+
+  it("rejects array input for nested objects", () => {
+    expect(isValidInsightsUpload([1, 2, 3])).toEqual({ valid: false, reason: "Expected an object" });
+    const data = makeValid();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (data as any).outcomes = [1, 2, 3];
+    const result = isValidInsightsUpload(data);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.reason).toContain("outcomes");
+  });
+
+  it("rejects non-integer values in outcomes", () => {
+    const data = makeValid();
+    data.outcomes.fullyAchieved = 1.5;
+    const result = isValidInsightsUpload(data);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.reason).toContain("outcomes.fullyAchieved");
+  });
+
+  it("rejects negative responseTime.medianSeconds", () => {
+    const data = makeValid();
+    data.responseTime.medianSeconds = -1;
+    const result = isValidInsightsUpload(data);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.reason).toContain("medianSeconds");
+  });
+
+  it("rejects negative totalToolCalls", () => {
+    const data = makeValid();
+    data.totalToolCalls = -1;
+    const result = isValidInsightsUpload(data);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.reason).toContain("totalToolCalls");
+  });
+
+  it("rejects non-numeric values in sessionTypes", () => {
+    const data = makeValid();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (data as any).sessionTypes = { "Single Task": "not-a-number" };
+    const result = isValidInsightsUpload(data);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.reason).toContain("sessionTypes");
+  });
 });
