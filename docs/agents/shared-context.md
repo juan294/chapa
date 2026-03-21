@@ -142,15 +142,16 @@
 - [DevOps]: All thresholds pass with 11.5%+ margin. 9 duplicate files still need cleanup — they cause coverage metric discrepancy.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-03-19T07:30:00Z -->
-## Triage — 2026-03-19
-- **Reports processed**: 4 (coverage, cost-analyst, qa, cc-rpi-update)
-- **Action items resolved**: 14 of 15 (1 skipped: heading hierarchy was false positive)
-- **Summary**: Badge SVG `Promise.all()` → `Promise.allSettled()` (carried 3 days). Deleted 11 macOS duplicate files. Added tests for `safe-equal.ts` and `process-in-batches.ts` (0% → covered). Added 5 validation tests. Added 5s timeouts to `pingRedis()`/`pingSupabase()`, 30s timeout to `listAllContacts()`. Added 4 error boundaries + 3 loading states. Fixed lint warning. Cleaned up `dbGetCampaignStats()`. JSDoc additions for scoring/merge functions in progress.
-- **Tests**: 5,518 passing (+23 new), 0 type errors, 0 lint issues
+<!-- ENTRY:START agent=triage timestamp=2026-03-21T12:00:00Z -->
+## Triage — 2026-03-21
+- **Reports processed**: 4 (coverage, cost-analyst, documentation, cc-rpi-update)
+- **Action items resolved**: 12 of 13 (1 already done: campaign admin rate limiting was already in `adminAuth()`)
+- **Summary**: Deleted 9 iCloud duplicate files + 6 duplicate logs. Hoisted nested `vi.mock()` in UserMenu tests. Cleared `Promise.race` timer in `listAllContacts()`. Fixed misleading SQL comment in `dbGetCampaignStats()`. Fixed 2 phantom routes + 2 method mismatches in CLAUDE.md. Added 20+ undocumented routes to CLAUDE.md. Added JSDoc to 4 critical functions. Created `/archetypes/artificer` page. Added render tests for PostHogProvider and SharePageOwnerContent. Updated design-system.md.
+- **Tests**: 5,531 passing (+13 new), 0 type errors, 0 lint issues
+- **Pre-existing issue found**: `ActivityHeatmap.test.tsx` fails in main repo (ResizeObserver not defined) — works in fresh worktree. Environment issue, not a regression.
 **Cross-agent recommendations:**
-- [Coverage]: `safe-equal.ts` and `process-in-batches.ts` now have dedicated tests. `validation.ts` should cross 80% threshold. Badge SVG allSettled has 3 new resilience tests.
-- [QA]: 4 new error boundaries (archetypes, coming-soon, privacy, terms) + 3 loading states (cli/authorize, privacy, terms). Duplicate files eliminated — false typecheck/lint noise resolved.
-- [Cost Analyst]: All 5 carried items resolved: badge SVG allSettled, listAllContacts timeout, health ping timeouts, studio config docs (already correct), campaigns stats cleanup.
-- [Security]: Health check endpoints now have explicit 5s timeouts — won't stall on hung Redis/Supabase.
+- [Coverage]: SharePageOwnerContent now has render tests (was 0%). PostHogProvider render tests expanded. Duplicate files eliminated — raw coverage denominator now accurate.
+- [QA]: Nested `vi.mock()` warning resolved. Pre-existing ResizeObserver issue in main repo needs investigation (JSDOM polyfill).
+- [Documentation]: CLAUDE.md now at ~95% route coverage (up from 65%). Phantom routes removed. Method mismatches fixed. Artificer added to archetype list.
+- [Cost Analyst]: Campaign admin rate limiting confirmed already present via `adminAuth()` — cost analyst report finding was incorrect.
 <!-- ENTRY:END -->
