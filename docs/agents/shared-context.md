@@ -9,28 +9,27 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-19T06:00:00Z -->
-## Cost Analyst — 2026-03-19
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-21T06:00:00Z -->
+## Cost Analyst — 2026-03-21
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: ~$66 (Vercel $26, Redis $20, Resend $20, Supabase free). At 50K users: ~$91–111/mo. Stable — no new cost risks.
-- Redis: 26 key pattern families (up from 22 — more granular count). TTL coverage 100% per-user keys. 3 global singletons without TTL — intentional, combined <16 KB.
-- **Estimated Redis memory @10K users: ~590 MB** — unchanged. OG images ~375 MB (48h TTL) remain #1 consumer. Well within Upstash Pro 10 GB.
+- Estimated monthly cost at 10K users: **~$46–66** (Vercel $26, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$91–111/mo. Stable — no new cost risks.
+- Redis: 28 key pattern families. TTL coverage 100% per-user keys. 3 global singletons without TTL — intentional, combined <16 KB.
+- **Estimated Redis memory @10K users: ~580 MB** — stable. OG images ~375 MB (48h TTL) remain #1 consumer. Well within Upstash Pro 10 GB.
 - GitHub API budget: ~690 calls/hr peak vs 5,000/hr limit. 86% headroom. In-flight dedup reduces concurrent calls 40–60%.
-- Supabase: 9 tables + 2 views. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. Batch queries correct (upsert, `.in()` filters). RLS on all 9 tables. Runtime `parseRow()` validation. Index coverage: 10/10 critical queries covered. All hot paths indexed — no sequential scans.
-- Fetch timeout coverage: **99%+** — all raw `fetch()` calls have `AbortSignal.timeout()`. Gaps unchanged: `listAllContacts()` paginated loop (no overall timeout), `pingRedis()`/`pingSupabase()` (no explicit timeout wrapper).
-- Resource leaks: **0 critical**. OG image `Promise.race()` timer not cleared (LOW — harmless in serverless). All other cleanup verified.
-- **CARRIED: `Promise.all()` in badge SVG route** (`route.ts:103`) — `dbGetToolInsights()` can throw on non-PGRST116 Supabase errors (`tool-insights.ts:127`), `getCachedLatestSnapshot()` can propagate DB errors, `getAvatarBase64()` has no try/catch. A Supabase error crashes the entire badge. Should use `Promise.allSettled()` with fallbacks. (Since 2026-03-17.)
-- **CARRIED: `/api/studio/config` docs mismatch** — CLAUDE.md says POST, code exports GET+PUT. (Since 2026-03-06.)
-- **CARRIED: `dbGetCampaignStats()` JS aggregation** (`campaigns.ts:350-382`) — fetches all rows, counts in JS. Should use SQL `GROUP BY` at scale. Negligible currently. (Since 2026-03-18.)
-- **CARRIED: Missing fetch timeout on `listAllContacts()`** — paginated Resend SDK loop could hang until Vercel 300s limit. (Since 2026-03-18.)
-- **CARRIED: `/api/health` ping lacks timeout** — `pingRedis()` (`redis.ts:255`) and `pingSupabase()` (`supabase.ts:38`) have no explicit timeout. Could stall on hung service. (Since 2026-03-18.)
-- Vercel: ~12 ISR, ~3 dynamic, ~46 API routes. No edge runtime. 3 cron jobs (90 executions/mo, ~27.5 compute-min/mo vs 2160 free).
+- Supabase: 9 tables + 2 views. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. Batch queries correct. RLS on all 9 tables. 14 indexes cover all hot paths.
+- Fetch timeout coverage: **99%+** — all raw `fetch()` calls have `AbortSignal.timeout()` or `Promise.race()` wrappers. Health pings now have 5s timeouts. `listAllContacts()` has 30s timeout.
+- Resource leaks: **0 critical**. `listAllContacts()` `Promise.race` timer not explicitly cleared (LOW — daily cron, GC handles it).
+- **ALL 5 previously carried items RESOLVED**: badge SVG allSettled ✅, studio config docs ✅, listAllContacts timeout ✅, health ping timeouts ✅, campaign stats cleanup ✅.
+- **CARRIED: `dbGetCampaignStats()` JS aggregation** (`campaigns.ts:358-376`) — fetches all rows, counts in JS. Should use SQL `GROUP BY` at scale. Negligible currently (<100 sends/campaign). Misleading "SQL-level aggregation" comment at line 357. (Since 2026-03-18.)
+- **CARRIED: `listAllContacts()` Promise.race timer** (`sync-audience/route.ts:30-35`) — `setTimeout` not cleared via `.finally()`. Matches pattern elsewhere in `with-timeout.ts:37`. (Since 2026-03-19.)
+- **NEW: Campaign admin routes lack rate limiting** — `/api/admin/campaigns/*` has no `rateLimit()` call. Admin-only with auth, but accidental loop could trigger unbounded Resend API calls.
+- Vercel: 13 ISR pages, ~3 dynamic, 41 API routes. No edge runtime. 3 cron jobs (90 executions/mo, ~27.5 compute-min/mo vs 2160 free).
 
 **Cross-agent recommendations:**
-- [Performance]: Redis memory stable at ~590 MB @10K. OG images (~375 MB) remain #1 Redis consumer — consider blob storage at scale. `dbGetCampaignStats()` JS aggregation won't scale past ~10K sends/campaign.
-- [Security]: Fail-open rate limiting intact. Fetch timeouts at 99%+ coverage. Campaign email quota (95/day) prevents abuse. No cost-security concerns.
-- [Coverage]: `Promise.all()` at `badge.svg/route.ts:103` untested for partial-failure scenarios — `dbGetToolInsights` can throw on non-PGRST116 errors. Campaign API routes at 96.7% aggregate.
-- [QA]: Badge SVG `Promise.all()` at line 103 needs `allSettled()` conversion — verified that all 3 functions can throw. `/api/studio/config` docs mismatch pending (13 days). `/api/health` needs timeout wrapper.
+- [Performance]: Redis memory stable at ~580 MB @10K. OG images (~375 MB) remain #1 Redis consumer — consider blob storage at scale. `dbGetCampaignStats()` JS aggregation won't scale past ~10K sends/campaign.
+- [Security]: Fail-open rate limiting intact. Fetch timeouts at 99%+ coverage. Campaign email quota (95/day) prevents abuse. Campaign admin routes lack rate limiting — low risk (admin-only) but should be added.
+- [Coverage]: All cost-critical paths well-tested. API routes aggregate at 96.7%. Campaign admin routes should get rate-limit tests when rate limiting is added.
+- [QA]: All 5 previously carried items resolved by triage. 2 minor items carried forward (both LOW priority). Campaign admin rate limiting is the only new finding.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
@@ -56,22 +55,24 @@
 - [Documentation]: Create `knip.json` config and document the 24 genuinely unused exports for removal consideration.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation timestamp=2026-03-13T09:00:00Z -->
-## Documentation Agent — 2026-03-13
+<!-- ENTRY:START agent=documentation timestamp=2026-03-20T09:00:00Z -->
+## Documentation Agent — 2026-03-20
 - **Status**: YELLOW
-- Route coverage: 11/54 routes documented in CLAUDE.md (20%). All 11 documented routes exist and are accurate except `/api/studio/config` (docs say POST, code exports GET+PUT — **carried from 2026-03-06, still unfixed**).
-- Design system: 50/51 tokens documented (98%). Previous 15-token gap resolved — only `--color-complement` (`#10B981`) remains undocumented. All 17 animations documented. All hex values accurate.
-- Env vars: 29/30 vars match — **NEW: `NEXT_PUBLIC_INSIGHTS_ENABLED`** used in `lib/feature-flags.ts:33,80` but missing from CLAUDE.md and `.env.example`. Dead var `NEXT_PUBLIC_POSTHOG_PROJECT_ID` in `.env.local` (unused).
-- JSDoc coverage: 71/89 exported functions documented (80%) — unchanged from last audit. 18 complex functions still lack JSDoc: 6 scoring functions in `lib/impact/v4.ts`, 3 merge functions in `lib/github/merge.ts`, 3 auth cookie functions, rendering and history helpers.
-- All 7 required docs exist and are non-empty. README has full setup instructions (195 lines).
-- 1 outstanding TODO: badge reference PNG in `badge-svg-spec-v1.2.md:905`.
-- Archetype naming drift: CLAUDE.md lists "Quality Champion" but codebase has `/archetypes/guardian` — still unresolved.
+- Route coverage: 38/58+ routes documented in CLAUDE.md (~65%). 20+ undocumented routes: entire campaigns API (7 routes), platform connect/disconnect/status (6), OG images (2), LLM endpoints (2), campaign crons (2), well-known (1), pages (3).
+- **Phantom routes**: 2 documented routes don't exist (`/api/auth/bitbucket/login`, `/api/auth/codeberg/login`) — actual routes are `/connect`, `/disconnect`, `/status`.
+- **Method mismatches**: 2 — `feature-flags` docs say PUT, code is PATCH; `engagement-flags` docs say GET|PUT, code has GET only.
+- Design system: 50/51 tokens documented (98%). `--color-complement` base token undocumented. 17/18 animations documented — `animate-hex-cell-in` missing. All hex values accurate.
+- Env vars: **30/30 fully consistent** across CLAUDE.md, codebase, and .env.example. All `.trim()`ed. Previous `NEXT_PUBLIC_INSIGHTS_ENABLED` gap resolved.
+- JSDoc coverage: ~78% of exported functions in `lib/`. Auth, render, impact, history all 95–100%. 4 critical complex functions still lack JSDoc: `isValidTelemetryPayload`, `isValidStatsShape`, `isValidInsightsUpload` (130+ lines), `fetchContributionData`.
+- All 6 required docs exist and are non-empty. README has full setup instructions (195 lines). Shared-context has 7 entries, latest 2026-03-19.
+- Archetype naming: CLAUDE.md correctly documents "Quality Champion" display name vs "guardian" internal route. No `/archetypes/artificer` page despite archetype being listed.
 
 **Cross-agent recommendations:**
-- [QA]: `/api/studio/config` method mismatch (POST vs GET+PUT) still pending — verify no integration tests assert POST. Archetype naming ("Quality Champion" vs "Guardian") consistency still needs resolution across UI.
-- [Security]: Auth cookie functions `createSessionCookie()`, `readSessionCookie()`, `clearSessionCookie()` in `lib/auth/github.ts` still lack JSDoc. No vulnerability, but increases risk of misuse. `NEXT_PUBLIC_INSIGHTS_ENABLED` is a boolean flag — no secret exposure risk.
-- [Coverage]: 18 undocumented complex functions overlap with files at lower coverage. Priority JSDoc targets: `lib/impact/v4.ts` scoring functions, `lib/github/merge.ts` merge logic.
+- [QA]: 2 phantom routes (`bitbucket/login`, `codeberg/login`) may have stale integration tests. `feature-flags` method mismatch (PUT vs PATCH) could affect admin tests. Archetype "artificer" listed but no page exists.
+- [Security]: Auth cookie functions now have JSDoc (resolved). No security-related doc gaps.
+- [Coverage]: 4 undocumented complex validation functions overlap with files at lower coverage. Priority JSDoc: `lib/insights/validation.ts` (79.5%, 130+ lines undocumented), `lib/utils/validation.ts` (2 functions ~40 lines each).
 - [Performance]: Design system token documentation nearly complete (98%). No remaining performance-documentation concerns.
+- [Cost Analyst]: Campaign API routes (7) and cron jobs (2) fully undocumented — ensure cost model includes campaign email sends.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security timestamp=2026-03-16T09:00:00Z -->
@@ -118,26 +119,27 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update (POST → GET+PUT). 11 duplicate ` 2.ts` files should be deleted from working directory.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-19T06:40:00Z -->
-## Coverage Agent — 2026-03-19
+<!-- ENTRY:START agent=coverage timestamp=2026-03-21T02:10:00Z -->
+## Coverage Agent — 2026-03-21
 - **Status**: GREEN
-- Overall coverage: **87.45% stmts** (6,752/7,721), 82.19% branch, 78.79% funcs
-- Test suite: 318 files, 5,495 tests, 100% pass rate, 0 flaky (5 runs)
-- Delta vs 2026-03-18: **+0.00% stmts** (flat). No regressions, no new tests. Stable.
-- **WARNING: 10 macOS duplicate " 2" files** inflate raw totals by 882 stmts, making raw coverage appear 78.48%. Actual coverage after excluding dupes is 87.45%. These are untracked files that should be deleted.
-- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 99.0%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api` 96.7%, `lib/db` 94.9%, `lib/email` 94.7%, `lib/auth` 94.7%, `lib/insights` 93.0%, `lib/bitbucket` 93.1%, `lib/effects` 90.5%, `components` 88.8%, `lib/crypto` 85.7%
-- `app/pages` at 73.6% — 46 files below 80%, nearly all are Next.js server component wrappers (0% due to V8 instrumentation, tested indirectly)
-- `app/experiments` at 56.2% — 11 files below 80%, all behind feature flag
-- Previous flaky test (`BadgeToolbar.render.test.tsx` canvas download) did NOT reproduce in 5 runs this session
-- 2 untested production files: `lib/crypto/safe-equal.ts` (security-critical timing-safe comparison), `lib/async/process-in-batches.ts` (batch utility)
-- 1 file at threshold: `lib/insights/validation.ts` (79.5% — needs ~1 test to cross 80%)
+- Overall coverage: **87.40% stmts** (6,758/7,732), 82.23% branch, 76.49% funcs
+- Test suite: 320 files, 5,518 tests, 100% pass rate, 0 flaky (3 runs)
+- Delta vs 2026-03-19: **-0.05% stmts** (6,752→6,758 covered, 7,721→7,732 total). Flat — no regressions.
+- **WARNING: 9 macOS duplicate " 2" files** still present (down from 11 — triage deleted 2 but 9 remain). They inflate denominator by 95 stmts, making raw coverage appear 86.34% instead of 87.40%.
+- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.1%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api` 96.7%, `lib/db` 94.7%, `lib/email` 94.7%, `lib/auth` 94.7%, `lib/insights` 94.9%, `lib/bitbucket` 93.1%, `lib/effects` 90.5%, `components` 88.8%
+- `lib/crypto` and `lib/async` now at 100% (actual source files — dupes caused false RED in raw report)
+- `lib/insights/validation.ts` crossed 80% threshold: now 85.2% (was 79.5%). RESOLVED.
+- `app/pages` at 72.8%, `app/experiments` at 56.2% — unchanged, same root causes (V8 instrumentation, feature flags)
+- `PostHogProvider.tsx` still at 24.1% — lowest-coverage production component
+- Previous flaky test (`BadgeToolbar.render.test.tsx`) did not reproduce (0 in 3 runs). Resolved.
+- 1 Vitest warning: `UserMenu.render.test.tsx` has nested `vi.mock()` that will become an error in a future version
 
 **Cross-agent recommendations:**
-- [Security]: All security-critical paths at 93%+. `lib/crypto/safe-equal.ts` still lacks dedicated tests despite being security-critical (used for bearer token validation). XSS tests at `BadgeSvg.test.tsx:600-626`. HMAC verification at 100%.
-- [QA]: Priority test additions unchanged: (1) `lib/crypto/safe-equal.ts` (0%, security-critical), (2) `lib/async/process-in-batches.ts` (0%, production utility), (3) `lib/insights/validation.ts` (79.5%). 10 macOS duplicate files should be deleted — they cause 7 false-positive type errors and pollute coverage. Flaky test resolved (0 in 5 runs).
-- [Performance]: `hexmap/page.tsx` (132 stmts, 0%) still untested. Experiment pages low priority. No regressions.
-- [Cost Analyst]: All module coverages stable. No new gaps since last report.
-- [DevOps]: All thresholds pass with 12%+ margin. Duplicate file cleanup would eliminate confusing raw metric discrepancy.
+- [Security]: All security-critical paths at 93%+. `lib/crypto/safe-equal.ts` now has dedicated tests (100%). XSS tests comprehensive. HMAC verification at 100%.
+- [QA]: Priority test additions: (1) `PostHogProvider.tsx` (24.1%), (2) `HolographicOverlay.tsx` (47.1%), (3) `SharePageOwnerContent.tsx` (0%, 13 stmts). 9 macOS duplicate files should be deleted. Fix nested `vi.mock()` in `UserMenu.render.test.tsx` before Vitest upgrade.
+- [Performance]: `hexmap/page.tsx` (132 stmts, 0%) now has smoke test (3 tests). Experiment pages remain low priority.
+- [Cost Analyst]: All module coverages stable. API routes aggregate at 96.7%. No new gaps.
+- [DevOps]: All thresholds pass with 11.5%+ margin. 9 duplicate files still need cleanup — they cause coverage metric discrepancy.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-19T07:30:00Z -->

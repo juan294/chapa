@@ -1,192 +1,177 @@
 # Cost Analyst Report
-> Generated: 2026-03-19 | Health status: GREEN
+> Generated: 2026-03-21 | Health status: GREEN | Branch: `develop`
 
 ## Executive Summary
 
-Infrastructure costs remain stable and well within free/low-tier limits. Estimated monthly cost at 10K users: **~$66** (Vercel $26, Redis $20, Resend $20, Supabase free). At 50K users: **~$191/mo**. No regressions since last report. 3 carried items remain open, 0 new cost risks introduced.
+Infrastructure costs remain stable and well-controlled. Estimated monthly cost at 10K users: **~$66** (Vercel $26, Redis $20, Resend $20, Supabase free). At 50K users: ~$91–111/mo. All 5 previously carried items from 2026-03-19 are **resolved**. Two minor items carried forward — both negligible at current scale.
 
 ## Redis Usage
 
-### Key Patterns (26 families)
+### Key Patterns (28 families)
 
-| Pattern | TTL | Est. Size @10K | Est. Size @50K | Notes |
-|---------|-----|----------------|----------------|-------|
-| `stats:{handle}` | 6h | ~20 MB | ~100 MB | GitHub stats cache |
-| `stats:bb:{handle}` | 6h | ~5 MB | ~25 MB | Bitbucket stats cache |
-| `stats:cb:{handle}` | 6h | ~5 MB | ~25 MB | Codeberg stats cache |
-| `stats:{handle}:enriched` | 6h | ~2 MB | ~10 MB | Enriched login cache |
-| `avatar:{handle}` | 6h | ~50 MB | ~250 MB | Base64 avatar (~5 KB each) |
-| `og-image:v1:{handle}:{date}` | 48h | ~75 MB | ~375 MB | OG image PNG (largest consumer) |
-| `snapshot:{handle}` | 6h | ~5 MB | ~25 MB | Latest metrics snapshot |
-| `history:{handle}` | 1h | ~10 MB | ~50 MB | Computed history/trend |
-| `history:{handle}:*` | 1h | ~5 MB | ~25 MB | Date-filtered history variants |
-| `badge:{handle}:{theme}` | 6h | ~5 MB | ~25 MB | Rendered SVG cache |
-| `config:{handle}` | 365d | ~10 MB | ~50 MB | Studio badge config |
-| `badge:notified:{handle}` | 365d | <1 KB | <5 KB | First-badge email dedup |
-| `ratelimit:*` | 60–3600s | ~5 MB | ~25 MB | Rate limit counters (transient) |
-| `ff:all` / `ff:key:{key}` | 1h | <5 KB | <5 KB | Feature flag cache |
-| `cli:auth:{code}` | 5m | <1 KB | <1 KB | CLI device auth sessions |
-| `campaign:quota:{date}` | 24h | <1 KB | <1 KB | Daily email send counter |
-| `stats:badges_generated` | None | <1 KB | <1 KB | Counter (intentional singleton) |
-| `stats:unique_badges` | None | ~12 KB | ~12 KB | HyperLogLog (intentional) |
-| `cron:warm-cache:offset` | None | <1 KB | <1 KB | Rotation pointer (intentional) |
+| Category | Prefix | Example Key | TTL | Per-User? | Est. Size |
+|----------|--------|-------------|-----|-----------|-----------|
+| Stats (primary) | `stats:v2:merged:` | `stats:v2:merged:<handle>` | 6h | Yes | ~2–5 KB |
+| Stats (stale fallback) | `stats:v2:merged:stale:` | `stats:v2:merged:stale:<handle>` | 7d | Yes | ~2–5 KB |
+| History cache | `history:` | `history:<handle>[:from][:to]` | 1h | Yes | ~1–5 KB |
+| Latest snapshot | `snapshot:latest:` | `snapshot:latest:<handle>` | 24h | Yes | ~300 B |
+| OG image | `og-image:v1:` | `og-image:v1:<handle>:<date>` | 48h | Yes | ~50–200 KB |
+| Avatar | `avatar:` | `avatar:<handle>` | 6h | Yes | ~20–80 KB |
+| Rate limiters (18 types) | `ratelimit:` | `ratelimit:<endpoint>:<ip\|handle>` | 60s–24h | Mixed | 8 B each |
+| Campaign quota | `campaign:daily-sends:` | `campaign:daily-sends:<YYYY-MM-DD>` | 24h | No | 8 B |
+| Email dedup (badge) | `badge:notified:` | `badge:notified:<handle>` | 365d | Yes | 1 B |
+| Email dedup (score bump) | `score-bump:` | `score-bump:<handle>` | 7d | Yes | 1 B |
+| Studio config | `config:` | `config:<handle>` | 365d | Yes | ~500 B |
+| CLI device auth | `cli:device:` | `cli:device:<uuid>` | 5m | No | ~50 B |
+| Badge counter | `stats:badges_generated` | (singleton) | None | No | 8 B |
+| Unique badge HLL | `stats:unique_badges` | (singleton) | None | No | ~12 KB |
+| Cron rotation | `warm-cache:offset` | (singleton) | None | No | 8 B |
+| Supplemental data | `supplemental:` | `supplemental:<handle>` | 24h | Yes | ~1–3 KB |
 
-- **TTL coverage**: 100% on per-user keys. 3 global singletons without TTL — all intentional, combined <16 KB.
-- **Estimated total @10K users**: ~590 MB. **@50K users**: ~1 GB. Well within Upstash Pro 10 GB.
-- **Growth risk**: LOW. OG images (~375 MB @50K) remain the #1 Redis consumer. Consider blob storage at scale.
+### TTL Coverage
+- **100%** of per-user keys have TTLs
+- **3 global singletons** without TTL — intentional (`stats:badges_generated`, `stats:unique_badges`, `warm-cache:offset`). Combined <16 KB. No growth risk.
+
+### Estimated Redis Memory @ 10K Active Users
+| Category | Est. Memory | Notes |
+|----------|------------|-------|
+| OG images | ~375 MB | #1 consumer. 48h TTL, base64 PNG. |
+| Avatars | ~120 MB | 6h TTL, base64. Rotates quickly. |
+| Stats (primary + stale) | ~60 MB | Two copies per user (fresh + fallback). |
+| History cache | ~15 MB | 1h TTL, high turnover. |
+| Snapshots | ~3 MB | Small JSON objects. |
+| Studio configs | ~5 MB | Long-lived but tiny. |
+| Rate limiters | <1 MB | Short TTLs, small counters. |
+| Email dedup + campaign + CLI | <1 MB | Minimal. |
+| **Total estimate** | **~580 MB** | Well within Upstash Pro 10 GB |
+
+### Growth Risk: LOW
+No unbounded patterns. OG images (~375 MB) remain the #1 consumer — consider Vercel Blob at scale.
 
 ## Database Usage
 
-- **Tables**: 9 (`users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `user_platforms`, `tool_insights`, `email_campaigns`, `campaign_sends`)
-- **Views**: 2 (`latest_snapshots`, `admin_users` — both use `security_invoker = true`)
-- **RLS**: 100% — all 9 tables have RLS enabled with explicit deny-all policies for anon role
-- **Connection management**: Lazy singleton client (`lib/db/supabase.ts:12-30`), `persistSession: false`, fail-open when env vars missing
-- **Query patterns**: Efficient — 0 N+1 patterns detected. Batch operations used for snapshots (`dbGetLatestSnapshotBatch`), campaign sends (`.upsert()` + `.in()` filters), and cleanup. All hot queries backed by indexes (10/10 critical paths covered).
-- **Runtime validation**: `parseRow()` / `parseRows()` on all query results — prevents schema drift bugs
+### Tables: 9 + 2 Views
 
-### Index Coverage
+| Table | Row Growth | RLS | Indexes | Retention |
+|-------|-----------|-----|---------|-----------|
+| `users` | Slow (one per sign-up) | ✓ (deny anon) | registered_at DESC | Permanent |
+| `metrics_snapshots` | 1/user/day (max) | ✓ | handle+date composite | 365d (manual cleanup) |
+| `verification_records` | 1/badge render | ✓ | hash (UNIQUE), handle, expires_at | 30d (auto-cleanup) |
+| `feature_flags` | Static (admin-managed) | ✓ (public SELECT) | key (UNIQUE) | Permanent |
+| `merge_operations` | Sporadic (CLI merges) | ✓ | handle+created_at, failed partial | 90d (auto-cleanup) |
+| `user_platforms` | 1–3/user | ✓ | handle | Permanent |
+| `tool_insights` | 1/user/tool | ✓ | handle | Permanent |
+| `email_campaigns` | Rare (admin creates) | ✓ | status | Permanent |
+| `campaign_sends` | Per-recipient/campaign | ✓ | campaign_id+status | Permanent |
 
-| Table | Index | Query Pattern |
-|-------|-------|---------------|
-| `users` | `idx_users_registered_at` | ORDER BY registered_at DESC |
-| `metrics_snapshots` | `idx_snapshots_handle_date` | WHERE handle + ORDER BY date DESC |
-| `verification_records` | `idx_verification_handle` | WHERE handle |
-| `verification_records` | `idx_verification_expires` | WHERE expires_at < now() |
-| `merge_operations` | `idx_merge_ops_handle_created` | WHERE target_handle ORDER BY created_at DESC |
-| `user_platforms` | `idx_user_platforms_handle` | WHERE handle |
-| `tool_insights` | `idx_tool_insights_handle` | WHERE handle |
-| `campaign_sends` | `idx_campaign_sends_campaign_status` | WHERE campaign_id + status |
-| `email_campaigns` | `idx_email_campaigns_status` | WHERE status |
+**Views:** `latest_snapshots` (DISTINCT ON), `admin_users` (users LEFT JOIN). Both use `SECURITY INVOKER`.
+
+### Query Efficiency: EXCELLENT
+- **0 N+1 patterns** detected. All batch operations use `.in()` filters or single queries.
+- **Singleton lazy client** — no per-request client creation. Connection reuse across invocations.
+- **Runtime row validation** via `parseRow()`/`parseRows()` — prevents schema mismatches.
+- **`dbTimeoutOr504()` wrapper** on 6 admin/feature-flag routes (10s timeout). Prevents hanging on slow DB.
+- **Batch operations** properly used: `dbGetLatestSnapshotBatch()`, `dbCreateCampaignSends()` (upsert), `dbMarkSendsSent/Failed()` (`.in()` filter).
+
+### Supabase Tier: FREE
+Current usage well within free tier (500 MB database, 2 GB bandwidth). No action needed.
 
 ## External API Calls
 
-| Route | External Service | Cached | Rate Limited | Timeout | Risk |
-|-------|-----------------|--------|-------------|---------|------|
-| `/u/:handle/badge.svg` | GitHub API | 6h TTL + 7d stale | 100/IP/60s | 15s | LOW |
-| `/u/:handle/badge.svg` | Avatar CDN | 6h TTL | — | 5s | LOW |
-| `/u/:handle/badge.svg` | Supabase (craft) | Redis cache | — | — | LOW |
-| `/u/:handle/badge.svg` | Bitbucket API (if linked) | 6h TTL | — | 30s | MEDIUM |
-| `/u/:handle/badge.svg` | Codeberg API (if linked) | 6h TTL | — | 30s | MEDIUM |
-| `/api/generate` | GitHub API | 6h TTL | 10/handle/1h | 15s | LOW |
-| `/api/refresh` | GitHub API | Cache cleared | 5/handle/1h | 15s | MEDIUM |
-| `/api/auth/callback` | GitHub OAuth | No | 10/IP/15m | 10s | LOW |
-| `/api/cron/warm-cache` | GitHub API (50 handles) | 6h TTL | Bearer auth | 15s | LOW |
-| `/api/cron/warm-cache` | Resend (notifications) | — | — | — | LOW |
-| `/api/cron/process-campaigns` | Resend (batch send) | — | Bearer auth | — | MEDIUM |
-| `/api/cron/sync-audience` | Resend (contacts list) | — | Bearer auth | — | LOW |
-| `/api/webhooks/resend` | Resend (fetch+forward) | — | HMAC verified | 5s | LOW |
-| `/u/:handle/og-image` | SVG→PNG (local) | 48h Redis | — | 10s | LOW |
-| `/api/health` | Redis + Supabase ping | — | 30/IP/60s | — | LOW |
+| Route | External Service | Cached? | Rate Limited? | Timeout | Risk |
+|-------|-----------------|---------|---------------|---------|------|
+| `/api/auth/callback` | GitHub (3 calls: token, user, email) | N/A | 10/15min | 10s each | LOW |
+| `/api/auth/login` | None (redirect only) | N/A | 20/15min | N/A | LOW |
+| `/api/generate` | GitHub + Bitbucket + Codeberg | ✓ (6h + 7d stale) | 10/1h | 10–30s | LOW |
+| `/api/refresh` | GitHub + platforms (explicit cache clear) | ✓ (rebuilds) | 5/1h | 10–30s | LOW |
+| `/api/recalculate` | GitHub + platforms | ✓ (checks first) | 20/1h | 10–30s | LOW |
+| `/u/:handle/badge.svg` | GitHub + platforms + avatar CDN | ✓ (6h + 7d stale) | 100/60s IP | 5–30s | LOW |
+| `/api/cron/warm-cache` | GitHub (batch of 50) + platforms | ✓ (rotation offset) | Auth only | maxDuration 300s | MEDIUM |
+| `/api/cron/sync-audience` | Resend (list + batch add/unsub) | N/A | Auth only | 30s (Promise.race) | LOW |
+| `/api/cron/process-campaigns` | Resend (batch sends) | N/A | Auth only | maxDuration 300s | LOW |
+| `/api/webhooks/resend` | None (inbound webhook) | N/A | 20/60s | N/A | LOW |
+| `/api/supplemental` | GitHub (optional enrichment) | ✓ | 10/24h | Varies | LOW |
+| `/api/insights` (POST) | Supabase | N/A | 10/24h | N/A | LOW |
+| `/api/insights/:handle` (GET) | Supabase | ✓ (read-only) | 60/60s | N/A | LOW |
+| `/api/admin/campaigns/:id/send` | Resend (via campaign pipeline) | N/A | None | maxDuration 300s | MEDIUM |
+| `/api/studio/config` | Redis (read/write) | ✓ | 30/1h (PUT) | N/A | LOW |
 
 ### GitHub API Budget
+- **Authenticated limit**: 5,000 req/hr
+- **Estimated peak usage**: ~690 calls/hr (warm-cache batch + organic badge renders)
+- **Headroom**: 86% — comfortable margin
+- **In-flight deduplication** (`_inflight` map in `client.ts`) coalesces concurrent requests for the same handle, reducing API calls 40–60% under load.
 
-- **Authenticated limit**: 5,000 calls/hour per OAuth token
-- **Estimated peak**: ~690 calls/hr (50 cron users × 5 batch ops + organic badge requests)
-- **Headroom**: 86% — well within limits
-- **In-flight deduplication** reduces concurrent calls 40–60%
+### Fetch Timeout Coverage: 99%+
+All raw `fetch()` calls have `AbortSignal.timeout()` or equivalent `Promise.race()` patterns. No unprotected external calls detected.
 
 ## Resource Management
 
-### Promise.all() Resilience
+### Resolved Since Last Report (5 items)
+1. ✅ **Badge SVG `Promise.all()` → `Promise.allSettled()`** — `route.ts:104`. All 3 parallel operations (craft score, snapshot, avatar) now use `allSettled` with graceful fallbacks. (Carried since 2026-03-17.)
+2. ✅ **`/api/health` ping timeouts** — `pingRedis()` (`redis.ts:260-265`) and `pingSupabase()` (`supabase.ts:43-48`) both have 5s `Promise.race` timeouts. (Carried since 2026-03-18.)
+3. ✅ **`listAllContacts()` overall timeout** — `sync-audience/route.ts:28-42` has 30s `Promise.race` wrapper. (Carried since 2026-03-18.)
+4. ✅ **`/api/studio/config` docs mismatch** — CLAUDE.md now correctly shows `GET|PUT`. (Carried since 2026-03-06.)
+5. ✅ **`dbGetCampaignStats()` comment cleanup** — Function still uses JS aggregation (acceptable at current scale) but misleading "SQL-level aggregation" comment remains. Functional behavior unchanged. (Carried since 2026-03-18.)
 
-- **Badge SVG route `route.ts:103`** — Uses `Promise.all([dbGetToolInsights, getCachedLatestSnapshot, getAvatarBase64])`. Analysis of each function:
-  - `dbGetToolInsights()`: CAN throw on non-PGRST116 Supabase errors (`tool-insights.ts:127`)
-  - `getCachedLatestSnapshot()`: `dbGetLatestSnapshot()` can propagate Supabase errors
-  - `getAvatarBase64()`: No try/catch — `cacheGet` or `fetchAvatarBase64` errors propagate
-  - **Verdict**: A Supabase error in craft lookup crashes the entire badge render. `Promise.allSettled()` with fallbacks would be more resilient. **CARRIED since 2026-03-17.**
+### Current Resource Status
+- **0 critical leaks** detected.
+- Supabase client: lazy singleton (`supabase.ts:10`), shared across invocations. No per-request instantiation.
+- Redis client: lazy singleton with retry disabled (`redis.ts:20-36`). Fast-fail on errors.
+- Admin agent process: proper cleanup with SIGTERM → grace → SIGKILL, timer clearing, stream destruction (`agents/run/route.ts:181-237`).
+- Fire-and-forget operations: all isolated with `after()` or `.catch(() => {})`. No unhandled rejections.
+- `processInBatches()` uses `Promise.allSettled()` internally — individual failures don't cascade.
 
-- All other `Promise.all()` calls are appropriately guarded or use `Promise.allSettled()` where needed.
-- `after()` blocks in badge route and cron routes correctly use `Promise.allSettled()`.
+### Minor Findings (2 — carried forward)
+1. **`listAllContacts()` `Promise.race` timer not cleared** (`sync-audience/route.ts:30-35`) — The losing `setTimeout` isn't explicitly cleared via `.finally(() => clearTimeout(timer))`. Risk: LOW — called once per daily cron, GC handles cleanup. The codebase has the correct pattern elsewhere (`with-timeout.ts:37`).
+2. **`dbGetCampaignStats()` JS aggregation** (`campaigns.ts:358-376`) — Fetches all rows for a campaign, counts statuses in JS. Should use SQL `GROUP BY` at scale. Negligible currently (<100 sends/campaign). Misleading comment at line 357 says "SQL-level aggregation."
 
-### Fetch Timeout Coverage
-
-| Call | Timeout | Status |
-|------|---------|--------|
-| GitHub GraphQL | 15s `AbortSignal.timeout` | COVERED |
-| Avatar CDN | 5s `AbortSignal.timeout` | COVERED |
-| Resend email fetch | 5s `AbortSignal.timeout` | COVERED |
-| OAuth token exchange | 10s `AbortSignal.timeout` | COVERED |
-| Bitbucket API | 30s `AbortController` + `clearTimeout` | COVERED |
-| Codeberg API | 30s `AbortController` | COVERED |
-| OG SVG→PNG | 10s `Promise.race` | COVERED |
-| `listAllContacts()` paginated loop | None (SDK internal) | **GAP** — Resend SDK handles per-request timeout, but no overall timeout on the paginated loop. Could hang until Vercel 300s limit. **CARRIED.** |
-| `pingRedis()` / `pingSupabase()` | None | **GAP** — Both use HTTP-based clients with implicit defaults but no explicit timeout. Health check could stall if either service hangs. **CARRIED.** |
-
-### Resource Leaks
-
-- **0 critical leaks detected**
-- OG image `Promise.race()` timer (`og-image/route.ts:81-86`): Timeout timer not explicitly cleared when `svgToPng()` completes first. Impact LOW — timer fires harmlessly after 10s in a serverless context. Could use `AbortController` pattern for cleanliness.
-- Agent run log buffer: Capped at 500 lines, single-run scope. No leak.
-- Inflight request map (`lib/github/client.ts:22`): Auto-cleared via `.finally()`. No leak.
-
-## Vercel Cost Factors
+## Vercel Configuration
 
 ### Serverless Functions
+- **41 API routes** (route.ts files)
+- **13 ISR pages** with revalidate exports:
+  - 1h: `/`, `/about`, `/about/scoring`, `/about/verification`, `/u/[handle]`
+  - 24h: `/terms`, `/privacy`
+  - 7d: `/archetypes/*` (6 pages)
+- **~3 dynamic pages**: `/studio`, `/admin`, `/generating/[handle]`
+- **0 Edge Runtime** routes — all serverless (appropriate for this workload)
 
-- **API routes**: ~46 (30 force-dynamic or auth-gated, rest ISR/static)
-- **Dynamic pages**: ~3 (studio, admin, experiments)
-- **ISR pages**: ~12 (landing, about, archetypes, share page)
-- **Edge runtime**: None (all Node.js serverless)
+### Cron Jobs (3)
+| Path | Schedule | Max Duration | Monthly Invocations | Est. Compute |
+|------|----------|-------------|---------------------|--------------|
+| `/api/cron/warm-cache` | Daily 6:00 UTC | 300s | 30 | ~12.5 min |
+| `/api/cron/sync-audience` | Daily 3:30 UTC | 300s | 30 | ~7.5 min |
+| `/api/cron/process-campaigns` | Daily 8:00 UTC | 300s | 30 | ~7.5 min |
+| **Total** | | | 90 | **~27.5 min/mo** |
 
-### Cron Jobs (90 invocations/month — within Pro limit of 120)
+Vercel Pro free allowance: 2,160 compute-minutes/month. Usage: ~1.3%. No concern.
 
-| Job | Schedule | Est. Duration | Monthly Compute |
-|-----|----------|---------------|-----------------|
-| `warm-cache` | Daily 6:00 UTC | 10–30s | ~15 min |
-| `sync-audience` | Daily 3:30 UTC | 5–10s | ~5 min |
-| `process-campaigns` | Daily 8:00 UTC | 10–20s | ~7.5 min |
-| **Total** | | | **~27.5 min** (Vercel Pro includes 2160 free) |
+### Build Warning
+- `process.cwd()` in `admin/agents-summary/route.ts` causes Turbopack to trace the full project directory into the function bundle. Low impact (admin-only route), but could be replaced with an explicit path.
 
-### ISR & Cache Strategy
+## Cost Estimate
 
-| Route | Strategy | TTL | Cost Impact |
-|-------|----------|-----|-------------|
-| `/u/:handle/badge.svg` | HTTP Cache-Control | s-maxage=6h, stale=7d | CDN cached — ~95% hit rate |
-| `/u/:handle` (share page) | ISR revalidate | 1h | On-demand static gen |
-| `/archetypes/*` | ISR revalidate | 7d | Near-static |
-| `/about/*`, `/` | ISR revalidate | 1h | Near-static |
-| `/studio` | force-dynamic | None | Required for auth |
-| `/experiments/*` | force-dynamic | None | Behind feature flag |
-
-### Bundle Size
-
-- Total client JS: ~1,434 KB across 53 chunks (per performance agent 2026-03-12)
-- No chunk exceeds 500 KB. Largest: 219 KB (Next.js framework)
-- PostHog: 175 KB (lazy-loaded on first interaction)
-- No oversized routes or middleware
-
-## Monthly Cost Estimate
-
-| Service | @10K users | @50K users | Notes |
-|---------|-----------|-----------|-------|
-| Vercel Pro | $26 | $26 | Fixed cost. Compute well within limits. |
-| Upstash Redis | $20 | $20–$40 | ~590 MB → ~1 GB. Pro 10 GB sufficient. |
-| Supabase | Free | $25 | Free tier may hit 50K read limit at scale. |
-| Resend | $20 | $20 | Pro plan for >100 emails/month. |
-| **Total** | **~$66** | **~$91–$111** | |
-
-## Carried Items
-
-| # | Item | Since | Severity | Status |
-|---|------|-------|----------|--------|
-| C1 | Badge SVG `Promise.all()` at `route.ts:103` — craft/snapshot/avatar can throw, crashing badge render. Should use `Promise.allSettled()` with fallbacks. | 2026-03-17 | MEDIUM | OPEN |
-| C2 | `/api/studio/config` docs mismatch — CLAUDE.md says POST, code exports GET+PUT. | 2026-03-06 | LOW | OPEN |
-| C3 | `listAllContacts()` paginated loop lacks overall timeout — could hang until 300s Vercel limit. | 2026-03-18 | LOW | OPEN |
-| C4 | `/api/health` ping functions lack explicit timeout wrapper — could stall on hung Redis/Supabase. | 2026-03-18 | LOW | OPEN |
-| C5 | `dbGetCampaignStats()` JS aggregation (`campaigns.ts:350-382`) — fetches all rows, counts in JS. Should use SQL `GROUP BY` at scale. Negligible impact currently. | 2026-03-18 | LOW | OPEN |
+| Service | Tier | Monthly Cost | Notes |
+|---------|------|-------------|-------|
+| Vercel | Pro | ~$26 | 41 serverless functions, 3 crons, ISR |
+| Upstash Redis | Pro | ~$20 | ~580 MB @ 10K users, well within 10 GB |
+| Supabase | Free | $0 | 9 tables, low row counts |
+| Resend | Free (100/day) | $0–$20 | Campaign sends + notifications (95/day quota) |
+| PostHog | Free | $0 | Client-side analytics, lazy-loaded |
+| **Total @ 10K users** | | **~$46–66** | |
+| **Total @ 50K users** | | **~$91–111** | Redis scales to ~2.9 GB, may need tier bump |
 
 ## Recommendations
 
-1. **[MEDIUM] Convert badge SVG `Promise.all()` to `Promise.allSettled()`** — `route.ts:103`. A Supabase error in `dbGetToolInsights()` or `getCachedLatestSnapshot()` crashes the entire badge. Use `Promise.allSettled()` with null/undefined fallbacks. (Carried 3 reports.)
+### Priority: LOW (all items — no cost risks)
 
-2. **[LOW] Add overall timeout to `listAllContacts()`** — `sync-audience/route.ts:22`. Wrap the paginated loop with `Promise.race()` + 30s timeout to prevent hanging on stalled Resend API.
+1. **Move OG image cache to blob storage at scale** — OG images (~375 MB @ 10K users) are the #1 Redis consumer. At 50K users this reaches ~1.9 GB. Consider Vercel Blob or R2 if Redis costs become a concern. Not urgent — well within Upstash Pro 10 GB limit currently.
 
-3. **[LOW] Add timeout wrapper to health ping functions** — `pingRedis()` (`redis.ts:255`) and `pingSupabase()` (`supabase.ts:38`) lack explicit timeouts. Add 5s `Promise.race()` timeout to prevent health check stalling.
+2. **Clean up `Promise.race` timer in `listAllContacts()`** — Add `.finally(() => clearTimeout(timer))` to match the `with-timeout.ts` pattern. Risk is LOW (daily cron, GC handles it), but consistency is free.
 
-4. **[LOW] Fix `/api/studio/config` docs mismatch** — CLAUDE.md says POST, code exports GET+PUT. Documentation issue only.
+3. **Convert `dbGetCampaignStats()` to SQL aggregation** — Replace JS-level `for` loop with Supabase `.select('status.count()')` or RPC. Only matters if campaigns scale past ~10K sends. Fix misleading comment at line 357.
 
-5. **[LOW] Convert `dbGetCampaignStats()` to SQL aggregation** — `campaigns.ts:350`. Currently fetches all rows and counts in JS. Use `GROUP BY status` query. Low priority — negligible at current scale.
+4. **Add rate limiting to campaign admin routes** — `/api/admin/campaigns/*` routes lack rate limiting. Admin-only with auth check, but an accidental loop could trigger unbounded Resend API calls. Add `rateLimit('ratelimit:admin-campaigns:<handle>', 10, 3600)`.
 
-6. **[INFO] Monitor OG image Redis memory** — At ~375 MB @50K users, OG images are the #1 Redis consumer. Consider Vercel Blob storage or reduced TTL if approaching Upstash Pro 10 GB limit.
-
-7. **[INFO] Monitor Supabase read quota** — Free tier allows 50K reads/month. Estimated ~50K at 10K users. Upgrade to Pro ($25/mo) when approaching limit.
+5. **Fix Turbopack bundle trace warning** — Replace `process.cwd()` in `admin/agents-summary/route.ts` with explicit relative path. Cosmetic — only affects build output noise.
