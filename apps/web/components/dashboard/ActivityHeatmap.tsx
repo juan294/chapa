@@ -3,7 +3,6 @@
 import { useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
-import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
 import { computeActivityInsights } from "./activity-insights";
 import { formatIsoDate } from "@/lib/utils/date";
 import { seededRandom } from "@/lib/utils/prng";
@@ -38,7 +37,7 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
   breadth: "Breadth",
 };
 
-const HEATMAP_DIMENSIONS: Dimension[] = [
+const DIMENSIONS: Dimension[] = [
   "delivery",
   "quality",
   "consistency",
@@ -47,10 +46,11 @@ const HEATMAP_DIMENSIONS: Dimension[] = [
 
 // ── Per-day dimension assignment ─────────────────────────────────────
 
-interface HexDay extends HeatmapDay {
-  intensity: number;
+interface EnrichedDay extends HeatmapDay {
   dominant: Dimension;
   dimensionWeights: Record<Dimension, number>;
+  /** Single-character weekday label (e.g. "M", "T") — precomputed to avoid Date parsing in render */
+  dayLabel: string;
 }
 
 /**
@@ -60,10 +60,9 @@ interface HexDay extends HeatmapDay {
 function enrichDays(
   data: HeatmapDay[],
   profileDimensions?: Record<Dimension, number>
-): HexDay[] {
+): EnrichedDay[] {
   const displaySize = WEEKS * DAYS;
   const sliced = data.length > displaySize ? data.slice(-displaySize) : data;
-  const max = Math.max(1, ...sliced.map((d) => d.count));
 
   // Compress profile scores so non-zero dimensions can win on some days.
   // Raw proportions (e.g. 86/168=51%) leave the top dimension dominant on every
@@ -97,12 +96,13 @@ function enrichDays(
       : { delivery: 0.25, quality: 0.25, consistency: 0.25, breadth: 0.25 };
 
   return sliced.map((day) => {
-    const intensity = getIntensityLevel(day.count, max);
-
     // Date-based seed for deterministic variation (single Date parse per day)
     const d = new Date(day.date + "T12:00:00");
     const dateSeed = d.getTime() / 86400000;
     const dow = d.getDay();
+    const dayLabel = d
+      .toLocaleDateString("en-US", { weekday: "short" })
+      .charAt(0);
 
     // Start with base weights, then apply per-day variation
     const weights: Record<Dimension, number> = { ...baseWeights };
@@ -118,15 +118,15 @@ function enrichDays(
     const total =
       Math.max(0, weights.delivery) + Math.max(0, weights.quality) +
       Math.max(0, weights.consistency) + Math.max(0, weights.breadth);
-    for (const dim of HEATMAP_DIMENSIONS) {
+    for (const dim of DIMENSIONS) {
       weights[dim] = total > 0 ? Math.max(0, weights[dim]) / total : 0;
     }
 
-    const dominant = HEATMAP_DIMENSIONS.reduce((a, b) =>
+    const dominant = DIMENSIONS.reduce((a, b) =>
       weights[a] >= weights[b] ? a : b
     );
 
-    return { ...day, intensity, dominant, dimensionWeights: weights };
+    return { ...day, dominant, dimensionWeights: weights, dayLabel };
   });
 }
 
@@ -190,7 +190,7 @@ export function ActivityHeatmap({
 
       {/* Dimension legend */}
       <div className="flex flex-wrap items-center gap-4 mt-3">
-        {HEATMAP_DIMENSIONS.map((dim) => (
+        {DIMENSIONS.map((dim) => (
           <div key={dim} className="flex items-center gap-1.5">
             <div
               className="h-2 w-2 rounded-full"
@@ -235,13 +235,12 @@ function InsightStat({ label, value }: { label: string; value: string }) {
 // ── Helper: aggregate days into weeks ─────────────────────────────────
 
 interface WeekBucket {
-  label: string; // e.g. "Mar 10"
+  label: string;
   total: number;
-  dimensionTotals: Record<Dimension, number>;
-  days: HexDay[];
+  days: EnrichedDay[];
 }
 
-function bucketByWeek(data: HexDay[]): WeekBucket[] {
+function bucketByWeek(data: EnrichedDay[]): WeekBucket[] {
   const weeks: WeekBucket[] = [];
   for (let i = 0; i < data.length; i += DAYS) {
     const chunk = data.slice(i, i + DAYS);
@@ -250,23 +249,10 @@ function bucketByWeek(data: HexDay[]): WeekBucket[] {
     const d = new Date(first.date + "T12:00:00");
     const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const total = chunk.reduce((s, c) => s + c.count, 0);
-    const dimensionTotals: Record<Dimension, number> = {
-      delivery: 0, quality: 0, consistency: 0, breadth: 0,
-    };
-    for (const day of chunk) {
-      if (day.count === 0) continue;
-      for (const dim of HEATMAP_DIMENSIONS) {
-        dimensionTotals[dim] += day.count * day.dimensionWeights[dim];
-      }
-    }
-    weeks.push({ label, total, dimensionTotals, days: chunk });
+    weeks.push({ label, total, days: chunk });
   }
   return weeks;
 }
-
-// ══════════════════════════════════════════════════════════════════════
-// Option A: Weekly stacked bar chart
-// ══════════════════════════════════════════════════════════════════════
 
 // ── Shared tooltip (portaled) ─────────────────────────────────────────
 
@@ -301,7 +287,7 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
             {tip.count} contribution{tip.count !== 1 ? "s" : ""}
           </p>
           <div className="mt-1.5 flex flex-col gap-0.5">
-            {HEATMAP_DIMENSIONS.map((dim) => {
+            {DIMENSIONS.map((dim) => {
               const pct = Math.round(tip.dimensionWeights[dim] * 100);
               return (
                 <div key={dim} className="flex items-center gap-1.5">
@@ -331,17 +317,18 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// Dot timeline (circles sized by count, colored by dimension)
-// ══════════════════════════════════════════════════════════════════════
+// ── Dot timeline ─────────────────────────────────────────────────────
 
-function DotTimeline({ data }: { data: HexDay[] }) {
-  const maxCount = Math.max(1, ...data.map((d) => d.count));
+function DotTimeline({ data }: { data: EnrichedDay[] }) {
+  const maxCount = useMemo(
+    () => Math.max(1, ...data.map((d) => d.count)),
+    [data]
+  );
   const weeks = useMemo(() => bucketByWeek(data), [data]);
   const [tooltip, setTooltip] = useState<ChartTooltipData | null>(null);
 
   const handleDotEnter = useCallback(
-    (day: HexDay & { dominant: Dimension; dimensionWeights: Record<Dimension, number> }, e: React.MouseEvent<HTMLDivElement>) => {
+    (day: EnrichedDay, e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       setTooltip({
         title: formatIsoDate(day.date),
@@ -370,9 +357,6 @@ function DotTimeline({ data }: { data: HexDay[] }) {
               const size = day.count > 0
                 ? 8 + (day.count / maxCount) * 24
                 : 6;
-              const dayName = new Date(day.date + "T12:00:00")
-                .toLocaleDateString("en-US", { weekday: "short" })
-                .charAt(0);
               return (
                 <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
                   <div
@@ -394,7 +378,7 @@ function DotTimeline({ data }: { data: HexDay[] }) {
                     onMouseLeave={handleLeave}
                   />
                   <span className="text-[7px] text-text-secondary font-body leading-none">
-                    {dayName}
+                    {day.dayLabel}
                   </span>
                 </div>
               );
