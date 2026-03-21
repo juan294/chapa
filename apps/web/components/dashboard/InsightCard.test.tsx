@@ -27,6 +27,16 @@ const trendDownInsight = {
   priority: 2,
 };
 
+const trendDimensionInsight = {
+  id: "trend-quality",
+  type: "trend" as const,
+  icon: "trending-up" as const,
+  headline: "Quality improved by +38",
+  body: "Your quality score jumped significantly this week.",
+  dimension: "quality" as const,
+  priority: 3,
+};
+
 const tipInsight = {
   id: "tip-quality",
   type: "tip" as const,
@@ -80,7 +90,7 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 2. Renders correct icon for each type (check SVG is present)
+  // 2. Renders an SVG icon for each insight type
   // ----------------------------------------------------------------
   it("renders an SVG icon for each insight type", () => {
     // Trending up
@@ -104,7 +114,7 @@ describe("InsightCard", () => {
     expect(c3.querySelector("svg[aria-hidden='true']")).toBeTruthy();
     u3();
 
-    // Tip with target
+    // Tip with target (archetype)
     const { container: c4, unmount: u4 } = render(
       <InsightCard insight={tipNoDimensionInsight} />,
     );
@@ -126,62 +136,80 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 3. Applies correct left border color for each type
+  // 3. Achievement card has green-themed container
   // ----------------------------------------------------------------
-  it("applies correct left border color for each type", () => {
-    // trend + trending-up => border-l-terminal-green
-    const { container: c1, unmount: u1 } = render(
-      <InsightCard insight={trendInsight} />,
-    );
-    const card1 = c1.querySelector("[role='article']") as HTMLElement;
-    expect(card1.className).toContain("border-l-terminal-green");
-    u1();
-
-    // trend + trending-down => border-l-terminal-yellow
-    const { container: c2, unmount: u2 } = render(
-      <InsightCard insight={trendDownInsight} />,
-    );
-    const card2 = c2.querySelector("[role='article']") as HTMLElement;
-    expect(card2.className).toContain("border-l-terminal-yellow");
-    u2();
-
-    // tip with dimension => inline borderLeftColor with CSS variable
-    const { container: c3, unmount: u3 } = render(
-      <InsightCard insight={tipInsight} />,
-    );
-    const card3 = c3.querySelector("[role='article']") as HTMLElement;
-    expect(card3.style.borderLeftColor).toBe(
-      "var(--color-dimension-quality)",
-    );
-    u3();
-
-    // tip without dimension => border-l-amber
-    const { container: c4, unmount: u4 } = render(
-      <InsightCard insight={tipNoDimensionInsight} />,
-    );
-    const card4 = c4.querySelector("[role='article']") as HTMLElement;
-    expect(card4.className).toContain("border-l-amber");
-    u4();
-
-    // achievement => border-l-terminal-green + bg-terminal-green/5
-    const { container: c5, unmount: u5 } = render(
+  it("achievement card has green-themed container", () => {
+    const { container } = render(
       <InsightCard insight={achievementInsight} />,
     );
-    const card5 = c5.querySelector("[role='article']") as HTMLElement;
-    expect(card5.className).toContain("border-l-terminal-green");
-    expect(card5.className).toContain("bg-terminal-green/5");
-    u5();
-
-    // next-tier => border-l-amber
-    const { container: c6 } = render(
-      <InsightCard insight={nextTierInsight} />,
-    );
-    const card6 = c6.querySelector("[role='article']") as HTMLElement;
-    expect(card6.className).toContain("border-l-amber");
+    const card = container.querySelector("[role='article']") as HTMLElement;
+    expect(card.className).toContain("border-terminal-green");
   });
 
   // ----------------------------------------------------------------
-  // 4. Has correct ARIA attributes (role="article", aria-label)
+  // 4. Trend-up card has green top border accent
+  // ----------------------------------------------------------------
+  it("trend-up card has green top border accent", () => {
+    const { container } = render(
+      <InsightCard insight={trendInsight} />,
+    );
+    const card = container.querySelector("[role='article']") as HTMLElement;
+    expect(card.style.borderTopColor).toBe("var(--color-terminal-green)");
+  });
+
+  // ----------------------------------------------------------------
+  // 5. Trend-down card has yellow top border accent
+  // ----------------------------------------------------------------
+  it("trend-down card has yellow top border accent", () => {
+    const { container } = render(
+      <InsightCard insight={trendDownInsight} />,
+    );
+    const card = container.querySelector("[role='article']") as HTMLElement;
+    expect(card.style.borderTopColor).toBe("var(--color-terminal-yellow)");
+  });
+
+  // ----------------------------------------------------------------
+  // 6. Trend card with dimension uses dimension color for top border
+  // ----------------------------------------------------------------
+  it("trend card with dimension uses dimension color for top border", () => {
+    const { container } = render(
+      <InsightCard insight={trendDimensionInsight} />,
+    );
+    const card = container.querySelector("[role='article']") as HTMLElement;
+    expect(card.style.borderTopColor).toBe("var(--color-dimension-quality)");
+  });
+
+  // ----------------------------------------------------------------
+  // 7. Next-tier card renders tier progress bar with labels
+  // ----------------------------------------------------------------
+  it("next-tier card renders tier progress bar with labels", () => {
+    render(<InsightCard insight={nextTierInsight} />);
+    expect(screen.getByText("Emerging")).toBeTruthy();
+    expect(screen.getByText("Solid")).toBeTruthy();
+    expect(screen.getByText("High")).toBeTruthy();
+    expect(screen.getByText("Elite")).toBeTruthy();
+  });
+
+  // ----------------------------------------------------------------
+  // 8. Archetype card applies archetype color accent bar
+  // ----------------------------------------------------------------
+  it("archetype card applies archetype color accent bar", () => {
+    const { container } = render(
+      <InsightCard insight={tipNoDimensionInsight} />,
+    );
+    const card = container.querySelector("[role='article']") as HTMLElement;
+    // Archetype card has a top accent bar with the archetype color
+    const accentBar = card.querySelector(
+      ".absolute.top-0",
+    ) as HTMLElement;
+    expect(accentBar).toBeTruthy();
+    expect(accentBar.style.backgroundColor).toBe(
+      "var(--color-archetype-builder)",
+    );
+  });
+
+  // ----------------------------------------------------------------
+  // 9. Has correct ARIA attributes (role="article", aria-label)
   // ----------------------------------------------------------------
   it("has correct ARIA attributes", () => {
     render(<InsightCard insight={achievementInsight} />);
@@ -194,7 +222,7 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 5. Applies animation delay via inline style
+  // 10. Applies animation delay via inline style
   // ----------------------------------------------------------------
   it("applies animation delay via inline style", () => {
     const { container } = render(
@@ -206,7 +234,7 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 6. Defaults animation delay to 0
+  // 11. Defaults animation delay to 0
   // ----------------------------------------------------------------
   it("defaults animation delay to 0", () => {
     const { container } = render(<InsightCard insight={trendInsight} />);

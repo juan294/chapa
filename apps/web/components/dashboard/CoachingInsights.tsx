@@ -37,19 +37,75 @@ export function CoachingInsights({
     return null;
   }
 
+  // Group insights by type for distinct visual layout
+  const achievements = insights.filter((i) => i.type === "achievement");
+  const trends = insights.filter((i) => i.type === "trend");
+  const nextTier = insights.filter((i) => i.type === "next-tier");
+  const coaching = insights.filter((i) => i.type === "tip");
+
+  let delayCounter = 0;
+  const nextDelay = () => 1600 + delayCounter++ * 150;
+
   return (
     <div className={className}>
-      <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-4">
+      <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-5 flex items-center gap-2">
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-sm bg-amber"
+          aria-hidden="true"
+        />
         Insights &amp; Coaching
       </h3>
+
       <div className="space-y-3">
-        {insights.map((insight, i) => (
+        {/* Achievements — full-width, prominent */}
+        {achievements.map((insight) => (
           <InsightCard
             key={insight.id}
             insight={insight}
-            animationDelay={1600 + i * 150}
+            animationDelay={nextDelay()}
           />
         ))}
+
+        {/* Trends — 2-column grid for compact metrics */}
+        {trends.length > 0 && (
+          <div
+            className={`grid gap-3 ${
+              trends.length >= 2
+                ? "grid-cols-1 sm:grid-cols-2"
+                : "grid-cols-1"
+            }`}
+          >
+            {trends.map((insight) => (
+              <InsightCard
+                key={insight.id}
+                insight={insight}
+                animationDelay={nextDelay()}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Next-tier — full-width with progress bar */}
+        {nextTier.map((insight) => (
+          <InsightCard
+            key={insight.id}
+            insight={insight}
+            animationDelay={nextDelay()}
+          />
+        ))}
+
+        {/* Coaching tips — compact treatment */}
+        {coaching.length > 0 && (
+          <div className="space-y-2">
+            {coaching.map((insight) => (
+              <InsightCard
+                key={insight.id}
+                insight={insight}
+                animationDelay={nextDelay()}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

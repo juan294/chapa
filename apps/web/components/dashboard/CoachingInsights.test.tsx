@@ -58,33 +58,79 @@ const twoInsights = [
   },
 ];
 
+const mixedInsights = [
+  {
+    id: "achievement-tier",
+    type: "achievement" as const,
+    icon: "trophy" as const,
+    headline: "You leveled up to High!",
+    body: "Your consistent effort paid off.",
+    priority: 1,
+  },
+  {
+    id: "trend-quality",
+    type: "trend" as const,
+    icon: "trending-up" as const,
+    headline: "Quality improved by +38",
+    body: "Your quality score jumped.",
+    dimension: "quality" as const,
+    priority: 3,
+  },
+  {
+    id: "trend-consistency",
+    type: "trend" as const,
+    icon: "trending-up" as const,
+    headline: "Consistency improved by +6",
+    body: "Your consistency score jumped.",
+    dimension: "consistency" as const,
+    priority: 3,
+  },
+  {
+    id: "next-tier",
+    type: "next-tier" as const,
+    icon: "arrow-up" as const,
+    headline: "4 points to High",
+    body: "Focus on your strongest dimension.",
+    priority: 5,
+  },
+  {
+    id: "tip-archetype",
+    type: "tip" as const,
+    icon: "target" as const,
+    headline: "You're a Builder",
+    body: "Your profile is driven by output.",
+    priority: 6,
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("CoachingInsights", () => {
   // ----------------------------------------------------------------
-  // 1. Renders InsightCards for generated insights
+  // 1. Renders InsightCards with type-grouped layout and staggered delays
   // ----------------------------------------------------------------
-  it("renders InsightCards for generated insights with staggered delays", () => {
+  it("renders InsightCards with type-grouped delays", () => {
     mockGenerateInsights.mockReturnValue(twoInsights);
 
     render(<CoachingInsights impact={mockImpact} trend={null} diff={null} />);
 
     // Both cards should be rendered
-    const card1 = screen.getByTestId("insight-card-tip-archetype");
-    const card2 = screen.getByTestId("insight-card-next-tier");
+    const nextTierCard = screen.getByTestId("insight-card-next-tier");
+    const archetypeCard = screen.getByTestId("insight-card-tip-archetype");
 
-    expect(card1).toBeTruthy();
-    expect(card2).toBeTruthy();
+    expect(nextTierCard).toBeTruthy();
+    expect(archetypeCard).toBeTruthy();
 
     // Check headlines are rendered
     expect(screen.getByText("You're a Builder")).toBeTruthy();
     expect(screen.getByText("17 points to High")).toBeTruthy();
 
-    // Check staggered animation delays: 1600 + i * 150
-    expect(card1.getAttribute("data-delay")).toBe("1600");
-    expect(card2.getAttribute("data-delay")).toBe("1750");
+    // Type grouping renders: achievements → trends → next-tier → coaching
+    // next-tier renders before tip-archetype, so it gets the earlier delay
+    expect(nextTierCard.getAttribute("data-delay")).toBe("1600");
+    expect(archetypeCard.getAttribute("data-delay")).toBe("1750");
   });
 
   // ----------------------------------------------------------------
@@ -126,5 +172,55 @@ describe("CoachingInsights", () => {
 
     // Nothing should be rendered
     expect(container.innerHTML).toBe("");
+  });
+
+  // ----------------------------------------------------------------
+  // 5. Groups insights by type and renders all in correct order
+  // ----------------------------------------------------------------
+  it("renders all insight types in grouped layout", () => {
+    mockGenerateInsights.mockReturnValue(mixedInsights);
+
+    render(<CoachingInsights impact={mockImpact} trend={null} diff={null} />);
+
+    // All 5 cards should be rendered
+    expect(screen.getByTestId("insight-card-achievement-tier")).toBeTruthy();
+    expect(screen.getByTestId("insight-card-trend-quality")).toBeTruthy();
+    expect(screen.getByTestId("insight-card-trend-consistency")).toBeTruthy();
+    expect(screen.getByTestId("insight-card-next-tier")).toBeTruthy();
+    expect(screen.getByTestId("insight-card-tip-archetype")).toBeTruthy();
+
+    // Delays should be monotonically increasing across groups
+    const cards = [
+      screen.getByTestId("insight-card-achievement-tier"),
+      screen.getByTestId("insight-card-trend-quality"),
+      screen.getByTestId("insight-card-trend-consistency"),
+      screen.getByTestId("insight-card-next-tier"),
+      screen.getByTestId("insight-card-tip-archetype"),
+    ];
+    const delays = cards.map((c) => Number(c.getAttribute("data-delay")));
+    for (let i = 1; i < delays.length; i++) {
+      expect(delays[i]!).toBeGreaterThan(delays[i - 1]!);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // 6. Trend cards are wrapped in a grid container
+  // ----------------------------------------------------------------
+  it("wraps multiple trend cards in a grid container", () => {
+    mockGenerateInsights.mockReturnValue(mixedInsights);
+
+    const { container } = render(
+      <CoachingInsights impact={mockImpact} trend={null} diff={null} />,
+    );
+
+    // Find the grid container — it has the grid class
+    const gridContainer = container.querySelector(".grid");
+    expect(gridContainer).toBeTruthy();
+
+    // Both trend cards should be inside the grid
+    const trendQuality = screen.getByTestId("insight-card-trend-quality");
+    const trendConsistency = screen.getByTestId("insight-card-trend-consistency");
+    expect(gridContainer!.contains(trendQuality)).toBe(true);
+    expect(gridContainer!.contains(trendConsistency)).toBe(true);
   });
 });
