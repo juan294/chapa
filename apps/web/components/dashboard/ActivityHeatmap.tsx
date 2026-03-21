@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
 import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
 import { computeActivityInsights } from "./activity-insights";
 import { formatIsoDate } from "@/lib/utils/date";
-import { cssVarAlpha } from "@/lib/utils/color";
 import { seededRandom } from "@/lib/utils/prng";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -45,49 +44,6 @@ const HEATMAP_DIMENSIONS: Dimension[] = [
   "consistency",
   "breadth",
 ];
-
-const INTENSITY_ALPHA: Record<number, number> = {
-  0: 0.12,
-  1: 0.35,
-  2: 0.55,
-  3: 0.78,
-  4: 0.95,
-};
-
-const HEX_CLIP_PATH =
-  "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
-
-const SQRT3 = Math.sqrt(3);
-
-// ── Hex geometry (flat-top) ──────────────────────────────────────────
-
-function hexPosition(
-  col: number,
-  row: number,
-  size: number,
-  gap: number
-): { x: number; y: number } {
-  const w = size * 2;
-  const h = size * SQRT3;
-  const colStep = w * 0.75 + gap * 0.75;
-  const rowStep = h + gap;
-  const offset = col % 2 === 1 ? (h + gap) / 2 : 0;
-  return { x: col * colStep, y: row * rowStep + offset };
-}
-
-function hexGridDimensions(
-  size: number,
-  gap: number
-): { width: number; height: number } {
-  const lastCol = hexPosition(WEEKS - 1, 0, size, gap);
-  const lastRow = hexPosition(0, DAYS - 1, size, gap);
-  const w = size * 2;
-  const h = size * SQRT3;
-  return {
-    width: lastCol.x + w,
-    height: lastRow.y + h + (h + gap) / 2,
-  };
-}
 
 // ── Per-day dimension assignment ─────────────────────────────────────
 
@@ -185,7 +141,7 @@ export function ActivityHeatmap({
     () => computeActivityInsights(heatmapData),
     [heatmapData]
   );
-  const hexDays = useMemo(
+  const enriched = useMemo(
     () => enrichDays(heatmapData, dimensions),
     [heatmapData, dimensions]
   );
@@ -194,7 +150,7 @@ export function ActivityHeatmap({
 
   return (
     <section
-      aria-label="Contribution activity heatmap"
+      aria-label="Contribution activity"
       className="animate-fade-in-up"
       style={{ animationDelay: "2000ms" }}
     >
@@ -228,8 +184,8 @@ export function ActivityHeatmap({
         </div>
       )}
 
-      <div className="rounded-xl border border-stroke bg-card p-4 overflow-x-auto">
-        <HexHeatmapGrid data={hexDays} />
+      <div className="rounded-xl border border-stroke bg-card p-4">
+        <DotTimeline data={enriched} />
       </div>
 
       {/* Dimension legend */}
@@ -261,218 +217,6 @@ export function ActivityHeatmap({
   );
 }
 
-// ── Hex heatmap grid ─────────────────────────────────────────────────
-
-const HEX_GAP = 2;
-const MIN_HEX_SIZE = 10;
-const MAX_HEX_SIZE = 32;
-const CENTER_COL = Math.floor(WEEKS / 2);
-const CENTER_ROW = Math.floor(DAYS / 2);
-
-/**
- * Compute hex size from container width so the grid fills the available space.
- * For flat-top hexagons in 13 columns:
- *   totalWidth = (WEEKS - 1) * colStep + hexWidth
- *              = (WEEKS - 1) * (size * 1.5 + gap * 0.75) + size * 2
- * Solving for size:
- *   size = (width - (WEEKS - 1) * gap * 0.75) / ((WEEKS - 1) * 1.5 + 2)
- */
-function hexSizeForWidth(containerWidth: number): number {
-  const size =
-    (containerWidth - (WEEKS - 1) * HEX_GAP * 0.75) /
-    ((WEEKS - 1) * 1.5 + 2);
-  return Math.min(MAX_HEX_SIZE, Math.max(MIN_HEX_SIZE, Math.floor(size)));
-}
-
-function HexHeatmapGrid({ data }: { data: HexDay[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [hexSize, setHexSize] = useState(MIN_HEX_SIZE);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (width && width > 0) setHexSize(hexSizeForWidth(width));
-    });
-    observer.observe(el);
-    // Initial measurement
-    setHexSize(hexSizeForWidth(el.clientWidth));
-    return () => observer.disconnect();
-  }, []);
-
-  const hexH = hexSize * SQRT3;
-  const gridDims = hexGridDimensions(hexSize, HEX_GAP);
-
-  const [tooltip, setTooltip] = useState<{
-    day: HexDay;
-    screenX: number;
-    screenY: number;
-    cellBottom: number;
-  } | null>(null);
-
-  const handleHover = useCallback(
-    (day: HexDay, e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      setTooltip({
-        day,
-        screenX: rect.left + rect.width / 2,
-        screenY: rect.top,
-        cellBottom: rect.bottom,
-      });
-    },
-    []
-  );
-
-  const handleLeave = useCallback(() => setTooltip(null), []);
-
-  const cells = data.length;
-  const totalCells = WEEKS * DAYS;
-
-  return (
-    <>
-      <div
-        ref={containerRef}
-        className="relative w-full"
-        style={{ height: gridDims.height }}
-        role="img"
-        aria-label="Hexagonal activity heatmap"
-      >
-        {Array.from({ length: totalCells }, (_, i) => {
-          const col = Math.floor(i / DAYS);
-          const row = i % DAYS;
-          const pos = hexPosition(col, row, hexSize, HEX_GAP);
-          const day = i < cells ? data[i] ?? null : null;
-
-          const isFuture = day === null;
-          const isNoActivity = day !== null && day.count === 0;
-          const emptyBg = isFuture || isNoActivity;
-
-          const alpha = day ? (INTENSITY_ALPHA[day.intensity] ?? 0.07) : 0.07;
-          const background =
-            day && day.count > 0
-              ? cssVarAlpha(DIMENSION_COLORS[day.dominant], alpha)
-              : "rgba(139,92,246,0.15)";
-
-          // Ripple delay from center
-          const dist = Math.sqrt(
-            (col - CENTER_COL) ** 2 + (row - CENTER_ROW) ** 2
-          );
-          const delay = Math.round(dist * 55);
-
-          return (
-            <div
-              key={`${col}-${row}`}
-              className={`absolute animate-hex-cell-in transition-transform duration-100 ${isFuture ? "" : "cursor-pointer hover:scale-125 hover:z-10"}`}
-              style={{
-                left: pos.x,
-                top: pos.y,
-                width: hexSize * 2,
-                height: hexH,
-                clipPath: HEX_CLIP_PATH,
-                background: isFuture
-                  ? "rgba(139,92,246,0.08)"
-                  : background,
-                animationDelay: `${delay}ms`,
-              }}
-              onMouseEnter={(e) => day && handleHover(day, e)}
-              onMouseLeave={handleLeave}
-              aria-hidden="true"
-            >
-              {/* Inner fill — solid border for no-activity, shimmer for future */}
-              {emptyBg && (
-                <div
-                  className={`absolute ${isFuture ? "animate-shimmer" : ""}`}
-                  style={{
-                    inset: 1.5,
-                    clipPath: HEX_CLIP_PATH,
-                    ...(isFuture
-                      ? {
-                          backgroundImage:
-                            "linear-gradient(90deg, var(--color-card) 25%, rgba(139,92,246,0.06) 50%, var(--color-card) 75%)",
-                          backgroundSize: "200% 100%",
-                        }
-                      : { backgroundColor: "var(--color-card)" }),
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Tooltip — portaled to document.body to escape ancestor transforms/overflow.
-          Uses position: fixed with viewport coordinates and z-index: 99999.
-          Flips below when cell is within 120px of viewport top. */}
-      {tooltip &&
-        createPortal(
-          <div
-            role="tooltip"
-            className="pointer-events-none fixed rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
-            style={{
-              zIndex: 99999,
-              left: tooltip.screenX,
-              ...(tooltip.screenY < 120
-                ? {
-                    top: tooltip.cellBottom + 8,
-                    transform: "translateX(-50%)",
-                  }
-                : {
-                    top: tooltip.screenY - 8,
-                    transform: "translate(-50%, -100%)",
-                  }),
-            }}
-          >
-            <p className="font-medium text-text-primary whitespace-nowrap">
-              {formatIsoDate(tooltip.day.date)}
-            </p>
-            {tooltip.day.count > 0 ? (
-              <>
-                <p className="text-text-secondary whitespace-nowrap">
-                  {tooltip.day.count} contribution
-                  {tooltip.day.count !== 1 ? "s" : ""}
-                </p>
-                <div className="mt-1.5 flex flex-col gap-0.5">
-                  {HEATMAP_DIMENSIONS.map((dim) => {
-                    const pct = Math.round(
-                      tooltip.day.dimensionWeights[dim] * 100
-                    );
-                    return (
-                      <div key={dim} className="flex items-center gap-1.5">
-                        <div
-                          className="h-1.5 w-1.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: DIMENSION_COLORS[dim],
-                          }}
-                        />
-                        <span
-                          className="whitespace-nowrap"
-                          style={{
-                            color:
-                              dim === tooltip.day.dominant
-                                ? DIMENSION_COLORS[dim]
-                                : undefined,
-                            fontWeight:
-                              dim === tooltip.day.dominant ? 600 : 400,
-                          }}
-                        >
-                          {DIMENSION_LABELS[dim]} {pct}%
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <p className="text-text-secondary">No activity</p>
-            )}
-          </div>,
-          document.body
-        )}
-    </>
-  );
-}
-
 // ── Subcomponents ────────────────────────────────────────────────────
 
 function InsightStat({ label, value }: { label: string; value: string }) {
@@ -484,6 +228,184 @@ function InsightStat({ label, value }: { label: string; value: string }) {
       <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider leading-none">
         {label}
       </span>
+    </div>
+  );
+}
+
+// ── Helper: aggregate days into weeks ─────────────────────────────────
+
+interface WeekBucket {
+  label: string; // e.g. "Mar 10"
+  total: number;
+  dimensionTotals: Record<Dimension, number>;
+  days: HexDay[];
+}
+
+function bucketByWeek(data: HexDay[]): WeekBucket[] {
+  const weeks: WeekBucket[] = [];
+  for (let i = 0; i < data.length; i += DAYS) {
+    const chunk = data.slice(i, i + DAYS);
+    const first = chunk[0];
+    if (!first) continue;
+    const d = new Date(first.date + "T12:00:00");
+    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const total = chunk.reduce((s, c) => s + c.count, 0);
+    const dimensionTotals: Record<Dimension, number> = {
+      delivery: 0, quality: 0, consistency: 0, breadth: 0,
+    };
+    for (const day of chunk) {
+      if (day.count === 0) continue;
+      for (const dim of HEATMAP_DIMENSIONS) {
+        dimensionTotals[dim] += day.count * day.dimensionWeights[dim];
+      }
+    }
+    weeks.push({ label, total, dimensionTotals, days: chunk });
+  }
+  return weeks;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Option A: Weekly stacked bar chart
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Shared tooltip (portaled) ─────────────────────────────────────────
+
+interface ChartTooltipData {
+  title: string;
+  count: number;
+  dimensionWeights: Record<Dimension, number>;
+  dominant: Dimension;
+  screenX: number;
+  screenY: number;
+  cellBottom: number;
+}
+
+function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      role="tooltip"
+      className="pointer-events-none fixed rounded-lg border border-stroke bg-card/95 px-3 py-2.5 text-xs font-body shadow-xl backdrop-blur-xl"
+      style={{
+        zIndex: 99999,
+        left: tip.screenX,
+        ...(tip.screenY < 120
+          ? { top: tip.cellBottom + 8, transform: "translateX(-50%)" }
+          : { top: tip.screenY - 8, transform: "translate(-50%, -100%)" }),
+      }}
+    >
+      <p className="font-medium text-text-primary whitespace-nowrap">{tip.title}</p>
+      {tip.count > 0 ? (
+        <>
+          <p className="text-text-secondary whitespace-nowrap">
+            {tip.count} contribution{tip.count !== 1 ? "s" : ""}
+          </p>
+          <div className="mt-1.5 flex flex-col gap-0.5">
+            {HEATMAP_DIMENSIONS.map((dim) => {
+              const pct = Math.round(tip.dimensionWeights[dim] * 100);
+              return (
+                <div key={dim} className="flex items-center gap-1.5">
+                  <div
+                    className="h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: DIMENSION_COLORS[dim] }}
+                  />
+                  <span
+                    className="whitespace-nowrap"
+                    style={{
+                      color: dim === tip.dominant ? DIMENSION_COLORS[dim] : undefined,
+                      fontWeight: dim === tip.dominant ? 600 : 400,
+                    }}
+                  >
+                    {DIMENSION_LABELS[dim]} {pct}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <p className="text-text-secondary">No activity</p>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Dot timeline (circles sized by count, colored by dimension)
+// ══════════════════════════════════════════════════════════════════════
+
+function DotTimeline({ data }: { data: HexDay[] }) {
+  const maxCount = Math.max(1, ...data.map((d) => d.count));
+  const weeks = useMemo(() => bucketByWeek(data), [data]);
+  const [tooltip, setTooltip] = useState<ChartTooltipData | null>(null);
+
+  const handleDotEnter = useCallback(
+    (day: HexDay & { dominant: Dimension; dimensionWeights: Record<Dimension, number> }, e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltip({
+        title: formatIsoDate(day.date),
+        count: day.count,
+        dimensionWeights: day.dimensionWeights,
+        dominant: day.dominant,
+        screenX: rect.left + rect.width / 2,
+        screenY: rect.top,
+        cellBottom: rect.bottom,
+      });
+    },
+    []
+  );
+
+  const handleLeave = useCallback(() => setTooltip(null), []);
+
+  return (
+    <div className="space-y-2" role="img" aria-label="Activity dot timeline">
+      {weeks.map((week, wi) => (
+        <div key={wi} className="flex items-center gap-2">
+          <span className="text-[9px] text-text-secondary font-body w-12 shrink-0 text-right">
+            {week.label}
+          </span>
+          <div className="flex items-center gap-1 flex-1">
+            {week.days.map((day, di) => {
+              const size = day.count > 0
+                ? 8 + (day.count / maxCount) * 24
+                : 6;
+              const dayName = new Date(day.date + "T12:00:00")
+                .toLocaleDateString("en-US", { weekday: "short" })
+                .charAt(0);
+              return (
+                <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
+                  <div
+                    className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
+                    style={{
+                      width: size,
+                      height: size,
+                      backgroundColor: day.count > 0
+                        ? DIMENSION_COLORS[day.dominant]
+                        : "var(--color-purple-tint)",
+                      opacity: day.count > 0
+                        ? 0.3 + (day.count / maxCount) * 0.7
+                        : 1,
+                      border: day.count === 0
+                        ? "1px solid rgba(139,92,246,0.15)"
+                        : "none",
+                    }}
+                    onMouseEnter={(e) => handleDotEnter(day, e)}
+                    onMouseLeave={handleLeave}
+                  />
+                  <span className="text-[7px] text-text-secondary font-body leading-none">
+                    {dayName}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <span className="text-[9px] text-text-secondary font-body w-8 shrink-0 tabular-nums">
+            {week.total > 0 ? week.total : ""}
+          </span>
+        </div>
+      ))}
+      {tooltip && <ChartTooltip tip={tooltip} />}
     </div>
   );
 }

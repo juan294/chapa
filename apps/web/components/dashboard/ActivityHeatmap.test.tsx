@@ -10,14 +10,6 @@ const SOURCE = fs.readFileSync(
   "utf-8"
 );
 
-// jsdom does not provide ResizeObserver — stub it so the component can mount
-class ResizeObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver;
-
 afterEach(cleanup);
 
 // ---------------------------------------------------------------------------
@@ -55,9 +47,9 @@ function makeDays(startDate: string, counts: number[]): HeatmapDay[] {
 
 describe("ActivityHeatmap", () => {
   // ----------------------------------------------------------------
-  // 1. Renders hexagonal heatmap grid
+  // 1. Renders dot timeline chart
   // ----------------------------------------------------------------
-  it("renders hexagonal heatmap grid", () => {
+  it("renders dot timeline chart", () => {
     render(
       <ActivityHeatmap
         heatmapData={mockHeatmapData}
@@ -67,7 +59,7 @@ describe("ActivityHeatmap", () => {
     );
 
     const grid = screen.getByRole("img", {
-      name: "Hexagonal activity heatmap",
+      name: "Activity dot timeline",
     });
     expect(grid).toBeTruthy();
   });
@@ -91,7 +83,7 @@ describe("ActivityHeatmap", () => {
       <ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />
     );
 
-    const section = screen.getByLabelText("Contribution activity heatmap");
+    const section = screen.getByLabelText("Contribution activity");
     expect(section).toBeTruthy();
   });
 
@@ -166,33 +158,13 @@ describe("ActivityHeatmap", () => {
     );
 
     const grid = screen.getByRole("img", {
-      name: "Hexagonal activity heatmap",
+      name: "Activity dot timeline",
     });
     expect(grid).toBeTruthy();
   });
 
   // ----------------------------------------------------------------
-  // 10. Grid container uses full width (responsive hex sizing)
-  // ----------------------------------------------------------------
-  it("renders hex grid with w-full container instead of fixed width", () => {
-    render(
-      <ActivityHeatmap
-        heatmapData={mockHeatmapData}
-        activeDays={42}
-        dimensions={mockDimensions}
-      />
-    );
-
-    const grid = screen.getByRole("img", {
-      name: "Hexagonal activity heatmap",
-    });
-    // Container should have w-full class, not mx-auto with fixed width
-    expect(grid.className).toContain("w-full");
-    expect(grid.className).not.toContain("mx-auto");
-  });
-
-  // ----------------------------------------------------------------
-  // 11. Uses CSS variables instead of hardcoded hex colors
+  // 10. Uses CSS variables instead of hardcoded hex colors
   // ----------------------------------------------------------------
   it("uses CSS variables for dimension colors, not hardcoded hex", () => {
     // Static analysis: DIMENSION_COLORS must use var(--color-dimension-*) CSS variables
