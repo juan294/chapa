@@ -373,7 +373,7 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                   : undefined,
                 background: emptyBg ? undefined : background,
                 filter: emptyBg
-                  ? "drop-shadow(0 0 0.5px var(--color-stroke))"
+                  ? "drop-shadow(0 0 1px rgba(139,92,246,0.25))"
                   : undefined,
                 animationDelay: `${delay}ms`,
               }}
