@@ -72,11 +72,13 @@ export function isValidBadgeConfig(value: unknown): boolean {
 }
 
 /**
- * Structural validation for uploaded StatsData.
- * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
- */
-/**
  * Validate a CLI telemetry payload (merge operation audit data).
+ *
+ * Checks structural integrity: operationId (UUID v4), targetHandle (GitHub handle),
+ * sourceHandle (EMU handle), success (boolean), optional errorCategory, stats
+ * (5 non-negative integer fields), timing (3 non-negative numbers), and cliVersion
+ * (non-empty string, max 20 chars).
+ *
  * Used by POST /api/telemetry.
  */
 const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -128,7 +130,13 @@ export function isValidTelemetryPayload(value: unknown): boolean {
 
 /**
  * Structural validation for uploaded StatsData.
- * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
+ *
+ * Ensures the shape matches what the scoring pipeline expects — prevents
+ * arbitrary JSON from being stored. Validates: handle + fetchedAt (strings),
+ * 14 required non-negative number fields (commits, PRs, reviews, etc.),
+ * and heatmapData (array of {date, count} entries, max 371 = 53 weeks × 7 days).
+ *
+ * Used by POST /api/supplemental.
  */
 export function isValidStatsShape(value: unknown): boolean {
   if (value == null || typeof value !== "object") return false;

@@ -354,7 +354,7 @@ export async function dbGetCampaignStats(
   if (!db) return { sent: 0, pending: 0, failed: 0 };
 
   try {
-    // Use SQL-level aggregation via RPC-like grouping to avoid fetching all rows
+    // Fetch status column only and count in JS — acceptable at current scale (<100 sends/campaign)
     const { data, error } = await db
       .from("campaign_sends")
       .select("status")

@@ -1,6 +1,16 @@
 /**
- * Validate that an object has the correct InsightsUpload shape.
- * Returns { valid: true } or { valid: false, reason: string }.
+ * Validate a Claude Code insights HTML report upload payload.
+ *
+ * Performs deep structural validation on 12 top-level fields: tool (must be
+ * "claude-code"), reportPeriod (ISO date range), volume (6 numeric metrics),
+ * toolUsage, sessionTypes, outcomes (3 categories), friction (3 categories),
+ * satisfaction (3 tiers), multiClauding (overlap stats), responseTime (median
+ * + average), toolErrors, totalSessions (>=1), and totalToolCalls (>=0).
+ *
+ * Returns `{ valid: true }` or `{ valid: false, reason: string }` with a
+ * human-readable description of the first validation failure.
+ *
+ * Used by POST /api/insights.
  */
 export function isValidInsightsUpload(
   data: unknown,

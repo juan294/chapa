@@ -10,6 +10,17 @@ export type { RawContributionData };
 
 const FETCH_TIMEOUT_MS = 15_000; // 15 seconds — prevents SSR from hanging in CI
 
+/**
+ * Fetch a user's GitHub contribution data via the GraphQL API.
+ *
+ * Queries the last 365 days of contribution activity (commits, PRs, reviews,
+ * issues, repositories, contribution calendar). Uses the provided OAuth token
+ * if available, otherwise falls back to `GITHUB_TOKEN` env var. Returns the
+ * raw `RawContributionData` shape used by the scoring pipeline, or `null` on
+ * error (HTTP failure, rate limiting, or missing user).
+ *
+ * Timeout: 15 seconds via `AbortSignal.timeout()`.
+ */
 export async function fetchContributionData(
   login: string,
   token?: string,

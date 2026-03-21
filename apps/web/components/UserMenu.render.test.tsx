@@ -45,6 +45,10 @@ vi.mock("@/hooks/useDropdownMenu", () => ({
   }),
 }));
 
+vi.mock("@/lib/insights/parser", () => ({
+  parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
+}));
+
 vi.mock("./ConfirmDialog", () => ({
   ConfirmDialog: ({
     open,
@@ -412,11 +416,6 @@ describe("UserMenu — insights import", () => {
     const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
-    // Mock parseInsightsHtml — dynamic import inside the handler
-    vi.mock("@/lib/insights/parser", () => ({
-      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
-    }));
-
     // Delay the fetch to keep it in loading state
     vi.spyOn(globalThis, "fetch").mockImplementation(
       () => new Promise(() => {}), // Never resolves — keeps loading
@@ -443,10 +442,6 @@ describe("UserMenu — insights import", () => {
     const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
-    vi.mock("@/lib/insights/parser", () => ({
-      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
-    }));
-
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response("", { status: 500 }),
     );
@@ -472,10 +467,6 @@ describe("UserMenu — insights import", () => {
   it("shows success toast with craft score after successful upload + recalculate", async () => {
     const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
-
-    vi.mock("@/lib/insights/parser", () => ({
-      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
-    }));
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     // First call: upload
@@ -515,10 +506,6 @@ describe("UserMenu — insights import", () => {
   it("shows success with fallback when recalculate fails", async () => {
     const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
-
-    vi.mock("@/lib/insights/parser", () => ({
-      parseInsightsHtml: vi.fn(() => ({ sessions: [] })),
-    }));
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     // Upload succeeds

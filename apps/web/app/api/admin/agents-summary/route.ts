@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
   const flagMap = new Map(flags.map((f) => [f.key, f.enabled]));
 
   // Build agent statuses
+  // process.cwd() causes Turbopack to trace the project dir into the bundle — cosmetic build warning only.
+  // Alternatives (import.meta.dirname with relative traversal) are brittle. Admin-only route, low impact.
   const projectRoot = process.cwd();
   const agents: AgentStatus[] = await Promise.all(
     Object.values(AGENTS).map(async (config) => {

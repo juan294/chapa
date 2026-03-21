@@ -25,15 +25,18 @@ async function listAllContacts(): Promise<Contact[]> {
   const resend = getResend();
   if (!resend) return [];
 
+  let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
     listAllContactsInner(resend),
-    new Promise<Contact[]>((_, reject) =>
-      setTimeout(
+    new Promise<Contact[]>((_, reject) => {
+      timer = setTimeout(
         () => reject(new Error("listAllContacts timed out")),
         LIST_CONTACTS_TIMEOUT_MS,
-      ),
-    ),
-  ]).catch((error) => {
+      );
+    }),
+  ])
+  .finally(() => clearTimeout(timer))
+  .catch((error) => {
     console.error(
       "[sync-audience] listAllContacts error:",
       (error as Error).message,

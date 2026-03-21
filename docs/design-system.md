@@ -188,6 +188,7 @@ Defined in `globals.css`:
 | `animate-terminal-type` | Typewriter width expansion (0 to 100%) | (set per-element) |
 | `.sparkline-animated polyline` | SVG polyline stroke trace via `--sparkline-length` | 0.6s ease-out |
 | `radar-expand` (keyframe only) | Scale from 0 + fade in (for radar chart polygons) | (set per-element) |
+| `animate-hex-cell-in` | Scale from 0.3 + fade in (hex grid cells) | (set per-element) |
 
 ## Icons
 

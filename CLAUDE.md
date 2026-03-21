@@ -42,27 +42,39 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/about` About page (scoring explainer, archetype showcase)
 - GET `/about/scoring` Scoring methodology detail
 - GET `/about/verification` Badge verification explainer
-- GET `/archetypes/:type` Archetype guide pages (builder, guardian, marathoner, polymath, balanced, emerging)
+- GET `/archetypes/:type` Archetype guide pages (builder, guardian, marathoner, polymath, artificer, balanced, emerging)
 - GET `/generating/:handle` Badge generation loading screen
 - GET `/cli/authorize` CLI device authorization flow
 - GET `/privacy` Privacy policy
 - GET `/terms` Terms of service
+- GET `/coming-soon` Coming soon placeholder
+- GET `/verify` Badge verification landing page
+- GET `/experiments/*` Experimental feature pages (gated by feature flag)
 
 ### Auth API
 - GET `/api/auth/login` GitHub OAuth login redirect
 - GET `/api/auth/callback` GitHub OAuth callback (token exchange)
 - GET `/api/auth/session` Current session info (login, name, avatar_url)
 - POST `/api/auth/logout` Clear session cookie
-- GET `/api/auth/bitbucket/login` Bitbucket OAuth login redirect
 - GET `/api/auth/bitbucket/callback` Bitbucket OAuth callback
-- GET `/api/auth/codeberg/login` Codeberg OAuth login redirect
+- GET `/api/auth/bitbucket/connect` Bitbucket OAuth connect (link account)
+- POST `/api/auth/bitbucket/disconnect` Bitbucket account unlink
+- GET `/api/auth/bitbucket/status` Bitbucket connection status
 - GET `/api/auth/codeberg/callback` Codeberg OAuth callback
+- GET `/api/auth/codeberg/connect` Codeberg OAuth connect (link account)
+- POST `/api/auth/codeberg/disconnect` Codeberg account unlink
+- GET `/api/auth/codeberg/status` Codeberg connection status
 
 ### Public API
 - GET `/api/verify/:hash` Badge verification endpoint
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
 - GET `/api/health` Health check (Redis + Supabase ping, rate-limited)
 - GET `/api/feature-flags` Public feature flag values
+- GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
+- GET `/og-image` Default OG image
+- GET `/llms.txt` LLM-friendly site summary
+- GET `/llms-full.txt` Full LLM-friendly site content
+- GET `/.well-known/security.txt` Security contact info
 
 ### Authenticated API
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
@@ -80,13 +92,19 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/admin/stats` Admin stats (bearer token auth via `ADMIN_SECRET`)
 - POST `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
 - GET `/api/admin/agents-summary` Agent run summaries
-- GET|PUT `/api/admin/feature-flags` Manage feature flags
-- GET|PUT `/api/admin/engagement-flags` Manage engagement flags
+- GET|PATCH `/api/admin/feature-flags` Manage feature flags
+- GET `/api/admin/engagement-flags` Manage engagement flags
+- GET|POST `/api/admin/campaigns` Campaign list and creation (admin auth)
+- GET|PATCH|DELETE `/api/admin/campaigns/:id` Campaign CRUD (admin auth, draft only)
+- GET `/api/admin/campaigns/:id/preview` Campaign email preview (admin auth)
+- POST `/api/admin/campaigns/:id/send` Initiate campaign send (admin auth)
 - POST `/api/notifications/unsubscribe` Email unsubscribe
 
 ### Webhooks & Cron
 - POST `/api/webhooks/resend` Resend email webhook (HMAC verified)
 - GET `/api/cron/warm-cache` Daily cache warming (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/sync-audience` Daily Resend audience sync (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/process-campaigns` Daily campaign batch processor (bearer auth via `CRON_SECRET`)
 - POST `/api/telemetry` Client telemetry ingestion
 
 ## Data & types
