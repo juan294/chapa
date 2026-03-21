@@ -159,75 +159,202 @@ export function ActivityHeatmap({
       </h3>
 
       <p className="text-sm text-text-secondary mb-3">
-        {activeDays} active days in the last year
+        {insights.summary}
       </p>
 
-      {/* Insight stats strip */}
+      {/* Insight cards */}
       {hasInsights && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <InsightStat
-            label="Current streak"
-            value={`${insights.currentStreak}d`}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <StreakCard
+            current={insights.currentStreak}
+            longest={insights.longestStreak}
+            last7={insights.last7DaysActive}
           />
-          <InsightStat
-            label="Longest streak"
-            value={`${insights.longestStreak}d`}
+          <RhythmCard
+            busiestDay={insights.busiestDay}
+            busiestDayIndex={insights.busiestDayIndex}
+            distribution={insights.weekdayDistribution}
           />
-          <InsightStat
-            label="Busiest day"
-            value={insights.busiestDay || "—"}
-          />
-          <InsightStat
-            label="Avg / active day"
-            value={insights.avgPerActiveDay.toFixed(1)}
+          <ThisWeekCard
+            total={insights.thisWeekTotal}
+            weeklyAvg={insights.weeklyAverage}
           />
         </div>
       )}
 
       <div className="rounded-xl border border-stroke bg-card p-4">
-        <DotTimeline data={enriched} />
+        <DotTimeline data={enriched} peakDate={insights.peakDay.date} />
       </div>
 
-      {/* Dimension legend */}
-      <div className="flex flex-wrap items-center gap-4 mt-3">
-        {DIMENSIONS.map((dim) => (
-          <div key={dim} className="flex items-center gap-1.5">
-            <div
-              className="h-2 w-2 rounded-full"
-              style={{ backgroundColor: DIMENSION_COLORS[dim] }}
-            />
-            <span className="text-[10px] text-text-secondary font-body">
-              {DIMENSION_LABELS[dim]}
-            </span>
-          </div>
-        ))}
+      {/* Legends */}
+      <div className="flex flex-wrap items-center justify-between mt-3 gap-2">
+        {/* Dimension colors */}
+        <div className="flex flex-wrap items-center gap-4">
+          {DIMENSIONS.map((dim) => (
+            <div key={dim} className="flex items-center gap-1.5">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: DIMENSION_COLORS[dim] }}
+              />
+              <span className="text-[10px] text-text-secondary font-body">
+                {DIMENSION_LABELS[dim]}
+              </span>
+            </div>
+          ))}
+        </div>
+        {/* Dot size key */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-text-secondary font-body">Activity:</span>
+          {[
+            { label: "Low", size: 5 },
+            { label: "Med", size: 9 },
+            { label: "High", size: 14 },
+          ].map(({ label, size }) => (
+            <div key={label} className="flex items-center gap-1">
+              <div
+                className="rounded-full bg-amber/40"
+                style={{ width: size, height: size }}
+              />
+              <span className="text-[9px] text-text-secondary font-body">
+                {label}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
-
-      {/* Peak day callout */}
-      {hasInsights && insights.peakDay.count > 0 && (
-        <p className="text-xs text-text-secondary mt-2">
-          Peak:{" "}
-          <span className="text-amber font-medium">
-            {insights.peakDay.count} contributions
-          </span>{" "}
-          on {formatIsoDate(insights.peakDay.date)}
-        </p>
-      )}
     </section>
   );
 }
 
-// ── Subcomponents ────────────────────────────────────────────────────
+// ── Insight cards ────────────────────────────────────────────────────
 
-function InsightStat({ label, value }: { label: string; value: string }) {
+const CARD_CLASS = "rounded-lg border border-stroke bg-card p-3";
+
+function StreakCard({
+  current,
+  longest,
+  last7,
+}: {
+  current: number;
+  longest: number;
+  last7: boolean[];
+}) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-base font-heading font-semibold text-text-primary leading-none">
-        {value}
+    <div className={CARD_CLASS}>
+      <div className="flex items-center gap-3">
+        <div className="flex flex-col">
+          <span
+            className="text-2xl font-heading font-bold text-text-primary leading-none"
+            title="Days with 1+ contribution"
+          >
+            {current}d
+          </span>
+          <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider mt-0.5">
+            Current streak
+          </span>
+        </div>
+        <div className="flex gap-1 items-center">
+          {last7.map((active, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full ${
+                active
+                  ? "bg-amber"
+                  : "bg-track border border-stroke"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+      <p className="text-[10px] text-text-secondary font-body mt-1.5">
+        Best: <span className="text-text-primary font-medium">{longest}d</span>
+      </p>
+    </div>
+  );
+}
+
+/** Mon=0 through Sun=6 display order, mapped to JS getDay() indices */
+const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+const WEEKDAY_JS_INDICES = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun → getDay() values
+
+function RhythmCard({
+  busiestDay,
+  busiestDayIndex,
+  distribution,
+}: {
+  busiestDay: string;
+  busiestDayIndex: number;
+  distribution: number[];
+}) {
+  const maxVal = Math.max(1, ...distribution);
+  return (
+    <div className={CARD_CLASS}>
+      <span className="text-lg font-heading font-semibold text-text-primary leading-none">
+        {busiestDay || "—"}
       </span>
-      <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider leading-none">
-        {label}
+      <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
+        Most active day
       </span>
+      <div className="flex items-end gap-px mt-2" style={{ height: 20 }}>
+        {WEEKDAY_JS_INDICES.map((jsIdx, displayIdx) => {
+          const val = distribution[jsIdx] ?? 0;
+          const barH = maxVal > 0 ? (val / maxVal) * 16 : 0;
+          const isBusiest = jsIdx === busiestDayIndex;
+          return (
+            <div
+              key={displayIdx}
+              className="flex-1 flex flex-col items-center gap-0.5"
+            >
+              <div
+                className="w-full rounded-sm"
+                style={{
+                  height: Math.max(2, barH),
+                  backgroundColor: isBusiest
+                    ? "var(--color-amber)"
+                    : "var(--color-purple-tint)",
+                }}
+              />
+              <span className="text-[7px] text-text-secondary font-body leading-none">
+                {WEEKDAY_LABELS[displayIdx]}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ThisWeekCard({
+  total,
+  weeklyAvg,
+}: {
+  total: number;
+  weeklyAvg: number;
+}) {
+  const ratio = weeklyAvg > 0 ? total / weeklyAvg : 0;
+  const ratioLabel = ratio > 0 ? `${ratio.toFixed(1)}x avg` : "";
+  const isAbove = ratio >= 1;
+
+  return (
+    <div className={CARD_CLASS}>
+      <span className="text-lg font-heading font-semibold text-text-primary leading-none">
+        {total.toLocaleString()}
+      </span>
+      <span className="text-[10px] text-text-secondary font-body uppercase tracking-wider block mt-0.5">
+        This week
+      </span>
+      {ratioLabel && (
+        <p className="text-[10px] font-body font-medium mt-1">
+          <span
+            className={
+              isAbove ? "text-terminal-green" : "text-terminal-red"
+            }
+          >
+            {isAbove ? "↑" : "↓"} {ratioLabel}
+          </span>
+        </p>
+      )}
     </div>
   );
 }
@@ -241,17 +368,24 @@ interface WeekBucket {
 }
 
 function bucketByWeek(data: EnrichedDay[]): WeekBucket[] {
-  const weeks: WeekBucket[] = [];
+  const chunks: { first: EnrichedDay; days: EnrichedDay[]; total: number }[] = [];
   for (let i = 0; i < data.length; i += DAYS) {
     const chunk = data.slice(i, i + DAYS);
     const first = chunk[0];
     if (!first) continue;
-    const d = new Date(first.date + "T12:00:00");
-    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const total = chunk.reduce((s, c) => s + c.count, 0);
-    weeks.push({ label, total, days: chunk });
+    chunks.push({ first, days: chunk, total: chunk.reduce((s, c) => s + c.count, 0) });
   }
-  return weeks;
+  return chunks.map(({ first, days, total }, idx) => {
+    const weeksAgo = chunks.length - 1 - idx;
+    let label: string;
+    if (weeksAgo === 0) label = "This wk";
+    else if (weeksAgo === 1) label = "Last wk";
+    else {
+      const d = new Date(first.date + "T12:00:00");
+      label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    return { label, total, days };
+  });
 }
 
 // ── Shared tooltip (portaled) ─────────────────────────────────────────
@@ -319,7 +453,9 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
 
 // ── Dot timeline ─────────────────────────────────────────────────────
 
-function DotTimeline({ data }: { data: EnrichedDay[] }) {
+const DOW_HEADERS = ["M", "T", "W", "T", "F", "S", "S"];
+
+function DotTimeline({ data, peakDate }: { data: EnrichedDay[]; peakDate: string }) {
   const maxCount = useMemo(
     () => Math.max(1, ...data.map((d) => d.count)),
     [data]
@@ -346,49 +482,65 @@ function DotTimeline({ data }: { data: EnrichedDay[] }) {
   const handleLeave = useCallback(() => setTooltip(null), []);
 
   return (
-    <div className="space-y-2" role="img" aria-label="Activity dot timeline">
-      {weeks.map((week, wi) => (
-        <div key={wi} className="flex items-center gap-2">
-          <span className="text-[9px] text-text-secondary font-body w-12 shrink-0 text-right">
-            {week.label}
-          </span>
-          <div className="flex items-center gap-1 flex-1">
-            {week.days.map((day, di) => {
-              const size = day.count > 0
-                ? 8 + (day.count / maxCount) * 24
-                : 6;
-              return (
-                <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
-                  <div
-                    className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
-                    style={{
-                      width: size,
-                      height: size,
-                      backgroundColor: day.count > 0
-                        ? DIMENSION_COLORS[day.dominant]
-                        : "var(--color-purple-tint)",
-                      opacity: day.count > 0
-                        ? 0.3 + (day.count / maxCount) * 0.7
-                        : 1,
-                      border: day.count === 0
-                        ? "1px solid rgba(139,92,246,0.15)"
-                        : "none",
-                    }}
-                    onMouseEnter={(e) => handleDotEnter(day, e)}
-                    onMouseLeave={handleLeave}
-                  />
-                  <span className="text-[7px] text-text-secondary font-body leading-none">
-                    {day.dayLabel}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <span className="text-[9px] text-text-secondary font-body w-8 shrink-0 tabular-nums">
-            {week.total > 0 ? week.total : ""}
-          </span>
+    <div role="img" aria-label="Activity dot timeline">
+      {/* Day-of-week column headers */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="w-12 shrink-0" />
+        <div className="flex items-center gap-1 flex-1">
+          {DOW_HEADERS.map((label, i) => (
+            <span
+              key={i}
+              className="flex-1 text-center text-[7px] text-text-secondary font-body"
+            >
+              {label}
+            </span>
+          ))}
         </div>
-      ))}
+      </div>
+
+      {/* Week rows */}
+      <div className="space-y-2">
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex items-center gap-2">
+            <span className="text-[9px] text-text-secondary font-body w-12 shrink-0 text-right">
+              {week.label}
+            </span>
+            <div className="flex items-center gap-1 flex-1">
+              {week.days.map((day, di) => {
+                const size = day.count > 0
+                  ? 8 + (day.count / maxCount) * 24
+                  : 6;
+                const isPeak = day.date === peakDate && day.count > 0;
+                return (
+                  <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
+                    <div
+                      className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
+                      style={{
+                        width: size,
+                        height: size,
+                        backgroundColor: day.count > 0
+                          ? DIMENSION_COLORS[day.dominant]
+                          : "var(--color-purple-tint)",
+                        opacity: day.count > 0
+                          ? 0.3 + (day.count / maxCount) * 0.7
+                          : 1,
+                        border: day.count === 0
+                          ? "1px solid rgba(139,92,246,0.15)"
+                          : "none",
+                        boxShadow: isPeak
+                          ? "0 0 0 2px var(--color-amber)"
+                          : undefined,
+                      }}
+                      onMouseEnter={(e) => handleDotEnter(day, e)}
+                      onMouseLeave={handleLeave}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
       {tooltip && <ChartTooltip tip={tooltip} />}
     </div>
   );

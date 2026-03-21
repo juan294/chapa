@@ -4,8 +4,20 @@ export interface ActivityInsights {
   currentStreak: number;
   longestStreak: number;
   busiestDay: string;
+  /** Index into DAY_NAMES (0=Sun, 1=Mon, ..., 6=Sat) for the busiest weekday */
+  busiestDayIndex: number;
   avgPerActiveDay: number;
   peakDay: { date: string; count: number };
+  /** Total contributions per weekday, indexed Sun=0 through Sat=6 */
+  weekdayDistribution: number[];
+  /** Mean weekly contribution total across all complete weeks */
+  weeklyAverage: number;
+  /** Total contributions in the most recent (possibly partial) week */
+  thisWeekTotal: number;
+  /** Last 7 data entries: true if count > 0 (oldest first) */
+  last7DaysActive: boolean[];
+  /** Natural-language summary sentence for the header */
+  summary: string;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -16,8 +28,14 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
       currentStreak: 0,
       longestStreak: 0,
       busiestDay: "",
+      busiestDayIndex: -1,
       avgPerActiveDay: 0,
       peakDay: { date: "", count: 0 },
+      weekdayDistribution: [0, 0, 0, 0, 0, 0, 0],
+      weeklyAverage: 0,
+      thisWeekTotal: 0,
+      last7DaysActive: [],
+      summary: "No activity recorded yet",
     };
   }
 
@@ -61,8 +79,9 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
     dayTotals[dow] = (dayTotals[dow] ?? 0) + day.count;
   }
   const maxDayTotal = Math.max(...dayTotals);
+  const busiestDayIndex = maxDayTotal === 0 ? -1 : dayTotals.indexOf(maxDayTotal);
   const busiestDay =
-    maxDayTotal === 0 ? "" : (DAY_NAMES[dayTotals.indexOf(maxDayTotal)] ?? "");
+    busiestDayIndex >= 0 ? (DAY_NAMES[busiestDayIndex] ?? "") : "";
 
   // Average contributions per active day
   const activeDays = data.filter((d) => d.count > 0);
@@ -76,11 +95,96 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
     if (day.count > peakDay.count) peakDay = day;
   }
 
+  // Weekly totals for average calculation
+  const weeklyTotals: number[] = [];
+  for (let i = 0; i < data.length; i += 7) {
+    const chunk = data.slice(i, i + 7);
+    weeklyTotals.push(chunk.reduce((s, d) => s + d.count, 0));
+  }
+  const thisWeekTotal = weeklyTotals[weeklyTotals.length - 1] ?? 0;
+  // Average excludes the current (possibly partial) week if there are at least 2 weeks
+  const avgWeeks = weeklyTotals.length > 1 ? weeklyTotals.slice(0, -1) : weeklyTotals;
+  const weeklyAverage =
+    avgWeeks.length > 0
+      ? avgWeeks.reduce((s, v) => s + v, 0) / avgWeeks.length
+      : 0;
+
+  // Last 7 days activity indicators
+  const last7 = data.slice(-7);
+  const last7DaysActive = last7.map((d) => d.count > 0);
+
+  // Summary sentence
+  const summary = generateSummary(data, weeklyTotals, weeklyAverage, peakDay);
+
   return {
     currentStreak,
     longestStreak,
     busiestDay,
+    busiestDayIndex,
     avgPerActiveDay,
     peakDay: { date: peakDay.date, count: peakDay.count },
+    weekdayDistribution: dayTotals,
+    weeklyAverage,
+    thisWeekTotal,
+    last7DaysActive,
+    summary,
   };
+}
+
+// ── Summary generation ────────────────────────────────────────────────
+
+function generateSummary(
+  data: HeatmapDay[],
+  weeklyTotals: number[],
+  weeklyAverage: number,
+  peakDay: HeatmapDay
+): string {
+  if (weeklyTotals.length === 0) return "No activity recorded yet";
+
+  // Find the best week
+  let bestWeekIdx = 0;
+  let bestWeekTotal = 0;
+  for (let i = 0; i < weeklyTotals.length; i++) {
+    const t = weeklyTotals[i] ?? 0;
+    if (t > bestWeekTotal) {
+      bestWeekTotal = t;
+      bestWeekIdx = i;
+    }
+  }
+
+  if (bestWeekTotal === 0) return "No activity recorded yet";
+
+  const ratio = weeklyAverage > 0 ? bestWeekTotal / weeklyAverage : 0;
+  const startIdx = bestWeekIdx * 7;
+  const startDay = data[startIdx];
+  const endDay = data[Math.min(startIdx + 6, data.length - 1)];
+
+  if (ratio > 1.2 && startDay && endDay) {
+    const range = formatWeekRange(startDay.date, endDay.date);
+    return `Most active week: ${range} — ${ratio.toFixed(1)}x your weekly average`;
+  }
+
+  if (peakDay.count > 0) {
+    const d = new Date(peakDay.date + "T12:00:00");
+    const label = d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    return `Peak day: ${label} with ${peakDay.count.toLocaleString()} contributions`;
+  }
+
+  const activeDays = data.filter((d) => d.count > 0).length;
+  return `${activeDays} active days in the last ${Math.ceil(data.length / 7)} weeks`;
+}
+
+function formatWeekRange(startDate: string, endDate: string): string {
+  const start = new Date(startDate + "T12:00:00");
+  const end = new Date(endDate + "T12:00:00");
+  const startLabel = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (start.getMonth() === end.getMonth()) {
+    return `${startLabel}–${end.getDate()}`;
+  }
+  const endLabel = end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${startLabel}–${endLabel}`;
 }

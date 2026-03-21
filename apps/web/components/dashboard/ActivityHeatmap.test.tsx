@@ -65,14 +65,14 @@ describe("ActivityHeatmap", () => {
   });
 
   // ----------------------------------------------------------------
-  // 2. Shows active days count in subheader
+  // 2. Shows contextual summary (not generic "active days" count)
   // ----------------------------------------------------------------
-  it("shows active days count in subheader", () => {
-    render(
-      <ActivityHeatmap heatmapData={mockHeatmapData} activeDays={42} />
-    );
+  it("shows contextual summary instead of generic active days count", () => {
+    const data = makeDays("2025-03-01", [3, 5, 2, 0, 4, 1, 8]);
+    render(<ActivityHeatmap heatmapData={data} activeDays={6} />);
 
-    expect(screen.getByText("42 active days in the last year")).toBeTruthy();
+    // Should NOT show the old generic paragraph
+    expect(screen.queryByText(/active days in the last year/)).toBeNull();
   });
 
   // ----------------------------------------------------------------
@@ -106,47 +106,67 @@ describe("ActivityHeatmap", () => {
   });
 
   // ----------------------------------------------------------------
-  // 5. Shows insight stats when data is available
+  // 5. Shows insight cards when data is available
   // ----------------------------------------------------------------
-  it("shows insight stats when there are active days", () => {
+  it("shows streak, rhythm, and this-week cards", () => {
     const data = makeDays("2025-03-01", [3, 5, 2, 0, 4, 1]);
-    render(<ActivityHeatmap heatmapData={data} activeDays={5} />);
+    render(
+      <ActivityHeatmap
+        heatmapData={data}
+        activeDays={5}
+        dimensions={mockDimensions}
+      />
+    );
 
     expect(screen.getByText("Current streak")).toBeTruthy();
-    expect(screen.getByText("Longest streak")).toBeTruthy();
-    expect(screen.getByText("Busiest day")).toBeTruthy();
-    expect(screen.getByText("Avg / active day")).toBeTruthy();
+    expect(screen.getByText("Most active day")).toBeTruthy();
+    expect(screen.getByText("This week")).toBeTruthy();
+    expect(screen.getByText(/Best:/)).toBeTruthy();
   });
 
   // ----------------------------------------------------------------
-  // 6. Hides insight stats when no active days
+  // 6. Hides insight cards when no active days
   // ----------------------------------------------------------------
-  it("hides insight stats when activeDays is 0", () => {
+  it("hides insight cards when activeDays is 0", () => {
     const data = makeDays("2025-03-01", [0, 0, 0]);
     render(<ActivityHeatmap heatmapData={data} activeDays={0} />);
 
     expect(screen.queryByText("Current streak")).toBeNull();
-    expect(screen.queryByText("Longest streak")).toBeNull();
+    expect(screen.queryByText("Most active day")).toBeNull();
   });
 
   // ----------------------------------------------------------------
-  // 7. Shows peak day callout
+  // 7. Shows day-of-week column headers
   // ----------------------------------------------------------------
-  it("shows peak day callout when peak count > 0", () => {
-    const data = makeDays("2025-03-01", [3, 15, 2]);
-    render(<ActivityHeatmap heatmapData={data} activeDays={3} />);
+  it("shows day-of-week column headers in dot grid", () => {
+    const data = makeDays("2025-03-01", [3, 5, 2, 0, 4, 1, 8]);
+    render(
+      <ActivityHeatmap heatmapData={data} activeDays={6} dimensions={mockDimensions} />
+    );
 
-    expect(screen.getByText("15 contributions")).toBeTruthy();
-    expect(screen.getByText(/Peak:/)).toBeTruthy();
+    // Headers M, T, W, T, F, S, S should be present
+    const allMs = screen.getAllByText("M");
+    expect(allMs.length).toBeGreaterThanOrEqual(1);
+    const allFs = screen.getAllByText("F");
+    expect(allFs.length).toBeGreaterThanOrEqual(1);
   });
 
   // ----------------------------------------------------------------
-  // 8. Hides peak day when empty data
+  // 8. Shows dot size legend
   // ----------------------------------------------------------------
-  it("hides peak callout when no data", () => {
-    render(<ActivityHeatmap heatmapData={[]} activeDays={0} />);
+  it("shows dot size legend", () => {
+    render(
+      <ActivityHeatmap
+        heatmapData={mockHeatmapData}
+        activeDays={42}
+        dimensions={mockDimensions}
+      />
+    );
 
-    expect(screen.queryByText(/Peak:/)).toBeNull();
+    expect(screen.getByText("Low")).toBeTruthy();
+    expect(screen.getByText("Med")).toBeTruthy();
+    expect(screen.getByText("High")).toBeTruthy();
+    expect(screen.getByText("Activity:")).toBeTruthy();
   });
 
   // ----------------------------------------------------------------
@@ -167,13 +187,11 @@ describe("ActivityHeatmap", () => {
   // 10. Uses CSS variables instead of hardcoded hex colors
   // ----------------------------------------------------------------
   it("uses CSS variables for dimension colors, not hardcoded hex", () => {
-    // Static analysis: DIMENSION_COLORS must use var(--color-dimension-*) CSS variables
     expect(SOURCE).toContain("var(--color-dimension-delivery)");
     expect(SOURCE).toContain("var(--color-dimension-quality)");
     expect(SOURCE).toContain("var(--color-dimension-consistency)");
     expect(SOURCE).toContain("var(--color-dimension-breadth)");
 
-    // Must NOT contain hardcoded hex values for dimension colors
     const dimColorsBlock = SOURCE.match(
       /DIMENSION_COLORS[\s\S]*?};/
     )?.[0] ?? "";
@@ -181,5 +199,14 @@ describe("ActivityHeatmap", () => {
     expect(dimColorsBlock).not.toContain('"#f97316"');
     expect(dimColorsBlock).not.toContain('"#06b6d4"');
     expect(dimColorsBlock).not.toContain('"#ec4899"');
+  });
+
+  // ----------------------------------------------------------------
+  // 11. Renders empty state gracefully
+  // ----------------------------------------------------------------
+  it("renders gracefully with empty data", () => {
+    render(<ActivityHeatmap heatmapData={[]} activeDays={0} />);
+
+    expect(screen.getByText("No activity recorded yet")).toBeTruthy();
   });
 });
