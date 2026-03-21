@@ -368,19 +368,27 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                 width: hexSize * 2,
                 height: hexH,
                 clipPath: HEX_CLIP_PATH,
-                backgroundColor: emptyBg
-                  ? "var(--color-purple-tint)"
-                  : undefined,
-                background: emptyBg ? undefined : background,
-                filter: emptyBg
-                  ? "drop-shadow(0 0 1px rgba(139,92,246,0.25))"
-                  : undefined,
+                background: emptyBg
+                  ? "rgba(139,92,246,0.15)"
+                  : background,
                 animationDelay: `${delay}ms`,
               }}
               onMouseEnter={(e) => day && handleHover(day, e)}
               onMouseLeave={handleLeave}
               aria-hidden="true"
-            />
+            >
+              {/* Inner fill creates a visible border on empty cells */}
+              {emptyBg && (
+                <div
+                  className="absolute"
+                  style={{
+                    inset: 1.5,
+                    clipPath: HEX_CLIP_PATH,
+                    backgroundColor: "var(--color-card)",
+                  }}
+                />
+              )}
+            </div>
           );
         })}
       </div>
