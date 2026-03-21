@@ -372,6 +372,9 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
                   ? "var(--color-purple-tint)"
                   : undefined,
                 background: emptyBg ? undefined : background,
+                filter: emptyBg
+                  ? "drop-shadow(0 0 0.5px var(--color-stroke))"
+                  : undefined,
                 animationDelay: `${delay}ms`,
               }}
               onMouseEnter={(e) => day && handleHover(day, e)}
