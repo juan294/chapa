@@ -147,36 +147,41 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 4. Trend-up card has green top border accent
+  // 4. Trend-up card uses green accent on icon container
   // ----------------------------------------------------------------
-  it("trend-up card has green top border accent", () => {
+  it("trend-up card uses green accent on icon container", () => {
     const { container } = render(
       <InsightCard insight={trendInsight} />,
     );
-    const card = container.querySelector("[role='article']") as HTMLElement;
-    expect(card.style.borderTopColor).toBe("var(--color-terminal-green)");
+    const iconBox = container.querySelector("[data-testid='trend-icon']") as HTMLElement;
+    expect(iconBox).toBeTruthy();
+    // Icon is rendered in green
+    const iconWrapper = iconBox.querySelector("div:last-child") as HTMLElement;
+    expect(iconWrapper.style.color).toBe("var(--color-terminal-green)");
   });
 
   // ----------------------------------------------------------------
-  // 5. Trend-down card has yellow top border accent
+  // 5. Trend-down card uses yellow accent on icon container
   // ----------------------------------------------------------------
-  it("trend-down card has yellow top border accent", () => {
+  it("trend-down card uses yellow accent on icon container", () => {
     const { container } = render(
       <InsightCard insight={trendDownInsight} />,
     );
-    const card = container.querySelector("[role='article']") as HTMLElement;
-    expect(card.style.borderTopColor).toBe("var(--color-terminal-yellow)");
+    const iconBox = container.querySelector("[data-testid='trend-icon']") as HTMLElement;
+    const iconWrapper = iconBox.querySelector("div:last-child") as HTMLElement;
+    expect(iconWrapper.style.color).toBe("var(--color-terminal-yellow)");
   });
 
   // ----------------------------------------------------------------
-  // 6. Trend card with dimension uses dimension color for top border
+  // 6. Trend card with dimension uses dimension color on icon
   // ----------------------------------------------------------------
-  it("trend card with dimension uses dimension color for top border", () => {
+  it("trend card with dimension uses dimension color on icon", () => {
     const { container } = render(
       <InsightCard insight={trendDimensionInsight} />,
     );
-    const card = container.querySelector("[role='article']") as HTMLElement;
-    expect(card.style.borderTopColor).toBe("var(--color-dimension-quality)");
+    const iconBox = container.querySelector("[data-testid='trend-icon']") as HTMLElement;
+    const iconWrapper = iconBox.querySelector("div:last-child") as HTMLElement;
+    expect(iconWrapper.style.color).toBe("var(--color-dimension-quality)");
   });
 
   // ----------------------------------------------------------------
@@ -191,21 +196,20 @@ describe("InsightCard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 8. Archetype card applies archetype color accent bar
+  // 8. Archetype card applies archetype color on icon and headline
   // ----------------------------------------------------------------
-  it("archetype card applies archetype color accent bar", () => {
+  it("archetype card applies archetype color on icon and headline", () => {
     const { container } = render(
       <InsightCard insight={tipNoDimensionInsight} />,
     );
-    const card = container.querySelector("[role='article']") as HTMLElement;
-    // Archetype card has a top accent bar with the archetype color
-    const accentBar = card.querySelector(
-      ".absolute.top-0",
-    ) as HTMLElement;
-    expect(accentBar).toBeTruthy();
-    expect(accentBar.style.backgroundColor).toBe(
-      "var(--color-archetype-builder)",
-    );
+    // Icon container has tinted background
+    const iconBox = container.querySelector("[data-testid='archetype-icon']") as HTMLElement;
+    expect(iconBox).toBeTruthy();
+    const tint = iconBox.querySelector(".absolute") as HTMLElement;
+    expect(tint.style.backgroundColor).toBe("var(--color-archetype-builder)");
+    // Headline uses archetype color
+    const headline = container.querySelector("p.font-heading") as HTMLElement;
+    expect(headline.style.color).toBe("var(--color-archetype-builder)");
   });
 
   // ----------------------------------------------------------------

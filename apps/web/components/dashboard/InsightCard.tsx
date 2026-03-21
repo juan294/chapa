@@ -274,7 +274,7 @@ function AchievementCard({ insight, animationDelay = 0 }: InsightCardProps) {
   );
 }
 
-/** Trend — compact metric card with colored top border accent */
+/** Trend — compact metric card with tinted icon container */
 function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
   const dimColor = insight.dimension
     ? `var(--color-dimension-${insight.dimension})`
@@ -288,16 +288,21 @@ function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
     <div
       role="article"
       aria-label={`${insight.headline} ${insight.body}`}
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
-      style={{
-        animationDelay: `${animationDelay}ms`,
-        borderTopWidth: "2px",
-        borderTopColor: accentColor,
-      }}
+      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up"
+      style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5" style={{ color: accentColor }}>
-          {isUp ? <TrendingUpIcon /> : <TrendingDownIcon />}
+        <div
+          className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
+          data-testid="trend-icon"
+        >
+          <div
+            className="absolute inset-0 opacity-15 rounded-lg"
+            style={{ backgroundColor: accentColor }}
+          />
+          <div style={{ color: accentColor }}>
+            {isUp ? <TrendingUpIcon /> : <TrendingDownIcon />}
+          </div>
         </div>
         <div className="min-w-0">
           <p className="font-heading text-sm font-semibold text-text-primary">
@@ -406,7 +411,7 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
   );
 }
 
-/** Archetype — identity card with archetype color accent */
+/** Archetype — identity card with colored icon and headline */
 function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
   const archetypeColor = resolveArchetypeColor(insight.headline);
 
@@ -414,21 +419,16 @@ function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
     <div
       role="article"
       aria-label={`${insight.headline} ${insight.body}`}
-      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up relative overflow-hidden"
+      className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up overflow-hidden"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      {/* Top accent line */}
-      <div
-        className="absolute top-0 left-0 right-0 h-0.5"
-        aria-hidden="true"
-        style={{ backgroundColor: archetypeColor }}
-      />
-
       <div className="flex items-start gap-3">
-        <div className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
-          {/* Background tint */}
+        <div
+          className="relative flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
+          data-testid="archetype-icon"
+        >
           <div
-            className="absolute inset-0 opacity-10 rounded-lg"
+            className="absolute inset-0 opacity-15 rounded-lg"
             style={{ backgroundColor: archetypeColor }}
           />
           <div style={{ color: archetypeColor }}>
