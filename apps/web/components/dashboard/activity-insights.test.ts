@@ -121,19 +121,6 @@ describe("computeActivityInsights", () => {
     });
   });
 
-  describe("avgPerActiveDay", () => {
-    it("computes total contributions divided by active days", () => {
-      // 3 active days with counts 2, 4, 6 = 12 total / 3 active = 4.0
-      const data = makeDays("2025-03-01", [2, 0, 4, 0, 6]);
-      expect(computeActivityInsights(data).avgPerActiveDay).toBeCloseTo(4.0);
-    });
-
-    it("returns 0 when no active days", () => {
-      const data = makeDays("2025-03-01", [0, 0, 0]);
-      expect(computeActivityInsights(data).avgPerActiveDay).toBe(0);
-    });
-  });
-
   describe("peakDay", () => {
     it("returns the day with the highest count", () => {
       const data = makeDays("2025-03-01", [3, 15, 7, 2]);

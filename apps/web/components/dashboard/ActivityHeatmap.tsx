@@ -49,8 +49,6 @@ const DIMENSIONS: Dimension[] = [
 interface EnrichedDay extends HeatmapDay {
   dominant: Dimension;
   dimensionWeights: Record<Dimension, number>;
-  /** Single-character weekday label (e.g. "M", "T") — precomputed to avoid Date parsing in render */
-  dayLabel: string;
 }
 
 /**
@@ -100,9 +98,6 @@ function enrichDays(
     const d = new Date(day.date + "T12:00:00");
     const dateSeed = d.getTime() / 86400000;
     const dow = d.getDay();
-    const dayLabel = d
-      .toLocaleDateString("en-US", { weekday: "short" })
-      .charAt(0);
 
     // Start with base weights, then apply per-day variation
     const weights: Record<Dimension, number> = { ...baseWeights };
@@ -126,7 +121,7 @@ function enrichDays(
       weights[a] >= weights[b] ? a : b
     );
 
-    return { ...day, dominant, dimensionWeights: weights, dayLabel };
+    return { ...day, dominant, dimensionWeights: weights };
   });
 }
 
@@ -273,9 +268,8 @@ function StreakCard({
   );
 }
 
-/** Mon=0 through Sun=6 display order, mapped to JS getDay() indices */
-const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
-const WEEKDAY_JS_INDICES = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun → getDay() values
+/** Maps Mon–Sun display order to JS getDay() indices (Mon=1, ..., Sun=0) */
+const WEEKDAY_JS_INDICES = [1, 2, 3, 4, 5, 6, 0];
 
 function RhythmCard({
   busiestDay,
@@ -315,7 +309,7 @@ function RhythmCard({
                 }}
               />
               <span className="text-[7px] text-text-secondary font-body leading-none">
-                {WEEKDAY_LABELS[displayIdx]}
+                {DOW_HEADERS[displayIdx]}
               </span>
             </div>
           );

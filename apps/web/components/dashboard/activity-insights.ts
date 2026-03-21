@@ -6,7 +6,6 @@ export interface ActivityInsights {
   busiestDay: string;
   /** Index into DAY_NAMES (0=Sun, 1=Mon, ..., 6=Sat) for the busiest weekday */
   busiestDayIndex: number;
-  avgPerActiveDay: number;
   peakDay: { date: string; count: number };
   /** Total contributions per weekday, indexed Sun=0 through Sat=6 */
   weekdayDistribution: number[];
@@ -29,7 +28,6 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
       longestStreak: 0,
       busiestDay: "",
       busiestDayIndex: -1,
-      avgPerActiveDay: 0,
       peakDay: { date: "", count: 0 },
       weekdayDistribution: [0, 0, 0, 0, 0, 0, 0],
       weeklyAverage: 0,
@@ -83,11 +81,7 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
   const busiestDay =
     busiestDayIndex >= 0 ? (DAY_NAMES[busiestDayIndex] ?? "") : "";
 
-  // Average contributions per active day
-  const activeDays = data.filter((d) => d.count > 0);
-  const totalContributions = activeDays.reduce((sum, d) => sum + d.count, 0);
-  const avgPerActiveDay =
-    activeDays.length > 0 ? totalContributions / activeDays.length : 0;
+  const activeDaysCount = data.filter((d) => d.count > 0).length;
 
   // Peak day — data.length > 0 guaranteed by early return above
   let peakDay: HeatmapDay = data[0]!;
@@ -114,14 +108,13 @@ export function computeActivityInsights(data: HeatmapDay[]): ActivityInsights {
   const last7DaysActive = last7.map((d) => d.count > 0);
 
   // Summary sentence
-  const summary = generateSummary(data, weeklyTotals, weeklyAverage, peakDay);
+  const summary = generateSummary(data, weeklyTotals, weeklyAverage, peakDay, activeDaysCount);
 
   return {
     currentStreak,
     longestStreak,
     busiestDay,
     busiestDayIndex,
-    avgPerActiveDay,
     peakDay: { date: peakDay.date, count: peakDay.count },
     weekdayDistribution: dayTotals,
     weeklyAverage,
@@ -137,7 +130,8 @@ function generateSummary(
   data: HeatmapDay[],
   weeklyTotals: number[],
   weeklyAverage: number,
-  peakDay: HeatmapDay
+  peakDay: HeatmapDay,
+  activeDaysCount: number
 ): string {
   if (weeklyTotals.length === 0) return "No activity recorded yet";
 
@@ -174,8 +168,7 @@ function generateSummary(
     return `Peak day: ${label} with ${peakDay.count.toLocaleString()} contributions`;
   }
 
-  const activeDays = data.filter((d) => d.count > 0).length;
-  return `${activeDays} active days in the last ${Math.ceil(data.length / 7)} weeks`;
+  return `${activeDaysCount} active days in the last ${Math.ceil(data.length / 7)} weeks`;
 }
 
 function formatWeekRange(startDate: string, endDate: string): string {
