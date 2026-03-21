@@ -342,15 +342,17 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
           const col = Math.floor(i / DAYS);
           const row = i % DAYS;
           const pos = hexPosition(col, row, hexSize, HEX_GAP);
-          const day = i < cells ? data[i] : null;
+          const day = i < cells ? data[i] ?? null : null;
+
+          const isFuture = day === null;
+          const isNoActivity = day !== null && day.count === 0;
+          const emptyBg = isFuture || isNoActivity;
 
           const alpha = day ? (INTENSITY_ALPHA[day.intensity] ?? 0.07) : 0.07;
           const background =
             day && day.count > 0
               ? cssVarAlpha(DIMENSION_COLORS[day.dominant], alpha)
-              : "var(--color-purple-tint)";
-          const emptyBg =
-            !day || day.count === 0;
+              : "rgba(139,92,246,0.15)";
 
           // Ripple delay from center
           const dist = Math.sqrt(
@@ -361,15 +363,15 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
           return (
             <div
               key={`${col}-${row}`}
-              className="absolute cursor-pointer animate-hex-cell-in transition-transform duration-100 hover:scale-125 hover:z-10"
+              className={`absolute animate-hex-cell-in transition-transform duration-100 ${isFuture ? "" : "cursor-pointer hover:scale-125 hover:z-10"}`}
               style={{
                 left: pos.x,
                 top: pos.y,
                 width: hexSize * 2,
                 height: hexH,
                 clipPath: HEX_CLIP_PATH,
-                background: emptyBg
-                  ? "rgba(139,92,246,0.15)"
+                background: isFuture
+                  ? "rgba(139,92,246,0.08)"
                   : background,
                 animationDelay: `${delay}ms`,
               }}
@@ -377,14 +379,20 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
               onMouseLeave={handleLeave}
               aria-hidden="true"
             >
-              {/* Inner fill creates a visible border on empty cells */}
+              {/* Inner fill — solid border for no-activity, shimmer for future */}
               {emptyBg && (
                 <div
-                  className="absolute"
+                  className={`absolute ${isFuture ? "animate-shimmer" : ""}`}
                   style={{
                     inset: 1.5,
                     clipPath: HEX_CLIP_PATH,
-                    backgroundColor: "var(--color-card)",
+                    ...(isFuture
+                      ? {
+                          backgroundImage:
+                            "linear-gradient(90deg, var(--color-card) 25%, rgba(139,92,246,0.06) 50%, var(--color-card) 75%)",
+                          backgroundSize: "200% 100%",
+                        }
+                      : { backgroundColor: "var(--color-card)" }),
                   }}
                 />
               )}
