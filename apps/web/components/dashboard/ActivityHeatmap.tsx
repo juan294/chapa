@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { HeatmapDay } from "@chapa/shared";
 import { getIntensityLevel } from "@/lib/effects/heatmap/HeatmapGrid";
@@ -263,14 +263,47 @@ export function ActivityHeatmap({
 
 // ── Hex heatmap grid ─────────────────────────────────────────────────
 
-const HEX_SIZE = 12;
 const HEX_GAP = 2;
-const HEX_H = HEX_SIZE * SQRT3;
+const MIN_HEX_SIZE = 10;
+const MAX_HEX_SIZE = 32;
 const CENTER_COL = Math.floor(WEEKS / 2);
 const CENTER_ROW = Math.floor(DAYS / 2);
 
+/**
+ * Compute hex size from container width so the grid fills the available space.
+ * For flat-top hexagons in 13 columns:
+ *   totalWidth = (WEEKS - 1) * colStep + hexWidth
+ *              = (WEEKS - 1) * (size * 1.5 + gap * 0.75) + size * 2
+ * Solving for size:
+ *   size = (width - (WEEKS - 1) * gap * 0.75) / ((WEEKS - 1) * 1.5 + 2)
+ */
+function hexSizeForWidth(containerWidth: number): number {
+  const size =
+    (containerWidth - (WEEKS - 1) * HEX_GAP * 0.75) /
+    ((WEEKS - 1) * 1.5 + 2);
+  return Math.min(MAX_HEX_SIZE, Math.max(MIN_HEX_SIZE, Math.floor(size)));
+}
+
 function HexHeatmapGrid({ data }: { data: HexDay[] }) {
-  const gridDims = hexGridDimensions(HEX_SIZE, HEX_GAP);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [hexSize, setHexSize] = useState(MIN_HEX_SIZE);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width && width > 0) setHexSize(hexSizeForWidth(width));
+    });
+    observer.observe(el);
+    // Initial measurement
+    setHexSize(hexSizeForWidth(el.clientWidth));
+    return () => observer.disconnect();
+  }, []);
+
+  const hexH = hexSize * SQRT3;
+  const gridDims = hexGridDimensions(hexSize, HEX_GAP);
+
   const [tooltip, setTooltip] = useState<{
     day: HexDay;
     screenX: number;
@@ -293,22 +326,22 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
 
   const handleLeave = useCallback(() => setTooltip(null), []);
 
-  // Pad to full grid if needed
   const cells = data.length;
   const totalCells = WEEKS * DAYS;
 
   return (
     <>
       <div
-        className="relative mx-auto"
-        style={{ width: gridDims.width, height: gridDims.height }}
+        ref={containerRef}
+        className="relative w-full"
+        style={{ height: gridDims.height }}
         role="img"
         aria-label="Hexagonal activity heatmap"
       >
         {Array.from({ length: totalCells }, (_, i) => {
           const col = Math.floor(i / DAYS);
           const row = i % DAYS;
-          const pos = hexPosition(col, row, HEX_SIZE, HEX_GAP);
+          const pos = hexPosition(col, row, hexSize, HEX_GAP);
           const day = i < cells ? data[i] : null;
 
           const alpha = day ? (INTENSITY_ALPHA[day.intensity] ?? 0.07) : 0.07;
@@ -332,8 +365,8 @@ function HexHeatmapGrid({ data }: { data: HexDay[] }) {
               style={{
                 left: pos.x,
                 top: pos.y,
-                width: HEX_SIZE * 2,
-                height: HEX_H,
+                width: hexSize * 2,
+                height: hexH,
                 clipPath: HEX_CLIP_PATH,
                 backgroundColor: emptyBg
                   ? "var(--color-purple-tint)"
