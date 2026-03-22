@@ -11,6 +11,7 @@ import { formatDate } from "../admin-types";
 type ViewMode = "list" | "create" | "detail" | "edit";
 
 interface FormData {
+  type: "announcement" | "engagement";
   name: string;
   subject: string;
   previewText: string;
@@ -22,6 +23,7 @@ interface FormData {
 }
 
 const EMPTY_FORM: FormData = {
+  type: "announcement",
   name: "",
   subject: "",
   previewText: "",
@@ -111,6 +113,7 @@ export function CampaignsDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          type: form.type,
           previewText: form.previewText || null,
         }),
       });
@@ -225,6 +228,7 @@ export function CampaignsDashboard() {
 
   const openEdit = (campaign: Campaign) => {
     setForm({
+      type: campaign.type,
       name: campaign.name,
       subject: campaign.subject,
       previewText: campaign.previewText ?? "",
@@ -320,6 +324,31 @@ export function CampaignsDashboard() {
           onSubmit={handleCreate}
           className="space-y-4 rounded-xl border border-stroke bg-card p-6"
         >
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-medium text-text-secondary">Campaign Type</legend>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                <input type="radio" name="type" value="announcement"
+                  checked={form.type === "announcement"}
+                  onChange={() => updateField("type", "announcement")}
+                  className="accent-amber" />
+                Announcement
+              </label>
+              <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                <input type="radio" name="type" value="engagement"
+                  checked={form.type === "engagement"}
+                  onChange={() => updateField("type", "engagement")}
+                  className="accent-amber" />
+                Engagement
+              </label>
+            </div>
+            <p className="text-xs text-text-secondary/60">
+              {form.type === "announcement"
+                ? "Manual send to all users with email on file."
+                : "Automated — sent when a user's score increases significantly."}
+            </p>
+          </fieldset>
+
           <div>
             <label className="block text-xs font-medium text-text-secondary mb-1">
               Campaign Name
@@ -384,6 +413,11 @@ export function CampaignsDashboard() {
               rows={3}
               required
             />
+            {form.type === "engagement" && (
+              <p className="text-xs text-text-secondary/60 mt-1">
+                Placeholders: {"{{handle}}"}, {"{{delta}}"}, {"{{tier_from}}"}, {"{{tier_to}}"}, {"{{archetype_from}}"}, {"{{archetype_to}}"}
+              </p>
+            )}
           </div>
 
           <fieldset className="space-y-2">
@@ -538,6 +572,11 @@ export function CampaignsDashboard() {
               rows={3}
               required
             />
+            {form.type === "engagement" && (
+              <p className="text-xs text-text-secondary/60 mt-1">
+                Placeholders: {"{{handle}}"}, {"{{delta}}"}, {"{{tier_from}}"}, {"{{tier_to}}"}, {"{{archetype_from}}"}, {"{{archetype_to}}"}
+              </p>
+            )}
           </div>
 
           <fieldset className="space-y-2">
@@ -698,6 +737,13 @@ export function CampaignsDashboard() {
           </div>
         )}
 
+        {/* Engagement info banner */}
+        {c.type === "engagement" && (
+          <div className="rounded-lg border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement">
+            This template is sent automatically when a user&#39;s score increases by 10+ points. Enable delivery in the Engagement tab.
+          </div>
+        )}
+
         {/* Actions */}
         {c.status === "draft" && (
           <div className="flex gap-3">
@@ -713,13 +759,15 @@ export function CampaignsDashboard() {
             >
               Edit Draft
             </button>
-            <button
-              onClick={() => handleSend(c.id)}
-              disabled={sending}
-              className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light disabled:opacity-50"
-            >
-              {sending ? "Sending..." : "Send Campaign"}
-            </button>
+            {c.type !== "engagement" && (
+              <button
+                onClick={() => handleSend(c.id)}
+                disabled={sending}
+                className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light disabled:opacity-50"
+              >
+                {sending ? "Sending..." : "Send Campaign"}
+              </button>
+            )}
             <button
               onClick={() => handleDelete(c.id)}
               className="rounded-lg border border-terminal-red/20 px-4 py-2 text-sm font-medium text-terminal-red hover:bg-terminal-red/5"
@@ -833,7 +881,14 @@ export function CampaignsDashboard() {
                   onClick={() => openDetail(c)}
                   className="cursor-pointer border-b border-stroke/50 hover:bg-amber/5 transition-colors"
                 >
-                  <td className="px-4 py-3 text-text-primary">{c.name}</td>
+                  <td className="px-4 py-3 text-text-primary">
+                    {c.name}
+                    {c.type === "engagement" && (
+                      <span className="ml-2 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-complement/10 text-complement font-heading">
+                        engagement
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={c.status} />
                   </td>
