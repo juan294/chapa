@@ -9,8 +9,11 @@ export async function GET(request: NextRequest) {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const type = request.nextUrl.searchParams.get("type") as CampaignType | null;
-  const campaigns = await dbGetCampaigns(undefined, type ?? undefined);
+  const rawType = request.nextUrl.searchParams.get("type");
+  const type = rawType && VALID_TYPES.includes(rawType as CampaignType)
+    ? (rawType as CampaignType)
+    : undefined;
+  const campaigns = await dbGetCampaigns(undefined, type);
   return NextResponse.json({ campaigns });
 }
 

@@ -5,6 +5,7 @@
  */
 
 import { getSupabase } from "./supabase";
+import { cacheGet, cacheSet } from "../cache/redis";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -238,7 +239,14 @@ export async function dbUpdateCampaign(
   }
 }
 
+const ENGAGEMENT_CACHE_KEY = "campaign:active-engagement";
+const ENGAGEMENT_CACHE_TTL = 3600; // 1 hour
+
 export async function dbGetActiveEngagementCampaign(): Promise<Campaign | null> {
+  // Check cache first — avoids N+1 queries during cron batch processing
+  const cached = await cacheGet<Campaign>(ENGAGEMENT_CACHE_KEY);
+  if (cached) return cached;
+
   const db = getSupabase();
   if (!db) return null;
 
@@ -254,7 +262,9 @@ export async function dbGetActiveEngagementCampaign(): Promise<Campaign | null> 
     if (error) throw error;
     if (!data) return null;
 
-    return mapCampaignRow(data);
+    const campaign = mapCampaignRow(data);
+    await cacheSet(ENGAGEMENT_CACHE_KEY, campaign, ENGAGEMENT_CACHE_TTL);
+    return campaign;
   } catch (error) {
     console.error(
       "[db] dbGetActiveEngagementCampaign failed:",

@@ -6,6 +6,7 @@
  */
 
 import { escapeHtml } from "@/lib/email/resend";
+import { featureRow } from "@/lib/email/html-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,15 +55,7 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
     : undefined;
 
   const featureRows = data.features
-    .map(
-      (f) => `
-          <tr><td style="padding-bottom:20px;padding-left:8px;">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#8B5CF6;">&rarr;</span>
-            <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#E2E4E9;padding-left:8px;">
-              ${escapeHtml(f.text)}
-            </span>
-          </td></tr>`,
-    )
+    .map((f) => featureRow(escapeHtml(f.text), 20))
     .join("");
 
   return `<!DOCTYPE html>

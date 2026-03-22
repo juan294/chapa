@@ -21,6 +21,7 @@ import {
   buildAnnouncementHtml,
   buildAnnouncementText,
 } from "./templates/announcement";
+import { featureRow } from "./html-helpers";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { dbGetUserEmail } from "@/lib/db/users";
 import { dbGetFeatureFlag } from "@/lib/db/feature-flags";
@@ -388,18 +389,8 @@ function buildHtml(data: TemplateData): string {
 }
 
 // ---------------------------------------------------------------------------
-// HTML helper functions
+// Helpers
 // ---------------------------------------------------------------------------
-
-function featureRow(text: string): string {
-  return `
-          <tr><td style="padding-bottom:12px;padding-left:8px;">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#8B5CF6;">&rarr;</span>
-            <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#E2E4E9;padding-left:8px;">
-              ${text}
-            </span>
-          </td></tr>`;
-}
 
 function formatDelta(n: number): string {
   const sign = n > 0 ? "+" : "";

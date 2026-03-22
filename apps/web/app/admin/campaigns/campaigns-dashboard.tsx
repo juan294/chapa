@@ -113,7 +113,6 @@ export function CampaignsDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          type: form.type,
           previewText: form.previewText || null,
         }),
       });
@@ -740,7 +739,7 @@ export function CampaignsDashboard() {
         {/* Engagement info banner */}
         {c.type === "engagement" && (
           <div className="rounded-lg border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement">
-            This template is sent automatically when a user&#39;s score increases by 10+ points. Enable delivery in the Engagement tab.
+            This template is sent automatically when a user&apos;s score increases by 10+ points. Enable delivery in the Engagement tab.
           </div>
         )}
 
