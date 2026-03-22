@@ -16,13 +16,26 @@
 import type { SnapshotDiff } from "@/lib/history/diff";
 import type { SignificantChange } from "@/lib/history/significant-change";
 import { getResend, escapeHtml } from "./resend";
-import { EMAIL_FROM } from "./campaigns";
+import { EMAIL_FROM, buildEmailContent } from "./campaigns";
+import {
+  buildAnnouncementHtml,
+  buildAnnouncementText,
+} from "./templates/announcement";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { dbGetUserEmail } from "@/lib/db/users";
 import { dbGetFeatureFlag } from "@/lib/db/feature-flags";
+import { dbGetActiveEngagementCampaign } from "@/lib/db/campaigns";
 import { getBaseUrl } from "@/lib/env";
 
 const DEDUP_TTL = 604_800; // 7 days in seconds
+
+// ---------------------------------------------------------------------------
+// Interpolation helper
+// ---------------------------------------------------------------------------
+
+function interpolate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key as string] ?? "");
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -53,26 +66,59 @@ export async function notifyScoreBump(
     const resend = getResend();
     if (!resend) return;
 
+    // 4b. Check for DB-backed engagement campaign template
+    const engagementCampaign = await dbGetActiveEngagementCampaign();
+
     // 5. Build email
     const baseUrl = getBaseUrl();
     const shareUrl = `${baseUrl}/u/${lowerHandle}`;
     const unsubscribeUrl = `${baseUrl}/api/notifications/unsubscribe?handle=${lowerHandle}`;
 
-    const subject = buildSubject(lowerHandle, diff, significance);
-    const html = buildHtml({
-      handle: lowerHandle,
-      diff,
-      significance,
-      shareUrl,
-      unsubscribeUrl,
-    });
-    const text = buildText({
-      handle: lowerHandle,
-      diff,
-      significance,
-      shareUrl,
-      unsubscribeUrl,
-    });
+    let subject: string;
+    let html: string;
+    let text: string;
+
+    if (engagementCampaign) {
+      // DB-backed engagement template with variable interpolation
+      const delta = `+${Math.round(diff.adjustedComposite)}`;
+      const vars: Record<string, string> = {
+        handle: lowerHandle,
+        delta,
+        tier_from: diff.tier?.from ?? "",
+        tier_to: diff.tier?.to ?? "",
+        archetype_from: diff.archetype?.from ?? "",
+        archetype_to: diff.archetype?.to ?? "",
+      };
+
+      const interpolatedCampaign = {
+        ...engagementCampaign,
+        subject: interpolate(engagementCampaign.subject, vars),
+        headline: interpolate(engagementCampaign.headline, vars),
+        bodyText: interpolate(engagementCampaign.bodyText, vars),
+      };
+
+      subject = interpolatedCampaign.subject;
+      const content = buildEmailContent(interpolatedCampaign, lowerHandle);
+      html = buildAnnouncementHtml(content);
+      text = buildAnnouncementText(content);
+    } else {
+      // Fallback to hardcoded templates
+      subject = buildSubject(lowerHandle, diff, significance);
+      html = buildHtml({
+        handle: lowerHandle,
+        diff,
+        significance,
+        shareUrl,
+        unsubscribeUrl,
+      });
+      text = buildText({
+        handle: lowerHandle,
+        diff,
+        significance,
+        shareUrl,
+        unsubscribeUrl,
+      });
+    }
 
     // 6. Send
     const { error } = await resend.emails.send({
