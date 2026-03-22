@@ -111,11 +111,18 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
         </td></tr>
 
         <!-- Body -->
-        ${bodyParagraphs.map((p) => `<tr><td style="padding-bottom:16px;">
+        ${bodyParagraphs.map((p, i) => {
+          const divider = `<tr><td style="padding-bottom:16px;"><div style="height:1px;background:rgba(139,92,246,0.40);"></div></td></tr>`;
+          let rows = "";
+          if (bodyParagraphs.length > 1 && i === 0) rows += divider;
+          rows += `<tr><td style="padding-bottom:16px;">
           <p style="margin:0;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#8B8FA0;line-height:1.6;">
             ${p}
           </p>
-        </td></tr>`).join("\n        ")}
+        </td></tr>`;
+          if (bodyParagraphs.length > 1 && i === 0) rows += divider;
+          return rows;
+        }).join("\n        ")}
 
         <!-- Feature bullets -->
         ${featureRows}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 32 32">
+  <title>Chapa</title>
+  <!-- Solid dark background -->
+  <rect width="32" height="32" fill="#0C0D14"/>
+  <!-- Shield -->
+  <path d="M16 4 L26 8 L26 15 C26 21 21 26 16 28 C11 26 6 21 6 15 L6 8 Z"
+        fill="#1A1530" stroke="#8B5CF6" stroke-width="1.2"/>
+  <!-- Chevron -->
+  <path d="M12 19 L16 13 L20 19" stroke="#8B5CF6" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

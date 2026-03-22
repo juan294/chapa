@@ -69,7 +69,7 @@ export function CampaignsDashboard() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
-  const [testEmail, setTestEmail] = useState("");
+  const [testEmail, setTestEmail] = useState("juan294@gmail.com");
   const [sendingTest, setSendingTest] = useState(false);
 
   // -------------------------------------------------------------------------
