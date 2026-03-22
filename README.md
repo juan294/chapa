@@ -142,7 +142,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
 | Hosting | Vercel |
-| Testing | Vitest, 330+ test files, 5,680+ tests, TDD workflow |
+| Testing | Vitest, 337+ test files, 5,760+ tests, TDD workflow |
 
 ## Environment Variables
 

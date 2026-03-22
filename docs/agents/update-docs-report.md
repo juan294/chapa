@@ -1,35 +1,37 @@
 # Documentation Update Report
 
-> Generated on 2026-03-22 | Branch: `develop` | Changes since v1.2.0 (384 commits)
+> Generated on 2026-03-22 | Branch: `develop` | Changes since v2.0.0 (30 commits)
 
 ## Summary
-
-- **7 documents updated**
-- 0 diagrams refreshed (ASCII diagrams flagged for review but not confidently updatable)
-- 1 version reference corrected (TypeScript badge 5.7 → 5.9)
-- 0 inline doc blocks updated (existing JSDoc was current)
+- 6 documents updated
+- 0 diagrams refreshed (all current)
+- 2 version references corrected
+- 0 inline doc blocks updated (all current)
 - 0 items flagged [NEEDS REVIEW]
 
 ## Changes by File
 
-| File | What Changed | Why |
-|------|-------------|-----|
-| `CHANGELOG.md` | Added comprehensive `[Unreleased]` section covering all 384 commits since v1.2.0 | Only had 1.0.0 entry — 5 weeks of features missing |
-| `README.md` | Updated TypeScript badge (5.7→5.9), added multi-platform support, v4→v6 scoring, Craft dimension, Artificer archetype, Supabase to tech stack, Bitbucket/Codeberg env vars, updated test count (77→330+), project structure, key endpoints | Multiple stale references throughout |
-| `docs/how-it-works.md` | v4→v6 references, added Craft dimension section, added Artificer archetype, added multi-platform integration section, Redis sorted sets→Supabase, updated data sources to include Bitbucket/Codeberg | Core explainer was stale on 3 major features |
-| `docs/spec.md` | v4→v6 references, 4→4–5 dimensions | Product spec referenced outdated scoring version |
-| `docs/demo.md` | v4→v6, added multi-platform and Craft mentions, updated radar chart description | Demo script didn't mention new features |
-| `docs/supabase-migration-plan.md` | Status: Draft → Complete | Migration is done |
-| `docs/agents/pre-launch-report.md` | Updated to v35 with current audit results | Was from previous audit cycle |
+### `docs/how-it-works.md` (3 fixes)
+- **Caps table**: Updated from V4 caps (600/180/15/500/200/100) to V5 caps (300/80/12/150/80), removed watchers row
+- **Dimension weights**: Consistency updated from 50%/35%/15% to 45%/40%/15%; Breadth updated from V4 to V5 weights (40%/25%/15%/10%/5%)
+- **Confidence table**: `low_activity_signal` trigger changed from "AND" to "OR"
+- **FAQ**: Added Craft dimension and Artificer archetype mention
 
-## Diagrams Reviewed (No Changes Made)
+### `CHANGELOG.md`
+- Added `[Unreleased]` section documenting all 30 commits since v2.0.0: campaign type system, scoring accuracy fixes, a11y improvements, email enhancements, dependency updates
 
-The following ASCII diagrams were reviewed but not modified — they depict specific flows (EMU merge, email forwarding) that remain accurate for their scope. The new multi-platform content was added as a new section rather than modifying existing diagrams.
+### `README.md`
+- Test counts updated from "330+ files, 5,680+ tests" to "337+ files, 5,760+ tests"
 
-- `docs/how-it-works.md:238-298` — EMU merge flow (still accurate for EMU-specific flow)
-- `docs/scheduled-agents-admin-panel.md:24-48` — Agent architecture (current)
-- `docs/email-forwarding-setup.md:7-17` — Email pipeline (current)
+### `CLAUDE.md`
+- Goal #2: "Impact v4 Profile" → "Impact v6 Profile"
+- Engineering rule #6: "Impact v4 compute" → "Impact v6 compute"
+
+### `docs/agents/shared-context.md`
+- Next.js version reference updated from 16.1.6 to 16.2.1
+
+### `docs/agents/pre-launch-report.md`
+- Test counts updated from 5,706/331 to 5,763/337
 
 ## Flagged for Review
-
 None.
