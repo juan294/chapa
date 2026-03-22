@@ -96,6 +96,8 @@ export async function notifyScoreBump(
         subject: interpolate(engagementCampaign.subject, vars),
         headline: interpolate(engagementCampaign.headline, vars),
         bodyText: interpolate(engagementCampaign.bodyText, vars),
+        ctaUrl: interpolate(engagementCampaign.ctaUrl, vars),
+        ctaText: interpolate(engagementCampaign.ctaText, vars),
         features: engagementCampaign.features.map((f) => ({
           text: interpolate(f.text, vars),
         })),
