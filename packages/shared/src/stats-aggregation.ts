@@ -1,6 +1,6 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
-import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
+import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
 
 /** Branch names that indicate a direct push (not a feature branch). */
 const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
@@ -52,10 +52,9 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ? mergedPRs.filter((pr) => pr.closingIssuesCount > 0).length / prsMergedCount
     : undefined;
 
-  // 5c. Micro-commit ratio: fraction of merged PRs with < 10 total lines changed
-  // Threshold aligns with PR weight sizeMultiplier cutoff (totalChanges / 10)
+  // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold
   const microCommitRatio = prsMergedCount > 0
-    ? mergedPRs.filter((pr) => pr.additions + pr.deletions < 10).length / prsMergedCount
+    ? mergedPRs.filter((pr) => pr.additions + pr.deletions < MICRO_PR_LINE_THRESHOLD).length / prsMergedCount
     : undefined;
 
   // 6. Reviews and issues
