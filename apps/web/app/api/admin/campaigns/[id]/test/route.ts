@@ -87,6 +87,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         subject: interpolate(campaign.subject, recipientHandle),
         headline: interpolate(campaign.headline, recipientHandle),
         bodyText: interpolate(campaign.bodyText, recipientHandle),
+        features: campaign.features.map((f) => ({
+          text: interpolate(f.text, recipientHandle),
+        })),
       }
     : campaign;
 

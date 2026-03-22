@@ -96,6 +96,9 @@ export async function notifyScoreBump(
         subject: interpolate(engagementCampaign.subject, vars),
         headline: interpolate(engagementCampaign.headline, vars),
         bodyText: interpolate(engagementCampaign.bodyText, vars),
+        features: engagementCampaign.features.map((f) => ({
+          text: interpolate(f.text, vars),
+        })),
       };
 
       subject = interpolatedCampaign.subject;
