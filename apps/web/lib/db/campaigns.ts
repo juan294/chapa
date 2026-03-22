@@ -354,7 +354,11 @@ export async function dbGetCampaignStats(
   if (!db) return { sent: 0, pending: 0, failed: 0 };
 
   try {
-    // Fetch status column only and count in JS — acceptable at current scale (<100 sends/campaign)
+    // PostgREST (Supabase query builder) does not support GROUP BY, so we fetch
+    // the status column only and aggregate in JS. This is already minimal — one
+    // narrow SELECT with a single-pass O(n) count. An RPC/database function would
+    // move the aggregation to Postgres but adds migration overhead not warranted
+    // at current scale (<1K sends/campaign).
     const { data, error } = await db
       .from("campaign_sends")
       .select("status")
