@@ -15,6 +15,19 @@ interface RouteParams {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Replace {{var}} placeholders with sample values for test emails. */
+function interpolate(template: string, handle: string): string {
+  const vars: Record<string, string> = {
+    handle,
+    delta: "+12",
+    tier_from: "Solid",
+    tier_to: "High",
+    archetype_from: "Balanced",
+    archetype_to: "Builder",
+  };
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key as string] ?? "");
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const authError = await adminAuth(request);
   if (authError) return authError;
@@ -67,8 +80,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { session } = requireSession(request);
   const recipientHandle = handle || session!.login;
 
+  // For engagement campaigns, interpolate placeholders with sample values
+  const interpolated = campaign.type === "engagement"
+    ? {
+        ...campaign,
+        subject: interpolate(campaign.subject, recipientHandle),
+        headline: interpolate(campaign.headline, recipientHandle),
+        bodyText: interpolate(campaign.bodyText, recipientHandle),
+      }
+    : campaign;
+
   // Build email content using the same template as real sends
-  const content = buildEmailContent(campaign, recipientHandle);
+  const content = buildEmailContent(interpolated, recipientHandle);
   const html = buildAnnouncementHtml(content);
   const text = buildAnnouncementText(content);
 
@@ -76,7 +99,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: email,
-      subject: `[TEST] ${campaign.subject}`,
+      subject: `[TEST] ${interpolated.subject}`,
       html,
       text,
     });
