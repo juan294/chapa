@@ -44,6 +44,8 @@ function buildEmptyStats(session: {
   };
 }
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Creator Studio — Chapa",
   description:
