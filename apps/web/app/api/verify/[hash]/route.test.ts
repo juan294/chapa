@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { mockGetVerificationRecord, mockRateLimit } = vi.hoisted(() => ({
   mockGetVerificationRecord: vi.fn(),
@@ -190,6 +190,16 @@ describe("GET /api/verify/[hash]", () => {
   });
 
   describe("error handling", () => {
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
     it("returns 500 with CORS header when an unexpected error is thrown", async () => {
       mockGetVerificationRecord.mockRejectedValue(new Error("unexpected boom"));
       const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
