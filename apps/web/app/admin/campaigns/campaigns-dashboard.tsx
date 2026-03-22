@@ -349,10 +349,11 @@ export function CampaignsDashboard() {
           </fieldset>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-name" className="block text-xs font-medium text-text-secondary mb-1">
               Campaign Name
             </label>
             <input
+              id="create-name"
               className={inputClass}
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
@@ -362,10 +363,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-subject" className="block text-xs font-medium text-text-secondary mb-1">
               Email Subject
             </label>
             <input
+              id="create-subject"
               className={inputClass}
               value={form.subject}
               onChange={(e) => updateField("subject", e.target.value)}
@@ -375,11 +377,12 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-preview" className="block text-xs font-medium text-text-secondary mb-1">
               Preview Text
               <span className="text-text-secondary/50 ml-1">(optional)</span>
             </label>
             <input
+              id="create-preview"
               className={inputClass}
               value={form.previewText}
               onChange={(e) => updateField("previewText", e.target.value)}
@@ -388,10 +391,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-headline" className="block text-xs font-medium text-text-secondary mb-1">
               Headline
             </label>
             <input
+              id="create-headline"
               className={inputClass}
               value={form.headline}
               onChange={(e) => updateField("headline", e.target.value)}
@@ -401,10 +405,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-body" className="block text-xs font-medium text-text-secondary mb-1">
               Body
             </label>
             <textarea
+              id="create-body"
               className={inputClass}
               value={form.bodyText}
               onChange={(e) => updateField("bodyText", e.target.value)}
@@ -434,6 +439,7 @@ export function CampaignsDashboard() {
                 <button
                   type="button"
                   onClick={() => removeFeature(i)}
+                  aria-label="Remove feature"
                   className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
                 >
                   &times;
@@ -451,10 +457,11 @@ export function CampaignsDashboard() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="create-cta-text" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA Button Text
               </label>
               <input
+                id="create-cta-text"
                 className={inputClass}
                 value={form.ctaText}
                 onChange={(e) => updateField("ctaText", e.target.value)}
@@ -462,10 +469,11 @@ export function CampaignsDashboard() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="create-cta-url" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA URL
               </label>
               <input
+                id="create-cta-url"
                 className={inputClass}
                 value={form.ctaUrl}
                 onChange={(e) => updateField("ctaUrl", e.target.value)}
@@ -513,10 +521,11 @@ export function CampaignsDashboard() {
           className="space-y-4 rounded-xl border border-stroke bg-card p-6"
         >
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="edit-name" className="block text-xs font-medium text-text-secondary mb-1">
               Campaign Name
             </label>
             <input
+              id="edit-name"
               className={inputClass}
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
@@ -525,10 +534,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="edit-subject" className="block text-xs font-medium text-text-secondary mb-1">
               Email Subject
             </label>
             <input
+              id="edit-subject"
               className={inputClass}
               value={form.subject}
               onChange={(e) => updateField("subject", e.target.value)}
@@ -537,11 +547,12 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="edit-preview" className="block text-xs font-medium text-text-secondary mb-1">
               Preview Text
               <span className="text-text-secondary/50 ml-1">(optional)</span>
             </label>
             <input
+              id="edit-preview"
               className={inputClass}
               value={form.previewText}
               onChange={(e) => updateField("previewText", e.target.value)}
@@ -549,10 +560,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="edit-headline" className="block text-xs font-medium text-text-secondary mb-1">
               Headline
             </label>
             <input
+              id="edit-headline"
               className={inputClass}
               value={form.headline}
               onChange={(e) => updateField("headline", e.target.value)}
@@ -561,10 +573,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="edit-body" className="block text-xs font-medium text-text-secondary mb-1">
               Body
             </label>
             <textarea
+              id="edit-body"
               className={inputClass}
               value={form.bodyText}
               onChange={(e) => updateField("bodyText", e.target.value)}
@@ -593,6 +606,7 @@ export function CampaignsDashboard() {
                 <button
                   type="button"
                   onClick={() => removeFeature(i)}
+                  aria-label="Remove feature"
                   className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
                 >
                   &times;
@@ -610,10 +624,11 @@ export function CampaignsDashboard() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="edit-cta-text" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA Button Text
               </label>
               <input
+                id="edit-cta-text"
                 className={inputClass}
                 value={form.ctaText}
                 onChange={(e) => updateField("ctaText", e.target.value)}
@@ -621,10 +636,11 @@ export function CampaignsDashboard() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="edit-cta-url" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA URL
               </label>
               <input
+                id="edit-cta-url"
                 className={inputClass}
                 value={form.ctaUrl}
                 onChange={(e) => updateField("ctaUrl", e.target.value)}
@@ -782,7 +798,9 @@ export function CampaignsDashboard() {
             Send Test Email
           </h3>
           <div className="flex gap-2">
+            <label htmlFor="test-email" className="sr-only">Test Email Address</label>
             <input
+              id="test-email"
               className={inputClass}
               type="email"
               value={testEmail}
