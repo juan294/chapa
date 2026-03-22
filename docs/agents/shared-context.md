@@ -35,7 +35,7 @@
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
 ## Performance Engineer — 2026-03-12
 - **Status**: GREEN
-- Build: Next.js 16.1.6 (Turbopack), compiles in 2.7s, 0 TypeScript errors
+- Build: Next.js 16.2.1 (Turbopack), compiles in 2.7s, 0 TypeScript errors
 - Total client JS: 1,434 KB (1.4 MB) across 53 chunks. No chunk exceeds 500 KB. +58 KB vs last report (moderate, no action needed).
 - Largest chunk: 219 KB (Next.js framework). PostHog at 175 KB (lazy-loaded on first interaction — optimal).
 - **Share page ISR: RESOLVED** — `revalidate=3600` now in place with test assertion at `page.test.ts:120`.

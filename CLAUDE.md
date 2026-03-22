@@ -5,7 +5,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
-2. Compute **Impact v4 Profile** from last 12 months (365 days):
+2. Compute **Impact v6 Profile** from last 12 months (365 days):
    - 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional 5th (Craft), each 0–100
    - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
      - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
@@ -390,7 +390,7 @@ const token = process.env.GITHUB_CLIENT_SECRET?.trim();
 3. **Escape user input in SVG** — Any user-controlled text (handle, display name) must be escaped before rendering into SVG markup. This prevents XSS in embeddable badges.
 4. **Health endpoint** — `/api/health` should exist for monitoring. Don't break it.
 5. **No dead code** — Remove unused exports, imports, and files. Clean as you go.
-6. **Pure functions for scoring** — Impact v4 compute and normalization must be pure functions with deterministic output for a given input. This makes them trivially testable.
+6. **Pure functions for scoring** — Impact v6 compute and normalization must be pure functions with deterministic output for a given input. This makes them trivially testable.
 
 ## Issues & Contributing
 

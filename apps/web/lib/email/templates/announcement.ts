@@ -6,6 +6,7 @@
  */
 
 import { escapeHtml } from "@/lib/email/resend";
+import { featureRow } from "@/lib/email/html-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,7 +40,10 @@ function getBaseUrl(): string {
 export function buildAnnouncementHtml(data: AnnouncementData): string {
   const handle = escapeHtml(data.handle);
   const headline = escapeHtml(data.headline);
-  const bodyText = escapeHtml(data.bodyText);
+  const bodyParagraphs = data.bodyText
+    .split(/\n\n+/)
+    .map((p) => escapeHtml(p.trim()))
+    .filter(Boolean);
   const ctaText = escapeHtml(data.ctaText);
   const ctaUrl = escapeHtml(data.ctaUrl);
   const baseUrl = getBaseUrl();
@@ -51,15 +55,7 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
     : undefined;
 
   const featureRows = data.features
-    .map(
-      (f) => `
-          <tr><td style="padding-bottom:8px;padding-left:8px;">
-            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#8B5CF6;">&rarr;</span>
-            <span style="font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#E2E4E9;padding-left:8px;">
-              ${escapeHtml(f.text)}
-            </span>
-          </td></tr>`,
-    )
+    .map((f) => featureRow(escapeHtml(f.text), 20))
     .join("");
 
   return `<!DOCTYPE html>
@@ -108,11 +104,18 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
         </td></tr>
 
         <!-- Body -->
-        <tr><td style="padding-bottom:24px;">
+        ${bodyParagraphs.map((p, i) => {
+          const divider = `<tr><td style="padding-bottom:16px;"><div style="height:1px;background:rgba(139,92,246,0.40);"></div></td></tr>`;
+          let rows = "";
+          if (bodyParagraphs.length > 1 && i === 0) rows += divider;
+          rows += `<tr><td style="padding-bottom:16px;">
           <p style="margin:0;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#8B8FA0;line-height:1.6;">
-            ${bodyText}
+            ${p}
           </p>
-        </td></tr>
+        </td></tr>`;
+          if (bodyParagraphs.length > 1 && i === 0) rows += divider;
+          return rows;
+        }).join("\n        ")}
 
         <!-- Feature bullets -->
         ${featureRows}

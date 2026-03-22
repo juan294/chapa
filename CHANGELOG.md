@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-22
+
+### Added
+- Campaign type system: `announcement` (manual blast) vs `engagement` (automated score-bump template)
+- Send test email endpoint for campaign drafts (`POST /api/admin/campaigns/:id/test`)
+- BIMI logo for email branding (`apps/web/public/bimi.svg`)
+- `microCommitRatio` metric: fraction of merged PRs with < 10 lines changed (`MICRO_PR_LINE_THRESHOLD`)
+- `MICRO_PR_LINE_THRESHOLD` constant extracted to `packages/shared/src/constants.ts`
+- `dev` and `developer` added to `DEFAULT_BRANCH_NAMES` for accurate feature branch detection
+- 57 new tests (html-helpers, error boundaries, campaign a11y, experiment landmarks)
+
+### Changed
+- `low_activity_signal` confidence penalty: AND → OR (triggers on either low days or low commits)
+- Score-bump notification threshold raised from 5 to 10 points (`SCORE_BUMP_THRESHOLD`)
+- Email templates: improved subject lines (show delta/tier), multi-paragraph body support, shared `featureRow()` helper
+- Next.js updated to 16.2.1
+- Dev dependencies updated: vitest 4.1.0, jsdom 29.0.1
+
+### Fixed
+- Campaign template placeholder interpolation (ctaUrl, ctaText, features array, engagement fields)
+- Email feature bullet spacing
+- Campaign form a11y: added `htmlFor`/`id` label associations and `aria-label` on remove buttons
+- 7 experiment pages: changed `<div>` to `<main>` for proper landmark semantics
+- Suppressed expected stderr noise in error-handling tests
+
 ## [2.0.0] - 2026-03-22
 
 ### Added

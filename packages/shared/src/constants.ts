@@ -28,6 +28,13 @@ export const SCORING_CAPS = {
 export const REPO_DEPTH_THRESHOLD = 3;
 
 /**
+ * Maximum total lines changed (additions + deletions) for a PR to be
+ * classified as a "micro PR" in microCommitRatio computation.
+ * PRs below this threshold contribute negligible code change.
+ */
+export const MICRO_PR_LINE_THRESHOLD = 10;
+
+/**
  * All four scoring dimension keys in canonical order.
  * Used by v4 scoring, heatmap coloring, and archetype derivation.
  */

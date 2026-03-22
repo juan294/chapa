@@ -86,7 +86,7 @@ const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
  * | `low_collaboration_signal`  | -10     | >= 10 PRs merged with <= 1 review submitted    |
  * | `single_repo_concentration` | -5      | >= 95% activity in 1 repo, <= 1 repo total     |
  * | `supplemental_unverified`   | -5      | Includes unverified supplemental account data   |
- * | `low_activity_signal`       | -10     | < 30 active days AND < 50 total commits        |
+ * | `low_activity_signal`       | -10     | < 30 active days OR < 50 total commits         |
  * | `review_volume_imbalance`   | -10     | >= 50 reviews submitted with < 3 PRs merged    |
  * | `platform_linked`           | 0       | Verified linked platform (informational only)   |
  *
@@ -179,7 +179,7 @@ export function computeConfidence(
     score -= 5;
   }
 
-  if (stats.activeDays < 30 && stats.commitsTotal < 50) {
+  if (stats.activeDays < 30 || stats.commitsTotal < 50) {
     penalties.push({
       flag: "low_activity_signal",
       penalty: 10,

@@ -48,8 +48,8 @@ describe("isSignificantChange", () => {
       expect(result.significant).toBe(false);
     });
 
-    it("returns insignificant for small score increase (<5)", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: 4.9 }));
+    it("returns insignificant for small score increase (<10)", () => {
+      const result = isSignificantChange(makeDiff({ adjustedComposite: 9.9 }));
       expect(result.significant).toBe(false);
     });
 
@@ -102,7 +102,7 @@ describe("isSignificantChange", () => {
 
   describe("score bump", () => {
     it("detects score bump exactly at threshold", () => {
-      const result = isSignificantChange(makeDiff({ adjustedComposite: 5 }));
+      const result = isSignificantChange(makeDiff({ adjustedComposite: 10 }));
       expect(result.significant).toBe(true);
       if (result.significant) {
         expect(result.reason).toBe("score_bump");
@@ -142,7 +142,7 @@ describe("isSignificantChange", () => {
       const result = isSignificantChange(
         makeDiff({
           archetype: { from: "Quality Champion", to: "Polymath" },
-          adjustedComposite: 8,
+          adjustedComposite: 12,
         }),
       );
       expect(result.significant).toBe(true);
@@ -156,7 +156,7 @@ describe("isSignificantChange", () => {
       const result = isSignificantChange(
         makeDiff({
           tier: { from: "Emerging", to: "Solid" },
-          adjustedComposite: 6,
+          adjustedComposite: 11,
         }),
       );
       expect(result.significant).toBe(true);

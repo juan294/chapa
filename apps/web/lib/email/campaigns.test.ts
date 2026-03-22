@@ -61,6 +61,7 @@ beforeEach(() => {
 
 const draftCampaign = {
   id: "campaign-1",
+  type: "announcement" as const,
   name: "Test Campaign",
   subject: "Test Subject",
   previewText: null,

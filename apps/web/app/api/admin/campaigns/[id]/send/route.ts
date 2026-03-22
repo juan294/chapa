@@ -20,6 +20,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!campaign) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (campaign.type === "engagement") {
+    return NextResponse.json(
+      { error: "Engagement campaigns are sent automatically" },
+      { status: 400 },
+    );
+  }
   if (campaign.status !== "draft") {
     return NextResponse.json(
       { error: "Campaign already started" },

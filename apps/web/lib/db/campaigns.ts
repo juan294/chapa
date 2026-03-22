@@ -5,13 +5,17 @@
  */
 
 import { getSupabase } from "./supabase";
+import { cacheGet, cacheSet } from "../cache/redis";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+export type CampaignType = "announcement" | "engagement";
+
 export interface Campaign {
   id: string;
+  type: CampaignType;
   name: string;
   subject: string;
   previewText: string | null;
@@ -47,6 +51,7 @@ export interface CampaignSend {
 function mapCampaignRow(row: any): Campaign {
   return {
     id: row.id,
+    type: row.type ?? "announcement",
     name: row.name,
     subject: row.subject,
     previewText: row.preview_text ?? null,
@@ -84,6 +89,7 @@ function mapSendRow(row: any): CampaignSend {
 
 export async function dbGetCampaigns(
   status?: Campaign["status"],
+  type?: CampaignType,
 ): Promise<Campaign[]> {
   const db = getSupabase();
   if (!db) return [];
@@ -95,6 +101,9 @@ export async function dbGetCampaigns(
 
     if (status) {
       query = query.eq("status", status);
+    }
+    if (type) {
+      query = query.eq("type", type);
     }
 
     const { data, error } = await query.order("created_at", { ascending: false });
@@ -150,6 +159,7 @@ export async function dbCreateCampaign(
     const { data, error } = await db
       .from("email_campaigns")
       .insert({
+        type: campaign.type,
         name: campaign.name,
         subject: campaign.subject,
         preview_text: campaign.previewText,
@@ -226,6 +236,41 @@ export async function dbUpdateCampaign(
   } catch (error) {
     console.error("[db] dbUpdateCampaign failed:", (error as Error).message);
     return false;
+  }
+}
+
+const ENGAGEMENT_CACHE_KEY = "campaign:active-engagement";
+const ENGAGEMENT_CACHE_TTL = 3600; // 1 hour
+
+export async function dbGetActiveEngagementCampaign(): Promise<Campaign | null> {
+  // Check cache first — avoids N+1 queries during cron batch processing
+  const cached = await cacheGet<Campaign>(ENGAGEMENT_CACHE_KEY);
+  if (cached) return cached;
+
+  const db = getSupabase();
+  if (!db) return null;
+
+  try {
+    const { data, error } = await db
+      .from("email_campaigns")
+      .select("*")
+      .eq("type", "engagement")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    const campaign = mapCampaignRow(data);
+    await cacheSet(ENGAGEMENT_CACHE_KEY, campaign, ENGAGEMENT_CACHE_TTL);
+    return campaign;
+  } catch (error) {
+    console.error(
+      "[db] dbGetActiveEngagementCampaign failed:",
+      (error as Error).message,
+    );
+    return null;
   }
 }
 

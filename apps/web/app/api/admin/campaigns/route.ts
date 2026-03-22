@@ -1,12 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetCampaigns, dbCreateCampaign } from "@/lib/db/campaigns";
+import type { CampaignType } from "@/lib/db/campaigns";
+
+const VALID_TYPES: CampaignType[] = ["announcement", "engagement"];
 
 export async function GET(request: NextRequest) {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const campaigns = await dbGetCampaigns();
+  const rawType = request.nextUrl.searchParams.get("type");
+  const type = rawType && VALID_TYPES.includes(rawType as CampaignType)
+    ? (rawType as CampaignType)
+    : undefined;
+  const campaigns = await dbGetCampaigns(undefined, type);
   return NextResponse.json({ campaigns });
 }
 
@@ -31,7 +38,16 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const type = (body.type as string) ?? "announcement";
+  if (!VALID_TYPES.includes(type as CampaignType)) {
+    return NextResponse.json(
+      { error: `Invalid type: ${type}` },
+      { status: 400 },
+    );
+  }
+
   const id = await dbCreateCampaign({
+    type: type as CampaignType,
     name: body.name as string,
     subject: body.subject as string,
     previewText: (body.previewText as string) ?? null,

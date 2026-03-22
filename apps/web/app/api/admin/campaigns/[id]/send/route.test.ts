@@ -75,6 +75,14 @@ describe("POST /api/admin/campaigns/[id]/send", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for engagement campaigns", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue({ status: "draft", type: "engagement" } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const res = await POST(makeRequest(), { params: mockParams });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Engagement campaigns are sent automatically");
+  });
+
   it("initiates campaign and processes first batch", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue({ status: "draft" } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(initiateCampaign).mockResolvedValue({ totalRecipients: 10 });

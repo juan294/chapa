@@ -33,6 +33,26 @@ describe("experiment pages skip-link target", () => {
     },
   );
 
+  it.each(experimentDirs)(
+    "%s/page.tsx uses <main> landmark for id=\"main-content\"",
+    (dir) => {
+      const pagePath = path.join(EXPERIMENTS_DIR, dir, "page.tsx");
+      const source = fs.readFileSync(pagePath, "utf-8");
+
+      // The element with id="main-content" must be a <main>, not a <div>,
+      // so screen readers expose it as a landmark region.
+      expect(
+        source,
+        `${dir}/page.tsx must use <main id="main-content"> not <div id="main-content">`,
+      ).toMatch(/<main[\s][^>]*id="main-content"/);
+
+      expect(
+        source,
+        `${dir}/page.tsx must not use <div id="main-content">`,
+      ).not.toMatch(/<div[\s][^>]*id="main-content"/);
+    },
+  );
+
   it("has at least 10 experiment pages", () => {
     // Guard against accidentally deleting experiments and having a vacuous test
     expect(experimentDirs.length).toBeGreaterThanOrEqual(10);

@@ -8,9 +8,10 @@ import { formatDate } from "../admin-types";
 // Types
 // ---------------------------------------------------------------------------
 
-type ViewMode = "list" | "create" | "detail";
+type ViewMode = "list" | "create" | "detail" | "edit";
 
 interface FormData {
+  type: "announcement" | "engagement";
   name: string;
   subject: string;
   previewText: string;
@@ -22,6 +23,7 @@ interface FormData {
 }
 
 const EMPTY_FORM: FormData = {
+  type: "announcement",
   name: "",
   subject: "",
   previewText: "",
@@ -69,6 +71,8 @@ export function CampaignsDashboard() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState("juan294@gmail.com");
+  const [sendingTest, setSendingTest] = useState(false);
 
   // -------------------------------------------------------------------------
   // Fetch campaigns
@@ -174,10 +178,73 @@ export function CampaignsDashboard() {
     }
   };
 
+  const handleSendTest = async (campaignId: string) => {
+    if (!testEmail.trim()) return;
+    setSendingTest(true);
+    setSendResult(null);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: testEmail.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setSendResult(data.message);
+      setTestEmail("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCampaign) return;
+    try {
+      const res = await fetch(`/api/admin/campaigns/${selectedCampaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          previewText: form.previewText || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      await fetchCampaigns();
+      setMode("detail");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const openEdit = (campaign: Campaign) => {
+    setForm({
+      type: campaign.type,
+      name: campaign.name,
+      subject: campaign.subject,
+      previewText: campaign.previewText ?? "",
+      headline: campaign.headline,
+      bodyText: campaign.bodyText,
+      features: campaign.features,
+      ctaText: campaign.ctaText,
+      ctaUrl: campaign.ctaUrl,
+    });
+    setMode("edit");
+  };
+
   const openDetail = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setPreviewHtml(null);
     setSendResult(null);
+    setTestEmail("");
     setMode("detail");
   };
 
@@ -256,11 +323,37 @@ export function CampaignsDashboard() {
           onSubmit={handleCreate}
           className="space-y-4 rounded-xl border border-stroke bg-card p-6"
         >
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-medium text-text-secondary">Campaign Type</legend>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                <input type="radio" name="type" value="announcement"
+                  checked={form.type === "announcement"}
+                  onChange={() => updateField("type", "announcement")}
+                  className="accent-amber" />
+                Announcement
+              </label>
+              <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                <input type="radio" name="type" value="engagement"
+                  checked={form.type === "engagement"}
+                  onChange={() => updateField("type", "engagement")}
+                  className="accent-amber" />
+                Engagement
+              </label>
+            </div>
+            <p className="text-xs text-text-secondary/60">
+              {form.type === "announcement"
+                ? "Manual send to all users with email on file."
+                : "Automated — sent when a user's score increases significantly."}
+            </p>
+          </fieldset>
+
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-name" className="block text-xs font-medium text-text-secondary mb-1">
               Campaign Name
             </label>
             <input
+              id="create-name"
               className={inputClass}
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
@@ -270,10 +363,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-subject" className="block text-xs font-medium text-text-secondary mb-1">
               Email Subject
             </label>
             <input
+              id="create-subject"
               className={inputClass}
               value={form.subject}
               onChange={(e) => updateField("subject", e.target.value)}
@@ -283,11 +377,12 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-preview" className="block text-xs font-medium text-text-secondary mb-1">
               Preview Text
               <span className="text-text-secondary/50 ml-1">(optional)</span>
             </label>
             <input
+              id="create-preview"
               className={inputClass}
               value={form.previewText}
               onChange={(e) => updateField("previewText", e.target.value)}
@@ -296,10 +391,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-headline" className="block text-xs font-medium text-text-secondary mb-1">
               Headline
             </label>
             <input
+              id="create-headline"
               className={inputClass}
               value={form.headline}
               onChange={(e) => updateField("headline", e.target.value)}
@@ -309,10 +405,11 @@ export function CampaignsDashboard() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
+            <label htmlFor="create-body" className="block text-xs font-medium text-text-secondary mb-1">
               Body
             </label>
             <textarea
+              id="create-body"
               className={inputClass}
               value={form.bodyText}
               onChange={(e) => updateField("bodyText", e.target.value)}
@@ -320,6 +417,11 @@ export function CampaignsDashboard() {
               rows={3}
               required
             />
+            {form.type === "engagement" && (
+              <p className="text-xs text-text-secondary/60 mt-1">
+                Placeholders: {"{{handle}}"}, {"{{delta}}"}, {"{{tier_from}}"}, {"{{tier_to}}"}, {"{{archetype_from}}"}, {"{{archetype_to}}"}
+              </p>
+            )}
           </div>
 
           <fieldset className="space-y-2">
@@ -337,6 +439,7 @@ export function CampaignsDashboard() {
                 <button
                   type="button"
                   onClick={() => removeFeature(i)}
+                  aria-label="Remove feature"
                   className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
                 >
                   &times;
@@ -354,10 +457,11 @@ export function CampaignsDashboard() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="create-cta-text" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA Button Text
               </label>
               <input
+                id="create-cta-text"
                 className={inputClass}
                 value={form.ctaText}
                 onChange={(e) => updateField("ctaText", e.target.value)}
@@ -365,10 +469,11 @@ export function CampaignsDashboard() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1">
+              <label htmlFor="create-cta-url" className="block text-xs font-medium text-text-secondary mb-1">
                 CTA URL
               </label>
               <input
+                id="create-cta-url"
                 className={inputClass}
                 value={form.ctaUrl}
                 onChange={(e) => updateField("ctaUrl", e.target.value)}
@@ -390,6 +495,173 @@ export function CampaignsDashboard() {
               className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
             >
               Create Draft
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // EDIT VIEW
+  // =========================================================================
+
+  if (mode === "edit" && selectedCampaign) {
+    return (
+      <div className="space-y-6">
+        <h2 className="font-heading text-2xl tracking-tight text-text-primary">
+          <span className="text-amber">$</span> campaigns
+          <span className="text-text-secondary">/</span>edit
+        </h2>
+
+        {errorBanner}
+
+        <form
+          onSubmit={handleEdit}
+          className="space-y-4 rounded-xl border border-stroke bg-card p-6"
+        >
+          <div>
+            <label htmlFor="edit-name" className="block text-xs font-medium text-text-secondary mb-1">
+              Campaign Name
+            </label>
+            <input
+              id="edit-name"
+              className={inputClass}
+              value={form.name}
+              onChange={(e) => updateField("name", e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-subject" className="block text-xs font-medium text-text-secondary mb-1">
+              Email Subject
+            </label>
+            <input
+              id="edit-subject"
+              className={inputClass}
+              value={form.subject}
+              onChange={(e) => updateField("subject", e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-preview" className="block text-xs font-medium text-text-secondary mb-1">
+              Preview Text
+              <span className="text-text-secondary/50 ml-1">(optional)</span>
+            </label>
+            <input
+              id="edit-preview"
+              className={inputClass}
+              value={form.previewText}
+              onChange={(e) => updateField("previewText", e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-headline" className="block text-xs font-medium text-text-secondary mb-1">
+              Headline
+            </label>
+            <input
+              id="edit-headline"
+              className={inputClass}
+              value={form.headline}
+              onChange={(e) => updateField("headline", e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-body" className="block text-xs font-medium text-text-secondary mb-1">
+              Body
+            </label>
+            <textarea
+              id="edit-body"
+              className={inputClass}
+              value={form.bodyText}
+              onChange={(e) => updateField("bodyText", e.target.value)}
+              rows={3}
+              required
+            />
+            {form.type === "engagement" && (
+              <p className="text-xs text-text-secondary/60 mt-1">
+                Placeholders: {"{{handle}}"}, {"{{delta}}"}, {"{{tier_from}}"}, {"{{tier_to}}"}, {"{{archetype_from}}"}, {"{{archetype_to}}"}
+              </p>
+            )}
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-medium text-text-secondary">
+              Feature Highlights
+            </legend>
+            {form.features.map((f, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  className={inputClass}
+                  value={f.text}
+                  onChange={(e) => updateFeature(i, e.target.value)}
+                  placeholder="Feature description"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFeature(i)}
+                  aria-label="Remove feature"
+                  className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addFeature}
+              className="text-xs text-amber hover:text-amber-light"
+            >
+              + Add feature
+            </button>
+          </fieldset>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="edit-cta-text" className="block text-xs font-medium text-text-secondary mb-1">
+                CTA Button Text
+              </label>
+              <input
+                id="edit-cta-text"
+                className={inputClass}
+                value={form.ctaText}
+                onChange={(e) => updateField("ctaText", e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-cta-url" className="block text-xs font-medium text-text-secondary mb-1">
+                CTA URL
+              </label>
+              <input
+                id="edit-cta-url"
+                className={inputClass}
+                value={form.ctaUrl}
+                onChange={(e) => updateField("ctaUrl", e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setMode("detail")}
+              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+            >
+              Save Changes
             </button>
           </div>
         </form>
@@ -480,6 +752,13 @@ export function CampaignsDashboard() {
           </div>
         )}
 
+        {/* Engagement info banner */}
+        {c.type === "engagement" && (
+          <div className="rounded-lg border border-complement/20 bg-complement/5 px-4 py-2 text-sm text-complement">
+            This template is sent automatically when a user&apos;s score increases by 10+ points. Enable delivery in the Engagement tab.
+          </div>
+        )}
+
         {/* Actions */}
         {c.status === "draft" && (
           <div className="flex gap-3">
@@ -490,12 +769,20 @@ export function CampaignsDashboard() {
               Preview Email
             </button>
             <button
-              onClick={() => handleSend(c.id)}
-              disabled={sending}
-              className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light disabled:opacity-50"
+              onClick={() => openEdit(c)}
+              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
             >
-              {sending ? "Sending..." : "Send Campaign"}
+              Edit Draft
             </button>
+            {c.type !== "engagement" && (
+              <button
+                onClick={() => handleSend(c.id)}
+                disabled={sending}
+                className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light disabled:opacity-50"
+              >
+                {sending ? "Sending..." : "Send Campaign"}
+              </button>
+            )}
             <button
               onClick={() => handleDelete(c.id)}
               className="rounded-lg border border-terminal-red/20 px-4 py-2 text-sm font-medium text-terminal-red hover:bg-terminal-red/5"
@@ -504,6 +791,34 @@ export function CampaignsDashboard() {
             </button>
           </div>
         )}
+
+        {/* Send Test Email */}
+        <div className="rounded-xl border border-stroke bg-card p-4 space-y-3">
+          <h3 className="font-heading text-sm text-text-secondary">
+            Send Test Email
+          </h3>
+          <div className="flex gap-2">
+            <label htmlFor="test-email" className="sr-only">Test Email Address</label>
+            <input
+              id="test-email"
+              className={inputClass}
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="your@email.com"
+            />
+            <button
+              onClick={() => handleSendTest(c.id)}
+              disabled={sendingTest || !testEmail.trim()}
+              className="shrink-0 rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary disabled:opacity-50"
+            >
+              {sendingTest ? "Sending..." : "Send Test"}
+            </button>
+          </div>
+          <p className="text-xs text-text-secondary/60">
+            Sends one email with [TEST] prefix. Does not affect campaign status.
+          </p>
+        </div>
 
         {/* Preview iframe */}
         {previewHtml && (
@@ -583,7 +898,14 @@ export function CampaignsDashboard() {
                   onClick={() => openDetail(c)}
                   className="cursor-pointer border-b border-stroke/50 hover:bg-amber/5 transition-colors"
                 >
-                  <td className="px-4 py-3 text-text-primary">{c.name}</td>
+                  <td className="px-4 py-3 text-text-primary">
+                    {c.name}
+                    {c.type === "engagement" && (
+                      <span className="ml-2 inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-complement/10 text-complement font-heading">
+                        engagement
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={c.status} />
                   </td>

@@ -106,7 +106,7 @@ export default function ConfettiExperimentPage() {
   }, [particleCount, palette, speed]);
 
   return (
-    <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
+    <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
       <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
@@ -118,7 +118,7 @@ export default function ConfettiExperimentPage() {
         aria-hidden="true"
       />
 
-      <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
+      <div className="relative z-10 mx-auto max-w-5xl px-6 py-16">
         {/* Header */}
         <header className="mb-12 animate-fade-in-up">
           <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
@@ -376,7 +376,7 @@ export default function ConfettiExperimentPage() {
             &middot; disableForReducedMotion enabled
           </p>
         </footer>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }

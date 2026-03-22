@@ -86,6 +86,7 @@ beforeEach(() => {
 
 const fullRow = {
   id: "c-1",
+  type: "announcement",
   name: "Test Campaign",
   subject: "Subject Line",
   preview_text: "Preview here",
@@ -105,6 +106,7 @@ const fullRow = {
 
 const minimalRow = {
   id: "c-2",
+  type: "announcement",
   name: "Minimal",
   subject: "Sub",
   preview_text: undefined,
@@ -222,6 +224,7 @@ describe("dbGetCampaign", () => {
 
 describe("dbCreateCampaign", () => {
   const validInput = {
+    type: "announcement" as const,
     name: "Test",
     subject: "Subject",
     previewText: null,
@@ -270,6 +273,7 @@ describe("dbCreateCampaign", () => {
     });
 
     expect(mockInsert).toHaveBeenCalledWith({
+      type: "announcement",
       name: "Test",
       subject: "Subject",
       preview_text: "Some preview",

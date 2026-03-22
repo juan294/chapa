@@ -1,9 +1,9 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
-import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
+import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
 
 /** Branch names that indicate a direct push (not a feature branch). */
-const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "trunk"]);
+const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
 
 /**
  * Transform raw GitHub GraphQL contribution data into a StatsData object.
@@ -50,6 +50,11 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     : undefined;
   const issueLinkageRate = prsMergedCount > 0
     ? mergedPRs.filter((pr) => pr.closingIssuesCount > 0).length / prsMergedCount
+    : undefined;
+
+  // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold
+  const microCommitRatio = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => pr.additions + pr.deletions < MICRO_PR_LINE_THRESHOLD).length / prsMergedCount
     : undefined;
 
   // 6. Reviews and issues
@@ -114,6 +119,7 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ...(prDescriptionRate !== undefined && { prDescriptionRate }),
     ...(featureBranchRate !== undefined && { featureBranchRate }),
     ...(issueLinkageRate !== undefined && { issueLinkageRate }),
+    ...(microCommitRatio !== undefined && { microCommitRatio }),
     totalStars,
     totalForks,
     totalWatchers,

@@ -13,6 +13,7 @@ afterEach(cleanup);
 const mockCampaigns: Campaign[] = [
   {
     id: "c-1",
+    type: "announcement",
     name: "March Update",
     status: "draft",
     subject: "What's new",
@@ -31,6 +32,7 @@ const mockCampaigns: Campaign[] = [
   },
   {
     id: "c-2",
+    type: "announcement",
     name: "April Update",
     status: "sending",
     subject: "More updates",
@@ -51,6 +53,7 @@ const mockCampaigns: Campaign[] = [
 
 const sentCampaign: Campaign = {
   id: "c-3",
+  type: "announcement",
   name: "Sent Campaign",
   status: "sent",
   subject: "Old news",
@@ -848,5 +851,81 @@ describe("CampaignsDashboard — edge cases", () => {
       ok: true,
       json: () => Promise.resolve({ message: "Done" }),
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ACCESSIBILITY — label associations & aria-labels
+// ---------------------------------------------------------------------------
+
+describe("CampaignsDashboard — a11y label associations", () => {
+  it("create form inputs are associated with labels via htmlFor/id", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("New Campaign")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("New Campaign"));
+
+    // All form fields should be findable by their label text
+    expect(screen.getByLabelText("Campaign Name")).toBeTruthy();
+    expect(screen.getByLabelText("Email Subject")).toBeTruthy();
+    expect(screen.getByLabelText(/Preview Text/)).toBeTruthy();
+    expect(screen.getByLabelText("Headline")).toBeTruthy();
+    expect(screen.getByLabelText("Body")).toBeTruthy();
+    expect(screen.getByLabelText("CTA Button Text")).toBeTruthy();
+    expect(screen.getByLabelText("CTA URL")).toBeTruthy();
+  });
+
+  it("edit form inputs are associated with labels via htmlFor/id", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    // Open detail, then edit
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Draft")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Edit Draft"));
+
+    expect(screen.getByLabelText("Campaign Name")).toBeTruthy();
+    expect(screen.getByLabelText("Email Subject")).toBeTruthy();
+    expect(screen.getByLabelText(/Preview Text/)).toBeTruthy();
+    expect(screen.getByLabelText("Headline")).toBeTruthy();
+    expect(screen.getByLabelText("Body")).toBeTruthy();
+    expect(screen.getByLabelText("CTA Button Text")).toBeTruthy();
+    expect(screen.getByLabelText("CTA URL")).toBeTruthy();
+  });
+
+  it("detail view test email input is associated with a label", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Send Test Email")).toBeTruthy();
+    });
+
+    expect(screen.getByLabelText("Test Email Address")).toBeTruthy();
+  });
+
+  it("remove feature buttons have aria-label", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("New Campaign")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("New Campaign"));
+
+    // Add two features
+    fireEvent.click(screen.getByText("+ Add feature"));
+    fireEvent.click(screen.getByText("+ Add feature"));
+
+    const removeButtons = screen.getAllByRole("button", { name: "Remove feature" });
+    expect(removeButtons).toHaveLength(2);
   });
 });

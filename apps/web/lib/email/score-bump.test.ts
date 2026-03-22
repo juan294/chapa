@@ -36,6 +36,13 @@ vi.mock("@/lib/db/feature-flags", () => ({
   dbGetFeatureFlag: (...args: unknown[]) => mockDbGetFeatureFlag(...args),
 }));
 
+const mockDbGetActiveEngagementCampaign = vi.fn();
+
+vi.mock("@/lib/db/campaigns", () => ({
+  dbGetActiveEngagementCampaign: (...args: unknown[]) =>
+    mockDbGetActiveEngagementCampaign(...args),
+}));
+
 import { notifyScoreBump } from "./score-bump";
 import { _resetClient } from "./resend";
 import type { SnapshotDiff } from "@/lib/history/diff";
@@ -104,6 +111,9 @@ beforeEach(() => {
     email: "dev@example.com",
     emailNotifications: true,
   });
+
+  // Default: no engagement campaign (fallback to hardcoded template)
+  mockDbGetActiveEngagementCampaign.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -244,6 +254,7 @@ describe("email content — tier change", () => {
     await notifyScoreBump("testuser", diff, makeSignificance("tier_change"));
 
     const call = mockSend.mock.calls[0]![0];
+    expect(call.subject).toContain("Your Profile Just Leveled Up");
     expect(call.subject).toContain("Solid");
     expect(call.subject).toContain("High");
     expect(call.html).toContain("Solid");
@@ -322,5 +333,100 @@ describe("unsubscribe link", () => {
     const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain("/api/notifications/unsubscribe");
     expect(call.text).toContain("/api/notifications/unsubscribe");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DB-backed engagement template
+// ---------------------------------------------------------------------------
+
+describe("DB-backed engagement template", () => {
+  const engagementCampaign = {
+    id: "camp_eng_1",
+    type: "engagement" as const,
+    name: "Score Bump Engagement",
+    subject: "{{handle}}: Your Impact just jumped {{delta}} points!",
+    previewText: null,
+    headline: "You went from {{tier_from}} to {{tier_to}}!",
+    bodyText: "Your archetype evolved from {{archetype_from}} to {{archetype_to}}.",
+    features: [{ text: "Check your updated badge" }],
+    ctaText: "View Badge",
+    ctaUrl: "https://chapa.thecreativetoken.com/u/{{handle}}",
+    status: "draft" as const,
+    totalRecipients: 0,
+    sentCount: 0,
+    failedCount: 0,
+    createdAt: "2026-03-22T00:00:00Z",
+    startedAt: null,
+    completedAt: null,
+  };
+
+  it("uses engagement campaign template when one exists", async () => {
+    mockDbGetActiveEngagementCampaign.mockResolvedValue(engagementCampaign);
+
+    const diff = makeDiff({
+      adjustedComposite: 12,
+      tier: { from: "Solid", to: "High" },
+      archetype: { from: "Balanced", to: "Builder" },
+    });
+
+    await notifyScoreBump("testuser", diff, makeSignificance("tier_change"));
+
+    const call = mockSend.mock.calls[0]![0];
+    // Subject should be interpolated
+    expect(call.subject).toBe("testuser: Your Impact just jumped +12 points!");
+    // HTML should contain the interpolated headline from the announcement template
+    expect(call.html).toContain("You went from Solid to High!");
+  });
+
+  it("falls back to hardcoded template when no engagement campaign exists", async () => {
+    mockDbGetActiveEngagementCampaign.mockResolvedValue(null);
+
+    const diff = makeDiff({ adjustedComposite: 8 });
+
+    await notifyScoreBump("testuser", diff, makeSignificance("score_bump"));
+
+    const call = mockSend.mock.calls[0]![0];
+    // Should use the original buildSubject format
+    expect(call.subject).toContain("testuser");
+    expect(call.subject).toContain("+8");
+    // Should use the original buildHtml format (contains the score delta highlight)
+    expect(call.html).toContain("+8");
+  });
+
+  it("interpolates tier placeholders correctly", async () => {
+    mockDbGetActiveEngagementCampaign.mockResolvedValue(engagementCampaign);
+
+    const diff = makeDiff({
+      adjustedComposite: 5,
+      tier: { from: "Emerging", to: "Solid" },
+      archetype: { from: "Emerging", to: "Marathoner" },
+    });
+
+    await notifyScoreBump("testuser", diff, makeSignificance("tier_change"));
+
+    const call = mockSend.mock.calls[0]![0];
+    expect(call.subject).toBe("testuser: Your Impact just jumped +5 points!");
+    expect(call.html).toContain("You went from Emerging to Solid!");
+    expect(call.html).toContain("Your archetype evolved from Emerging to Marathoner.");
+  });
+
+  it("handles missing placeholders gracefully (empty string for unused vars)", async () => {
+    const campaignNoTier = {
+      ...engagementCampaign,
+      subject: "{{handle}}: Score bump {{delta}} — tier {{tier_from}} to {{tier_to}}",
+      headline: "Impact changed by {{delta}}!",
+    };
+    mockDbGetActiveEngagementCampaign.mockResolvedValue(campaignNoTier);
+
+    // No tier or archetype change — those vars should resolve to empty strings
+    const diff = makeDiff({ adjustedComposite: 7 });
+
+    await notifyScoreBump("testuser", diff, makeSignificance("score_bump"));
+
+    const call = mockSend.mock.calls[0]![0];
+    // tier_from and tier_to should be empty strings since diff.tier is null
+    expect(call.subject).toBe("testuser: Score bump +7 — tier  to ");
+    expect(call.html).toContain("Impact changed by +7!");
   });
 });

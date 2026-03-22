@@ -52,6 +52,7 @@ describe("process-campaigns cron", () => {
     vi.mocked(dbGetCampaigns).mockResolvedValue([
       {
         id: "c-1",
+        type: "announcement",
         name: "Test Campaign",
         status: "sending",
         subject: "Test",

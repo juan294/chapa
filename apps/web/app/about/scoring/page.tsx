@@ -550,7 +550,7 @@ export default function ScoringMethodologyPage() {
                 [
                   "Low activity signal",
                   "-10",
-                  "Fewer than 30 active days AND fewer than 50 commits",
+                  "Fewer than 30 active days OR fewer than 50 commits",
                   "Very limited activity reduces the signal available for scoring",
                 ],
                 [

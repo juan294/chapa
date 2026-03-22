@@ -496,7 +496,7 @@ export default function TextEffectsExperimentPage() {
         }
       `}</style>
 
-      <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
+      <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div
           className="pointer-events-none fixed top-1/4 left-1/3 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]"
@@ -507,7 +507,7 @@ export default function TextEffectsExperimentPage() {
           aria-hidden="true"
         />
 
-        <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
+        <div className="relative z-10 mx-auto max-w-5xl px-6 py-16">
           {/* ── Hero ─────────────────────────────────────────── */}
           <header className="mb-20 text-center animate-fade-in-up">
             <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
@@ -644,8 +644,8 @@ export default function TextEffectsExperimentPage() {
             </span>{" "}
             &middot; prefers-reduced-motion supported
           </p>
-        </main>
-      </div>
+        </div>
+      </main>
     </>
   );
 }

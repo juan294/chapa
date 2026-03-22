@@ -67,14 +67,13 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 
 | Signal | Cap | Rationale |
 |--------|-----|-----------|
-| Commits | 600 | ~1.6/day average is strong; more adds no extra credit |
-| PR Weight | 120 | Weighted by complexity, not count; cap prevents inflation |
-| Reviews | 180 | Encourages collaboration without requiring extreme volume |
-| Issues | 80 | Meaningful issue resolution, not ticket churn |
-| Repos | 15 | Cross-project work beyond 15 repos is fully credited |
-| Stars | 500 | Community recognition signal; log-normalized |
-| Forks | 200 | People building on your work; log-normalized |
-| Watchers | 100 | People actively following your repos; log-normalized |
+| Commits | 300 | Consistent contribution; diminishing returns beyond ~1/day |
+| PR Weight | 60 | Weighted by complexity, not count; cap prevents inflation |
+| Reviews | 80 | Encourages collaboration without requiring extreme volume |
+| Issues | 40 | Meaningful issue resolution, not ticket churn |
+| Repos | 12 | Cross-project work beyond 12 repos is fully credited |
+| Stars | 150 | Community recognition signal; log-normalized |
+| Forks | 80 | People building on your work; log-normalized |
 
 ### The core dimensions (each 0-100)
 
@@ -82,8 +81,8 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 |-----------|-----------------|-------------------|
 | **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
 | **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), inverse micro-commit ratio (15%) |
-| **Consistency** | Reliable, sustained contributions | Active days / 365 (50%), heatmap evenness (35%), inverse burst activity (15%) |
-| **Breadth** | Cross-project influence | Repos contributed (35%), inverse top-repo share (25%), stars (15%), forks (10%), watchers (5%), docs-only PR ratio (10%) |
+| **Consistency** | Reliable, sustained contributions | sqrt(activeDays/365) (45%), heatmap evenness (40%), inverse burst activity (15%) |
+| **Breadth** | Cross-project influence | Repos contributed (40%), inverse top-repo share (25%), docs-only PR ratio (15%), stars (10%), forks (5%) |
 
 Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers (zero reviews) are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Solo Quality returns 0 only if you have zero merged PRs.
 
@@ -155,7 +154,7 @@ Confidence starts at 100 and can be reduced by detected patterns:
 | Low collaboration | -10 | 10+ PRs merged AND 1 or fewer reviews given | Significant output without peer interaction |
 | Single repo focus | -5 | 95%+ of activity in one repo AND only 1 repo | Less cross-project signal (not bad, just less diverse data) |
 | Supplemental data | -5 | Includes merged EMU account data | Data from a linked account that cannot be independently verified |
-| Low activity signal | -10 | Fewer than 30 active days AND fewer than 50 commits | Very limited activity reduces the signal available for scoring |
+| Low activity signal | -10 | Fewer than 30 active days OR fewer than 50 commits | Very limited activity reduces the signal available for scoring |
 | Review volume imbalance | -10 | 50+ reviews AND fewer than 3 merged PRs | High review volume with very few merged changes reduces confidence in the activity mix |
 
 **Confidence floor:** 50. No combination of penalties can push confidence below 50. Note: "Low collaboration" and "Review volume imbalance" are mutually exclusive (one requires ≤ 1 reviews, the other ≥ 50), so the maximum simultaneous penalties is 7.
@@ -514,4 +513,4 @@ A: Linear scoring rewards volume -- 200 commits would score 2x higher than 100. 
 A: Multiple layers. (1) **Log normalization** makes volume-based gaming impractical. (2) **PR size multiplier** means empty/trivial PRs contribute zero weight. (3) **Repo depth threshold** requires 3+ commits per repo to count toward Breadth. (4) **Confidence penalties** detect patterns like review spam, burst commits, and thin activity profiles. (5) **Caps** on every metric mean there's a ceiling — you can't just do more of one thing to inflate your score.
 
 **Q: What are the four dimensions?**
-A: Delivery (shipping code), Quality (engineering discipline — code reviews on teams, PR hygiene when solo), Consistency (sustained activity over time), and Breadth (cross-project influence). Each is scored 0-100 independently. Your archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging) is derived from which dimension is strongest.
+A: Delivery (shipping code), Quality (engineering discipline — code reviews on teams, PR hygiene when solo), Consistency (sustained activity over time), and Breadth (cross-project influence). An optional fifth dimension, **Craft**, measures AI tool mastery when insights data is available. Each is scored 0-100 independently. Your archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging) is derived from which dimension is strongest.

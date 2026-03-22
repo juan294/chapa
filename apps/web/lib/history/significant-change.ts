@@ -17,7 +17,7 @@ import type { SnapshotDiff } from "./diff";
 // ---------------------------------------------------------------------------
 
 /** Minimum adjusted composite increase to count as significant. */
-const SCORE_BUMP_THRESHOLD = 5;
+const SCORE_BUMP_THRESHOLD = 10;
 
 // ---------------------------------------------------------------------------
 // Types

@@ -289,7 +289,7 @@ describe("computeConfidence", () => {
 
   // --- low_activity_signal ---
   describe("low_activity_signal flag", () => {
-    it("applies -10 when activeDays < 30 AND commitsTotal < 50", () => {
+    it("applies -10 when both activeDays < 30 AND commitsTotal < 50", () => {
       const { confidence, penalties } = computeConfidence(
         makeStats({ activeDays: 20, commitsTotal: 30 }),
       );
@@ -299,27 +299,45 @@ describe("computeConfidence", () => {
       expect(penalties[0]!.penalty).toBe(10);
     });
 
-    it("does NOT apply when activeDays >= 30", () => {
+    it("applies when activeDays < 30 even if commitsTotal >= 50", () => {
       const { penalties } = computeConfidence(
-        makeStats({ activeDays: 30, commitsTotal: 10 }),
+        makeStats({ activeDays: 17, commitsTotal: 65 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_activity_signal"),
+      ).toBeDefined();
+    });
+
+    it("applies when commitsTotal < 50 even if activeDays >= 30", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ activeDays: 100, commitsTotal: 30 }),
+      );
+      expect(
+        penalties.find((p) => p.flag === "low_activity_signal"),
+      ).toBeDefined();
+    });
+
+    it("does NOT apply when both activeDays >= 30 AND commitsTotal >= 50", () => {
+      const { penalties } = computeConfidence(
+        makeStats({ activeDays: 30, commitsTotal: 50 }),
       );
       expect(
         penalties.find((p) => p.flag === "low_activity_signal"),
       ).toBeUndefined();
     });
 
-    it("does NOT apply when commitsTotal >= 50", () => {
+    it("applies at boundary: activeDays=29, commitsTotal=50", () => {
       const { penalties } = computeConfidence(
-        makeStats({ activeDays: 10, commitsTotal: 50 }),
+        makeStats({ activeDays: 29, commitsTotal: 50 }),
       );
       expect(
         penalties.find((p) => p.flag === "low_activity_signal"),
-      ).toBeUndefined();
+      ).toBeDefined();
     });
 
-    it("applies at boundary: activeDays=29, commitsTotal=49", () => {
+    it("applies at boundary: activeDays=30, commitsTotal=49", () => {
       const { penalties } = computeConfidence(
-        makeStats({ activeDays: 29, commitsTotal: 49 }),
+        makeStats({ activeDays: 30, commitsTotal: 49 }),
       );
       expect(
         penalties.find((p) => p.flag === "low_activity_signal"),
