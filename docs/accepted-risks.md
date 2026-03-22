@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-02-24 | Audit: v21
+> Last reviewed: 2026-03-22 | Audit: v22
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -50,19 +50,41 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Future improvement:** Add `middleware.ts` with admin route matching when Next.js middleware stabilizes further or if the admin surface area grows significantly.
 
-## MPL-2.0 / LGPL-3.0 dependency (sharp/libvips) (#450)
+## ~~MPL-2.0 / LGPL-3.0 dependency (sharp/libvips) (#450)~~ — Resolved
 
-- **Risk:** The `sharp` image processing library is MPL-2.0 licensed and depends on `libvips` which is LGPL-3.0 (dynamically linked). Neither is on the project's explicit allowlist (MIT, Apache-2.0, BSD, ISC).
-- **Mitigation:** `sharp` is used by Next.js for image optimization and by `@resvg/resvg-js` for OG image generation — no viable alternative exists. LGPL-3.0 with dynamic linking does not require open-sourcing our code. MPL-2.0 is file-level copyleft only — modifications to MPL-licensed files must be shared, but our own code is unaffected. Both are compatible with our MIT license.
+- **Risk:** The `sharp` image processing library was MPL-2.0 licensed and depends on `libvips` which is LGPL-3.0 (dynamically linked).
+- **Resolution:** As of `sharp@0.34.5`, the package license changed to **Apache-2.0**, which is on the project allowlist. LGPL-3.0 for libvips (dynamically linked) remains acceptable — dynamic linking does not require open-sourcing our code.
+- **Severity:** None (resolved)
+- **Accepted:** 2026-02-21 | **Updated:** 2026-03-22
+
+## MPL-2.0 dependency (@resvg/resvg-js) (#464, #596)
+
+- **Risk:** `@resvg/resvg-js@2.6.2` (and its platform-specific binary `@resvg/resvg-js-darwin-arm64`) uses MPL-2.0 (weak copyleft), which is not on the project's explicit allowlist (MIT, Apache-2.0, BSD, ISC). Used for SVG-to-PNG rendering in OG image generation.
+- **Note:** `@vercel/analytics` was previously MPL-2.0 but has changed to **MIT** as of v2.0.1, resolving that concern.
+- **Mitigation:** MPL-2.0 is a file-level weak copyleft license — it only requires sharing modifications to the MPL-licensed source files themselves. Chapa uses the package as an unmodified dependency via its public API, so there is no obligation to open-source any of Chapa's own code. MPL-2.0 is not GPL, AGPL, or LGPL and is explicitly compatible with proprietary and MIT-licensed projects. No modifications are made to the package's source files.
 - **Severity:** Low
-- **Accepted:** 2026-02-21
+- **Accepted:** 2026-02-24 | **Updated:** 2026-03-22
 
-## MPL-2.0 dependencies (@resvg/resvg-js, @vercel/analytics) (#464)
+## Wildcard CORS on /api/verify/[hash] (#596)
 
-- **Risk:** Two production dependencies use MPL-2.0 (weak copyleft), which is not on the project's explicit allowlist (MIT, Apache-2.0, BSD, ISC). `@resvg/resvg-js` is used for SVG-to-PNG rendering and `@vercel/analytics` provides Vercel web analytics.
-- **Mitigation:** MPL-2.0 is a file-level weak copyleft license — it only requires sharing modifications to the MPL-licensed source files themselves. Chapa uses both packages as unmodified dependencies via their public APIs, so there is no obligation to open-source any of Chapa's own code. MPL-2.0 is not GPL, AGPL, or LGPL and is explicitly compatible with proprietary and MIT-licensed projects. No modifications are made to either package's source files.
+- **Risk:** The badge verification endpoint uses `Access-Control-Allow-Origin: *`, allowing any origin to call it from client-side JavaScript.
+- **Mitigation:** Intentional design. The verification endpoint is public, read-only, and rate-limited. Badge embeds on third-party sites (READMEs, portfolios, blogs) need client-side verification capability — restricting CORS would break the core use case. The endpoint returns only verification status and public badge data; no sensitive information is exposed.
 - **Severity:** Low
-- **Accepted:** 2026-02-24
+- **Accepted:** 2026-03-22
+
+## dangerouslySetInnerHTML with server-rendered SVG (#596)
+
+- **Risk:** The share page (`/u/[handle]/page.tsx`), landing page, and archetype pages inject badge SVG into the DOM via `dangerouslySetInnerHTML`, which bypasses React's XSS protections.
+- **Mitigation:** Safe because all SVG is generated server-side by `renderBadgeSvg()` with `escapeXml()` (in `lib/render/escape.ts`) applied to all user-controlled text (GitHub handle, display name). No user-controlled raw SVG reaches any `dangerouslySetInnerHTML` injection point. The SVG rendering pipeline is a pure function that takes sanitized inputs and produces deterministic output.
+- **Severity:** Low
+- **Accepted:** 2026-03-22
+
+## Turbopack NFT trace warning on agents-summary route (#596)
+
+- **Risk:** The `/api/admin/agents-summary` route uses `process.cwd()` + `node:fs` to read agent log files at runtime, causing a Turbopack "NFT trace" build warning about dynamic filesystem access.
+- **Mitigation:** This is an admin-only route behind session auth + `ADMIN_HANDLES` check. The `process.cwd()` pattern is documented in code comments (see `apps/web/app/api/admin/agents-summary/route.ts:61`). Alternative approaches (`import.meta.dirname` with relative traversal) are more brittle. The warning is cosmetic — no user-facing impact, no data leakage, no functional issue.
+- **Severity:** None (cosmetic build warning)
+- **Accepted:** 2026-03-22
 
 ---
 
@@ -92,6 +114,13 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** Bundle size is monitored via CI workflows (Dead Code Detection + Bundle Size Analysis). Individual chunks are inspected from `.next/static/chunks/`. The largest chunk is 219KB — well under the 500KB threshold. No route exceeds 300KB.
 - **Severity:** Low
 - **Accepted:** 2026-02-21
+
+## Experiment pages fully client-rendered (#596)
+
+- **Risk:** All 13 experiment pages (`/experiments/*`) use `"use client"`, meaning they are fully client-rendered with no SSR benefits (SEO, initial paint from server HTML).
+- **Mitigation:** Intentional design. Experiment pages are visual demos for badge effects (particles, 3D tilt, aurora, hexmap, etc.) that rely heavily on canvas, requestAnimationFrame, and interactive state — SSR provides no benefit for these. All 13 pages are gated behind the `experiments_enabled` feature flag (disabled by default in production). They are internal prototyping tools, not user-facing production features.
+- **Severity:** None
+- **Accepted:** 2026-03-22
 
 ---
 
