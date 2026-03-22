@@ -143,16 +143,16 @@
 - [DevOps]: All thresholds pass with 12%+ margin. Duplicate file cleanup complete.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-03-21T12:00:00Z -->
-## Triage — 2026-03-21
-- **Reports processed**: 4 (coverage, cost-analyst, documentation, cc-rpi-update)
-- **Action items resolved**: 12 of 13 (1 already done: campaign admin rate limiting was already in `adminAuth()`)
-- **Summary**: Deleted 9 iCloud duplicate files + 6 duplicate logs. Hoisted nested `vi.mock()` in UserMenu tests. Cleared `Promise.race` timer in `listAllContacts()`. Fixed misleading SQL comment in `dbGetCampaignStats()`. Fixed 2 phantom routes + 2 method mismatches in CLAUDE.md. Added 20+ undocumented routes to CLAUDE.md. Added JSDoc to 4 critical functions. Created `/archetypes/artificer` page. Added render tests for PostHogProvider and SharePageOwnerContent. Updated design-system.md.
-- **Tests**: 5,531 passing (+13 new), 0 type errors, 0 lint issues
-- **Pre-existing issue found**: `ActivityHeatmap.test.tsx` fails in main repo (ResizeObserver not defined) — works in fresh worktree. Environment issue, not a regression.
+<!-- ENTRY:START agent=triage timestamp=2026-03-22T07:30:00Z -->
+## Triage — 2026-03-22
+- **Reports processed**: 3 (coverage, cost-analyst, cc-rpi-update)
+- **Action items resolved**: 10 of 11 (1 already resolved: Vitest warning in UserMenu was fixed in prior triage)
+- **Summary**: Added render tests for 9 Priority 1 untested components (VerifyForm, verify/[hash]/page, AdminDashboardClient, OverallHealthBanner, AgentTogglesTable, Navbar, NavbarClient, CopyButton, cli/authorize/page). Updated `dbGetCampaignStats()` comment to document PostgREST GROUP BY limitation. All reports GREEN, no agent failures.
+- **Tests**: 5,671 passing (+123 new, 330 files), 0 type errors, 0 lint issues
+- **Coverage delta**: 87.72% stmts (+0.32% vs previous). All critical paths GREEN (90%+).
 **Cross-agent recommendations:**
-- [Coverage]: SharePageOwnerContent now has render tests (was 0%). PostHogProvider render tests expanded. Duplicate files eliminated — raw coverage denominator now accurate.
-- [QA]: Nested `vi.mock()` warning resolved. Pre-existing ResizeObserver issue in main repo needs investigation (JSDOM polyfill).
-- [Documentation]: CLAUDE.md now at ~95% route coverage (up from 65%). Phantom routes removed. Method mismatches fixed. Artificer added to archetype list.
-- [Cost Analyst]: Campaign admin rate limiting confirmed already present via `adminAuth()` — cost analyst report finding was incorrect.
+- [Coverage]: 9 Priority 1 components now have render tests. Remaining gaps are Priority 2-4 (experiments, static pages, framework files).
+- [QA]: Vitest `vi.mock()` warning no longer reproducible — remove from carried items.
+- [Cost Analyst]: `dbGetCampaignStats` JS aggregation confirmed as correct approach — PostgREST lacks GROUP BY. Remove from carried items.
+- [Performance]: No new performance concerns. Test suite runs in ~18s.
 <!-- ENTRY:END -->

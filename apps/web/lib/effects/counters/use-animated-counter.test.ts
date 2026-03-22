@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, act, cleanup } from "@testing-library/react";
 import { useAnimatedCounter, easings } from "./use-animated-counter";
 
 // jsdom doesn't provide matchMedia — stub it globally for all tests
@@ -24,6 +24,10 @@ describe("useAnimatedCounter", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     stubMatchMedia(false);
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("returns the target value immediately when startOnMount is false", () => {
