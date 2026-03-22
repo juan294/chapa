@@ -227,6 +227,10 @@ describe("POST /api/refresh", () => {
   });
 
   it("returns 500 when an unexpected error is thrown", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     vi.mocked(getStats).mockRejectedValue(new Error("unexpected boom"));
 
@@ -234,5 +238,7 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe("Internal server error");
+
+    consoleErrorSpy.mockRestore();
   });
 });

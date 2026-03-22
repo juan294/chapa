@@ -120,6 +120,10 @@ describe("POST /api/generate", () => {
   });
 
   it("returns 500 when an unexpected error is thrown", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockRejectedValue(new Error("unexpected boom"));
 
@@ -127,5 +131,7 @@ describe("POST /api/generate", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe("Internal server error");
+
+    consoleErrorSpy.mockRestore();
   });
 });
