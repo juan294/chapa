@@ -18,6 +18,16 @@ export interface BitbucketTokenResponse {
   scopes: string;
 }
 
+/**
+ * Discriminated result for token refresh attempts.
+ * - `ok: true` — refresh succeeded, new tokens available
+ * - `ok: false, reason: "revoked"` — grant is dead (user revoked, token expired server-side)
+ * - `ok: false, reason: "transient"` — temporary failure (network, timeout, server error)
+ */
+export type TokenRefreshResult<T> =
+  | { ok: true; tokens: T }
+  | { ok: false; reason: "revoked" | "transient" };
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -165,13 +175,34 @@ export async function exchangeBitbucketCode(
 // ---------------------------------------------------------------------------
 
 /**
+ * Classify an OAuth error response as revoked or transient.
+ * Only HTTP 400 with `error: "invalid_grant"` is treated as revocation;
+ * everything else (5xx, timeout, other 4xx) is transient.
+ */
+export async function classifyOAuthError(res: Response): Promise<"revoked" | "transient"> {
+  if (res.status === 400) {
+    try {
+      const body = await res.json();
+      if (body.error === "invalid_grant") return "revoked";
+    } catch {
+      // Unparseable body — treat as transient
+    }
+  }
+  return "transient";
+}
+
+/**
  * Refresh an expired access token.
+ *
+ * Returns a discriminated result distinguishing permanent revocation
+ * (HTTP 400 + `invalid_grant`) from transient failures (network, timeout, 5xx).
+ * Callers should only unlink the platform on `reason: "revoked"`.
  */
 export async function refreshBitbucketToken(
   refreshToken: string,
   clientId: string,
   clientSecret: string,
-): Promise<BitbucketTokenResponse | null> {
+): Promise<TokenRefreshResult<BitbucketTokenResponse>> {
   try {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
@@ -188,12 +219,17 @@ export async function refreshBitbucketToken(
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return { ok: false, reason: await classifyOAuthError(res) };
+    }
+
     const data = await res.json();
-    if (!data.access_token) return null;
-    return data as BitbucketTokenResponse;
+    if (!data.access_token) {
+      return { ok: false, reason: "transient" };
+    }
+    return { ok: true, tokens: data as BitbucketTokenResponse };
   } catch {
-    return null;
+    return { ok: false, reason: "transient" };
   }
 }
 

@@ -657,11 +657,14 @@ describe("getStats", () => {
       });
       mockIsTokenExpired.mockReturnValue(true);
       mockRefreshBitbucketToken.mockResolvedValue({
-        access_token: "new-token",
-        refresh_token: "new-refresh",
-        expires_in: 7200,
-        token_type: "bearer",
-        scopes: "repository",
+        ok: true,
+        tokens: {
+          access_token: "new-token",
+          refresh_token: "new-refresh",
+          expires_in: 7200,
+          token_type: "bearer",
+          scopes: "repository",
+        },
       });
       mockFetchBitbucketStats.mockResolvedValue(bb);
 
@@ -707,7 +710,7 @@ describe("getStats", () => {
         },
       });
       mockIsTokenExpired.mockReturnValue(true);
-      mockRefreshBitbucketToken.mockResolvedValue(null); // refresh failed
+      mockRefreshBitbucketToken.mockResolvedValue({ ok: false, reason: "revoked" });
 
       vi.stubEnv("BITBUCKET_CLIENT_ID", "test-client-id");
       vi.stubEnv("BITBUCKET_CLIENT_SECRET", "test-client-secret");
@@ -718,6 +721,41 @@ describe("getStats", () => {
         "test-user",
         "bitbucket",
       );
+      // Should still return GitHub-only stats
+      expect(result!.commitsTotal).toBe(50);
+
+      vi.unstubAllEnvs();
+    });
+
+    it("keeps link on transient refresh failure (Bitbucket)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "bb-user",
+        tokens: {
+          accessToken: "expired-token",
+          refreshToken: "bb-refresh",
+          expiresAt: new Date("2020-01-01"),
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockRefreshBitbucketToken.mockResolvedValue({ ok: false, reason: "transient" });
+
+      vi.stubEnv("BITBUCKET_CLIENT_ID", "test-client-id");
+      vi.stubEnv("BITBUCKET_CLIENT_SECRET", "test-client-secret");
+
+      const result = await getStats("test-user");
+
+      // Should NOT unlink — transient failure
+      expect(mockDbDeleteLinkedPlatform).not.toHaveBeenCalled();
       // Should still return GitHub-only stats
       expect(result!.commitsTotal).toBe(50);
 
@@ -952,10 +990,13 @@ describe("getStats", () => {
       });
       mockIsTokenExpired.mockReturnValue(true);
       mockRefreshCodebergToken.mockResolvedValue({
-        access_token: "new-cb-token",
-        refresh_token: "new-cb-refresh",
-        expires_in: 7200,
-        token_type: "bearer",
+        ok: true,
+        tokens: {
+          access_token: "new-cb-token",
+          refresh_token: "new-cb-refresh",
+          expires_in: 7200,
+          token_type: "bearer",
+        },
       });
       mockFetchCodebergStats.mockResolvedValue(cb);
 
@@ -1001,7 +1042,7 @@ describe("getStats", () => {
         },
       });
       mockIsTokenExpired.mockReturnValue(true);
-      mockRefreshCodebergToken.mockResolvedValue(null); // refresh failed
+      mockRefreshCodebergToken.mockResolvedValue({ ok: false, reason: "revoked" });
 
       vi.stubEnv("CODEBERG_CLIENT_ID", "cb-client-id");
       vi.stubEnv("CODEBERG_CLIENT_SECRET", "cb-client-secret");
@@ -1012,6 +1053,41 @@ describe("getStats", () => {
         "test-user",
         "codeberg",
       );
+      expect(result!.commitsTotal).toBe(50); // GitHub-only
+
+      vi.unstubAllEnvs();
+    });
+
+    it("keeps link on transient refresh failure (Codeberg)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "expired-token",
+          refreshToken: "cb-refresh",
+          expiresAt: new Date("2020-01-01"),
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockRefreshCodebergToken.mockResolvedValue({ ok: false, reason: "transient" });
+
+      vi.stubEnv("CODEBERG_CLIENT_ID", "cb-client-id");
+      vi.stubEnv("CODEBERG_CLIENT_SECRET", "cb-client-secret");
+
+      const result = await getStats("test-user");
+
+      // Should NOT unlink — transient failure
+      expect(mockDbDeleteLinkedPlatform).not.toHaveBeenCalled();
       expect(result!.commitsTotal).toBe(50); // GitHub-only
 
       vi.unstubAllEnvs();

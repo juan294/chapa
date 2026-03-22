@@ -214,12 +214,19 @@ describe("refreshBitbucketToken", () => {
     );
 
     const result = await refreshBitbucketToken("old_refresh", "cid", "csecret");
-    expect(result).not.toBeNull();
-    expect(result!.access_token).toBe("new_access");
-    expect(result!.refresh_token).toBe("new_refresh");
+    expect(result).toEqual({
+      ok: true,
+      tokens: {
+        access_token: "new_access",
+        refresh_token: "new_refresh",
+        expires_in: 7200,
+        token_type: "bearer",
+        scopes: "account",
+      },
+    });
   });
 
-  it("returns null on error (e.g. refresh token revoked)", async () => {
+  it("returns revoked when 400 + invalid_grant", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -230,17 +237,68 @@ describe("refreshBitbucketToken", () => {
     );
 
     const result = await refreshBitbucketToken("revoked", "cid", "csecret");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: "revoked" });
   });
 
-  it("returns null on network error", async () => {
+  it("returns transient on network error", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new Error("network error")),
     );
 
     const result = await refreshBitbucketToken("refresh", "cid", "csecret");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 500 server error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      }),
+    );
+
+    const result = await refreshBitbucketToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 400 without invalid_grant", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: "invalid_request" }),
+      }),
+    );
+
+    const result = await refreshBitbucketToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 400 with unparseable body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => { throw new Error("bad json"); },
+      }),
+    );
+
+    const result = await refreshBitbucketToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on timeout (AbortError)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await refreshBitbucketToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
   });
 });
 

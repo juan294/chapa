@@ -223,12 +223,17 @@ describe("refreshCodebergToken", () => {
     );
 
     const result = await refreshCodebergToken("old_refresh", "cid", "csecret");
-    expect(result).not.toBeNull();
-    expect(result!.access_token).toBe("new_access");
-    expect(result!.refresh_token).toBe("new_refresh");
+    expect(result).toEqual({
+      ok: true,
+      tokens: {
+        access_token: "new_access",
+        token_type: "bearer",
+        refresh_token: "new_refresh",
+      },
+    });
   });
 
-  it("returns null on error", async () => {
+  it("returns revoked when 400 + invalid_grant", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -239,17 +244,54 @@ describe("refreshCodebergToken", () => {
     );
 
     const result = await refreshCodebergToken("revoked", "cid", "csecret");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: "revoked" });
   });
 
-  it("returns null on network error", async () => {
+  it("returns transient on network error", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new Error("network error")),
     );
 
     const result = await refreshCodebergToken("refresh", "cid", "csecret");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 500 server error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      }),
+    );
+
+    const result = await refreshCodebergToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 400 without invalid_grant", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: "invalid_request" }),
+      }),
+    );
+
+    const result = await refreshCodebergToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on timeout (AbortError)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await refreshCodebergToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
   });
 });
 

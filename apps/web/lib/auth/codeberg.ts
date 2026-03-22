@@ -1,4 +1,5 @@
 import { randomBytes, timingSafeEqual } from "crypto";
+import { classifyOAuthError, type TokenRefreshResult } from "./bitbucket";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -161,13 +162,16 @@ export async function exchangeCodebergCode(
 
 /**
  * Refresh an expired access token.
- * Returns null if Codeberg doesn't support refresh for this token.
+ *
+ * Returns a discriminated result distinguishing permanent revocation
+ * (HTTP 400 + `invalid_grant`) from transient failures (network, timeout, 5xx).
+ * Callers should only unlink the platform on `reason: "revoked"`.
  */
 export async function refreshCodebergToken(
   refreshToken: string,
   clientId: string,
   clientSecret: string,
-): Promise<CodebergTokenResponse | null> {
+): Promise<TokenRefreshResult<CodebergTokenResponse>> {
   try {
     const res = await fetch(CB_TOKEN_URL, {
       method: "POST",
@@ -183,12 +187,17 @@ export async function refreshCodebergToken(
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return { ok: false, reason: await classifyOAuthError(res) };
+    }
+
     const data = await res.json();
-    if (!data.access_token) return null;
-    return data as CodebergTokenResponse;
+    if (!data.access_token) {
+      return { ok: false, reason: "transient" };
+    }
+    return { ok: true, tokens: data as CodebergTokenResponse };
   } catch {
-    return null;
+    return { ok: false, reason: "transient" };
   }
 }
 
