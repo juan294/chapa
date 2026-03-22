@@ -1,13 +1,14 @@
 # Chapa — Dev Impact Badge
 
 ## One-liner
-Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v4 Profile** (4 dimensions + archetype + confidence) from GitHub activity, with a Creator Studio for badge customization, a share page, and one-click sharing.
+Chapa generates a **live, embeddable, animated SVG badge** that showcases a developer's **Impact v6 Profile** (4–5 dimensions + archetype + confidence) from GitHub activity and optional AI tool insights, with a Creator Studio for badge customization, a share page, and one-click sharing.
 
 ## Goals
 1. GitHub OAuth login (for "Verified" mode + better API limits).
 2. Compute **Impact v4 Profile** from last 12 months (365 days):
-   - 4 dimensions (Delivery, Quality, Consistency, Breadth), each 0–100
-   - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
+   - 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional 5th (Craft), each 0–100
+   - developer archetype (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
+     - Note: "Quality Champion" is the display name; internal code/routes use "guardian" (e.g., `/archetypes/guardian`, `--color-archetype-guardian`)
    - composite score (0–100), confidence (50–100) + reasons, adjusted score, tier.
 
 3. Serve **Creator Studio**: `/studio` (badge customization with 9 visual categories).
@@ -30,22 +31,86 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - Domain: chapa.thecreativetoken.com
 
 ## Key routes
+
+### Pages
 - GET `/` Landing + GitHub login (terminal-first UI)
 - GET `/studio` Creator Studio (badge customization, requires auth)
 - GET `/admin` Admin dashboard (requires auth + admin handle, see `ADMIN_HANDLES`)
 - GET `/u/:handle` Share page (badge preview, breakdown, embed snippet, share CTA)
 - GET `/u/:handle/badge.svg` Embeddable badge SVG (cacheable)
+- GET `/verify/:hash` Badge verification page (public)
+- GET `/about` About page (scoring explainer, archetype showcase)
+- GET `/about/scoring` Scoring methodology detail
+- GET `/about/verification` Badge verification explainer
+- GET `/archetypes/:type` Archetype guide pages (builder, guardian, marathoner, polymath, artificer, balanced, emerging)
+- GET `/generating/:handle` Badge generation loading screen
+- GET `/cli/authorize` CLI device authorization flow
+- GET `/privacy` Privacy policy
+- GET `/terms` Terms of service
+- GET `/coming-soon` Coming soon placeholder
+- GET `/verify` Badge verification landing page
+- GET `/experiments/*` Experimental feature pages (gated by feature flag)
+
+### Auth API
+- GET `/api/auth/login` GitHub OAuth login redirect
+- GET `/api/auth/callback` GitHub OAuth callback (token exchange)
+- GET `/api/auth/session` Current session info (login, name, avatar_url)
+- POST `/api/auth/logout` Clear session cookie
+- GET `/api/auth/bitbucket/callback` Bitbucket OAuth callback
+- GET `/api/auth/bitbucket/connect` Bitbucket OAuth connect (link account)
+- POST `/api/auth/bitbucket/disconnect` Bitbucket account unlink
+- GET `/api/auth/bitbucket/status` Bitbucket connection status
+- GET `/api/auth/codeberg/callback` Codeberg OAuth callback
+- GET `/api/auth/codeberg/connect` Codeberg OAuth connect (link account)
+- POST `/api/auth/codeberg/disconnect` Codeberg account unlink
+- GET `/api/auth/codeberg/status` Codeberg connection status
+
+### Public API
 - GET `/api/verify/:hash` Badge verification endpoint
-- GET `/api/admin/users` Admin user list (session auth + admin check)
+- GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
+- GET `/api/health` Health check (Redis + Supabase ping, rate-limited)
+- GET `/api/feature-flags` Public feature flag values
+- GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
+- GET `/og-image` Default OG image
+- GET `/llms.txt` LLM-friendly site summary
+- GET `/llms-full.txt` Full LLM-friendly site content
+- GET `/.well-known/security.txt` Security contact info
+
+### Authenticated API
 - POST `/api/supplemental` Upload EMU supplemental stats (CLI)
-- POST `/api/studio/config` Save/load badge customization config
+- GET|PUT `/api/studio/config` Load/save badge customization config
 - POST `/api/refresh?handle=` Force refresh (rate-limited)
-- GET `/api/history/:handle` Score history, trend, and diff (public, rate-limited)
+- POST `/api/generate` Generate badge for authenticated user
+- POST `/api/recalculate` Recalculate impact scores
+- GET `/api/insights/:handle` AI tool insights for a user
+- POST `/api/insights` Submit tool insights data
+- GET|POST `/api/cli/auth/poll` CLI device auth polling
+- POST `/api/cli/auth/approve` CLI device auth approval
+
+### Admin API
+- GET `/api/admin/users` Admin user list (session auth + admin check)
+- GET `/api/admin/stats` Admin stats (bearer token auth via `ADMIN_SECRET`)
+- POST `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
+- GET `/api/admin/agents-summary` Agent run summaries
+- GET|PATCH `/api/admin/feature-flags` Manage feature flags
+- GET `/api/admin/engagement-flags` Manage engagement flags
+- GET|POST `/api/admin/campaigns` Campaign list and creation (admin auth)
+- GET|PATCH|DELETE `/api/admin/campaigns/:id` Campaign CRUD (admin auth, draft only)
+- GET `/api/admin/campaigns/:id/preview` Campaign email preview (admin auth)
+- POST `/api/admin/campaigns/:id/send` Initiate campaign send (admin auth)
+- POST `/api/notifications/unsubscribe` Email unsubscribe
+
+### Webhooks & Cron
+- POST `/api/webhooks/resend` Resend email webhook (HMAC verified)
+- GET `/api/cron/warm-cache` Daily cache warming (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/sync-audience` Daily Resend audience sync (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/process-campaigns` Daily campaign batch processor (bearer auth via `CRON_SECRET`)
+- POST `/api/telemetry` Client telemetry ingestion
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
 - `StatsData` — aggregated GitHub stats (23 fields)
-- `ImpactV4Result` — 4 dimensions, archetype, composite score, confidence, tier
+- `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
@@ -59,7 +124,7 @@ Shared types live in: `packages/shared/src/types.ts`
 
 ## Design system (MANDATORY for UI work)
 - Full spec: @docs/design-system.md
-- Accent color: `#7C6AEF` (cool indigo/violet). Use `text-amber`, `bg-amber`.
+- Accent color: `#8B5CF6` (saturated violet). Use `text-amber`, `bg-amber`.
 - Heading font: **JetBrains Mono** (`font-heading`) — monospace, no italic.
 - Body font: **Plus Jakarta Sans** (`font-body`) — default on `<body>`.
 - Light/dark theme support via `next-themes`. Light is the default; dark (`#0A0A0F`) is the signature brand look. Badge SVG always renders dark.
@@ -76,7 +141,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)
 - Cache SVG output per user/day + theme (TTL 24h)
-- **Lifetime metrics**: `MetricsSnapshot` records stored in Redis sorted sets (`history:<handle>`) with **no TTL** — permanent history. Max 1 snapshot per user per day (date-based dedup). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
+- **Lifetime metrics**: `MetricsSnapshot` records stored in Supabase `metrics_snapshots` table — permanent history. Max 1 snapshot per user per day (UNIQUE constraint on handle+date). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
 - **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
@@ -96,11 +161,11 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
-- Badge shows: heatmap, radar chart (4 dimensions), archetype label, stars/forks/watchers, Impact tier, adjusted score.
+- Badge shows: heatmap, radar chart (4 or 5 dimensions — pentagon when Craft is present, diamond fallback), archetype label, stars/forks/watchers, Impact tier, adjusted score.
 - `/u/:handle` shows badge + breakdown + embed snippet. Confidence is computed internally but not shown to users.
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
-- Repo contains `docs/impact-v4.md` and `docs/svg-design.md` as spec truth.
+- Repo contains `docs/impact-v6.md` (current spec truth), `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
 - Creator Studio at `/studio` allows badge visual customization (9 categories).
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
@@ -150,11 +215,23 @@ All significant changes go through four phases:
 
 ## Rules for Implementation
 
-- Follow the atomic loop: implement → review → fix → approve.
+- Follow the atomic loop: implement → review (plan compliance) → fix → approve → `/simplify` (code quality) → verify.
+- Run `/simplify` after reviewer approval — it handles code reuse, quality, and efficiency in one native pass.
+- Check for `[batch-eligible]` phases in the plan — use `/batch` to execute independent phases in parallel.
 - Run ALL automated verification after each phase.
 - STOP after each phase and wait for human confirmation.
 - Never auto-proceed to the next phase.
 - If the plan doesn't match reality, STOP and explain the mismatch.
+
+### Pre-Release Workflow
+
+```
+/pre-launch -> /remediate -> /update-docs -> /release
+```
+
+- `/remediate` -- resolve all pre-launch findings with parallel TDD agents, CI verification
+- `/update-docs` -- refreshes all documentation, diagrams, version references, and inline code docs
+- `/release` -- version bump, CHANGELOG, tag, GitHub release, registry publish advisory
 
 ## Testing Philosophy
 
@@ -163,12 +240,19 @@ All significant changes go through four phases:
 - If you can verify it with a command or tool, do so automatically.
 - Don't use Claude for linting/formatting — use automated tools and hooks instead.
 
-## Research Documents
-Store in: `docs/research/YYYY-MM-DD-description.md`
+## Project File Locations
 
-## Implementation Plans
-Store in: `docs/plans/YYYY-MM-DD-description.md`
-Phase files: `docs/plans/YYYY-MM-DD-description-phases/phase-N.md`
+Go directly to these paths — never search the codebase for them.
+
+| Topic | Path | Notes |
+|-------|------|-------|
+| Agent reports | `docs/agents/*-report.md` | Flag YELLOW/RED items. Cross-agent context in `shared-context.md` |
+| Agent logs | `logs/<name>.log`, `<name>.error.log` | Read alongside reports to diagnose failures |
+| Agent scripts | `scripts/agents/` | Standalone bash files invoking Claude CLI headless |
+| ADRs | `docs/decisions/` | Architecture decision records |
+| PR descriptions | `docs/prs/{number}_description.md` | |
+| Research docs | `docs/research/YYYY-MM-DD-description.md` | |
+| Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
 
 ---
 
@@ -268,6 +352,8 @@ CHAPA_VERIFICATION_SECRET= # HMAC secret for badge verification hash generation 
 NEXT_PUBLIC_STUDIO_ENABLED= # Set to "true" to enable Creator Studio (optional, disabled by default)
 NEXT_PUBLIC_EXPERIMENTS_ENABLED= # Set to "true" to enable /experiments pages (optional, disabled by default)
 
+NEXT_PUBLIC_INSIGHTS_ENABLED=  # Set to "true" to enable AI Insights integration (optional, disabled by default)
+
 BITBUCKET_CLIENT_ID=           # Bitbucket OAuth consumer key (optional — Bitbucket integration disabled without it)
 BITBUCKET_CLIENT_SECRET=       # Bitbucket OAuth consumer secret (optional — server-side only)
 NEXT_PUBLIC_BITBUCKET_ENABLED= # Set to "true" to enable Bitbucket link/unlink in User Menu (optional, disabled by default)
@@ -318,6 +404,23 @@ GitHub Issues is the single source of truth for planned work. Every issue gets *
 
 Reference issues in commits with `Fixes #N` or `Refs #N`.
 
+## Conditional Blocks for Context-Specific Rules
+
+As this file grows, wrap domain-specific sections in `<important if="condition">` tags.
+The agent activates these only when the condition matches the current task, reducing noise.
+Keep universal content (stack, structure, git workflow) unwrapped.
+
+```markdown
+<important if="you are writing or modifying tests">
+- Use `createTestApp()` helper for integration tests
+- Mock database with `dbMock` from `packages/db/test`
+- Test fixtures live in `__fixtures__/` directories
+</important>
+```
+
+- **Be specific.** `"you are writing tests"` is good. `"you are writing code"` matches everything and defeats the purpose.
+- **Group by domain.** One block per domain (testing, deployment, database) — don't wrap individual lines.
+
 ## Agent Operational Rules
 
 ### Shell & Tools
@@ -326,20 +429,33 @@ Reference issues in commits with `Fixes #N` or `Refs #N`.
 - Never use `~` in file tool paths — use full absolute paths starting with `/`
 - Always pass `{ encoding: 'utf-8' }` to `execSync`/`spawnSync`
 
+### Git Recipes (use these exact sequences — hooks enforce critical steps)
+```bash
+# Push sequence — ALWAYS commit before pulling (Error #33, hook enforced)
+git add <files> && git commit -m "msg" && git pull --rebase && git push
+
+# First push — set upstream tracking
+git add <files> && git commit -m "msg" && git push -u origin <branch>
+
+# Push with tag — NEVER use --tags (Error #44, hook enforced)
+git push origin main && git push origin v1.0.0
+# Or: git push origin main --follow-tags
+
+# Worktree cleanup
+git worktree remove --force <path>; git branch -D <branch>
+```
+
 ### Git Operations
 - Run typecheck/lint BEFORE committing (pre-commit hooks run the same checks)
-- `git pull --rebase` before every push
 - Remove worktrees BEFORE merging PRs with `--delete-branch`
-- `git worktree remove --force` (always use --force)
-- `git branch -D` (uppercase) for worktree branch cleanup
-- Use `;` not `&&` for multiple cleanup operations
+- Never fabricate filesystem paths — use the working directory or discover with `ls`
 
 ### GitHub CLI
 - Don't guess `gh --json` field names — query available fields first
 - Check CI per-PR with `--json`, not chained human-readable output
 - `review: fail` means "needs approval", NOT a CI failure
 
-### Sub-Agents & Agent Teams
+### Sub-agents & Agent Teams
 - Verify tool permissions before spawning sub-agents for write operations
 - If a sub-agent fails due to permissions, take over manually immediately
 - Monitor context size when running many parallel agents
@@ -347,6 +463,7 @@ Reference issues in commits with `Fixes #N` or `Refs #N`.
 - When creating a team: break work so each teammate owns different files (avoid conflicts)
 - Teammates don't inherit conversation history — include full context in spawn prompts
 - Use subagents for focused tasks (result is all that matters); use teams for collaborative work requiring discussion
+- **Only the main agent handles git commit/push.** Sub-agents and teammates write changes to their working directories. The main agent reviews the changes, runs tests, and commits centrally. This prevents wrong-branch pushes and merge conflicts from parallel agents.
 
 ## Push Accountability
 

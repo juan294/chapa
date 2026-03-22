@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { safeEqual } from "@/lib/crypto/safe-equal";
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbInsertSnapshot,
   dbGetLatestSnapshotBatch,
+  dbCleanOldSnapshots,
 } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
@@ -13,7 +14,10 @@ import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
+import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { processInBatches } from "@/lib/async/process-in-batches";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -26,25 +30,6 @@ const BATCH_SIZE = 5;
 
 /** Redis key storing the rotation offset for round-robin handle processing. */
 const ROTATION_KEY = "cron:warm-cache:offset";
-
-/**
- * Process items in parallel batches of a fixed size.
- * Uses Promise.allSettled for error isolation — individual failures
- * do not block other items in the batch.
- */
-async function processInBatches<T>(
-  items: T[],
-  batchSize: number,
-  fn: (item: T) => Promise<unknown>,
-): Promise<PromiseSettledResult<unknown>[]> {
-  const results: PromiseSettledResult<unknown>[] = [];
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    const batchResults = await Promise.allSettled(batch.map(fn));
-    results.push(...batchResults);
-  }
-  return results;
-}
 
 /** Per-handle result from warmHandle, used to aggregate counters. */
 interface HandleResult {
@@ -157,6 +142,22 @@ export async function GET(request: NextRequest) {
     // Non-critical — don't fail the cron response
   }
 
+  // Clean merge_operations rows older than 90 days (fire-and-forget safe)
+  let expiredMergeOpsDeleted = 0;
+  try {
+    expiredMergeOpsDeleted = await dbCleanExpiredMergeOperations();
+  } catch {
+    // Non-critical — don't fail the cron response
+  }
+
+  // Clean metrics_snapshots older than retention period (fire-and-forget safe)
+  let expiredSnapshotsDeleted = 0;
+  try {
+    expiredSnapshotsDeleted = await dbCleanOldSnapshots();
+  } catch {
+    // Non-critical — don't fail the cron response
+  }
+
   return NextResponse.json(
     {
       warmed,
@@ -164,6 +165,8 @@ export async function GET(request: NextRequest) {
       snapshots,
       notifications,
       expiredVerificationsDeleted,
+      expiredMergeOpsDeleted,
+      expiredSnapshotsDeleted,
       total: toWarm.length,
       handles: toWarm,
       rotation: {
@@ -190,6 +193,11 @@ async function warmHandle(
   try {
     const stats = await getStats(handle, githubToken);
     if (!stats) {
+      void captureServerError({
+        route: "/api/cron/warm-cache",
+        statusCode: 502,
+        error: new Error(`Stats fetch returned null for handle: ${handle}`),
+      });
       return { warmed: false, snapshotRecorded: false, notified: false };
     }
 
@@ -231,13 +239,13 @@ async function warmHandle(
     }
 
     return { warmed: true, snapshotRecorded, notified };
-  } catch {
+  } catch (err) {
+    void captureServerError({
+      route: "/api/cron/warm-cache",
+      statusCode: 500,
+      error: err,
+    });
     return { warmed: false, snapshotRecorded: false, notified: false };
   }
 }
 
-/** Timing-safe string comparison to prevent timing attacks. */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}

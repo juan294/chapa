@@ -195,6 +195,23 @@ const HOTSPOTS: Hotspot[] = [
     },
   },
   {
+    id: "badge-craft",
+    tooltip:
+      "AI Craft Score — measures your proficiency, effectiveness, and sophistication with AI coding tools like Claude Code.",
+    position: "top",
+    // Pill at x=60, y=530, ~110×24 → center (115, 542)
+    top: "84%",
+    left: "5%",
+    width: "9.5%",
+    height: "4%",
+    leaderLine: {
+      path: "M 115 542 C 100 580 80 620 60 688",
+      panelTop: "109%",
+      panelLeft: "5%",
+      panelAnchor: "below",
+    },
+  },
+  {
     id: "badge-github",
     tooltip:
       "Chapa analyzes public metrics from GitHub and other linked platforms. These platforms are not affiliated with or endorsing this project.",

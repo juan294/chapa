@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /**
  * GET /api/feature-flags
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const flags = await dbGetFeatureFlags();
+  const flags = await dbTimeoutOr504(dbGetFeatureFlags(), "dbGetFeatureFlags");
+  if (flags instanceof NextResponse) return flags;
 
   return NextResponse.json(
     { flags },

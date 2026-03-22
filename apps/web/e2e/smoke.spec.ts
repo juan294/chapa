@@ -4,12 +4,7 @@ test.describe("Smoke tests — core routes", () => {
   test("landing page loads", async ({ page }) => {
     await page.goto("/");
     // The landing page should render meaningful content
-    const main = page.locator("main");
-    const h1 = page.locator("h1");
-    // At least one of these should be visible
-    const hasMain = await main.isVisible().catch(() => false);
-    const hasH1 = await h1.first().isVisible().catch(() => false);
-    expect(hasMain || hasH1).toBe(true);
+    await expect(page.locator("#main-content")).toBeVisible();
   });
 
   test("health API returns JSON with status field", async ({ request }) => {

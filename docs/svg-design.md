@@ -2,13 +2,21 @@
 
 > Implementation: `apps/web/lib/render/BadgeSvg.tsx`
 
+## Badge version history
+
+| Version | Changes |
+|---------|---------|
+| **v1** | Initial badge: 4-axis diamond radar, heatmap, score ring, archetype pill |
+| **v2** | Added craft score pill (AI Craft indicator) in footer area |
+| **v3** | Pentagon radar (5 axes) when craft dimension is present; removed standalone craft pill. Graceful fallback to 4-axis diamond when craft is absent. |
+
 ## Output formats
 - Default: 1200x630 (wide)
 - Theme: Warm Amber (dark card with purple/indigo accent)
 - Rendering method: JSX `<svg>` template rendered server-side to string.
 
 ## Layout goals
-- Premium dark card with purple accents (`#7C6AEF`)
+- Premium dark card with purple accents (`#8B5CF6`)
 - Strong hierarchy: header > archetype + metrics > heatmap + radar + score > footer
 - Readable at small size
 - Subtle animation only
@@ -17,7 +25,7 @@
 
 ### 1) Background frame
 - Rounded rect with subtle gradient
-- Border stroke (low opacity purple): `rgba(124,106,239,0.12)`
+- Border stroke (low opacity purple): `rgba(139,92,246,0.12)`
 
 ### 2) Header row (top)
 - Avatar circle (30px radius, left-aligned)
@@ -39,19 +47,22 @@
 - 13 weeks x 7 days grid (91 cells)
 - Cell size ~14px with ~3px gap
 - 5 intensity colors from theme (purple-based):
-  - 0: `rgba(124,106,239,0.06)` (none)
-  - 1: `rgba(124,106,239,0.20)` (low)
-  - 2: `rgba(124,106,239,0.38)` (medium)
-  - 3: `rgba(124,106,239,0.58)` (high)
-  - 4: `rgba(124,106,239,0.85)` (intense)
+  - 0: `rgba(139,92,246,0.06)` (none)
+  - 1: `rgba(139,92,246,0.20)` (low)
+  - 2: `rgba(139,92,246,0.38)` (medium)
+  - 3: `rgba(139,92,246,0.58)` (high)
+  - 4: `rgba(139,92,246,0.85)` (intense)
 - Animation: fade-in by week group
 
 **Center column: Radar chart**
-- 4-point radar/spider chart showing dimension scores
-- Axes: Delivery (top), Quality (right), Consistency (bottom), Breadth (left)
+- Dynamic radar/spider chart showing dimension scores
+- **Pentagon mode** (5 axes, 72° spacing): When craft dimension is present in `DimensionScores`. Axes: Delivery (top), Quality, Consistency, Breadth, Craft (clockwise).
+- **Diamond mode** (4 axes, 90° spacing): When craft is absent. Axes: Delivery (top), Quality (right), Consistency (bottom), Breadth (left). Identical to v1/v2 layout.
 - Filled polygon with purple accent fill at low opacity
-- Axis labels at each corner
-- Grid rings at 25%, 50%, 75%, 100%
+- Axis labels at each vertex
+- Guide rings at 25%, 50%, 75%, 100% (shape matches axis count: pentagon or diamond)
+- Data point dots at each axis vertex
+- Implementation: `apps/web/lib/render/RadarChart.ts`
 
 **Right column: Score ring**
 - Large circular score display (hero element)
@@ -88,35 +99,36 @@ Defined in `apps/web/lib/render/theme.ts`:
 | card | `#13141E` |
 | textPrimary | `#E6EDF3` |
 | textSecondary | `#9AA4B2` |
-| accent | `#7C6AEF` |
-| stroke | `rgba(124,106,239,0.12)` |
+| accent | `#8B5CF6` |
+| stroke | `rgba(139,92,246,0.12)` |
 
 ### Heatmap palette (0..4)
 | Level | Color |
 |-------|-------|
-| 0 (none) | `rgba(124,106,239,0.06)` |
-| 1 (low) | `rgba(124,106,239,0.20)` |
-| 2 (medium) | `rgba(124,106,239,0.38)` |
-| 3 (high) | `rgba(124,106,239,0.58)` |
-| 4 (intense) | `rgba(124,106,239,0.85)` |
+| 0 (none) | `rgba(139,92,246,0.12)` |
+| 1 (low) | `rgba(139,92,246,0.30)` |
+| 2 (medium) | `rgba(139,92,246,0.48)` |
+| 3 (high) | `rgba(139,92,246,0.68)` |
+| 4 (intense) | `rgba(139,92,246,0.92)` |
 
 ### Tier colors
 | Tier | Color |
 |------|-------|
 | Emerging | `#9AA4B2` (muted gray) |
 | Solid | `#E6EDF3` (light) |
-| High | `#9D8FFF` (light purple) |
-| Elite | `#7C6AEF` (signature purple) |
+| High | `#A78BFA` (light purple) |
+| Elite | `#8B5CF6` (signature purple) |
 
 ### Archetype colors
 | Archetype | Color |
 |-----------|-------|
-| Builder | `#7C6AEF` (purple) |
-| Quality Champion | `#F472B6` (pink) |
-| Marathoner | `#4ADE80` (green) |
-| Polymath | `#FBBF24` (amber/gold) |
-| Balanced | `#E6EDF3` (light gray) |
-| Emerging | `#9AA4B2` (muted gray) |
+| Builder | `#8B5CF6` (violet) |
+| Quality Champion | `#EC4899` (pink) |
+| Marathoner | `#22C55E` (green) |
+| Polymath | `#EAB308` (amber/gold) |
+| Balanced | `#0EA5E9` (sky blue) |
+| Emerging | `#F97316` (warm orange) |
+| Artificer | `#F59E0B` (amber) |
 
 ## Typography
 - All text uses system-safe fonts embedded in SVG
@@ -145,7 +157,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 
 **From `ImpactV4Result`:**
 - `archetype` (archetype pill)
-- `dimensions` (radar chart: delivery, quality, consistency, breadth)
+- `dimensions` (radar chart: delivery, quality, consistency, breadth, and optionally craft)
 - `adjustedComposite` (score ring)
 - `tier` (tier label)
 
@@ -153,6 +165,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 - `includeBranding` (footer)
 - `avatarDataUri` (inline avatar)
 - `verificationHash`, `verificationDate` (verification strip)
+- ~~`craftScore`~~ — removed in v3 (craft is now a radar axis, not a separate pill)
 
 ## Accessibility
 - Ensure contrast is high enough for legibility

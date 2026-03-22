@@ -7,6 +7,8 @@ import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
+import { invalidateHistoryCache } from "@/lib/history/history";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -50,12 +52,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     // Clear cached stats so getStats fetches fresh from GitHub
-    // Key must match lib/github/client.ts cache key: "stats:v2:<handle>" (lowercase)
-    await cacheDel(`stats:v2:${normalizedHandle}`);
+    // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>" (lowercase)
+    await cacheDel(`stats:v2:merged:${normalizedHandle}`);
+
+    // Invalidate history cache so next /api/history/:handle request fetches fresh data
+    await invalidateHistoryCache(handle);
 
     // Fetch fresh stats with the user's OAuth token for better rate limits
     const stats = await getStats(handle, session.token);
     if (!stats) {
+      void captureServerError({
+        route: "/api/refresh",
+        statusCode: 502,
+        error: new Error(`Failed to fetch stats for handle: ${handle}`),
+      });
       return NextResponse.json(
         { error: "Failed to fetch stats. Try again later." },
         { status: 502 },
@@ -75,6 +85,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     return NextResponse.json({ stats, impact });
   } catch (err) {
     console.error("[refresh] Unhandled error:", err);
+    void captureServerError({
+      route: "/api/refresh",
+      statusCode: 500,
+      error: err,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

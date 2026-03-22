@@ -62,9 +62,9 @@ function BorderWrapper({ variant, enabled, speed, children }: BorderWrapperProps
     <div className="w-full max-w-2xl">
       {/* Label */}
       <div className="mb-3 flex items-center gap-3">
-        <h3 className="font-heading text-sm text-text-primary font-medium">
+        <h2 className="font-heading text-sm text-text-primary font-medium">
           {VARIANT_META[variant].label}
-        </h3>
+        </h2>
         <span className="text-xs text-text-secondary">
           {VARIANT_META[variant].description}
         </span>
@@ -171,7 +171,7 @@ export default function GradientBorderExperiment() {
         }}
       />
 
-      <main className="min-h-screen bg-bg bg-grid-warm">
+      <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div
           className="pointer-events-none fixed inset-0 overflow-hidden"

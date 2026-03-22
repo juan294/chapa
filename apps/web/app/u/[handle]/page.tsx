@@ -1,26 +1,26 @@
+export const revalidate = 3600;
+
 import { after } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
-import { applyEMA } from "@/lib/impact/smoothing";
+import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { ImpactBreakdown, getArchetypeProfile, DataSources } from "@/components/ImpactBreakdown";
-import { CopyButton } from "@/components/CopyButton";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
-import { readSessionCookie } from "@/lib/auth/github";
 import { isValidHandle } from "@/lib/validation";
 import { cacheGet, trackBadgeGenerated } from "@/lib/cache/redis";
-import { Navbar } from "@/components/Navbar";
-import Link from "next/link";
-import { headers } from "next/headers";
+import { NavbarClient } from "@/components/NavbarClient";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { BadgeConfig } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
+import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
 import { isStudioEnabled } from "@/lib/feature-flags";
+import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import { getBaseUrl } from "@/lib/env";
+import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { generateVerificationCode } from "@/lib/verification/hmac";
@@ -35,6 +35,7 @@ const BASE_URL = getBaseUrl();
 
 interface SharePageProps {
   params: Promise<{ handle: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({
@@ -47,7 +48,7 @@ export async function generateMetadata({
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   // Daily cache buster forces social platforms to re-fetch the OG image
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateString(new Date());
   const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${today}`;
   return {
     title: `@${handle} — Developer Impact, Decoded`,
@@ -93,43 +94,33 @@ export default async function SharePage({ params }: SharePageProps) {
     notFound();
   }
 
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  let sessionLogin: string | null = null;
-  let token: string | undefined;
-  if (sessionSecret) {
-    const headerStore = await headers();
-    const session = readSessionCookie(
-      headerStore.get("cookie"),
-      sessionSecret,
-    );
-    if (session) {
-      token = session.token;
-      sessionLogin = session.login;
-    }
-  }
+  // ISR: No dynamic request APIs (next/headers, next/cookies) are called.
+  // Session is checked client-side via SharePageOwnerContent and NavbarClient.
+  // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
-  // Fetch stats, config, and snapshot in parallel (snapshot was previously sequential)
-  const [stats, savedConfig, latestSnapshot] = await Promise.all([
-    getStats(handle, token),
+  // Fetch stats, config, snapshot, craft score, and feature flags in parallel
+  const [stats, savedConfig, latestSnapshot, craftResult, studioEnabled] = await Promise.all([
+    getStats(handle),
     cacheGet<BadgeConfig>(`config:${handle}`),
     getCachedLatestSnapshot(handle),
+    dbGetToolInsights(handle),
+    isStudioEnabled(),
   ]);
 
-  const impact = stats ? computeImpactV4(stats) : null;
+  const impact = stats ? computeImpactV4(stats, craftResult?.craftScore ?? undefined) : null;
 
   // Start avatar fetch immediately (runs concurrently with EMA computation)
   const avatarPromise = stats?.avatarUrl
     ? getAvatarBase64(handle, stats.avatarUrl)
     : Promise.resolve(undefined);
 
-  // V5: Apply EMA smoothing using previous day's snapshot
+  // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
+  // on same-day repeated requests (smoothScore returns cached value for today).
   if (impact) {
-    const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
-    impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
+    impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
     impact.tier = getTier(impact.adjustedComposite);
   }
 
-  const isOwner = sessionLogin !== null && sessionLogin === handle;
   const useInteractivePreview =
     hasCustomConfig(savedConfig) && stats && impact;
 
@@ -185,7 +176,6 @@ export default async function SharePage({ params }: SharePageProps) {
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
-  const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" height="315" />`;
 
   const displayLabel = stats?.displayName ?? handle;
 
@@ -207,7 +197,7 @@ export default async function SharePage({ params }: SharePageProps) {
       <SharePageShortcuts
         embedMarkdown={embedMarkdown}
         handle={handle}
-        isOwner={isOwner}
+        isOwner={false}
       />
       {/* SAFETY: JSON-LD uses JSON.stringify (auto-escapes quotes/special chars) + explicit < escape to prevent </script> injection. User handle is a URL param but only appears as a JSON string value, never raw HTML. */}
       <script
@@ -217,7 +207,7 @@ export default async function SharePage({ params }: SharePageProps) {
         }}
       />
 
-      <Navbar />
+      <NavbarClient />
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <h1 className="sr-only">
@@ -266,145 +256,17 @@ export default async function SharePage({ params }: SharePageProps) {
         <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
           <BadgeToolbar
             handle={handle}
-            isOwner={isOwner}
-            studioEnabled={await isStudioEnabled()}
+            isOwner={false}
+            studioEnabled={studioEnabled}
           />
         </div>
 
-        {/* ── Visitor CTA (non-owners) ───────────────────────── */}
-        {!isOwner && (
-          <section className="mb-10 animate-fade-in-up [animation-delay:300ms]">
-            <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
-              <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2">
-                Curious what your developer impact looks like?
-              </h2>
-              <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto">
-                Decode your coding DNA in seconds. See your archetype, impact score, and how you compare.
-              </p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
-              >
-                Discover your impact
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-          </section>
-        )}
-
-        {/* ── Impact Breakdown (owner only) ─────────────────── */}
-        {isOwner && (
-          <>
-            <hr className="border-stroke mb-10" />
-
-            {/* ── Data Sources ──────────────────────────────────── */}
-            {stats && (
-              <section className="mb-10 animate-fade-in-up [animation-delay:260ms]">
-                <DataSources stats={stats} handle={handle} />
-              </section>
-            )}
-
-            <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up [animation-delay:280ms]">
-              Impact Breakdown
-            </h2>
-
-            {/* ── Archetype Header ──────────────────────────────── */}
-            {impact && (
-              <div className="mb-12 animate-fade-in-up [animation-delay:300ms]">
-                <div className="flex items-baseline gap-3 mb-2">
-                  <h3 className="font-heading text-3xl font-extrabold text-amber tracking-tight">
-                    {impact.archetype}
-                  </h3>
-                  {impact.tier !== impact.archetype && (
-                    <span className="inline-flex items-center rounded-full bg-amber/10 px-3 py-1 text-xs font-heading font-semibold text-amber uppercase tracking-wider">
-                      {impact.tier}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-text-secondary leading-relaxed">
-                  {getArchetypeProfile(impact)}
-                </p>
-              </div>
-            )}
-
-            {/* ── Impact Dashboard ──────────────────────────────── */}
-            {impact && stats ? (
-              <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-                <ImpactBreakdown impact={impact} stats={stats} />
-              </section>
-            ) : (
-              <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-                <div className="rounded-2xl border border-stroke bg-card p-8">
-                  <p className="text-text-secondary">
-                    Could not load impact data for this user. Try again later.
-                  </p>
-                </div>
-              </section>
-            )}
-
-            {/* ── Embed Snippets ──────────────────────────────────── */}
-            <section className="space-y-6 animate-fade-in-up [animation-delay:500ms]">
-          <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary">
-            Embed This Badge
-          </h2>
-
-          {/* Markdown snippet */}
-          <div className="rounded-xl border border-stroke bg-card overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
-              <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
-              <span className="ml-2 text-xs text-terminal-dim font-heading">
-                Markdown
-              </span>
-              <div className="ml-auto">
-                <CopyButton text={embedMarkdown} />
-              </div>
-            </div>
-            <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
-              <p className="text-text-primary/80 whitespace-nowrap">
-                <span className="text-amber">{"![Chapa Badge]("}</span>
-                <span className="text-text-secondary">
-                  {`https://chapa.thecreativetoken.com/u/${handle}/badge.svg`}
-                </span>
-                <span className="text-amber">{")"}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* HTML snippet */}
-          <div className="rounded-xl border border-stroke bg-card overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-stroke">
-              <div className="w-2.5 h-2.5 rounded-full bg-terminal-red/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
-              <span className="ml-2 text-xs text-terminal-dim font-heading">
-                HTML
-              </span>
-              <div className="ml-auto">
-                <CopyButton text={embedHtml} />
-              </div>
-            </div>
-            <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
-              <p className="text-text-primary/80 whitespace-nowrap">
-                <span className="text-amber">{"<img "}</span>
-                <span className="text-text-secondary">{"src="}</span>
-                <span className="text-amber/70">{`"https://chapa.thecreativetoken.com/u/${handle}/badge.svg"`}</span>
-                <span className="text-text-secondary">{" alt="}</span>
-                <span className="text-amber/70">{`"Chapa Badge for ${handle}"`}</span>
-                <span className="text-text-secondary">{" width="}</span>
-                <span className="text-amber/70">{'"600"'}</span>
-                <span className="text-text-secondary">{" height="}</span>
-                <span className="text-amber/70">{'"315"'}</span>
-                <span className="text-amber">{" />"}</span>
-              </p>
-            </div>
-            </div>
-          </section>
-          </>
-        )}
+        {/* ── Owner/Visitor Content (client-side session check) ── */}
+        <SharePageOwnerContent
+          handle={handle}
+          stats={stats}
+          impact={impact}
+        />
       </div>
 
       <GlobalCommandBarLazy />

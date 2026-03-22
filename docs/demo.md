@@ -1,7 +1,7 @@
 # Chapa Demo Script (2–3 minutes)
 
 ## Demo goal
-Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v4 Profile** (4 dimensions + archetype + tier) that updates automatically and is easy to customize and share.
+Show that Chapa turns GitHub, Bitbucket, and Codeberg activity into a **beautiful, live, embeddable, animated SVG badge** with an **Impact v6 Profile** (4–5 dimensions + archetype + tier) that updates automatically and is easy to customize and share.
 
 ## 10-second opener (hook)
 "Developers already have GitHub graphs—but they're not embeddable, not beautiful, and they don't tell an impact story. Chapa generates a live badge you can embed anywhere, with a multi-dimensional Impact Profile that discourages gaming."
@@ -9,8 +9,9 @@ Show that Chapa turns GitHub activity into a **beautiful, live, embeddable, anim
 ## Key highlights
 - Live endpoint: `/u/:handle/badge.svg`
 - Animated SVG (web-native)
-- Impact v4 = 4 dimensions (Delivery, Quality, Consistency, Breadth) + archetype + tier
-- Radar chart visualization of developer strengths
+- Impact v6 = 4 core dimensions (Delivery, Quality, Consistency, Breadth) + optional Craft + archetype + tier
+- Radar chart visualization (diamond or pentagon when Craft is present)
+- Multi-platform support (GitHub + Bitbucket + Codeberg)
 - Creator Studio for badge visual customization
 - Verified mode via GitHub OAuth
 - Cacheable + fast for real-world usage
@@ -27,7 +28,7 @@ Say:
 ### 2) The badge (45s)
 - Point at the badge:
   - heatmap (left column, 13 weeks of activity)
-  - radar chart (4 dimensions: Delivery, Quality, Consistency, Breadth)
+  - radar chart (4–5 dimensions: Delivery, Quality, Consistency, Breadth, optional Craft)
   - archetype label (e.g. Builder, Quality Champion, Marathoner, Polymath)
   - adjusted composite score + tier (Emerging/Solid/High/Elite)
   - stars, forks, watchers metrics

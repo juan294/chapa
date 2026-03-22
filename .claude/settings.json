@@ -32,6 +32,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash .claude/hooks/guard-bash.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "case \"$CLAUDE_TOOL_INPUT\" in *'git commit'*) npx tsc --noEmit && pnpm test -- --bail ;; esac"
           }
         ]

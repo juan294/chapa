@@ -1,3 +1,5 @@
+export const revalidate = 604800;
+
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
@@ -8,7 +10,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "The Quality Champion Archetype",
   description:
-    "Quality Champions are the quality gatekeepers. They review pull requests, catch bugs before they ship, and raise the bar for everyone around them.",
+    "Quality Champions are the engineering discipline leaders. On teams, they review pull requests and catch bugs. Solo, they write descriptive PRs, use feature branches, and link issues. Either way, they raise the bar.",
 };
 
 const badgeSvg = renderBadgeSvg(GUARDIAN_STATS, GUARDIAN_IMPACT, {
@@ -52,25 +54,27 @@ export default function GuardianPage() {
             <div className="space-y-6 text-text-secondary text-sm leading-relaxed">
               <p>
                 Software teams talk a lot about shipping, but rarely about the people who make sure
-                what ships actually works. Quality Champions are those people. They live in the pull request
-                review queue. They read diffs the way editors read manuscripts &mdash; not just for
-                correctness, but for clarity, maintainability, and the subtle ways that today&apos;s
-                shortcut becomes next quarter&apos;s outage.
+                what ships actually works. Quality Champions are those people. On teams, they live
+                in the pull request review queue. They read diffs the way editors read manuscripts
+                &mdash; not just for correctness, but for clarity, maintainability, and the subtle
+                ways that today&apos;s shortcut becomes next quarter&apos;s outage.
               </p>
 
               <p>
-                The Quality dimension in Chapa measures review behavior, not just review count.
-                It considers how many reviews you submit, the ratio of reviews to your own PRs,
-                and code hygiene signals. A developer who reviews multiple PRs for every one they
-                open scores higher than someone who rubber-stamps approvals to unblock the pipeline.
+                But quality isn&apos;t only a team activity. In the era of AI-assisted development,
+                many capable engineers work solo &mdash; building side projects, maintaining open-source
+                libraries, or freelancing. Their engineering discipline shows up differently: descriptive
+                PR bodies, feature branches instead of pushing to main, issues linked to code changes,
+                and clean commit histories. These habits protect a codebase whether one person works
+                on it or a hundred.
               </p>
 
               <p>
-                This is intentional. The best code reviewers don&apos;t just click &ldquo;Approve.&rdquo;
-                They leave comments that teach. They catch race conditions that tests miss. They
-                ask the question that makes the author realize the entire approach needs rethinking
-                &mdash; and they do it with enough tact that the author is grateful rather than
-                defensive.
+                The Quality dimension in Chapa adapts to how you work. For collaborative developers,
+                it measures review behavior &mdash; how many reviews you submit, the ratio of reviews
+                to your own PRs, and code hygiene signals. For solo developers, it measures
+                engineering discipline &mdash; PR descriptions, feature branch usage, issue linkage,
+                and commit cleanliness.
               </p>
 
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
@@ -78,11 +82,9 @@ export default function GuardianPage() {
               </h2>
 
               <p>
-                To earn the Quality Champion archetype, your Quality dimension must be strong and your
-                most dominant trait. There&apos;s an important constraint: the Quality Champion archetype
-                is only available to collaborative profiles. If you work solo and have zero code
-                reviews, Chapa won&apos;t assign you as a Quality Champion &mdash; because quality
-                gatekeeping is fundamentally a team activity.
+                To earn the Quality Champion archetype, your Quality dimension must be your strongest
+                and score at least 60. This applies to both collaborative and solo profiles &mdash;
+                a solo developer with disciplined PR habits can absolutely be a Quality Champion.
               </p>
 
               <p>
@@ -92,7 +94,7 @@ export default function GuardianPage() {
               </p>
 
               <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
-                Key signals
+                Key signals (collaborative)
               </h3>
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
@@ -109,16 +111,41 @@ export default function GuardianPage() {
                 </div>
               </div>
 
+              <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
+                Key signals (solo)
+              </h3>
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">PRIMARY</span>
+                  <span className="text-text-secondary text-sm">PR description rate &mdash; how often you document what a PR does and why.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SECONDARY</span>
+                  <span className="text-text-secondary text-sm">Feature branch rate &mdash; using branches instead of pushing directly to main.</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
+                  <span className="text-text-secondary text-sm">Issue linkage and commit cleanliness &mdash; connecting code to tracked work.</span>
+                </div>
+              </div>
+
               <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
                 What a Quality Champion looks like in practice
               </h2>
 
               <p>
-                Quality Champions are often the senior engineers, the tech leads, the staff developers who
-                have shifted from writing features to multiplying the effectiveness of everyone
-                around them. They&apos;re the reason your team catches the SQL injection before it
-                hits production. They&apos;re the reason the junior developer&apos;s second PR is
-                dramatically better than their first.
+                On teams, Quality Champions are often the senior engineers, the tech leads, the staff
+                developers who have shifted from writing features to multiplying the effectiveness of
+                everyone around them. They&apos;re the reason your team catches the SQL injection
+                before it hits production. They&apos;re the reason the junior developer&apos;s second
+                PR is dramatically better than their first.
+              </p>
+
+              <p>
+                Solo Quality Champions are the developers who treat their own codebase with the same
+                rigor a team lead would. Every PR has a description. Every feature starts on a branch.
+                Issues are linked, commits are clean. These habits compound &mdash; a year from now,
+                their git history tells a story anyone can follow.
               </p>
 
               <p>

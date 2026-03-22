@@ -227,4 +227,56 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).not.toContain('"#ec4899"');
     });
   });
+
+  describe("null safety (#QA-4)", () => {
+    it("guards stats values with ?? 0 fallback for formatCompact", () => {
+      // formatCompact(undefined) would produce "NaNM" — stats fields must
+      // default to 0 when absent. Each stat.value must use ?? 0 or similar.
+      const statFields = [
+        "stats.totalStars",
+        "stats.totalForks",
+        "stats.totalWatchers",
+        "stats.activeDays",
+        "stats.commitsTotal",
+        "stats.prsMergedCount",
+        "stats.reviewsSubmittedCount",
+        "stats.reposContributed",
+      ];
+      for (const field of statFields) {
+        expect(SOURCE).toContain(`${field} ?? 0`);
+      }
+    });
+  });
+
+  describe("null guard for props (#577)", () => {
+    it("guards against null/undefined impact prop early", () => {
+      expect(SOURCE).toMatch(/if\s*\(\s*!impact/);
+    });
+
+    it("guards against null/undefined stats prop early", () => {
+      expect(SOURCE).toMatch(/!\s*stats\b/);
+    });
+
+    it("renders a fallback message when data is missing", () => {
+      expect(SOURCE).toContain("No impact data available");
+    });
+  });
+
+  describe("craft dimension (Impact v6)", () => {
+    it("iterates only active dimensions — 4 when craft absent", () => {
+      // The dimension iteration must filter based on craft presence.
+      // When craft is absent, only delivery/quality/consistency/breadth render.
+      // Source should NOT hardcode the 4 keys without a filter mechanism.
+      const fnBody = SOURCE.slice(SOURCE.indexOf("export function ImpactBreakdown"));
+      // Must have craft label and color entries
+      expect(SOURCE).toContain('"craft"');
+      // Must have a filtering mechanism for active dimensions
+      expect(fnBody).toMatch(/filter|dimensions\.craft|craft\s*!=|craft\s*!==|hasCraft/);
+    });
+
+    it("has craft entries in dimension labels, colors, and tooltips", () => {
+      expect(SOURCE).toContain('"Craft"');
+      expect(SOURCE).toContain("var(--color-dimension-craft)");
+    });
+  });
 });

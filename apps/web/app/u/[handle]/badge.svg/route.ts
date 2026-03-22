@@ -16,8 +16,10 @@ import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
-import { applyEMA } from "@/lib/impact/smoothing";
+import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -33,8 +35,8 @@ const CACHE_HEADERS = {
 function fallbackSvg(handle: string, message: string): string {
   const safe = escapeXml(handle);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="rgba(124,106,239,0.12)" stroke-width="2"/>
-  <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="#7C6AEF">CHAPA</text>
+  <rect width="1200" height="630" rx="16" fill="#0C0D14" stroke="rgba(139,92,246,0.12)" stroke-width="2"/>
+  <text x="60" y="80" font-family="'JetBrains Mono', monospace" font-size="42" font-weight="700" fill="#8B5CF6">CHAPA</text>
   <text x="60" y="120" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="18" fill="#9AA4B2">Developer Impact Badge</text>
   <text x="60" y="340" font-family="'JetBrains Mono', monospace" font-size="28" fill="#E6EDF3">@${safe}</text>
   <text x="60" y="400" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2">${escapeXml(message)}</text>
@@ -80,95 +82,113 @@ export async function GET(
     if (session) token = session.token;
   }
 
-  // Fetch stats (cache-first)
-  const stats = await getStats(handle, token);
-  if (!stats) {
-    const svg = fallbackSvg(
-      handle,
-      "Could not load data — try again later.",
-    );
+  try {
+    // Fetch stats (cache-first)
+    const stats = await getStats(handle, token);
+    if (!stats) {
+      const svg = fallbackSvg(
+        handle,
+        "Could not load data — try again later.",
+      );
+      return new NextResponse(svg, {
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
+    // Fetch craft score, snapshot, and avatar in parallel — all are independent
+    // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
+    // Uses allSettled so a single DB/network error doesn't crash the entire badge.
+    const [craftSettled, snapshotSettled, avatarSettled] = await Promise.allSettled([
+      dbGetToolInsights(handle),
+      getCachedLatestSnapshot(handle),
+      stats.avatarUrl
+        ? getAvatarBase64(handle, stats.avatarUrl)
+        : Promise.resolve(undefined),
+    ]);
+    const craftResult = craftSettled.status === "fulfilled" ? craftSettled.value : null;
+    const latestSnapshot = snapshotSettled.status === "fulfilled" ? snapshotSettled.value : null;
+    const avatarDataUri = avatarSettled.status === "fulfilled" ? avatarSettled.value : undefined;
+
+    // Compute impact (craft score feeds into the 5th pentagon dimension)
+    const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
+
+    // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
+    // on same-day repeated requests (smoothScore returns cached value for today).
+    impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
+    impact.tier = getTier(impact.adjustedComposite);
+
+    // Generate verification code (returns null if secret is unset)
+    const verification = generateVerificationCode(stats, impact);
+
+    // Post-response work: use after() to guarantee completion on Vercel
+    // (void promises may be killed when the serverless function freezes).
+    // Operations run in parallel via allSettled — each has its own try/catch
+    // so individual failures don't block others.
+    after(() => {
+      const ops: Promise<void>[] = [];
+
+      if (verification) {
+        const record: VerificationRecord = {
+          handle: stats.handle.toLowerCase(),
+          displayName: stats.displayName,
+          adjustedComposite: impact.adjustedComposite,
+          confidence: impact.confidence,
+          tier: impact.tier,
+          archetype: impact.archetype,
+          dimensions: impact.dimensions,
+          commitsTotal: stats.commitsTotal,
+          prsMergedCount: stats.prsMergedCount,
+          reviewsSubmittedCount: stats.reviewsSubmittedCount,
+          generatedAt: verification.date,
+          profileType: impact.profileType,
+        };
+        ops.push(storeVerificationRecord(verification.hash, record));
+      }
+
+      ops.push(trackBadgeGenerated(handle));
+      ops.push(notifyFirstBadge(handle, impact));
+      const snapshot = buildSnapshot(stats, impact);
+      ops.push(
+        dbInsertSnapshot(handle, snapshot).then((inserted) => {
+          if (inserted) updateSnapshotCache(handle, snapshot);
+        }),
+      );
+
+      // Persist profile fields so admin dashboard always has latest data
+      if (stats.displayName || stats.avatarUrl) {
+        ops.push(
+          dbUpsertUser(handle, {
+            displayName: stats.displayName ?? undefined,
+            avatarUrl: stats.avatarUrl ?? undefined,
+          }).catch(() => {}),
+        );
+      }
+
+      return Promise.allSettled(ops);
+    });
+
+    // Render full badge
+    const svg = renderBadgeSvg(stats, impact, {
+      avatarDataUri,
+      verificationHash: verification?.hash,
+      verificationDate: verification?.date,
+    });
+
+    return new NextResponse(svg, { headers: CACHE_HEADERS });
+  } catch (err) {
+    void captureServerError({
+      route: `/u/${handle}/badge.svg`,
+      statusCode: 500,
+      error: err,
+    });
+
+    const svg = fallbackSvg(handle, "Something went wrong — try again later.");
     return new NextResponse(svg, {
-      headers: {
-        "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-      },
+      status: 500,
+      headers: { "Content-Type": "image/svg+xml" },
     });
   }
-
-  // Compute impact
-  const impact = computeImpactV4(stats);
-
-  // Fetch snapshot (for EMA smoothing) and avatar in parallel — both are
-  // independent I/O operations that previously ran sequentially (~50-200ms saving).
-  // Pattern matches the share page (apps/web/app/u/[handle]/page.tsx).
-  const [latestSnapshot, avatarDataUri] = await Promise.all([
-    getCachedLatestSnapshot(handle),
-    stats.avatarUrl
-      ? getAvatarBase64(handle, stats.avatarUrl)
-      : Promise.resolve(undefined),
-  ]);
-
-  // V5: Apply EMA smoothing using previous day's snapshot (Redis-cached)
-  const previousSmoothed = latestSnapshot?.adjustedComposite ?? null;
-  impact.adjustedComposite = applyEMA(impact.adjustedComposite, previousSmoothed);
-  impact.tier = getTier(impact.adjustedComposite);
-
-  // Generate verification code (returns null if secret is unset)
-  const verification = generateVerificationCode(stats, impact);
-
-  // Post-response work: use after() to guarantee completion on Vercel
-  // (void promises may be killed when the serverless function freezes).
-  // Operations run in parallel via allSettled — each has its own try/catch
-  // so individual failures don't block others.
-  after(() => {
-    const ops: Promise<void>[] = [];
-
-    if (verification) {
-      const record: VerificationRecord = {
-        handle: stats.handle.toLowerCase(),
-        displayName: stats.displayName,
-        adjustedComposite: impact.adjustedComposite,
-        confidence: impact.confidence,
-        tier: impact.tier,
-        archetype: impact.archetype,
-        dimensions: impact.dimensions,
-        commitsTotal: stats.commitsTotal,
-        prsMergedCount: stats.prsMergedCount,
-        reviewsSubmittedCount: stats.reviewsSubmittedCount,
-        generatedAt: verification.date,
-        profileType: impact.profileType,
-      };
-      ops.push(storeVerificationRecord(verification.hash, record));
-    }
-
-    ops.push(trackBadgeGenerated(handle));
-    ops.push(notifyFirstBadge(handle, impact));
-    const snapshot = buildSnapshot(stats, impact);
-    ops.push(
-      dbInsertSnapshot(handle, snapshot).then((inserted) => {
-        if (inserted) updateSnapshotCache(handle, snapshot);
-      }),
-    );
-
-    // Persist profile fields so admin dashboard always has latest data
-    if (stats.displayName || stats.avatarUrl) {
-      ops.push(
-        dbUpsertUser(handle, {
-          displayName: stats.displayName ?? undefined,
-          avatarUrl: stats.avatarUrl ?? undefined,
-        }).catch(() => {}),
-      );
-    }
-
-    return Promise.allSettled(ops);
-  });
-
-  // Render full badge
-  const svg = renderBadgeSvg(stats, impact, {
-    avatarDataUri,
-    verificationHash: verification?.hash,
-    verificationDate: verification?.date,
-  });
-
-  return new NextResponse(svg, { headers: CACHE_HEADERS });
 }

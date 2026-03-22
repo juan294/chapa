@@ -12,7 +12,7 @@ All specialists are **read-only** — they investigate and report, never modify 
 **Agent type:** `Bash`
 
 ```
-You are the **qa-lead** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/GenAI_Projects/chapa.
+You are the **qa-lead** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/code/chapa.
 
 This is a **read-only audit** — do NOT modify any files. Only investigate and report findings.
 
@@ -64,7 +64,7 @@ Report your findings in this format:
 **Agent type:** `Bash`
 
 ```
-You are the **security-reviewer** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/GenAI_Projects/chapa.
+You are the **security-reviewer** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/code/chapa.
 
 This is a **read-only audit** — do NOT modify any files. Only investigate and report findings.
 
@@ -123,7 +123,7 @@ Report your findings in this format:
 **Agent type:** `Bash`
 
 ```
-You are the **architect** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/GenAI_Projects/chapa.
+You are the **architect** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/code/chapa.
 
 This is a **read-only audit** — do NOT modify any files. Only investigate and report findings.
 
@@ -176,7 +176,7 @@ Report your findings in this format:
 **Agent type:** `Bash`
 
 ```
-You are the **performance-eng** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/GenAI_Projects/chapa.
+You are the **performance-eng** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/code/chapa.
 
 This is a **read-only audit** — do NOT modify any files. Only investigate and report findings.
 
@@ -226,7 +226,7 @@ Report your findings in this format:
 **Agent type:** `general-purpose`
 
 ```
-You are the **ux-reviewer** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/GenAI_Projects/chapa.
+You are the **ux-reviewer** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/code/chapa.
 
 This is a **read-only audit** — do NOT modify any files. Only investigate and report findings.
 
@@ -286,7 +286,7 @@ Report your findings in this format:
 **Agent type:** `Bash`
 
 ```
-You are the **devops** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/GenAI_Projects/chapa.
+You are the **devops** specialist in a pre-launch audit for the Chapa project at /Users/juan/Documents/code/chapa.
 
 This is a **read-only audit** — do NOT modify any files. Only investigate and report findings.
 

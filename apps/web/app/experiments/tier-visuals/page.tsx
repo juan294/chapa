@@ -101,11 +101,11 @@ function heatmapColor(level: number, tier: TierName): string {
   }
   // High and Elite use amber
   const colors = [
-    "rgba(124,106,239,0.04)",
-    "rgba(124,106,239,0.18)",
-    "rgba(124,106,239,0.35)",
-    "rgba(124,106,239,0.60)",
-    "rgba(124,106,239,0.90)",
+    "rgba(139,92,246,0.04)",
+    "rgba(139,92,246,0.18)",
+    "rgba(139,92,246,0.35)",
+    "rgba(139,92,246,0.60)",
+    "rgba(139,92,246,0.90)",
   ];
   return colors[level] ?? colors[0]!;
 }
@@ -735,7 +735,7 @@ export default function TierVisualsExperimentPage() {
         }}
       />
 
-      <div className="min-h-screen bg-bg bg-grid-warm">
+      <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
           <div className="absolute top-1/4 -left-32 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]" />

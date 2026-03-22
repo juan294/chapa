@@ -1,3 +1,5 @@
+> **Deprecated:** This document describes Impact v4/v5 scoring. The current scoring system is **Impact v6** — see `docs/impact-v6.md`. The function is still named `computeImpactV4` but implements v6 logic with 5 dimensions.
+
 # Impact v4: Developer Impact Profile
 
 > Source of truth for scoring. Implementation: `apps/web/lib/impact/v4.ts`
@@ -11,7 +13,7 @@ AI-assisted development makes traditional volume metrics (commits, LOC, PR count
 | Dimension | What it measures | Primary signals | Weights |
 |-----------|-----------------|-----------------|---------|
 | **Delivery** | Shipping meaningful changes | `prsMergedWeight` (70%), `issuesClosedCount` (20%), `commitsTotal` (10%) | Log-normalized with caps |
-| **Quality** | Reviewing & quality gatekeeping | `reviewsSubmittedCount` (60%), review-to-PR ratio (25%), inverse `microCommitRatio` (15%) | Reviews log-normalized; ratio capped at 5:1 |
+| **Quality** | Engineering discipline | **Collaborative:** `reviewsSubmittedCount` (60%), review-to-PR ratio (25%), inverse `microCommitRatio` (15%). **Solo:** `prDescriptionRate` (40%), `featureBranchRate` (25%), `issueLinkageRate` (20%), inverse `microCommitRatio` (15%) | Reviews log-normalized; ratio capped at 5:1; solo rates are raw 0-1 |
 | **Consistency** | Reliable, sustained contributions | `activeDays/365` (50%), heatmap evenness (35%), inverse burst activity (15%) | Linear for streak; CV-based for evenness |
 | **Breadth** | Cross-project influence | `reposContributed` (35%), inverse `topRepoShare` (25%), `totalStars` (15%), `totalForks` (10%), `totalWatchers` (5%), `docsOnlyPrRatio` (10%) | Linear with caps; community metrics log-normalized (stars cap 500, forks cap 200, watchers cap 100) |
 
@@ -19,7 +21,8 @@ AI-assisted development makes traditional volume metrics (commits, LOC, PR count
 
 Each dimension returns 0 when the primary signal is absent:
 - Delivery: always has activity if any stats present
-- Quality: returns 0 if `reviewsSubmittedCount === 0`
+- Quality (collaborative): uses review-based formula when `reviewsSubmittedCount > 0`
+- Quality (solo): uses PR hygiene formula when `reviewsSubmittedCount === 0`; returns 0 if `prsMergedCount === 0`
 - Consistency: returns 0 if `activeDays === 0`
 - Breadth: returns 0 if `reposContributed === 0`
 

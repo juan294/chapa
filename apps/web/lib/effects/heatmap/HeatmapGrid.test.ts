@@ -2,7 +2,13 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { createElement } from "react";
-import { getIntensityLevel, HeatmapGrid, HEATMAP_GRID_CSS } from "./HeatmapGrid";
+import {
+  getIntensityLevel,
+  HeatmapGrid,
+  HEATMAP_GRID_CSS,
+  computeMonthLabels,
+  computeDayLabels,
+} from "./HeatmapGrid";
 import { WEEKS, DAYS } from "./animations";
 import type { HeatmapDay } from "@chapa/shared";
 
@@ -61,6 +67,83 @@ describe("getIntensityLevel", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* computeMonthLabels (pure function)                                  */
+/* ------------------------------------------------------------------ */
+
+describe("computeMonthLabels", () => {
+  it("returns WEEKS-length array", () => {
+    const data = makeWeekAlignedDays(91, "2025-01-05");
+    expect(computeMonthLabels(data)).toHaveLength(WEEKS);
+  });
+
+  it("shows month abbreviation at the first week of each month", () => {
+    // 91 days starting Jan 5 (Sun) → spans Jan, Feb, Mar, Apr
+    const data = makeWeekAlignedDays(91, "2025-01-05");
+    const labels = computeMonthLabels(data);
+    // First label should be Jan
+    expect(labels[0]).toBe("Jan");
+    // At least one label should be Feb, one Mar
+    expect(labels).toContain("Feb");
+    expect(labels).toContain("Mar");
+  });
+
+  it("has empty strings for non-boundary weeks", () => {
+    const data = makeWeekAlignedDays(91, "2025-01-05");
+    const labels = computeMonthLabels(data);
+    const nonEmpty = labels.filter((l) => l !== "");
+    // There should be fewer labels than WEEKS (not every week is a boundary)
+    expect(nonEmpty.length).toBeLessThan(WEEKS);
+    expect(nonEmpty.length).toBeGreaterThan(0);
+  });
+
+  it("drops labels that are too close together (< 2 columns apart)", () => {
+    // Start on Nov 30 (Sun) — Nov only gets 1 column before Dec starts
+    const data = makeWeekAlignedDays(91, "2024-11-24");
+    const labels = computeMonthLabels(data);
+    // Nov should be dropped (only 1 column) and Dec should be kept
+    expect(labels).not.toContain("Nov");
+    expect(labels).toContain("Dec");
+  });
+
+  it("handles empty data", () => {
+    const labels = computeMonthLabels([]);
+    expect(labels).toHaveLength(WEEKS);
+    expect(labels.every((l) => l === "")).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* computeDayLabels (pure function)                                    */
+/* ------------------------------------------------------------------ */
+
+describe("computeDayLabels", () => {
+  it("returns DAYS-length array", () => {
+    // Data starting on a Sunday (2025-01-05 is a Sunday)
+    const data = makeWeekAlignedDays(7, "2025-01-05");
+    expect(computeDayLabels(data)).toHaveLength(DAYS);
+  });
+
+  it("shows Mon, Wed, Fri labels for data starting on Sunday", () => {
+    // 2025-01-05 is Sunday → row 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+    const data = makeWeekAlignedDays(7, "2025-01-05");
+    const labels = computeDayLabels(data);
+    expect(labels[0]).toBe(""); // Sun
+    expect(labels[1]).toBe("Mon");
+    expect(labels[2]).toBe(""); // Tue
+    expect(labels[3]).toBe("Wed");
+    expect(labels[4]).toBe(""); // Thu
+    expect(labels[5]).toBe("Fri");
+    expect(labels[6]).toBe(""); // Sat
+  });
+
+  it("handles empty data", () => {
+    const labels = computeDayLabels([]);
+    expect(labels).toHaveLength(DAYS);
+    expect(labels.every((l) => l === "")).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* HeatmapGrid component                                               */
 /* ------------------------------------------------------------------ */
 
@@ -69,6 +152,19 @@ function makeDays(count: number, value = 1): HeatmapDay[] {
     date: `2025-01-${String(i + 1).padStart(2, "0")}`,
     count: value,
   }));
+}
+
+/** Generate week-aligned days starting from a specific date. */
+function makeWeekAlignedDays(count: number, startDate: string): HeatmapDay[] {
+  const start = new Date(startDate + "T12:00:00");
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    return {
+      date: d.toISOString().split("T")[0] ?? startDate,
+      count: (i % 5) + 1,
+    };
+  });
 }
 
 describe("HeatmapGrid", () => {
@@ -210,6 +306,69 @@ describe("HeatmapGrid", () => {
       );
       const grid = container.querySelector('[role="img"]') as HTMLElement;
       expect(grid.style.gridTemplateRows).toBe(`repeat(${DAYS}, 1fr)`);
+    });
+  });
+
+  describe("showLabels", () => {
+    it("does not render labels or legend by default", () => {
+      const data = makeDays(91);
+      const { container } = render(
+        createElement(HeatmapGrid, { data, animation: "fade-in" }),
+      );
+      expect(container.querySelector('[aria-label="Activity level legend"]')).toBeNull();
+      // No text content for "Less" or "More"
+      expect(container.textContent).not.toContain("Less");
+      expect(container.textContent).not.toContain("More");
+    });
+
+    it("renders legend when showLabels is true", () => {
+      const data = makeWeekAlignedDays(91, "2025-01-05");
+      const { container } = render(
+        createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+      );
+      const legend = container.querySelector('[aria-label="Activity level legend"]');
+      expect(legend).not.toBeNull();
+      expect(legend?.textContent).toContain("Less");
+      expect(legend?.textContent).toContain("More");
+    });
+
+    it("renders 5 legend color swatches", () => {
+      const data = makeWeekAlignedDays(91, "2025-01-05");
+      const { container } = render(
+        createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+      );
+      const legend = container.querySelector('[aria-label="Activity level legend"]');
+      const swatches = legend?.querySelectorAll("div");
+      expect(swatches?.length).toBe(5);
+    });
+
+    it("renders month labels when showLabels is true", () => {
+      const data = makeWeekAlignedDays(91, "2025-01-05");
+      const { container } = render(
+        createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+      );
+      // Should contain at least "Jan" in the text
+      expect(container.textContent).toContain("Jan");
+    });
+
+    it("renders day-of-week labels when showLabels is true", () => {
+      const data = makeWeekAlignedDays(91, "2025-01-05");
+      const { container } = render(
+        createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+      );
+      expect(container.textContent).toContain("Mon");
+      expect(container.textContent).toContain("Wed");
+      expect(container.textContent).toContain("Fri");
+    });
+
+    it("still renders 91 cells even with labels", () => {
+      const data = makeWeekAlignedDays(91, "2025-01-05");
+      const { container } = render(
+        createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+      );
+      const grid = container.querySelector('[role="img"]');
+      const cells = grid?.querySelectorAll("[aria-hidden='true']");
+      expect(cells?.length).toBe(WEEKS * DAYS);
     });
   });
 });

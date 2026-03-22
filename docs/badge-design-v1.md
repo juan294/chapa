@@ -67,7 +67,7 @@ Layout: `flex gap-6`.
 |---------|---------|---------|
 | Container | `flex-1 min-w-0` | Flexible width. |
 | Label | `text-[10px] tracking-widest uppercase text-text-primary/50 mb-2` | Text: "Activity". |
-| HeatmapGrid | Component | 13 weeks × 7 days (91 cells). CSS Grid with `gap-[3px]`, `gridTemplateRows: repeat(7, 1fr)`, `gridAutoFlow: column`. Each cell: `aspect-square rounded-[3px]`. Colors by intensity level (0–4): `rgba(124,106,239,0.00)`, `rgba(124,106,239,0.15)`, `rgba(124,106,239,0.35)`, `rgba(124,106,239,0.55)`, `rgba(124,106,239,0.85)`. Animation: `heatmap-cell-in 0.4s ease-out` with variant-specific delays. |
+| HeatmapGrid | Component | 13 weeks × 7 days (91 cells). CSS Grid with `gap-[3px]`, `gridTemplateRows: repeat(7, 1fr)`, `gridAutoFlow: column`. Each cell: `aspect-square rounded-[3px]`. Colors by intensity level (0–4): `rgba(139,92,246,0.00)`, `rgba(139,92,246,0.15)`, `rgba(139,92,246,0.35)`, `rgba(139,92,246,0.55)`, `rgba(139,92,246,0.85)`. Animation: `heatmap-cell-in 0.4s ease-out` with variant-specific delays. |
 
 ### 2b. Right Column — Developer Profile
 
@@ -83,19 +83,19 @@ SVG container: `w-[140px] h-[140px]`, `viewBox="0 0 140 140"`.
 
 **Guide rings** (4 concentric diamonds at scales 0.25, 0.5, 0.75, 1.0):
 - Points formula: `70,${70-55*s} ${70+55*s},70 70,${70+55*s} ${70-55*s},70`
-- `fill="none" stroke="rgba(124,106,239,0.12)" strokeWidth="1"`
+- `fill="none" stroke="rgba(139,92,246,0.12)" strokeWidth="1"`
 
 **Axes** (2 lines):
 - Vertical: `x1=70 y1=15 x2=70 y2=125`
 - Horizontal: `x1=15 y1=70 x2=125 y2=70`
-- `stroke="rgba(124,106,239,0.08)" strokeWidth="1"`
+- `stroke="rgba(139,92,246,0.08)" strokeWidth="1"`
 
 **Data polygon**:
 - Points derived from `impact.dimensions` (delivery=top, quality=right, consistency=bottom, breadth=left)
 - Each vertex at `70 ± (dimension/100) * 55` along its axis
-- `fill="rgba(124,106,239,0.20)" stroke="#7C6AEF" strokeWidth="1.5"`
+- `fill="rgba(139,92,246,0.20)" stroke="#8B5CF6" strokeWidth="1.5"`
 
-**Vertex dots** (4 circles, `r="3" fill="#7C6AEF"`):
+**Vertex dots** (4 circles, `r="3" fill="#8B5CF6"`):
 - Top: `cx=70, cy=70-(delivery/100)*55`
 - Right: `cx=70+(quality/100)*55, cy=70`
 - Bottom: `cx=70, cy=70+(consistency/100)*55`
@@ -160,9 +160,9 @@ Rendered when `tierTreatment === "enhanced"` AND tier is `"High"` or `"Elite"`.
 
 | Dot | Size | Color | Position | Delay |
 |-----|------|-------|----------|-------|
-| 1 | `w-1 h-1` | `bg-[#9D8FFF]` | `top: 12%, right: 8%` | `0s` |
-| 2 | `w-[3px] h-[3px]` | `bg-[#7C6AEF]` | `bottom: 18%, left: 6%` | `0.7s` |
-| 3 | `w-1 h-1` | `bg-[#9D8FFF]` | `top: 45%, right: 3%` | `1.4s` |
+| 1 | `w-1 h-1` | `bg-[#A78BFA]` | `top: 12%, right: 8%` | `0s` |
+| 2 | `w-[3px] h-[3px]` | `bg-[#8B5CF6]` | `bottom: 18%, left: 6%` | `0.7s` |
+| 3 | `w-1 h-1` | `bg-[#A78BFA]` | `top: 45%, right: 3%` | `1.4s` |
 
 All have `sparkle-dot` class (pulsing animation), `rounded-full`, `aria-hidden="true"`.
 

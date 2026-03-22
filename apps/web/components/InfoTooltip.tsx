@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 interface InfoTooltipProps {
   content: string;
@@ -16,9 +17,36 @@ export function InfoTooltip({
   className,
 }: InfoTooltipProps) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
   const wrapperRef = useRef<HTMLSpanElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const close = useCallback(() => setOpen(false), []);
+
+  const visible = open || hovered;
+
+  // Recompute position when visible
+  useEffect(() => {
+    if (!visible || !buttonRef.current) return;
+
+    const update = () => {
+      const rect = buttonRef.current!.getBoundingClientRect();
+      setCoords({
+        x: rect.left + rect.width / 2,
+        y: position === "top" ? rect.top : rect.bottom,
+      });
+    };
+
+    update();
+
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [visible, position]);
 
   // Close on outside click (mobile)
   useEffect(() => {
@@ -49,21 +77,39 @@ export function InfoTooltip({
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, close]);
 
-  const panelPosition =
-    position === "top"
-      ? "bottom-full mb-2"
-      : "top-full mt-2";
+  const tooltip = visible && coords ? createPortal(
+    <span
+      id={id}
+      role="tooltip"
+      className="fixed z-[9999] w-max max-w-[240px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none"
+      style={{
+        left: coords.x,
+        top: position === "top" ? coords.y - 8 : coords.y + 8,
+        transform: position === "top"
+          ? "translate(-50%, -100%)"
+          : "translate(-50%, 0)",
+      }}
+    >
+      {content}
+    </span>,
+    document.body,
+  ) : null;
 
   return (
     <span
       ref={wrapperRef}
-      className={`group/tip relative inline-flex items-center ${className ?? ""}`}
+      className={`inline-flex items-center ${className ?? ""}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <button
+        ref={buttonRef}
         type="button"
         aria-label="More info"
         aria-describedby={id}
         onClick={() => setOpen((prev) => !prev)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
         className="inline-flex items-center justify-center w-4 h-4 text-text-secondary hover:text-amber focus-visible:text-amber transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber rounded-full"
       >
         <svg
@@ -83,13 +129,7 @@ export function InfoTooltip({
         </svg>
       </button>
 
-      <span
-        id={id}
-        role="tooltip"
-        className={`absolute ${panelPosition} left-1/2 -translate-x-1/2 z-50 w-max max-w-[240px] rounded-lg bg-card/90 backdrop-blur-xl border border-stroke shadow-lg p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none opacity-0 translate-y-1 scale-95 transition-all duration-200 ease-[cubic-bezier(0.65,0,0.35,1)] group-hover/tip:opacity-100 group-hover/tip:translate-y-0 group-hover/tip:scale-100 group-focus-within/tip:opacity-100 group-focus-within/tip:translate-y-0 group-focus-within/tip:scale-100 ${open ? "!opacity-100 !translate-y-0 !scale-100 pointer-events-auto" : ""}`}
-      >
-        {content}
-      </span>
+      {tooltip}
     </span>
   );
 }

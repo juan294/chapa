@@ -8,7 +8,8 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>CHAPA_PROJECT_DIR/scripts/qa-agent.sh</string>
+    <string>-c</string>
+    <string>exec /bin/bash CHAPA_PROJECT_DIR/scripts/qa-agent.sh</string>
   </array>
 
   <key>StartCalendarInterval</key>
@@ -22,19 +23,29 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/qa-agent-launchd.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/qa-agent.log</string>
 
   <key>StandardErrorPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/qa-agent-launchd-error.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/qa-agent.error.log</string>
+
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>122880</integer>
+  </dict>
 
   <key>SoftResourceLimits</key>
   <dict>
     <key>NumberOfFiles</key>
-    <integer>10240</integer>
+    <integer>122880</integer>
   </dict>
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>HOME</key>
+    <string>/Users/juan</string>
+    <key>TERM</key>
+    <string>xterm-256color</string>
     <key>PATH</key>
     <string>/Users/juan/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
   </dict>

@@ -29,9 +29,9 @@ const SPEED_DURATIONS: Record<Speed, { a1: string; a2: string; a3: string }> = {
 };
 
 const COLOR_BLOBS: Record<ColorVariant, [string, string, string]> = {
-  amber: ["#7C6AEF", "#9D8FFF", "#5E4FCC"],
-  "amber-white": ["#7C6AEF", "#9D8FFF", "#E0DBFF"],
-  "amber-deep": ["#7C6AEF", "#9D8FFF", "#3D2F8C"],
+  amber: ["#8B5CF6", "#A78BFA", "#7C3AED"],
+  "amber-white": ["#8B5CF6", "#A78BFA", "#E0DBFF"],
+  "amber-deep": ["#8B5CF6", "#A78BFA", "#3D2F8C"],
 };
 
 function AuroraBackground({
@@ -170,7 +170,7 @@ export default function AuroraExperimentPage() {
   const [speed, setSpeed] = useState<Speed>("medium");
 
   return (
-    <div className="relative min-h-screen bg-bg">
+    <div id="main-content" className="relative min-h-screen bg-bg">
       {/* Aurora effect — always behind everything */}
       <AuroraBackground
         intensity={intensity}

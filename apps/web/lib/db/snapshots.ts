@@ -10,6 +10,12 @@ import type { MetricsSnapshot } from "@/lib/history/types";
 import { getSupabase } from "./supabase";
 import { parseRow, parseRows } from "./parse-row";
 
+/** Snapshots older than this are eligible for cleanup. */
+export const SNAPSHOT_RETENTION_DAYS = 365;
+
+/** Max rows deleted per cleanup run to avoid locking the table. */
+export const SNAPSHOT_CLEANUP_BATCH_SIZE = 1000;
+
 // ---------------------------------------------------------------------------
 // Row ↔ Type mapping
 // ---------------------------------------------------------------------------
@@ -231,6 +237,42 @@ export async function dbInsertSnapshot(
 }
 
 /**
+ * Replace today's snapshot for a user. Uses ON CONFLICT DO UPDATE
+ * instead of DO NOTHING — overwrites all columns if a same-day row exists.
+ *
+ * Use this for deliberate user actions (insights upload, recalculate)
+ * where the score has legitimately changed mid-day and the new snapshot
+ * should be the reference for EMA smoothing.
+ *
+ * Returns true if the row was written (inserted or updated), false on error.
+ */
+export async function dbReplaceSnapshot(
+  handle: string,
+  snapshot: MetricsSnapshot,
+): Promise<boolean> {
+  const db = getSupabase();
+  if (!db) return false;
+
+  try {
+    const row = snapshotToRow(handle, snapshot);
+    const { error } = await db
+      .from("metrics_snapshots")
+      .upsert(row, {
+        onConflict: "handle,date",
+      });
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error(
+      "[db] dbReplaceSnapshot failed:",
+      (error as Error).message,
+    );
+    return false;
+  }
+}
+
+/**
  * Get snapshots for a user, optionally filtered by date range.
  * Ordered by date ascending (oldest first) — matches Redis ZRANGE behavior.
  */
@@ -344,5 +386,36 @@ export async function dbGetLatestSnapshot(
       (error as Error).message,
     );
     return null;
+  }
+}
+
+/**
+ * Delete snapshots older than SNAPSHOT_RETENTION_DAYS (batched to avoid table locks).
+ * Intended to be called from cron (warm-cache).
+ * Returns the number of deleted rows, or 0 on error.
+ */
+export async function dbCleanOldSnapshots(): Promise<number> {
+  const db = getSupabase();
+  if (!db) return 0;
+
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - SNAPSHOT_RETENTION_DAYS);
+
+    const { data, error } = await db
+      .from("metrics_snapshots")
+      .delete()
+      .lt("captured_at", cutoff.toISOString())
+      .limit(SNAPSHOT_CLEANUP_BATCH_SIZE)
+      .select("id");
+
+    if (error) throw error;
+    return data?.length ?? 0;
+  } catch (error) {
+    console.error(
+      "[db] dbCleanOldSnapshots failed:",
+      (error as Error).message,
+    );
+    return 0;
   }
 }

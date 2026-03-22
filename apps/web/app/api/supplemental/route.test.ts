@@ -215,9 +215,9 @@ describe("POST /api/supplemental", () => {
     );
     await POST(req);
 
-    // The stats client (lib/github/client.ts) uses "stats:v2:<handle>" (lowercase) as cache key.
+    // The stats client (lib/github/client.ts) uses "stats:v2:merged:<handle>" as cache key.
     // The supplemental handler MUST delete the same key to force a re-merge.
-    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:juan294");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
   });
 
   it("handle comparison is case-insensitive", async () => {

@@ -1,5 +1,6 @@
 # dependencies
-node_modules/
+node_modules
+node_modules.nosync/
 .pnp
 .pnp.js
 
@@ -53,6 +54,7 @@ playwright/.cache/
 # claude code
 .claude/settings.local.json
 .claude/skills/
+.claude/worktrees/
 CLAUDE.local.md
 
 # product hunt launch assets

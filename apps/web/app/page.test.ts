@@ -175,3 +175,205 @@ describe("History module — pre-built API surface JSDoc (#301)", () => {
     expect(match).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// ISR and server component (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — ISR and component export", () => {
+  it("exports revalidate = 3600", () => {
+    expect(SOURCE).toContain("export const revalidate = 3600");
+  });
+
+  it("exports a default async function", () => {
+    expect(SOURCE).toContain("export default async function Home");
+  });
+
+  it("does NOT have 'use client' directive", () => {
+    expect(SOURCE).not.toMatch(/^["']use client["']/m);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error handling (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — OAuth error handling", () => {
+  it("reads error from searchParams", () => {
+    expect(SOURCE).toContain("searchParams");
+  });
+
+  it("uses getOAuthErrorMessage for error display", () => {
+    expect(SOURCE).toContain("getOAuthErrorMessage");
+  });
+
+  it("renders ErrorBanner conditionally", () => {
+    expect(SOURCE).toContain("<ErrorBanner");
+    expect(SOURCE).toContain("errorMessage &&");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hero section (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — hero section", () => {
+  it("has an h1 heading", () => {
+    expect(SOURCE).toContain("<h1");
+  });
+
+  it("heading contains 'Developer Impact'", () => {
+    expect(SOURCE).toContain("Developer Impact");
+  });
+
+  it("heading has 'Decoded' in accent color", () => {
+    expect(SOURCE).toContain(">Decoded</span>");
+  });
+
+  it("has 'Get Your Badge' CTA linking to OAuth", () => {
+    expect(SOURCE).toContain('href="/api/auth/login"');
+    expect(SOURCE).toContain("Get Your Badge");
+  });
+
+  it("has 'Verify a Badge' CTA", () => {
+    expect(SOURCE).toContain('href="/verify"');
+    expect(SOURCE).toContain("Verify a Badge");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Demo badge preview (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — badge preview", () => {
+  it("renders demo badge SVG from hardcoded data", () => {
+    expect(SOURCE).toContain("DEMO_STATS");
+    expect(SOURCE).toContain("DEMO_IMPACT");
+    expect(SOURCE).toContain("renderBadgeSvg");
+  });
+
+  it("has role='img' and aria-label on badge container", () => {
+    expect(SOURCE).toContain('role="img"');
+    expect(SOURCE).toContain('aria-label="Example Chapa developer impact badge"');
+  });
+
+  it("renders BadgeOverlay", () => {
+    expect(SOURCE).toContain("<BadgeOverlay");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Embed snippet (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — embed snippet", () => {
+  it("shows CopyButton for embed snippet", () => {
+    expect(SOURCE).toContain("<CopyButton");
+  });
+
+  it("snippet references badge.svg URL", () => {
+    expect(SOURCE).toContain("badge.svg");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Terminal sections (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — terminal sections", () => {
+  it("has all nav-linked section anchors", () => {
+    expect(SOURCE).toContain('id="features"');
+    expect(SOURCE).toContain('id="how-it-works"');
+    expect(SOURCE).toContain('id="enterprise"');
+    expect(SOURCE).toContain('id="stats"');
+  });
+
+  it("renders terminal command lines", () => {
+    expect(SOURCE).toContain("chapa features");
+    expect(SOURCE).toContain("chapa explain");
+    expect(SOURCE).toContain("chapa enterprise");
+    expect(SOURCE).toContain("chapa stats");
+    expect(SOURCE).toContain("chapa login");
+  });
+
+  it("renders all 5 features", () => {
+    expect(SOURCE).toContain("MULTI-DIMENSIONAL");
+    expect(SOURCE).toContain("DEVELOPER ARCHETYPE");
+    expect(SOURCE).toContain("VERIFIED METRICS");
+    expect(SOURCE).toContain("LIVING DOCUMENT");
+    expect(SOURCE).toContain("ONE-CLICK EMBED");
+  });
+
+  it("renders 3 how-it-works steps", () => {
+    expect(SOURCE).toContain("Sign in with GitHub");
+    expect(SOURCE).toContain("We build your profile");
+    expect(SOURCE).toContain("Share your badge");
+  });
+
+  it("renders stats values", () => {
+    expect(SOURCE).toContain("archetypes");
+    expect(SOURCE).toContain("dimensions");
+    expect(SOURCE).toContain("days scored");
+  });
+
+  it("renders LandingTerminal", () => {
+    expect(SOURCE).toContain("<LandingTerminal");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Heading hierarchy (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — heading hierarchy", () => {
+  it("has exactly one h1", () => {
+    const h1Matches = SOURCE.match(/<h1\b/g) ?? [];
+    expect(h1Matches.length).toBe(1);
+  });
+
+  it("has sr-only h2 headings for sections", () => {
+    const srOnlyH2Count = (SOURCE.match(/<h2 className="sr-only">/g) ?? []).length;
+    expect(srOnlyH2Count).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Footer (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — footer", () => {
+  it("has a footer element", () => {
+    expect(SOURCE).toContain("<footer");
+  });
+
+  it("shows Chapa branding", () => {
+    expect(SOURCE).toContain("Chapa<span");
+  });
+
+  it("shows copyright with dynamic year", () => {
+    expect(SOURCE).toContain("new Date().getFullYear()");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Design system compliance (#586)
+// ---------------------------------------------------------------------------
+
+describe("Landing page — design system compliance", () => {
+  it("uses Navbar with navLinks", () => {
+    expect(SOURCE).toContain("navLinks={NAV_LINKS}");
+  });
+
+  it("uses border-l border-stroke for terminal output blocks", () => {
+    const borderMatches = SOURCE.match(/border-l border-stroke/g) ?? [];
+    expect(borderMatches.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("uses terminal-dim for $ prefixes", () => {
+    expect(SOURCE).toContain("text-terminal-dim");
+  });
+
+  it("has main landmark with id", () => {
+    expect(SOURCE).toContain('id="main-content"');
+  });
+});

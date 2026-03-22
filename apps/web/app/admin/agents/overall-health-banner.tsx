@@ -1,5 +1,3 @@
-"use client";
-
 import type { AgentStatus } from "../agents-types";
 
 interface OverallHealthBannerProps {

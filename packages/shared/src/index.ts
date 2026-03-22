@@ -23,6 +23,11 @@ export type {
   BadgeCelebration,
   BadgeConfig,
   FeatureFlag,
+  InsightsTool,
+  InsightsUpload,
+  CraftDimensions,
+  CraftTier,
+  CraftResult,
 } from "./types";
 
 export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";
@@ -38,4 +43,6 @@ export {
   PR_WEIGHT_AGG_CAP,
   SCORING_CAPS,
   REPO_DEPTH_THRESHOLD,
+  DIMENSION_KEYS,
+  SOLO_DIMENSION_KEYS,
 } from "./constants";

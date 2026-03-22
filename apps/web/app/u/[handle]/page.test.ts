@@ -48,13 +48,15 @@ describe("SharePage", () => {
     });
   });
 
-  describe("archetype header", () => {
-    it("renders the archetype name from impact data", () => {
-      expect(SOURCE).toContain("impact.archetype");
+  describe("owner content delegation", () => {
+    it("delegates owner/visitor sections to SharePageOwnerContent", () => {
+      expect(SOURCE).toContain("SharePageOwnerContent");
     });
 
-    it("renders the archetype description", () => {
-      expect(SOURCE).toContain("getArchetypeProfile");
+    it("passes stats, impact, and handle to SharePageOwnerContent", () => {
+      expect(SOURCE).toContain("stats={stats}");
+      expect(SOURCE).toContain("impact={impact}");
+      expect(SOURCE).toContain("handle={handle}");
     });
   });
 
@@ -83,35 +85,11 @@ describe("SharePage", () => {
     });
   });
 
-  // #234 — archetype name must be h3 (sub-section under "Impact Breakdown" h2)
-  describe("archetype heading level", () => {
-    it("renders archetype name as h3, not h2", () => {
-      // Find the heading tag that directly wraps {impact.archetype}
-      // It should be <h3 ...>{impact.archetype}</h3>
-      const archetypeLineMatch = SOURCE.match(/<(h\d)[^>]*>\s*\{impact\.archetype\}\s*<\/\1>/);
-      expect(archetypeLineMatch).not.toBeNull();
-      expect(archetypeLineMatch![1]).toBe("h3");
-    });
-
-    it("does not use h2 for archetype name", () => {
-      // There should be no <h2> that contains impact.archetype
-      expect(SOURCE).not.toMatch(/<h2[^>]*>\s*\{impact\.archetype\}\s*<\/h2>/);
-    });
-  });
-
-  describe("visitor CTA for non-owners", () => {
-    it("shows a 'Discover your impact' CTA for non-owners", () => {
-      expect(SOURCE).toContain("!isOwner");
-      expect(SOURCE).toContain("Discover your impact");
-    });
-
-    it("CTA links to the homepage using Next.js Link", () => {
-      expect(SOURCE).toContain('import Link from "next/link"');
-      expect(SOURCE).toMatch(/href="\/"/);
-    });
-
-    it("uses curiosity-driven copy that focuses on the reader", () => {
-      expect(SOURCE).toContain("Curious what your developer impact looks like");
+  // #234 — archetype heading is now rendered inside ImpactDashboard (HeroScoreZone)
+  describe("archetype heading delegation", () => {
+    it("does not render archetype heading directly (delegated to ImpactDashboard)", () => {
+      // The archetype heading was moved into HeroScoreZone via ImpactDashboard
+      expect(SOURCE).not.toMatch(/<h3[^>]*>\s*\{impact\.archetype\}\s*<\/h3>/);
     });
   });
 
@@ -127,14 +105,6 @@ describe("SharePage", () => {
     });
   });
 
-  // #440 — embed snippet includes both width and height for proper aspect ratio
-  describe("embed snippet dimensions", () => {
-    it("embed HTML includes width=\"600\" and height=\"315\"", () => {
-      expect(SOURCE).toContain('width="600"');
-      expect(SOURCE).toContain('height="315"');
-    });
-  });
-
   // #120 — JSON-LD script injection prevention
   describe("JSON-LD security", () => {
     it("escapes < characters in JSON-LD to prevent script injection", () => {
@@ -144,27 +114,33 @@ describe("SharePage", () => {
     });
   });
 
-  // Data Sources section — rendered before Impact Breakdown
-  describe("data sources section", () => {
-    it("imports DataSources component", () => {
-      expect(SOURCE).toContain("DataSources");
+  // #555 — ISR revalidation for share pages (cuts serverless invocations 80-90%)
+  describe("ISR revalidation", () => {
+    it("exports revalidate = 3600 for Incremental Static Regeneration", () => {
+      expect(SOURCE).toContain("export const revalidate = 3600");
     });
 
-    it("renders DataSources before Impact Breakdown heading", () => {
-      const dsIndex = SOURCE.indexOf("DataSources");
-      const breakdownIndex = SOURCE.indexOf("Impact Breakdown");
-      expect(dsIndex).toBeGreaterThan(-1);
-      expect(breakdownIndex).toBeGreaterThan(-1);
-      expect(dsIndex).toBeLessThan(breakdownIndex);
+    it("does NOT import headers from next/headers (ISR incompatible)", () => {
+      expect(SOURCE).not.toContain('from "next/headers"');
+      expect(SOURCE).not.toContain("from 'next/headers'");
     });
 
-    it("passes stats and handle to DataSources", () => {
-      expect(SOURCE).toContain("stats={stats}");
-      expect(SOURCE).toContain("handle={handle}");
+    it("does NOT call headers() anywhere (ISR incompatible)", () => {
+      // Ensure no headers() call that would force dynamic rendering
+      expect(SOURCE).not.toMatch(/\bheaders\(\)/);
     });
 
-    it("does not render standalone '+ Bitbucket' indicator", () => {
-      expect(SOURCE).not.toContain("+ Bitbucket");
+    it("does NOT import readSessionCookie (session is client-side)", () => {
+      expect(SOURCE).not.toContain("readSessionCookie");
+    });
+
+    it("uses NavbarClient instead of server-side Navbar", () => {
+      expect(SOURCE).toContain("NavbarClient");
+      expect(SOURCE).not.toMatch(/from ["']@\/components\/Navbar["']/);
+    });
+
+    it("uses SharePageOwnerContent for client-side owner detection", () => {
+      expect(SOURCE).toContain("SharePageOwnerContent");
     });
   });
 });

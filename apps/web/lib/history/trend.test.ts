@@ -160,4 +160,31 @@ describe("computeTrend", () => {
     expect(snapshots).toEqual(copy);
     expect(snapshots.length).toBe(2);
   });
+
+  it("includes craft trend when snapshots have craft dimension", () => {
+    const snapshots = [
+      makeSnapshot({ date: "2025-06-14", craft: 30 }),
+      makeSnapshot({ date: "2025-06-15", craft: 40 }),
+    ];
+    const trend = computeTrend(snapshots);
+
+    expect(trend).not.toBeNull();
+    expect(trend!.dimensions.craft).toBeDefined();
+    expect(trend!.dimensions.craft!.avgDelta).toBe(10);
+    expect(trend!.dimensions.craft!.values).toEqual([
+      { date: "2025-06-14", value: 30 },
+      { date: "2025-06-15", value: 40 },
+    ]);
+  });
+
+  it("excludes craft trend when snapshots lack craft dimension", () => {
+    const snapshots = [
+      makeSnapshot({ date: "2025-06-14" }),
+      makeSnapshot({ date: "2025-06-15" }),
+    ];
+    const trend = computeTrend(snapshots);
+
+    expect(trend).not.toBeNull();
+    expect(trend!.dimensions.craft).toBeUndefined();
+  });
 });

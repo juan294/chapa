@@ -8,6 +8,7 @@ export default defineConfig({
       "packages/**/*.test.{ts,tsx}",
       "scripts/**/*.test.ts",
     ],
+    exclude: ["**/node_modules/**", "**/node_modules.nosync/**"],
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
@@ -18,7 +19,13 @@ export default defineConfig({
         "apps/web/components/**",
         "packages/shared/**",
       ],
-      exclude: ["**/*.test.*", "**/*.d.ts", "**/*.md"],
+      exclude: [
+        "**/*.test.*",
+        "**/*.d.ts",
+        "**/*.md",
+        "**/node_modules.nosync/**",
+        "**/__fixtures__/**",
+      ],
       thresholds: {
         statements: 75,
         branches: 70,

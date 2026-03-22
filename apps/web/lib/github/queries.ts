@@ -10,6 +10,17 @@ export type { RawContributionData };
 
 const FETCH_TIMEOUT_MS = 15_000; // 15 seconds — prevents SSR from hanging in CI
 
+/**
+ * Fetch a user's GitHub contribution data via the GraphQL API.
+ *
+ * Queries the last 365 days of contribution activity (commits, PRs, reviews,
+ * issues, repositories, contribution calendar). Uses the provided OAuth token
+ * if available, otherwise falls back to `GITHUB_TOKEN` env var. Returns the
+ * raw `RawContributionData` shape used by the scoring pipeline, or `null` on
+ * error (HTTP failure, rate limiting, or missing user).
+ *
+ * Timeout: 15 seconds via `AbortSignal.timeout()`.
+ */
 export async function fetchContributionData(
   login: string,
   token?: string,
@@ -74,11 +85,24 @@ export async function fetchContributionData(
         nodes: cc.pullRequestContributions.nodes
           .filter((n: { pullRequest: unknown } | null) => n != null && n.pullRequest != null)
           .map(
-            (n: { pullRequest: { additions: number; deletions: number; changedFiles: number; merged: boolean } }) => ({
+            (n: {
+              pullRequest: {
+                additions: number;
+                deletions: number;
+                changedFiles: number;
+                merged: boolean;
+                body: string | null;
+                headRefName: string;
+                closingIssuesReferences?: { totalCount: number };
+              };
+            }) => ({
               additions: n.pullRequest.additions,
               deletions: n.pullRequest.deletions,
               changedFiles: n.pullRequest.changedFiles,
               merged: n.pullRequest.merged,
+              body: n.pullRequest.body,
+              headRefName: n.pullRequest.headRefName,
+              closingIssuesCount: n.pullRequest.closingIssuesReferences?.totalCount ?? 0,
             }),
           ),
       },

@@ -15,7 +15,7 @@ interface AdminUserTableRowProps {
   onImgError: (handle: string) => void;
 }
 
-export const AdminUserTableRow = memo(function AdminUserTableRow({
+const AdminUserTableRow = memo(function AdminUserTableRow({
   user,
   hasImgError,
   onImgError,

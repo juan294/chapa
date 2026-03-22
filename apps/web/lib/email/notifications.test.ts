@@ -187,7 +187,7 @@ describe("email content", () => {
     await notifyFirstBadge("testuser", sampleImpact);
 
     const call = mockSend.mock.calls[0]![0];
-    expect(call.html).toContain("#7C6AEF"); // brand purple
+    expect(call.html).toContain("#8B5CF6"); // brand purple
     expect(call.html).toContain("CHAPA");
   });
 });

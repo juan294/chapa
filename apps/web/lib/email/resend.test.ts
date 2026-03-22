@@ -161,11 +161,12 @@ describe("fetchReceivedEmail", () => {
     expect(result).toEqual(sampleEmail);
     expect(mockFetch).toHaveBeenCalledWith(
       "https://api.resend.com/emails/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      {
+      expect.objectContaining({
         headers: {
           Authorization: "Bearer re_test_123",
         },
-      },
+        signal: expect.any(AbortSignal),
+      }),
     );
   });
 

@@ -496,7 +496,7 @@ export default function TextEffectsExperimentPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-bg bg-grid-warm">
+      <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div
           className="pointer-events-none fixed top-1/4 left-1/3 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]"

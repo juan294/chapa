@@ -18,6 +18,16 @@ export interface BitbucketTokenResponse {
   scopes: string;
 }
 
+/**
+ * Discriminated result for token refresh attempts.
+ * - `ok: true` — refresh succeeded, new tokens available
+ * - `ok: false, reason: "revoked"` — grant is dead (user revoked, token expired server-side)
+ * - `ok: false, reason: "transient"` — temporary failure (network, timeout, server error)
+ */
+export type TokenRefreshResult<T> =
+  | { ok: true; tokens: T }
+  | { ok: false; reason: "revoked" | "transient" };
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -25,6 +35,9 @@ export interface BitbucketTokenResponse {
 const BB_AUTHORIZE_URL = "https://bitbucket.org/site/oauth2/authorize";
 const BB_TOKEN_URL = "https://bitbucket.org/site/oauth2/access_token";
 const BB_API_URL = "https://api.bitbucket.org/2.0";
+
+/** 10-second timeout for all external OAuth fetches */
+const FETCH_TIMEOUT_MS = 10_000;
 
 /** 5-minute buffer before token expiry — refresh proactively */
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
@@ -67,6 +80,12 @@ function cookieFlags(): string {
   return `HttpOnly;${secure} SameSite=Lax; Path=/`;
 }
 
+/**
+ * Generate a cryptographically random CSRF state token for Bitbucket OAuth
+ * and return it as a `Set-Cookie` header value (HttpOnly, SameSite=Lax, 10-minute Max-Age).
+ *
+ * @returns Object with `state` (hex token) and `cookie` (Set-Cookie header value)
+ */
 export function createBitbucketStateCookie(): {
   state: string;
   cookie: string;
@@ -76,6 +95,15 @@ export function createBitbucketStateCookie(): {
   return { state, cookie };
 }
 
+/**
+ * Validate the Bitbucket OAuth CSRF state parameter against the cookie value.
+ *
+ * Uses `crypto.timingSafeEqual` for constant-time comparison.
+ *
+ * @param cookieHeader - Raw `Cookie` header string from the incoming request
+ * @param queryState - The `state` query parameter from Bitbucket's OAuth redirect
+ * @returns `true` if both values are present and identical; `false` otherwise
+ */
 export function validateBitbucketState(
   cookieHeader: string | null,
   queryState: string | null,
@@ -93,6 +121,11 @@ export function validateBitbucketState(
   return timingSafeEqual(cookieBuf, queryBuf);
 }
 
+/**
+ * Return a `Set-Cookie` header value that immediately expires the Bitbucket CSRF state cookie.
+ *
+ * @returns Set-Cookie header string with Max-Age=0
+ */
 export function clearBitbucketStateCookie(): string {
   return `${BB_STATE_COOKIE_NAME}=; ${cookieFlags()}; Max-Age=0`;
 }
@@ -125,6 +158,7 @@ export async function exchangeBitbucketCode(
         Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       },
       body,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!res.ok) return null;
@@ -141,13 +175,34 @@ export async function exchangeBitbucketCode(
 // ---------------------------------------------------------------------------
 
 /**
+ * Classify an OAuth error response as revoked or transient.
+ * Only HTTP 400 with `error: "invalid_grant"` is treated as revocation;
+ * everything else (5xx, timeout, other 4xx) is transient.
+ */
+export async function classifyOAuthError(res: Response): Promise<"revoked" | "transient"> {
+  if (res.status === 400) {
+    try {
+      const body = await res.json();
+      if (body.error === "invalid_grant") return "revoked";
+    } catch {
+      // Unparseable body — treat as transient
+    }
+  }
+  return "transient";
+}
+
+/**
  * Refresh an expired access token.
+ *
+ * Returns a discriminated result distinguishing permanent revocation
+ * (HTTP 400 + `invalid_grant`) from transient failures (network, timeout, 5xx).
+ * Callers should only unlink the platform on `reason: "revoked"`.
  */
 export async function refreshBitbucketToken(
   refreshToken: string,
   clientId: string,
   clientSecret: string,
-): Promise<BitbucketTokenResponse | null> {
+): Promise<TokenRefreshResult<BitbucketTokenResponse>> {
   try {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
@@ -161,14 +216,20 @@ export async function refreshBitbucketToken(
         Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       },
       body,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return { ok: false, reason: await classifyOAuthError(res) };
+    }
+
     const data = await res.json();
-    if (!data.access_token) return null;
-    return data as BitbucketTokenResponse;
+    if (!data.access_token) {
+      return { ok: false, reason: "transient" };
+    }
+    return { ok: true, tokens: data as BitbucketTokenResponse };
   } catch {
-    return null;
+    return { ok: false, reason: "transient" };
   }
 }
 
@@ -187,6 +248,7 @@ export async function fetchBitbucketUser(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -205,15 +267,26 @@ export async function fetchBitbucketUser(
 // ---------------------------------------------------------------------------
 
 /**
- * Compute token expiry from `expires_in` seconds.
+ * Compute the absolute expiry timestamp from a relative `expires_in` value.
+ *
+ * Adds `expiresIn` seconds to `Date.now()` to produce an absolute `Date`.
+ *
+ * @param expiresIn - Token lifetime in seconds (typically 7200 = 2 hours for Bitbucket)
+ * @returns A `Date` representing when the token expires
  */
 export function computeTokenExpiry(expiresIn: number): Date {
   return new Date(Date.now() + expiresIn * 1000);
 }
 
 /**
- * Check if a token is expired (with 5-minute buffer).
- * Returns true if expiresAt is null (unknown) or within 5 minutes of now.
+ * Check if a token is expired or about to expire (with 5-minute buffer).
+ *
+ * Returns `true` if `expiresAt` is `null` (unknown expiry — treat as expired)
+ * or if the current time is within 5 minutes of the expiry timestamp.
+ * The buffer ensures proactive refresh before the token actually expires.
+ *
+ * @param expiresAt - The absolute expiry timestamp, or `null` if unknown
+ * @returns `true` if the token should be refreshed; `false` if still valid
  */
 export function isTokenExpired(expiresAt: Date | null): boolean {
   if (!expiresAt) return true;

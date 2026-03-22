@@ -22,12 +22,12 @@ describe("BadgeOverlay", () => {
     expect(container.querySelector("#leader-lines-svg")).not.toBeNull();
   });
 
-  it("renders all 10 hotspot regions", () => {
+  it("renders all 11 hotspot regions", () => {
     render(<BadgeOverlay />);
     const hotspots = screen.getAllByRole("group").filter(
       (el) => el.getAttribute("tabindex") === "0",
     );
-    expect(hotspots.length).toBe(10);
+    expect(hotspots.length).toBe(11);
   });
 
   it("hotspots have aria-label", () => {

@@ -210,11 +210,11 @@ describe("BadgeContent", () => {
 
   // Issue #289 — no hardcoded accent hex in component; use WARM_AMBER.accent
   describe("accent color constant (#289)", () => {
-    it("does not hardcode #7C6AEF in SVG markup", () => {
+    it("does not hardcode #8B5CF6 in SVG markup", () => {
       // Remove import lines and string literals from consideration —
       // only SVG attributes should reference the accent color via the constant
       const withoutImports = SOURCE.replace(/^import .*/gm, "");
-      expect(withoutImports).not.toContain('"#7C6AEF"');
+      expect(withoutImports).not.toContain('"#8B5CF6"');
     });
 
     it("imports WARM_AMBER from the render theme", () => {

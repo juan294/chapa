@@ -11,6 +11,12 @@ set -euo pipefail
 ulimit -n 2147483646 2>/dev/null || ulimit -n 10240 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
+# Prevent nested Claude session errors when triggered from an active session.
+# Under launchd this is a no-op (CLAUDECODE isn't set).
+# ---------------------------------------------------------------------------
+unset CLAUDECODE 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 

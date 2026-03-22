@@ -5,6 +5,118 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-22
+
+### Added
+
+**Multi-Platform Integration**
+- Bitbucket OAuth connect/disconnect with encrypted token storage in Supabase
+- Codeberg OAuth connect/disconnect with encrypted token storage in Supabase
+- Multi-platform stats merging (GitHub + Bitbucket + Codeberg) in badge and share page
+- Platform-specific data source chips on share page with clickable profile links
+- Dynamic platform logo branding in badge footer (shows only connected platforms)
+
+**Impact V6 Scoring**
+- Optional 5th dimension: Craft (AI tool usage insights via Claude Code reports)
+- Artificer archetype for developers with strong Craft scores
+- Pentagon radar chart when Craft data is present (falls back to diamond for 4 dimensions)
+- Impact V6 spec documented as current source of truth (`docs/impact-v6.md`)
+
+**Impact Dashboard Redesign**
+- Interactive radar chart with clickable vertices and dimension detail panels
+- Enhanced dimension cards with sparklines and expandable sub-metric breakdowns
+- Coaching insights with trend-based recommendation cards
+- Dot timeline activity chart replacing hex heatmap
+- Bold hero score variant with tier badge
+
+**Badge V3**
+- Pentagon radar for 5-dimension profiles
+- Dot timeline activity visualization
+- Platform-neutral Chapa branding (replaced GitHub-only footer)
+- Grouped pill container with opacity contrast text
+- Updated branding tagline
+
+**Admin & Infrastructure**
+- Feature flags system (Supabase `feature_flags` table + API + admin UI)
+- Agent fleet: 7 scheduled agents (Coverage, Cost Analyst, QA, Security, Performance, Documentation, cc-rpi Update) with launchd plists and admin dashboard
+- Agent run API for manual triggering
+- Engagement tab with score notification toggles
+- Admin dashboard data layer migrated from Redis to Supabase
+- Batch snapshot queries with skeleton loader and deferred search
+
+**Email & Campaigns**
+- Campaign management system: CRUD, preview, send, cron processing
+- Score-bump email notifications
+- Resend audience sync cron job
+- Email unsubscribe endpoint with webhook verification
+
+**CLI & Integrations**
+- Claude Code Insights import (upload HTML report, compute Craft dimension)
+- Telemetry API for CLI merge audit data
+- Recalculate endpoint for score refresh after insights upload
+
+**UX & Accessibility**
+- Dark/light theme with `next-themes` (light default, dark signature brand)
+- Skip-to-main-content link (WCAG 2.4.1)
+- ARIA labels on all interactive elements (admin table, confidence bars, dropdowns, overlays)
+- Focus trap in mobile nav, keyboard navigation on radar chart and dimension cards
+- `prefers-reduced-motion` support across all animations
+- Loading and error boundaries for all major routes
+- Social sharing: Bluesky and LinkedIn added to share dropdown
+- Updated favicon and logo with shield + glow design
+
+**Testing & CI**
+- Test suite expanded: 330 test files, 5,680 tests (was 130 files, 2,100 tests)
+- 100% API route test coverage (41/41 handlers)
+- Render tests for 9 previously untested components
+- 113 admin sub-component render tests
+- Lighthouse CI workflow for Core Web Vitals tracking
+- Bundle size CI with 500KB budget check
+- Circular dependency check (madge) in CI
+- Dead code detection (knip) in CI
+
+**New API Routes**
+- `/api/auth/bitbucket/*` (callback, connect, disconnect, status)
+- `/api/auth/codeberg/*` (callback, connect, disconnect, status)
+- `/api/admin/campaigns` (CRUD + preview + send)
+- `/api/admin/agents-summary`, `/api/admin/agents/run`
+- `/api/admin/engagement-flags`, `/api/admin/feature-flags`
+- `/api/feature-flags` (public)
+- `/api/insights`, `/api/insights/:handle`
+- `/api/notifications/unsubscribe`
+- `/api/recalculate`
+- `/api/telemetry`
+- `/api/cron/process-campaigns`, `/api/cron/sync-audience`
+
+### Changed
+- Impact scoring: "Building" dimension renamed to "Delivery", "Guarding" to "Quality"
+- Archetype: "Guardian" renamed to "Quality Champion" (internal routes still use "guardian")
+- Lifetime metric snapshots migrated from Redis sorted sets to Supabase `metrics_snapshots` table
+- `GithubBranding.tsx` replaced with platform-neutral `BadgeBranding.tsx`
+- `KeyboardShortcutsProvider` wrapper replaced with `KeyboardShortcutsListener` sibling component
+- Activity heatmap redesigned from hexagonal grid to dot-based timeline
+- Badge cache headers changed from 24h to 6h `s-maxage` for fresher updates
+
+### Fixed
+- Token refresh resilience: transient failures (network, timeout) no longer auto-unlink Bitbucket/Codeberg — only confirmed revocation (`400 + invalid_grant`) triggers unlinking
+- RLS enabled on all Supabase tables with explicit deny policies for anon role
+- Rate limiting added to all API endpoints
+- XSS vector: escape handle param in unsubscribe HTML response
+- Badge: star pill trailing space, metric pill sizing, empty hexagon visibility
+- Accessibility: nested button violations, focus indicators, dark mode contrast, touch targets
+- Performance: inline badge SVG, parallel data fetching, lazy-load command bar
+- Studio: `force-dynamic` export to suppress build cache warnings
+- Experiment pages: heading hierarchy fix, loading state fallbacks
+- UTC timezone bug in streak calculation
+
+### Security
+- AES-256-GCM token encryption for all platform OAuth tokens
+- CSRF state validation with `timingSafeEqual` on all OAuth callbacks
+- Comprehensive security headers (HSTS, CSP, X-Frame-Options, Permissions-Policy)
+- `flatted` override bumped to `>=3.4.2` (prototype pollution CVE)
+- Next.js updated to 16.2.0 (resolved 5 security advisories)
+- Dependency audit: `eslint` transitive deps overridden for known vulnerabilities
+
 ## [1.0.0] - 2026-02-16
 
 ### Added

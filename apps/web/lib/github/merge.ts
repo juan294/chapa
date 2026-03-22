@@ -4,16 +4,23 @@ import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
 /**
  * Merge primary GitHub stats with supplemental stats (e.g. from an EMU account).
  *
- * Rules:
- * - Numeric counts: summed
- * - prsMergedWeight: summed, capped at PR_WEIGHT_AGG_CAP (120)
- * - heatmapData: merged by date (same date → sum counts), sorted chronologically
- * - activeDays: recomputed from merged heatmap
- * - topRepoShare: approximated — max(P*shareP, S*shareS) / (P+S)
- * - maxCommitsIn10Min: max of both
- * - microCommitRatio / docsOnlyPrRatio: max of both (if defined)
- * - Identity fields (handle, displayName, avatarUrl, fetchedAt): kept from primary
- * - Sets hasSupplementalData: true
+ * Merge strategy per field:
+ * - Numeric counts (commits, PRs, reviews, issues, lines, repos): summed.
+ * - `prsMergedWeight`: summed, then capped at {@link PR_WEIGHT_AGG_CAP} (120).
+ * - `heatmapData`: merged by date via {@link mergeHeatmap} (same date sums counts), sorted chronologically.
+ * - `activeDays`: recomputed from the merged heatmap (count of days with count > 0).
+ * - `topRepoShare`: approximated — `max(P * shareP, S * shareS) / (P + S)`.
+ * - `maxCommitsIn10Min`: max of both.
+ * - `microCommitRatio` / `docsOnlyPrRatio`: max of both (if defined) via {@link mergeOptionalMax}.
+ * - `totalStars` / `totalForks` / `totalWatchers`: max of both (vanity metrics may overlap across accounts).
+ * - Identity fields (`handle`, `displayName`, `avatarUrl`, `fetchedAt`): kept from primary.
+ * - `hasSupplementalData`: set to `true` (controllable via `options.markAsSupplemental`).
+ *
+ * @param primary - The user's primary GitHub stats (identity fields are preserved from here)
+ * @param supplemental - The supplemental stats to merge in (e.g. EMU / secondary account)
+ * @param options - Optional merge configuration
+ * @param options.markAsSupplemental - Whether to set `hasSupplementalData` on the result (default: `true`)
+ * @returns A new `StatsData` object combining both sources — never mutates inputs
  */
 export function mergeStats(
   primary: StatsData,
@@ -58,6 +65,17 @@ export function mergeStats(
   };
 }
 
+/**
+ * Merge two heatmap arrays by date.
+ *
+ * When both arrays contain the same date, their counts are summed.
+ * The result is sorted chronologically by date string (lexicographic, which
+ * works correctly for ISO date format YYYY-MM-DD).
+ *
+ * @param a - First heatmap array (typically the primary account)
+ * @param b - Second heatmap array (typically the supplemental account)
+ * @returns A new deduplicated, chronologically sorted heatmap array
+ */
 function mergeHeatmap(a: HeatmapDay[], b: HeatmapDay[]): HeatmapDay[] {
   const map = new Map<string, number>();
   for (const day of a) {
@@ -71,6 +89,19 @@ function mergeHeatmap(a: HeatmapDay[], b: HeatmapDay[]): HeatmapDay[] {
     .map(([date, count]) => ({ date, count }));
 }
 
+/**
+ * Merge two optional numeric values by taking the maximum.
+ *
+ * Returns `undefined` only when both inputs are `undefined`. When one side
+ * is defined and the other is not, the defined value is returned as-is.
+ * This is used for ratio fields (`microCommitRatio`, `docsOnlyPrRatio`)
+ * where the worst-case (highest) value across accounts is the most
+ * representative signal.
+ *
+ * @param a - First optional value
+ * @param b - Second optional value
+ * @returns The maximum of the defined values, or `undefined` if both are absent
+ */
 function mergeOptionalMax(
   a: number | undefined,
   b: number | undefined,

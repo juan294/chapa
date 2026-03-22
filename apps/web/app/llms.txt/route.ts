@@ -10,9 +10,9 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 
 ## Key Concepts
 
-- **Impact v4 Profile**: A composite developer impact score (0-100) based on four independent dimensions — Delivery, Quality, Consistency, and Breadth — computed from 12 months of public development activity across linked platforms.
-- **Four Dimensions**: Delivery measures shipping (PRs merged, issues closed). Quality measures code review quality. Consistency measures sustained contributions over time. Breadth measures cross-project influence.
-- **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
+- **Impact v6 Profile**: A composite developer impact score (0-100) based on four core dimensions — Delivery, Quality, Consistency, and Breadth — plus an optional fifth Craft dimension (AI tool mastery), computed from 12 months of public development activity across linked platforms.
+- **Dimensions**: Delivery measures shipping (PRs merged, issues closed). Quality measures code review quality. Consistency measures sustained contributions over time. Breadth measures cross-project influence. Craft (optional) measures AI tool collaboration patterns.
+- **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
 - **Tier System**: Four tiers based on adjusted score — Emerging (0-39), Solid (40-69), High (70-84), and Elite (85-100).
 - **Confidence Rating**: A quality signal (50-100) based on data diversity and consistency.
 - **Badge Verification**: Every badge includes a cryptographic HMAC-SHA256 hash proving data authenticity.
@@ -23,14 +23,14 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 - \`GET /u/{handle}\` — Share page with badge preview, impact breakdown, and embed snippets.
 - \`GET /u/{handle}/badge.svg\` — Embeddable SVG badge image. Public, no auth required. Cached.
 - \`GET /about/scoring\` — Full scoring methodology documentation.
-- \`GET /archetypes/{type}\` — Archetype guide pages (builder, guardian, marathoner, polymath, balanced, emerging).
+- \`GET /archetypes/{type}\` — Archetype guide pages (builder, guardian, marathoner, polymath, artificer, balanced, emerging).
 - \`GET /api/history/{handle}\` — Score history, trend analysis, and snapshot diffs. Public, rate-limited.
 - \`GET /studio\` — Creator Studio for badge visual customization.
 
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
-2. Chapa computes your Impact v4 Profile from public platform data (GitHub, Bitbucket, Codeberg).
+2. Chapa computes your Impact v6 Profile from public platform data (GitHub, Bitbucket, Codeberg).
 3. Embed the badge in your README, portfolio, resume, or LinkedIn:
 
 Markdown:

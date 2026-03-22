@@ -13,6 +13,19 @@ const PLATFORM_LOGOS: Record<Platform, string> = {
 /** Canonical platform ordering: GitHub first, then alphabetical */
 const PLATFORM_ORDER: Platform[] = ["github", "bitbucket", "codeberg"];
 
+/**
+ * Render the badge footer branding strip as SVG markup.
+ *
+ * Produces a pill containing platform logos (GitHub, Bitbucket, Codeberg)
+ * in canonical order, followed by the tagline and the chapa domain name.
+ * Personal badges show only connected platforms; demo badges show all three.
+ *
+ * @param x - Left edge X coordinate for the branding strip
+ * @param y - Baseline Y coordinate for text and logo placement
+ * @param rightX - Right edge X coordinate (used for right-aligned domain text)
+ * @param platforms - Array of platform identifiers whose logos should appear
+ * @returns SVG markup string containing the branding elements
+ */
 export function renderBadgeBranding(
   x: number,
   y: number,
@@ -31,7 +44,7 @@ export function renderBadgeBranding(
   const pillW = pillPadX * 2 + sorted.length * logoSize + (sorted.length - 1) * logoGap;
   const pillH = logoSize + pillPadY * 2;
   const pillY = y - pillPadY;
-  const pillSvg = `<rect x="${x}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="rgba(124,106,239,0.08)" stroke="rgba(124,106,239,0.15)" stroke-width="1"/>`;
+  const pillSvg = `<rect x="${x}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.15)" stroke-width="1"/>`;
 
   const scale = (logoSize / 24).toFixed(4);
   const logosSvg = sorted

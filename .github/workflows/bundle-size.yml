@@ -190,7 +190,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: dummy
 
       - name: Upload analyzer report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-analyzer-report
           path: |

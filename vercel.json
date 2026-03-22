@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/warm-cache",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-audience",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/process-campaigns",
+      "schedule": "0 8 * * *"
     }
   ]
 }

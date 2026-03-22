@@ -7,6 +7,11 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+const OWNER_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../../../components/SharePageOwnerContent.tsx"),
+  "utf-8",
+);
+
 describe("mobile responsiveness (#240)", () => {
   it("main container uses reduced mobile padding (px-4 sm:px-6)", () => {
     expect(SOURCE).toContain("px-4 sm:px-6");
@@ -17,6 +22,7 @@ describe("mobile responsiveness (#240)", () => {
   });
 
   it("embed code blocks use smaller font on mobile (text-xs sm:text-sm)", () => {
-    expect(SOURCE).toContain("text-xs sm:text-sm");
+    // Embed snippets are rendered in SharePageOwnerContent (client component)
+    expect(OWNER_SOURCE).toContain("text-xs sm:text-sm");
   });
 });

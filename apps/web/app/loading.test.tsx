@@ -7,34 +7,28 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
-describe("Root loading.tsx", () => {
-  it("renders a default export function", () => {
-    expect(SOURCE).toMatch(/export default function/);
+describe("Root loading.tsx — structure", () => {
+  it("has terminal window chrome with title bar", () => {
+    expect(SOURCE).toContain("Terminal window chrome");
+    expect(SOURCE).toContain("Title bar");
   });
 
-  it("uses bg-bg for page background", () => {
-    expect(SOURCE).toContain("bg-bg");
+  it("has terminal body with command lines", () => {
+    expect(SOURCE).toContain("Terminal body");
+    expect(SOURCE).toContain("chapa init");
   });
 
-  it("uses text-text-secondary for muted text", () => {
-    expect(SOURCE).toContain("text-text-secondary");
+  it("uses staggered animation delays for sequential reveal", () => {
+    expect(SOURCE).toContain("[animation-delay:200ms]");
+    expect(SOURCE).toContain("[animation-delay:400ms]");
+    expect(SOURCE).toContain("[animation-delay:600ms]");
   });
 
-  it("uses font-heading for monospace text", () => {
-    expect(SOURCE).toContain("font-heading");
+  it("has a subtle loading indicator below the terminal", () => {
+    expect(SOURCE).toContain("animate-shimmer");
   });
 
-  it("uses animate-pulse for skeleton effect", () => {
-    expect(SOURCE).toContain("animate-pulse");
-  });
-
-  it("has role='status' and aria-label='Loading' on the main container", () => {
-    expect(SOURCE).toContain('role="status"');
-    expect(SOURCE).toContain('aria-label="Loading"');
-  });
-
-  it("has an sr-only loading text span", () => {
-    expect(SOURCE).toContain('className="sr-only"');
-    expect(SOURCE).toContain("Loading...");
+  it("uses select-none on prompt characters to prevent copy issues", () => {
+    expect(SOURCE).toContain("select-none");
   });
 });

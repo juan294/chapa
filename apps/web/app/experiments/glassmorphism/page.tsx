@@ -22,7 +22,7 @@ function glassStyle(config: GlassConfig): React.CSSProperties {
     backdropFilter: `blur(${config.blur}px) saturate(${config.saturation}%)`,
     WebkitBackdropFilter: `blur(${config.blur}px) saturate(${config.saturation}%)`,
     border: config.showBorder
-      ? `1px solid rgba(124, 106, 239, ${config.borderOpacity})`
+      ? `1px solid rgba(139, 92, 246, ${config.borderOpacity})`
       : "1px solid transparent",
   };
 }
@@ -79,13 +79,13 @@ function presetToStyle(variant: GlassVariant, showBorder: boolean): React.CSSPro
     backdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     WebkitBackdropFilter: `blur(${p.blur}px) saturate(${p.saturation}%)`,
     border: showBorder
-      ? `1px solid rgba(124, 106, 239, ${p.borderOpacity})`
+      ? `1px solid rgba(139, 92, 246, ${p.borderOpacity})`
       : "1px solid transparent",
   };
 
   // Amber variant uses amber-tinted background
   if (variant === "amber") {
-    base.background = `rgba(124, 106, 239, ${p.bgOpacity})`;
+    base.background = `rgba(139, 92, 246, ${p.bgOpacity})`;
   } else {
     base.background = `rgba(19, 20, 30, ${p.bgOpacity})`;
   }
@@ -646,7 +646,7 @@ export default function GlassmorphismExperimentPage() {
   backdrop-filter: blur(${blur}px) saturate(${saturation}%);
   -webkit-backdrop-filter: blur(${blur}px) saturate(${saturation}%);${
     showBorder
-      ? `\n  border: 1px solid rgba(124, 106, 239, 0.15);`
+      ? `\n  border: 1px solid rgba(139, 92, 246, 0.15);`
       : ""
   }
 }`}</code>

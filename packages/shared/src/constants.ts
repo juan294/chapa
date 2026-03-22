@@ -26,3 +26,28 @@ export const SCORING_CAPS = {
  * to many repos. `topRepoShare` still uses ALL active repos (1+ commits).
  */
 export const REPO_DEPTH_THRESHOLD = 3;
+
+/**
+ * All four scoring dimension keys in canonical order.
+ * Used by v4 scoring, heatmap coloring, and archetype derivation.
+ */
+export const DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
+  "delivery",
+  "quality",
+  "consistency",
+  "breadth",
+  "craft",
+];
+
+/**
+ * Dimension keys used for solo profile composite scoring and archetype derivation.
+ * Quality is excluded — solo quality (computed from PR descriptions, branch strategy,
+ * issue linkage) is displayed on radar/cards but does not count toward the composite.
+ * Craft is included when present (v6).
+ */
+export const SOLO_DIMENSION_KEYS: (keyof import("./types").DimensionScores)[] = [
+  "delivery",
+  "consistency",
+  "breadth",
+  "craft",
+];

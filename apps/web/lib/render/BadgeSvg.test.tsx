@@ -355,7 +355,7 @@ describe("renderBadgeSvg", () => {
     it("contains a score ring track circle", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       // Background track: circle with dim stroke, no fill
-      expect(svg).toMatch(/stroke="rgba\(124,106,239,0\.10\)"[^/]*stroke-width="4"/);
+      expect(svg).toMatch(/stroke="rgba\(139,92,246,0\.10\)"[^/]*stroke-width="4"/);
     });
 
     it("contains a score ring arc with stroke-dasharray", () => {
@@ -528,6 +528,54 @@ describe("renderBadgeSvg", () => {
     it("uses Plus Jakarta Sans for body text", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("Plus Jakarta Sans");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Pentagon radar (craft dimension)
+  // ---------------------------------------------------------------------------
+
+  describe("pentagon radar (craft dimension)", () => {
+    it("renders pentagon radar with Craft label when craft dimension is present", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ dimensions: { delivery: 72, quality: 55, consistency: 68, breadth: 48, craft: 60 } }),
+      );
+      expect(svg).toContain(">Craft<");
+      expect(svg).toContain(">Delivery<");
+      expect(svg).toContain(">Quality<");
+      expect(svg).toContain(">Consistency<");
+      expect(svg).toContain(">Breadth<");
+    });
+
+    it("renders diamond radar without Craft label when craft dimension is absent", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).not.toContain(">Craft<");
+      expect(svg).toContain(">Delivery<");
+      expect(svg).toContain(">Quality<");
+      expect(svg).toContain(">Consistency<");
+      expect(svg).toContain(">Breadth<");
+    });
+
+    it("does not contain AI Craft pill in output (removed in v3)", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact());
+      expect(svg).not.toContain("AI Craft");
+    });
+
+    it("does not contain AI Craft pill even when craft dimension is present", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ dimensions: { delivery: 72, quality: 55, consistency: 68, breadth: 48, craft: 60 } }),
+      );
+      expect(svg).not.toContain("AI Craft");
+    });
+
+    it("badge dimensions remain 1200x630 with pentagon radar", () => {
+      const svg = renderBadgeSvg(
+        makeStats(),
+        makeImpact({ dimensions: { delivery: 72, quality: 55, consistency: 68, breadth: 48, craft: 60 } }),
+      );
+      expect(svg).toContain('viewBox="0 0 1200 630"');
     });
   });
 

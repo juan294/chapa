@@ -51,9 +51,14 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
   updateSnapshotCache: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("@/lib/history/history", () => ({
+  invalidateHistoryCache: vi.fn(() => Promise.resolve()),
+}));
+
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
+import { invalidateHistoryCache } from "@/lib/history/history";
 
 const SESSION = {
   token: "tok",
@@ -173,8 +178,8 @@ describe("POST /api/refresh", () => {
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(200);
 
-    // Should have deleted cache first (must match client.ts cache key: stats:v2:<handle> lowercase)
-    expect(cacheDel).toHaveBeenCalledWith("stats:v2:testuser");
+    // Should have deleted merged cache key (must match client.ts: stats:v2:merged:<handle>)
+    expect(cacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
 
     // Should have fetched fresh stats with token
     expect(getStats).toHaveBeenCalledWith("testuser", "tok");
@@ -182,6 +187,35 @@ describe("POST /api/refresh", () => {
     const body = await res.json();
     expect(body.stats.commitsTotal).toBe(142);
     expect(body.impact.adjustedComposite).toBe(72);
+  });
+
+  it("invalidates history cache on successful refresh", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockResolvedValue({
+      handle: "testuser",
+      commitsTotal: 142,
+      activeDays: 45,
+      prsMergedCount: 18,
+      prsMergedWeight: 22,
+      reviewsSubmittedCount: 31,
+      issuesClosedCount: 5,
+      linesAdded: 4200,
+      linesDeleted: 1100,
+      reposContributed: 4,
+      topRepoShare: 0.6,
+      maxCommitsIn10Min: 3,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
+      heatmapData: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    // Should invalidate history cache so next history request fetches fresh data
+    expect(invalidateHistoryCache).toHaveBeenCalledWith("testuser");
   });
 
   it("returns 502 when GitHub fetch fails", async () => {

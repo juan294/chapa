@@ -10,6 +10,8 @@ import {
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
+import { addContact } from "@/lib/email/audience";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
@@ -85,16 +87,31 @@ export async function GET(request: NextRequest) {
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
 
   if (!clientId || !clientSecret || !sessionSecret) {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 500,
+      error: new Error("OAuth config incomplete: missing required env vars"),
+    });
     return NextResponse.redirect(new URL("/?error=config", request.url));
   }
 
   const token = await exchangeCodeForToken(code, clientId, clientSecret);
   if (!token) {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 502,
+      error: new Error("GitHub token exchange failed"),
+    });
     return NextResponse.redirect(new URL("/?error=token_exchange", request.url));
   }
 
   const user = await fetchGitHubUser(token);
   if (!user) {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 502,
+      error: new Error("GitHub user fetch failed after token exchange"),
+    });
     return NextResponse.redirect(new URL("/?error=user_fetch", request.url));
   }
 
@@ -105,6 +122,14 @@ export async function GET(request: NextRequest) {
     displayName: user.name ?? null,
     avatarUrl: user.avatar_url ?? null,
   }).catch(() => {});
+
+  // Sync to Resend audience (fire-and-forget, non-blocking)
+  if (email) {
+    void addContact(email, {
+      firstName: user.name ?? undefined,
+      handle: user.login,
+    }).catch(() => {});
+  }
 
   const cookie = createSessionCookie(
     {

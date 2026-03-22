@@ -8,7 +8,8 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>CHAPA_PROJECT_DIR/scripts/cc-rpi-update.sh</string>
+    <string>-c</string>
+    <string>exec /bin/bash CHAPA_PROJECT_DIR/scripts/cc-rpi-update.sh</string>
   </array>
 
   <key>StartCalendarInterval</key>
@@ -16,23 +17,33 @@
     <key>Hour</key>
     <integer>3</integer>
     <key>Minute</key>
-    <integer>0</integer>
+    <integer>15</integer>
   </dict>
 
   <key>StandardOutPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/cc-rpi-update-launchd.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/cc-rpi-update.log</string>
 
   <key>StandardErrorPath</key>
-  <string>CHAPA_PROJECT_DIR/logs/cc-rpi-update-launchd-error.log</string>
+  <string>/Users/juan/Library/Logs/Chapa/cc-rpi-update.error.log</string>
+
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>122880</integer>
+  </dict>
 
   <key>SoftResourceLimits</key>
   <dict>
     <key>NumberOfFiles</key>
-    <integer>10240</integer>
+    <integer>122880</integer>
   </dict>
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>HOME</key>
+    <string>/Users/juan</string>
+    <key>TERM</key>
+    <string>xterm-256color</string>
     <key>PATH</key>
     <string>/Users/juan/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
   </dict>

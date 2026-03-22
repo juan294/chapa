@@ -201,4 +201,28 @@ describe("buildSnapshot", () => {
     // 25 original + 3 explanatory stats = 28 (no confidencePenalties key)
     expect(Object.keys(snapshot)).toHaveLength(28);
   });
+
+  it("includes craft field when impact has craft dimension", () => {
+    const snapshot = buildSnapshot(
+      makeStats(),
+      makeImpact({
+        dimensions: { delivery: 75, quality: 60, consistency: 80, breadth: 55, craft: 42 },
+      }),
+    );
+
+    expect(snapshot.craft).toBe(42);
+    expect(Object.keys(snapshot)).toContain("craft");
+  });
+
+  it("excludes craft field when impact has no craft dimension", () => {
+    const snapshot = buildSnapshot(
+      makeStats(),
+      makeImpact({
+        dimensions: { delivery: 75, quality: 60, consistency: 80, breadth: 55 },
+      }),
+    );
+
+    expect(snapshot.craft).toBeUndefined();
+    expect(Object.keys(snapshot)).not.toContain("craft");
+  });
 });

@@ -11,9 +11,11 @@ const mockEq = vi.fn();
 const mockIn = vi.fn();
 const mockGte = vi.fn();
 const mockLte = vi.fn();
+const mockLt = vi.fn();
 const mockOrder = vi.fn();
 const mockLimit = vi.fn();
 const mockMaybeSingle = vi.fn();
+const mockDelete = vi.fn();
 
 function chainBuilder() {
   const chain: Record<string, unknown> = {};
@@ -35,6 +37,14 @@ function chainBuilder() {
   };
   chain.lte = (...args: unknown[]) => {
     mockLte(...args);
+    return chain;
+  };
+  chain.lt = (...args: unknown[]) => {
+    mockLt(...args);
+    return chain;
+  };
+  chain.delete = () => {
+    mockDelete();
     return chain;
   };
   chain.order = (...args: unknown[]) => {
@@ -91,9 +101,13 @@ vi.mock("./supabase", () => ({
 import { getSupabase } from "./supabase";
 import {
   dbInsertSnapshot,
+  dbReplaceSnapshot,
   dbGetSnapshots,
   dbGetLatestSnapshot,
   dbGetLatestSnapshotBatch,
+  dbCleanOldSnapshots,
+  SNAPSHOT_RETENTION_DAYS,
+  SNAPSHOT_CLEANUP_BATCH_SIZE,
 } from "./snapshots";
 
 beforeEach(() => {
@@ -185,6 +199,56 @@ describe("dbInsertSnapshot", () => {
     });
     const result = await dbInsertSnapshot("testuser", makeSnapshot());
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbReplaceSnapshot
+// ---------------------------------------------------------------------------
+
+describe("dbReplaceSnapshot", () => {
+  it("inserts a new snapshot when none exists for today", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(true);
+  });
+
+  it("replaces existing same-day snapshot (returns true)", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 200 });
+    const result = await dbReplaceSnapshot(
+      "testuser",
+      makeSnapshot({ adjustedComposite: 65 }),
+    );
+    expect(result).toBe(true); // true even on "update" (status 200)
+  });
+
+  it("does NOT use ignoreDuplicates", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    await dbReplaceSnapshot("testuser", makeSnapshot());
+    const upsertArgs = mockUpsert.mock.calls[0]!;
+    expect(upsertArgs[1]).toEqual({ onConflict: "handle,date" });
+    expect(upsertArgs[1]).not.toHaveProperty("ignoreDuplicates");
+  });
+
+  it("returns false when Supabase is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(false);
+  });
+
+  it("returns false on error", async () => {
+    mockUpsert.mockResolvedValue({
+      error: new Error("DB error"),
+      status: 500,
+    });
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(false);
+  });
+
+  it("lowercases handle", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    await dbReplaceSnapshot("TestUser", makeSnapshot());
+    expect(mockUpsert.mock.calls[0]![0].handle).toBe("testuser");
   });
 });
 
@@ -396,5 +460,47 @@ describe("dbGetLatestSnapshotBatch", () => {
     await dbGetLatestSnapshotBatch(["UPPER", "MiXeD"]);
 
     expect(mockIn).toHaveBeenCalledWith("handle", ["upper", "mixed"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbCleanOldSnapshots
+// ---------------------------------------------------------------------------
+
+describe("dbCleanOldSnapshots", () => {
+  it("exports retention and batch size constants", () => {
+    expect(SNAPSHOT_RETENTION_DAYS).toBe(365);
+    expect(SNAPSHOT_CLEANUP_BATCH_SIZE).toBe(1000);
+  });
+
+  it("deletes old snapshots and returns count", async () => {
+    terminalResolve = {
+      data: [{ id: 1 }, { id: 2 }, { id: 3 }],
+      error: null,
+    };
+
+    const result = await dbCleanOldSnapshots();
+
+    expect(result).toBe(3);
+    expect(mockFrom).toHaveBeenCalledWith("metrics_snapshots");
+    expect(mockDelete).toHaveBeenCalled();
+    expect(mockLt).toHaveBeenCalledWith(
+      "captured_at",
+      expect.any(String),
+    );
+    expect(mockLimit).toHaveBeenCalledWith(SNAPSHOT_CLEANUP_BATCH_SIZE);
+    expect(mockSelect).toHaveBeenCalledWith("id");
+  });
+
+  it("returns 0 when DB is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+    const result = await dbCleanOldSnapshots();
+    expect(result).toBe(0);
+  });
+
+  it("returns 0 on query error", async () => {
+    terminalResolve = { data: null, error: new Error("timeout") };
+    const result = await dbCleanOldSnapshots();
+    expect(result).toBe(0);
   });
 });

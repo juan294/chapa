@@ -113,16 +113,19 @@ async function _fetchAndCache(
     return null;
   }
 
-  // Fetch Bitbucket data (from cache or live)
-  const bbStats = await _fetchBitbucketIfLinked(handle, lowerHandle);
+  // Fetch Bitbucket + Codeberg in parallel — error in one must not block the other
+  const [bbResult, cbResult] = await Promise.allSettled([
+    _fetchBitbucketIfLinked(handle, lowerHandle),
+    _fetchCodebergIfLinked(handle, lowerHandle),
+  ]);
+
+  const bbStats = bbResult.status === "fulfilled" ? bbResult.value : null;
+  const cbStats = cbResult.status === "fulfilled" ? cbResult.value : null;
 
   // Merge Bitbucket into primary (markAsSupplemental: false — linked platform, not EMU)
   let stats: StatsData = bbStats
     ? mergeStats(primary, bbStats, { markAsSupplemental: false })
     : primary;
-
-  // Fetch Codeberg data (from cache or live)
-  const cbStats = await _fetchCodebergIfLinked(handle, lowerHandle);
 
   // Merge Codeberg into current stats
   if (cbStats) {
@@ -197,21 +200,23 @@ async function _fetchBitbucketIfLinked(
 
     const clientId = process.env.BITBUCKET_CLIENT_ID?.trim() ?? "";
     const clientSecret = process.env.BITBUCKET_CLIENT_SECRET?.trim() ?? "";
-    const refreshed = await refreshBitbucketToken(refreshToken, clientId, clientSecret);
+    const result = await refreshBitbucketToken(refreshToken, clientId, clientSecret);
 
-    if (!refreshed) {
-      // Token revoked — unlink platform
-      void dbDeleteLinkedPlatform(handle, "bitbucket");
+    if (!result.ok) {
+      if (result.reason === "revoked") {
+        void dbDeleteLinkedPlatform(handle, "bitbucket");
+      }
+      // Transient: keep the link, skip stats this time
       return null;
     }
 
-    accessToken = refreshed.access_token;
+    accessToken = result.tokens.access_token;
     void dbUpdatePlatformTokens(
       handle,
       "bitbucket",
-      refreshed.access_token,
-      refreshed.refresh_token,
-      new Date(Date.now() + refreshed.expires_in * 1000),
+      result.tokens.access_token,
+      result.tokens.refresh_token,
+      new Date(Date.now() + result.tokens.expires_in * 1000),
     );
   }
 
@@ -264,25 +269,28 @@ async function _fetchCodebergIfLinked(
     } else {
       const clientId = process.env.CODEBERG_CLIENT_ID?.trim() ?? "";
       const clientSecret = process.env.CODEBERG_CLIENT_SECRET?.trim() ?? "";
-      const refreshed = await refreshCodebergToken(
+      const result = await refreshCodebergToken(
         refreshToken,
         clientId,
         clientSecret,
       );
 
-      if (!refreshed) {
-        void dbDeleteLinkedPlatform(handle, "codeberg");
+      if (!result.ok) {
+        if (result.reason === "revoked") {
+          void dbDeleteLinkedPlatform(handle, "codeberg");
+        }
+        // Transient: keep the link, skip stats this time
         return null;
       }
 
-      accessToken = refreshed.access_token;
+      accessToken = result.tokens.access_token;
       void dbUpdatePlatformTokens(
         handle,
         "codeberg",
-        refreshed.access_token,
-        refreshed.refresh_token ?? null,
-        refreshed.expires_in
-          ? new Date(Date.now() + refreshed.expires_in * 1000)
+        result.tokens.access_token,
+        result.tokens.refresh_token ?? null,
+        result.tokens.expires_in
+          ? new Date(Date.now() + result.tokens.expires_in * 1000)
           : null,
       );
     }

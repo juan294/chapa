@@ -24,9 +24,14 @@ interface RunState {
   status: "running" | "completed" | "failed" | "stopped";
   lines: LogLine[];
   process: ChildProcess;
+  cleanup?: () => void;
 }
 
 const MAX_LOG_LINES = 500;
+/** Hard timeout for spawned agent processes (5 minutes). */
+const PROCESS_TIMEOUT_MS = 300_000;
+/** Grace period after SIGTERM before escalating to SIGKILL. */
+const SIGKILL_GRACE_MS = 5_000;
 
 let currentRun: RunState | null = null;
 
@@ -173,17 +178,62 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let processTimer: ReturnType<typeof setTimeout> | null = null;
+  let killTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Destroy streams, remove listeners, and clear pending timers. */
+  function cleanupProcess() {
+    if (processTimer) { clearTimeout(processTimer); processTimer = null; }
+    if (killTimer) { clearTimeout(killTimer); killTimer = null; }
+    child.stdout?.removeAllListeners();
+    child.stderr?.removeAllListeners();
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+    child.removeAllListeners();
+  }
+
+  // Store cleanup on run state so the DELETE handler can call it
+  run.cleanup = cleanupProcess;
+
   child.stdout!.on("data", (data: Buffer) => addLines(data, "stdout"));
   child.stderr!.on("data", (data: Buffer) => addLines(data, "stderr"));
 
   child.on("close", (code) => {
     if (run.status === "stopped") return; // already stopped via DELETE
     run.status = code === 0 ? "completed" : "failed";
+    cleanupProcess();
   });
 
   child.on("error", () => {
     run.status = "failed";
+    cleanupProcess();
   });
+
+  // Hard timeout — kill the process if it runs too long
+  processTimer = setTimeout(() => {
+    if (run.status === "running") {
+      run.status = "failed";
+      run.lines.push({
+        timestamp: new Date().toISOString(),
+        text: `Process killed after ${PROCESS_TIMEOUT_MS / 1000}s timeout`,
+        stream: "stderr",
+      });
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // Process may have already exited
+      }
+      // Escalate to SIGKILL if SIGTERM doesn't terminate within grace period
+      killTimer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // Process may have already exited
+        }
+        cleanupProcess();
+      }, SIGKILL_GRACE_MS);
+    }
+  }, PROCESS_TIMEOUT_MS);
 
   currentRun = run;
 
@@ -273,6 +323,8 @@ export async function DELETE(request: NextRequest) {
   } catch {
     // Process may have already exited
   }
+  // Clean up streams, listeners, and timers
+  currentRun.cleanup?.();
 
   const result = {
     status: "stopped" as const,

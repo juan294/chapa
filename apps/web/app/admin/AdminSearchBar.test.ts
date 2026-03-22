@@ -25,9 +25,8 @@ describe("AdminSearchBar", () => {
       expect(SOURCE).toContain('aria-label="Filter users"');
     });
 
-    it("has a visible focus indicator (#435)", () => {
-      expect(SOURCE).toContain("focus-visible:ring-2");
-      expect(SOURCE).toContain("focus-visible:ring-amber");
+    it("has no focus ring (intentionally removed)", () => {
+      expect(SOURCE).not.toContain("focus-visible:ring");
     });
   });
 

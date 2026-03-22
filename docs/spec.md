@@ -1,14 +1,14 @@
 # Chapa Product Spec
 
 ## User story
-As a developer, I want a **beautiful, embeddable badge** that shows my multi-dimensional Impact v4 Profile and updates automatically, so I can share it on my portfolio, README, or social media.
+As a developer, I want a **beautiful, embeddable badge** that shows my multi-dimensional Impact v6 Profile and updates automatically, so I can share it on my portfolio, README, or social media.
 
 ## Primary UI flow
 1) Landing `/`: CTA "Sign in with GitHub" (terminal-first UI)
 2) After OAuth: show "Generate badge" and redirect to `/u/:handle`
 3) Share page `/u/:handle`:
    - Badge preview (animated SVG with heatmap, radar chart, score ring)
-   - Impact v4 summary: 4 dimension scores, archetype, tier, adjusted composite, confidence + reasons
+   - Impact v6 summary: 4–5 dimension scores, archetype, tier, adjusted composite, confidence + reasons
    - Embed code snippets: Markdown + HTML
    - One-click "Share on X" with prefilled copy
 4) Creator Studio `/studio`:
@@ -32,8 +32,8 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
   - Badge verification endpoint (proves data integrity via HMAC-SHA256)
 - POST `/api/supplemental`
   - Upload EMU supplemental stats (CLI tool)
-- POST `/api/studio/config`
-  - Save/load Creator Studio badge customization
+- GET|PUT `/api/studio/config`
+  - Load/save Creator Studio badge customization (GET to load, PUT to save)
 - GET `/api/history/:handle`
   - Score history, trend analysis, and snapshot diffs (public, rate-limited)
 
@@ -68,7 +68,7 @@ Optional display:
 - embed_copy_html
 - share_click_x
 
-## Impact v4 Profile
+## Impact v6 Profile
 
 The badge and share page display a multi-dimensional developer profile:
 

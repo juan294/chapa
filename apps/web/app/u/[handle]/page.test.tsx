@@ -7,11 +7,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockGetStats,
   mockComputeImpactV4,
-  mockApplyEMA,
+  mockSmoothScore,
   mockGetTier,
   mockGetCachedLatestSnapshot,
   mockUpdateSnapshotCache,
-  mockReadSessionCookie,
   mockIsValidHandle,
   mockCacheGet,
   mockTrackBadgeGenerated,
@@ -23,11 +22,12 @@ const {
   mockBuildSnapshot,
   mockDbInsertSnapshot,
   mockIsStudioEnabled,
+  mockDbGetToolInsights,
   mockAfter,
 } = vi.hoisted(() => ({
   mockGetStats: vi.fn(),
   mockComputeImpactV4: vi.fn(),
-  mockApplyEMA: vi.fn((score: number) => score),
+  mockSmoothScore: vi.fn((score: number) => score),
   mockGetTier: vi.fn((score: number) => {
     if (score >= 85) return "Elite";
     if (score >= 70) return "High";
@@ -36,7 +36,6 @@ const {
   }),
   mockGetCachedLatestSnapshot: vi.fn(),
   mockUpdateSnapshotCache: vi.fn(),
-  mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockCacheGet: vi.fn(),
   mockTrackBadgeGenerated: vi.fn(),
@@ -48,6 +47,7 @@ const {
   mockBuildSnapshot: vi.fn(),
   mockDbInsertSnapshot: vi.fn(),
   mockIsStudioEnabled: vi.fn(),
+  mockDbGetToolInsights: vi.fn(),
   mockAfter: vi.fn(),
 }));
 
@@ -60,7 +60,7 @@ vi.mock("@/lib/impact/v4", () => ({
 }));
 
 vi.mock("@/lib/impact/smoothing", () => ({
-  applyEMA: mockApplyEMA,
+  smoothScore: mockSmoothScore,
 }));
 
 vi.mock("@/lib/impact/utils", () => ({
@@ -70,10 +70,6 @@ vi.mock("@/lib/impact/utils", () => ({
 vi.mock("@/lib/cache/snapshot-cache", () => ({
   getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
   updateSnapshotCache: mockUpdateSnapshotCache,
-}));
-
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: mockReadSessionCookie,
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -117,6 +113,10 @@ vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabled: mockIsStudioEnabled,
 }));
 
+vi.mock("@/lib/db/tool-insights", () => ({
+  dbGetToolInsights: mockDbGetToolInsights,
+}));
+
 vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.thecreativetoken.com",
 }));
@@ -130,13 +130,6 @@ vi.mock("next/server", async (importOriginal) => {
   };
 });
 
-// Mock next/headers
-vi.mock("next/headers", () => ({
-  headers: () => Promise.resolve({
-    get: () => null,
-  }),
-}));
-
 // Mock next/navigation
 const mockNotFound = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -149,8 +142,8 @@ vi.mock("@/components/GlobalCommandBarLazy", () => ({
 }));
 
 // Mock components to return simple elements
-vi.mock("@/components/Navbar", () => ({
-  Navbar: () => "<nav />",
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => "<nav />",
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
@@ -161,13 +154,11 @@ vi.mock("@/components/ShareBadgePreviewLazy", () => ({
 vi.mock("@/components/BadgeToolbar", () => ({
   BadgeToolbar: () => "<div>toolbar</div>",
 }));
-vi.mock("@/components/ImpactBreakdown", () => ({
-  ImpactBreakdown: () => "<div>breakdown</div>",
-  getArchetypeProfile: () => "A builder profile",
-  DataSources: () => "<div>sources</div>",
+vi.mock("@/components/SharePageOwnerContent", () => ({
+  SharePageOwnerContent: () => "<div>owner-content</div>",
 }));
-vi.mock("@/components/CopyButton", () => ({
-  CopyButton: () => "<button>copy</button>",
+vi.mock("@/components/dashboard/HeroScoreZone", () => ({
+  HeroScoreZone: () => "<div>hero</div>",
 }));
 
 // ---------------------------------------------------------------------------
@@ -206,7 +197,10 @@ const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="6
 const FAKE_SNAPSHOT = { adjustedComposite: 60, date: "2026-01-01" };
 
 async function renderPage(handle = "testuser") {
-  return SharePage({ params: Promise.resolve({ handle }) });
+  return SharePage({
+    params: Promise.resolve({ handle }),
+    searchParams: Promise.resolve({}),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +210,6 @@ async function renderPage(handle = "testuser") {
 describe("SharePage /u/[handle]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
     mockIsValidHandle.mockReturnValue(true);
     mockGetStats.mockResolvedValue(FAKE_STATS);
     mockCacheGet.mockResolvedValue(null); // no saved config
@@ -232,7 +225,20 @@ describe("SharePage /u/[handle]", () => {
     mockDbInsertSnapshot.mockResolvedValue(true);
     mockUpdateSnapshotCache.mockResolvedValue(undefined);
     mockIsStudioEnabled.mockResolvedValue(false);
-    mockReadSessionCookie.mockReturnValue(null);
+    mockDbGetToolInsights.mockResolvedValue(null);
+  });
+
+  // -------------------------------------------------------------------------
+  // ISR compatibility — no headers() call
+  // -------------------------------------------------------------------------
+
+  describe("ISR compatibility", () => {
+    it("calls getStats without user token (ISR has no request context)", async () => {
+      await renderPage();
+      // With ISR, no per-user OAuth token is available — getStats is called
+      // with handle only, relying on env GITHUB_TOKEN fallback.
+      expect(mockGetStats).toHaveBeenCalledWith("testuser");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -245,20 +251,20 @@ describe("SharePage /u/[handle]", () => {
 
       // All three should be called — the key assertion is that snapshot
       // is called BEFORE stats resolves (i.e., in parallel, not sequential)
-      expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined);
+      expect(mockGetStats).toHaveBeenCalledWith("testuser");
       expect(mockCacheGet).toHaveBeenCalledWith("config:testuser");
       expect(mockGetCachedLatestSnapshot).toHaveBeenCalledWith("testuser");
     });
 
     it("uses snapshot data for EMA smoothing", async () => {
       await renderPage();
-      expect(mockApplyEMA).toHaveBeenCalledWith(65, 60);
+      expect(mockSmoothScore).toHaveBeenCalledWith(65, FAKE_SNAPSHOT);
     });
 
     it("handles null snapshot gracefully", async () => {
       mockGetCachedLatestSnapshot.mockResolvedValue(null);
       await renderPage();
-      expect(mockApplyEMA).toHaveBeenCalledWith(65, null);
+      expect(mockSmoothScore).toHaveBeenCalledWith(65, null);
     });
   });
 
@@ -386,6 +392,45 @@ describe("SharePage /u/[handle]", () => {
       await afterCallback();
 
       expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 4: Craft score integration
+  // -------------------------------------------------------------------------
+
+  describe("craft score integration", () => {
+    it("passes craft score to computeImpactV4 when tool insights exist", async () => {
+      mockDbGetToolInsights.mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 68,
+        tier: "Practitioner",
+        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+        computedAt: "2025-03-01T00:00:00Z",
+      });
+      await renderPage();
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, 68);
+    });
+
+    it("passes undefined craft score when no tool insights exist", async () => {
+      await renderPage();
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+    });
+
+    it("does not render CraftBreakdown component", async () => {
+      // CraftBreakdown was removed in Phase 4 — verify it's not imported
+      mockDbGetToolInsights.mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 68,
+        tier: "Practitioner",
+        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+        computedAt: "2025-03-01T00:00:00Z",
+      });
+      // Should still render without errors — CraftBreakdown section is gone
+      const result = await renderPage();
+      expect(result).toBeDefined();
     });
   });
 

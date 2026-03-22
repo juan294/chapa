@@ -7,7 +7,7 @@ import type { AdminUser, SortField, SortDir, PaginatedResponse } from "./admin-t
 // Tab type
 // ---------------------------------------------------------------------------
 
-export type AdminTab = "users" | "agents" | "engagement";
+export type AdminTab = "users" | "agents" | "engagement" | "campaigns";
 
 // ---------------------------------------------------------------------------
 // Hook return type
@@ -106,7 +106,7 @@ export function useAdminDashboard(): AdminDashboardState {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       const tab = detail?.tab as AdminTab | undefined;
-      if (tab === "users" || tab === "agents" || tab === "engagement") setActiveTab(tab);
+      if (tab === "users" || tab === "agents" || tab === "engagement" || tab === "campaigns") setActiveTab(tab);
     };
     window.addEventListener("chapa:admin-tab", handler);
     return () => window.removeEventListener("chapa:admin-tab", handler);

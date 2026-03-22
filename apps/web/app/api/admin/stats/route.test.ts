@@ -78,4 +78,22 @@ describe("GET /api/admin/stats", () => {
     const res = await GET(makeRequest(sameLength));
     expect(res.status).toBe(401);
   });
+
+  it("returns 504 when data call times out", async () => {
+    vi.useFakeTimers();
+
+    vi.mocked(getBadgeStats).mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    const resPromise = GET(makeRequest(VALID_SECRET));
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    const res = await resPromise;
+    expect(res.status).toBe(504);
+    const body = await res.json();
+    expect(body.error).toMatch(/timeout/i);
+
+    vi.useRealTimers();
+  });
 });

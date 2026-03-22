@@ -2,26 +2,10 @@
 
 import { useState } from "react";
 import type { SharedContextEntry } from "../agents-types";
+import { escapeHtml } from "@/lib/utils/escape";
 
 interface CrossAgentInsightsProps {
   entries: SharedContextEntry[];
-}
-
-/**
- * Escape HTML entities in user-controlled strings before embedding in HTML.
- *
- * Uses numeric &#39; for single quotes (universally safe in HTML, including
- * HTML4). Intentionally separate from escapeXml (which uses &apos;) in
- * lib/render/escape.ts to avoid importing server-side modules into this
- * "use client" component.
- */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/'/g, "&#39;")
-    .replace(/"/g, "&quot;");
 }
 
 /** Simple markdown to HTML: headings, bold, bullets, inline code. */

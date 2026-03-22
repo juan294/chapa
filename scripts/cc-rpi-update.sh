@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # ── Configuration ──
-CC_RPI_PATH="/Users/juan/Documents/GenAI_Projects/cc-rpi"
+CC_RPI_PATH="/Users/juan/code/cc-rpi"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

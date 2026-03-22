@@ -6,10 +6,12 @@ import { NextRequest } from "next/server";
 // ---------------------------------------------------------------------------
 
 const mockDbUpdateEmailNotifications = vi.fn();
+const mockDbGetUserEmail = vi.fn();
 
 vi.mock("@/lib/db/users", () => ({
   dbUpdateEmailNotifications: (...args: unknown[]) =>
     mockDbUpdateEmailNotifications(...args),
+  dbGetUserEmail: (...args: unknown[]) => mockDbGetUserEmail(...args),
 }));
 
 vi.mock("@/lib/email/resend", () => ({
@@ -20,6 +22,11 @@ vi.mock("@/lib/email/resend", () => ({
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;"),
+}));
+
+const mockMarkUnsubscribed = vi.fn();
+vi.mock("@/lib/email/audience", () => ({
+  markUnsubscribed: (...args: unknown[]) => mockMarkUnsubscribed(...args),
 }));
 
 const mockRateLimit = vi.fn();
@@ -42,6 +49,8 @@ function makeRequest(handle?: string): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mockDbUpdateEmailNotifications.mockResolvedValue(undefined);
+  mockDbGetUserEmail.mockResolvedValue(null);
+  mockMarkUnsubscribed.mockResolvedValue(null);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
 });
 
@@ -116,5 +125,27 @@ describe("GET /api/notifications/unsubscribe", () => {
     expect(res.headers.get("Retry-After")).toBe("60");
     const body = await res.json();
     expect(body.error).toMatch(/too many requests/i);
+  });
+
+  it("syncs unsubscribe to Resend when user has email", async () => {
+    mockDbGetUserEmail.mockResolvedValue({
+      email: "dev@example.com",
+      emailNotifications: true,
+    });
+
+    await GET(makeRequest("testuser"));
+
+    // Wait for fire-and-forget to flush
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockMarkUnsubscribed).toHaveBeenCalledWith("dev@example.com");
+  });
+
+  it("does not call Resend sync when user has no email", async () => {
+    mockDbGetUserEmail.mockResolvedValue(null);
+
+    await GET(makeRequest("testuser"));
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
   });
 });

@@ -7,8 +7,17 @@ import { isValidHandle } from "@/lib/validation";
 import { generateVerificationCode } from "@/lib/verification/hmac";
 import { svgToPng } from "@/lib/render/svg-to-png";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { toDateString } from "@/lib/utils/date";
 
-const OG_CACHE_TTL = 86400; // 24 hours
+const OG_CACHE_TTL = 172800; // 48 hours
+const SVG_TO_PNG_TIMEOUT_MS = 10_000; // 10 seconds
+
+class SvgToPngTimeoutError extends Error {
+  constructor() {
+    super("svgToPng timed out");
+    this.name = "SvgToPngTimeoutError";
+  }
+}
 
 /**
  * GET /u/:handle/og-image
@@ -29,7 +38,7 @@ export async function GET(
     return new NextResponse("Invalid handle", { status: 400 });
   }
 
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = toDateString(new Date());
   const ogCacheKey = `og-image:v1:${handle}:${today}`;
 
   // Try cached PNG first
@@ -69,9 +78,14 @@ export async function GET(
       verificationDate: verification?.date,
     });
 
-    const png = svgToPng(svg, 1200);
+    const png = await Promise.race([
+      Promise.resolve().then(() => svgToPng(svg, 1200)),
+      new Promise<never>((_resolve, reject) =>
+        setTimeout(() => reject(new SvgToPngTimeoutError()), SVG_TO_PNG_TIMEOUT_MS),
+      ),
+    ]);
 
-    // Cache the PNG as base64 for 24h (fire-and-forget — don't block response)
+    // Cache the PNG as base64 for 48h (fire-and-forget — don't block response)
     cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL).catch(() => {});
 
     return new NextResponse(Buffer.from(png), {
@@ -82,6 +96,10 @@ export async function GET(
       },
     });
   } catch (e) {
+    if (e instanceof SvgToPngTimeoutError) {
+      console.error("[og-image] svgToPng timed out after 10s");
+      return new NextResponse("PNG conversion timed out", { status: 504 });
+    }
     console.error("[og-image] failed to generate badge PNG:", e);
     return new NextResponse("Failed to generate image", { status: 500 });
   }

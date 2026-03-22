@@ -7,6 +7,16 @@
  */
 const GITHUB_HANDLE_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
 
+/**
+ * Validate a GitHub handle against GitHub's naming rules.
+ *
+ * Rules: 1--39 alphanumeric characters or hyphens, cannot start or end
+ * with a hyphen. Used to guard API endpoints and cache key construction
+ * from injection via malformed handles.
+ *
+ * @param handle - The candidate GitHub handle to validate
+ * @returns `true` if the handle matches GitHub's format requirements
+ */
 export function isValidHandle(handle: string): boolean {
   return GITHUB_HANDLE_RE.test(handle);
 }
@@ -20,6 +30,16 @@ export function isValidHandle(handle: string): boolean {
  */
 const EMU_HANDLE_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,98}[a-zA-Z0-9]$/;
 
+/**
+ * Validate a GitHub EMU (Enterprise Managed User) handle.
+ *
+ * EMU handles allow underscores in addition to the standard alphanumeric
+ * characters and hyphens (e.g. "Juan-GonzalezPonce_avoltagh"), with a
+ * maximum length of 100 characters.
+ *
+ * @param handle - The candidate EMU handle to validate
+ * @returns `true` if the handle matches EMU format requirements
+ */
 export function isValidEmuHandle(handle: string): boolean {
   if (handle.length === 1) return /^[a-zA-Z0-9]$/.test(handle);
   return EMU_HANDLE_RE.test(handle);
@@ -52,11 +72,13 @@ export function isValidBadgeConfig(value: unknown): boolean {
 }
 
 /**
- * Structural validation for uploaded StatsData.
- * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
- */
-/**
  * Validate a CLI telemetry payload (merge operation audit data).
+ *
+ * Checks structural integrity: operationId (UUID v4), targetHandle (GitHub handle),
+ * sourceHandle (EMU handle), success (boolean), optional errorCategory, stats
+ * (5 non-negative integer fields), timing (3 non-negative numbers), and cliVersion
+ * (non-empty string, max 20 chars).
+ *
  * Used by POST /api/telemetry.
  */
 const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -108,7 +130,13 @@ export function isValidTelemetryPayload(value: unknown): boolean {
 
 /**
  * Structural validation for uploaded StatsData.
- * Ensures the shape matches what we expect — prevents arbitrary JSON from being stored.
+ *
+ * Ensures the shape matches what the scoring pipeline expects — prevents
+ * arbitrary JSON from being stored. Validates: handle + fetchedAt (strings),
+ * 14 required non-negative number fields (commits, PRs, reviews, etc.),
+ * and heatmapData (array of {date, count} entries, max 371 = 53 weeks × 7 days).
+ *
+ * Used by POST /api/supplemental.
  */
 export function isValidStatsShape(value: unknown): boolean {
   if (value == null || typeof value !== "object") return false;

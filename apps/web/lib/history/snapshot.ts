@@ -1,5 +1,6 @@
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
 import type { MetricsSnapshot } from "./types";
+import { toDateString } from "@/lib/utils/date";
 
 /**
  * Build a compact MetricsSnapshot from stats + impact data.
@@ -14,7 +15,7 @@ export function buildSnapshot(
 ): MetricsSnapshot {
   const now = new Date();
   const snapshot: MetricsSnapshot = {
-    date: now.toISOString().slice(0, 10),
+    date: toDateString(now),
     capturedAt: now.toISOString(),
 
     commitsTotal: stats.commitsTotal,
@@ -34,11 +35,15 @@ export function buildSnapshot(
     maxCommitsIn10Min: stats.maxCommitsIn10Min,
     ...(stats.microCommitRatio !== undefined && { microCommitRatio: stats.microCommitRatio }),
     ...(stats.docsOnlyPrRatio !== undefined && { docsOnlyPrRatio: stats.docsOnlyPrRatio }),
+    ...(stats.prDescriptionRate !== undefined && { prDescriptionRate: stats.prDescriptionRate }),
+    ...(stats.featureBranchRate !== undefined && { featureBranchRate: stats.featureBranchRate }),
+    ...(stats.issueLinkageRate !== undefined && { issueLinkageRate: stats.issueLinkageRate }),
 
     delivery: impact.dimensions.delivery,
     quality: impact.dimensions.quality,
     consistency: impact.dimensions.consistency,
     breadth: impact.dimensions.breadth,
+    ...(impact.dimensions.craft != null && { craft: impact.dimensions.craft }),
     archetype: impact.archetype,
     profileType: impact.profileType,
     compositeScore: impact.compositeScore,

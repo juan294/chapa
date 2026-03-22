@@ -349,4 +349,22 @@ describe("GET /api/admin/agents-summary", () => {
     const res = await GET(makeRequest());
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
+
+  it("returns 504 when Supabase call times out", async () => {
+    vi.useFakeTimers();
+
+    vi.mocked(dbGetFeatureFlags).mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    const resPromise = GET(makeRequest());
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    const res = await resPromise;
+    expect(res.status).toBe(504);
+    const body = await res.json();
+    expect(body.error).toMatch(/timeout/i);
+
+    vi.useRealTimers();
+  });
 });

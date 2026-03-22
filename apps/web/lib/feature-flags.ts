@@ -17,16 +17,44 @@ import { dbGetFeatureFlag } from "./db/feature-flags";
 // Sync (env-var only) — for client components
 // ---------------------------------------------------------------------------
 
+/**
+ * Synchronously check whether Creator Studio is enabled (env-var only).
+ * Use in client components where `await` is not available.
+ *
+ * @returns `true` if `NEXT_PUBLIC_STUDIO_ENABLED` is `"true"`
+ */
 export function isStudioEnabledSync(): boolean {
   return process.env.NEXT_PUBLIC_STUDIO_ENABLED?.trim() === "true";
 }
 
+/**
+ * Synchronously check whether Bitbucket integration is enabled (env-var only).
+ * Use in client components where `await` is not available.
+ *
+ * @returns `true` if `NEXT_PUBLIC_BITBUCKET_ENABLED` is `"true"`
+ */
 export function isBitbucketEnabledSync(): boolean {
   return process.env.NEXT_PUBLIC_BITBUCKET_ENABLED?.trim() === "true";
 }
 
+/**
+ * Synchronously check whether Codeberg integration is enabled (env-var only).
+ * Use in client components where `await` is not available.
+ *
+ * @returns `true` if `NEXT_PUBLIC_CODEBERG_ENABLED` is `"true"`
+ */
 export function isCodebergEnabledSync(): boolean {
   return process.env.NEXT_PUBLIC_CODEBERG_ENABLED?.trim() === "true";
+}
+
+/**
+ * Synchronously check whether AI Insights integration is enabled (env-var only).
+ * Use in client components where `await` is not available.
+ *
+ * @returns `true` if `NEXT_PUBLIC_INSIGHTS_ENABLED` is `"true"`
+ */
+export function isInsightsEnabledSync(): boolean {
+  return process.env.NEXT_PUBLIC_INSIGHTS_ENABLED?.trim() === "true";
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +70,12 @@ async function checkFlag(
   return envVar?.trim() === "true";
 }
 
+/**
+ * Check whether Creator Studio is enabled (DB-backed, env-var fallback).
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `studio_enabled` flag is on in DB or `NEXT_PUBLIC_STUDIO_ENABLED` is `"true"`
+ */
 export async function isStudioEnabled(): Promise<boolean> {
   return checkFlag(
     "studio_enabled",
@@ -49,6 +83,12 @@ export async function isStudioEnabled(): Promise<boolean> {
   );
 }
 
+/**
+ * Check whether experimental pages are enabled (DB-backed, env-var fallback).
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `experiments_enabled` flag is on in DB or `NEXT_PUBLIC_EXPERIMENTS_ENABLED` is `"true"`
+ */
 export async function isExperimentsEnabled(): Promise<boolean> {
   return checkFlag(
     "experiments_enabled",
@@ -56,6 +96,12 @@ export async function isExperimentsEnabled(): Promise<boolean> {
   );
 }
 
+/**
+ * Check whether Bitbucket integration is enabled (DB-backed, env-var fallback).
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `bitbucket_integration` flag is on in DB or `NEXT_PUBLIC_BITBUCKET_ENABLED` is `"true"`
+ */
 export async function isBitbucketEnabled(): Promise<boolean> {
   return checkFlag(
     "bitbucket_integration",
@@ -63,10 +109,29 @@ export async function isBitbucketEnabled(): Promise<boolean> {
   );
 }
 
+/**
+ * Check whether Codeberg integration is enabled (DB-backed, env-var fallback).
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `codeberg_integration` flag is on in DB or `NEXT_PUBLIC_CODEBERG_ENABLED` is `"true"`
+ */
 export async function isCodebergEnabled(): Promise<boolean> {
   return checkFlag(
     "codeberg_integration",
     process.env.NEXT_PUBLIC_CODEBERG_ENABLED,
+  );
+}
+
+/**
+ * Check whether AI Insights integration is enabled (DB-backed, env-var fallback).
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `insights_integration` flag is on in DB or `NEXT_PUBLIC_INSIGHTS_ENABLED` is `"true"`
+ */
+export async function isInsightsEnabled(): Promise<boolean> {
+  return checkFlag(
+    "insights_integration",
+    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED,
   );
 }
 

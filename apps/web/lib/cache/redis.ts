@@ -257,10 +257,53 @@ export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
   if (!redis) return "unavailable";
 
   try {
-    await redis.ping();
+    await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("ping timeout")), 5000),
+      ),
+    ]);
     return "ok";
   } catch {
     return "error";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Atomic increment (used for daily campaign send quota)
+// ---------------------------------------------------------------------------
+
+/**
+ * Atomically increment a Redis counter by `amount`.
+ *
+ * When `ttlSeconds` is provided, `EXPIRE` is called unconditionally after
+ * `INCRBY`. This is idempotent (refreshes the same TTL) and avoids a race
+ * condition where concurrent callers could skip the expiry, leaving a key
+ * that never expires.
+ *
+ * Returns the new counter value, or `0` if Redis is unavailable (fail-open).
+ *
+ * **Note:** Callers should treat a return value of `0` as "zero or unknown"
+ * — it is indistinguishable from a genuine zero count when Redis is down.
+ */
+export async function cacheIncr(
+  key: string,
+  amount: number = 1,
+  ttlSeconds?: number,
+): Promise<number> {
+  const redis = getRedis();
+  if (!redis) return 0;
+
+  try {
+    const newVal = await redis.incrby(key, amount);
+    // Always refresh TTL — idempotent and avoids race under concurrency
+    if (ttlSeconds) {
+      await redis.expire(key, ttlSeconds);
+    }
+    return newVal;
+  } catch (error) {
+    console.error("[cache] cacheIncr failed:", (error as Error).message);
+    return 0;
   }
 }
 

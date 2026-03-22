@@ -11,30 +11,9 @@
 
 import { Resend } from "resend";
 import { Webhook } from "svix";
-
-// ---------------------------------------------------------------------------
-// HTML escaping for email templates
-// ---------------------------------------------------------------------------
-
-/**
- * Escape HTML entities in user-controlled strings before embedding in HTML email.
- *
- * NOTE: This is intentionally separate from `escapeXml` in `lib/render/escape.ts`.
- * The two functions differ in single-quote escaping:
- *   - escapeHtml uses `&#39;`  — the numeric reference, universally safe in HTML
- *     (including HTML4 email clients).
- *   - escapeXml uses `&apos;` — the named entity correct for XML/SVG, but NOT
- *     defined in HTML4 and potentially broken in older email renderers.
- * Consolidating these would risk breaking email rendering or SVG validity.
- */
-export function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/'/g, "&#39;")
-    .replace(/"/g, "&quot;");
-}
+import { escapeHtml } from "@/lib/utils/escape";
+// Re-export so existing consumers (score-bump.ts, unsubscribe/route.ts) keep working
+export { escapeHtml };
 
 // ---------------------------------------------------------------------------
 // HTML sanitization for forwarded email bodies
@@ -147,6 +126,7 @@ export async function fetchReceivedEmail(
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!res.ok) {

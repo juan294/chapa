@@ -53,14 +53,15 @@ vi.mock("@/lib/agents/agent-config", () => ({
 }));
 
 // Mock child_process.spawn
-const mockStdout = { on: vi.fn() };
-const mockStderr = { on: vi.fn() };
+const mockStdout = { on: vi.fn(), destroy: vi.fn(), removeAllListeners: vi.fn() };
+const mockStderr = { on: vi.fn(), destroy: vi.fn(), removeAllListeners: vi.fn() };
 const mockProcess = {
   pid: 12345,
   stdout: mockStdout,
   stderr: mockStderr,
   on: vi.fn(),
   kill: vi.fn(),
+  removeAllListeners: vi.fn(),
 };
 
 vi.mock("node:child_process", () => ({
@@ -142,8 +143,13 @@ beforeEach(() => {
   mockProcess.pid = 12345;
   mockProcess.kill.mockReset();
   mockProcess.on.mockReset();
+  mockProcess.removeAllListeners.mockReset();
   mockStdout.on.mockReset();
+  mockStdout.destroy.mockReset();
+  mockStdout.removeAllListeners.mockReset();
   mockStderr.on.mockReset();
+  mockStderr.destroy.mockReset();
+  mockStderr.removeAllListeners.mockReset();
   vi.mocked(spawn).mockReturnValue(mockProcess as never);
 });
 
@@ -227,6 +233,68 @@ describe("POST /api/admin/agents/run", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toContain("already running");
+  });
+
+  it("calls removeAllListeners on process and streams after close", async () => {
+    await POST(makePostRequest({ agentKey: "coverage_agent" }));
+
+    // Trigger the "close" callback
+    const closeCallback = mockProcess.on.mock.calls.find(
+      (c: string[]) => c[0] === "close",
+    )?.[1];
+    expect(closeCallback).toBeDefined();
+    closeCallback(0);
+
+    expect(mockStdout.removeAllListeners).toHaveBeenCalled();
+    expect(mockStderr.removeAllListeners).toHaveBeenCalled();
+    expect(mockProcess.removeAllListeners).toHaveBeenCalled();
+  });
+
+  it("calls removeAllListeners on process and streams after error", async () => {
+    await POST(makePostRequest({ agentKey: "coverage_agent" }));
+
+    // Trigger the "error" callback
+    const errorCallback = mockProcess.on.mock.calls.find(
+      (c: string[]) => c[0] === "error",
+    )?.[1];
+    expect(errorCallback).toBeDefined();
+    errorCallback(new Error("spawn failed"));
+
+    expect(mockStdout.removeAllListeners).toHaveBeenCalled();
+    expect(mockStderr.removeAllListeners).toHaveBeenCalled();
+    expect(mockProcess.removeAllListeners).toHaveBeenCalled();
+  });
+
+  it("uses 5-minute (300_000ms) timeout constant", async () => {
+    // Import the module's PROCESS_TIMEOUT_MS indirectly by checking the
+    // timeout log message — the route pushes a line with the timeout seconds.
+    vi.useFakeTimers();
+
+    await POST(makePostRequest({ agentKey: "coverage_agent" }));
+
+    // Advance time past 5 minutes
+    await vi.advanceTimersByTimeAsync(300_001);
+
+    // The timeout handler should have killed the process
+    expect(mockProcess.kill).toHaveBeenCalledWith("SIGTERM");
+
+    vi.useRealTimers();
+  });
+
+  it("escalates from SIGTERM to SIGKILL after grace period", async () => {
+    vi.useFakeTimers();
+
+    await POST(makePostRequest({ agentKey: "coverage_agent" }));
+
+    // Advance past the main timeout (300_000ms)
+    await vi.advanceTimersByTimeAsync(300_001);
+    expect(mockProcess.kill).toHaveBeenCalledWith("SIGTERM");
+
+    // Advance past the SIGKILL grace period (5_000ms)
+    await vi.advanceTimersByTimeAsync(5_001);
+    expect(mockProcess.kill).toHaveBeenCalledWith("SIGKILL");
+
+    vi.useRealTimers();
   });
 });
 
@@ -345,6 +413,20 @@ describe("DELETE /api/admin/agents/run", () => {
     expect(res.status).toBe(200);
     expect(body.status).toBe("stopped");
     expect(mockProcess.kill).toHaveBeenCalled();
+  });
+
+  it("cleans up streams and listeners when stopping", async () => {
+    await POST(makePostRequest({ agentKey: "coverage_agent" }));
+
+    await DELETE_HANDLER(
+      makeRequest("DELETE", { agentKey: "coverage_agent" }),
+    );
+
+    expect(mockStdout.removeAllListeners).toHaveBeenCalled();
+    expect(mockStderr.removeAllListeners).toHaveBeenCalled();
+    expect(mockStdout.destroy).toHaveBeenCalled();
+    expect(mockStderr.destroy).toHaveBeenCalled();
+    expect(mockProcess.removeAllListeners).toHaveBeenCalled();
   });
 
   it("allows starting a new agent after stopping", async () => {

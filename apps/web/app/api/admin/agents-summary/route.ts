@@ -6,6 +6,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 import { AGENTS } from "@/lib/agents/agent-config";
 import {
   parseHealthStatus,
@@ -52,10 +53,13 @@ export async function GET(request: NextRequest) {
   }
 
   // Load feature flags to determine enabled state
-  const flags = await dbGetFeatureFlags();
+  const flags = await dbTimeoutOr504(dbGetFeatureFlags(), "dbGetFeatureFlags");
+  if (flags instanceof NextResponse) return flags;
   const flagMap = new Map(flags.map((f) => [f.key, f.enabled]));
 
   // Build agent statuses
+  // process.cwd() causes Turbopack to trace the project dir into the bundle — cosmetic build warning only.
+  // Alternatives (import.meta.dirname with relative traversal) are brittle. Admin-only route, low impact.
   const projectRoot = process.cwd();
   const agents: AgentStatus[] = await Promise.all(
     Object.values(AGENTS).map(async (config) => {

@@ -4,6 +4,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { dbUpdateFeatureFlag } from "@/lib/db/feature-flags";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /**
  * PATCH /api/admin/feature-flags
@@ -67,7 +68,8 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const success = await dbUpdateFeatureFlag(body.key, updates);
+  const success = await dbTimeoutOr504(dbUpdateFeatureFlag(body.key, updates), "dbUpdateFeatureFlag");
+  if (success instanceof NextResponse) return success;
   if (!success) {
     return NextResponse.json(
       { error: "Failed to update feature flag" },

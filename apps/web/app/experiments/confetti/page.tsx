@@ -106,7 +106,7 @@ export default function ConfettiExperimentPage() {
   }, [particleCount, palette, speed]);
 
   return (
-    <div className="min-h-screen bg-bg bg-grid-warm">
+    <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
       <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div

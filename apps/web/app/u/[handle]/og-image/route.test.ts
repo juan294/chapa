@@ -138,13 +138,13 @@ describe("GET /u/[handle]/og-image", () => {
       expect(res.headers.get("Content-Type")).toBe("image/png");
     });
 
-    it("stores the generated PNG as base64 in Redis with 24h TTL", async () => {
+    it("stores the generated PNG as base64 in Redis with 48h TTL", async () => {
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
       expect(mockCacheSet).toHaveBeenCalledWith(
         "og-image:v1:testuser:2026-02-14",
         FAKE_PNG_BASE64,
-        86400,
+        172800, // 48 hours
       );
     });
 
@@ -276,6 +276,38 @@ describe("GET /u/[handle]/og-image", () => {
       expect(res.status).toBe(500);
 
       consoleSpy.mockRestore();
+    });
+
+    it("returns 504 when svgToPng exceeds the timeout", async () => {
+      // Silence expected console.error from the timeout error path
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // Simulate a svgToPng call that never resolves within the timeout
+      mockSvgToPng.mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 30_000)),
+      );
+
+      const [req, ctx] = makeRequest("testuser");
+
+      // Advance timers past the 10s timeout
+      const responsePromise = GET(req, ctx);
+      await vi.advanceTimersByTimeAsync(10_001);
+      const res = await responsePromise;
+
+      expect(res.status).toBe(504);
+      const body = await res.text();
+      expect(body).toContain("timed out");
+
+      consoleSpy.mockRestore();
+    });
+
+    it("returns PNG successfully when svgToPng completes within timeout", async () => {
+      // Ensure the timeout guard doesn't interfere with normal fast responses
+      mockSvgToPng.mockReturnValue(FAKE_PNG);
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe("image/png");
     });
   });
 });

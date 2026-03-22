@@ -1,4 +1,5 @@
 import type { StatsData, ImpactV4Result, HeatmapDay } from "@chapa/shared";
+import { toDateString } from "@/lib/utils/date";
 
 /* ── Heatmap data (13 weeks × 7 days = 91 entries) ────────────────────────
    Levels: 0 = none, 1 = low, 2 = medium, 3 = high, 4 = intense
@@ -38,7 +39,7 @@ function buildDemoHeatmap(): HeatmapDay[] {
       const d = new Date(baseDate);
       d.setDate(d.getDate() + idx);
       days.push({
-        date: d.toISOString().slice(0, 10),
+        date: toDateString(d),
         count: LEVEL_TO_COUNT[LEVEL_GRID[week]![day]!] ?? 0,
       });
     }
@@ -77,6 +78,7 @@ export const DEMO_IMPACT: ImpactV4Result = {
     quality: 72,
     consistency: 80,
     breadth: 65,
+    craft: 72,
   },
   archetype: "Builder",
   compositeScore: 76,

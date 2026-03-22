@@ -16,6 +16,7 @@
 import type { SnapshotDiff } from "@/lib/history/diff";
 import type { SignificantChange } from "@/lib/history/significant-change";
 import { getResend, escapeHtml } from "./resend";
+import { EMAIL_FROM } from "./campaigns";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { dbGetUserEmail } from "@/lib/db/users";
 import { dbGetFeatureFlag } from "@/lib/db/feature-flags";
@@ -75,7 +76,7 @@ export async function notifyScoreBump(
 
     // 6. Send
     const { error } = await resend.emails.send({
-      from: "Chapa <notifications@chapa.thecreativetoken.com>",
+      from: EMAIL_FROM,
       to: [userEmail.email],
       subject,
       html,
@@ -202,11 +203,11 @@ function buildHtml(data: TemplateData): string {
       break;
     case "archetype_change":
       headline = `Your profile evolved: ${escapeHtml(diff.archetype!.from)} → ${escapeHtml(diff.archetype!.to)}`;
-      headlineColor = "#7C6AEF"; // brand purple
+      headlineColor = "#8B5CF6"; // brand purple
       break;
     case "score_bump":
       headline = `Your Impact score just jumped +${Math.round(diff.adjustedComposite)} points!`;
-      headlineColor = "#7C6AEF";
+      headlineColor = "#8B5CF6";
       break;
   }
 
@@ -217,7 +218,7 @@ function buildHtml(data: TemplateData): string {
   }
   if (diff.archetype) {
     changeRows.push(
-      changeRow("Archetype", diff.archetype.from, diff.archetype.to, "#7C6AEF"),
+      changeRow("Archetype", diff.archetype.from, diff.archetype.to, "#8B5CF6"),
     );
   }
 
@@ -235,10 +236,10 @@ function buildHtml(data: TemplateData): string {
 <body style="margin:0;padding:0;background:#0A0A0F;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;padding:32px 16px;">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:12px;border:1px solid rgba(124,106,239,0.15);overflow:hidden;">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#111118;border-radius:12px;border:1px solid rgba(139,92,246,0.15);overflow:hidden;">
 
         <!-- Header -->
-        <tr><td style="background:linear-gradient(135deg,#7C6AEF 0%,#5E4FCC 100%);padding:24px 32px;">
+        <tr><td style="background:linear-gradient(135deg,#8B5CF6 0%,#7C3AED 100%);padding:24px 32px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="font-family:'Courier New',monospace;font-size:24px;font-weight:700;color:#FFFFFF;letter-spacing:2px;">CHAPA</td>
@@ -255,7 +256,7 @@ function buildHtml(data: TemplateData): string {
           <div style="font-size:14px;color:#6B6F7B;margin-bottom:24px;">@${safeHandle}</div>
 
           <!-- Score delta card -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;border-radius:8px;border:1px solid rgba(124,106,239,0.10);margin-bottom:24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0F;border-radius:8px;border:1px solid rgba(139,92,246,0.10);margin-bottom:24px;">
             <tr>
               <td align="center" style="padding:20px;">
                 <div style="font-size:36px;font-weight:700;color:#4ADE80;">+${Math.round(diff.adjustedComposite)}</div>
@@ -283,7 +284,7 @@ function buildHtml(data: TemplateData): string {
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
             <tr>
               <td align="center">
-                <a href="${shareUrl}" style="display:inline-block;background:#7C6AEF;color:#FFFFFF;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">View Your Updated Badge</a>
+                <a href="${shareUrl}" style="display:inline-block;background:#8B5CF6;color:#FFFFFF;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">View Your Updated Badge</a>
               </td>
             </tr>
           </table>
@@ -291,7 +292,7 @@ function buildHtml(data: TemplateData): string {
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="padding:16px 32px;border-top:1px solid rgba(124,106,239,0.10);">
+        <tr><td style="padding:16px 32px;border-top:1px solid rgba(139,92,246,0.10);">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="font-size:11px;color:#3A3A4A;">chapa.thecreativetoken.com</td>

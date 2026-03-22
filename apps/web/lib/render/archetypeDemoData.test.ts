@@ -12,6 +12,8 @@ import {
   BALANCED_IMPACT,
   EMERGING_STATS,
   EMERGING_IMPACT,
+  ARTIFICER_STATS,
+  ARTIFICER_IMPACT,
 } from "./archetypeDemoData";
 
 describe("archetypeDemoData", () => {
@@ -23,6 +25,7 @@ describe("archetypeDemoData", () => {
       { name: "Polymath", stats: POLYMATH_STATS, impact: POLYMATH_IMPACT },
       { name: "Balanced", stats: BALANCED_STATS, impact: BALANCED_IMPACT },
       { name: "Emerging", stats: EMERGING_STATS, impact: EMERGING_IMPACT },
+      { name: "Artificer", stats: ARTIFICER_STATS, impact: ARTIFICER_IMPACT },
     ];
 
     for (const { name, stats, impact } of archetypes) {
@@ -43,16 +46,20 @@ describe("archetypeDemoData", () => {
           expect(typeof day.count).toBe("number");
         });
 
-        it("has 4 dimensions between 0 and 100", () => {
+        it("has core dimensions between 0 and 100", () => {
           const dims = impact.dimensions;
           for (const key of ["delivery", "quality", "consistency", "breadth"] as const) {
             expect(dims[key]).toBeGreaterThanOrEqual(0);
             expect(dims[key]).toBeLessThanOrEqual(100);
           }
+          if (dims.craft !== undefined) {
+            expect(dims.craft).toBeGreaterThanOrEqual(0);
+            expect(dims.craft).toBeLessThanOrEqual(100);
+          }
         });
 
         it("has valid tier", () => {
-          expect(["Emerging", "Growing", "Established", "High", "Exceptional"]).toContain(impact.tier);
+          expect(["Emerging", "Solid", "High", "Elite"]).toContain(impact.tier);
         });
       });
     }

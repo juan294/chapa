@@ -1,4 +1,4 @@
-import type { ImpactV4Result, DeveloperArchetype, StatsData, Platform } from "@chapa/shared";
+import type { ImpactV4Result, DeveloperArchetype, StatsData, Platform, DimensionScores } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 
@@ -7,6 +7,7 @@ const DIMENSION_LABELS: Record<string, string> = {
   quality: "Quality",
   consistency: "Consistency",
   breadth: "Breadth",
+  craft: "Craft",
 };
 
 const DIMENSION_SUBTITLES: Record<string, string> = {
@@ -14,6 +15,11 @@ const DIMENSION_SUBTITLES: Record<string, string> = {
   quality: "Code reviews \u00b7 quality gatekeeping",
   consistency: "Active days \u00b7 sustained contributions",
   breadth: "Repos contributed \u00b7 community reach",
+  craft: "AI tool proficiency \u00b7 effectiveness \u00b7 sophistication",
+};
+
+const SOLO_DIMENSION_SUBTITLES: Partial<Record<string, string>> = {
+  quality: "PR descriptions \u00b7 branch discipline \u00b7 issue linkage",
 };
 
 const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
@@ -21,6 +27,7 @@ const DIMENSION_COLORS: Record<string, { from: string; to: string }> = {
   quality: { from: "var(--color-dimension-quality)", to: "var(--color-dimension-quality-light)" },
   consistency: { from: "var(--color-dimension-consistency)", to: "var(--color-dimension-consistency-light)" },
   breadth: { from: "var(--color-dimension-breadth)", to: "var(--color-dimension-breadth-light)" },
+  craft: { from: "var(--color-dimension-craft)", to: "var(--color-dimension-craft-light)" },
 };
 
 
@@ -41,6 +48,17 @@ const DIMENSION_TOOLTIPS: Record<string, { id: string; tip: string }> = {
     id: "dim-breadth",
     tip: "Measures cross-project reach: repos contributed to, project diversity, and community metrics (stars, forks, watchers).",
   },
+  craft: {
+    id: "dim-craft",
+    tip: "Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.",
+  },
+};
+
+const SOLO_DIMENSION_TOOLTIPS: Partial<Record<string, { id: string; tip: string }>> = {
+  quality: {
+    id: "dim-quality",
+    tip: "Measures engineering discipline: PR descriptions, feature branch usage, issue linkage, and commit cleanliness.",
+  },
 };
 
 const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
@@ -51,7 +69,7 @@ const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   Commits: { id: "stat-commits", tip: "Commits pushed across all repos in the last 365 days." },
   "PRs Merged": { id: "stat-prs-merged", tip: "Pull requests you authored that were merged in the last 365 days." },
   Reviews: { id: "stat-reviews", tip: "Code reviews submitted on others\u2019 PRs in the last 365 days." },
-  Repos: { id: "stat-repos", tip: "Distinct repositories you contributed to in the last 365 days." },
+  Repos: { id: "stat-repos", tip: "Repos with 3+ commits in the last 365 days. Shallow one-commit contributions are excluded." },
 };
 
 const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewBox: string }> = {
@@ -163,6 +181,8 @@ const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
     "Your profile is impressively well-rounded \u2014 no single dimension dominates because you invest across delivery, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
   Emerging:
     "Your profile is still taking shape \u2014 with more contributions over the coming months, your strongest dimensions will emerge and reveal your developer identity. Every commit, review, and repo you touch sharpens the picture.",
+  Artificer:
+    "Your profile is defined by craft \u2014 you leverage AI coding tools with exceptional skill and sophistication, turning them into force multipliers for your development workflow. Craft is your dominant dimension, showcasing mastery of modern AI-assisted development.",
 };
 
 const DIMENSION_TIPS: Record<string, string> = {
@@ -170,6 +190,11 @@ const DIMENSION_TIPS: Record<string, string> = {
   quality: "To strengthen Quality, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
   consistency: "To strengthen Consistency, aim for regular contributions across more days \u2014 even small commits on consecutive days build this dimension faster than occasional bursts.",
   breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
+  craft: "To strengthen Craft, explore AI coding tools more deeply \u2014 use them for complex refactoring, test generation, and code review to build proficiency and sophistication.",
+};
+
+const SOLO_DIMENSION_TIPS: Partial<Record<string, string>> = {
+  quality: "To strengthen Quality, write PR descriptions, use feature branches, and link PRs to issues \u2014 even as a solo dev, these habits protect your codebase.",
 };
 
 /**
@@ -187,7 +212,8 @@ export function getArchetypeProfile(impact: ImpactV4Result): string {
 
   const entries = Object.entries(dims) as [string, number][];
   const weakest = entries.reduce((min, curr) => (curr[1] < min[1] ? curr : min));
-  const tip = DIMENSION_TIPS[weakest[0]];
+  const isSolo = impact.profileType === "solo";
+  const tip = (isSolo ? SOLO_DIMENSION_TIPS[weakest[0]] : undefined) ?? DIMENSION_TIPS[weakest[0]];
 
   return `${profile} ${tip}`;
 }
@@ -198,7 +224,20 @@ interface ImpactBreakdownProps {
 }
 
 export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
+  if (!impact || !stats) {
+    return (
+      <div className="rounded-xl border border-stroke bg-card p-8 text-center">
+        <p className="text-sm text-text-secondary">No impact data available</p>
+      </div>
+    );
+  }
+
   const dims = impact.dimensions;
+  const isSolo = impact.profileType === "solo";
+  const hasCraft = dims.craft != null;
+  const activeDimensions: (keyof DimensionScores)[] = hasCraft
+    ? ["delivery", "quality", "consistency", "breadth", "craft"]
+    : ["delivery", "quality", "consistency", "breadth"];
 
   return (
     <div className="space-y-10">
@@ -208,7 +247,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           Performance Dimensions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {(["delivery", "quality", "consistency", "breadth"] as const).map(
+          {activeDimensions.map(
             (key, i) => (
               <div
                 key={key}
@@ -219,8 +258,8 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   <span className="text-xs text-text-secondary uppercase tracking-wider flex items-center gap-1">
                     {DIMENSION_LABELS[key]}
                     <InfoTooltip
-                      id={DIMENSION_TOOLTIPS[key]!.id}
-                      content={DIMENSION_TOOLTIPS[key]!.tip}
+                      id={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.id : undefined) ?? DIMENSION_TOOLTIPS[key]!.id}
+                      content={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.tip : undefined) ?? DIMENSION_TOOLTIPS[key]!.tip}
                     />
                   </span>
                   <span className="font-heading text-3xl font-extrabold text-text-primary leading-none">
@@ -243,7 +282,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   />
                 </div>
                 <p className="text-xs text-text-secondary/50 mt-2.5 leading-relaxed">
-                  {DIMENSION_SUBTITLES[key]}
+                  {(isSolo ? SOLO_DIMENSION_SUBTITLES[key] : undefined) ?? DIMENSION_SUBTITLES[key]}
                 </p>
               </div>
             ),
@@ -258,14 +297,14 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { value: stats.totalStars, label: "Stars" },
-            { value: stats.totalForks, label: "Forks" },
-            { value: stats.totalWatchers, label: "Watchers" },
-            { value: stats.activeDays, label: "Active Days" },
-            { value: stats.commitsTotal, label: "Commits" },
-            { value: stats.prsMergedCount, label: "PRs Merged" },
-            { value: stats.reviewsSubmittedCount, label: "Reviews" },
-            { value: stats.reposContributed, label: "Repos" },
+            { value: stats.totalStars ?? 0, label: "Stars" },
+            { value: stats.totalForks ?? 0, label: "Forks" },
+            { value: stats.totalWatchers ?? 0, label: "Watchers" },
+            { value: stats.activeDays ?? 0, label: "Active Days" },
+            { value: stats.commitsTotal ?? 0, label: "Commits" },
+            { value: stats.prsMergedCount ?? 0, label: "PRs Merged" },
+            { value: stats.reviewsSubmittedCount ?? 0, label: "Reviews" },
+            { value: stats.reposContributed ?? 0, label: "Repos" },
           ].map((stat, i) => (
             <div
               key={stat.label}

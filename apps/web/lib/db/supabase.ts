@@ -40,8 +40,13 @@ export async function pingSupabase(): Promise<"ok" | "error" | "unavailable"> {
   if (!db) return "unavailable";
 
   try {
-    const { error } = await db.from("users").select("id").limit(1);
-    return error ? "error" : "ok";
+    const result = await Promise.race([
+      db.from("users").select("id").limit(1),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("ping timeout")), 5000),
+      ),
+    ]);
+    return result.error ? "error" : "ok";
   } catch {
     return "error";
   }

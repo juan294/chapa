@@ -142,14 +142,14 @@ describe("BadgeOverlay lazy rendering (#323)", () => {
 });
 
 describe("BadgeOverlay CSS variable colors (#331)", () => {
-  it("does NOT use hardcoded #7C6AEF in SVG elements", () => {
+  it("does NOT use hardcoded #8B5CF6 in SVG elements", () => {
     // The accent color should come from CSS variables, not hardcoded hex.
     // Check the SVG rendering section specifically (not the HOTSPOTS data).
     const svgSection = SRC.match(
       /id="leader-lines-svg"[\s\S]*?<\/svg>/,
     )?.[0];
     expect(svgSection).toBeDefined();
-    expect(svgSection).not.toContain("#7C6AEF");
+    expect(svgSection).not.toContain("#8B5CF6");
   });
 
   it("uses var(--color-amber) for stroke and fill", () => {

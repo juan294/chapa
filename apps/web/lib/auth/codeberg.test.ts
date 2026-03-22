@@ -223,12 +223,17 @@ describe("refreshCodebergToken", () => {
     );
 
     const result = await refreshCodebergToken("old_refresh", "cid", "csecret");
-    expect(result).not.toBeNull();
-    expect(result!.access_token).toBe("new_access");
-    expect(result!.refresh_token).toBe("new_refresh");
+    expect(result).toEqual({
+      ok: true,
+      tokens: {
+        access_token: "new_access",
+        token_type: "bearer",
+        refresh_token: "new_refresh",
+      },
+    });
   });
 
-  it("returns null on error", async () => {
+  it("returns revoked when 400 + invalid_grant", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -239,17 +244,54 @@ describe("refreshCodebergToken", () => {
     );
 
     const result = await refreshCodebergToken("revoked", "cid", "csecret");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: "revoked" });
   });
 
-  it("returns null on network error", async () => {
+  it("returns transient on network error", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new Error("network error")),
     );
 
     const result = await refreshCodebergToken("refresh", "cid", "csecret");
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 500 server error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      }),
+    );
+
+    const result = await refreshCodebergToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on 400 without invalid_grant", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: "invalid_request" }),
+      }),
+    );
+
+    const result = await refreshCodebergToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns transient on timeout (AbortError)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await refreshCodebergToken("refresh", "cid", "csecret");
+    expect(result).toEqual({ ok: false, reason: "transient" });
   });
 });
 
@@ -383,6 +425,78 @@ describe("clearCodebergStateCookie", () => {
     const cookie = clearCodebergStateCookie();
     expect(cookie).toContain("chapa_cb_oauth_state=");
     expect(cookie).toContain("Max-Age=0");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AbortSignal timeout on all fetch calls
+// ---------------------------------------------------------------------------
+
+describe("Codeberg OAuth fetch AbortSignal timeout", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("exchangeCodebergCode passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "tok",
+          token_type: "bearer",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await exchangeCodebergCode("code", "cid", "csecret", "http://localhost:3001/cb");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("refreshCodebergToken passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          access_token: "tok",
+          token_type: "bearer",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await refreshCodebergToken("refresh_tok", "cid", "csecret");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("fetchCodebergUser passes an AbortSignal to fetch", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          login: "cb-user",
+          full_name: "CB User",
+          avatar_url: "https://codeberg.org/avatars/12345",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchCodebergUser("access_tok");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null when fetch aborts due to timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal timed out", "AbortError")),
+    );
+
+    const result = await exchangeCodebergCode("code", "cid", "csecret", "http://localhost:3001/cb");
+    expect(result).toBeNull();
   });
 });
 

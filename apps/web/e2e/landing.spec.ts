@@ -24,7 +24,7 @@ test.describe("Landing page — sections and content", () => {
 
     // Check for known feature titles (exact match to avoid ambiguity)
     await expect(
-      page.getByText("FOUR DIMENSIONS", { exact: true })
+      page.getByText("MULTI-DIMENSIONAL", { exact: true })
     ).toBeVisible();
     await expect(
       page.getByText("DEVELOPER ARCHETYPE", { exact: true })
@@ -52,9 +52,9 @@ test.describe("Landing page — sections and content", () => {
     await expect(section).toBeAttached();
 
     // Scope to #stats to avoid matching unrelated content
-    await expect(section.getByText("6", { exact: true })).toBeVisible();
+    await expect(section.getByText("7", { exact: true })).toBeVisible();
     await expect(section.getByText("archetypes")).toBeVisible();
-    await expect(section.getByText("4", { exact: true })).toBeVisible();
+    await expect(section.getByText("5", { exact: true })).toBeVisible();
     await expect(section.getByText("dimensions")).toBeVisible();
     await expect(section.getByText("365", { exact: true })).toBeVisible();
   });

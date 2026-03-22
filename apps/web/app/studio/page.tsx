@@ -7,6 +7,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
+import { toDateString } from "@/lib/utils/date";
 import { StudioClient } from "./StudioClient";
 import type { BadgeConfig, StatsData } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
@@ -36,12 +37,14 @@ function buildEmptyStats(session: {
     totalForks: 0,
     totalWatchers: 0,
     heatmapData: Array.from({ length: 366 }, (_, i) => ({
-      date: new Date(now - (365 - i) * 86400000).toISOString().slice(0, 10),
+      date: toDateString(new Date(now - (365 - i) * 86400000)),
       count: 0,
     })),
     fetchedAt: new Date(now).toISOString(),
   };
 }
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Creator Studio — Chapa",

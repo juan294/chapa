@@ -35,6 +35,9 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
             deletions
             changedFiles
             merged
+            body
+            headRefName
+            closingIssuesReferences(first: 1) { totalCount }
           }
         }
       }

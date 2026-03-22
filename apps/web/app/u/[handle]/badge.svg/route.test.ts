@@ -87,7 +87,7 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
 }));
 
 vi.mock("@/lib/impact/smoothing", () => ({
-  applyEMA: vi.fn((score: number) => score),
+  smoothScore: vi.fn((score: number) => score),
 }));
 
 vi.mock("@/lib/impact/utils", () => ({
@@ -97,6 +97,10 @@ vi.mock("@/lib/impact/utils", () => ({
     if (score >= 30) return "Solid";
     return "Emerging";
   }),
+}));
+
+vi.mock("@/lib/db/tool-insights", () => ({
+  dbGetToolInsights: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -236,10 +240,25 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
     });
 
-    it("passes stats to computeImpactV4", async () => {
+    it("passes stats to computeImpactV4 without craft score when no insights exist", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+    });
+
+    it("passes craft score to computeImpactV4 when tool insights exist", async () => {
+      const { dbGetToolInsights } = await import("@/lib/db/tool-insights");
+      vi.mocked(dbGetToolInsights).mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 75,
+        tier: "Expert",
+        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+        computedAt: "2025-03-01T00:00:00Z",
+      });
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      await GET(req, ctx);
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, 75);
     });
 
     it("passes stats, impact, and options to renderBadgeSvg", async () => {
@@ -511,6 +530,39 @@ describe("GET /u/[handle]/badge.svg", () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("renders badge when dbGetToolInsights throws (allSettled resilience)", async () => {
+      const { dbGetToolInsights } = await import("@/lib/db/tool-insights");
+      vi.mocked(dbGetToolInsights).mockRejectedValue(new Error("Supabase error"));
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toBe(FAKE_SVG);
+      // craft score falls back to undefined
+      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+    });
+
+    it("renders badge when getCachedLatestSnapshot throws (allSettled resilience)", async () => {
+      mockGetCachedLatestSnapshot.mockRejectedValue(new Error("Redis error"));
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toBe(FAKE_SVG);
+    });
+
+    it("renders badge when getAvatarBase64 throws (allSettled resilience)", async () => {
+      mockGetAvatarBase64.mockRejectedValue(new Error("Network error"));
+      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+        avatarDataUri: undefined,
+        verificationHash: undefined,
+        verificationDate: undefined,
+      });
     });
   });
 

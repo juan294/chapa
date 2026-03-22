@@ -5,6 +5,7 @@ import {
   REPO_DEPTH_THRESHOLD,
 } from "@chapa/shared";
 import type { RawCodebergData } from "./types";
+import { toDateString } from "@/lib/utils/date";
 
 /**
  * Transform raw Codeberg data into a StatsData object.
@@ -16,7 +17,7 @@ export function buildStatsFromCodeberg(raw: RawCodebergData): StatsData {
   //    Aggregate by date (multiple timestamps can map to same date)
   const heatmapMap = new Map<string, number>();
   for (const entry of raw.heatmap) {
-    const date = new Date(entry.timestamp * 1000).toISOString().slice(0, 10);
+    const date = toDateString(new Date(entry.timestamp * 1000));
     heatmapMap.set(date, (heatmapMap.get(date) ?? 0) + entry.contributions);
   }
   const heatmapData: HeatmapDay[] = Array.from(heatmapMap.entries())

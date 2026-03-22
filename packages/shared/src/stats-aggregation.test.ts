@@ -23,9 +23,9 @@ function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionD
     pullRequests: {
       totalCount: 3,
       nodes: [
-        { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-        { additions: 50, deletions: 10, changedFiles: 3, merged: true },
-        { additions: 200, deletions: 50, changedFiles: 8, merged: false },
+        { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: "Fixes the login bug", headRefName: "fix/login-bug", closingIssuesCount: 1 },
+        { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: null, headRefName: "main", closingIssuesCount: 0 },
+        { additions: 200, deletions: 50, changedFiles: 8, merged: false, body: "WIP", headRefName: "feat/new-feature", closingIssuesCount: 0 },
       ],
     },
     reviews: { totalCount: 15 },
@@ -172,7 +172,7 @@ describe("buildStatsFromRaw", () => {
       pullRequests: {
         totalCount: 1,
         nodes: [
-          { additions: 1000, deletions: 500, changedFiles: 20, merged: true },
+          { additions: 1000, deletions: 500, changedFiles: 20, merged: true, body: "Big PR", headRefName: "feat/big", closingIssuesCount: 0 },
         ],
       },
     });
@@ -188,6 +188,9 @@ describe("buildStatsFromRaw", () => {
       deletions: 5000,
       changedFiles: 100,
       merged: true,
+      body: "Large PR",
+      headRefName: "feat/large" as string,
+      closingIssuesCount: 0,
     }));
     const raw = makeRaw({
       pullRequests: { totalCount: 60, nodes },
@@ -201,8 +204,8 @@ describe("buildStatsFromRaw", () => {
       pullRequests: {
         totalCount: 2,
         nodes: [
-          { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-          { additions: 999, deletions: 999, changedFiles: 50, merged: false },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: "Fix", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 999, deletions: 999, changedFiles: 50, merged: false, body: "WIP", headRefName: "feat/b", closingIssuesCount: 0 },
         ],
       },
     });
@@ -219,8 +222,8 @@ describe("buildStatsFromRaw", () => {
       pullRequests: {
         totalCount: 2,
         nodes: [
-          { additions: 100, deletions: 20, changedFiles: 5, merged: true },
-          { additions: 50, deletions: 10, changedFiles: 3, merged: true },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: "Fix A", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "Fix B", headRefName: "fix/b", closingIssuesCount: 0 },
         ],
       },
     });
@@ -436,5 +439,65 @@ describe("buildStatsFromRaw", () => {
     });
     const result = buildStatsFromRaw(raw);
     expect(result.totalWatchers).toBe(0);
+  });
+
+  // --- Solo quality signals ---
+
+  it("computes prDescriptionRate from merged PRs with non-empty body", () => {
+    const result = buildStatsFromRaw(makeRaw());
+    // Default data: 2 merged PRs, 1 has body "Fixes the login bug", 1 has null body
+    expect(result.prDescriptionRate).toBeCloseTo(0.5, 2);
+  });
+
+  it("treats whitespace-only body as empty", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 10, deletions: 5, changedFiles: 2, merged: true, body: "   \n  ", headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 10, deletions: 5, changedFiles: 2, merged: true, body: "Real description", headRefName: "feat/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.prDescriptionRate).toBeCloseTo(0.5, 2);
+  });
+
+  it("computes featureBranchRate excluding default branch names", () => {
+    const result = buildStatsFromRaw(makeRaw());
+    // Default data: 2 merged PRs, headRefNames: "fix/login-bug" (feature), "main" (default)
+    expect(result.featureBranchRate).toBeCloseTo(0.5, 2);
+  });
+
+  it("excludes all default branch names from featureBranchRate", () => {
+    const defaultBranches = ["main", "master", "develop", "development", "trunk"];
+    for (const branch of defaultBranches) {
+      const raw = makeRaw({
+        pullRequests: {
+          totalCount: 1,
+          nodes: [
+            { additions: 10, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: branch, closingIssuesCount: 0 },
+          ],
+        },
+      });
+      const result = buildStatsFromRaw(raw);
+      expect(result.featureBranchRate).toBe(0);
+    }
+  });
+
+  it("computes issueLinkageRate from merged PRs with closingIssuesCount > 0", () => {
+    const result = buildStatsFromRaw(makeRaw());
+    // Default data: 2 merged PRs, 1 has closingIssuesCount=1, 1 has 0
+    expect(result.issueLinkageRate).toBeCloseTo(0.5, 2);
+  });
+
+  it("returns undefined rates when no merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: { totalCount: 0, nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.prDescriptionRate).toBeUndefined();
+    expect(result.featureBranchRate).toBeUndefined();
+    expect(result.issueLinkageRate).toBeUndefined();
   });
 });

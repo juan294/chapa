@@ -9,9 +9,9 @@
   --color-text-secondary: #6B7280;
   --color-stroke: #00000014;
 
-  --color-amber: #7C6AEF;
-  --color-amber-light: #9D8FFF;
-  --color-amber-dark: #5E4FCC;
+  --color-amber: #8B5CF6;
+  --color-amber-light: #A78BFA;
+  --color-amber-dark: #7C3AED;
 
   --color-warm-bg: #FFFFFF;
   --color-warm-card: #F9FAFB;
@@ -30,23 +30,26 @@
 
   --color-track: #0000000F;
 
-  /* Dimension colors — data visualization accents for the 4 impact dimensions */
+  /* Dimension colors — data visualization accents for the impact dimensions */
   --color-dimension-delivery: #22c55e;
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
-  --color-dimension-delivery-light: #86efac;
-  --color-dimension-quality-light: #fdba74;
-  --color-dimension-consistency-light: #67e8f9;
-  --color-dimension-breadth-light: #f9a8d4;
+  --color-dimension-craft: #F59E0B;
+  --color-dimension-delivery-light: #4ADE80;
+  --color-dimension-quality-light: #FB923C;
+  --color-dimension-consistency-light: #22D3EE;
+  --color-dimension-breadth-light: #F472B6;
+  --color-dimension-craft-light: #FBBF24;
 
   /* Archetype colors — accent color per developer archetype */
-  --color-archetype-builder: #7C6AEF;
-  --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #16A34A;
-  --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #64748B;
+  --color-archetype-builder: #8B5CF6;
+  --color-archetype-guardian: #EC4899;
+  --color-archetype-marathoner: #22C55E;
+  --color-archetype-polymath: #EAB308;
+  --color-archetype-balanced: #0EA5E9;
   --color-archetype-emerging: #F97316;
+  --color-archetype-artificer: #F59E0B;
 
   /* Typography — Tailwind v4 uses --font-* (not --font-family-*) to generate font-* utilities */
   --font-heading: var(--font-jetbrains-mono), "Courier New", monospace;
@@ -84,17 +87,20 @@
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
-  --color-dimension-delivery-light: #86efac;
-  --color-dimension-quality-light: #fdba74;
-  --color-dimension-consistency-light: #67e8f9;
-  --color-dimension-breadth-light: #f9a8d4;
+  --color-dimension-craft: #F59E0B;
+  --color-dimension-delivery-light: #4ADE80;
+  --color-dimension-quality-light: #FB923C;
+  --color-dimension-consistency-light: #22D3EE;
+  --color-dimension-breadth-light: #F472B6;
+  --color-dimension-craft-light: #FBBF24;
 
-  --color-archetype-builder: #7C6AEF;
-  --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #16A34A;
-  --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #64748B;
+  --color-archetype-builder: #8B5CF6;
+  --color-archetype-guardian: #EC4899;
+  --color-archetype-marathoner: #22C55E;
+  --color-archetype-polymath: #EAB308;
+  --color-archetype-balanced: #0EA5E9;
   --color-archetype-emerging: #F97316;
+  --color-archetype-artificer: #F59E0B;
 }
 
 [data-theme="dark"] {
@@ -102,15 +108,15 @@
   --color-card: #111118;
   --color-text-primary: #E2E4E9;
   --color-text-secondary: #8B8FA0;
-  --color-stroke: rgba(124, 106, 239, 0.10);
+  --color-stroke: rgba(139, 92, 246, 0.10);
 
   --color-warm-bg: #0A0A0F;
   --color-warm-card: #111118;
-  --color-warm-stroke: rgba(124, 106, 239, 0.10);
+  --color-warm-stroke: rgba(139, 92, 246, 0.10);
 
   --color-dark-section: #06060A;
   --color-dark-card: #0E0E16;
-  --color-purple-tint: rgba(124, 106, 239, 0.06);
+  --color-purple-tint: rgba(139, 92, 246, 0.06);
   --color-complement-light: rgba(16, 185, 129, 0.15);
 
   --color-terminal-green: #4ADE80;
@@ -124,17 +130,20 @@
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
   --color-dimension-breadth: #ec4899;
-  --color-dimension-delivery-light: #86efac;
-  --color-dimension-quality-light: #fdba74;
-  --color-dimension-consistency-light: #67e8f9;
-  --color-dimension-breadth-light: #f9a8d4;
+  --color-dimension-craft: #F59E0B;
+  --color-dimension-delivery-light: #4ADE80;
+  --color-dimension-quality-light: #FB923C;
+  --color-dimension-consistency-light: #22D3EE;
+  --color-dimension-breadth-light: #F472B6;
+  --color-dimension-craft-light: #FBBF24;
 
-  --color-archetype-builder: #7C6AEF;
-  --color-archetype-guardian: #F472B6;
-  --color-archetype-marathoner: #16A34A;
-  --color-archetype-polymath: #FCD34D;
-  --color-archetype-balanced: #64748B;
+  --color-archetype-builder: #8B5CF6;
+  --color-archetype-guardian: #EC4899;
+  --color-archetype-marathoner: #22C55E;
+  --color-archetype-polymath: #EAB308;
+  --color-archetype-balanced: #0EA5E9;
   --color-archetype-emerging: #F97316;
+  --color-archetype-artificer: #F59E0B;
 }
 
 html {
@@ -174,6 +183,17 @@ html {
   }
 }
 
+@keyframes hex-cell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -188,10 +208,10 @@ html {
 @keyframes pulse-glow-amber {
   0%,
   100% {
-    box-shadow: 0 0 20px rgba(124, 106, 239, 0.1);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
   }
   50% {
-    box-shadow: 0 0 40px rgba(124, 106, 239, 0.18);
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.18);
   }
 }
 
@@ -240,6 +260,17 @@ html {
   }
 }
 
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+}
+
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -285,6 +316,45 @@ html {
   animation: bar-fill 0.8s ease-out both;
 }
 
+/* ── Sparkline trace ───────────────────────────────────── */
+
+@keyframes radar-expand {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sparkline-trace {
+  from {
+    stroke-dashoffset: var(--sparkline-length);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.sparkline-animated polyline {
+  animation: sparkline-trace 0.6s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkline-animated polyline {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+
+  [role="img"][aria-label="Hexagonal activity heatmap"] div {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* ── Animation utilities ─────────────────────────────────── */
 
 .animate-float-slow {
@@ -312,11 +382,17 @@ html {
 .animate-scale-in {
   animation: scale-in 0.6s ease-out both;
 }
+.animate-toast-out {
+  animation: toast-out 0.3s ease-in forwards;
+}
 .animate-cursor-blink {
   animation: cursor-blink 1s step-end infinite;
 }
 .animate-terminal-fade-in {
   animation: terminal-fade-in 0.3s ease-out both;
+}
+.animate-hex-cell-in {
+  animation: hex-cell-in 0.45s ease-out both;
 }
 
 /* ── Background grid pattern ─────────────────────────────── */
@@ -332,10 +408,10 @@ html {
 
 [data-theme="dark"] .bg-grid-warm {
   background-image: linear-gradient(
-      rgba(124, 106, 239, 0.04) 1px,
+      rgba(139, 92, 246, 0.04) 1px,
       transparent 1px
     ),
-    linear-gradient(90deg, rgba(124, 106, 239, 0.04) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
 }
 
 /* ── Focus indicators (accessibility) ────────────────────── */
@@ -385,8 +461,8 @@ html {
 }
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(124, 106, 239, 0.15);
+  background: rgba(139, 92, 246, 0.15);
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 106, 239, 0.25);
+  background: rgba(139, 92, 246, 0.25);
 }

@@ -1,10 +1,17 @@
 /**
  * Supabase data access — merge_operations table.
  *
- * Stores CLI merge telemetry data. Fail-open: returns false on error, never throws.
+ * Stores CLI merge telemetry data and provides retention cleanup.
+ * Fail-open: returns false/0 on error, never throws.
  */
 
 import { getSupabase } from "./supabase";
+
+/** Rows older than this many days are eligible for cleanup. */
+export const MERGE_OPS_RETENTION_DAYS = 90;
+
+/** Max rows deleted per cleanup run to avoid locking the table. */
+export const MERGE_OPS_CLEANUP_BATCH_SIZE = 1000;
 
 export interface TelemetryPayload {
   operationId: string;
@@ -63,5 +70,36 @@ export async function dbInsertTelemetry(payload: TelemetryPayload): Promise<bool
   } catch (error) {
     console.error("[db] dbInsertTelemetry failed:", (error as Error).message);
     return false;
+  }
+}
+
+/**
+ * Delete merge_operations rows older than MERGE_OPS_RETENTION_DAYS (90 days).
+ * Batched to avoid table locks. Intended to be called from cron (warm-cache).
+ * Returns the number of deleted rows, or 0 on error (fail-open).
+ */
+export async function dbCleanExpiredMergeOperations(): Promise<number> {
+  const db = getSupabase();
+  if (!db) return 0;
+
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - MERGE_OPS_RETENTION_DAYS);
+
+    const { data, error } = await db
+      .from("merge_operations")
+      .delete()
+      .lt("created_at", cutoff.toISOString())
+      .limit(MERGE_OPS_CLEANUP_BATCH_SIZE)
+      .select("id");
+
+    if (error) throw error;
+    return data?.length ?? 0;
+  } catch (error) {
+    console.error(
+      "[db] dbCleanExpiredMergeOperations failed:",
+      (error as Error).message,
+    );
+    return 0;
   }
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Toast } from "./Toast";
 
 /** Module-level cache for platform status fetches — persists across mounts */
 const platformStatusCache: {
@@ -52,6 +53,78 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   } | null>(null);
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
+
+  // Insights import — file picker triggered directly from menu
+  const insightsFileRef = useRef<HTMLInputElement>(null);
+  const handleToastDismiss = useCallback(() => setToast(null), []);
+  const [toast, setToast] = useState<{
+    message: string;
+    detail?: string;
+    type: "loading" | "success" | "error" | "info";
+  } | null>(null);
+
+  async function handleInsightsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    if (file.size > 10 * 1024 * 1024) {
+      setToast({ message: "File too large", detail: "Maximum size is 10 MB", type: "error" });
+      return;
+    }
+
+    setOpen(false);
+    setToast({ message: "Processing report…", type: "loading" });
+
+    try {
+      const html = await file.text();
+      const { parseInsightsHtml } = await import("@/lib/insights/parser");
+      const data = parseInsightsHtml(html);
+
+      const uploadRes = await fetch("/api/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!uploadRes.ok) throw new Error("Upload failed");
+
+      setToast({ message: "Recalculating score…", type: "loading" });
+
+      // Parse upload response and start recalculate in parallel
+      const [uploadData, recalcRes] = await Promise.all([
+        uploadRes.json(),
+        fetch("/api/recalculate", { method: "POST" }),
+      ]);
+
+      if (recalcRes.ok) {
+        const recalcData = await recalcRes.json();
+        const craftScore = uploadData.craftScore?.craftScore ?? recalcData.craftScore;
+        const craftTier = uploadData.craftScore?.tier ?? recalcData.craftTier;
+        const newScore = recalcData.adjustedComposite;
+
+        setToast({
+          message: `Craft: ${craftScore} ${craftTier}`,
+          detail: `Score updated to ${newScore}`,
+          type: "success",
+        });
+      } else {
+        const craftScore = uploadData.craftScore?.craftScore;
+        const craftTier = uploadData.craftScore?.tier;
+        setToast({
+          message: craftScore
+            ? `Craft: ${craftScore} ${craftTier}`
+            : "Insights uploaded",
+          detail: "Score will update on next badge view",
+          type: "success",
+        });
+      }
+
+      setTimeout(() => window.location.reload(), 2500);
+    } catch {
+      setToast({ message: "Import failed", detail: "Please try again", type: "error" });
+    }
+  }
 
   useEffect(() => {
     if (platformStatusCache.fetched) {
@@ -237,6 +310,38 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 </svg>
                 Creator Studio
               </Link>
+            )}
+            {isInsightsEnabledSync() && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => insightsFileRef.current?.click()}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+              >
+                <svg
+                  className="h-4 w-4 text-text-secondary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Import Claude Code Insights
+                <input
+                  ref={insightsFileRef}
+                  type="file"
+                  accept=".html"
+                  onChange={handleInsightsFile}
+                  className="sr-only"
+                  aria-label="Select Claude Code insights HTML report"
+                />
+              </button>
             )}
             {isBitbucketEnabledSync() && bbStatus && (
               bbStatus.linked ? (
@@ -444,6 +549,15 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         onConfirm={handleUnlinkCodeberg}
         onCancel={() => setShowCbUnlinkConfirm(false)}
       />
+      {toast && (
+        <Toast
+          message={toast.message}
+          detail={toast.detail}
+          type={toast.type}
+          duration={toast.type === "loading" ? 0 : toast.type === "error" ? 5000 : 4000}
+          onDismiss={handleToastDismiss}
+        />
+      )}
     </div>
   );
 }
