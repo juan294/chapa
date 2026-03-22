@@ -1,26 +1,27 @@
 # How Chapa Works
 
-This document explains Chapa's Impact v4 Profile calculation, security model, verification flow, and the EMU account merge feature. It is the reference for anyone asking "how does this work?" or "how is this secure?"
+This document explains Chapa's Impact v6 Profile calculation, security model, verification flow, multi-platform integration, and the EMU account merge feature. It is the reference for anyone asking "how does this work?" or "how is this secure?"
 
 ---
 
 ## Table of Contents
 
 1. [What Chapa Measures](#what-chapa-measures)
-2. [Impact v4 Profile](#impact-v4-profile)
+2. [Impact v6 Profile](#impact-v6-profile)
 3. [Confidence System](#confidence-system)
 4. [Tiers](#tiers)
 5. [Data Sources and Verification](#data-sources-and-verification)
-6. [EMU Account Merge](#emu-account-merge)
-7. [Security Model](#security-model)
-8. [Lifetime Metrics & Score History](#lifetime-metrics--score-history)
-9. [Privacy Guarantees](#privacy-guarantees)
+6. [Multi-Platform Integration](#multi-platform-integration)
+7. [EMU Account Merge](#emu-account-merge)
+8. [Security Model](#security-model)
+9. [Lifetime Metrics & Score History](#lifetime-metrics--score-history)
+10. [Privacy Guarantees](#privacy-guarantees)
 
 ---
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity and produces a **multi-dimensional Impact v4 Profile** — four independent dimension scores (0-100 each), a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
+Chapa analyzes a developer's **last 12 months** (365 days) of activity across connected platforms (GitHub, Bitbucket, Codeberg) and produces a **multi-dimensional Impact v6 Profile** — four core dimension scores (0-100 each) plus an optional fifth Craft dimension, a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
 
 ### Signals we track
 
@@ -44,9 +45,9 @@ Chapa analyzes a developer's **last 12 months** (365 days) of GitHub activity an
 
 ---
 
-## Impact v4 Profile
+## Impact v6 Profile
 
-Impact v4 replaces a single weighted-sum score with a **multi-dimensional Developer Impact Profile**. Instead of one number, developers get four independent dimension scores and a developer archetype that describes their contribution shape.
+Impact v6 produces a **multi-dimensional Developer Impact Profile**. Instead of one number, developers get four core dimension scores plus an optional fifth Craft dimension, and a developer archetype that describes their contribution shape.
 
 ### Why multi-dimensional?
 
@@ -75,7 +76,7 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 | Forks | 200 | People building on your work; log-normalized |
 | Watchers | 100 | People actively following your repos; log-normalized |
 
-### The four dimensions (each 0-100)
+### The core dimensions (each 0-100)
 
 | Dimension | What it measures | Signals & weights |
 |-----------|-----------------|-------------------|
@@ -86,6 +87,16 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 
 Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers (zero reviews) are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Solo Quality returns 0 only if you have zero merged PRs.
 
+### Optional fifth dimension: Craft
+
+When a developer imports Claude Code usage insights, a fifth **Craft** dimension is computed from AI tool usage patterns. When Craft data is present:
+
+- The radar chart renders as a **pentagon** (5 axes) instead of a diamond (4 axes)
+- The **Artificer** archetype becomes available (Craft is highest AND >= 70)
+- The composite score averages all 5 dimensions instead of 4
+
+Craft is fully optional — developers without AI tool insights see the standard 4-dimension profile.
+
 ### Developer archetypes
 
 Derived from the dimension profile shape. Priority order for tie-breaking: Polymath > Quality Champion > Marathoner > Builder.
@@ -94,6 +105,7 @@ Derived from the dimension profile shape. Priority order for tie-breaking: Polym
 |-----------|------|
 | **Emerging** | Average < 40 OR no dimension >= 50 |
 | **Balanced** | All dimensions within 15 pts AND average >= 60 |
+| **Artificer** | Craft is highest AND >= 70 *(only when Craft data present)* |
 | **Polymath** | Breadth is highest AND >= 70 |
 | **Quality Champion** | Quality is highest AND >= 70 |
 | **Marathoner** | Consistency is highest AND >= 70 |
@@ -101,10 +113,10 @@ Derived from the dimension profile shape. Priority order for tie-breaking: Polym
 
 ### Composite score
 
-The composite score is the average of all four dimensions, rounded to an integer:
+The composite score is the average of all dimensions (4 or 5), rounded to an integer:
 
 ```
-compositeScore = round(avg(delivery, quality, consistency, breadth))
+compositeScore = round(avg(delivery, quality, consistency, breadth [, craft]))
 ```
 
 The composite is then adjusted by confidence (see below) and mapped to a tier.
@@ -187,12 +199,13 @@ The adjusted score maps to a tier:
 
 ### Where the data comes from
 
-Chapa uses the **GitHub GraphQL API** to fetch contribution data. We query:
-- Contribution calendar (commits, activity by day)
-- Pull request contributions (merged PRs with size metrics)
-- Pull request review contributions (reviews given)
-- Issue contributions (issues resolved)
-- Repository data (repos contributed to, commit distribution)
+**GitHub (primary):** Chapa uses the GitHub GraphQL API to fetch contribution data — contribution calendar, merged PRs, reviews given, issues resolved, and repository data.
+
+**Bitbucket (optional):** Users can link their Bitbucket account via OAuth. Chapa fetches repository data, commits, and PRs from the Bitbucket REST API. Stars and watchers are not available from Bitbucket's public API.
+
+**Codeberg (optional):** Users can link their Codeberg account via OAuth. Chapa fetches repository data, commits, PRs, stars, forks, and watchers from the Codeberg/Gitea API.
+
+When multiple platforms are connected, stats are merged automatically (see [Multi-Platform Integration](#multi-platform-integration)).
 
 ### Verification modes
 
@@ -213,6 +226,35 @@ Chapa uses the **GitHub GraphQL API** to fetch contribution data. We query:
 - We NEVER request write access to repositories
 - We NEVER access private repository content or code
 - We query contribution metadata only (counts, dates, PR sizes)
+
+---
+
+## Multi-Platform Integration
+
+Chapa supports linking Bitbucket and Codeberg accounts alongside your primary GitHub account. When platforms are connected, their stats are merged before scoring.
+
+### Merge strategy
+
+| Field | Strategy | Rationale |
+|-------|----------|-----------|
+| Commits, PRs, reviews, issues | **Summed** | Activity is distinct across platforms |
+| Repos contributed to | **Summed** | Repos are unique per platform |
+| Stars, forks, watchers | **Max** | Avoids double-counting when repos are mirrored |
+| Heatmap / active days | **Merged by date** | Contributions from all platforms are unified |
+| Lines added/deleted | **Summed** | Code volume is additive |
+
+### Token refresh resilience
+
+Platform tokens (Bitbucket expires every 2 hours, Codeberg varies) are automatically refreshed when expired. If a refresh fails:
+
+- **Token revoked** (HTTP 400 + `invalid_grant`): the platform link is removed — the user must re-connect
+- **Transient failure** (network error, timeout, server error): the link is preserved and stats are skipped for this request — the next request will retry
+
+This prevents accidental unlinking from temporary outages.
+
+### Platform branding
+
+The badge footer dynamically shows logos for connected platforms. Personal badges show only the user's connected platforms; demo badges show all three.
 
 ---
 
@@ -385,7 +427,7 @@ Since badges are embeddable SVGs, all user-controlled text (handles, display nam
 
 ## Lifetime Metrics & Score History
 
-Chapa captures daily snapshots of each user's metrics and stores them permanently in Redis sorted sets. This enables trend tracking, score change analysis, and historical comparisons.
+Chapa captures daily snapshots of each user's metrics and stores them permanently in the Supabase `metrics_snapshots` table. This enables trend tracking, score change analysis, and historical comparisons.
 
 ### How snapshots are captured
 

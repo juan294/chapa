@@ -3,7 +3,7 @@
 > Migrate permanent/historical data from Upstash Redis to Supabase Postgres.
 > Redis remains for caching, rate limiting, and ephemeral state.
 
-**Status:** Draft
+**Status:** Complete
 **Created:** 2026-02-17
 **Target:** Incremental (no big-bang cutover)
 

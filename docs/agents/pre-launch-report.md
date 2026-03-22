@@ -1,12 +1,12 @@
-# Pre-Launch Audit Report (v34)
+# Pre-Launch Audit Report (v35)
 
-> Generated on 2026-03-06 | Branch: `develop` | Commit: `2efef5b`
-> 4,238 tests | 272 test files | 58+ routes | Next.js 16.1.6 (Turbopack)
+> Generated on 2026-03-22 | Branch: `develop` | Commit: `5cc834b`
+> 5,680 tests | 330 test files | 64+ routes | Next.js 16.2.0 (Turbopack)
 > CI: ALL GREEN (5/5 workflows passed) | 6 parallel specialists
 
 ## Verdict: CONDITIONAL
 
-No blockers. 8 warnings (1 high, 3 medium, 4 low). The single high warning is `develop` being 44 commits ahead of `main` — a release PR is overdue.
+No blockers. 7 warnings (1 medium, 6 low). All warnings are non-critical — safe to release with awareness.
 
 ## Blockers (must fix before release)
 
@@ -16,14 +16,13 @@ None.
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | `develop` is 44 commits ahead of `main` | HIGH | devops | Release PR overdue — large delta increases merge risk |
-| W2 | `minimatch` ReDoS (CVE) — pnpm override at `>=10.2.1`, needs `>=10.2.3` | MEDIUM | architect, security | Dev-only (eslint transitive dep), no production impact |
-| W3 | `dompurify` XSS (GHSA-v2wj-7wpq-c8vv) — transitive via `posthog-js`, patched in `>=3.3.2` | MEDIUM | architect, security | Low risk: used internally by PostHog, not by Chapa code |
-| W4 | 1 unpushed commit + 10 uncommitted files in working tree | MEDIUM | devops | Latest commit not CI-validated; docs/agent reports not committed |
-| W5 | 11 experiment pages missing `id="main-content"` skip link target | LOW | ux-reviewer | Skip-to-content link becomes dead link on these pages |
-| W6 | Hardcoded hex colors in `ActivityHeatmap.tsx` and `Sparkline.tsx` | LOW | ux-reviewer | Programmatic SVG colors bypass design system tokens; won't respond to theme changes |
-| W7 | Functions coverage at 70.36% (lowest of 4 coverage metrics) | LOW | qa-lead | Most uncovered functions are UI hooks and thin wrappers |
-| W8 | 13 experiment pages are monolithic `"use client"` components | LOW | performance-eng | Feature-flagged, no production bundle impact |
+| W1 | 2 unpushed commits on `develop` | MEDIUM | devops | Must push before release PR — commits not CI-validated on remote |
+| W2 | `flatted` prototype pollution (HIGH CVE) — dev-only transitive dep via eslint | LOW | architect, security | Dev-only (eslint > flat-cache > flatted), not shipped to production |
+| W3 | `@resvg/resvg-js` uses MPL-2.0 license (project policy: MIT/Apache/BSD/ISC) | LOW | security | Weak copyleft, file-level only. Used as-is, no modifications. Accepted risk. |
+| W4 | 14 stale remote branches already merged into `develop` | LOW | devops | Clutter, no functional impact |
+| W5 | Heading hierarchy violation in `/experiments/gradient-border` page | LOW | ux-reviewer | Feature-flagged experiment page, low traffic |
+| W6 | Experiment pages missing individual `loading.tsx` files | LOW | ux-reviewer | Feature-flagged, shared parent error boundary exists |
+| W7 | Build cache warnings for `/studio` route (dynamic rendering fallback) | LOW | devops | Informational only — Next.js correctly falls back to dynamic rendering |
 
 ## Detailed Findings
 
@@ -32,35 +31,28 @@ None.
 ### 1. Quality Assurance (qa-lead) — GREEN
 
 **Test Suite:**
-- 272 test files, 4,238 tests, **100% pass rate**
-- Duration: 15.31s
+- 330 test files, 5,680 tests, **100% pass rate**
+- Duration: 13.94s
 - TypeScript: clean | ESLint: clean (0 errors, 0 warnings)
-
-**Coverage:**
-
-| Metric | Value |
-|--------|-------|
-| Statements | 78.46% |
-| Branches | 74.42% |
-| Functions | 70.36% |
-| Lines | 79.65% |
 
 **Critical Path Coverage:**
 
-| Module | Statements | Branches | Functions |
-|--------|-----------|----------|-----------|
-| `lib/impact/` (scoring) | 99.4% | 97.2% | 100.0% |
-| `lib/render/` (SVG rendering) | 100.0% | 94.7% | 100.0% |
-| `lib/auth/` (OAuth/auth) | 94.1% | 88.3% | 100.0% |
-| `lib/cache/` (Redis cache) | 88.9% | 87.2% | 80.0% |
-| `lib/github/` (GitHub data) | 97.1% | 89.6% | 95.7% |
-| `lib/db/` (Supabase data access) | 93.0% | 87.6% | 100.0% |
-| `lib/history/` (lifetime history) | 97.8% | 90.3% | 100.0% |
-| `app/api/` (API routes) | 95.5% | 91.0% | 89.5% |
+| Module | Test Files | Status |
+|--------|-----------|--------|
+| `lib/impact/` (scoring) | 6 test files | COVERED |
+| `lib/render/` (SVG rendering) | 11 test files | COVERED |
+| `lib/auth/` (OAuth/auth) | 8 test files | COVERED |
+| `lib/cache/` (Redis cache) | 3 test files | COVERED |
+| `lib/github/` (GitHub data) | 4 test files | COVERED |
+| `lib/db/` (Supabase data access) | 11 test files | COVERED |
+| `lib/history/` (lifetime history) | 5 test files | COVERED |
+| `app/api/` (API routes) | 41/41 route handlers tested | COVERED |
 
-**Untested files:** Only thin server page wrappers (`admin/error.tsx`, `generating/[handle]/page.tsx`, `cli/authorize/page.tsx`) and type-definition files.
-
-**Graceful Degradation:** STRONG — every external dependency (Redis, Supabase, GitHub API, Resend) has explicit fail-open behavior with safe defaults. Badge route returns fallback SVG on any error. Documented and tested.
+**Graceful Degradation:** STRONG
+- GitHub rate limit (403): serves stale cached data (7d TTL)
+- Redis unavailability: fail-open design, all requests allowed
+- Supabase downtime: returns sensible defaults (null/false/0)
+- All degradation paths have corresponding test assertions
 
 ---
 
@@ -70,143 +62,118 @@ None.
 
 | Severity | Package | Description | Production? |
 |----------|---------|-------------|-------------|
-| High | `minimatch` >=10.0.0 <10.2.3 | ReDoS via matchOne() | No (dev-only, eslint) |
-| High | `minimatch` >=10.0.0 <10.2.3 | ReDoS via nested extglobs | No (dev-only, eslint) |
-| Moderate | `dompurify` >=3.1.3 <=3.3.1 | XSS vulnerability | Transitive (posthog-js internal) |
+| High | `flatted` <=3.4.1 | Prototype pollution via parse() | No (dev-only, eslint) |
 
 **Hardcoded Secrets:** None found. All test files use mock values. All env vars use `.trim()`.
 
-**XSS/Injection:** `escapeXml()` consistently applied across all SVG user-input entry points. All `dangerouslySetInnerHTML` usages (21 instances) reviewed as safe. No raw SQL — all DB access uses Supabase parameterized query builder.
+**XSS/Injection:** `escapeXml()` consistently applied across all SVG user-input entry points. Avatar URL validated against allowlist.
 
 **Authentication:** STRONG
 - AES-256-GCM encrypted tokens in HttpOnly/Secure/SameSite=Lax cookies
 - CSRF state with `crypto.randomBytes(16)` + `timingSafeEqual` validation
 - Open redirect protection via `isSafeRedirect()`
-- CLI tokens: HMAC-SHA256 signed, expiry-validated
-- Session endpoint does NOT leak tokens (returns only `login`, `name`, `avatar_url`)
-- Rate limiting on all auth endpoints (login: 20/15min, callback: 10/15min, session: 60/60s)
+- Rate limiting on all auth endpoints
 
-**Client Secret Exposure:** None. All `NEXT_PUBLIC_*` vars are non-sensitive (analytics keys, feature flags, base URL).
+**Client Secret Exposure:** None. All `NEXT_PUBLIC_*` vars are non-sensitive.
 
-**CORS:** Only on `/api/verify/[hash]` (public badge verification) — `Access-Control-Allow-Origin: *` with OPTIONS preflight. Rate-limited.
+**Security Headers:** Comprehensive — HSTS (2yr + preload), CSP, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy.
 
-**License Compliance:** Clean. 2 MPL-2.0 deps (`@resvg/resvg-js`, `@vercel/analytics`) — accepted risk, documented (#450, #464). No GPL/AGPL.
-
-**Security Headers:** Comprehensive — HSTS (2yr + preload), CSP (script/style/img/connect/frame-ancestors), X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy. Badge SVG correctly allows `frame-ancestors *`.
+**License Compliance:** Clean. 1 MPL-2.0 dep (`@resvg/resvg-js`) — accepted risk, used as-is.
 
 ---
 
-### 3. Infrastructure (devops) — GREEN
+### 3. Infrastructure (devops) — YELLOW
 
-**Build:** PASS — Next.js 16.1.6 Turbopack, 58 static pages, zero errors.
+**Build:** PASS — Next.js 16.2.0 Turbopack, zero errors.
 
 **CI Status (all green):**
 
-| Workflow | Status | Last Run |
-|----------|--------|----------|
-| Secret Scanning | success | 2026-03-06 05:06 UTC |
-| Security Scan | success | 2026-03-04 07:36 UTC |
-| Dead Code Detection | success | 2026-03-04 07:36 UTC |
-| CI (lint/test/build/e2e) | success | 2026-03-04 07:36 UTC |
-| Bundle Size Analysis | success | 2026-03-04 07:36 UTC |
+| Workflow | Status |
+|----------|--------|
+| CI (lint/test/build/e2e) | success |
+| Bundle Size Analysis | success |
+| Dead Code Detection | success |
+| Security Scan | success |
+| Secret Scanning | success |
 
-**Environment Variables:** All 29 documented vars accounted for. No undocumented env vars found. `.trim()` consistently applied.
+**Environment Variables:** All 30 documented vars accounted for. No undocumented env vars found.
 
 **Error Pages:** All 3 exist (`not-found.tsx`, `error.tsx`, `global-error.tsx`).
 
-**Health Endpoint:** Returns JSON with `status`, `timestamp`, `dependencies.redis`, `dependencies.supabase`. Rate-limited (30 req/IP/60s). HTTP 503 on degraded state.
+**Health Endpoint:** Returns JSON with status, timestamp, dependencies. Rate-limited. HTTP 503 on degraded state.
 
 **Git State:**
-- Branch: `develop`, 1 commit ahead of `origin/develop` (unpushed)
-- 10 modified/untracked files (agent reports + pre-commit hook)
+- Branch: `develop`, 2 commits ahead of `origin/develop` (unpushed)
+- Working tree: clean
 - No stale worktrees, no stashed changes
+- 14 stale remote branches (merged, should be cleaned up)
 
-**Vercel Config:** Minimal, correct. Cron: `/api/cron/warm-cache` daily 6:00 AM UTC, protected by `CRON_SECRET` with timing-safe comparison.
-
-**CI Workflows:** 7 configured — CI, Secret Scanning, Security Scan, Dead Code, Bundle Size, Lighthouse (continue-on-error), Claude Code Review.
+**Vercel Config:** 3 cron jobs properly configured with `CRON_SECRET` auth.
 
 ---
 
-### 4. Architecture (architect) — GREEN
+### 4. Architecture (architect) — YELLOW
 
-**TypeScript:** PASS — zero errors across all 3 tsconfigs. Strict mode enabled everywhere (`strict: true`, `noUncheckedIndexedAccess: true`).
+**TypeScript:** PASS — zero errors. Strict mode enabled everywhere (`strict: true`, `noUncheckedIndexedAccess: true`).
 
 **Outdated Dependencies:**
 
 | Package | Current | Latest | Type |
 |---------|---------|--------|------|
-| `eslint` (dev) | 9.39.2 | 10.0.2 | MAJOR |
-| `posthog-js` | 1.353.1 | 1.358.0 | minor |
-| `@supabase/supabase-js` | 2.97.0 | 2.98.0 | patch |
-| `@upstash/redis` | 1.36.2 | 1.36.3 | patch |
-| `resend` | 6.9.2 | 6.9.3 | patch |
-| `@types/node` (dev) | 25.3.0 | 25.3.3 | patch |
+| `jsdom` (dev) | 29.0.0 | 29.0.1 | patch |
+| `@vitest/coverage-v8` (dev) | 4.0.18 | 4.1.0 | minor |
+| `vitest` (dev) | 4.0.18 | 4.1.0 | minor |
 
-**Circular Dependencies:** PASS — 539 files scanned, 0 circular deps.
+No major version bumps. All are minor/patch, safe to update.
 
-**Dead Code:** PASS — `knip` reports zero findings. CI workflow enforces this.
+**Circular Dependencies:** PASS — 620 files scanned, 0 circular deps.
 
-**Duplicate Code:** Minimal — one inline `Math.max(0, Math.min(100, ...))` in `smoothing.ts:33` instead of `clampScore()`. Not a bug, consistency nit.
+**Dead Code:** PASS — `knip` reports zero findings.
 
-**Code Quality:** Zero `as any` in production code. All `any` usage limited to test mocks.
+**Duplicate Code:** 2.38% line duplication (64 clones), all in test files. Production code duplication is minimal.
 
 ---
 
 ### 5. Performance (performance-eng) — GREEN
 
-**Build Output:**
-- Compiled successfully in 3.6s (Turbopack)
-- 58 static pages generated
-- Routes over 500KB: **None**
+**Build Output:** Compiled successfully. No routes exceed 500KB compressed.
 
-**Chunk Sizes (top 5):**
+**Route Sizes (First Load JS, uncompressed — compresses ~65-70% with gzip):**
 
-| Chunk | Size | Content |
-|-------|------|---------|
-| `484c69d...js` | 224 KB | React DOM (framework) |
-| `9ff022d...js` | 177 KB | PostHog (lazy-loaded) |
-| `a6dad97...js` | 113 KB | Framework shared code |
-| `70c742e...js` | 111 KB | Next.js App Router runtime |
-| `f26a8d3...js` | 60 KB | App code |
+| Route | Uncompressed | Page-specific JS |
+|-------|-------------|------------------|
+| `/u/[handle]` | 702 KB | ~124 KB |
+| `/studio` | 691 KB | ~113 KB |
+| `/admin` | 675 KB | ~97 KB |
+| `/` (landing) | 654 KB | ~76 KB |
+| `/about/*`, `/archetypes/*` | 654 KB | ~76 KB |
+| `/_not-found` (baseline) | 578 KB | 0 KB |
 
-**Code Splitting:** Excellent — core pages are Server Components, `"use client"` only at leaf-level interactive components. 5 heavy components properly code-split with `next/dynamic` + `ssr: false`.
+Framework baseline is 569KB uncompressed (~170KB compressed). Page-specific JS ranges from 0–124KB.
 
-**Lazy Loading:** PostHog deferred until first user interaction or 5s timeout. `canvas-confetti` fully dynamic-imported. No heavy libs in critical path.
+**Code Splitting:** Excellent — production pages are Server Components, `"use client"` only at leaf-level interactive components. Heavy components (`PostHog`, `canvas-confetti`, admin sub-dashboards) properly lazy-loaded via `next/dynamic`.
 
-**Font Loading:** Optimal — `next/font/google` with `display: "swap"`, self-hosted.
-
-**CLS Risks:** None — all images have explicit dimensions, fonts use swap.
-
-**Cache Headers (badge):** `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800` (6h CDN, 7d stale).
+**Font Loading:** Optimal — `display: "swap"`, self-hosted via `next/font/google`.
 
 **No barrel exports** — direct imports throughout, enabling clean tree-shaking.
 
-**Server-only deps stay server-side:** `@supabase/supabase-js`, `@upstash/redis`, `resend`, `@resvg/resvg-js` confirmed absent from client chunks.
-
 ---
 
-### 6. UX/Accessibility (ux-reviewer) — GREEN
+### 6. UX/Accessibility (ux-reviewer) — YELLOW
 
-**Heading Hierarchy:** PASS — all pages follow h1 > h2 > h3 correctly. Each page has exactly one h1.
+**Heading Hierarchy:** PASS on production pages. Minor violation in experiment page (`/experiments/gradient-border`).
 
-**ARIA Labels:** PASS — comprehensive implementation:
-- All icon-only buttons have `aria-label`
-- Decorative icons: `aria-hidden="true"`
-- Proper roles: `dialog`, `alert`, `log`, `listbox`, `menu`, `tablist`, `progressbar`, `img`, `status`, `tooltip`, `switch`, `article`, `region`
-- Live regions: `aria-live="polite"` on terminal output and status messages
-- `aria-expanded`, `aria-busy`, `aria-controls`, `aria-describedby` correctly used
+**ARIA Labels:** PASS — comprehensive implementation across all interactive components. Decorative icons use `aria-hidden="true"`. Proper roles on dialogs, menus, listboxes.
 
-**Focus Indicators:** PASS — global `*:focus-visible` ring (2px purple outline, offset 2px). Skip-to-content link present.
+**Focus Indicators:** PASS — global `*:focus-visible` ring. Skip-to-content link present.
 
-**Reduced Motion:** PASS — global `prefers-reduced-motion` override in CSS + component-level `matchMedia` checks across 12+ files. Defense-in-depth.
+**Reduced Motion:** PASS — global `prefers-reduced-motion` override + component-level checks. Defense-in-depth.
 
-**Alt Text:** PASS — all images have descriptive alt text. No empty or generic alts.
+**Keyboard Navigation:** PASS — all interactive elements properly accessible. Focus trap in MobileNav. Enter/Space support on custom buttons.
 
-**Keyboard Navigation:** PASS — all `onClick` on non-interactive elements have proper `role`, `tabIndex`, and `onKeyDown`. Focus trap in MobileNav. `DimensionCard` uses `role="button"` + `tabIndex={0}` + `aria-expanded` + `onKeyDown`.
+**Error/Loading States:** PASS — root-level + 12 route-level error boundaries. 11 loading.tsx files covering key routes.
 
-**Error/Loading States:** PASS — 8 `loading.tsx` files with `role="status"` and sr-only text. Global + route-level error boundaries. `ErrorBanner` with `role="alert"`.
-
-**Design System Consistency:** PASS — semantic color tokens used throughout. `global-error.tsx` intentionally uses hardcoded hex (documented: CSS custom properties unavailable at that level).
+**Design System Consistency:** PASS — semantic color tokens used throughout. No hardcoded hex in production components.
 
 ---
 
@@ -214,17 +181,16 @@ None.
 
 | Specialist | Status | Key Metric |
 |------------|--------|------------|
-| QA Lead | GREEN | 4,238 tests, 100% pass, 78.46% statement coverage |
+| QA Lead | GREEN | 5,680 tests, 100% pass, 41/41 API routes tested |
 | Security | GREEN | 0 production vulns, auth strong, XSS escaped |
-| DevOps | GREEN | Build passes, CI 5/5 green, health endpoint solid |
-| Architect | GREEN | 0 circular deps, 0 dead code, strict TS everywhere |
-| Performance | GREEN | Largest chunk 224 KB (< 500 KB), code splitting excellent |
-| UX/A11y | GREEN | Full ARIA, keyboard nav, reduced motion, heading hierarchy |
+| DevOps | YELLOW | Build passes, CI 5/5 green, 2 unpushed commits |
+| Architect | YELLOW | 0 circular deps, 0 dead code, flatted override needs bump |
+| Performance | GREEN | Page-specific JS ≤124KB, code splitting excellent |
+| UX/A11y | YELLOW | Full ARIA, keyboard nav, minor experiment page issues |
 
 ## Recommended Next Steps
 
-1. **Push unpushed commit and verify CI** — `2efef5b` has not been CI-validated yet
-2. **Bump dependency overrides** — `minimatch: ">=10.2.3"` and add `dompurify: ">=3.3.2"` to clear audit warnings (W2, W3)
-3. **Commit or stash agent report files** — clean up working tree before release PR
-4. **Create release PR** (`develop` -> `main`) — 44 commits ready, all CI green
-5. **Optional**: Add `id="main-content"` to the 11 experiment pages missing the skip link target (W5)
+1. **Push unpushed commits** — `git push origin develop` to sync and trigger CI
+2. **Clean up stale remote branches** — 14 merged branches to delete
+3. **Bump `flatted` override** — change `>=3.4.0` to `>=3.4.2` in package.json to clear audit warning
+4. **Create release PR** (`develop` -> `main`) after CI confirms green
