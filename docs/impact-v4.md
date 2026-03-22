@@ -105,7 +105,7 @@ Implementation: `apps/web/lib/impact/v4.ts` (line 54)
 
 ### 4. Confidence penalty: low_activity_signal (-10)
 
-Triggers when `activeDays < 30 AND commitsTotal < 50`. Catches thin-signal profiles that somehow score high through concentration in a few metrics.
+Triggers when `activeDays < 30 OR commitsTotal < 50`. Reflects limited scoring signal when either temporal coverage or commit volume is low.
 
 Reason: "Very limited activity in this period reduces the signal available for scoring."
 
@@ -125,7 +125,7 @@ Reason: "High review volume with very few merged changes reduces confidence in t
 | `low_collaboration_signal` | -10 | `prsMergedCount >= 10 AND reviews <= 1` (collaborative only) |
 | `single_repo_concentration` | -5 | `topRepoShare >= 0.95 AND repos <= 1` |
 | `supplemental_unverified` | -5 | `hasSupplementalData === true` |
-| `low_activity_signal` | -10 | `activeDays < 30 AND commitsTotal < 50` |
+| `low_activity_signal` | -10 | `activeDays < 30 OR commitsTotal < 50` |
 | `review_volume_imbalance` | -10 | `reviews >= 50 AND prsMergedCount < 3` |
 
 Maximum simultaneous penalties: 7 (review_volume_imbalance and low_collaboration_signal are mutually exclusive). Floor: 50.
