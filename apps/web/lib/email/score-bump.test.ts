@@ -244,6 +244,7 @@ describe("email content — tier change", () => {
     await notifyScoreBump("testuser", diff, makeSignificance("tier_change"));
 
     const call = mockSend.mock.calls[0]![0];
+    expect(call.subject).toContain("Your Profile Just Leveled Up");
     expect(call.subject).toContain("Solid");
     expect(call.subject).toContain("High");
     expect(call.html).toContain("Solid");
