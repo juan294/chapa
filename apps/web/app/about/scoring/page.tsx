@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBar } from "@/components/GlobalCommandBar";
+import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
 import type { Metadata } from "next";
 
 export const revalidate = 3600;
@@ -106,6 +107,37 @@ export default function ScoringMethodologyPage() {
             Full transparency on how Chapa decodes your developer impact.
             Every weight, cap, and decision is explained here.
           </p>
+
+          {/* ---------------------------------------------------------- */}
+          {/* Video explainer                                              */}
+          {/* ---------------------------------------------------------- */}
+          <div className="mb-10 animate-fade-in-up [animation-delay:150ms]">
+            <div className="flex items-center gap-2 mb-3">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 text-amber"
+                aria-hidden="true"
+              >
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+              <h2 className="font-heading text-lg font-medium text-text-primary tracking-tight">
+                Watch the explainer
+              </h2>
+            </div>
+            <LiteYouTubeEmbed
+              videoId=""
+              title="How Chapa Scores Developer Impact"
+            />
+            <p className="text-text-secondary text-sm mt-2">
+              Prefer reading? The full methodology is detailed below.
+            </p>
+          </div>
 
           <div className="space-y-2 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:200ms]">
             {/* ---------------------------------------------------------- */}
