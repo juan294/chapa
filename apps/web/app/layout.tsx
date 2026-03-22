@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s — Chapa",
   },
   description:
-    "Your developer impact, decoded into four dimensions — Delivery, Quality, Consistency, Breadth — from 12 months of development activity. Live, embeddable SVG badge.",
+    "Your developer impact, decoded into multiple dimensions — Delivery, Quality, Consistency, Breadth, and optional Craft — from 12 months of development activity. Live, embeddable SVG badge.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     siteName: "Chapa",
     title: "Chapa — Developer Impact, Decoded",
     description:
-      "Your developer impact, decoded into four dimensions from 12 months of development activity. Live, embeddable SVG badge.",
+      "Your developer impact, decoded into multiple dimensions from 12 months of development activity. Live, embeddable SVG badge.",
     url: BASE_URL,
     images: [
       {
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Chapa — Developer Impact, Decoded",
     description:
-      "Your developer impact, decoded into four dimensions. Live, embeddable SVG badge.",
+      "Your developer impact, decoded into multiple dimensions. Live, embeddable SVG badge.",
     images: ["/og-image"],
   },
   alternates: {
@@ -93,7 +93,7 @@ export default function RootLayout({
               name: "Chapa",
               url: BASE_URL,
               description:
-                "Developer impact badge tool that analyzes 12 months of development activity across four dimensions — Delivery, Quality, Consistency, and Breadth — to generate a live, embeddable SVG badge with archetype classification and impact scoring.",
+                "Developer impact badge tool that analyzes 12 months of development activity across multiple dimensions — Delivery, Quality, Consistency, Breadth, and optional Craft — to generate a live, embeddable SVG badge with archetype classification and impact scoring.",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               keywords:
@@ -104,11 +104,11 @@ export default function RootLayout({
                 priceCurrency: "USD",
               },
               featureList: [
-                "Four-dimension impact scoring (Delivery, Quality, Consistency, Breadth)",
-                "Developer archetype classification (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)",
+                "Multi-dimension impact scoring (Delivery, Quality, Consistency, Breadth, optional Craft)",
+                "Developer archetype classification (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)",
                 "Live embeddable SVG badge for READMEs and portfolios",
-                "52-week contribution heatmap",
-                "Four-axis radar chart visualization",
+                "Activity timeline visualization",
+                "Dynamic radar chart (pentagon or diamond)",
                 "Badge visual customization via Creator Studio",
                 "Cryptographic badge verification (HMAC-SHA256)",
                 "Score history and trend tracking",

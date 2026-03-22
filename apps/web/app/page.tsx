@@ -24,12 +24,12 @@ const NAV_LINKS = [
 
 const FEATURES = [
   {
-    title: "FOUR DIMENSIONS",
-    description: "Commit counts reward volume, not impact. Chapa scores four dimensions — Delivery, Quality, Consistency, Breadth — to show what kind of engineer you actually are.",
+    title: "MULTI-DIMENSIONAL",
+    description: "Commit counts reward volume, not impact. Chapa scores four core dimensions — Delivery, Quality, Consistency, Breadth — plus an optional Craft dimension for AI tool mastery.",
   },
   {
     title: "DEVELOPER ARCHETYPE",
-    description: (<>No two developers contribute the same way, but platforms treat everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
+    description: (<>No two developers contribute the same way, but platforms treat everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">Artificer</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
   },
   {
     title: "VERIFIED METRICS",
@@ -47,7 +47,7 @@ const FEATURES = [
 
 const STEPS = [
   { number: "01", title: "Sign in with GitHub", description: "Secure OAuth over HTTPS \u2014 we only request read access to public data. No passwords stored, no private repos accessed." },
-  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Delivery, Quality, Consistency, and Breadth \u2014 plus archetype and composite score. The badge heatmap shows the last 90 days at a glance." },
+  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Delivery, Quality, Consistency, and Breadth \u2014 plus optional Craft dimension, archetype, and composite score. The badge shows the last 90 days at a glance." },
   { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere \u2014 and explore the full scoring breakdown on your share page." },
 ];
 
@@ -59,8 +59,8 @@ const DIMENSIONS = [
 ];
 
 const STATS = [
-  { value: "6", label: "archetypes" },
-  { value: "4", label: "dimensions" },
+  { value: "7", label: "archetypes" },
+  { value: "5", label: "dimensions" },
   { value: "365", label: "days scored" },
 ];
 
@@ -146,7 +146,7 @@ export default async function Home({
                 <div className="pl-5 space-y-1 text-sm">
                   <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the complete story anymore.</p>
                   <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
-                  <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Four dimensions. Cryptographically verified.</p>
+                  <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Multiple dimensions. Cryptographically verified.</p>
                 </div>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
@@ -278,11 +278,12 @@ export default async function Home({
                   What we measure
                 </h3>
                 <p className="text-text-secondary text-sm">
-                  Chapa scores four independent dimensions of your development activity from the last 12 months. Your unique combination across these dimensions determines your developer archetype:{" "}
+                  Chapa scores four core dimensions of your development activity from the last 12 months, plus an optional Craft dimension for AI tool mastery. Your unique combination determines your developer archetype:{" "}
                   <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
                   <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
                   <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
                   <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
+                  <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">Artificer</Link>,{" "}
                   <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
                   <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>.
                 </p>

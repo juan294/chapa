@@ -8,7 +8,7 @@ import { computeImpactV4 } from "@/lib/impact/v4";
  * POST /api/generate
  *
  * Warm the badge cache for the authenticated user by fetching their
- * GitHub stats and computing the Impact v4 profile. Called from the
+ * GitHub stats and computing the Impact v6 profile. Called from the
  * /generating/:handle progress page after OAuth login.
  *
  * If the user's stats are already cached, getStats returns them

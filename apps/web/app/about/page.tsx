@@ -8,11 +8,11 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Learn about Chapa — developer impact, decoded. Discover how the four-dimension scoring model works and what data we analyze.",
+    "Learn about Chapa — developer impact, decoded. Discover how the multi-dimension scoring model works and what data we analyze.",
   openGraph: {
     title: "About Chapa",
     description:
-      "Learn about Chapa — developer impact, decoded. Four dimensions that show what kind of developer you are.",
+      "Learn about Chapa — developer impact, decoded. Multiple dimensions that show what kind of developer you are.",
   },
   twitter: {
     card: "summary",
@@ -43,12 +43,12 @@ export default function AboutPage() {
             <p>
               Chapa generates a live, embeddable SVG badge that decodes your
               developer impact from your linked platforms. It analyzes your
-              last 12 months across four independent dimensions to show what kind
-              of developer you are.
+              last 12 months across four core dimensions — plus an optional
+              fifth for AI tool mastery — to show what kind of developer you are.
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              Four dimensions
+              Dimensions
             </h2>
             <p>
               <strong className="text-text-primary">Delivery</strong> — shipping meaningful changes
@@ -70,6 +70,7 @@ export default function AboutPage() {
               <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
               <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
               <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
+              <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">Artificer</Link>,{" "}
               <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
               <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>. The
               archetype is shown as the primary label on your badge, with a

@@ -297,7 +297,7 @@ describe("Landing page — terminal sections", () => {
   });
 
   it("renders all 5 features", () => {
-    expect(SOURCE).toContain("FOUR DIMENSIONS");
+    expect(SOURCE).toContain("MULTI-DIMENSIONAL");
     expect(SOURCE).toContain("DEVELOPER ARCHETYPE");
     expect(SOURCE).toContain("VERIFIED METRICS");
     expect(SOURCE).toContain("LIVING DOCUMENT");

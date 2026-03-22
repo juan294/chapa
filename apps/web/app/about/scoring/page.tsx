@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Chapa Scoring Methodology",
     description:
-      "Full transparency on how the four-dimension Impact Profile is calculated. Every weight and decision explained.",
+      "Full transparency on how the multi-dimension Impact Profile is calculated. Every weight and decision explained.",
   },
   twitter: {
     card: "summary",
@@ -123,9 +123,10 @@ export default function ScoringMethodologyPage() {
               <strong className="text-text-primary">
                 multi-dimensional impact breakdown
               </strong>
-              : four independent dimension scores (each 0-100), a developer
-              archetype, a composite score, and a confidence rating. Each
-              contribution style can shine on its own terms.
+              : four core dimension scores (each 0-100) plus an optional
+              fifth Craft dimension, a developer archetype, a composite score,
+              and a confidence rating. Each contribution style can shine on its
+              own terms.
             </p>
 
             {/* ---------------------------------------------------------- */}
@@ -205,9 +206,9 @@ export default function ScoringMethodologyPage() {
             />
 
             {/* ---------------------------------------------------------- */}
-            {/* The four dimensions                                         */}
+            {/* The dimensions                                               */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>The four dimensions</SectionHeading>
+            <SectionHeading>The core dimensions</SectionHeading>
             <p>
               Each dimension is scored 0-100 independently. A dimension returns
               0 when its primary signal is completely absent.
@@ -304,7 +305,7 @@ export default function ScoringMethodologyPage() {
             <p>
               Solo developers are never penalized for working alone. Instead of
               skipping Quality entirely, Chapa evaluates the engineering habits
-              visible in their PR workflow. All four dimensions are always scored
+              visible in their PR workflow. All core dimensions are always scored
               for every developer.
             </p>
 
@@ -408,6 +409,11 @@ export default function ScoringMethodologyPage() {
                   "Well-rounded contributor across all areas",
                 ],
                 [
+                  "Artificer",
+                  "Craft is highest AND >= 60",
+                  "Master of AI tool collaboration — amplifies output while maintaining quality",
+                ],
+                [
                   "Polymath",
                   "Breadth is highest AND >= 60",
                   "Cross-project influence is your strongest suit",
@@ -431,8 +437,8 @@ export default function ScoringMethodologyPage() {
             />
             <p>
               Tie-breaking priority: Polymath &gt; Quality Champion &gt; Marathoner &gt;
-              Builder. If no specific archetype matches (highest dimension &lt;
-              60 and not Balanced), the fallback is Emerging.
+              Builder &gt; Artificer. If no specific archetype matches (highest
+              dimension &lt; 60 and not Balanced), the fallback is Emerging.
             </p>
 
             {/* ---------------------------------------------------------- */}
@@ -440,7 +446,7 @@ export default function ScoringMethodologyPage() {
             {/* ---------------------------------------------------------- */}
             <SectionHeading>Composite score and tiers</SectionHeading>
             <p>
-              The composite score is the average of all four dimensions,
+              The composite score is the average of all dimensions (4 or 5),
               rounded to an integer. It then passes through recency weighting
               and confidence adjustment:
             </p>
