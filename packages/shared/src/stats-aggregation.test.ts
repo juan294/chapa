@@ -499,5 +499,81 @@ describe("buildStatsFromRaw", () => {
     expect(result.prDescriptionRate).toBeUndefined();
     expect(result.featureBranchRate).toBeUndefined();
     expect(result.issueLinkageRate).toBeUndefined();
+    expect(result.microCommitRatio).toBeUndefined();
+  });
+
+  // --- Micro-commit ratio ---
+
+  it("computes microCommitRatio as fraction of merged PRs with < 10 lines changed", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 4,
+        nodes: [
+          { additions: 3, deletions: 2, changedFiles: 1, merged: true, body: "tiny", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 1, deletions: 0, changedFiles: 1, merged: true, body: "typo", headRefName: "fix/b", closingIssuesCount: 0 },
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "real", headRefName: "feat/c", closingIssuesCount: 0 },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: "big", headRefName: "feat/d", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.microCommitRatio).toBeCloseTo(0.5, 2);
+  });
+
+  it("treats PRs at exactly 10 lines as non-micro (boundary)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 7, deletions: 3, changedFiles: 1, merged: true, body: "x", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 6, deletions: 3, changedFiles: 1, merged: true, body: "x", headRefName: "fix/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.microCommitRatio).toBeCloseTo(0.5, 2);
+  });
+
+  it("returns 0 microCommitRatio when all PRs are substantial", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.microCommitRatio).toBe(0);
+  });
+
+  it("returns 1.0 microCommitRatio when all PRs are micro", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 1, deletions: 0, changedFiles: 1, merged: true, body: "x", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 2, deletions: 1, changedFiles: 1, merged: true, body: "x", headRefName: "fix/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.microCommitRatio).toBe(1);
+  });
+
+  it("excludes unmerged PRs from microCommitRatio", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 3,
+        nodes: [
+          { additions: 1, deletions: 0, changedFiles: 1, merged: true, body: "x", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 },
+          { additions: 1, deletions: 0, changedFiles: 1, merged: false, body: "x", headRefName: "fix/c", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.microCommitRatio).toBeCloseTo(0.5, 2);
   });
 });

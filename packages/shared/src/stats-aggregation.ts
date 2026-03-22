@@ -52,6 +52,12 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ? mergedPRs.filter((pr) => pr.closingIssuesCount > 0).length / prsMergedCount
     : undefined;
 
+  // 5c. Micro-commit ratio: fraction of merged PRs with < 10 total lines changed
+  // Threshold aligns with PR weight sizeMultiplier cutoff (totalChanges / 10)
+  const microCommitRatio = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => pr.additions + pr.deletions < 10).length / prsMergedCount
+    : undefined;
+
   // 6. Reviews and issues
   const reviewsSubmittedCount = raw.reviews.totalCount;
   const issuesClosedCount = raw.issues.totalCount;
@@ -114,6 +120,7 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ...(prDescriptionRate !== undefined && { prDescriptionRate }),
     ...(featureBranchRate !== undefined && { featureBranchRate }),
     ...(issueLinkageRate !== undefined && { issueLinkageRate }),
+    ...(microCommitRatio !== undefined && { microCommitRatio }),
     totalStars,
     totalForks,
     totalWatchers,
