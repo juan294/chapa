@@ -131,7 +131,7 @@ export default function ScoringMethodologyPage() {
               </h2>
             </div>
             <LiteYouTubeEmbed
-              videoId=""
+              videoId="hJfXESKmTSo"
               title="How Chapa Scores Developer Impact"
             />
             <p className="text-text-secondary text-sm mt-2">
