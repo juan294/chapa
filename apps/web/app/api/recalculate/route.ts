@@ -42,9 +42,8 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Fetch stats and craft score in parallel (independent operations)
-  // No user token passed — getStats falls back to cached data or service token
   const [stats, craftResult] = await Promise.all([
-    getStats(handle),
+    getStats(handle, auth.token),
     dbGetToolInsights(handle),
   ]);
 

@@ -121,7 +121,7 @@ describe("resolveRequestAuth", () => {
         makeRequest({ cookie: "chapa_session=encrypted_value" }),
       );
 
-      expect(result).toEqual({ handle: "juan294" });
+      expect(result).toEqual({ handle: "juan294", token: "ghp_test" });
       expect(mockReadSessionCookie).toHaveBeenCalledWith(
         "chapa_session=encrypted_value",
         "test-secret-key",

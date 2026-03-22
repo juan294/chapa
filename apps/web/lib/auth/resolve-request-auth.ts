@@ -5,14 +5,16 @@ import { fetchGitHubUser, readSessionCookie } from "@/lib/auth/github";
  * Resolve the authenticated handle from a request.
  *
  * Tries Bearer token first (CLI token or GitHub PAT), then falls back
- * to session cookie. Returns `{ handle }` on success, `null` on failure.
+ * to session cookie. Returns `{ handle, token? }` on success, `null` on
+ * failure. The `token` field is only populated from session cookies (the
+ * user's GitHub OAuth token) — CLI tokens are not GitHub tokens.
  *
  * Used by API routes that need to accept both CLI and browser auth:
  * `/api/insights`, `/api/recalculate`, `/api/supplemental`.
  */
 export async function resolveRequestAuth(
   request: Request,
-): Promise<{ handle: string } | null> {
+): Promise<{ handle: string; token?: string } | null> {
   const secret = process.env.NEXTAUTH_SECRET?.trim();
   if (!secret) return null;
 
@@ -27,7 +29,7 @@ export async function resolveRequestAuth(
   const cookieHeader = request.headers.get("cookie");
   const session = readSessionCookie(cookieHeader, secret);
   if (session) {
-    return { handle: session.login };
+    return { handle: session.login, token: session.token };
   }
 
   return null;
@@ -42,8 +44,7 @@ async function resolveHandle(
   secret: string,
 ): Promise<{ handle: string } | null> {
   if (isCliToken(token)) {
-    const result = verifyCliToken(token, secret);
-    return result; // { handle } | null
+    return verifyCliToken(token, secret);
   }
 
   // Fallback: verify as GitHub PAT

@@ -236,7 +236,7 @@ describe("POST /api/recalculate", () => {
   it("lowercases handle for all operations", async () => {
     await POST(makeRequest());
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser");
+    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined);
     expect(mockDbGetToolInsights).toHaveBeenCalledWith("testuser");
     expect(mockDbReplaceSnapshot).toHaveBeenCalledWith(
       "testuser",
