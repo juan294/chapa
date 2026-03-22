@@ -3,7 +3,7 @@ import { computePrWeight } from "./scoring";
 import { PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
 
 /** Branch names that indicate a direct push (not a feature branch). */
-const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "trunk"]);
+const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
 
 /**
  * Transform raw GitHub GraphQL contribution data into a StatsData object.

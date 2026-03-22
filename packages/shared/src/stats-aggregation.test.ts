@@ -470,7 +470,7 @@ describe("buildStatsFromRaw", () => {
   });
 
   it("excludes all default branch names from featureBranchRate", () => {
-    const defaultBranches = ["main", "master", "develop", "development", "trunk"];
+    const defaultBranches = ["main", "master", "develop", "development", "dev", "developer", "trunk"];
     for (const branch of defaultBranches) {
       const raw = makeRaw({
         pullRequests: {
