@@ -735,14 +735,14 @@ export default function TierVisualsExperimentPage() {
         }}
       />
 
-      <div id="main-content" className="min-h-screen bg-bg bg-grid-warm">
+      <main id="main-content" className="min-h-screen bg-bg bg-grid-warm">
         {/* Ambient glow */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
           <div className="absolute top-1/4 -left-32 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]" />
           <div className="absolute bottom-1/3 -right-32 h-[400px] w-[400px] rounded-full bg-amber/[0.04] blur-[120px]" />
         </div>
 
-        <main className="relative z-10 mx-auto max-w-7xl px-6 py-16 sm:py-24">
+        <div className="relative z-10 mx-auto max-w-7xl px-6 py-16 sm:py-24">
           {/* Header */}
           <header className="mb-12 sm:mb-16 max-w-3xl animate-fade-in-up">
             <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
@@ -853,8 +853,8 @@ export default function TierVisualsExperimentPage() {
               &middot; prefers-reduced-motion supported
             </p>
           </footer>
-        </main>
-      </div>
+        </div>
+      </main>
     </>
   );
 }

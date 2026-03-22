@@ -170,7 +170,7 @@ export default function AuroraExperimentPage() {
   const [speed, setSpeed] = useState<Speed>("medium");
 
   return (
-    <div id="main-content" className="relative min-h-screen bg-bg">
+    <main id="main-content" className="relative min-h-screen bg-bg">
       {/* Aurora effect — always behind everything */}
       <AuroraBackground
         intensity={intensity}
@@ -310,7 +310,7 @@ export default function AuroraExperimentPage() {
           </div>
         </section>
       </div>
-    </div>
+    </main>
   );
 }
 
