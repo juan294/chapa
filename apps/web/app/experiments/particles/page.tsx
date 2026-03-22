@@ -649,7 +649,7 @@ const INTERACTIVE_CONFIG: ParticleConfig = {
 
 export default function ParticlesExperimentPage() {
   return (
-    <div id="main-content" className="min-h-screen bg-bg">
+    <main id="main-content" className="min-h-screen bg-bg">
       <style>{getBadgeContentCSS({}).join("\n")}</style>
       {/* Ambient glow */}
       <div
@@ -661,7 +661,7 @@ export default function ParticlesExperimentPage() {
         aria-hidden="true"
       />
 
-      <main className="relative z-10 mx-auto max-w-5xl px-6 py-16">
+      <div className="relative z-10 mx-auto max-w-5xl px-6 py-16">
         {/* Header */}
         <header className="mb-12 animate-fade-in-up">
           <p className="text-amber text-sm tracking-widest uppercase mb-4 font-semibold">
@@ -777,8 +777,8 @@ export default function ParticlesExperimentPage() {
             &middot; Zero external dependencies
           </p>
         </footer>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
 

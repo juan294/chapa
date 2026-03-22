@@ -589,7 +589,7 @@ export default function NumberCountersPage() {
   }, []);
 
   return (
-    <div id="main-content" className="relative min-h-screen bg-bg">
+    <main id="main-content" className="relative min-h-screen bg-bg">
       {/* Ambient glow */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 left-1/4 h-[500px] w-[500px] rounded-full bg-amber/[0.03] blur-[150px]" />
@@ -650,6 +650,6 @@ export default function NumberCountersPage() {
           </p>
         </footer>
       </div>
-    </div>
+    </main>
   );
 }
