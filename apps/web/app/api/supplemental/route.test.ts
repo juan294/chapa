@@ -4,20 +4,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockFetchGitHubUser, mockCacheSet, mockCacheDel, mockRateLimit } = vi.hoisted(() => ({
-  mockFetchGitHubUser: vi.fn(),
+const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit } = vi.hoisted(() => ({
+  mockResolveRequestAuth: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/github", () => ({
-  fetchGitHubUser: mockFetchGitHubUser,
-}));
-
-vi.mock("@/lib/auth/cli-token", () => ({
-  isCliToken: (t: string) => t.includes("."),
-  verifyCliToken: () => null, // CLI token verification not tested here
+vi.mock("@/lib/auth/resolve-request-auth", () => ({
+  resolveRequestAuth: mockResolveRequestAuth,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -98,7 +93,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("returns 401 when token is invalid (GitHub rejects it)", async () => {
-    mockFetchGitHubUser.mockResolvedValue(null);
+    mockResolveRequestAuth.mockResolvedValue(null);
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "bad-token",
@@ -108,11 +103,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("returns 403 when authenticated user does not match targetHandle", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "other-user",
-      name: "Other",
-      avatar_url: "https://example.com/other.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "other-user" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
@@ -122,11 +113,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("returns 400 when body is missing required fields", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     const req = makeRequest(
       { targetHandle: "juan294" }, // missing sourceHandle, stats
       "valid-token",
@@ -136,11 +123,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("returns 400 when stats shape is invalid", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: { bad: true } },
       "valid-token",
@@ -150,11 +133,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("returns 400 when sourceHandle is invalid", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "<script>", stats: validStats },
       "valid-token",
@@ -164,11 +143,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("returns 200 and stores data on success", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
@@ -181,11 +156,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("stores supplemental data in Redis with correct key and TTL", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
@@ -204,11 +175,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("invalidates the v2 stats cache key (must match client.ts cache key)", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
@@ -221,11 +188,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("handle comparison is case-insensitive", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "Juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "Juan294" });
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
@@ -253,11 +216,7 @@ describe("POST /api/supplemental", () => {
   });
 
   it("rate limits by targetHandle with correct key and window (10 req / 24h)", async () => {
-    mockFetchGitHubUser.mockResolvedValue({
-      login: "juan294",
-      name: "Juan",
-      avatar_url: "https://example.com/juan.png",
-    });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
 
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
