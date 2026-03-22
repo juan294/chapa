@@ -10,8 +10,11 @@ import { getSupabase } from "./supabase";
 // Types
 // ---------------------------------------------------------------------------
 
+export type CampaignType = "announcement" | "engagement";
+
 export interface Campaign {
   id: string;
+  type: CampaignType;
   name: string;
   subject: string;
   previewText: string | null;
@@ -47,6 +50,7 @@ export interface CampaignSend {
 function mapCampaignRow(row: any): Campaign {
   return {
     id: row.id,
+    type: row.type ?? "announcement",
     name: row.name,
     subject: row.subject,
     previewText: row.preview_text ?? null,
@@ -84,6 +88,7 @@ function mapSendRow(row: any): CampaignSend {
 
 export async function dbGetCampaigns(
   status?: Campaign["status"],
+  type?: CampaignType,
 ): Promise<Campaign[]> {
   const db = getSupabase();
   if (!db) return [];
@@ -95,6 +100,9 @@ export async function dbGetCampaigns(
 
     if (status) {
       query = query.eq("status", status);
+    }
+    if (type) {
+      query = query.eq("type", type);
     }
 
     const { data, error } = await query.order("created_at", { ascending: false });
@@ -150,6 +158,7 @@ export async function dbCreateCampaign(
     const { data, error } = await db
       .from("email_campaigns")
       .insert({
+        type: campaign.type,
         name: campaign.name,
         subject: campaign.subject,
         preview_text: campaign.previewText,
@@ -226,6 +235,32 @@ export async function dbUpdateCampaign(
   } catch (error) {
     console.error("[db] dbUpdateCampaign failed:", (error as Error).message);
     return false;
+  }
+}
+
+export async function dbGetActiveEngagementCampaign(): Promise<Campaign | null> {
+  const db = getSupabase();
+  if (!db) return null;
+
+  try {
+    const { data, error } = await db
+      .from("email_campaigns")
+      .select("*")
+      .eq("type", "engagement")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return mapCampaignRow(data);
+  } catch (error) {
+    console.error(
+      "[db] dbGetActiveEngagementCampaign failed:",
+      (error as Error).message,
+    );
+    return null;
   }
 }
 

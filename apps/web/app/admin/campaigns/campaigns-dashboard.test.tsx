@@ -13,6 +13,7 @@ afterEach(cleanup);
 const mockCampaigns: Campaign[] = [
   {
     id: "c-1",
+    type: "announcement",
     name: "March Update",
     status: "draft",
     subject: "What's new",
@@ -31,6 +32,7 @@ const mockCampaigns: Campaign[] = [
   },
   {
     id: "c-2",
+    type: "announcement",
     name: "April Update",
     status: "sending",
     subject: "More updates",
@@ -51,6 +53,7 @@ const mockCampaigns: Campaign[] = [
 
 const sentCampaign: Campaign = {
   id: "c-3",
+  type: "announcement",
   name: "Sent Campaign",
   status: "sent",
   subject: "Old news",

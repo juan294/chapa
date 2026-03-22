@@ -45,6 +45,7 @@ const mockParams = Promise.resolve({ id: "c-1" });
 
 const CAMPAIGN = {
   id: "c-1",
+  type: "announcement" as const,
   name: "Test Campaign",
   subject: "Test Subject",
   headline: "Test Headline",
