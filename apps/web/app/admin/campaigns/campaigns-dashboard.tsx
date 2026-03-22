@@ -8,7 +8,7 @@ import { formatDate } from "../admin-types";
 // Types
 // ---------------------------------------------------------------------------
 
-type ViewMode = "list" | "create" | "detail";
+type ViewMode = "list" | "create" | "detail" | "edit";
 
 interface FormData {
   name: string;
@@ -69,6 +69,8 @@ export function CampaignsDashboard() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
 
   // -------------------------------------------------------------------------
   // Fetch campaigns
@@ -174,10 +176,72 @@ export function CampaignsDashboard() {
     }
   };
 
+  const handleSendTest = async (campaignId: string) => {
+    if (!testEmail.trim()) return;
+    setSendingTest(true);
+    setSendResult(null);
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: testEmail.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setSendResult(data.message);
+      setTestEmail("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCampaign) return;
+    try {
+      const res = await fetch(`/api/admin/campaigns/${selectedCampaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          previewText: form.previewText || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      await fetchCampaigns();
+      setMode("detail");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const openEdit = (campaign: Campaign) => {
+    setForm({
+      name: campaign.name,
+      subject: campaign.subject,
+      previewText: campaign.previewText ?? "",
+      headline: campaign.headline,
+      bodyText: campaign.bodyText,
+      features: campaign.features,
+      ctaText: campaign.ctaText,
+      ctaUrl: campaign.ctaUrl,
+    });
+    setMode("edit");
+  };
+
   const openDetail = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setPreviewHtml(null);
     setSendResult(null);
+    setTestEmail("");
     setMode("detail");
   };
 
@@ -398,6 +462,160 @@ export function CampaignsDashboard() {
   }
 
   // =========================================================================
+  // EDIT VIEW
+  // =========================================================================
+
+  if (mode === "edit" && selectedCampaign) {
+    return (
+      <div className="space-y-6">
+        <h2 className="font-heading text-2xl tracking-tight text-text-primary">
+          <span className="text-amber">$</span> campaigns
+          <span className="text-text-secondary">/</span>edit
+        </h2>
+
+        {errorBanner}
+
+        <form
+          onSubmit={handleEdit}
+          className="space-y-4 rounded-xl border border-stroke bg-card p-6"
+        >
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Campaign Name
+            </label>
+            <input
+              className={inputClass}
+              value={form.name}
+              onChange={(e) => updateField("name", e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Email Subject
+            </label>
+            <input
+              className={inputClass}
+              value={form.subject}
+              onChange={(e) => updateField("subject", e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Preview Text
+              <span className="text-text-secondary/50 ml-1">(optional)</span>
+            </label>
+            <input
+              className={inputClass}
+              value={form.previewText}
+              onChange={(e) => updateField("previewText", e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Headline
+            </label>
+            <input
+              className={inputClass}
+              value={form.headline}
+              onChange={(e) => updateField("headline", e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Body
+            </label>
+            <textarea
+              className={inputClass}
+              value={form.bodyText}
+              onChange={(e) => updateField("bodyText", e.target.value)}
+              rows={3}
+              required
+            />
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-medium text-text-secondary">
+              Feature Highlights
+            </legend>
+            {form.features.map((f, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  className={inputClass}
+                  value={f.text}
+                  onChange={(e) => updateFeature(i, e.target.value)}
+                  placeholder="Feature description"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFeature(i)}
+                  className="shrink-0 rounded-lg border border-stroke px-2 text-text-secondary hover:text-terminal-red hover:border-terminal-red/20"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addFeature}
+              className="text-xs text-amber hover:text-amber-light"
+            >
+              + Add feature
+            </button>
+          </fieldset>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1">
+                CTA Button Text
+              </label>
+              <input
+                className={inputClass}
+                value={form.ctaText}
+                onChange={(e) => updateField("ctaText", e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1">
+                CTA URL
+              </label>
+              <input
+                className={inputClass}
+                value={form.ctaUrl}
+                onChange={(e) => updateField("ctaUrl", e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setMode("detail")}
+              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // =========================================================================
   // DETAIL VIEW
   // =========================================================================
 
@@ -490,6 +708,12 @@ export function CampaignsDashboard() {
               Preview Email
             </button>
             <button
+              onClick={() => openEdit(c)}
+              className="rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary"
+            >
+              Edit Draft
+            </button>
+            <button
               onClick={() => handleSend(c.id)}
               disabled={sending}
               className="rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white hover:bg-amber-light disabled:opacity-50"
@@ -504,6 +728,32 @@ export function CampaignsDashboard() {
             </button>
           </div>
         )}
+
+        {/* Send Test Email */}
+        <div className="rounded-xl border border-stroke bg-card p-4 space-y-3">
+          <h3 className="font-heading text-sm text-text-secondary">
+            Send Test Email
+          </h3>
+          <div className="flex gap-2">
+            <input
+              className={inputClass}
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="your@email.com"
+            />
+            <button
+              onClick={() => handleSendTest(c.id)}
+              disabled={sendingTest || !testEmail.trim()}
+              className="shrink-0 rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary disabled:opacity-50"
+            >
+              {sendingTest ? "Sending..." : "Send Test"}
+            </button>
+          </div>
+          <p className="text-xs text-text-secondary/60">
+            Sends one email with [TEST] prefix. Does not affect campaign status.
+          </p>
+        </div>
 
         {/* Preview iframe */}
         {previewHtml && (
