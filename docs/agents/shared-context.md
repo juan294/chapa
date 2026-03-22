@@ -9,27 +9,27 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-21T06:00:00Z -->
-## Cost Analyst — 2026-03-21
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-22T06:00:00Z -->
+## Cost Analyst — 2026-03-22
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$46–66** (Vercel $26, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$91–111/mo. Stable — no new cost risks.
-- Redis: 28 key pattern families. TTL coverage 100% per-user keys. 3 global singletons without TTL — intentional, combined <16 KB.
-- **Estimated Redis memory @10K users: ~580 MB** — stable. OG images ~375 MB (48h TTL) remain #1 consumer. Well within Upstash Pro 10 GB.
-- GitHub API budget: ~690 calls/hr peak vs 5,000/hr limit. 86% headroom. In-flight dedup reduces concurrent calls 40–60%.
+- Estimated monthly cost at 10K users: **~$40–60** (Vercel $20, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$65–95/mo. Stable — no new cost risks.
+- Redis: 15 key pattern families. TTL coverage 100% per-user keys. 3 global singletons without TTL — intentional, combined <16 KB. OG images (~30–60 KB each, 48h TTL) remain #1 consumer.
+- **Estimated Redis memory @10K users: ~535 MB** (160 MB user keys + 375 MB OG images). Well within Upstash Pro 10 GB.
+- GitHub API budget: ~420 calls/hr @10K users (50% cache hit) vs 5,000/hr limit. 91.6% headroom. In-flight dedup reduces concurrent calls 40–60%.
 - Supabase: 9 tables + 2 views. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. Batch queries correct. RLS on all 9 tables. 14 indexes cover all hot paths.
-- Fetch timeout coverage: **99%+** — all raw `fetch()` calls have `AbortSignal.timeout()` or `Promise.race()` wrappers. Health pings now have 5s timeouts. `listAllContacts()` has 30s timeout.
-- Resource leaks: **0 critical**. `listAllContacts()` `Promise.race` timer not explicitly cleared (LOW — daily cron, GC handles it).
-- **ALL 5 previously carried items RESOLVED**: badge SVG allSettled ✅, studio config docs ✅, listAllContacts timeout ✅, health ping timeouts ✅, campaign stats cleanup ✅.
-- **CARRIED: `dbGetCampaignStats()` JS aggregation** (`campaigns.ts:358-376`) — fetches all rows, counts in JS. Should use SQL `GROUP BY` at scale. Negligible currently (<100 sends/campaign). Misleading "SQL-level aggregation" comment at line 357. (Since 2026-03-18.)
-- **CARRIED: `listAllContacts()` Promise.race timer** (`sync-audience/route.ts:30-35`) — `setTimeout` not cleared via `.finally()`. Matches pattern elsewhere in `with-timeout.ts:37`. (Since 2026-03-19.)
-- **NEW: Campaign admin routes lack rate limiting** — `/api/admin/campaigns/*` has no `rateLimit()` call. Admin-only with auth, but accidental loop could trigger unbounded Resend API calls.
-- Vercel: 13 ISR pages, ~3 dynamic, 41 API routes. No edge runtime. 3 cron jobs (90 executions/mo, ~27.5 compute-min/mo vs 2160 free).
+- Fetch timeout coverage: **100%** — all `fetch()` calls have `AbortSignal.timeout()` or `Promise.race()`. `listAllContacts()` timer now cleared via `.finally()`.
+- Resource leaks: **0 critical**. Badge SVG route uses `Promise.allSettled()` (verified line 104). All timers properly cleaned up.
+- **ALL previously carried items RESOLVED**: `listAllContacts()` timer ✅ (`.finally(() => clearTimeout(timer))` at line 38), badge SVG `allSettled` ✅ (verified at `route.ts:104`), campaign admin rate limiting ✅ (confirmed present via `adminAuth()`).
+- **CARRIED: `dbGetCampaignStats()` JS aggregation** (`campaigns.ts:350-376`) — fetches all status rows, counts in JS. Should use SQL `GROUP BY` at scale. Comment at line 357 now accurate. Negligible currently (<100 sends/campaign). (Since 2026-03-18.)
+- **MONITOR: `sync-audience` contact pagination** — fetches all Resend contacts from page 1 every run. At 10K+ contacts, consider cursor caching for incremental sync.
+- **MONITOR: OG image Redis memory** — at 50K+ users could approach Upstash Pro limits. Consider blob storage (Vercel Blob, R2).
+- Vercel: ISR on all public pages, ~3 dynamic, 41+ API routes. No edge runtime. 3 cron jobs (90 executions/mo, ~45 compute-min/mo vs 2,160 free).
 
 **Cross-agent recommendations:**
-- [Performance]: Redis memory stable at ~580 MB @10K. OG images (~375 MB) remain #1 Redis consumer — consider blob storage at scale. `dbGetCampaignStats()` JS aggregation won't scale past ~10K sends/campaign.
-- [Security]: Fail-open rate limiting intact. Fetch timeouts at 99%+ coverage. Campaign email quota (95/day) prevents abuse. Campaign admin routes lack rate limiting — low risk (admin-only) but should be added.
-- [Coverage]: All cost-critical paths well-tested. API routes aggregate at 96.7%. Campaign admin routes should get rate-limit tests when rate limiting is added.
-- [QA]: All 5 previously carried items resolved by triage. 2 minor items carried forward (both LOW priority). Campaign admin rate limiting is the only new finding.
+- [Performance]: Redis memory stable at ~535 MB @10K. OG images remain #1 Redis consumer — consider blob storage at 50K+ scale. `dbGetCampaignStats()` JS aggregation won't scale past ~1K sends/campaign.
+- [Security]: Fail-open rate limiting intact. Fetch timeouts at 100% coverage. Campaign email quota (95/day) prevents abuse. All admin routes confirmed rate-limited via `adminAuth()`.
+- [Coverage]: All cost-critical paths well-tested. API routes aggregate at 97%+ for admin, 98.6% for auth. No new gaps.
+- [QA]: All previously carried items now verified resolved. 1 minor item carried forward (JS aggregation, LOW priority). 2 monitor items (pagination, OG memory) for future scale.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
@@ -119,27 +119,28 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update (POST → GET+PUT). 11 duplicate ` 2.ts` files should be deleted from working directory.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-21T02:10:00Z -->
-## Coverage Agent — 2026-03-21
+<!-- ENTRY:START agent=coverage timestamp=2026-03-22T02:15:00Z -->
+## Coverage Agent — 2026-03-22
 - **Status**: GREEN
-- Overall coverage: **87.40% stmts** (6,758/7,732), 82.23% branch, 76.49% funcs
-- Test suite: 320 files, 5,518 tests, 100% pass rate, 0 flaky (3 runs)
-- Delta vs 2026-03-19: **-0.05% stmts** (6,752→6,758 covered, 7,721→7,732 total). Flat — no regressions.
-- **WARNING: 9 macOS duplicate " 2" files** still present (down from 11 — triage deleted 2 but 9 remain). They inflate denominator by 95 stmts, making raw coverage appear 86.34% instead of 87.40%.
-- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.1%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api` 96.7%, `lib/db` 94.7%, `lib/email` 94.7%, `lib/auth` 94.7%, `lib/insights` 94.9%, `lib/bitbucket` 93.1%, `lib/effects` 90.5%, `components` 88.8%
-- `lib/crypto` and `lib/async` now at 100% (actual source files — dupes caused false RED in raw report)
-- `lib/insights/validation.ts` crossed 80% threshold: now 85.2% (was 79.5%). RESOLVED.
-- `app/pages` at 72.8%, `app/experiments` at 56.2% — unchanged, same root causes (V8 instrumentation, feature flags)
-- `PostHogProvider.tsx` still at 24.1% — lowest-coverage production component
-- Previous flaky test (`BadgeToolbar.render.test.tsx`) did not reproduce (0 in 3 runs). Resolved.
-- 1 Vitest warning: `UserMenu.render.test.tsx` has nested `vi.mock()` that will become an error in a future version
+- Overall coverage: **87.72% stmts** (6,853/7,812), 82.45% branch, 79.14% funcs, 88.96% lines
+- Test suite: 321 files, 5,548 tests, 100% pass rate, 0 flaky (3 runs)
+- Delta vs 2026-03-21: **+0.32% stmts** (6,758→6,853 covered, 7,732→7,812 total). Positive trend — 95 newly covered stmts vs 80 new total.
+- macOS duplicate files cleaned up by triage — no longer inflating denominator.
+- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.1%, `lib/history` 98.2%, `app/api/auth` 98.6%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api/admin` 97.0%, `lib/db` 94.7%, `lib/auth` 94.7%, `lib/email` 94.7%, `lib/insights` 94.9%, `lib/bitbucket` 93.1%, `components` 90.7%, `lib/effects` 88.8%
+- `lib/crypto`, `lib/async`, `lib/analytics`, `lib/dashboard`, `lib/utils` all at 100%
+- `app/admin` pages at 79.1% (YELLOW) — `AdminDashboardClient.tsx` (0%, 31 stmts) and agent admin pages are the gap
+- `app/experiments` at 56.2% — unchanged, feature-flagged, V8 instrumentation issues
+- `PostHogProvider.tsx` still lowest-coverage production component (render tests added by triage but SDK init hard to test)
+- `HolographicOverlay.tsx` at 47.1% — DOM API gaps in JSDOM
+- 0 flaky tests across 3 consecutive runs. Previous `BadgeToolbar.render.test.tsx` flaky: resolved.
+- 1 Vitest warning: `UserMenu.render.test.tsx` nested `vi.mock()` still present (triage noted as hoisted but warning persists)
 
 **Cross-agent recommendations:**
-- [Security]: All security-critical paths at 93%+. `lib/crypto/safe-equal.ts` now has dedicated tests (100%). XSS tests comprehensive. HMAC verification at 100%.
-- [QA]: Priority test additions: (1) `PostHogProvider.tsx` (24.1%), (2) `HolographicOverlay.tsx` (47.1%), (3) `SharePageOwnerContent.tsx` (0%, 13 stmts). 9 macOS duplicate files should be deleted. Fix nested `vi.mock()` in `UserMenu.render.test.tsx` before Vitest upgrade.
-- [Performance]: `hexmap/page.tsx` (132 stmts, 0%) now has smoke test (3 tests). Experiment pages remain low priority.
-- [Cost Analyst]: All module coverages stable. API routes aggregate at 96.7%. No new gaps.
-- [DevOps]: All thresholds pass with 11.5%+ margin. 9 duplicate files still need cleanup — they cause coverage metric discrepancy.
+- [Security]: All security-critical paths at 93%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
+- [QA]: Priority test additions: (1) `app/verify/VerifyForm.tsx` (0%, 13 stmts — client interaction), (2) `HolographicOverlay.tsx` (47.1%), (3) `app/admin/AdminDashboardClient.tsx` (0%, 31 stmts). Nested `vi.mock()` warning in UserMenu still present.
+- [Performance]: All critical rendering and API paths at 90%+. Experiment pages remain low priority. `hexmap/page.tsx` (0%, 132 stmts) is canvas-heavy.
+- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at 97%+ for admin, 98.6% for auth. No new gaps.
+- [DevOps]: All thresholds pass with 12%+ margin. Duplicate file cleanup complete.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-21T12:00:00Z -->
