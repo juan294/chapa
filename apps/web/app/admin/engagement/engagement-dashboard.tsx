@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { Campaign } from "@/lib/db/campaigns";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +32,7 @@ export function EngagementDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [engagementCampaign, setEngagementCampaign] = useState<Campaign | null>(null);
 
   const fetchFlags = useCallback(async () => {
     try {
@@ -52,6 +54,13 @@ export function EngagementDashboard() {
   useEffect(() => {
     fetchFlags();
   }, [fetchFlags]);
+
+  useEffect(() => {
+    fetch("/api/admin/campaigns?type=engagement")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setEngagementCampaign(data?.campaigns?.[0] ?? null))
+      .catch(() => {});
+  }, []);
 
   const handleToggle = useCallback(
     async (key: string, enabled: boolean) => {
@@ -181,6 +190,26 @@ export function EngagementDashboard() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Score bump email template card */}
+      <div className="rounded-xl border border-stroke bg-card p-4 mt-6 space-y-3">
+        <h3 className="font-heading text-sm text-text-secondary">
+          Score Bump Email Template
+        </h3>
+        {engagementCampaign ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-text-primary">{engagementCampaign.name}</p>
+              <p className="text-xs text-text-secondary mt-1">Subject: {engagementCampaign.subject}</p>
+            </div>
+            <p className="text-xs text-text-secondary">Edit in Campaigns tab</p>
+          </div>
+        ) : (
+          <p className="text-sm text-text-secondary">
+            No engagement template created yet. Create one in the Campaigns tab to customize the score bump email.
+          </p>
+        )}
       </div>
     </div>
   );
