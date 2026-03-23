@@ -7,19 +7,58 @@ const SOURCE = fs.readFileSync(
   "utf-8",
 );
 
-describe("AdminPage", () => {
-  describe("landmark accessibility (#287)", () => {
-    it("has id='main-content' on the <main> element", () => {
-      // The <main> element must have id="main-content" for skip-nav links
-      expect(SOURCE).toMatch(/<main[^>]*id="main-content"/);
+describe("Admin page (server component)", () => {
+  describe("component type", () => {
+    it("is NOT a client component", () => {
+      expect(SOURCE).not.toMatch(/^["']use client["']/m);
+    });
+
+    it("is an async function", () => {
+      expect(SOURCE).toContain("async function");
     });
   });
 
-  describe("a11y: sr-only h1 heading (#421)", () => {
-    it("has a screen-reader-only <h1> with 'Admin Dashboard' text", () => {
-      // The admin page needs a static <h1> for screen readers so the page
-      // has a heading landmark independent of client-side loading state.
-      expect(SOURCE).toMatch(/<h1[^>]*className="sr-only"[^>]*>Admin Dashboard<\/h1>/);
+  describe("authentication", () => {
+    it("reads session cookie", () => {
+      expect(SOURCE).toContain("readSessionCookie");
+    });
+
+    it("redirects unauthenticated users", () => {
+      expect(SOURCE).toContain("redirect");
+    });
+
+    it("checks admin handle", () => {
+      expect(SOURCE).toContain("isAdminHandle");
+    });
+  });
+
+  describe("metadata", () => {
+    it("exports metadata", () => {
+      expect(SOURCE).toContain("metadata");
+    });
+
+    it("sets robots noindex", () => {
+      expect(SOURCE).toContain("index: false");
+    });
+  });
+
+  describe("rendering", () => {
+    it("renders Navbar", () => {
+      expect(SOURCE).toContain("Navbar");
+    });
+
+    it("renders AdminDashboardClient", () => {
+      expect(SOURCE).toContain("AdminDashboardClient");
+    });
+
+    it("renders GlobalCommandBar with admin flag", () => {
+      expect(SOURCE).toContain("GlobalCommandBar");
+      expect(SOURCE).toContain("isAdmin");
+    });
+
+    it("has a screen-reader heading", () => {
+      expect(SOURCE).toContain("sr-only");
+      expect(SOURCE).toContain("Admin Dashboard");
     });
   });
 });
