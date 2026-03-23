@@ -79,7 +79,7 @@ The badge and share page display a multi-dimensional developer profile:
 - **Adjusted score**: Composite gently weighted by confidence
 - **Tier**: Emerging (0-39), Solid (40-69), High (70-84), Elite (85-100)
 
-Full scoring spec: `docs/impact-v4.md`
+Full scoring spec: `docs/impact-v6.md`
 
 ## Non-goals
 - No leaderboard

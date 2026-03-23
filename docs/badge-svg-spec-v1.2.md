@@ -402,6 +402,8 @@ Grid extent:
 
 ## 5. Radar Chart
 
+<!-- [NEEDS REVIEW] Diagram shows 4-axis diamond only. When Craft dimension is present, the badge renders a 5-axis pentagon (72° spacing). See impact-v6.md for pentagon axis order. -->
+
 ```
          Delivery
             ▲

@@ -1,7 +1,7 @@
 # Badge Design v1 Spec — React Component (Creator Studio)
 
 > **Scope**: This spec covers the **React component** (`BadgeContent.tsx`) used in the Creator Studio preview — NOT the embeddable SVG badge.
-> For the **embeddable SVG badge** served at `/u/:handle/badge.svg`, see [`badge-svg-spec-v1.0.md`](./badge-svg-spec-v1.0.md).
+> For the **embeddable SVG badge** served at `/u/:handle/badge.svg`, see [`badge-svg-spec-v1.2.md`](./badge-svg-spec-v1.2.md).
 >
 > Implemented in `apps/web/components/badge/BadgeContent.tsx`.
 
