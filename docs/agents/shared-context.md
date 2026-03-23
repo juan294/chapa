@@ -143,16 +143,16 @@
 - [DevOps]: All thresholds pass with 13%+ margin. Test suite runs in ~12-38s depending on coverage mode.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-03-22T07:30:00Z -->
-## Triage — 2026-03-22
-- **Reports processed**: 3 (coverage, cost-analyst, cc-rpi-update)
-- **Action items resolved**: 10 of 11 (1 already resolved: Vitest warning in UserMenu was fixed in prior triage)
-- **Summary**: Added render tests for 9 Priority 1 untested components (VerifyForm, verify/[hash]/page, AdminDashboardClient, OverallHealthBanner, AgentTogglesTable, Navbar, NavbarClient, CopyButton, cli/authorize/page). Updated `dbGetCampaignStats()` comment to document PostgREST GROUP BY limitation. All reports GREEN, no agent failures.
-- **Tests**: 5,671 passing (+123 new, 330 files), 0 type errors, 0 lint issues
-- **Coverage delta**: 87.72% stmts (+0.32% vs previous). All critical paths GREEN (90%+).
+<!-- ENTRY:START agent=triage timestamp=2026-03-23T07:30:00Z -->
+## Triage — 2026-03-23
+- **Reports processed**: 2 (coverage, cost-analyst)
+- **Action items resolved**: 7 of 9 (items 8-9 are medium-effort branch coverage improvements, deferred to next cycle)
+- **Summary**: Added render tests for 6 Priority 1 page components (landing, about/scoring, about/verification, cli/authorize/AuthorizeClient, generating/[handle], admin). Both reports GREEN with no blockers. Coverage continues upward trend.
+- **Tests**: 5,782 passing (340 files), 0 type errors, 0 lint issues
+- **Coverage delta**: 88.55% stmts (+0.83% vs previous). All critical paths GREEN (91%+).
 **Cross-agent recommendations:**
-- [Coverage]: 9 Priority 1 components now have render tests. Remaining gaps are Priority 2-4 (experiments, static pages, framework files).
-- [QA]: Vitest `vi.mock()` warning no longer reproducible — remove from carried items.
-- [Cost Analyst]: `dbGetCampaignStats` JS aggregation confirmed as correct approach — PostgREST lacks GROUP BY. Remove from carried items.
-- [Performance]: No new performance concerns. Test suite runs in ~18s.
+- [Coverage]: 6 Priority 1 page components now have tests. Remaining Priority 1 gap: `app/studio/page.tsx` already had tests. Priority 2: `campaigns-dashboard.tsx` (74.6%) and `AdminDashboardClient.tsx` (71.0%) need branch coverage.
+- [Cost Analyst]: All GREEN, no action needed. Monitor items (OG image blob storage, sync-audience pagination) are future-scale only.
+- [QA]: AuthorizeClient now has full render tests including error states and approval flow.
+- [Performance]: No new performance concerns. Test suite runs in ~14s.
 <!-- ENTRY:END -->
