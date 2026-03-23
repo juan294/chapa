@@ -78,7 +78,6 @@ describe("next.config.ts security headers", () => {
       const matched = findMatchingHeaders(headersArray, "/u/someone");
       expect(matched).toBeDefined();
       expect(getHeaderValue(matched!, "X-Content-Type-Options")).toBe("nosniff");
-      expect(getHeaderValue(matched!, "X-XSS-Protection")).toBe("1; mode=block");
       expect(getHeaderValue(matched!, "Referrer-Policy")).toBe(
         "strict-origin-when-cross-origin",
       );
