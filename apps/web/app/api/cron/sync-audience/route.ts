@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { safeEqual } from "@/lib/crypto/safe-equal";
+import { verifyCronSecret } from "@/lib/auth/cron";
 import { dbGetUsersWithEmail } from "@/lib/db/users";
 import { getResend } from "@/lib/email/resend";
 import {
@@ -79,17 +79,8 @@ async function listAllContactsInner(
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const authHeader = request.headers.get("Authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-
-  if (!token || !safeEqual(token, secret)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronSecret(request);
+  if (denied) return denied;
 
   // Ensure segment exists
   const segmentId = await ensureSegment();

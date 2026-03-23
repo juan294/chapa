@@ -122,10 +122,12 @@ describe("GET /api/cron/warm-cache", () => {
       expect(res.status).toBe(401);
     });
 
-    it("returns 401 when CRON_SECRET env var is not set", async () => {
+    it("passes through when CRON_SECRET env var is not set", async () => {
       delete process.env.CRON_SECRET;
+      mockedDbGetUsers.mockResolvedValue([]);
       const res = await GET(makeRequest("test-cron-secret"));
-      expect(res.status).toBe(401);
+      // No CRON_SECRET configured = auth skipped (pass-through)
+      expect(res.status).toBe(200);
     });
 
     it("returns 401 when token does not match CRON_SECRET", async () => {
