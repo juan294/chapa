@@ -435,6 +435,7 @@ export function CampaignsDashboard() {
                   value={f.text}
                   onChange={(e) => updateFeature(i, e.target.value)}
                   placeholder="Feature description"
+                  aria-label={`Feature highlight ${i + 1}`}
                 />
                 <button
                   type="button"
@@ -602,6 +603,7 @@ export function CampaignsDashboard() {
                   value={f.text}
                   onChange={(e) => updateFeature(i, e.target.value)}
                   placeholder="Feature description"
+                  aria-label={`Feature highlight ${i + 1}`}
                 />
                 <button
                   type="button"

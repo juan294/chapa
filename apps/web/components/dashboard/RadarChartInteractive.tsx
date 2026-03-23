@@ -291,7 +291,7 @@ export function RadarChartInteractive({
                 onDimensionHover?.(null);
               }}
               onKeyDown={(e) => handleVertexKeyDown(axis.key, e)}
-              style={{ cursor: "pointer", outline: "none" }}
+              style={{ cursor: "pointer" }}
             />
           );
         })}

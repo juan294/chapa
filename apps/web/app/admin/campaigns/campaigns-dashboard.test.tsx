@@ -928,4 +928,49 @@ describe("CampaignsDashboard — a11y label associations", () => {
     const removeButtons = screen.getAllByRole("button", { name: "Remove feature" });
     expect(removeButtons).toHaveLength(2);
   });
+
+  it("feature highlight inputs have aria-label in create form", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("New Campaign")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("New Campaign"));
+
+    // Add two features
+    fireEvent.click(screen.getByText("+ Add feature"));
+    fireEvent.click(screen.getByText("+ Add feature"));
+
+    const featureInputs = screen.getAllByPlaceholderText("Feature description");
+    for (const input of featureInputs) {
+      expect(input.getAttribute("aria-label")).toMatch(/Feature highlight \d+/);
+    }
+  });
+
+  it("feature highlight inputs have aria-label in edit form", async () => {
+    // Use a campaign with existing features
+    const campaignWithFeatures: Campaign = {
+      ...mockCampaigns[0]!,
+      features: [{ text: "Feature A" }, { text: "Feature B" }],
+    };
+    mockFetchSuccess([campaignWithFeatures]);
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    // Open detail, then edit
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Draft")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Edit Draft"));
+
+    const featureInputs = screen.getAllByPlaceholderText("Feature description");
+    expect(featureInputs).toHaveLength(2);
+    for (const input of featureInputs) {
+      expect(input.getAttribute("aria-label")).toMatch(/Feature highlight \d+/);
+    }
+  });
 });
