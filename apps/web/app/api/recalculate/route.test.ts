@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 // ---------------------------------------------------------------------------
 
 const {
-  mockRequireSession,
+  mockResolveRequestAuth,
   mockRateLimit,
   mockGetStats,
   mockComputeImpactV4,
@@ -16,7 +16,7 @@ const {
   mockUpdateSnapshotCache,
   mockGetTier,
 } = vi.hoisted(() => ({
-  mockRequireSession: vi.fn(),
+  mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetStats: vi.fn(),
   mockComputeImpactV4: vi.fn(),
@@ -27,8 +27,8 @@ const {
   mockGetTier: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/require-session", () => ({
-  requireSession: mockRequireSession,
+vi.mock("@/lib/auth/resolve-request-auth", () => ({
+  resolveRequestAuth: mockResolveRequestAuth,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -73,12 +73,7 @@ import { POST } from "./route";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SESSION = {
-  token: "ghp_test123",
-  login: "TestUser",
-  name: "Test",
-  avatar_url: "https://avatars.githubusercontent.com/u/1",
-};
+const AUTH = { handle: "TestUser" };
 
 function makeRequest(): NextRequest {
   return new NextRequest(
@@ -120,7 +115,7 @@ function makeImpact(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireSession.mockReturnValue({ session: SESSION });
+  mockResolveRequestAuth.mockResolvedValue(AUTH);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
   mockGetStats.mockResolvedValue(makeStats());
   mockComputeImpactV4.mockReturnValue(makeImpact());
@@ -140,14 +135,24 @@ beforeEach(() => {
 
 describe("POST /api/recalculate", () => {
   it("returns 401 when not authenticated", async () => {
-    mockRequireSession.mockReturnValue({
-      error: new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { "Content-Type": "application/json" } },
-      ),
-    });
+    mockResolveRequestAuth.mockResolvedValue(null);
     const resp = await POST(makeRequest());
     expect(resp.status).toBe(401);
+  });
+
+  it("accepts Bearer token authentication", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "cli-user" });
+    mockGetStats.mockResolvedValue(makeStats());
+    const req = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/recalculate",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer cli.token.here" },
+      },
+    );
+    const resp = await POST(req);
+    expect(resp.status).toBe(200);
+    expect(mockResolveRequestAuth).toHaveBeenCalled();
   });
 
   it("returns 429 when rate limited", async () => {
@@ -231,7 +236,7 @@ describe("POST /api/recalculate", () => {
   it("lowercases handle for all operations", async () => {
     await POST(makeRequest());
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", SESSION.token);
+    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined);
     expect(mockDbGetToolInsights).toHaveBeenCalledWith("testuser");
     expect(mockDbReplaceSnapshot).toHaveBeenCalledWith(
       "testuser",

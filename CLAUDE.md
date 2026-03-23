@@ -98,6 +98,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET|PATCH|DELETE `/api/admin/campaigns/:id` Campaign CRUD (admin auth, draft only)
 - GET `/api/admin/campaigns/:id/preview` Campaign email preview (admin auth)
 - POST `/api/admin/campaigns/:id/send` Initiate campaign send (admin auth)
+- POST `/api/admin/campaigns/:id/test` Send test email for campaign draft (admin auth)
 - POST `/api/notifications/unsubscribe` Email unsubscribe
 
 ### Webhooks & Cron

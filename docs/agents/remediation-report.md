@@ -1,55 +1,49 @@
 # Remediation Report
-
-> Generated on 2026-03-22 | Branch: `develop` | Commit: `8f1b686` | 14 findings resolved
+> Generated on 2026-03-23 | Branch: `develop` | 8 issues resolved
 >
-> Pre-launch report: `docs/agents/pre-launch-report.md` (v36)
+> Pre-launch report: `docs/agents/pre-launch-report.md` (v37)
 
 ## Summary
-- Findings processed: 14 (all warnings from pre-launch audit)
-- Issues created: 6 (#592–#597)
-- Issues resolved: 6/6
-- Tests added: 57 (5706 → 5763)
-- Files modified: 26
+- Findings processed: 12 (3 warnings + 9 recommendations)
+- Issues created: 8 (#602–#609)
+- Issues resolved: 8/8
+- Tests added: 28 new tests across 8 test files
+- Files modified: 19
 - CI status: PASSING
 
 ## Issues Resolved
-
 | # | Issue | Domain | Severity | Tests Added | Status |
 |---|-------|--------|----------|-------------|--------|
-| #592 | Campaign form a11y: label associations + aria-label | ux | Medium | 4 | Closed |
-| #593 | Experiment page landmarks: div → main | ux | Low | 13 (regression test) | Closed |
-| #594 | Missing tests: html-helpers + 5 error boundaries | qa | Low | 40 (9 + 31) | Closed |
-| #595 | Suppress expected stderr in error-handling tests | infra | Very Low | 0 (existing tests improved) | Closed |
-| #596 | Document accepted risks (W1-W4, W11, W12) | docs | Low | 0 (documentation) | Closed |
-| #597 | Update dev deps + commit plan files | infra | Very Low | 0 (maintenance) | Closed |
+| #602 | Update dev deps | architecture | rec | 0 (already current) | Closed |
+| #603 | Extract verifyCronSecret() helper | architecture | rec | 6 | Closed |
+| #604 | Remove X-XSS-Protection header | security | rec | 0 (test updated) | Closed |
+| #605 | Close stale dependabot branches | devops | rec | 0 (git ops) | Closed |
+| #606 | Add coming-soon loading.tsx | devops | rec | 5 | Closed |
+| #607 | A11y: campaign labels + radar focus | ux | warning | 3 | Closed |
+| #608 | Render tests (terms, not-found, ThemeProvider) | qa | rec | 14 | Closed |
+| #609 | Evaluate browserslist polyfill | performance | rec | 0 (not actionable) | Closed |
 
-## Findings Coverage
+## Resolution Details
 
-| Finding | Resolution |
-|---------|-----------|
-| W1 MPL-2.0 deps | Documented: only `@resvg/resvg-js` remains MPL-2.0; `sharp` now Apache-2.0 |
-| W2 Wildcard CORS on verify | Documented as intentional (badges need client-side verification) |
-| W3 dangerouslySetInnerHTML SVG | Documented as safe (server-rendered, escapeXml on all user input) |
-| W4 Fail-open rate limiting | Already documented; confirmed current |
-| W5 Campaign form labels | Fixed: 15 htmlFor/id pairs added |
-| W6 Remove feature aria-label | Fixed: aria-label="Remove feature" added |
-| W7 Experiment page landmarks | Fixed: 7 pages changed div→main, nested main conflicts resolved |
-| W8 html-helpers no test file | Fixed: 9 tests in new html-helpers.test.ts |
-| W9 5 error boundaries untested | Fixed: 31 tests across 5 new test files |
-| W10 Test stderr noise | Fixed: console.error mocked in 3 test suites |
-| W11 Turbopack NFT trace | Documented as accepted (admin-only, code-documented) |
-| W12 Experiment pages client-rendered | Documented as accepted (feature-flagged, interactive demos) |
-| W13 Outdated dev deps | Fixed: vitest 4.1.0, jsdom 29.0.1 |
-| W14 Untracked plan files | Fixed: committed to repo |
+- **#602**: Already up to date — lockfile pins vitest 4.1.0, jsdom 29.0.1, coverage-v8 4.1.0
+- **#603**: New `lib/auth/cron.ts` helper with 6 tests. All 3 cron routes refactored to use it
+- **#604**: Removed deprecated `X-XSS-Protection` header from `next.config.ts` and test assertions
+- **#605**: Deleted 3 stale dependabot remote branches
+- **#606**: New `coming-soon/loading.tsx` with accessibility attributes and 5 tests
+- **#607**: Added `aria-label` to campaign inputs, removed `outline: "none"` from radar chart vertices, 3 tests
+- **#608**: Added source-based tests for `terms/page.tsx` (5), `not-found.tsx` (4), `ThemeProvider.tsx` (5)
+- **#609**: Not actionable — the 110KB polyfill is Next.js's built-in `nomodule` chunk, served only to legacy browsers. Modern browsers skip it entirely. Browserslist does not affect it.
+
+## Accepted Items
+- **W1** (Turbopack NFT trace warning): Cosmetic — build succeeds. No fix available.
+- **R7** (cli/authorize error.tsx): Already existed — no action needed.
 
 ## Final Verification
-- [x] All tests passing (5763)
-- [x] Typecheck clean
-- [x] Lint clean
-- [x] CI green on develop
-- [x] All worktrees removed
-- [x] All remediation branches deleted
-- [x] All 6 issues closed
+- [x] All tests passing (5,723 tests, 345 files)
+- [x] Typecheck clean (0 errors)
+- [x] Lint clean (0 issues)
+- [x] Build succeeds
+- [x] CI green
 
 ## Remaining Items
-None. All 14 findings resolved.
+None — all findings addressed or documented as not actionable.

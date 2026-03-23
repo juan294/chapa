@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { safeEqual } from "@/lib/crypto/safe-equal";
+import { verifyCronSecret } from "@/lib/auth/cron";
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbInsertSnapshot,
@@ -53,17 +53,8 @@ interface HandleResult {
  */
 export async function GET(request: NextRequest) {
   // Auth: Vercel sends CRON_SECRET as Authorization: Bearer <secret>
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const authHeader = request.headers.get("Authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-
-  if (!token || !safeEqual(token, secret)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronSecret(request);
+  if (denied) return denied;
 
   const start = Date.now();
 

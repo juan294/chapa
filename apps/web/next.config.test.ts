@@ -78,7 +78,6 @@ describe("next.config.ts security headers", () => {
       const matched = findMatchingHeaders(headersArray, "/u/someone");
       expect(matched).toBeDefined();
       expect(getHeaderValue(matched!, "X-Content-Type-Options")).toBe("nosniff");
-      expect(getHeaderValue(matched!, "X-XSS-Protection")).toBe("1; mode=block");
       expect(getHeaderValue(matched!, "Referrer-Policy")).toBe(
         "strict-origin-when-cross-origin",
       );
@@ -205,6 +204,28 @@ describe("next.config.ts security headers", () => {
       const pp = getHeaderValue(matched!, "Permissions-Policy");
       expect(pp).toBeDefined();
       expect(pp).toContain("camera=()");
+    });
+  });
+
+  describe("CSP img-src includes YouTube thumbnails", () => {
+    it("includes i.ytimg.com in img-src", async () => {
+      const config = await loadConfig();
+      const headersArray = await config.headers!();
+      const matched = findMatchingHeaders(headersArray, "/about/scoring");
+      expect(matched).toBeDefined();
+      const csp = getHeaderValue(matched!, "Content-Security-Policy");
+      expect(csp).toContain("https://i.ytimg.com");
+    });
+  });
+
+  describe("CSP frame-src includes YouTube embed", () => {
+    it("includes youtube-nocookie.com in frame-src", async () => {
+      const config = await loadConfig();
+      const headersArray = await config.headers!();
+      const matched = findMatchingHeaders(headersArray, "/about/scoring");
+      expect(matched).toBeDefined();
+      const csp = getHeaderValue(matched!, "Content-Security-Policy");
+      expect(csp).toContain("https://www.youtube-nocookie.com");
     });
   });
 

@@ -242,6 +242,15 @@ describe("RadarChartInteractive", () => {
       }
     });
 
+    it("vertex dots do not suppress focus outline", () => {
+      const { container } = renderChart();
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+      for (const dot of dots) {
+        const style = (dot as SVGElement).style;
+        expect(style.outline).not.toBe("none");
+      }
+    });
+
     it("guide diamonds and axis lines are aria-hidden", () => {
       const { container } = renderChart();
       const guides = container.querySelectorAll(

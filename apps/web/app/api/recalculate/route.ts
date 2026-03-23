@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth/require-session";
+import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
@@ -21,13 +21,16 @@ import { getTier } from "@/lib/impact/utils";
  * Use after any deliberate user action that changes the score
  * (insights upload, platform connect/disconnect).
  *
- * Auth required. Rate limited: 20 requests/handle/hour.
+ * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
+ * Rate limited: 20 requests/handle/hour.
  */
 export async function POST(request: NextRequest): Promise<Response> {
-  const { session, error } = requireSession(request);
-  if (error) return error;
+  const auth = await resolveRequestAuth(request);
+  if (!auth) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
 
-  const handle = session.login.toLowerCase();
+  const handle = auth.handle.toLowerCase();
 
   // Rate limit: 20 per handle per hour
   const rl = await rateLimit(`ratelimit:recalculate:${handle}`, 20, 3600);
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   // Fetch stats and craft score in parallel (independent operations)
   const [stats, craftResult] = await Promise.all([
-    getStats(handle, session.token),
+    getStats(handle, auth.token),
     dbGetToolInsights(handle),
   ]);
 

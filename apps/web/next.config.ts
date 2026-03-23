@@ -36,9 +36,10 @@ function buildCsp(frameAncestors: string): string {
     // custom properties. Accepted risk: inline style injection is low-severity
     // compared to inline script injection, and our CSP blocks script-based XSS.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: https://avatars.githubusercontent.com",
+    "img-src 'self' data: https://avatars.githubusercontent.com https://i.ytimg.com",
     "font-src 'self' https://fonts.gstatic.com",
     "connect-src 'self' https://eu.i.posthog.com https://api.github.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
+    "frame-src https://www.youtube-nocookie.com",
     `frame-ancestors ${frameAncestors}`,
   ].join("; ");
 }
@@ -48,10 +49,6 @@ const baseSecurityHeaders = [
   {
     key: "X-Content-Type-Options",
     value: "nosniff",
-  },
-  {
-    key: "X-XSS-Protection",
-    value: "1; mode=block",
   },
   {
     key: "Referrer-Policy",

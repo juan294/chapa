@@ -7,7 +7,7 @@ import type { InsightsUpload } from "@chapa/shared";
 // ---------------------------------------------------------------------------
 
 const {
-  mockRequireSession,
+  mockResolveRequestAuth,
   mockRateLimit,
   mockCacheDel,
   mockIsInsightsEnabled,
@@ -16,7 +16,7 @@ const {
   mockGetClientIp,
   mockInvalidateSnapshotCache,
 } = vi.hoisted(() => ({
-  mockRequireSession: vi.fn(),
+  mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
   mockCacheDel: vi.fn(),
   mockIsInsightsEnabled: vi.fn(),
@@ -26,8 +26,8 @@ const {
   mockInvalidateSnapshotCache: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/require-session", () => ({
-  requireSession: mockRequireSession,
+vi.mock("@/lib/auth/resolve-request-auth", () => ({
+  resolveRequestAuth: mockResolveRequestAuth,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -87,12 +87,7 @@ import { POST } from "./route";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SESSION = {
-  token: "ghp_test123",
-  login: "juan294",
-  name: "Juan",
-  avatar_url: "https://avatars.githubusercontent.com/u/1",
-};
+const AUTH = { handle: "juan294" };
 
 function makeValidUpload(): InsightsUpload {
   return {
@@ -127,7 +122,7 @@ function makePostRequest(body: unknown): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsInsightsEnabled.mockResolvedValue(true);
-  mockRequireSession.mockReturnValue({ session: SESSION });
+  mockResolveRequestAuth.mockResolvedValue(AUTH);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   mockCacheDel.mockResolvedValue(undefined);
   mockInvalidateSnapshotCache.mockResolvedValue(undefined);
@@ -153,15 +148,25 @@ describe("POST /api/insights", () => {
     expect(body.craftScore.dimensions.proficiency).toBeGreaterThan(0);
   });
 
-  it("returns 401 when no session", async () => {
-    mockRequireSession.mockReturnValue({
-      error: new Response(JSON.stringify({ error: "Authentication required" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
-    });
+  it("returns 401 when no auth", async () => {
+    mockResolveRequestAuth.mockResolvedValue(null);
     const resp = await POST(makePostRequest(makeValidUpload()));
     expect(resp.status).toBe(401);
+  });
+
+  it("accepts Bearer token authentication", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "cli-user" });
+    const req = new NextRequest("https://chapa.thecreativetoken.com/api/insights", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer cli.token.here",
+      },
+      body: JSON.stringify(makeValidUpload()),
+    });
+    const resp = await POST(req);
+    expect(resp.status).toBe(200);
+    expect(mockResolveRequestAuth).toHaveBeenCalled();
   });
 
   it("returns 400 on invalid data (missing fields)", async () => {

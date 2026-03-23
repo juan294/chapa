@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { safeEqual } from "@/lib/crypto/safe-equal";
+import { verifyCronSecret } from "@/lib/auth/cron";
 import { dbGetCampaigns } from "@/lib/db/campaigns";
 import { processCampaignBatch } from "@/lib/email/campaigns";
 
 export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const authHeader = request.headers.get("Authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-
-  if (!token || !safeEqual(token, secret)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyCronSecret(request);
+  if (denied) return denied;
 
   // Find active campaigns (filter at DB level)
   const active = await dbGetCampaigns("sending");

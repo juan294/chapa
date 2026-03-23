@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse, after } from "next/server";
-import { requireSession } from "@/lib/auth/require-session";
+import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit, cacheDel } from "@/lib/cache/redis";
 import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { isInsightsEnabled } from "@/lib/feature-flags";
@@ -10,15 +10,18 @@ import type { InsightsUpload } from "@chapa/shared";
 
 /**
  * POST /api/insights — Upload an insights report and compute craft score.
- * Auth required. Rate limited: 10 requests/handle/24h.
+ * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
+ * Rate limited: 10 requests/handle/24h.
  */
 export async function POST(request: NextRequest): Promise<Response> {
   if (!(await isInsightsEnabled())) {
     return NextResponse.json({ error: "Feature not available" }, { status: 403 });
   }
 
-  const { session, error } = requireSession(request);
-  if (error) return error;
+  const auth = await resolveRequestAuth(request);
+  if (!auth) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
 
   // Parse body
   let body: unknown;
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   // Rate limit: 10 uploads per handle per 24h
   const rl = await rateLimit(
-    `ratelimit:insights:${session.login.toLowerCase()}`,
+    `ratelimit:insights:${auth.handle.toLowerCase()}`,
     10,
     86400,
   );
@@ -54,11 +57,11 @@ export async function POST(request: NextRequest): Promise<Response> {
   const scores = computeCraftScore(data);
 
   // Store in database (synchronous — response needs the stored result)
-  const stored = await dbUpsertToolInsights(session.login, data, scores);
+  const stored = await dbUpsertToolInsights(auth.handle, data, scores);
 
   // Defer cache invalidation to post-response (non-blocking)
   after(async () => {
-    const handle = session.login.toLowerCase();
+    const handle = auth.handle.toLowerCase();
     await Promise.allSettled([
       cacheDel(`stats:v2:merged:${handle}`),
       invalidateSnapshotCache(handle),

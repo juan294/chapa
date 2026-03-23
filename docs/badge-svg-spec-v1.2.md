@@ -402,16 +402,20 @@ Grid extent:
 
 ## 5. Radar Chart
 
+The radar chart renders dynamically as either a **5-point pentagon** (when the Craft dimension is present) or a **4-point diamond** (fallback when Craft is absent). The decision is a single check: `hasCraft = dimensions.craft != null`.
+
 ```
-         Delivery
-            ▲
-           / \
-          /   \
-  Breadth ◄─────► Quality
-          \   /
-           \ /
-            ▼
-        Consistency
+        Pentagon (5-axis)                    Diamond (4-axis, fallback)
+
+          Delivery                              Delivery
+             ▲                                     ▲
+            / \                                   / \
+    Craft ◄    ► Quality                         /   \
+           \  /                          Breadth ◄─────► Quality
+            \/                                   \   /
+   Breadth ◄──► Consistency                       \ /
+                                                   ▼
+                                              Consistency
 ```
 
 ### 5a. Positioning
@@ -424,16 +428,28 @@ Grid extent:
 | Center Y (`radarCY`) | `275` | — |
 | Radius (`radarR`) | `85` | — |
 
-### 5b. Axes (4-point diamond)
+### 5b. Axes
 
-Axes are positioned using trigonometric angles:
+Axes are positioned using trigonometric angles. The axis count and spacing adapt to the dimension count.
 
-| Axis | Key | Label | Angle (radians) | Direction |
-|------|-----|-------|-----------------|-----------|
-| Top | `delivery` | `Delivery` | `-π/2` (−90°) | Up |
-| Right | `quality` | `Quality` | `0` (0°) | Right |
-| Bottom | `consistency` | `Consistency` | `π/2` (90°) | Down |
-| Left | `breadth` | `Breadth` | `π` (180°) | Left |
+**Pentagon mode (5-axis, 72° spacing)** — when `craft != null`:
+
+| # | Key | Label | Angle (radians) | Angle (degrees) | Direction |
+|---|-----|-------|-----------------|-----------------|-----------|
+| 1 | `delivery` | `Delivery` | `-π/2` | −90° | Top |
+| 2 | `quality` | `Quality` | `-π/2 + 2π/5` | −18° | Upper right |
+| 3 | `consistency` | `Consistency` | `-π/2 + 4π/5` | 54° | Lower right |
+| 4 | `breadth` | `Breadth` | `-π/2 + 6π/5` | 126° | Lower left |
+| 5 | `craft` | `Craft` | `-π/2 + 8π/5` | 198° | Upper left |
+
+**Diamond mode (4-axis, 90° spacing)** — when `craft` is absent:
+
+| # | Key | Label | Angle (radians) | Angle (degrees) | Direction |
+|---|-----|-------|-----------------|-----------------|-----------|
+| 1 | `delivery` | `Delivery` | `-π/2` | −90° | Top |
+| 2 | `quality` | `Quality` | `0` | 0° | Right |
+| 3 | `consistency` | `Consistency` | `π/2` | 90° | Bottom |
+| 4 | `breadth` | `Breadth` | `π` | 180° | Left |
 
 ### 5c. Point Position Formula
 
@@ -446,7 +462,7 @@ point(angle, distance) = (
 
 For data points, `distance = (dimensionScore / 100) * radius`.
 
-At full radius (100):
+**Diamond at full radius (100):**
 
 | Axis | Point |
 |------|-------|
@@ -455,9 +471,19 @@ At full radius (100):
 | Consistency (bottom) | `(905, 360)` |
 | Breadth (left) | `(820, 275)` |
 
-### 5d. Guide Rings (4 concentric diamonds)
+**Pentagon at full radius (100):**
 
-Diamond polygons at `25%`, `50%`, `75%`, `100%` of radius:
+| Axis | Point |
+|------|-------|
+| Delivery (top) | `(905, 190)` |
+| Quality (upper-right) | `(986, 249)` |
+| Consistency (lower-right) | `(955, 344)` |
+| Breadth (lower-left) | `(855, 344)` |
+| Craft (upper-left) | `(824, 249)` |
+
+### 5d. Guide Rings (4 concentric polygons)
+
+Polygons at `25%`, `50%`, `75%`, `100%` of radius. The polygon shape matches the axis count (pentagon or diamond):
 
 | Level | Radius | Outer stroke-width | Opacity |
 |-------|--------|-------------------|---------|
@@ -470,7 +496,7 @@ All guides: `fill="none" stroke="#8B5CF6"`.
 
 ### 5e. Axis Lines
 
-From center `(905, 275)` to each axis endpoint:
+From center `(905, 275)` to each axis endpoint. Pentagon renders 5 lines, diamond renders 4:
 
 ```xml
 <line x1="905" y1="275" x2="{endpoint.x}" y2="{endpoint.y}"
@@ -479,15 +505,23 @@ From center `(905, 275)` to each axis endpoint:
 
 ### 5f. Data Polygon
 
+Pentagon renders a 5-point polygon, diamond renders 4-point:
+
 ```xml
+<!-- Diamond (4 points) -->
 <polygon points="{p1.x},{p1.y} {p2.x},{p2.y} {p3.x},{p3.y} {p4.x},{p4.y}"
+         fill="#8B5CF6" fill-opacity="0.15"
+         stroke="#8B5CF6" stroke-width="2" stroke-opacity="0.8"/>
+
+<!-- Pentagon (5 points) -->
+<polygon points="{p1.x},{p1.y} {p2.x},{p2.y} {p3.x},{p3.y} {p4.x},{p4.y} {p5.x},{p5.y}"
          fill="#8B5CF6" fill-opacity="0.15"
          stroke="#8B5CF6" stroke-width="2" stroke-opacity="0.8"/>
 ```
 
 ### 5g. Vertex Dots
 
-One dot per data point:
+One dot per data point (4 or 5 depending on mode):
 
 ```xml
 <circle cx="{x}" cy="{y}" r="4" fill="#8B5CF6" stroke="#0C0D14" stroke-width="2"/>
@@ -495,7 +529,7 @@ One dot per data point:
 
 ### 5h. Axis Labels
 
-Labels offset `20px` beyond the radius, with dynamic anchoring:
+Labels offset `20px` beyond the radius, with dynamic anchoring. The same logic works for both pentagon and diamond because it is purely angle-based:
 
 | Property | Value |
 |----------|-------|
@@ -513,7 +547,7 @@ Labels offset `20px` beyond the radius, with dynamic anchoring:
 - `sin > 0.3` → `dy = +14` (below)
 - Otherwise → `dy = +4` (middle)
 
-**Computed label positions** (at full `radius + 20 = 105`):
+**Diamond label positions** (at `radius + 20 = 105`):
 
 | Label | Approx position | Anchor |
 |-------|----------------|--------|
@@ -521,6 +555,16 @@ Labels offset `20px` beyond the radius, with dynamic anchoring:
 | `Quality` | `(1014, 279)` | `start` |
 | `Consistency` | `(905, 394)` | `middle` |
 | `Breadth` | `(796, 279)` | `end` |
+
+**Pentagon label positions** (at `radius + 20 = 105`):
+
+| Label | Approx position | Anchor |
+|-------|----------------|--------|
+| `Delivery` | `(905, 170)` | `middle` |
+| `Quality` | `(1009, 240)` | `start` |
+| `Consistency` | `(970, 360)` | `start` |
+| `Breadth` | `(840, 360)` | `end` |
+| `Craft` | `(801, 240)` | `end` |
 
 ---
 

@@ -1,36 +1,17 @@
 import { NextResponse } from "next/server";
-import { fetchGitHubUser } from "@/lib/auth/github";
-import { isCliToken, verifyCliToken } from "@/lib/auth/cli-token";
+import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
 import type { SupplementalStats } from "@chapa/shared";
 
 const CACHE_TTL = 86400; // 24 hours
 
-/**
- * Resolve the authenticated handle from a Bearer token.
- * Supports both Chapa CLI tokens (HMAC-signed) and GitHub PATs.
- */
-async function resolveHandle(token: string): Promise<string | null> {
-  if (isCliToken(token)) {
-    const secret = process.env.NEXTAUTH_SECRET?.trim();
-    if (!secret) return null;
-    const result = verifyCliToken(token, secret);
-    return result?.handle ?? null;
-  }
-
-  // Fallback: verify as GitHub PAT
-  const user = await fetchGitHubUser(token);
-  return user?.login ?? null;
-}
-
 export async function POST(request: Request): Promise<Response> {
-  // 1. Extract Bearer token
+  // 1. Require Bearer token (supplemental is CLI-only, no session cookie fallback)
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Missing or invalid Authorization header" }, { status: 401 });
   }
-  const token = authHeader.slice(7);
 
   // 2. Parse body
   let body: { targetHandle?: string; sourceHandle?: string; stats?: unknown };
@@ -68,13 +49,13 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // 4. Verify token ownership (CLI token or GitHub PAT)
-  const authenticatedHandle = await resolveHandle(token);
-  if (!authenticatedHandle) {
+  // 4. Verify token ownership via shared auth resolver
+  const auth = await resolveRequestAuth(request);
+  if (!auth) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  if (authenticatedHandle.toLowerCase() !== targetHandle.toLowerCase()) {
+  if (auth.handle.toLowerCase() !== targetHandle.toLowerCase()) {
     return NextResponse.json({ error: "Token does not match targetHandle" }, { status: 403 });
   }
 
