@@ -15,7 +15,7 @@ describe("VerifyForm", () => {
   });
 
   describe("hash validation", () => {
-    it("defines HASH_PATTERN for 8 or 16 hex characters", () => {
+    it("defines HASH_PATTERN for 8, 16, or 32 hex characters", () => {
       expect(SOURCE).toContain("HASH_PATTERN");
     });
 
@@ -24,7 +24,7 @@ describe("VerifyForm", () => {
     });
 
     it("shows error for invalid hash format", () => {
-      expect(SOURCE).toContain("Enter a valid 8 or 16 character hex hash");
+      expect(SOURCE).toContain("Enter a valid 8, 16, or 32 character hex hash");
     });
   });
 
@@ -42,8 +42,8 @@ describe("VerifyForm", () => {
       expect(SOURCE).toContain("Verification Hash");
     });
 
-    it("input has maxLength of 16", () => {
-      expect(SOURCE).toContain("maxLength={16}");
+    it("input has maxLength of 32", () => {
+      expect(SOURCE).toContain("maxLength={32}");
     });
 
     it("input has placeholder with example hash", () => {

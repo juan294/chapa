@@ -65,7 +65,7 @@ describe("VerifyPage", () => {
       expect(screen.getByText("Invalid Hash")).toBeDefined();
       expect(
         screen.getByText(
-          "The verification hash must be 8 or 16 hex characters.",
+          "The verification hash must be 8, 16, or 32 hex characters.",
         ),
       ).toBeDefined();
       expect(screen.getByText("zzzzzzzz")).toBeDefined();

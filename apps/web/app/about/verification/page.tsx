@@ -189,11 +189,11 @@ export default function VerificationPage() {
               </li>
               <li>
                 <strong className="text-text-primary">
-                  Truncate to 16 characters
+                  Truncate to 32 characters
                 </strong>{" "}
-                — the first 16 hex characters are used as the verification code.
-                This is short enough to display on the badge while providing
-                strong collision resistance.
+                — the first 32 hex characters (128 bits) are used as the verification code.
+                This provides strong collision resistance while remaining
+                compact enough to display on the badge.
               </li>
             </ol>
 
@@ -332,7 +332,7 @@ export default function VerificationPage() {
             <SectionHeading>How to verify a badge</SectionHeading>
             <ol className="list-decimal pl-6 space-y-2 my-4">
               <li>
-                Find the 16-character hex code on the right edge of any Chapa
+                Find the 32-character hex code on the right edge of any Chapa
                 badge.
               </li>
               <li>
@@ -371,8 +371,8 @@ export default function VerificationPage() {
                   "Industry standard, widely audited, and supported natively in Node.js. Security relies on key secrecy, not algorithm secrecy.",
                 ],
                 [
-                  "16-character truncation",
-                  "64 bits of the hash — strong collision resistance for this use case while remaining short enough to print on a badge.",
+                  "32-character truncation",
+                  "128 bits of the hash — strong collision resistance (2^64 birthday resistance) while remaining compact enough to print on a badge.",
                 ],
                 [
                   "30-day TTL",

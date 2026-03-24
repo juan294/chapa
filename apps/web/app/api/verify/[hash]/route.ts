@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getBaseUrl } from "@/lib/env";
 
-const HASH_PATTERN = /^[0-9a-f]{8}([0-9a-f]{8})?$/;
+const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +16,7 @@ export async function GET(
     // Validate hash format
     if (!HASH_PATTERN.test(hash)) {
       return NextResponse.json(
-        { error: "Invalid hash format. Expected 8 or 16 hex characters." },
+        { error: "Invalid hash format. Expected 8, 16, or 32 hex characters." },
         { status: 400, headers: { "Access-Control-Allow-Origin": "*" } },
       );
     }
