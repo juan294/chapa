@@ -141,6 +141,61 @@ describe("UserMenu", () => {
   });
 });
 
+// ─── Button type safety ──────────────────────────────────────────────
+
+describe("UserMenu — all buttons have explicit type attribute", () => {
+  afterEach(() => {
+    clearPlatformStatusCache();
+  });
+
+  it("every <button> in the component has type='button' or type='submit'", async () => {
+    dropdownOpen = true;
+
+    // Enable all conditional sections so every button renders
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    clearPlatformStatusCache();
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    const buttons = screen.getAllByRole("button");
+    for (const button of buttons) {
+      const typeAttr = button.getAttribute("type");
+      expect(
+        typeAttr === "button" || typeAttr === "submit",
+        `<button> "${button.textContent?.trim()}" is missing an explicit type attribute (got ${typeAttr})`,
+      ).toBe(true);
+    }
+
+    // Reset feature flag mocks to prevent leaking into subsequent tests
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+  });
+});
+
 // ─── Platform status caching ──────────────────────────────────────────
 
 describe("UserMenu — platform status caching", () => {

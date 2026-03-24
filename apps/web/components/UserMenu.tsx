@@ -199,6 +199,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     <div ref={menuRef} className="relative">
       {/* Trigger */}
       <button
+        type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
@@ -358,6 +359,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                     <span className="text-sm text-text-primary">{bbStatus.remoteLogin}</span>
                   </a>
                   <button
+                    type="button"
                     onClick={() => setShowUnlinkConfirm(true)}
                     aria-label="Unlink Bitbucket account"
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
@@ -390,6 +392,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                     <span className="text-sm text-text-primary">{cbStatus.remoteLogin}</span>
                   </a>
                   <button
+                    type="button"
                     onClick={() => setShowCbUnlinkConfirm(true)}
                     aria-label="Unlink Codeberg account"
                     className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
