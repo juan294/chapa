@@ -23,9 +23,7 @@ vi.mock("@/lib/email/campaigns", () => ({
   DAILY_SEND_LIMIT: 95,
 }));
 
-import { readSessionCookie } from "@/lib/auth/github";
-import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
+import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { initiateCampaign, processCampaignBatch } from "@/lib/email/campaigns";
 import { POST } from "./route";
@@ -33,12 +31,7 @@ import { POST } from "./route";
 const mockParams = Promise.resolve({ id: "c-1" });
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  process.env.NEXTAUTH_SECRET = "test-secret";
-  vi.mocked(readSessionCookie).mockReturnValue({
-    token: "t", login: "admin", name: "Admin", avatar_url: "",
-  });
-  vi.mocked(isAdminHandle).mockReturnValue(true);
+  adminAuthBeforeEach();
 });
 
 function makeRequest(): NextRequest {
