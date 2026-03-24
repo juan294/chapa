@@ -45,7 +45,6 @@ vi.mock("@/lib/impact/v4", () => ({
 
 vi.mock("@/lib/cache/craft-cache", () => ({
   getCachedCraftScore: mockDbGetToolInsights,
-  invalidateCraftCache: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/lib/history/snapshot", () => ({
