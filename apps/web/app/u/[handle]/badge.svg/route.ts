@@ -16,7 +16,7 @@ import { storeVerificationRecord } from "@/lib/verification/store";
 import type { VerificationRecord } from "@/lib/verification/types";
 import { getClientIp } from "@/lib/http/client-ip";
 import { notifyFirstBadge } from "@/lib/email/notifications";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { captureServerError } from "@/lib/analytics/server-errors";
@@ -102,7 +102,7 @@ export async function GET(
     // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
     // Uses allSettled so a single DB/network error doesn't crash the entire badge.
     const [craftSettled, snapshotSettled, avatarSettled] = await Promise.allSettled([
-      dbGetToolInsights(handle),
+      getCachedCraftScore(handle),
       getCachedLatestSnapshot(handle),
       stats.avatarUrl
         ? getAvatarBase64(handle, stats.avatarUrl)

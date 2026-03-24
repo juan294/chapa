@@ -18,7 +18,7 @@ import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getBaseUrl } from "@/lib/env";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
@@ -103,7 +103,7 @@ export default async function SharePage({ params }: SharePageProps) {
     getStats(handle),
     cacheGet<BadgeConfig>(`config:${handle}`),
     getCachedLatestSnapshot(handle),
-    dbGetToolInsights(handle),
+    getCachedCraftScore(handle),
     isStudioEnabled(),
   ]);
 

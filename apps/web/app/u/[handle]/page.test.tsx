@@ -113,8 +113,8 @@ vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabled: mockIsStudioEnabled,
 }));
 
-vi.mock("@/lib/db/tool-insights", () => ({
-  dbGetToolInsights: mockDbGetToolInsights,
+vi.mock("@/lib/cache/craft-cache", () => ({
+  getCachedCraftScore: mockDbGetToolInsights,
 }));
 
 vi.mock("@/lib/env", () => ({

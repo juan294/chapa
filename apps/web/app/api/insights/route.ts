@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse, after } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit, cacheDel } from "@/lib/cache/redis";
 import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
+import { invalidateCraftCache } from "@/lib/cache/craft-cache";
 import { isInsightsEnabled } from "@/lib/feature-flags";
 import { isValidInsightsUpload } from "@/lib/insights/validation";
 import { computeCraftScore } from "@/lib/insights/scoring";
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     await Promise.allSettled([
       cacheDel(`stats:v2:merged:${handle}`),
       invalidateSnapshotCache(handle),
+      invalidateCraftCache(handle),
     ]);
   });
 

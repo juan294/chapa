@@ -3,7 +3,7 @@ import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { getCachedCraftScore, invalidateCraftCache } from "@/lib/cache/craft-cache";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   // Fetch stats and craft score in parallel (independent operations)
   const [stats, craftResult] = await Promise.all([
     getStats(handle, auth.token),
-    dbGetToolInsights(handle),
+    getCachedCraftScore(handle),
   ]);
 
   if (!stats) {
@@ -71,6 +71,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Update Redis cache so subsequent badge views use the new snapshot
     await updateSnapshotCache(handle, snapshot);
   }
+
+  // Invalidate craft cache so next badge request fetches fresh from DB
+  await invalidateCraftCache(handle);
 
   return NextResponse.json({
     success: true,
