@@ -1,4 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  RATE_LIMIT_STATUS_ALLOWED,
+  RATE_LIMIT_STATUS_BLOCKED,
+  TEST_IP,
+  allowSession,
+  denySession,
+} from "@/lib/test-helpers/platform-auth-fixtures";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -28,18 +35,33 @@ vi.mock("@/lib/auth/require-session", () => ({
 
 vi.mock("@/lib/db/user-platforms", () => ({
   dbGetLinkedPlatforms: mockDbGetLinkedPlatforms,
+  // Stubs required by platform-oauth.ts (not used in status flow)
+  dbUpsertLinkedPlatform: vi.fn(),
+  dbDeleteLinkedPlatform: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  // Stub required by platform-oauth.ts (not used in status flow)
+  cacheDel: vi.fn(),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
 }));
 
+// Stub all codeberg auth functions required by ../config.ts
+vi.mock("@/lib/auth/codeberg", () => ({
+  createCodebergStateCookie: vi.fn(),
+  buildCodebergAuthUrl: vi.fn(),
+  validateCodebergState: vi.fn(),
+  clearCodebergStateCookie: vi.fn(),
+  exchangeCodebergCode: vi.fn(),
+  fetchCodebergUser: vi.fn(),
+}));
+
 import { GET } from "./route";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,17 +73,6 @@ function makeRequest(): NextRequest {
   );
 }
 
-function allowSession() {
-  mockRequireSession.mockReturnValue({
-    session: {
-      login: "testuser",
-      token: "gho_test",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -70,9 +81,9 @@ describe("GET /api/auth/codeberg/status", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsCodebergEnabled.mockResolvedValue(true);
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
-    mockGetClientIp.mockReturnValue("1.2.3.4");
-    allowSession();
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_STATUS_ALLOWED);
+    mockGetClientIp.mockReturnValue(TEST_IP);
+    allowSession(mockRequireSession);
     mockDbGetLinkedPlatforms.mockResolvedValue([]);
   });
 
@@ -86,19 +97,14 @@ describe("GET /api/auth/codeberg/status", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 21, limit: 20 });
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_STATUS_BLOCKED);
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockRequireSession.mockReturnValue({
-      error: NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 },
-      ),
-    });
+    denySession(mockRequireSession);
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(401);

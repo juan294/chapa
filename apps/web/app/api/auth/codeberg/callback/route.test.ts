@@ -1,4 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  CODEBERG_ENV_VARS,
+  CODEBERG_TOKEN_RESPONSE,
+  CODEBERG_USER,
+  CODEBERG_CLEAR_COOKIE,
+  RATE_LIMIT_ALLOWED,
+  RATE_LIMIT_BLOCKED,
+  TEST_TOKEN_EXPIRY,
+  TEST_IP,
+  allowSession,
+  denySession,
+  setEnvVars,
+  clearEnvVars,
+} from "@/lib/test-helpers/platform-auth-fixtures";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -43,6 +57,9 @@ vi.mock("@/lib/auth/codeberg", () => ({
   clearCodebergStateCookie: mockClearCodebergStateCookie,
   exchangeCodebergCode: mockExchangeCodebergCode,
   fetchCodebergUser: mockFetchCodebergUser,
+  // Stubs required by ../config.ts (not used in callback flow)
+  createCodebergStateCookie: vi.fn(),
+  buildCodebergAuthUrl: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/bitbucket", () => ({
@@ -51,6 +68,9 @@ vi.mock("@/lib/auth/bitbucket", () => ({
 
 vi.mock("@/lib/db/user-platforms", () => ({
   dbUpsertLinkedPlatform: mockDbUpsertLinkedPlatform,
+  // Stubs required by platform-oauth.ts (not used in callback flow)
+  dbDeleteLinkedPlatform: vi.fn(),
+  dbGetLinkedPlatforms: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -63,7 +83,7 @@ vi.mock("@/lib/http/client-ip", () => ({
 }));
 
 import { GET } from "./route";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,53 +104,19 @@ function makeRequest(params?: {
   return new NextRequest(url, { headers });
 }
 
-function allowSession() {
-  mockRequireSession.mockReturnValue({
-    session: {
-      login: "testuser",
-      token: "gho_test",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    },
-  });
-}
-
-function setEnvVars() {
-  process.env.CODEBERG_CLIENT_ID = "test-cb-client-id";
-  process.env.CODEBERG_CLIENT_SECRET = "test-cb-client-secret";
-  process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
-}
-
-function clearEnvVars() {
-  delete process.env.CODEBERG_CLIENT_ID;
-  delete process.env.CODEBERG_CLIENT_SECRET;
-  delete process.env.NEXT_PUBLIC_BASE_URL;
-}
-
 function setupHappyPath() {
   mockIsCodebergEnabled.mockResolvedValue(true);
-  mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-  mockGetClientIp.mockReturnValue("1.2.3.4");
-  allowSession();
-  setEnvVars();
+  mockRateLimit.mockResolvedValue(RATE_LIMIT_ALLOWED);
+  mockGetClientIp.mockReturnValue(TEST_IP);
+  allowSession(mockRequireSession);
+  setEnvVars(CODEBERG_ENV_VARS);
   mockValidateCodebergState.mockReturnValue(true);
-  mockExchangeCodebergCode.mockResolvedValue({
-    access_token: "cb_access_123",
-    token_type: "bearer",
-    expires_in: 28800,
-    refresh_token: "cb_refresh_456",
-  });
-  mockFetchCodebergUser.mockResolvedValue({
-    login: "cb-user",
-    full_name: "CB User",
-    avatar_url: "https://codeberg.org/avatars/12345",
-  });
-  mockComputeTokenExpiry.mockReturnValue(new Date("2026-03-01T00:00:00Z"));
+  mockExchangeCodebergCode.mockResolvedValue(CODEBERG_TOKEN_RESPONSE);
+  mockFetchCodebergUser.mockResolvedValue(CODEBERG_USER);
+  mockComputeTokenExpiry.mockReturnValue(TEST_TOKEN_EXPIRY);
   mockDbUpsertLinkedPlatform.mockResolvedValue(true);
   mockCacheDel.mockResolvedValue(undefined);
-  mockClearCodebergStateCookie.mockReturnValue(
-    "chapa_cb_oauth_state=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
-  );
+  mockClearCodebergStateCookie.mockReturnValue(CODEBERG_CLEAR_COOKIE);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +130,7 @@ describe("GET /api/auth/codeberg/callback", () => {
   });
 
   afterEach(() => {
-    clearEnvVars();
+    clearEnvVars(CODEBERG_ENV_VARS);
   });
 
   it("returns 404 when feature flag is disabled", async () => {
@@ -157,7 +143,7 @@ describe("GET /api/auth/codeberg/callback", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_BLOCKED);
 
     const res = await GET(
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_cb_oauth_state=xyz" }),
@@ -166,12 +152,7 @@ describe("GET /api/auth/codeberg/callback", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockRequireSession.mockReturnValue({
-      error: NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 },
-      ),
-    });
+    denySession(mockRequireSession);
 
     const res = await GET(
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_cb_oauth_state=xyz" }),
@@ -270,7 +251,7 @@ describe("GET /api/auth/codeberg/callback", () => {
       "cb-user",
       "cb_access_123",
       "cb_refresh_456",
-      new Date("2026-03-01T00:00:00Z"),
+      TEST_TOKEN_EXPIRY,
     );
   });
 
