@@ -386,7 +386,7 @@ If you cannot install Node.js system-wide, options:
 
 3. **Docker** — If Docker is available:
    ```bash
-   docker run --rm -it node:18-slim npx chapa-cli --version
+   docker run --rm -it node:20-slim npx chapa-cli --version
    ```
 
 ### 7.5 VPN-related issues

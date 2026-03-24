@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-03-22 | Audit: v22
+> Last reviewed: 2026-03-24 | Audit: v38
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -129,5 +129,4 @@ Documented security, infrastructure, and performance decisions that were evaluat
 These accepted risks should be re-evaluated:
 - When upgrading Next.js major versions (CSP nonce support may land)
 - When adding new admin functionality (middleware protection becomes more valuable)
-- When verification URLs are redesigned (hash length can be increased)
 - Quarterly as part of routine security review
