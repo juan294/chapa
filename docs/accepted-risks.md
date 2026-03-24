@@ -36,12 +36,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** Style injection is categorically lower severity than script injection. Style-based attacks (CSS exfiltration) require specific conditions that don't apply here (no sensitive data in form fields rendered alongside attacker-controlled styles). Script-based XSS is independently blocked by the `script-src` directive.
 - **Severity:** Low
 
-## HMAC verification hash truncated to 64 bits (#401)
+## ~~HMAC verification hash truncated to 64 bits (#401)~~ — Resolved
 
-- **Risk:** The SHA-256 badge verification hash is truncated to 16 hex characters (64 bits), reducing collision resistance from 2^128 to 2^32 for birthday attacks.
-- **Mitigation:** The hash is used for badge data integrity verification, not for passwords, authentication, or access control. An attacker who finds a collision can only produce an alternative input that verifies -- they cannot forge arbitrary badge data without the HMAC secret. Finding a meaningful collision (one that produces valid badge JSON) is significantly harder than a random collision. 2^32 attempts is computationally feasible but not economically motivated for badge verification.
-- **Severity:** Low
-- **Future improvement:** Consider increasing to 32 hex characters (128 bits) when a verification URL migration is feasible. This would raise birthday resistance to 2^64.
+- **Risk:** The SHA-256 badge verification hash was truncated to 16 hex characters (64 bits), reducing collision resistance from 2^128 to 2^32 for birthday attacks.
+- **Resolution:** Hash increased to 32 hex characters (128 bits) in #617. Birthday resistance is now 2^64, computationally infeasible for any attacker. Verification endpoints accept legacy 8-char and 16-char hashes for backward compatibility.
+- **Severity:** None (resolved)
+- **Accepted:** 2026-02-24 | **Updated:** 2026-03-24
 
 ## No edge middleware for admin protection (#402)
 
