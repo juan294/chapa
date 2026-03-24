@@ -1,21 +1,8 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
-import dynamic from "next/dynamic";
 import PostHogProvider from "@/components/PostHogProvider";
-
-const Analytics = dynamic(
-  () =>
-    import("@vercel/analytics/react").then((m) => ({ default: m.Analytics })),
-  { ssr: false }
-);
-const SpeedInsights = dynamic(
-  () =>
-    import("@vercel/speed-insights/next").then((m) => ({
-      default: m.SpeedInsights,
-    })),
-  { ssr: false }
-);
+import { ClientAnalytics } from "@/components/ClientAnalytics";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getBaseUrl } from "@/lib/env";
@@ -140,8 +127,7 @@ export default function RootLayout({
             {children}
           </PostHogProvider>
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
+        <ClientAnalytics />
       </body>
     </html>
   );
