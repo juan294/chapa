@@ -18,6 +18,8 @@ import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
+import { getAvatarBase64 } from "@/lib/render/avatar";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -195,9 +197,16 @@ async function warmHandle(
     let snapshotRecorded = false;
     let notified = false;
 
+    // Pre-warm avatar + craft caches in parallel (both are non-critical)
+    const [craftSettled] = await Promise.allSettled([
+      getCachedCraftScore(handle),
+      stats.avatarUrl ? getAvatarBase64(handle, stats.avatarUrl) : Promise.resolve(undefined),
+    ]);
+    const craftResult = craftSettled.status === "fulfilled" ? craftSettled.value : null;
+
     // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
     try {
-      const impact = computeImpactV4(stats);
+      const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
       const snapshot = buildSnapshot(stats, impact);
 
       const previousSnapshot = previousSnapshots.get(handle.toLowerCase());
