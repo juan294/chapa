@@ -217,6 +217,62 @@ describe("POST /api/admin/campaigns/[id]/test", () => {
     expect(dbGetCampaign).toHaveBeenCalledOnce();
   });
 
+  it("returns 400 for invalid JSON body", async () => {
+    const req = new NextRequest("https://example.com/api/admin/campaigns/c-1/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: "session=x" },
+      body: "not valid json{{{",
+    });
+    const res = await POST(req, { params: mockParams });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Invalid JSON");
+  });
+
+  it("interpolates placeholders for engagement campaigns", async () => {
+    const engagementCampaign = {
+      ...CAMPAIGN,
+      type: "engagement" as const,
+      subject: "Hey {{handle}}!",
+      headline: "Score went up {{delta}} points",
+      bodyText: "From {{tier_from}} to {{tier_to}}",
+      ctaUrl: "https://example.com/u/{{handle}}",
+      ctaText: "Check {{handle}}'s badge",
+      features: [{ text: "{{archetype_from}} → {{archetype_to}}" }],
+    };
+    const mockSend = vi.fn().mockResolvedValue({ data: { id: "email-1" }, error: null });
+    vi.mocked(dbGetCampaign).mockResolvedValue(engagementCampaign);
+    vi.mocked(getResend).mockReturnValue({ emails: { send: mockSend } } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await POST(makeRequest({ email: "test@test.com" }), { params: mockParams });
+    expect(res.status).toBe(200);
+
+    // buildEmailContent should receive the interpolated campaign
+    expect(buildEmailContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Hey admin!",
+        headline: "Score went up +12 points",
+        bodyText: "From Solid to High",
+        ctaUrl: "https://example.com/u/admin",
+        ctaText: "Check admin's badge",
+        features: [{ text: "Balanced → Builder" }],
+      }),
+      "admin",
+    );
+  });
+
+  it("returns 500 when resend.emails.send throws", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(CAMPAIGN);
+    vi.mocked(getResend).mockReturnValue({
+      emails: { send: vi.fn().mockRejectedValue(new Error("network failure")) },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await POST(makeRequest({ email: "test@test.com" }), { params: mockParams });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("network failure");
+  });
+
   it("allows test send for any campaign status", async () => {
     const mockSend = vi.fn().mockResolvedValue({ data: { id: "email-1" }, error: null });
     vi.mocked(getResend).mockReturnValue({ emails: { send: mockSend } } as any); // eslint-disable-line @typescript-eslint/no-explicit-any

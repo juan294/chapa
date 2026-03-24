@@ -855,6 +855,288 @@ describe("CampaignsDashboard — edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
+// EDIT VIEW
+// ---------------------------------------------------------------------------
+
+describe("CampaignsDashboard — edit view", () => {
+  it("edit form submits PATCH and returns to detail", async () => {
+    const fetchMock = vi.fn()
+      // Initial campaigns fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ campaigns: mockCampaigns }),
+      })
+      // PATCH
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      })
+      // Refresh after edit
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ campaigns: mockCampaigns }),
+      });
+    global.fetch = fetchMock;
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    // Open detail, then edit
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Draft")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Edit Draft"));
+
+    // Change name and submit
+    fireEvent.change(screen.getByLabelText("Campaign Name"), {
+      target: { value: "Updated Name" },
+    });
+    fireEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/campaigns/c-1",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+  });
+
+  it("edit form cancel returns to detail view", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Draft")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Edit Draft"));
+
+    expect(screen.getByText("Save Changes")).toBeTruthy();
+    fireEvent.click(screen.getByText("Cancel"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Preview Email")).toBeTruthy();
+    });
+  });
+
+  it("shows error when edit fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ campaigns: mockCampaigns }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: "Edit validation failed" }),
+      });
+    global.fetch = fetchMock;
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Draft")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Edit Draft"));
+    fireEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Edit validation failed")).toBeTruthy();
+    });
+  });
+
+  it("updates feature text in edit form", async () => {
+    const campaignWithFeatures: Campaign = {
+      ...mockCampaigns[0]!,
+      features: [{ text: "Original feature" }],
+    };
+    mockFetchSuccess([campaignWithFeatures]);
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Edit Draft")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText("Edit Draft"));
+
+    const featureInput = screen.getByDisplayValue("Original feature");
+    fireEvent.change(featureInput, { target: { value: "Updated feature" } });
+    expect((featureInput as HTMLInputElement).value).toBe("Updated feature");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SEND TEST EMAIL
+// ---------------------------------------------------------------------------
+
+describe("CampaignsDashboard — send test email", () => {
+  it("sends test email successfully", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ campaigns: mockCampaigns }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ message: "Test email sent to test@test.com" }),
+      });
+    global.fetch = fetchMock;
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Send Test")).toBeTruthy();
+    });
+
+    // Change the test email and send
+    const emailInput = screen.getByLabelText("Test Email Address");
+    fireEvent.change(emailInput, { target: { value: "test@test.com" } });
+    fireEvent.click(screen.getByText("Send Test"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Test email sent to test@test.com")).toBeTruthy();
+    });
+  });
+
+  it("shows error when test email send fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ campaigns: mockCampaigns }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: "Invalid email" }),
+      });
+    global.fetch = fetchMock;
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Send Test")).toBeTruthy();
+    });
+
+    const emailInput = screen.getByLabelText("Test Email Address");
+    fireEvent.change(emailInput, { target: { value: "bad@email.com" } });
+    fireEvent.click(screen.getByText("Send Test"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Invalid email")).toBeTruthy();
+    });
+  });
+
+  it("does not send when test email is empty", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("March Update")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("March Update"));
+    await waitFor(() => {
+      expect(screen.getByText("Send Test")).toBeTruthy();
+    });
+
+    // Clear the email field
+    const emailInput = screen.getByLabelText("Test Email Address");
+    fireEvent.change(emailInput, { target: { value: "" } });
+
+    // Send Test button should be disabled
+    const sendBtn = screen.getByText("Send Test").closest("button");
+    expect(sendBtn?.disabled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ENGAGEMENT CAMPAIGN TYPE
+// ---------------------------------------------------------------------------
+
+describe("CampaignsDashboard — engagement campaigns", () => {
+  const engagementCampaign: Campaign = {
+    ...mockCampaigns[0]!,
+    id: "c-eng-1",
+    type: "engagement",
+    name: "Score Bump",
+    status: "draft",
+  };
+
+  it("shows engagement badge in list view", async () => {
+    mockFetchSuccess([engagementCampaign]);
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("Score Bump")).toBeTruthy();
+      expect(screen.getByText("engagement")).toBeTruthy();
+    });
+  });
+
+  it("shows engagement info banner in detail view", async () => {
+    mockFetchSuccess([engagementCampaign]);
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("Score Bump")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Score Bump"));
+    await waitFor(() => {
+      expect(screen.getByText(/sent automatically/)).toBeTruthy();
+    });
+  });
+
+  it("hides Send Campaign button for engagement campaigns", async () => {
+    mockFetchSuccess([engagementCampaign]);
+
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("Score Bump")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("Score Bump"));
+    await waitFor(() => {
+      expect(screen.getByText("Preview Email")).toBeTruthy();
+    });
+
+    expect(screen.queryByText("Send Campaign")).toBeNull();
+  });
+
+  it("shows placeholder help text in create form for engagement type", async () => {
+    render(<CampaignsDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText("New Campaign")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText("New Campaign"));
+
+    // Switch to engagement type
+    fireEvent.click(screen.getByLabelText("Engagement"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/\{\{handle\}\}/)).toBeTruthy();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ACCESSIBILITY — label associations & aria-labels
 // ---------------------------------------------------------------------------
 
