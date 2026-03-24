@@ -1,6 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
@@ -13,6 +11,7 @@ import {
   parseHealthSummary,
   parseSharedContext,
 } from "@/lib/agents/report-parser";
+import { readReportFile, readSharedContext } from "@/lib/agents/report-reader";
 import type {
   AgentStatus,
   AgentsDashboardData,
@@ -58,53 +57,33 @@ export async function GET(request: NextRequest) {
   const flagMap = new Map(flags.map((f) => [f.key, f.enabled]));
 
   // Build agent statuses
-  // process.cwd() causes Turbopack to trace the project dir into the bundle — cosmetic build warning only.
-  // Alternatives (import.meta.dirname with relative traversal) are brittle. Admin-only route, low impact.
-  const projectRoot = process.cwd();
   const agents: AgentStatus[] = await Promise.all(
     Object.values(AGENTS).map(async (config) => {
-      const filePath = join(projectRoot, config.outputFile);
-      let reportContent: string | null = null;
-      let lastRun: string | null = null;
-
-      try {
-        const fileStat = await stat(filePath);
-        lastRun = fileStat.mtime.toISOString();
-        reportContent = await readFile(filePath, "utf-8");
-      } catch {
-        // Report file doesn't exist yet — that's fine
-      }
+      const report = await readReportFile(config.outputFile);
 
       return {
         key: config.key,
         label: config.label,
         schedule: config.schedule,
         enabled: flagMap.get(config.key) ?? false,
-        health: reportContent
-          ? parseHealthStatus(reportContent)
+        health: report.content
+          ? parseHealthStatus(report.content)
           : "unknown",
-        healthSummary: reportContent
-          ? parseHealthSummary(reportContent)
+        healthSummary: report.content
+          ? parseHealthSummary(report.content)
           : "No summary available",
-        lastRun,
+        lastRun: report.lastRun,
         outputFile: config.outputFile,
-        reportContent,
+        reportContent: report.content,
       };
     }),
   );
 
   // Parse shared context
-  const sharedContextPath = join(
-    projectRoot,
-    "docs/agents/shared-context.md",
-  );
-  let sharedContext: AgentsDashboardData["sharedContext"] = [];
-  try {
-    const content = await readFile(sharedContextPath, "utf-8");
-    sharedContext = parseSharedContext(content);
-  } catch {
-    // Shared context file doesn't exist yet — return empty
-  }
+  const raw = await readSharedContext();
+  const sharedContext: AgentsDashboardData["sharedContext"] = raw
+    ? parseSharedContext(raw)
+    : [];
 
   const data: AgentsDashboardData = { agents, sharedContext };
 

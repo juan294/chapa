@@ -141,8 +141,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Spawn the agent shell script
-  // process.cwd() inside Next.js returns apps/web/ — go up to monorepo root
-  const projectRoot = join(process.cwd(), "..", "..");
+  // process.cwd() inside Next.js returns apps/web/ — go up to monorepo root.
+  // turbopackIgnore prevents NFT from tracing the entire project tree.
+  const projectRoot = join(/* turbopackIgnore: true */ process.cwd(), "..", "..");
   const agentConfig = AGENTS[agentKey]!;
   const scriptPath = join(projectRoot, `scripts/${agentConfig.scriptName}.sh`);
   const startedAt = new Date().toISOString();
