@@ -520,13 +520,14 @@ function ControlsSection({
 
         {/* Duration slider */}
         <div>
-          <label className="mb-3 block text-sm font-medium text-text-secondary">
+          <label htmlFor="duration-slider" className="mb-3 block text-sm font-medium text-text-secondary">
             Duration:{" "}
             <span className="font-heading text-text-primary">
               {duration}ms
             </span>
           </label>
           <input
+            id="duration-slider"
             type="range"
             min={500}
             max={4000}
@@ -543,10 +544,11 @@ function ControlsSection({
 
         {/* Target value */}
         <div>
-          <label className="mb-3 block text-sm font-medium text-text-secondary">
+          <label htmlFor="target-value" className="mb-3 block text-sm font-medium text-text-secondary">
             Target Value
           </label>
           <input
+            id="target-value"
             type="number"
             min={1}
             max={9999}
