@@ -1,38 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { isCodebergEnabled } from "@/lib/feature-flags";
-import { requireSession } from "@/lib/auth/require-session";
-import { dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
-import { rateLimit } from "@/lib/cache/redis";
-import { getClientIp } from "@/lib/http/client-ip";
+import { createStatusHandler } from "@/lib/auth/platform-oauth";
+import { codebergOAuthConfig } from "../config";
 
-export async function GET(request: NextRequest) {
-  // 1. Feature flag check — return soft "not enabled" (not 404)
-  if (!(await isCodebergEnabled())) {
-    return NextResponse.json({ enabled: false });
-  }
-
-  // 2. Rate limit: 20 requests per IP per 15 minutes
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:cb:status:${ip}`, 20, 900);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "900" } },
-    );
-  }
-
-  // 3. Require authenticated session
-  const { session, error } = requireSession(request);
-  if (error) return error;
-
-  // 4. Get linked platforms
-  const platforms = await dbGetLinkedPlatforms(session.login);
-  const codeberg = platforms.find((p) => p.platform === "codeberg");
-
-  return NextResponse.json({
-    enabled: true,
-    linked: !!codeberg,
-    remoteLogin: codeberg?.remoteLogin ?? null,
-    connectedAt: codeberg?.connectedAt ?? null,
-  });
-}
+export const GET = createStatusHandler(codebergOAuthConfig);

@@ -1,4 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  RATE_LIMIT_ALLOWED,
+  RATE_LIMIT_BLOCKED,
+  TEST_IP,
+  allowSession,
+  denySession,
+} from "@/lib/test-helpers/platform-auth-fixtures";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -30,6 +37,9 @@ vi.mock("@/lib/auth/require-session", () => ({
 
 vi.mock("@/lib/db/user-platforms", () => ({
   dbDeleteLinkedPlatform: mockDbDeleteLinkedPlatform,
+  // Stubs required by platform-oauth.ts (not used in disconnect flow)
+  dbUpsertLinkedPlatform: vi.fn(),
+  dbGetLinkedPlatforms: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -41,8 +51,19 @@ vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
 }));
 
+// Stub all bitbucket auth functions required by ../config.ts
+vi.mock("@/lib/auth/bitbucket", () => ({
+  createBitbucketStateCookie: vi.fn(),
+  buildBitbucketAuthUrl: vi.fn(),
+  validateBitbucketState: vi.fn(),
+  clearBitbucketStateCookie: vi.fn(),
+  exchangeBitbucketCode: vi.fn(),
+  fetchBitbucketUser: vi.fn(),
+  computeTokenExpiry: vi.fn(),
+}));
+
 import { POST } from "./route";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -55,17 +76,6 @@ function makeRequest(): NextRequest {
   );
 }
 
-function allowSession() {
-  mockRequireSession.mockReturnValue({
-    session: {
-      login: "testuser",
-      token: "gho_test",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -74,9 +84,9 @@ describe("POST /api/auth/bitbucket/disconnect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsBitbucketEnabled.mockResolvedValue(true);
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-    mockGetClientIp.mockReturnValue("1.2.3.4");
-    allowSession();
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_ALLOWED);
+    mockGetClientIp.mockReturnValue(TEST_IP);
+    allowSession(mockRequireSession);
     mockDbDeleteLinkedPlatform.mockResolvedValue(true);
     mockCacheDel.mockResolvedValue(undefined);
   });
@@ -89,19 +99,14 @@ describe("POST /api/auth/bitbucket/disconnect", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_BLOCKED);
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockRequireSession.mockReturnValue({
-      error: NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 },
-      ),
-    });
+    denySession(mockRequireSession);
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);

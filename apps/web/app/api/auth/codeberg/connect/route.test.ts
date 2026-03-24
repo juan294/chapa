@@ -1,4 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  CODEBERG_ENV_VARS,
+  CODEBERG_STATE_COOKIE,
+  CODEBERG_AUTH_URL,
+  RATE_LIMIT_ALLOWED,
+  RATE_LIMIT_BLOCKED,
+  TEST_IP,
+  allowSession,
+  denySession,
+  setEnvVars,
+  clearEnvVars,
+} from "@/lib/test-helpers/platform-auth-fixtures";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -31,18 +43,32 @@ vi.mock("@/lib/auth/require-session", () => ({
 vi.mock("@/lib/auth/codeberg", () => ({
   createCodebergStateCookie: mockCreateCodebergStateCookie,
   buildCodebergAuthUrl: mockBuildCodebergAuthUrl,
+  // Stubs required by ../config.ts (not used in connect flow)
+  validateCodebergState: vi.fn(),
+  clearCodebergStateCookie: vi.fn(),
+  exchangeCodebergCode: vi.fn(),
+  fetchCodebergUser: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  // Stub required by platform-oauth.ts (not used in connect flow)
+  cacheDel: vi.fn(),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
 }));
 
+// Stub all DB functions required by platform-oauth.ts (not used in connect flow)
+vi.mock("@/lib/db/user-platforms", () => ({
+  dbUpsertLinkedPlatform: vi.fn(),
+  dbDeleteLinkedPlatform: vi.fn(),
+  dbGetLinkedPlatforms: vi.fn(),
+}));
+
 import { GET } from "./route";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,27 +80,6 @@ function makeRequest(): NextRequest {
   );
 }
 
-function allowSession() {
-  mockRequireSession.mockReturnValue({
-    session: {
-      login: "testuser",
-      token: "gho_test",
-      name: "Test User",
-      avatar_url: "https://example.com/avatar.png",
-    },
-  });
-}
-
-function setEnvVars() {
-  process.env.CODEBERG_CLIENT_ID = "test-cb-client-id";
-  process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
-}
-
-function clearEnvVars() {
-  delete process.env.CODEBERG_CLIENT_ID;
-  delete process.env.NEXT_PUBLIC_BASE_URL;
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -83,21 +88,16 @@ describe("GET /api/auth/codeberg/connect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsCodebergEnabled.mockResolvedValue(true);
-    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-    mockGetClientIp.mockReturnValue("1.2.3.4");
-    allowSession();
-    setEnvVars();
-    mockCreateCodebergStateCookie.mockReturnValue({
-      state: "random-csrf-state",
-      cookie: "chapa_cb_oauth_state=random-csrf-state; HttpOnly; SameSite=Lax; Path=/; Max-Age=600",
-    });
-    mockBuildCodebergAuthUrl.mockReturnValue(
-      "https://codeberg.org/login/oauth/authorize?client_id=test-cb-client-id&state=random-csrf-state",
-    );
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_ALLOWED);
+    mockGetClientIp.mockReturnValue(TEST_IP);
+    allowSession(mockRequireSession);
+    setEnvVars(CODEBERG_ENV_VARS);
+    mockCreateCodebergStateCookie.mockReturnValue(CODEBERG_STATE_COOKIE);
+    mockBuildCodebergAuthUrl.mockReturnValue(CODEBERG_AUTH_URL);
   });
 
   afterEach(() => {
-    clearEnvVars();
+    clearEnvVars(CODEBERG_ENV_VARS);
   });
 
   it("returns 404 when feature flag is disabled", async () => {
@@ -108,19 +108,14 @@ describe("GET /api/auth/codeberg/connect", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockRateLimit.mockResolvedValue(RATE_LIMIT_BLOCKED);
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(429);
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockRequireSession.mockReturnValue({
-      error: NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 },
-      ),
-    });
+    denySession(mockRequireSession);
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(401);
@@ -148,9 +143,7 @@ describe("GET /api/auth/codeberg/connect", () => {
     const res = await GET(makeRequest());
 
     expect(res.status).toBe(307);
-    expect(res.headers.get("Location")).toBe(
-      "https://codeberg.org/login/oauth/authorize?client_id=test-cb-client-id&state=random-csrf-state",
-    );
+    expect(res.headers.get("Location")).toBe(CODEBERG_AUTH_URL);
   });
 
   it("sets CSRF state cookie on success", async () => {
