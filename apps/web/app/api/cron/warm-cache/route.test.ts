@@ -72,6 +72,14 @@ vi.mock("@/lib/email/score-bump", () => ({
   notifyScoreBump: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("@/lib/cache/craft-cache", () => ({
+  getCachedCraftScore: vi.fn(() => Promise.resolve(null)),
+}));
+
+vi.mock("@/lib/render/avatar", () => ({
+  getAvatarBase64: vi.fn(() => Promise.resolve("data:image/png;base64,abc")),
+}));
+
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbInsertSnapshot,
@@ -85,6 +93,9 @@ import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
+import { getAvatarBase64 } from "@/lib/render/avatar";
+import { computeImpactV4 } from "@/lib/impact/v4";
 import { GET } from "./route";
 
 const mockedDbGetUsers = vi.mocked(dbGetUsers);
@@ -760,6 +771,92 @@ describe("GET /api/cron/warm-cache", () => {
       const res = await GET(makeRequest("test-cron-secret"));
 
       expect(res.status).toBe(200);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Avatar and craft warming
+  // ---------------------------------------------------------------------------
+
+  describe("avatar and craft warming", () => {
+    it("warms avatar cache for handles with avatarUrl", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({
+        handle: "alice",
+        avatarUrl: "https://avatars.githubusercontent.com/u/123",
+      } as never);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(getAvatarBase64)).toHaveBeenCalledWith(
+        "alice",
+        "https://avatars.githubusercontent.com/u/123",
+      );
+    });
+
+    it("skips avatar warming when stats have no avatarUrl", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(getAvatarBase64)).not.toHaveBeenCalled();
+    });
+
+    it("warms craft cache via getCachedCraftScore", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(getCachedCraftScore)).toHaveBeenCalledWith("alice");
+    });
+
+    it("passes craft score to computeImpactV4 when available", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(getCachedCraftScore).mockResolvedValue({
+        tool: "claude-code",
+        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
+        craftScore: 75,
+        tier: "Practitioner",
+        reportPeriod: { start: "2025-01-01", end: "2025-12-31" },
+        computedAt: "2025-12-31T00:00:00.000Z",
+      });
+
+      await GET(makeRequest("test-cron-secret"));
+
+      expect(vi.mocked(computeImpactV4)).toHaveBeenCalledWith(
+        expect.objectContaining({ handle: "alice" }),
+        75,
+      );
+    });
+
+    it("continues warming even if avatar fetch fails", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({
+        handle: "alice",
+        avatarUrl: "https://avatars.githubusercontent.com/u/123",
+      } as never);
+      vi.mocked(getAvatarBase64).mockRejectedValue(new Error("CDN timeout"));
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.warmed).toBe(1);
+      expect(body.failed).toBe(0);
+    });
+
+    it("continues warming even if craft cache fails", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(getCachedCraftScore).mockRejectedValue(new Error("Redis down"));
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.warmed).toBe(1);
+      expect(body.failed).toBe(0);
     });
   });
 });

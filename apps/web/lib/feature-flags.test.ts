@@ -14,6 +14,8 @@ import {
   isBitbucketEnabledSync,
   isCodebergEnabled,
   isCodebergEnabledSync,
+  isInsightsEnabled,
+  isInsightsEnabledSync,
   _resetFlagCache,
 } from "./feature-flags";
 
@@ -336,6 +338,82 @@ describe("isCodebergEnabled", () => {
     delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
 
     const result = await isCodebergEnabled();
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isInsightsEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isInsightsEnabledSync", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+  });
+
+  it("returns false when env var not set", () => {
+    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+    expect(isInsightsEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "true";
+    expect(isInsightsEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "false";
+    expect(isInsightsEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "  true  ";
+    expect(isInsightsEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isInsightsEnabled (async, DB-backed)
+// ---------------------------------------------------------------------------
+
+describe("isInsightsEnabled", () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("insights_integration", true),
+    );
+
+    const result = await isInsightsEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when DB flag is disabled", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("insights_integration", false),
+    );
+
+    const result = await isInsightsEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("falls back to env var when DB unavailable", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "true";
+
+    const result = await isInsightsEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when both DB and env var are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+
+    const result = await isInsightsEnabled();
     expect(result).toBe(false);
   });
 });

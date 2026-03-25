@@ -18,7 +18,7 @@ import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getBaseUrl } from "@/lib/env";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
@@ -30,6 +30,7 @@ import { notifyFirstBadge } from "@/lib/email/notifications";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 
 const BASE_URL = getBaseUrl();
 
@@ -103,7 +104,7 @@ export default async function SharePage({ params }: SharePageProps) {
     getStats(handle),
     cacheGet<BadgeConfig>(`config:${handle}`),
     getCachedLatestSnapshot(handle),
-    dbGetToolInsights(handle),
+    getCachedCraftScore(handle),
     isStudioEnabled(),
   ]);
 
@@ -237,16 +238,19 @@ export default async function SharePage({ params }: SharePageProps) {
                   dangerouslySetInnerHTML={{ __html: inlineSvg }}
                 />
               ) : (
-                /* Fallback: if SVG render failed, load via <img> */
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
-                  alt={`Chapa badge for ${handle}`}
-                  width={1200}
-                  height={630}
-                  fetchPriority="high"
-                  className="w-full rounded-xl"
-                />
+                /* Fallback: if SVG render failed, load via <img> with skeleton */
+                <div className="relative">
+                  <BadgeSkeleton />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
+                    alt={`Chapa badge for ${handle}`}
+                    width={1200}
+                    height={630}
+                    fetchPriority="high"
+                    className="w-full rounded-xl relative"
+                  />
+                </div>
               )}
             </div>
           )}

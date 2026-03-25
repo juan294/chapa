@@ -75,8 +75,14 @@ describe("GET /api/verify/[hash]", () => {
       expect(res.status).toBe(400);
     });
 
-    it("returns 400 for hash longer than 16 characters", async () => {
-      const [req, ctx] = makeRequest("abc12345abc12345a", "1.2.3.4");
+    it("returns 400 for hash of 24 characters (neither 8, 16, nor 32)", async () => {
+      const [req, ctx] = makeRequest("abc12345abc12345abc12345", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 for hash longer than 32 characters", async () => {
+      const [req, ctx] = makeRequest("abc12345abc12345abc12345abc12345a", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.status).toBe(400);
     });
@@ -84,6 +90,13 @@ describe("GET /api/verify/[hash]", () => {
     it("accepts valid 16-char hex hash", async () => {
       mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
       const [req, ctx] = makeRequest("abc12345abc12345", "1.2.3.4");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+    });
+
+    it("accepts valid 32-char hex hash", async () => {
+      mockGetVerificationRecord.mockResolvedValue(FAKE_RECORD);
+      const [req, ctx] = makeRequest("abc12345abc12345abc12345abc12345", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.status).toBe(200);
     });

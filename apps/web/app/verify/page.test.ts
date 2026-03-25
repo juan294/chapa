@@ -50,8 +50,8 @@ describe("Verify input page", () => {
   });
 
   describe("instructions", () => {
-    it("explains hash format (8 or 16 characters)", () => {
-      expect(SOURCE).toContain("8 or 16 character");
+    it("explains hash format (8, 16, or 32 characters)", () => {
+      expect(SOURCE).toContain("8, 16, or 32 character");
     });
 
     it("tells user where to find the hash", () => {

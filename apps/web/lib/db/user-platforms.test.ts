@@ -122,6 +122,47 @@ describe("dbGetLinkedPlatform", () => {
     expect(query.eq).toHaveBeenCalledWith("handle", "testuser");
   });
 
+  it("handles null refresh_token", async () => {
+    const { query } = mockSupabase();
+    query.maybeSingle.mockResolvedValue({
+      data: {
+        handle: "testuser",
+        platform: "bitbucket",
+        remote_login: "bb-user",
+        access_token: "enc:my-access-token",
+        refresh_token: null,
+        token_expires_at: null,
+        connected_at: "2026-02-23T00:00:00Z",
+        updated_at: "2026-02-23T00:00:00Z",
+      },
+      error: null,
+    });
+
+    const result = await dbGetLinkedPlatform("testuser", "bitbucket");
+    expect(result).not.toBeNull();
+    expect(result!.tokens.refreshToken).toBeNull();
+    expect(result!.tokens.expiresAt).toBeNull();
+  });
+
+  it("returns null on DB query error", async () => {
+    const { query } = mockSupabase();
+    query.maybeSingle.mockRejectedValue(new Error("connection timeout"));
+
+    const result = await dbGetLinkedPlatform("testuser", "bitbucket");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when supabase query returns error", async () => {
+    const { query } = mockSupabase();
+    query.maybeSingle.mockResolvedValue({
+      data: null,
+      error: { message: "table not found" },
+    });
+
+    const result = await dbGetLinkedPlatform("testuser", "bitbucket");
+    expect(result).toBeNull();
+  });
+
   it("returns null when decryption fails", async () => {
     const { query } = mockSupabase();
     query.maybeSingle.mockResolvedValue({
@@ -233,6 +274,14 @@ describe("dbDeleteLinkedPlatform", () => {
     const result = await dbDeleteLinkedPlatform("testuser", "bitbucket");
     expect(result).toBe(false);
   });
+
+  it("returns false on DB error", async () => {
+    const { setResolveValue } = mockSupabase();
+    setResolveValue({ error: { message: "delete failed" } });
+
+    const result = await dbDeleteLinkedPlatform("testuser", "bitbucket");
+    expect(result).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -272,6 +321,39 @@ describe("dbUpdatePlatformTokens", () => {
     );
     expect(result).toBe(false);
   });
+
+  it("returns false on DB error", async () => {
+    const { setResolveValue } = mockSupabase();
+    setResolveValue({ error: { message: "update failed" } });
+
+    const result = await dbUpdatePlatformTokens(
+      "testuser",
+      "bitbucket",
+      "new-access",
+      "new-refresh",
+      new Date("2026-03-01T00:00:00Z"),
+    );
+    expect(result).toBe(false);
+  });
+
+  it("handles null refreshToken and expiresAt", async () => {
+    const { query } = mockSupabase();
+
+    await dbUpdatePlatformTokens(
+      "testuser",
+      "bitbucket",
+      "new-access",
+      null,
+      null,
+    );
+
+    expect(query.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        refresh_token: null,
+        token_expires_at: null,
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -302,6 +384,14 @@ describe("dbHasLinkedPlatform", () => {
 
   it("returns false when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValue(null);
+    const result = await dbHasLinkedPlatform("testuser", "bitbucket");
+    expect(result).toBe(false);
+  });
+
+  it("returns false on DB error", async () => {
+    const { query } = mockSupabase();
+    query.limit.mockRejectedValue(new Error("query failed"));
+
     const result = await dbHasLinkedPlatform("testuser", "bitbucket");
     expect(result).toBe(false);
   });

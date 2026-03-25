@@ -1,34 +1,53 @@
 # Documentation Update Report
 
-> Generated on 2026-03-23 | Branch: `develop` | Changes since v2.1.0 (17 commits)
+> Generated on 2026-03-24 | Branch: `develop` | Changes since v2.2.0 (17 commits)
 
 ## Summary
-- 7 documents updated
-- 0 diagrams refreshed (1 flagged `[NEEDS REVIEW]`)
-- 2 version/spec references corrected
-- 0 inline doc blocks updated (refresh only — no expansion)
-- 1 item flagged `[NEEDS REVIEW]`
+
+- 5 documents updated
+- 0 diagrams refreshed (none exist)
+- 3 version references corrected
+- 0 inline doc blocks updated (no stale JSDoc found)
+- 0 items flagged [NEEDS REVIEW]
 
 ## Changes by File
 
-| File | What Changed | Why |
-|------|-------------|-----|
-| `CLAUDE.md` | Added `POST /api/admin/campaigns/:id/test` route | Missing from route listing |
-| `CLAUDE.local.md:235` | "Impact v4" → "Impact v6" | Stale scoring version reference |
-| `docs/spec.md:82` | `docs/impact-v4.md` → `docs/impact-v6.md` | Stale spec reference |
-| `README.md:145` | Test counts "337+ files, 5,760+" → "345+ files, 5,720+" | Updated to match current state |
-| `CHANGELOG.md` | Added `[Unreleased]` section with 17 post-v2.1.0 commits | New features, fixes, refactors not yet tracked |
-| `docs/badge-design-v1.md:4` | `badge-svg-spec-v1.0.md` → `badge-svg-spec-v1.2.md` | Broken cross-reference |
-| `docs/badge-svg-spec-v1.2.md:405` | Added `[NEEDS REVIEW]` comment above radar diagram | Diamond-only diagram; pentagon variant undocumented |
+### 1. `README.md`
+- **Updated:** Test count from `345+ test files, 5,720+ tests` to `367+ test files, 5,920+ tests`
+- **Reason:** 167 new tests added during v38 remediation (5,926 actual as of bd07ec5)
+
+### 2. `CHANGELOG.md`
+- **Added:** `[Unreleased]` section documenting all post-v2.2.0 changes
+- **Reason:** 17 commits since v2.2.0 with no changelog tracking. Covers: BadgeSkeleton, craft cache, HMAC 128-bit upgrade, platform OAuth refactor, dynamic analytics import, test coverage boost, a11y fixes, build fix
+
+### 3. `docs/badge-verification.md`
+- **Updated:** HMAC hash description from 8 hex chars (32 bits) to 32 hex chars (128 bits)
+- **Updated:** Hash format validation to show all accepted formats (8/16/32 chars)
+- **Updated:** Threat model brute-force entry to reflect 2^128 search space
+- **Updated:** Verification strip example to show 32-char hash
+- **Added:** Backward compatibility note for legacy hash formats
+- **Reason:** HMAC hash was increased to 128 bits in commit c544bd0 (#617)
+
+### 4. `docs/accepted-risks.md`
+- **Updated:** "Last reviewed" date from 2026-03-22 to 2026-03-24, audit version from v22 to v38
+- **Removed:** "When verification URLs are redesigned (hash length can be increased)" from review schedule (completed in #617)
+- **Verified:** HMAC 64-bit risk was already marked as resolved (no change needed)
+- **Reason:** Audit v38 completed; hash length increase was the outstanding review trigger
+
+### 5. `docs/cli-guide.md`
+- **Updated:** Docker example from `node:18-slim` to `node:20-slim`
+- **Reason:** Project requires Node.js 20+; example was stale
+
+## Not Updated (Verified Current)
+
+- `CLAUDE.md` — Route table comprehensive, no new routes added since v2.2.0
+- `docs/impact-v6.md` — Scoring spec unchanged
+- `docs/design-system.md` — No design changes
+- `docs/how-it-works.md` — All changes since v2.2.0 are internal (caching, refactoring, tests); no new user-facing behavior to document
+- `docs/svg-design.md` — Badge layout unchanged
+- Agent reports — Point-in-time snapshots; will be refreshed on next agent run
+- `docs/agents/shared-context.md` — Agent entries are historical snapshots; stale numbers (test counts) will be updated when agents next run
 
 ## Flagged for Review
 
-1. **`docs/badge-svg-spec-v1.2.md:405`** — The radar chart ASCII diagram shows only the 4-axis diamond layout. When the Craft dimension is present, the badge renders a 5-axis pentagon. The diagram and surrounding spec text (section 5b "Axes (4-point diamond)") should be expanded to document both variants. This requires understanding the exact pentagon geometry from the renderer code.
-
-## Items Verified Current (No Update Needed)
-- `docs/impact-v6.md` — unchanged, still current spec
-- `docs/how-it-works.md` — updated in v2.1.0 pass, still accurate
-- `docs/scoring-explainer-video.md` — new since v2.1.0, already current
-- `docs/design-system.md` — `--color-complement` and `animate-hex-cell-in` already documented
-- `docs/accepted-risks.md` — reviewed, current
-- All agent reports — freshly generated today
+None.

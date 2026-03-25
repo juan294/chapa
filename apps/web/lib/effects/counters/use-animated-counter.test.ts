@@ -141,6 +141,10 @@ describe("useAnimatedCounter advanced", () => {
     stubMatchMedia(false);
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("animate triggers animation state", () => {
     const { result } = renderHook(() => useAnimatedCounter(100));
     act(() => {

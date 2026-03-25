@@ -9,27 +9,27 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-23T06:00:00Z -->
-## Cost Analyst — 2026-03-23
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-24T08:00:00Z -->
+## Cost Analyst — 2026-03-24
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$40–60** (Vercel $20, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$65–145/mo. Stable — no new cost risks.
-- Redis: 16 key pattern families. TTL coverage 100% per-user keys. 3 global singletons without TTL — intentional, combined <16 KB. OG images (~50–100 KB each, 48h TTL) remain #1 consumer.
+- Estimated monthly cost at 10K users: **~$40–60** (Vercel $20, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$70–150/mo. Stable — no new cost risks.
+- Redis: **17 key pattern families**. TTL coverage 100% per-user keys. 2 global singletons without TTL — intentional, combined <16 KB. OG images (~50–100 KB each, 48h TTL) remain #1 consumer.
 - **Estimated Redis memory @10K users: ~535 MB** (160 MB user keys + 375 MB OG images). Well within Upstash Pro 10 GB.
 - GitHub API budget: ~420 calls/hr @10K users (50% cache hit) vs 5,000/hr limit. 91.6% headroom. In-flight dedup reduces concurrent calls 40–60%.
-- Supabase: 9 tables + 2 views. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. Batch queries correct. RLS on all 9 tables. 14 indexes cover all hot paths. Runtime row validation via `parseRow()`/`parseRows()`.
-- Fetch timeout coverage: **100%** — all `fetch()` calls have `AbortSignal.timeout()` or `Promise.race()`.
-- Resource leaks: **0 critical**. Badge SVG route uses `Promise.allSettled()` (re-verified line 104). All timers properly cleaned up. Agent state has 5m hard timeout.
-- Rate limiting: **14+ routes** with comprehensive coverage. All fail-open by design. Exact limits documented in full report.
-- **ACCEPTED: `dbGetCampaignStats()` JS aggregation** — PostgREST lacks GROUP BY. Confirmed correct approach by triage (2026-03-22). Documented in code. Not a cost concern at current scale.
-- **MONITOR: `sync-audience` contact pagination** — fetches all Resend contacts from page 1 every run. At 10K+ contacts, consider cursor caching for incremental sync.
-- **MONITOR: OG image Redis memory** — at 50K+ users (~2.5 GB) could approach Upstash Pro limits. Consider blob storage (Vercel Blob, R2).
-- Vercel: ISR on all public pages (7d archetypes, 1h content, 24h legal), ~3 dynamic, 42+ API routes. No edge runtime. No middleware. 3 cron jobs (90 executions/mo, ~0.25 compute-hr/mo vs 2,160 free).
+- Supabase: 9 tables + 1 view. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. RLS on all 9 tables. `dbGetCampaignStats()` JS aggregation ACCEPTED (PostgREST lacks GROUP BY).
+- Fetch timeout coverage: **100% on critical path** — all `fetch()` calls have `AbortSignal.timeout()` or `Promise.race()`. 1 exception: `captureServerError` PostHog (fire-and-forget, never blocks response).
+- Resource leaks: **0 critical, 0 warnings**. Badge SVG route uses `Promise.allSettled()` (re-verified at line 104). All timers properly cleaned up. All `after()` callbacks use `Promise.allSettled`.
+- Rate limiting: **36 call sites** across all API routes. Comprehensive coverage. All fail-open by design. Campaign email: 95/day quota.
+- ISR: 14 routes (7d archetypes, 1h content, 24h legal). 2 force-dynamic. No edge runtime. No middleware.
+- Cron: 3 jobs, ~90 executions/mo, ~0.25–0.9 compute-hr/mo vs 2,160 free.
+- **MONITOR: `sync-audience` contact pagination** — CARRIED. Future scale only.
+- **MONITOR: OG image Redis memory** — CARRIED. Future scale only.
 
 **Cross-agent recommendations:**
-- [Performance]: Redis memory stable at ~535 MB @10K. OG images remain #1 Redis consumer — consider blob storage at 50K+ scale. No new performance-cost tradeoffs.
-- [Security]: Fail-open rate limiting intact. Fetch timeouts at 100% coverage. Campaign email quota (95/day) prevents abuse. All admin routes rate-limited via `adminAuth()`. No cost-security concerns.
-- [Coverage]: All cost-critical paths well-tested. API routes at 95%+ admin, 98.6% auth. No new gaps.
-- [QA]: `dbGetCampaignStats` JS aggregation reclassified ACCEPTED (not CARRIED). Badge SVG `Promise.allSettled()` re-verified. 2 monitor items for future scale only.
+- [QA]: Badge SVG `Promise.allSettled` finding from QA 2026-03-18 is resolved — please mark as closed. Share page `Promise.all` at `page.tsx:102` is safe (all callees fail gracefully).
+- [Security]: Fetch timeouts at 100% critical path. Fail-open rate limiting intact. Campaign email quota prevents abuse. No cost-security concerns.
+- [Performance]: Redis memory stable at ~535 MB @10K. OG images remain #1 Redis consumer — consider blob storage at 50K+ scale. No new bundle or build regressions.
+- [Coverage]: All cost-critical paths well-covered. API routes at 96.4%. `sync-audience` at 84.6% — aligns with monitor item.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
@@ -75,27 +75,28 @@
 - [Cost Analyst]: Campaign API routes (7) and cron jobs (2) fully undocumented — ensure cost model includes campaign email sends.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-03-16T09:00:00Z -->
-## Security Scanner — 2026-03-16
+<!-- ENTRY:START agent=security timestamp=2026-03-23T10:00:00Z -->
+## Security Scanner — 2026-03-23
 - **Status**: GREEN
 - Vulnerabilities: 0 critical, 0 high, 0 medium, 0 low — `pnpm audit` clean.
-- Secret leaks: none — all 10 server secrets isolated, 7 NEXT_PUBLIC_ vars are non-sensitive. Error logging scrubs tokens via regex before PostHog.
+- Secret leaks: none — all 10 server secrets isolated, 8 NEXT_PUBLIC_ vars are non-sensitive. Error logging scrubs tokens via regex before PostHog.
 - License issues: 1 LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`) — dynamically linked, no compliance action needed.
-- XSS: all 7 user-input entry points in SVG pipeline escaped via `escapeXml()`, explicit XSS tests at `BadgeSvg.test.tsx:600-626`. Fallback SVG also escapes.
-- CORS: only `/api/verify/[hash]` allows `*` (intentional, rate-limited 30 req/60s, read-only). CSP properly configured in `next.config.ts`. Global headers: HSTS, nosniff, X-XSS-Protection.
-- RLS: **all 10 Supabase tables** RLS-enabled with explicit deny policies (up from 6). NEW: `email_campaigns`, `campaign_sends` added with deny policies in migration 016. Views use `security_invoker = true`.
-- Knip: clean — 1 config hint only (redundant entry pattern).
+- XSS: 9 user-input entry points in SVG pipeline escaped via `escapeXml()` (handle, displayName, archetype, tier, avatarDataUri, fallback handle, fallback error, verification hash, verification date). Explicit XSS tests at `BadgeSvg.test.tsx:59-65`. Fallback SVG also escapes.
+- CORS: only `/api/verify/[hash]` allows `*` (intentional, rate-limited 30 req/60s, read-only). CSP properly configured in `next.config.ts`. Global headers: HSTS (2yr+preload), nosniff, X-XSS-Protection, restrictive Permissions-Policy.
+- RLS: **all 9 Supabase tables** RLS-enabled with explicit deny policies. 2 views with `security_invoker = true`.
+- Knip: **fully clean** — 0 findings (improved from 1 config hint in previous audit).
 - Hardcoded secrets: none found in source. All env vars `.trim()`ed.
-- OAuth: CSRF state validation, redirect URL validation, AES-256-GCM token encryption, 10s fetch timeouts.
+- OAuth: CSRF state validation via `timingSafeEqual()`, AES-256-GCM token encryption (fresh IV per encryption), 10s fetch timeouts. CLI tokens HMAC-SHA256 signed with 90-day expiry.
 - Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`.
-- Campaign email system: auth checks, daily send quota (95), batch size 50, Redis counter. Follows existing security patterns.
+- Rate limiting: **14+ routes**. Admin routes rate-limited via `adminAuth()` (10 req/IP/60s). Campaign email: 95/day quota, batch 50, Redis counter. All fail-open by design.
+- Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure` (HTTPS), 10-minute `Max-Age`.
 
 **Cross-agent recommendations:**
-- [Coverage]: All security-critical paths at 86%+. Campaign API routes at 77–78% need error-path coverage. XSS tests comprehensive. HMAC verification at 100%.
-- [QA]: No security UX issues. Campaign send pipeline uses batch operations and daily limits correctly. Process stream leak (admin agent route) is resource hygiene, not security.
-- [Cost Analyst]: Fail-open rate limiting intact. All fetch timeouts in place (100%). Campaign email quota prevents abuse. No cost-security concerns.
-- [Performance]: No security-related performance concerns. Rate limiting fail-open by design. CSP `connect-src` properly scoped.
-- [Documentation]: Auth cookie functions still lack JSDoc — documentation gap increases misuse risk, not a vulnerability.
+- [Coverage]: All security-critical paths at 91%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
+- [QA]: No security UX issues. Campaign pipeline uses proper auth + quotas. Badge SVG `Promise.allSettled()` re-verified by cost-analyst.
+- [Cost Analyst]: Fail-open rate limiting intact. Fetch timeouts at 100%. Campaign email quota prevents abuse. No cost-security concerns.
+- [Performance]: No security-related performance concerns. Knip fully clean (0 findings). Rate limiting fail-open by design. CSP properly scoped.
+- [Documentation]: Auth cookie functions JSDoc resolved per documentation agent (2026-03-20). No remaining security-documentation gaps.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-03-18T09:00:00Z -->
@@ -119,40 +120,39 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update (POST → GET+PUT). 11 duplicate ` 2.ts` files should be deleted from working directory.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-23T02:10:00Z -->
-## Coverage Agent — 2026-03-23
+<!-- ENTRY:START agent=coverage timestamp=2026-03-24T02:05:00Z -->
+## Coverage Agent — 2026-03-24
 - **Status**: GREEN
-- Overall coverage: **88.55% stmts** (7,064/7,977), 84.02% branch, 80.43% funcs, 89.81% lines
-- Test suite: 339 files, 5,782 tests, 100% pass rate, 0 flaky (3 runs)
-- Delta vs 2026-03-22: **+0.83% stmts** (6,853→7,064 covered, 7,812→7,977 total). Strong positive trend — 211 newly covered stmts vs 165 new total.
+- Overall coverage: **88.69% stmts** (7,072/7,974), 84.19% branch, 80.64% funcs, 89.96% lines
+- Test suite: 345 files, 5,723 tests, 100% pass rate, 0 flaky (3 runs)
+- Delta vs 2026-03-23: **+0.14% stmts** (7,064→7,072 covered, 7,977→7,974 total). Stable — minor coverage gain with slight reduction in total tracked stmts.
 - All thresholds pass with 13%+ margin (75% stmts threshold).
-- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.1%, `lib/history` 98.2%, `app/api/auth` 98.6%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api/admin` 95.4%, `lib/db` 91.9%, `lib/auth` 95.1%, `lib/email` 94.7%, `lib/insights` 94.9%, `lib/bitbucket` 93.1%, `components` 92.4%, `lib/effects` 89.3%
-- `lib/crypto`, `lib/async`, `lib/analytics`, `lib/dashboard`, `lib/utils` all at 100%
-- `app/admin` pages at 82.8% (YELLOW) — up from 79.1%. `AdminDashboardClient.tsx` at 71.0% (up from 0%), `campaigns-dashboard.tsx` at 74.6%.
-- `app/pages` at 73.8% (RED) — 7 server/client page components at 0% (landing, about/scoring, about/verification, cli/authorize, generating, studio, admin page.tsx).
-- `app/experiments` at 56.1% — unchanged, feature-flagged, V8 instrumentation issues. Low priority.
+- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.1%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api` 96.4%, `lib/auth` 95.2%, `lib/insights` 94.9%, `lib/email` 94.7%, `lib/bitbucket` 93.1%, `components` 92.5%, `lib/db` 91.9%, `lib/effects` 90.7%
+- `app/admin` at 83.0% (YELLOW). `AdminDashboardClient.tsx` at 71.0%, `campaigns-dashboard.tsx` at 75.1%.
+- `app/pages` at 68.1% (RED) — 7 server page components at 0% (landing, about/scoring, about/verification, admin, generating, studio page.tsx, hexmap).
+- `app/experiments` at 56.1% — unchanged, feature-flagged, V8/JSDOM limitations. Low priority.
 - `HolographicOverlay.tsx` at 47.1% — DOM API gaps in JSDOM. Accepted limitation.
-- 0 flaky tests across 3 consecutive runs. No warnings.
-- Only 2 truly untested files with executable logic: `ThemeProvider.tsx`, `test-helpers/fixtures.ts`. All other untested files are type-only.
+- 4 critical-path files below 90%: `lib/db/user-platforms.ts` (81.8%), `app/api/admin/campaigns/[id]/test/route.ts` (83.3%), `app/api/cron/sync-audience/route.ts` (84.6%), `lib/db/campaigns.ts` (89.0%).
+- 0 flaky tests across 3 consecutive runs (avg ~33s per run).
 
 **Cross-agent recommendations:**
 - [Security]: All security-critical paths at 91%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
-- [QA]: Priority test additions: (1) 7 page components at 0% coverage (small stmts each — quick wins), (2) `campaigns-dashboard.tsx` at 74.6% (needs error-path tests), (3) `HolographicOverlay.tsx` at 47.1% (JSDOM limitation, accepted).
+- [QA]: Priority test additions: (1) `AdminDashboardClient.tsx` at 71.0% (needs branch tests), (2) `campaigns-dashboard.tsx` at 75.1% (needs error-path tests), (3) 4 critical-path files below 90% need targeted branch coverage.
 - [Performance]: All critical rendering and API paths at 91%+. Experiment pages remain low priority. `hexmap/page.tsx` (0%, 132 stmts) is canvas-heavy.
-- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at 95%+ for admin, 98.6% for auth. No new gaps.
-- [DevOps]: All thresholds pass with 13%+ margin. Test suite runs in ~12-38s depending on coverage mode.
+- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at 96.4%. `sync-audience` route at 84.6% — aligns with cost-analyst's monitor item on contact pagination.
+- [DevOps]: All thresholds pass with 13%+ margin. Test suite runs in ~30-37s with coverage, ~14s without.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-03-23T07:30:00Z -->
-## Triage — 2026-03-23
-- **Reports processed**: 2 (coverage, cost-analyst)
-- **Action items resolved**: 7 of 9 (items 8-9 are medium-effort branch coverage improvements, deferred to next cycle)
-- **Summary**: Added render tests for 6 Priority 1 page components (landing, about/scoring, about/verification, cli/authorize/AuthorizeClient, generating/[handle], admin). Both reports GREEN with no blockers. Coverage continues upward trend.
-- **Tests**: 5,782 passing (340 files), 0 type errors, 0 lint issues
-- **Coverage delta**: 88.55% stmts (+0.83% vs previous). All critical paths GREEN (91%+).
+<!-- ENTRY:START agent=triage timestamp=2026-03-24T20:25:00Z -->
+## Triage — 2026-03-24
+- **Reports processed**: 4 (cc-rpi-update, cost-analyst, coverage, security)
+- **Action items resolved**: 10 of 10 — all implemented
+- **Summary**: All 4 reports GREEN with no blockers. Added 44 tests covering uncovered branches: user-platforms DB error/null paths, campaigns test route (invalid JSON, engagement interpolation, resend throw), campaigns-dashboard (edit form, send test email, engagement type handling), plus studio page source test. Previous Priority 2 deferred items now addressed.
+- **Tests**: 5,767 passing (346 files), 0 type errors, 0 lint issues
+- **Coverage delta**: Targeted branch coverage for 4 critical-path files below 90% (user-platforms 81.8%, campaigns test route 83.3%, campaigns-dashboard 75.1%, AdminDashboardClient 71.0%).
 **Cross-agent recommendations:**
-- [Coverage]: 6 Priority 1 page components now have tests. Remaining Priority 1 gap: `app/studio/page.tsx` already had tests. Priority 2: `campaigns-dashboard.tsx` (74.6%) and `AdminDashboardClient.tsx` (71.0%) need branch coverage.
-- [Cost Analyst]: All GREEN, no action needed. Monitor items (OG image blob storage, sync-audience pagination) are future-scale only.
-- [QA]: AuthorizeClient now has full render tests including error states and approval flow.
-- [Performance]: No new performance concerns. Test suite runs in ~14s.
+- [Coverage]: Priority 2 items from 2026-03-23 (campaigns-dashboard, AdminDashboardClient branch coverage) now addressed with 44 new tests. user-platforms and campaigns test route also improved. Server page 0% files remain (source-inspection pattern — V8 doesn't track string reads).
+- [QA]: Badge SVG `Promise.allSettled` at route.ts:104 confirmed RESOLVED by cost-analyst. `/api/studio/config` docs mismatch still pending from QA 2026-03-18.
+- [Cost Analyst]: All stable. No new cost concerns. Monitor items carried (OG image blob, sync-audience pagination).
+- [Security]: All GREEN, 0 vulnerabilities, knip clean. No action needed.
 <!-- ENTRY:END -->

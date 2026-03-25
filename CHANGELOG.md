@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-24
+
+### Added
+- Badge loading skeleton (`BadgeSkeleton`) — shimmer placeholder while badge `<img>` loads on share page
+- Redis craft score cache (`lib/cache/craft-cache.ts`) — 1h TTL, fail-open to Supabase
+- Pre-warming of avatar and craft caches in `warm-cache` cron job
+- Generic platform OAuth handler factory (`lib/auth/platform-oauth.ts`) — eliminates Bitbucket/Codeberg code duplication
+- `ClientAnalytics` wrapper component for Vercel Analytics/SpeedInsights (Next.js 16 Server Component compatibility)
+- ~167 new tests across 48 test files; function coverage boosted from 81.3% to 85.7%
+- Shared test helpers: `adminAuthSetup()` for campaign tests, platform auth fixtures
+- `report-reader` module for agents-summary route (isolates filesystem access from Turbopack NFT tracing)
+
+### Changed
+- HMAC verification hash increased from 64 bits (16 hex chars) to 128 bits (32 hex chars); verification endpoints accept legacy 8/16/32-char formats
+- Supabase: `FORCE ROW LEVEL SECURITY` enabled on all 9 tables (defense-in-depth)
+- Vercel Analytics and SpeedInsights dynamically imported (reduces server bundle)
+- Dev dependencies updated: vitest 4.1.1, @vitest/coverage-v8 4.1.1
+
+### Fixed
+- `next/dynamic` with `ssr: false` in Server Component (Next.js 16 build failure) — extracted to client component
+- Unhandled "window is not defined" error from `useAnimatedCounter` test cleanup
+- `type="button"` added to UserMenu trigger and platform unlink buttons (prevents accidental form submission)
+- `htmlFor`/`id` pairing on number-counters experiment slider (screen reader accessibility)
+- NFT trace warning in agents-summary route (filesystem reads extracted to separate module)
+
 ## [2.2.0] - 2026-03-23
 
 ### Added

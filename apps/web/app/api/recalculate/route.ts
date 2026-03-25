@@ -3,7 +3,7 @@ import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
-import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   // Fetch stats and craft score in parallel (independent operations)
   const [stats, craftResult] = await Promise.all([
     getStats(handle, auth.token),
-    dbGetToolInsights(handle),
+    getCachedCraftScore(handle),
   ]);
 
   if (!stats) {

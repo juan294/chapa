@@ -9,7 +9,7 @@ const SOURCE = fs.readFileSync(
 
 describe("VerifyPage", () => {
   describe("hash validation", () => {
-    it("defines HASH_PATTERN for 8 or 16 hex characters", () => {
+    it("defines HASH_PATTERN for 8, 16, or 32 hex characters", () => {
       expect(SOURCE).toContain("HASH_PATTERN");
       expect(SOURCE).toMatch(/\/\^.*[0-9a-f].*\$\//);
     });
@@ -93,7 +93,7 @@ describe("VerifyPage", () => {
     });
 
     it("explains the expected format", () => {
-      expect(SOURCE).toContain("8 or 16 hex characters");
+      expect(SOURCE).toContain("8, 16, or 32 hex characters");
     });
   });
 

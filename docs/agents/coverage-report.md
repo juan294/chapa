@@ -1,131 +1,109 @@
 # Coverage Report
-> Generated: 2026-03-23 | Health status: GREEN
+> Generated: 2026-03-24 | Branch: `develop` | Health status: GREEN
 
 ## Executive Summary
-Overall coverage is **88.55% statements** across 7,977 statements in 339 test files (5,782 tests). All critical paths (scoring, rendering, auth, verification) are at 95%+ coverage. Coverage improved +0.83% stmts vs last report (87.72% on 2026-03-22), with 211 newly covered statements against 165 new total — a strong positive trend. Zero flaky tests detected across 3 consecutive runs.
+
+Overall statement coverage is **88.69%** (7,072/7,974) across 309 tracked files, with 345 test files containing 5,723 tests — all passing with zero flaky tests across 3 consecutive runs. All critical paths (scoring, rendering, API, auth, cache, verification) are at 91%+ coverage. Thresholds pass with 13%+ margin.
 
 ## Coverage Summary
 
-| Metric | Coverage | Covered/Total | Threshold | Margin |
-|--------|----------|---------------|-----------|--------|
-| Statements | 88.55% | 7,064/7,977 | 75% | +13.55% |
-| Branches | 84.02% | 3,860/4,594 | 70% | +14.02% |
-| Functions | 80.43% | 1,328/1,651 | 65% | +15.43% |
-| Lines | 89.81% | 6,466/7,199 | 75% | +14.81% |
+| Metric | Coverage | Covered/Total |
+|--------|----------|---------------|
+| Statements | 88.69% | 7,072 / 7,974 |
+| Branches | 84.19% | 3,856 / 4,580 |
+| Functions | 80.64% | 1,333 / 1,653 |
+| Lines | 89.96% | 6,471 / 7,193 |
+
+**Delta vs 2026-03-23:** +0.14% stmts (7,064 → 7,072 covered, 7,977 → 7,974 total). Stable positive trend.
 
 ## Coverage by Module
 
 | Module | Stmts | Branch | Funcs | Status |
 |--------|-------|--------|-------|--------|
-| packages/shared | 100.0% | 100.0% | 100.0% | GREEN |
-| lib/render | 100.0% | 93.8% | 100.0% | GREEN |
-| lib/verification | 100.0% | 100.0% | 100.0% | GREEN |
-| lib/crypto | 100.0% | 100.0% | 100.0% | GREEN |
-| lib/utils | 100.0% | 100.0% | 100.0% | GREEN |
-| lib/async | 100.0% | 100.0% | 100.0% | GREEN |
-| lib/dashboard | 100.0% | 86.8% | 100.0% | GREEN |
-| lib/analytics | 100.0% | 90.9% | 100.0% | GREEN |
-| lib/impact | 99.5% | 97.5% | 100.0% | GREEN |
-| app/api/auth | 98.6% | 94.5% | 88.5% | GREEN |
-| lib/history | 98.2% | 90.6% | 100.0% | GREEN |
-| lib/cache | 98.1% | 97.7% | 84.2% | GREEN |
-| lib/codeberg | 97.5% | 95.7% | 96.2% | GREEN |
-| lib/github | 97.1% | 90.2% | 95.7% | GREEN |
-| lib/other | 96.7% | 96.7% | 94.7% | GREEN |
-| app/api/other | 95.9% | 93.3% | 87.2% | GREEN |
-| app/api/admin | 95.4% | 91.4% | 89.2% | GREEN |
-| lib/auth | 95.1% | 90.1% | 100.0% | GREEN |
-| lib/insights | 94.9% | 87.0% | 100.0% | GREEN |
-| lib/email | 94.7% | 91.4% | 97.7% | GREEN |
-| components | 92.4% | 81.9% | 87.3% | GREEN |
-| lib/bitbucket | 93.1% | 76.3% | 96.3% | GREEN |
-| lib/db | 91.9% | 88.5% | 96.8% | GREEN |
-| lib/effects | 89.3% | 80.0% | 86.8% | YELLOW |
-| lib/hooks | 87.1% | 72.2% | 75.0% | YELLOW |
-| app/admin | 82.8% | 78.6% | 73.1% | YELLOW |
-| app/pages | 73.8% | 80.3% | 60.5% | RED |
-| app/experiments | 56.1% | 51.2% | 52.6% | RED |
+| `lib/impact` | 99.5% | 97.5% | 100.0% | GREEN |
+| `lib/render` | 100.0% | 93.8% | 100.0% | GREEN |
+| `lib/verification` | 100.0% | 100.0% | 100.0% | GREEN |
+| `packages/shared` | 100.0% | 100.0% | 100.0% | GREEN |
+| `lib/history` | 98.2% | 90.6% | 100.0% | GREEN |
+| `lib/cache` | 98.1% | 97.7% | 84.2% | GREEN |
+| `lib/codeberg` | 97.5% | 95.7% | 96.2% | GREEN |
+| `lib/github` | 97.1% | 90.2% | 95.7% | GREEN |
+| `app/api` | 96.4% | 92.9% | 88.2% | GREEN |
+| `lib/auth` | 95.2% | 90.7% | 100.0% | GREEN |
+| `lib/insights` | 94.9% | 87.0% | 100.0% | GREEN |
+| `lib/email` | 94.7% | 91.4% | 97.7% | GREEN |
+| `lib/bitbucket` | 93.1% | 76.3% | 96.3% | GREEN |
+| `components` | 92.5% | 81.9% | 87.6% | GREEN |
+| `lib/db` | 91.9% | 88.5% | 96.8% | GREEN |
+| `lib/effects` | 90.7% | 80.5% | 88.2% | GREEN |
+| `app/studio` | 86.8% | 82.5% | 84.7% | YELLOW |
+| `app/admin` | 83.0% | 78.6% | 73.7% | YELLOW |
+| `app/pages` | 68.1% | 83.3% | 44.0% | RED |
+| `app/experiments` | 56.1% | 51.2% | 52.6% | RED |
+| `other` | 97.1% | 93.3% | 95.5% | GREEN |
 
-## Delta vs Previous Report (2026-03-22)
+## Critical Path Files Below 90%
 
-| Metric | Previous | Current | Delta |
-|--------|----------|---------|-------|
-| Statements | 87.72% (6,853/7,812) | 88.55% (7,064/7,977) | **+0.83%** |
-| Branches | 82.45% | 84.02% | **+1.57%** |
-| Functions | 79.14% | 80.43% | **+1.29%** |
-| Lines | 88.96% | 89.81% | **+0.85%** |
-| Test files | 321 | 339 | **+18** |
-| Tests | 5,548 | 5,782 | **+234** |
+These are files in security/scoring/API/DB critical paths that need attention:
 
-Strong positive trend: 211 newly covered stmts vs 165 new total stmts.
+| File | Coverage | Stmts |
+|------|----------|-------|
+| `lib/db/user-platforms.ts` | 81.8% | 63/77 |
+| `app/api/admin/campaigns/[id]/test/route.ts` | 83.3% | 30/36 |
+| `app/api/cron/sync-audience/route.ts` | 84.6% | 44/52 |
+| `lib/db/campaigns.ts` | 89.0% | 146/164 |
 
 ## Gaps & Recommendations
 
-### Priority 1 — Files below 80% in production code (non-experimental)
+### Priority 1 — Server page components at 0% (quick wins, 1-3 stmts each)
+These are mostly thin server components with minimal logic, but should have basic render tests:
+- `app/page.tsx` (17 stmts) — landing page server component
+- `app/studio/page.tsx` (19 stmts) — studio page server component
+- `app/admin/page.tsx` (11 stmts) — admin page server component
+- `app/about/verification/page.tsx` (10 stmts) — verification about page
+- `app/about/scoring/page.tsx` (9 stmts) — scoring about page
+- `app/generating/[handle]/page.tsx` (6 stmts) — generating page
 
-| File | Coverage | Stmts | Notes |
-|------|----------|-------|-------|
-| `app/admin/AdminDashboardClient.tsx` | 71.0% | 22/31 | Client interaction, render tests exist but need branch coverage |
-| `app/admin/campaigns/campaigns-dashboard.tsx` | 74.6% | 132/177 | Complex campaign UI, needs error/edge-case paths |
-| `lib/effects/interactions/HolographicOverlay.tsx` | 47.1% | 8/17 | DOM API gaps in JSDOM — hard to test canvas/animation |
-| `lib/effects/counters/use-animated-counter.ts` | 79.5% | 35/44 | Hook timing edge cases |
-| `app/page.tsx` (landing) | 0.0% | 0/17 | Server component — needs render test |
-| `app/about/scoring/page.tsx` | 0.0% | 0/9 | Server component — needs render test |
-| `app/about/verification/page.tsx` | 0.0% | 0/10 | Server component — needs render test |
-| `app/cli/authorize/AuthorizeClient.tsx` | 0.0% | 0/9 | Client component — needs render test |
-| `app/generating/[handle]/page.tsx` | 0.0% | 0/6 | Server component — needs render test |
-| `app/studio/page.tsx` | 0.0% | 0/19 | Server component — needs render test |
-| `app/admin/page.tsx` | 0.0% | 0/11 | Server component — needs render test |
+### Priority 2 — Admin components below 80%
+- `app/admin/AdminDashboardClient.tsx` — 71.0% (22/31 stmts). Needs error-path and edge-case branch tests.
+- `app/admin/campaigns/campaigns-dashboard.tsx` — 75.1% (133/177 stmts). Needs error-path tests for campaign operations.
 
-### Priority 2 — Experimental pages (feature-flagged, lower urgency)
+### Priority 3 — Experiment pages (low priority, feature-flagged)
+- `app/experiments/hexmap/page.tsx` — 0% (132 stmts). Canvas-heavy, V8 instrumentation issues. Accepted limitation.
+- `app/experiments/holographic/page.tsx` — 45.7% (16/35 stmts). DOM API gaps in JSDOM.
+- `app/experiments/confetti/page.tsx` — 47.5% (19/40 stmts). Animation-heavy.
+- `app/experiments/3d-tilt/page.tsx` — 55.6% (10/18 stmts).
+- `app/experiments/metallic-shimmer/page.tsx` — 60.0% (18/30 stmts).
+- `app/experiments/number-counters/page.tsx` — 61.7% (74/120 stmts).
+- `app/experiments/tier-visuals/page.tsx` — 65.9% (58/88 stmts).
+- `app/experiments/heatmap-wave/page.tsx` — 72.4% (21/29 stmts).
+- `app/experiments/particles/page.tsx` — 76.6% (118/154 stmts).
+- `app/experiments/glassmorphism/page.tsx` — 79.5% (31/39 stmts).
 
-| File | Coverage | Stmts | Notes |
-|------|----------|-------|-------|
-| `app/experiments/hexmap/page.tsx` | 0.0% | 0/132 | Canvas-heavy, V8 instrumentation issues |
-| `app/experiments/holographic/page.tsx` | 45.7% | 16/35 | DOM interactions |
-| `app/experiments/confetti/page.tsx` | 47.5% | 19/40 | Animation/canvas |
-| `app/experiments/3d-tilt/page.tsx` | 55.6% | 10/18 | DOM interactions |
-| `app/experiments/metallic-shimmer/page.tsx` | 60.0% | 18/30 | CSS animation |
-| `app/experiments/number-counters/page.tsx` | 61.7% | 74/120 | Complex counter logic |
-| `app/experiments/tier-visuals/page.tsx` | 65.9% | 58/88 | Visual components |
-| `app/experiments/heatmap-wave/page.tsx` | 72.4% | 21/29 | Animation |
-| `app/experiments/particles/page.tsx` | 76.6% | 118/154 | Canvas/WebGL |
-| `app/experiments/glassmorphism/page.tsx` | 79.5% | 31/39 | CSS effects |
+### Priority 4 — Effects interaction layer
+- `lib/effects/interactions/HolographicOverlay.tsx` — 47.1% (8/17 stmts). JSDOM lacks full DOM API for overlay calculations. Accepted limitation.
 
-### Priority 3 — Untested files (no .test.ts at all)
-
-| File | Notes |
-|------|-------|
-| `components/ThemeProvider.tsx` | Thin wrapper — smoke test worthwhile |
-| `lib/test-helpers/fixtures.ts` | Test infrastructure — optional |
-| `lib/bitbucket/types.ts` | Type-only — no testable logic |
-| `lib/codeberg/types.ts` | Type-only — no testable logic |
-| `lib/history/types.ts` | Re-export — no testable logic |
-| `lib/verification/types.ts` | Type-only — no testable logic |
-| `packages/shared/src/index.ts` | Barrel file — no testable logic |
-| `packages/shared/src/platforms.ts` | Type-only — no testable logic |
-| `packages/shared/src/types.ts` | Types + constants — constants testable |
+### Not actionable (0% but trivial — 1-4 stmts, re-export wrappers)
+54 files at 0% are thin wrappers (error.tsx, loading.tsx, icon.tsx, archetype pages). These are 1-4 statement server components tested indirectly via their parent route tests. Adding direct coverage would be low value.
 
 ## Flaky Tests
 
-**None detected.** 3 consecutive runs all passed with identical results:
+**None detected.** All 3 consecutive runs produced identical results:
+- Run 1: 345 files, 5,723 tests, 0 failures (37.31s)
+- Run 2: 345 files, 5,723 tests, 0 failures (30.64s)
+- Run 3: 345 files, 5,723 tests, 0 failures (30.64s)
 
-| Run | Files | Tests | Result |
-|-----|-------|-------|--------|
-| 1 (with coverage) | 339 | 5,782 | All passed |
-| 2 | 339 | 5,782 | All passed |
-| 3 | 339 | 5,782 | All passed |
+## Test Suite Health
 
-Note: One transient failure was observed during a coverage configuration variant run (1 test failed when using non-default reporter flags). This did not reproduce in any of the 3 standard runs and is attributable to test isolation under different Vitest configurations, not a flaky test.
-
-## Recommendations Summary
-
-1. **Quick wins (0% coverage, small stmts):** Add render tests for 7 server/client page components (`app/page.tsx`, `about/scoring`, `about/verification`, `cli/authorize/AuthorizeClient`, `generating/[handle]/page`, `studio/page`, `admin/page`). These are 6-19 stmts each — simple smoke tests would close the gap.
-
-2. **Medium effort:** Improve `campaigns-dashboard.tsx` (74.6%) and `AdminDashboardClient.tsx` (71.0%) branch coverage with error-path and edge-case tests.
-
-3. **Hard to test (accepted):** `HolographicOverlay.tsx` (47.1%) and `hexmap/page.tsx` (0%) are canvas/DOM-heavy — JSDOM limitations make full coverage impractical. Smoke tests already exist for hexmap.
-
-4. **Experiments pages:** Feature-flagged and non-critical. V8 instrumentation issues artificially deflate some numbers. Low priority.
-
-5. **No action needed:** 7 of 9 untested files are pure type definitions or re-exports with no executable logic.
+| Metric | Value |
+|--------|-------|
+| Test files | 345 |
+| Total tests | 5,723 |
+| Pass rate | 100% |
+| Flaky tests | 0 |
+| Avg run time | ~33s |
+| Coverage provider | V8 |
+| Threshold: statements | 75% (actual: 88.69%, margin: +13.69%) |
+| Threshold: branches | 70% (actual: 84.19%, margin: +14.19%) |
+| Threshold: functions | 65% (actual: 80.64%, margin: +15.64%) |
+| Threshold: lines | 75% (actual: 89.96%, margin: +14.96%) |

@@ -50,19 +50,21 @@ The fields, pipe-delimited:
 
 **Why round dimensions?** Floating-point arithmetic across different environments can produce slightly different decimal values (e.g., `70.00000001` vs `70.0`). Rounding to integers makes the payload stable.
 
-### 2. HMAC-SHA256, truncated to 8 hex characters
+### 2. HMAC-SHA256, truncated to 32 hex characters
 
 ```typescript
-createHmac("sha256", secret).update(payload).digest("hex").slice(0, 8)
+createHmac("sha256", secret).update(payload).digest("hex").slice(0, 32)
 ```
 
 We use **HMAC-SHA256** with a server-side secret (`CHAPA_VERIFICATION_SECRET`). This is a keyed hash — you can't reproduce it without knowing the secret, so forging a valid hash for a modified badge is computationally infeasible.
 
-We then truncate the output to **8 hex characters** (32 bits).
+We then truncate the output to **32 hex characters** (128 bits). This gives birthday-attack resistance of 2^64 — computationally infeasible for any attacker.
 
-**Why truncate?** The hash appears visually on the badge. `a1b2c3d4` is readable. `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2` is not. This is a verification seal, not a cryptographic certificate. 32 bits gives us ~4 billion possible values — more than enough collision resistance for our use case (thousands of badges, not billions of transactions).
+**Why truncate at all?** The hash appears visually on the badge. 32 hex chars is compact enough for a seal while providing strong collision resistance. The full 64-character SHA-256 output would be excessive for a visual watermark.
 
 **Why HMAC instead of plain SHA-256?** A plain hash of the payload would be reproducible by anyone who knows the payload format. HMAC requires a secret key, so only our server can generate valid hashes. An attacker can see the payload (it's the data on the badge) but can't produce a matching hash without the secret.
+
+**Backward compatibility:** The verification API accepts hashes in 8-char (legacy v1), 16-char (legacy v2), and 32-char (current) formats. Old badges with shorter hashes still verify correctly.
 
 ### 3. Storage in Redis
 
@@ -103,7 +105,7 @@ The `VerificationRecord` contains the full snapshot of what the badge displayed:
 The hash appears on the badge itself as a vertical coral-colored strip on the right edge:
 
 ```
-VERIFIED · a1b2c3d4 · 2025-06-15
+VERIFIED · a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6 · 2025-06-15
 ```
 
 Rendered rotated 90 degrees (bottom-to-top), at 50% opacity, in JetBrains Mono at 11px. Subtle — visible if you look, invisible if you don't.
@@ -130,7 +132,7 @@ Returns the stored record if found:
 
 Rate-limited to 30 requests per IP per 60 seconds. CORS-open so third-party sites can verify badges they're displaying.
 
-**Hash format validation**: Only accepts `^[0-9a-f]{8}$`. Anything else gets a 400 before we touch Redis.
+**Hash format validation**: Accepts `^[0-9a-f]{8}$`, `^[0-9a-f]{16}$`, or `^[0-9a-f]{32}$` (legacy 8-char, legacy 16-char, and current 32-char formats). Anything else gets a 400 before we touch Redis.
 
 ## What this doesn't do
 
@@ -145,7 +147,7 @@ Rate-limited to 30 requests per IP per 60 seconds. CORS-open so third-party site
 | Editing SVG to change score | Hash won't match. Verification API returns `not_found`. |
 | Forging a hash for a fake badge | Requires `CHAPA_VERIFICATION_SECRET`. HMAC is computationally infeasible to brute-force. |
 | Replaying an old badge hash | Hash is date-scoped. Old hashes still verify (for 30 days) but the date is visible on the strip. |
-| Brute-forcing the verification API | Rate-limited to 30 req/IP/min. 8 hex chars = 4B possibilities. |
+| Brute-forcing the verification API | Rate-limited to 30 req/IP/min. 32 hex chars = 2^128 possibilities. |
 | Redis unavailable | Fail-open. Badge renders without verification. No data loss. |
 
 ## File map

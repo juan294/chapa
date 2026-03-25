@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import PostHogProvider from "@/components/PostHogProvider";
+import { ClientAnalytics } from "@/components/ClientAnalytics";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { getBaseUrl } from "@/lib/env";
@@ -128,8 +127,7 @@ export default function RootLayout({
             {children}
           </PostHogProvider>
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
+        <ClientAnalytics />
       </body>
     </html>
   );

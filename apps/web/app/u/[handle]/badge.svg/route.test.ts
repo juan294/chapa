@@ -99,8 +99,8 @@ vi.mock("@/lib/impact/utils", () => ({
   }),
 }));
 
-vi.mock("@/lib/db/tool-insights", () => ({
-  dbGetToolInsights: vi.fn(() => Promise.resolve(null)),
+vi.mock("@/lib/cache/craft-cache", () => ({
+  getCachedCraftScore: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -247,8 +247,8 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
 
     it("passes craft score to computeImpactV4 when tool insights exist", async () => {
-      const { dbGetToolInsights } = await import("@/lib/db/tool-insights");
-      vi.mocked(dbGetToolInsights).mockResolvedValue({
+      const { getCachedCraftScore } = await import("@/lib/cache/craft-cache");
+      vi.mocked(getCachedCraftScore).mockResolvedValue({
         tool: "claude-code",
         dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
         craftScore: 75,
@@ -532,9 +532,9 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
     });
 
-    it("renders badge when dbGetToolInsights throws (allSettled resilience)", async () => {
-      const { dbGetToolInsights } = await import("@/lib/db/tool-insights");
-      vi.mocked(dbGetToolInsights).mockRejectedValue(new Error("Supabase error"));
+    it("renders badge when getCachedCraftScore throws (allSettled resilience)", async () => {
+      const { getCachedCraftScore } = await import("@/lib/cache/craft-cache");
+      vi.mocked(getCachedCraftScore).mockRejectedValue(new Error("Cache error"));
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.status).toBe(200);

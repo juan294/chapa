@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse, after } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit, cacheDel } from "@/lib/cache/redis";
 import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
+import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isInsightsEnabled } from "@/lib/feature-flags";
 import { isValidInsightsUpload } from "@/lib/insights/validation";
 import { computeCraftScore } from "@/lib/insights/scoring";
@@ -59,12 +60,14 @@ export async function POST(request: NextRequest): Promise<Response> {
   // Store in database (synchronous — response needs the stored result)
   const stored = await dbUpsertToolInsights(auth.handle, data, scores);
 
-  // Defer cache invalidation to post-response (non-blocking)
+  // Defer cache updates to post-response (non-blocking)
+  const freshCraft = stored ?? scores;
   after(async () => {
     const handle = auth.handle.toLowerCase();
     await Promise.allSettled([
       cacheDel(`stats:v2:merged:${handle}`),
       invalidateSnapshotCache(handle),
+      updateCraftCache(handle, freshCraft),
     ]);
   });
 
