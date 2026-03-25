@@ -182,6 +182,18 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
 - Always confirm the target branch before pushing — if the goal is production deployment, ensure the PR targets `main`.
 
+<important if="you are merging PRs, merging branches to main, deploying, or handling dependency updates">
+### Deployment Safety
+
+- **Merging to `main` IS deploying to production.** Every merge triggers a production deployment. No exceptions.
+- **Dependabot PRs target `main` by default.** Never merge them directly. Cherry-pick to `develop`, close the PR, release normally.
+- **Every CI run and deployment costs money.** Before starting: estimate how many runs/deploys this will trigger. If more than 2-3, batch the work.
+- **Framework upgrades (Next.js, React, etc.) require preview deployment verification.** CI passing is NOT sufficient. Deploy to a preview URL and verify before merging to production.
+- **When production is down:** Roll back immediately. Investigate on non-production. Fix forward on `develop`. Never deploy to diagnose. Never promote broken deployments "briefly."
+- **Batch dependency updates** into a single branch and PR. Never merge N PRs one-by-one (causes O(n^2) CI waste from rebase cascades).
+- **Justify every external action** — before any CI run, deployment, or API call: Is this needed? Is this justified? Is this verifiable? If any answer is "no," stop.
+</important>
+
 ## Language & Tone
 - All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
 - For social media copy: keep tone confident and positive — avoid pitying, resentful, or overly dramatic language. Never mention unreleased/unpublished features.
