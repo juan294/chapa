@@ -194,6 +194,43 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - **Justify every external action** — before any CI run, deployment, or API call: Is this needed? Is this justified? Is this verifiable? If any answer is "no," stop.
 </important>
 
+<important if="you are writing Supabase migrations or creating tables in Supabase">
+### Supabase Migration Rules
+
+- **Every migration that creates a public-facing table must include explicit grants:**
+  ```sql
+  GRANT SELECT ON table_name TO anon, authenticated;
+  ```
+- **Add `ALTER DEFAULT PRIVILEGES` in the initial setup migration** so all future tables automatically get anon SELECT. Never rely on Supabase dashboard-granted defaults for migration-created tables.
+- **Fallback data paths must log at ERROR level.** If a query fails and the code falls back to default/placeholder data, log `[TABLE_FALLBACK]` at ERROR — not INFO. Silent fallbacks hide permission bugs for days.
+- **Health endpoints must check actual data access**, not just connectivity. Return `"degraded"` if primary tables are inaccessible.
+</important>
+
+<important if="you are creating or modifying Supabase database migrations">
+### Supabase Migration Safety
+
+Always test migrations locally before pushing to the remote project.
+
+```bash
+# 1. Ensure local Supabase is running (requires Docker Desktop)
+supabase start
+
+# 2. Apply all migrations to the local Postgres instance
+supabase db reset
+
+# 3. Verify the migration worked (query the local database)
+docker exec supabase_db_<project> psql -U postgres -c "<verification query>"
+
+# 4. Only after local verification succeeds, push to remote
+supabase db push
+```
+
+- The local instance is a full Postgres with RLS, extensions, and auth — treat it as your UAT environment.
+- If `supabase start` fails, check that Docker Desktop is running.
+- The container name follows the pattern `supabase_db_<project>` where `<project>` is the Supabase project name from `supabase/config.toml`.
+- Never push a migration to remote without testing it locally first.
+</important>
+
 ## Language & Tone
 - All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
 - For social media copy: keep tone confident and positive — avoid pitying, resentful, or overly dramatic language. Never mention unreleased/unpublished features.
