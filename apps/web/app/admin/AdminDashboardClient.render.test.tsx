@@ -360,5 +360,156 @@ describe("AdminDashboardClient", () => {
       render(<AdminDashboardClient />);
       expect(screen.queryByTestId("admin-user-table")).toBeNull();
     });
+
+    it("renders dynamic AgentsDashboard component on agents tab", () => {
+      mockState = createMockState({ activeTab: "agents" });
+      render(<AdminDashboardClient />);
+      expect(screen.getByTestId("dynamic-loading-agents")).toBeDefined();
+    });
+
+    it("renders dynamic EngagementDashboard component on engagement tab", () => {
+      mockState = createMockState({ activeTab: "engagement" });
+      render(<AdminDashboardClient />);
+      expect(screen.getByTestId("dynamic-loading-engagement")).toBeDefined();
+    });
+
+    it("renders dynamic CampaignsDashboard component on campaigns tab", () => {
+      mockState = createMockState({ activeTab: "campaigns" });
+      render(<AdminDashboardClient />);
+      expect(screen.getByTestId("dynamic-loading-campaigns")).toBeDefined();
+    });
+  });
+
+  // ─── Additional branch coverage ─────────────────────────────────────
+
+  describe("additional branch coverage", () => {
+    it("does not show 'updated' text when lastRefreshed is null", () => {
+      mockState = createMockState({ total: 5, lastRefreshed: null });
+      render(<AdminDashboardClient />);
+      expect(screen.queryByText(/updated/)).toBeNull();
+      expect(screen.queryByText(/formatted:/)).toBeNull();
+    });
+
+    it("shows 0 developers with plural form", () => {
+      mockState = createMockState({ total: 0 });
+      render(<AdminDashboardClient />);
+      expect(screen.getByText("0 developers", { exact: false })).toBeDefined();
+    });
+
+    it("loading with agents tab skips loading state and shows agents panel", () => {
+      mockState = createMockState({ loading: true, activeTab: "agents" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryByTestId("admin-table-skeleton")).toBeNull();
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.getAttribute("id")).toBe("tabpanel-agents");
+    });
+
+    it("loading with engagement tab skips loading state and shows engagement panel", () => {
+      mockState = createMockState({ loading: true, activeTab: "engagement" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryByTestId("admin-table-skeleton")).toBeNull();
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.getAttribute("id")).toBe("tabpanel-engagement");
+    });
+
+    it("loading with campaigns tab skips loading state and shows campaigns panel", () => {
+      mockState = createMockState({ loading: true, activeTab: "campaigns" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryByTestId("admin-table-skeleton")).toBeNull();
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.getAttribute("id")).toBe("tabpanel-campaigns");
+    });
+
+    it("error with engagement tab skips error state and shows engagement panel", () => {
+      mockState = createMockState({ error: "fail", activeTab: "engagement" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryByText("fail")).toBeNull();
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.getAttribute("id")).toBe("tabpanel-engagement");
+    });
+
+    it("error with campaigns tab skips error state and shows campaigns panel", () => {
+      mockState = createMockState({ error: "fail", activeTab: "campaigns" });
+      render(<AdminDashboardClient />);
+      expect(screen.queryByText("fail")).toBeNull();
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.getAttribute("id")).toBe("tabpanel-campaigns");
+    });
+
+    it("refresh icon has animate-spin class when refreshing", () => {
+      mockState = createMockState({ refreshing: true });
+      render(<AdminDashboardClient />);
+      const button = screen.getByLabelText("Refresh data");
+      const svg = button.querySelector("svg");
+      expect(svg).not.toBeNull();
+      expect(svg!.className.baseVal || svg!.getAttribute("class")).toContain("animate-spin");
+    });
+
+    it("refresh icon does not have animate-spin class when not refreshing", () => {
+      mockState = createMockState({ refreshing: false });
+      render(<AdminDashboardClient />);
+      const button = screen.getByLabelText("Refresh data");
+      const svg = button.querySelector("svg");
+      expect(svg).not.toBeNull();
+      expect(svg!.className.baseVal || svg!.getAttribute("class")).not.toContain("animate-spin");
+    });
+
+    it("shows pagination range text 'Showing X-Y of Z'", () => {
+      mockState = createMockState({ totalPages: 3, page: 2, total: 75, limit: 25 });
+      render(<AdminDashboardClient />);
+      // Page 2 with limit 25: showing 26–50 of 75
+      expect(screen.getByText(/Showing 26/)).toBeDefined();
+      expect(screen.getByText(/of 75/)).toBeDefined();
+    });
+
+    it("shows correct range on last page when total is not a multiple of limit", () => {
+      mockState = createMockState({ totalPages: 3, page: 3, total: 65, limit: 25 });
+      render(<AdminDashboardClient />);
+      // Page 3 with limit 25: showing 51–65 of 65
+      expect(screen.getByText(/Showing 51/)).toBeDefined();
+      expect(screen.getByText(/of 65/)).toBeDefined();
+    });
+
+    it("active tab button has amber border class", () => {
+      mockState = createMockState({ activeTab: "users" });
+      render(<AdminDashboardClient />);
+      const usersTab = screen.getByRole("tab", { name: "Users" });
+      expect(usersTab.className).toContain("border-amber");
+      expect(usersTab.className).toContain("text-amber");
+    });
+
+    it("inactive tab button has transparent border class", () => {
+      mockState = createMockState({ activeTab: "users" });
+      render(<AdminDashboardClient />);
+      const agentsTab = screen.getByRole("tab", { name: "Agents" });
+      expect(agentsTab.className).toContain("border-transparent");
+      expect(agentsTab.className).toContain("text-text-secondary");
+    });
+
+    it("calls setActiveTab('engagement') when Engagement tab is clicked", () => {
+      render(<AdminDashboardClient />);
+      fireEvent.click(screen.getByRole("tab", { name: "Engagement" }));
+      expect(mockState.setActiveTab).toHaveBeenCalledWith("engagement");
+    });
+
+    it("calls setActiveTab('campaigns') when Campaigns tab is clicked", () => {
+      render(<AdminDashboardClient />);
+      fireEvent.click(screen.getByRole("tab", { name: "Campaigns" }));
+      expect(mockState.setActiveTab).toHaveBeenCalledWith("campaigns");
+    });
+
+    it("calls setActiveTab('users') when Users tab is clicked", () => {
+      mockState = createMockState({ activeTab: "agents" });
+      render(<AdminDashboardClient />);
+      fireEvent.click(screen.getByRole("tab", { name: "Users" }));
+      expect(mockState.setActiveTab).toHaveBeenCalledWith("users");
+    });
+
+    it("refresh button is not disabled when not refreshing", () => {
+      mockState = createMockState({ refreshing: false });
+      render(<AdminDashboardClient />);
+      const button = screen.getByLabelText("Refresh data");
+      expect(button.hasAttribute("disabled")).toBe(false);
+    });
   });
 });

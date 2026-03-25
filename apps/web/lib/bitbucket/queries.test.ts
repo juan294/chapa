@@ -409,4 +409,323 @@ describe("fetchBitbucketContributionData", () => {
     expect(result).not.toBeNull();
     expect(result!.closedIssues).toBe(0);
   });
+
+  // --- Branch coverage: fetchUserReviewActivity (lines 291-309) ---
+
+  it("collects approval activities by user on PRs authored by others", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        return {
+          status: 200,
+          json: async () => paginated([makeWorkspace("ws")]),
+        };
+      }
+      if (
+        url.includes("/repositories/ws") &&
+        !url.includes("/commits") &&
+        !url.includes("/pullrequests") &&
+        !url.includes("/forks") &&
+        !url.includes("/issues") &&
+        !url.includes("/diffstat") &&
+        !url.includes("/activity")
+      ) {
+        return {
+          status: 200,
+          json: async () => paginated([makeRepo("ws", "repo1", "other-user")]),
+        };
+      }
+      if (url.includes("/commits")) {
+        return { status: 200, json: async () => paginated([]) };
+      }
+      // Merged PRs for review counting — PR authored by "other-user"
+      if (url.includes("/pullrequests") && !url.includes("/diffstat") && !url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () => paginated([makePR(10, "other-user")]),
+        };
+      }
+      // Activity for PR#10 — bbuser approved it
+      if (url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () =>
+            paginated([
+              {
+                approval: {
+                  user: { username: "bbuser" },
+                  date: "2025-06-01",
+                },
+              },
+              // Activity by someone else — should be filtered out
+              {
+                approval: {
+                  user: { username: "someone-else" },
+                  date: "2025-06-01",
+                },
+              },
+            ]),
+        };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData(
+      "bbuser",
+      "token",
+      { displayName: "BB User", avatarUrl: "https://bb.org/avatar.png" },
+    );
+
+    expect(result).not.toBeNull();
+    // Only the approval by bbuser should be collected
+    expect(result!.reviewActivities).toHaveLength(1);
+    expect(result!.reviewActivities[0]!.approval?.user.username).toBe("bbuser");
+  });
+
+  it("collects changes_requested activities by user on PRs authored by others", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        return {
+          status: 200,
+          json: async () => paginated([makeWorkspace("ws")]),
+        };
+      }
+      if (
+        url.includes("/repositories/ws") &&
+        !url.includes("/commits") &&
+        !url.includes("/pullrequests") &&
+        !url.includes("/forks") &&
+        !url.includes("/issues") &&
+        !url.includes("/diffstat") &&
+        !url.includes("/activity")
+      ) {
+        return {
+          status: 200,
+          json: async () => paginated([makeRepo("ws", "repo1", "other-user")]),
+        };
+      }
+      if (url.includes("/commits")) {
+        return { status: 200, json: async () => paginated([]) };
+      }
+      // PR authored by "other-user"
+      if (url.includes("/pullrequests") && !url.includes("/diffstat") && !url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () => paginated([makePR(20, "other-user")]),
+        };
+      }
+      // Activity for PR#20 — bbuser requested changes
+      if (url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () =>
+            paginated([
+              {
+                changes_requested: {
+                  user: { username: "bbuser" },
+                  date: "2025-06-02",
+                },
+              },
+            ]),
+        };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData(
+      "bbuser",
+      "token",
+      { displayName: "BB User", avatarUrl: "https://bb.org/avatar.png" },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.reviewActivities).toHaveLength(1);
+    expect(result!.reviewActivities[0]!.changes_requested?.user.username).toBe("bbuser");
+  });
+
+  it("skips self-review: does not fetch activity for PRs authored by user", async () => {
+    let activityFetchCount = 0;
+
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        return {
+          status: 200,
+          json: async () => paginated([makeWorkspace("ws")]),
+        };
+      }
+      if (
+        url.includes("/repositories/ws") &&
+        !url.includes("/commits") &&
+        !url.includes("/pullrequests") &&
+        !url.includes("/forks") &&
+        !url.includes("/issues") &&
+        !url.includes("/diffstat") &&
+        !url.includes("/activity")
+      ) {
+        return {
+          status: 200,
+          json: async () => paginated([makeRepo("ws", "repo1", "other-user")]),
+        };
+      }
+      if (url.includes("/commits")) {
+        return { status: 200, json: async () => paginated([]) };
+      }
+      // Two merged PRs: one by "bbuser" (self), one by "other-user"
+      if (url.includes("/pullrequests") && !url.includes("/diffstat") && !url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () =>
+            paginated([
+              makePR(30, "bbuser"),       // self-authored — should be skipped
+              makePR(31, "other-user"),    // by someone else — should be processed
+            ]),
+        };
+      }
+      if (url.includes("/activity")) {
+        activityFetchCount++;
+        return {
+          status: 200,
+          json: async () =>
+            paginated([
+              {
+                approval: {
+                  user: { username: "bbuser" },
+                  date: "2025-06-01",
+                },
+              },
+            ]),
+        };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData(
+      "bbuser",
+      "token",
+      { displayName: "BB User", avatarUrl: "https://bb.org/avatar.png" },
+    );
+
+    expect(result).not.toBeNull();
+    // Activity should only be fetched for the non-self PR (PR#31)
+    expect(activityFetchCount).toBe(1);
+    expect(result!.reviewActivities).toHaveLength(1);
+  });
+
+  it("handles activity entries with neither approval nor changes_requested", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        return {
+          status: 200,
+          json: async () => paginated([makeWorkspace("ws")]),
+        };
+      }
+      if (
+        url.includes("/repositories/ws") &&
+        !url.includes("/commits") &&
+        !url.includes("/pullrequests") &&
+        !url.includes("/forks") &&
+        !url.includes("/issues") &&
+        !url.includes("/diffstat") &&
+        !url.includes("/activity")
+      ) {
+        return {
+          status: 200,
+          json: async () => paginated([makeRepo("ws", "repo1", "other-user")]),
+        };
+      }
+      if (url.includes("/commits")) {
+        return { status: 200, json: async () => paginated([]) };
+      }
+      if (url.includes("/pullrequests") && !url.includes("/diffstat") && !url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () => paginated([makePR(40, "other-user")]),
+        };
+      }
+      // Activity has only a comment (no approval, no changes_requested)
+      if (url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () =>
+            paginated([
+              {
+                comment: {
+                  user: { username: "bbuser" },
+                  content: { raw: "Looks good!" },
+                },
+              },
+            ]),
+        };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData(
+      "bbuser",
+      "token",
+      { displayName: "BB User", avatarUrl: "https://bb.org/avatar.png" },
+    );
+
+    expect(result).not.toBeNull();
+    // Comment-only activities are not counted as review activities
+    expect(result!.reviewActivities).toHaveLength(0);
+  });
+
+  it("handles changes_requested by a different user (not collected)", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        return {
+          status: 200,
+          json: async () => paginated([makeWorkspace("ws")]),
+        };
+      }
+      if (
+        url.includes("/repositories/ws") &&
+        !url.includes("/commits") &&
+        !url.includes("/pullrequests") &&
+        !url.includes("/forks") &&
+        !url.includes("/issues") &&
+        !url.includes("/diffstat") &&
+        !url.includes("/activity")
+      ) {
+        return {
+          status: 200,
+          json: async () => paginated([makeRepo("ws", "repo1", "other-user")]),
+        };
+      }
+      if (url.includes("/commits")) {
+        return { status: 200, json: async () => paginated([]) };
+      }
+      if (url.includes("/pullrequests") && !url.includes("/diffstat") && !url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () => paginated([makePR(50, "other-user")]),
+        };
+      }
+      // changes_requested by someone else — should NOT be collected for bbuser
+      if (url.includes("/activity")) {
+        return {
+          status: 200,
+          json: async () =>
+            paginated([
+              {
+                changes_requested: {
+                  user: { username: "someone-else" },
+                  date: "2025-06-03",
+                },
+              },
+            ]),
+        };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData(
+      "bbuser",
+      "token",
+      { displayName: "BB User", avatarUrl: "https://bb.org/avatar.png" },
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.reviewActivities).toHaveLength(0);
+  });
 });
