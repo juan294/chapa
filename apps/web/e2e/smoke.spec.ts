@@ -3,8 +3,9 @@ import { test, expect } from "@playwright/test";
 test.describe("Smoke tests — core routes", () => {
   test("landing page loads", async ({ page }) => {
     await page.goto("/");
-    // The landing page should render meaningful content
-    await expect(page.locator("#main-content")).toBeVisible();
+    // Use .first() because loading.tsx and page.tsx both have id="main-content"
+    // and may briefly coexist in the DOM during hydration
+    await expect(page.locator("#main-content").first()).toBeVisible();
   });
 
   test("health API returns JSON with status field", async ({ request }) => {
