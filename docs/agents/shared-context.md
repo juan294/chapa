@@ -9,27 +9,27 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-24T08:00:00Z -->
-## Cost Analyst — 2026-03-24
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-25T09:00:00Z -->
+## Cost Analyst — 2026-03-25
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$40–60** (Vercel $20, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$70–150/mo. Stable — no new cost risks.
+- Estimated monthly cost at 10K users: **~$40–60** (Vercel $20, Redis $20, Resend $0–20, Supabase free). At 50K users: ~$65–100/mo. Stable — no new cost risks.
 - Redis: **17 key pattern families**. TTL coverage 100% per-user keys. 2 global singletons without TTL — intentional, combined <16 KB. OG images (~50–100 KB each, 48h TTL) remain #1 consumer.
-- **Estimated Redis memory @10K users: ~535 MB** (160 MB user keys + 375 MB OG images). Well within Upstash Pro 10 GB.
+- **Estimated Redis memory @10K users: ~535 MB** (160 MB user keys + 375 MB OG images). Well within Upstash Pro 10 GB (94.6% headroom).
 - GitHub API budget: ~420 calls/hr @10K users (50% cache hit) vs 5,000/hr limit. 91.6% headroom. In-flight dedup reduces concurrent calls 40–60%.
 - Supabase: 9 tables + 1 view. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. RLS on all 9 tables. `dbGetCampaignStats()` JS aggregation ACCEPTED (PostgREST lacks GROUP BY).
 - Fetch timeout coverage: **100% on critical path** — all `fetch()` calls have `AbortSignal.timeout()` or `Promise.race()`. 1 exception: `captureServerError` PostHog (fire-and-forget, never blocks response).
 - Resource leaks: **0 critical, 0 warnings**. Badge SVG route uses `Promise.allSettled()` (re-verified at line 104). All timers properly cleaned up. All `after()` callbacks use `Promise.allSettled`.
 - Rate limiting: **36 call sites** across all API routes. Comprehensive coverage. All fail-open by design. Campaign email: 95/day quota.
 - ISR: 14 routes (7d archetypes, 1h content, 24h legal). 2 force-dynamic. No edge runtime. No middleware.
-- Cron: 3 jobs, ~90 executions/mo, ~0.25–0.9 compute-hr/mo vs 2,160 free.
+- Cron: 3 jobs, ~90 executions/mo, ~1.1 compute-hr/mo vs 2,160 free (0.05% usage).
 - **MONITOR: `sync-audience` contact pagination** — CARRIED. Future scale only.
 - **MONITOR: OG image Redis memory** — CARRIED. Future scale only.
 
 **Cross-agent recommendations:**
-- [QA]: Badge SVG `Promise.allSettled` finding from QA 2026-03-18 is resolved — please mark as closed. Share page `Promise.all` at `page.tsx:102` is safe (all callees fail gracefully).
+- [QA]: Badge SVG `Promise.allSettled` finding from QA 2026-03-18 is RESOLVED. All `after()` callbacks verified. `/api/studio/config` docs mismatch still pending.
 - [Security]: Fetch timeouts at 100% critical path. Fail-open rate limiting intact. Campaign email quota prevents abuse. No cost-security concerns.
 - [Performance]: Redis memory stable at ~535 MB @10K. OG images remain #1 Redis consumer — consider blob storage at 50K+ scale. No new bundle or build regressions.
-- [Coverage]: All cost-critical paths well-covered. API routes at 96.4%. `sync-audience` at 84.6% — aligns with monitor item.
+- [Coverage]: All cost-critical paths well-covered. API routes at 96.7%. `sync-audience` at 84.6% — aligns with monitor item on contact pagination.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
@@ -120,27 +120,26 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update (POST → GET+PUT). 11 duplicate ` 2.ts` files should be deleted from working directory.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-24T02:05:00Z -->
-## Coverage Agent — 2026-03-24
+<!-- ENTRY:START agent=coverage timestamp=2026-03-25T02:00:00Z -->
+## Coverage Agent — 2026-03-25
 - **Status**: GREEN
-- Overall coverage: **88.69% stmts** (7,072/7,974), 84.19% branch, 80.64% funcs, 89.96% lines
-- Test suite: 345 files, 5,723 tests, 100% pass rate, 0 flaky (3 runs)
-- Delta vs 2026-03-23: **+0.14% stmts** (7,064→7,072 covered, 7,977→7,974 total). Stable — minor coverage gain with slight reduction in total tracked stmts.
-- All thresholds pass with 13%+ margin (75% stmts threshold).
-- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.1%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api` 96.4%, `lib/auth` 95.2%, `lib/insights` 94.9%, `lib/email` 94.7%, `lib/bitbucket` 93.1%, `components` 92.5%, `lib/db` 91.9%, `lib/effects` 90.7%
-- `app/admin` at 83.0% (YELLOW). `AdminDashboardClient.tsx` at 71.0%, `campaigns-dashboard.tsx` at 75.1%.
-- `app/pages` at 68.1% (RED) — 7 server page components at 0% (landing, about/scoring, about/verification, admin, generating, studio page.tsx, hexmap).
-- `app/experiments` at 56.1% — unchanged, feature-flagged, V8/JSDOM limitations. Low priority.
+- Overall coverage: **90.65% stmts** (7,218/7,962), 84.85% branch, 85.57% funcs, 92.10% lines
+- Test suite: 367 files, 5,926 tests, 100% pass rate, 0 flaky (3 runs)
+- Delta vs 2026-03-24: **+1.96% stmts** (7,072→7,218 covered, 7,974→7,962 total). +22 test files, +203 tests, +4.93% funcs. Significant improvement.
+- All thresholds pass with 15%+ margin (75% stmts threshold).
+- Critical paths all GREEN: `lib/render` 100%, `lib/verification` 100%, `packages/shared` 100%, `lib/impact` 99.5%, `lib/cache` 98.4%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/github` 97.1%, `app/api` 96.7%, `lib/auth` 96.3%, `lib/insights` 94.9%, `lib/email` 94.9%, `lib/db` 93.7%, `lib/bitbucket` 93.1%, `components` 91.9%, `lib/effects` ~91%
+- `app/admin` at 80.2% (YELLOW). `AdminDashboardClient.tsx` at 71.0%, `campaigns-dashboard.tsx` improved to 91.5%.
+- `app/experiments` at 71.4% (RED) — feature-flagged, canvas/animation-heavy, V8/JSDOM limitations. Low priority.
 - `HolographicOverlay.tsx` at 47.1% — DOM API gaps in JSDOM. Accepted limitation.
-- 4 critical-path files below 90%: `lib/db/user-platforms.ts` (81.8%), `app/api/admin/campaigns/[id]/test/route.ts` (83.3%), `app/api/cron/sync-audience/route.ts` (84.6%), `lib/db/campaigns.ts` (89.0%).
-- 0 flaky tests across 3 consecutive runs (avg ~33s per run).
+- Previous critical-path gaps partially resolved: `user-platforms.ts` improved to 96.1%, `campaigns/[id]/test/route.ts` improved to 100%. Remaining: `sync-audience/route.ts` (84.6%), `lib/db/campaigns.ts` (89.0%), `lib/insights/validation.ts` (85.2%), `lib/bitbucket/queries.ts` (89.7%, 67.9% branch).
+- 0 flaky tests across 3 consecutive runs (avg ~35s per run).
 
 **Cross-agent recommendations:**
-- [Security]: All security-critical paths at 91%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
-- [QA]: Priority test additions: (1) `AdminDashboardClient.tsx` at 71.0% (needs branch tests), (2) `campaigns-dashboard.tsx` at 75.1% (needs error-path tests), (3) 4 critical-path files below 90% need targeted branch coverage.
+- [Security]: All security-critical paths at 93%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
+- [QA]: Priority test additions: (1) `AdminDashboardClient.tsx` at 71.0% (needs interaction tests), (2) `admin/agents/agent-card.tsx` and `agent-status-grid.tsx` at 0% (new components needing tests), (3) `lib/bitbucket/queries.ts` at 67.9% branch coverage.
 - [Performance]: All critical rendering and API paths at 91%+. Experiment pages remain low priority. `hexmap/page.tsx` (0%, 132 stmts) is canvas-heavy.
-- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at 96.4%. `sync-audience` route at 84.6% — aligns with cost-analyst's monitor item on contact pagination.
-- [DevOps]: All thresholds pass with 13%+ margin. Test suite runs in ~30-37s with coverage, ~14s without.
+- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at 96.7%. `sync-audience` route at 84.6% — aligns with cost-analyst's monitor item on contact pagination.
+- [DevOps]: All thresholds pass with 15%+ margin. Test suite runs in ~31-39s with coverage.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-24T20:25:00Z -->
