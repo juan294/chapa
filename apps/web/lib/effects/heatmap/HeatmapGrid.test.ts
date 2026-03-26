@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import { createElement } from "react";
 import {
   getIntensityLevel,
@@ -370,6 +370,277 @@ describe("HeatmapGrid", () => {
       const cells = grid?.querySelectorAll("[aria-hidden='true']");
       expect(cells?.length).toBe(WEEKS * DAYS);
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* HEATMAP_GRID_CSS                                                    */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* getIntensityLabel (via tooltip content)                              */
+/* ------------------------------------------------------------------ */
+
+describe("getIntensityLabel (via tooltip)", () => {
+  it("shows 'No activity' for a cell with count 0", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("No activity");
+  });
+
+  it("shows 'Light activity' for intensity level 1", () => {
+    // All counts are 1, max is 10 → ratio 0.1 → level 1
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: i === 0 ? 1 : 0,
+    }));
+    // maxValue=10 so count=1 has ratio=0.1 → level 1
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", maxValue: 10 }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("Light activity");
+  });
+
+  it("shows 'Active day' for intensity level 2", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: i === 0 ? 5 : 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", maxValue: 10 }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("Active day");
+  });
+
+  it("shows 'High output' for intensity level 3", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: i === 0 ? 7 : 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", maxValue: 10 }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("High output");
+  });
+
+  it("shows 'Peak performance' for intensity level 4", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: i === 0 ? 10 : 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", maxValue: 10 }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("Peak performance");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Cell hover interactions                                             */
+/* ------------------------------------------------------------------ */
+
+describe("HeatmapGrid hover interactions", () => {
+  it("shows a tooltip on mouseenter", () => {
+    const data = makeDays(91, 5);
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip).not.toBeNull();
+  });
+
+  it("hides the tooltip on mouseleave", () => {
+    const data = makeDays(91, 5);
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    expect(container.querySelector('[role="tooltip"]')).not.toBeNull();
+    fireEvent.mouseLeave(cell);
+    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+  });
+
+  it("displays correct contribution count in tooltip", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: i === 0 ? 7 : 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("7 contributions");
+  });
+
+  it("displays singular 'contribution' for count of 1", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: i === 0 ? 1 : 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("1 contribution");
+    expect(tooltip?.textContent).not.toContain("1 contributions");
+  });
+
+  it("displays 'No contributions' for count of 0", () => {
+    const data: HeatmapDay[] = Array.from({ length: 91 }, (_, i) => ({
+      date: `2025-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      count: 0,
+    }));
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip?.textContent).toContain("No contributions");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Tooltip positioning with showLabels                                 */
+/* ------------------------------------------------------------------ */
+
+describe("HeatmapGrid tooltip positioning", () => {
+  it("applies DAY_LABEL_W offset when showLabels is true", () => {
+    const data = makeWeekAlignedDays(91, "2025-01-05");
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]') as HTMLElement;
+    expect(tooltip).not.toBeNull();
+    // DAY_LABEL_W is 32, so the left position includes that offset
+    const left = parseFloat(tooltip.style.left);
+    // With showLabels=true, left = tooltipPos.x + 32
+    // tooltipPos.x is 0 in jsdom (getBoundingClientRect returns zeros), so left = 32
+    expect(left).toBe(32);
+  });
+
+  it("does not apply DAY_LABEL_W offset when showLabels is false", () => {
+    const data = makeWeekAlignedDays(91, "2025-01-05");
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: false }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]') as HTMLElement;
+    expect(tooltip).not.toBeNull();
+    // Without showLabels, left = tooltipPos.x + 0 = 0
+    const left = parseFloat(tooltip.style.left);
+    expect(left).toBe(0);
+  });
+
+  it("applies different top offset when showLabels is true vs false", () => {
+    const data = makeWeekAlignedDays(91, "2025-01-05");
+    // With showLabels=true
+    const { container: c1 } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+    );
+    const grid1 = c1.querySelector('[role="img"]');
+    const cell1 = grid1?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell1);
+    const tooltip1 = c1.querySelector('[role="tooltip"]') as HTMLElement;
+    const top1 = parseFloat(tooltip1.style.top);
+
+    // With showLabels=false
+    const { container: c2 } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: false }),
+    );
+    const grid2 = c2.querySelector('[role="img"]');
+    const cell2 = grid2?.querySelector("[aria-hidden='true']") as HTMLElement;
+    fireEvent.mouseEnter(cell2);
+    const tooltip2 = c2.querySelector('[role="tooltip"]') as HTMLElement;
+    const top2 = parseFloat(tooltip2.style.top);
+
+    // showLabels=true adds +20 to top: top = 0 - 8 + 20 = 12
+    // showLabels=false: top = 0 - 8 + 0 = -8
+    expect(top1).toBe(12);
+    expect(top2).toBe(-8);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* hoveredIdx boundary safety                                          */
+/* ------------------------------------------------------------------ */
+
+describe("HeatmapGrid hoveredIdx boundary", () => {
+  it("does not show tooltip when hovering a cell beyond data length", () => {
+    // Only 10 days of data, but grid renders 91 cells. Last cells have no entry.
+    const data = makeDays(10, 5);
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cells = grid?.querySelectorAll("[aria-hidden='true']");
+    // Hover the last cell (index 90), which is beyond sliced.length (10)
+    const lastCell = cells?.[90] as HTMLElement;
+    fireEvent.mouseEnter(lastCell);
+    // hoveredDay should be null because idx >= sliced.length
+    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* gridRef null safety                                                  */
+/* ------------------------------------------------------------------ */
+
+describe("HeatmapGrid gridRef null safety", () => {
+  it("does not crash when gridRef.current is null during hover", () => {
+    const data = makeDays(91, 5);
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
+    );
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+    // Even if getBoundingClientRect returns zeros (jsdom default), tooltip should still render
+    fireEvent.mouseEnter(cell);
+    const tooltip = container.querySelector('[role="tooltip"]');
+    expect(tooltip).not.toBeNull();
   });
 });
 

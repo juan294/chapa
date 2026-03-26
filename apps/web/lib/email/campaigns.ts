@@ -6,6 +6,7 @@
  */
 
 import { getResend } from "./resend";
+import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import {
   buildAnnouncementHtml,
   buildAnnouncementText,
@@ -177,7 +178,11 @@ export async function processCampaignBatch(
   const sendIds = pending.map((s) => s.id);
 
   try {
-    const { error } = await resend.batch.send(emails);
+    const { error } = await withTimeout(
+      resend.batch.send(emails),
+      EMAIL_SEND_TIMEOUT_MS,
+      "processCampaignBatch",
+    );
 
     if (error) {
       await dbMarkSendsFailed(sendIds, error.message);

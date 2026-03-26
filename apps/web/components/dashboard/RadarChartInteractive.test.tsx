@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, fireEvent } from "@testing-library/react";
+import { render, cleanup, fireEvent, act } from "@testing-library/react";
 import type { DimensionScores } from "@chapa/shared";
 import { RadarChartInteractive } from "./RadarChartInteractive";
 
@@ -315,6 +315,217 @@ describe("RadarChartInteractive", () => {
       expect(dots[0]?.getAttribute("r")).toBe("5");
       expect(dots[2]?.getAttribute("r")).toBe("5");
       expect(dots[3]?.getAttribute("r")).toBe("5");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Animation with animated=true and inView=true
+  // -----------------------------------------------------------------------
+  describe("animation", () => {
+    it("starts with progress=0 when animated=true and advances via rAF", () => {
+      // useInView mock already returns true.
+      // When animated=true, progress starts at 0 so initial display values are 0.
+      // Mock rAF to collect callbacks without recursion issues.
+      let latestCallback: ((ts: number) => void) | null = null;
+      const origRAF = globalThis.requestAnimationFrame;
+      const origCAF = globalThis.cancelAnimationFrame;
+      globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
+        latestCallback = cb;
+        return 1;
+      };
+      globalThis.cancelAnimationFrame = vi.fn();
+
+      const { container } = render(
+        <RadarChartInteractive dimensions={mockDimensions} animated={true} />,
+      );
+
+      // Before any rAF fires, progress is 0 → all display values are 0 → data polygon at center
+      const dataPoly = container.querySelector("[data-testid='data-polygon']");
+      const pointsBefore = dataPoly!.getAttribute("points")!;
+      const pairsBefore = pointsBefore.trim().split(/\s+/).map((p) => p.split(",").map(Number));
+      // All points should be at center (140, 140) since progress=0
+      for (const pt of pairsBefore) {
+        expect(Math.abs(pt![0]! - 140)).toBeLessThan(2);
+        expect(Math.abs(pt![1]! - 140)).toBeLessThan(2);
+      }
+
+      // Drive rAF to completion inside act() so React flushes state updates.
+      // First call sets startTimeRef, second call with t > duration completes animation.
+      act(() => {
+        if (latestCallback) latestCallback(0);
+      });
+      act(() => {
+        if (latestCallback) latestCallback(2000);
+      });
+
+      // After animation completes, polygon points should reflect actual dimension scores
+      const pointsAfter = dataPoly!.getAttribute("points")!;
+      const pairsAfter = pointsAfter.trim().split(/\s+/).map((p) => p.split(",").map(Number));
+      // Delivery=85, angle=-PI/2 (top): vertex should be above center
+      const deliveryY = pairsAfter[0]![1]!;
+      expect(deliveryY).toBeLessThan(140); // above center
+
+      globalThis.requestAnimationFrame = origRAF;
+      globalThis.cancelAnimationFrame = origCAF;
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Vertex onBlur handler
+  // -----------------------------------------------------------------------
+  describe("vertex blur", () => {
+    it("clears active state and calls onDimensionHover(null) on blur", () => {
+      const hoverFn = vi.fn();
+      const { container } = renderChart({ onDimensionHover: hoverFn });
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+
+      // Focus to activate
+      fireEvent.focus(dots[0]!);
+      expect(hoverFn).toHaveBeenCalledWith("delivery");
+      hoverFn.mockClear();
+
+      // Blur to deactivate
+      fireEvent.blur(dots[0]!);
+      expect(hoverFn).toHaveBeenCalledWith(null);
+
+      // Verify the vertex dot returns to inactive radius (r=5)
+      expect(dots[0]?.getAttribute("r")).toBe("5");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Text anchor positioning
+  // -----------------------------------------------------------------------
+  describe("text anchor positioning", () => {
+    it('right-side axis (Quality, angle=0) has text-anchor="start"', () => {
+      const { container } = renderChart();
+      const labels = container.querySelectorAll("[data-testid='axis-label']");
+      // Quality is the second axis (index 1), angle=0 → cosA=1 > 0.3 → "start"
+      expect(labels[1]?.getAttribute("text-anchor")).toBe("start");
+    });
+
+    it('left-side axis (Breadth, angle=PI) has text-anchor="end"', () => {
+      const { container } = renderChart();
+      const labels = container.querySelectorAll("[data-testid='axis-label']");
+      // Breadth is the fourth axis (index 3), angle=PI → cosA=-1 < -0.3 → "end"
+      expect(labels[3]?.getAttribute("text-anchor")).toBe("end");
+    });
+
+    it('top axis (Delivery, angle=-PI/2) has text-anchor="middle"', () => {
+      const { container } = renderChart();
+      const labels = container.querySelectorAll("[data-testid='axis-label']");
+      // Delivery is the first axis (index 0), angle=-PI/2 → cosA≈0 → "middle"
+      expect(labels[0]?.getAttribute("text-anchor")).toBe("middle");
+    });
+
+    it('bottom axis (Consistency, angle=PI/2) has text-anchor="middle"', () => {
+      const { container } = renderChart();
+      const labels = container.querySelectorAll("[data-testid='axis-label']");
+      // Consistency is the third axis (index 2), angle=PI/2 → cosA≈0 → "middle"
+      expect(labels[2]?.getAttribute("text-anchor")).toBe("middle");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Non-Enter/Space keydown on vertex
+  // -----------------------------------------------------------------------
+  describe("non-activating keydown on vertex", () => {
+    it("Tab key on vertex dot does not trigger onDimensionClick", () => {
+      const clickFn = vi.fn();
+      const { container } = renderChart({ onDimensionClick: clickFn });
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+      fireEvent.keyDown(dots[0]!, { key: "Tab" });
+      expect(clickFn).not.toHaveBeenCalled();
+    });
+
+    it("Escape key on vertex dot does not trigger onDimensionClick", () => {
+      const clickFn = vi.fn();
+      const { container } = renderChart({ onDimensionClick: clickFn });
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+      fireEvent.keyDown(dots[1]!, { key: "Escape" });
+      expect(clickFn).not.toHaveBeenCalled();
+    });
+
+    it("letter key on vertex dot does not trigger onDimensionClick", () => {
+      const clickFn = vi.fn();
+      const { container } = renderChart({ onDimensionClick: clickFn });
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+      fireEvent.keyDown(dots[2]!, { key: "a" });
+      expect(clickFn).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // 5-dimension (pentagon) mode
+  // -----------------------------------------------------------------------
+  describe("pentagon mode (5 dimensions)", () => {
+    const pentagonDimensions: DimensionScores = {
+      delivery: 85,
+      quality: 72,
+      consistency: 91,
+      breadth: 68,
+      craft: 55,
+    };
+
+    it("renders 5 vertex dots when craft dimension is present", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+      expect(dots.length).toBe(5);
+    });
+
+    it("renders 5 guide pentagons instead of diamonds", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const guides = container.querySelectorAll("[data-testid='guide-diamond']");
+      expect(guides.length).toBe(4); // Still 4 ring levels
+      // Each guide polygon should have 5 points (pentagon)
+      for (const guide of guides) {
+        const points = guide.getAttribute("points")!;
+        const pairs = points.trim().split(/\s+/);
+        expect(pairs.length).toBe(5);
+      }
+    });
+
+    it("renders 5 axis lines", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const axisLines = container.querySelectorAll("[data-testid='axis-line']");
+      expect(axisLines.length).toBe(5);
+    });
+
+    it("renders 5 axis labels including Craft", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const labels = container.querySelectorAll("[data-testid='axis-label']");
+      expect(labels.length).toBe(5);
+      const svgText = container.querySelector("svg")!.textContent ?? "";
+      expect(svgText).toContain("Craft");
+      expect(svgText).toContain("55");
+    });
+
+    it("data polygon has 5 points in pentagon mode", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const dataPoly = container.querySelector("[data-testid='data-polygon']");
+      const points = dataPoly!.getAttribute("points")!;
+      const pairs = points.trim().split(/\s+/);
+      expect(pairs.length).toBe(5);
+    });
+
+    it("5th vertex dot uses craft dimension color", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const dots = container.querySelectorAll("[data-testid='vertex-dot']");
+      expect(dots[4]?.getAttribute("fill")).toBe("var(--color-dimension-craft)");
+    });
+
+    it("aria-label includes all 5 dimensions", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const svg = container.querySelector("svg");
+      expect(svg?.getAttribute("aria-label")).toBe(
+        "Radar chart showing Delivery 85, Quality 72, Consistency 91, Breadth 68, Craft 55",
+      );
+    });
+
+    it("renders 5 hit areas for hover interaction", () => {
+      const { container } = renderChart({ dimensions: pentagonDimensions });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      expect(hitAreas.length).toBe(5);
     });
   });
 });
