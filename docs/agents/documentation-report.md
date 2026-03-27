@@ -1,235 +1,214 @@
 # Documentation Report
-> Generated: 2026-03-20 | Health status: **yellow**
+> Generated: 2026-03-27 | Health status: yellow
 
 ## Executive Summary
-Documentation is mostly accurate (env vars 100%, design tokens 98%, docs all present) but route coverage remains low at ~65% — 20+ routes including the entire campaigns API, platform connect/disconnect/status endpoints, OG images, and LLM endpoints are undocumented. Two HTTP method mismatches and two phantom routes need correction.
 
----
+Documentation is **well-maintained** overall (84% JSDoc coverage, 30/30 env vars documented, all 6 required docs present), but **route documentation has 6 method mismatches** and **1 undocumented API route**. Design system tokens are 98%+ accurate. Previous audit's phantom routes (`bitbucket/login`, `codeberg/login`) have been fixed. Key action: correct method signatures in CLAUDE.md and add JSDoc to 11 complex undocumented functions.
 
 ## Route Documentation
 
-### Pages
+### Pages (34 total)
 
-| Route | Documented in CLAUDE.md | Actually Exists | Status |
-|-------|:-----------------------:|:---------------:|--------|
-| GET `/` | ✓ | ✓ | OK |
-| GET `/studio` | ✓ | ✓ | OK |
-| GET `/admin` | ✓ | ✓ | OK |
-| GET `/u/:handle` | ✓ | ✓ | OK |
-| GET `/u/:handle/badge.svg` | ✓ | ✓ | OK |
-| GET `/verify/:hash` | ✓ | ✓ | OK |
-| GET `/about` | ✓ | ✓ | OK |
-| GET `/about/scoring` | ✓ | ✓ | OK |
-| GET `/about/verification` | ✓ | ✓ | OK |
-| GET `/archetypes/:type` | ✓ | ✓ (builder, guardian, marathoner, polymath, balanced, emerging) | OK |
-| GET `/generating/:handle` | ✓ | ✓ | OK |
-| GET `/cli/authorize` | ✓ | ✓ | OK |
-| GET `/privacy` | ✓ | ✓ | OK |
-| GET `/terms` | ✓ | ✓ | OK |
-| GET `/coming-soon` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/experiments/*` (13 pages) | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/verify` (page) | ✗ | ✓ | **MISSING_DOCS** |
+All 34 page routes exist and match CLAUDE.md documentation. The 13 experiment pages are covered by the wildcard `/experiments/*` entry.
 
-### Auth API
+| Page Route | In CLAUDE.md | Status |
+|------------|-------------|--------|
+| `/` through `/verify/[hash]` (21 core pages) | Yes | OK |
+| `/experiments/*` (13 experiment pages) | Yes (wildcard) | OK |
+| `/archetypes/artificer` | Listed in archetype set | OK |
 
-| Route | Documented in CLAUDE.md | Actually Exists | Status |
-|-------|:-----------------------:|:---------------:|--------|
-| GET `/api/auth/login` | ✓ | ✓ | OK |
-| GET `/api/auth/callback` | ✓ | ✓ | OK |
-| GET `/api/auth/session` | ✓ | ✓ | OK |
-| POST `/api/auth/logout` | ✓ | ✓ | OK |
-| GET `/api/auth/bitbucket/login` | ✓ | ✗ | **PHANTOM** — route doesn't exist |
-| GET `/api/auth/bitbucket/callback` | ✓ | ✓ | OK |
-| GET `/api/auth/bitbucket/connect` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/api/auth/bitbucket/disconnect` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/api/auth/bitbucket/status` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/api/auth/codeberg/login` | ✓ | ✗ | **PHANTOM** — route doesn't exist |
-| GET `/api/auth/codeberg/callback` | ✓ | ✓ | OK |
-| GET `/api/auth/codeberg/connect` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/api/auth/codeberg/disconnect` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/api/auth/codeberg/status` | ✗ | ✓ | **MISSING_DOCS** |
+### API Routes (42 total)
 
-### Public API
+| Route | CLAUDE.md | Actual Methods | Status |
+|-------|-----------|---------------|--------|
+| `/api/auth/login` | GET | GET | OK |
+| `/api/auth/callback` | GET | GET | OK |
+| `/api/auth/session` | GET | GET | OK |
+| `/api/auth/logout` | POST | POST | OK |
+| `/api/auth/bitbucket/*` (4 routes) | All correct | All correct | OK |
+| `/api/auth/codeberg/*` (4 routes) | All correct | All correct | OK |
+| `/api/verify/[hash]` | GET | GET | OK |
+| `/api/profile/[handle]` | GET | GET | OK |
+| `/api/history/[handle]` | GET | GET | OK |
+| `/api/health` | GET | GET | OK |
+| `/api/feature-flags` | GET | GET | OK |
+| `/api/generate` | POST | POST | OK |
+| `/api/refresh` | POST | POST | OK |
+| `/api/recalculate` | POST | POST | OK |
+| `/api/supplemental` | POST | POST | OK |
+| `/api/insights/[handle]` | GET | GET | OK |
+| `/api/insights` | POST | POST | OK |
+| `/api/studio/config` | GET\|PUT | GET\|PUT | OK |
+| `/api/cli/auth/approve` | POST | POST | OK |
+| `/api/admin/users` | GET | GET | OK |
+| `/api/admin/stats` | GET | GET | OK |
+| `/api/admin/agents-summary` | GET | GET | OK |
+| `/api/admin/campaigns` | GET\|POST | GET\|POST | OK |
+| `/api/admin/campaigns/[id]` | GET\|PATCH\|DELETE | GET\|PATCH\|DELETE | OK |
+| `/api/admin/campaigns/[id]/preview` | GET | GET | OK |
+| `/api/admin/campaigns/[id]/send` | POST | POST | OK |
+| `/api/admin/campaigns/[id]/test` | POST | POST | OK |
+| `/api/webhooks/resend` | POST | POST | OK |
+| `/api/cron/warm-cache` | GET | GET | OK |
+| `/api/cron/sync-audience` | GET | GET | OK |
+| `/api/cron/process-campaigns` | GET | GET | OK |
+| `/u/[handle]/badge.svg` | GET | GET | OK |
+| `/u/[handle]/og-image` | GET | GET | OK |
+| `/og-image` | GET | GET | OK |
+| `/llms.txt` | GET | GET | OK |
+| `/llms-full.txt` | GET | GET | OK |
+| `/.well-known/security.txt` | GET | GET | OK |
+| **`/api/cli/auth/poll`** | **GET\|POST** | **GET only** | **MISMATCH** |
+| **`/api/admin/feature-flags`** | **GET\|PATCH** | **PATCH only** | **MISMATCH** |
+| **`/api/admin/engagement-flags`** | **GET\|PUT** | **GET only** | **MISMATCH** |
+| **`/api/admin/agents/run`** | **POST** | **POST\|GET\|DELETE** | **MISMATCH** |
+| **`/api/notifications/unsubscribe`** | **POST** | **GET** | **MISMATCH** |
+| **`/api/telemetry`** | **Not listed** | **POST** | **MISSING** |
 
-| Route | Documented in CLAUDE.md | Actually Exists | Status |
-|-------|:-----------------------:|:---------------:|--------|
-| GET `/api/verify/:hash` | ✓ | ✓ | OK |
-| GET `/api/history/:handle` | ✓ | ✓ | OK |
-| GET `/api/health` | ✓ | ✓ | OK |
-| GET `/api/feature-flags` | ✓ | ✓ | OK |
+### Summary
 
-### Authenticated API
-
-| Route | Documented in CLAUDE.md | Actually Exists | Status |
-|-------|:-----------------------:|:---------------:|--------|
-| POST `/api/supplemental` | ✓ | ✓ | OK |
-| GET\|PUT `/api/studio/config` | ✓ | ✓ | OK |
-| POST `/api/refresh` | ✓ | ✓ | OK |
-| POST `/api/generate` | ✓ | ✓ | OK |
-| POST `/api/recalculate` | ✓ | ✓ | OK |
-| GET `/api/insights/:handle` | ✓ | ✓ | OK |
-| POST `/api/insights` | ✓ | ✓ | OK |
-| GET\|POST `/api/cli/auth/poll` | ✓ | ✓ | OK |
-| POST `/api/cli/auth/approve` | ✓ | ✓ | OK |
-
-### Admin API
-
-| Route | Documented in CLAUDE.md | Actually Exists | Status |
-|-------|:-----------------------:|:---------------:|--------|
-| GET `/api/admin/users` | ✓ | ✓ | OK |
-| GET `/api/admin/stats` | ✓ | ✓ | OK |
-| POST `/api/admin/agents/run` | ✓ | ✓ | OK |
-| GET `/api/admin/agents-summary` | ✓ | ✓ | OK |
-| GET\|PUT `/api/admin/feature-flags` | ✓ | ✓ (GET\|PATCH) | **MISMATCH** — docs say PUT, code is PATCH |
-| GET\|PUT `/api/admin/engagement-flags` | ✓ | ✓ (GET only) | **MISMATCH** — docs say GET\|PUT, code has GET only |
-| POST `/api/notifications/unsubscribe` | ✓ | ✓ | OK |
-| GET\|POST `/api/admin/campaigns` | ✗ | ✓ | **MISSING_DOCS** |
-| GET\|PATCH\|DELETE `/api/admin/campaigns/:id` | ✗ | ✓ | **MISSING_DOCS** |
-| POST `/api/admin/campaigns/:id/preview` | ✗ | ✓ | **MISSING_DOCS** |
-| POST `/api/admin/campaigns/:id/send` | ✗ | ✓ | **MISSING_DOCS** |
-
-### Webhooks, Cron & Special
-
-| Route | Documented in CLAUDE.md | Actually Exists | Status |
-|-------|:-----------------------:|:---------------:|--------|
-| POST `/api/webhooks/resend` | ✓ | ✓ | OK |
-| GET `/api/cron/warm-cache` | ✓ | ✓ | OK |
-| POST `/api/telemetry` | ✓ | ✓ | OK |
-| GET `/api/cron/process-campaigns` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/api/cron/sync-audience` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/.well-known/security.txt` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/og-image` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/u/:handle/og-image` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/llms.txt` | ✗ | ✓ | **MISSING_DOCS** |
-| GET `/llms-full.txt` | ✗ | ✓ | **MISSING_DOCS** |
-
-### Route Summary
-- **Documented & exist**: 38 routes — OK
-- **Undocumented**: 20+ routes (campaigns API, platform connect/disconnect/status, crons, OG images, LLM endpoints, experiments, coming-soon)
-- **Phantom routes** (documented but don't exist): 2 (`/api/auth/bitbucket/login`, `/api/auth/codeberg/login`)
-- **Method mismatches**: 2 (`feature-flags` PUT→PATCH, `engagement-flags` missing PUT)
-
----
-
-## Design System Token Accuracy
-
-| Area | Documented | In CSS | Status |
-|------|:----------:|:------:|--------|
-| Color tokens | 50 | 51 | **98%** — `--color-complement` base token undocumented (light variant documented) |
-| Animation classes | 17 | 18 | **94%** — `animate-hex-cell-in` undocumented |
-| Hex values | All match | — | OK |
-
-### Discrepancies
-1. **`--color-complement`** (`#10B981`) — base token exists in CSS, only `-light` variant in docs
-2. **`animate-hex-cell-in`** — fully implemented (keyframe + utility class) but not in docs table
-3. **`animate-shimmer-sweep`** — documented but has NO utility class (keyframe only)
-4. **`animate-terminal-type`** — documented but has NO utility class (keyframe only, used inline per-element)
-
----
+- **Correct routes**: 36/42 (86%)
+- **Method mismatches**: 5
+- **Undocumented routes**: 1 (`/api/telemetry`)
+- **Phantom routes from previous audit**: 0 (fixed)
 
 ## Stale Documentation
 
-| Document | Issue | Severity |
-|----------|-------|----------|
-| CLAUDE.md — Auth API | Documents `/api/auth/bitbucket/login` and `/api/auth/codeberg/login` which don't exist; actual routes are `/connect`, `/disconnect`, `/status` | HIGH |
-| CLAUDE.md — Admin API | `feature-flags` documented as GET\|PUT, code is GET\|PATCH; `engagement-flags` documented as GET\|PUT, code is GET only | MEDIUM |
-| CLAUDE.md — Archetypes | Lists "artificer" in archetype list but no `/archetypes/artificer` page exists | LOW |
-| design-system.md | Missing `--color-complement` base token and `animate-hex-cell-in` animation | LOW |
-
----
+| Item | Document | Issue | Severity |
+|------|----------|-------|----------|
+| `/api/cli/auth/poll` methods | CLAUDE.md:290 | Docs say GET\|POST, code exports GET only | Medium |
+| `/api/admin/feature-flags` methods | CLAUDE.md:296 | Docs say GET\|PATCH, code exports PATCH only | Medium |
+| `/api/admin/engagement-flags` methods | CLAUDE.md:297 | Docs say GET\|PUT, code exports GET only | Medium |
+| `/api/admin/agents/run` methods | CLAUDE.md:298 | Docs say POST, code exports POST\|GET\|DELETE | Medium |
+| `/api/notifications/unsubscribe` method | CLAUDE.md:305 | Docs say POST, code exports GET | High |
+| `animate-hex-cell-in` duration | design-system.md | Docs say "(set per-element)", actual CSS defines 0.45s | Low |
+| `animate-shimmer-sweep` | design-system.md animation table | Exists in CSS, mentioned in tokens table but missing from animation table | Low |
 
 ## Missing Documentation
 
-### Undocumented Routes (20+)
-1. **Campaign Management API** (7 routes): `/api/admin/campaigns`, `/api/admin/campaigns/:id`, preview, send
-2. **Campaign Cron Jobs** (2 routes): `/api/cron/process-campaigns`, `/api/cron/sync-audience`
-3. **Platform Connect/Disconnect/Status** (6 routes): Bitbucket + Codeberg connect, disconnect, status
-4. **OG Image Routes** (2): `/og-image`, `/u/:handle/og-image`
-5. **LLM Endpoints** (2): `/llms.txt`, `/llms-full.txt`
-6. **Well-known** (1): `/.well-known/security.txt`
-7. **Pages**: `/coming-soon`, `/verify` (page), `/experiments/*`
+### Undocumented API Route
+- **`POST /api/telemetry`** — Client telemetry ingestion endpoint. Not listed in CLAUDE.md Key Routes section.
 
-### Undocumented Complex Functions (4 critical)
-| Function | File | Lines | Why it matters |
-|----------|------|-------|----------------|
-| `isValidTelemetryPayload()` | `lib/utils/validation.ts:85` | ~40 | Complex nested validation, no JSDoc |
-| `isValidStatsShape()` | `lib/utils/validation.ts:133` | ~45 | Complex object validation, no JSDoc |
-| `isValidInsightsUpload()` | `lib/insights/validation.ts:5` | ~130 | Largest undocumented function in codebase |
-| `fetchContributionData()` | `lib/github/queries.ts:13` | ~60 | Core GraphQL fetch, complex data transform |
+### Complex Functions Without JSDoc (11 total)
 
-### JSDoc Coverage
-- **Overall**: ~78% of exported functions in `lib/` have JSDoc
-- **Well-documented areas**: auth (100%), render (100%), history (95%), impact (100%), cache (95%)
-- **Gaps**: validation functions, agent report parsers, some utility helpers
+| File | Function | Lines | Priority |
+|------|----------|-------|----------|
+| `lib/validation.ts` | `isValidTelemetryPayload` | 43 | P1 — validates critical API payload |
+| `lib/validation.ts` | `isValidBadgeConfig` | 17 | P1 — validates badge config API payload |
+| `lib/dashboard/generate-insights.ts` | `generateInsights` | >30 | P1 — core feature: personalized insights |
+| `lib/db/campaigns.ts` | `dbCreateCampaign` | >30 | P2 — campaign CRUD |
+| `lib/db/campaigns.ts` | `dbUpdateCampaign` | >30 | P2 — campaign CRUD |
+| `lib/db/campaigns.ts` | `dbGetActiveEngagementCampaign` | >30 | P2 — campaign query |
+| `lib/db/campaigns.ts` | `dbGetCampaignStats` | >30 | P2 — JS aggregation (PostgREST limitation) |
+| `lib/email/score-bump.ts` | `notifyScoreBump` | >30 | P2 — email notification |
+| `lib/email/templates/announcement.ts` | `buildAnnouncementHtml` | >30 | P2 — email template |
+| `lib/effects/counters/use-animated-counter.ts` | `useAnimatedCounter` | >30 | P3 — UI hook |
+| `lib/hooks/use-trend-data.ts` | `useTrendData` | >30 | P3 — data hook |
 
----
+### JSDoc Coverage by Category
+
+| Category | Coverage | Status |
+|----------|----------|--------|
+| Auth & OAuth | 100% | Excellent |
+| Cache & Performance | 100% | Excellent |
+| Core Scoring & Impact | 100% | Excellent |
+| History & Trends | 100% | Excellent |
+| Utilities & Helpers | 100% | Excellent |
+| packages/shared | 100% | Excellent |
+| Database & ORM | 98% | Excellent |
+| Email & Templates | 50% | Needs attention |
+| UI Effects | 42% | Critical gaps |
+
+**Overall JSDoc coverage: 84% (284/338 exports)**
+
+### Previously Reported Gaps — Now Resolved
+- `lib/insights/validation.ts::isValidInsightsUpload` — now fully documented
+- `lib/github/queries.ts::fetchContributionData` — now fully documented
+- `lib/utils/validation.ts::isValidStatsShape` — now fully documented
+- Auth cookie functions — now documented per security agent
 
 ## Environment Variables
 
-| Variable | In CLAUDE.md | Used in Code | In .env.example | Status |
-|----------|:------------:|:------------:|:---------------:|--------|
-| GITHUB_CLIENT_ID | ✓ | ✓ | ✓ | OK |
-| GITHUB_CLIENT_SECRET | ✓ | ✓ | ✓ | OK |
-| NEXTAUTH_SECRET | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_BASE_URL | ✓ | ✓ | ✓ | OK |
-| UPSTASH_REDIS_REST_URL | ✓ | ✓ | ✓ | OK |
-| UPSTASH_REDIS_REST_TOKEN | ✓ | ✓ | ✓ | OK |
-| SUPABASE_URL | ✓ | ✓ | ✓ | OK |
-| SUPABASE_SERVICE_ROLE_KEY | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_POSTHOG_KEY | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_POSTHOG_HOST | ✓ | ✓ | ✓ | OK |
-| RESEND_API_KEY | ✓ | ✓ | ✓ | OK |
-| RESEND_WEBHOOK_SECRET | ✓ | ✓ | ✓ | OK |
-| SUPPORT_FORWARD_EMAIL | ✓ | ✓ | ✓ | OK |
-| GITHUB_TOKEN | ✓ | ✓ | ✓ | OK |
-| CHAPA_VERIFICATION_SECRET | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_STUDIO_ENABLED | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_EXPERIMENTS_ENABLED | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_INSIGHTS_ENABLED | ✓ | ✓ | ✓ | OK |
-| BITBUCKET_CLIENT_ID | ✓ | ✓ | ✓ | OK |
-| BITBUCKET_CLIENT_SECRET | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_BITBUCKET_ENABLED | ✓ | ✓ | ✓ | OK |
-| CODEBERG_CLIENT_ID | ✓ | ✓ | ✓ | OK |
-| CODEBERG_CLIENT_SECRET | ✓ | ✓ | ✓ | OK |
-| NEXT_PUBLIC_CODEBERG_ENABLED | ✓ | ✓ | ✓ | OK |
-| ADMIN_HANDLES | ✓ | ✓ | ✓ | OK |
-| ADMIN_SECRET | ✓ | ✓ | ✓ | OK |
-| ALLOW_AGENT_RUN | ✓ | ✓ | ✓ | OK |
-| CRON_SECRET | ✓ | ✓ | ✓ | OK |
-| VERCEL_ENV | ✓ | ✓ | (commented) | OK |
-| ANALYZE | ✓ | ✓ | (commented) | OK |
+| Variable | In CLAUDE.md | Used in Code | Status |
+|----------|-------------|-------------|--------|
+| GITHUB_CLIENT_ID | Yes | Yes | OK |
+| GITHUB_CLIENT_SECRET | Yes | Yes | OK |
+| NEXTAUTH_SECRET | Yes | Yes | OK |
+| NEXT_PUBLIC_BASE_URL | Yes | Yes | OK |
+| UPSTASH_REDIS_REST_URL | Yes | Yes | OK |
+| UPSTASH_REDIS_REST_TOKEN | Yes | Yes | OK |
+| SUPABASE_URL | Yes | Yes | OK |
+| SUPABASE_SERVICE_ROLE_KEY | Yes | Yes | OK |
+| NEXT_PUBLIC_POSTHOG_KEY | Yes | Yes | OK |
+| NEXT_PUBLIC_POSTHOG_HOST | Yes | Yes | OK |
+| RESEND_API_KEY | Yes | Yes | OK |
+| RESEND_WEBHOOK_SECRET | Yes | Yes | OK |
+| SUPPORT_FORWARD_EMAIL | Yes | Yes | OK |
+| GITHUB_TOKEN | Yes | Yes | OK |
+| CHAPA_VERIFICATION_SECRET | Yes | Yes | OK |
+| NEXT_PUBLIC_STUDIO_ENABLED | Yes | Yes | OK |
+| NEXT_PUBLIC_EXPERIMENTS_ENABLED | Yes | Yes | OK |
+| NEXT_PUBLIC_INSIGHTS_ENABLED | Yes | Yes | OK |
+| BITBUCKET_CLIENT_ID | Yes | Yes | OK |
+| BITBUCKET_CLIENT_SECRET | Yes | Yes | OK |
+| NEXT_PUBLIC_BITBUCKET_ENABLED | Yes | Yes | OK |
+| CODEBERG_CLIENT_ID | Yes | Yes | OK |
+| CODEBERG_CLIENT_SECRET | Yes | Yes | OK |
+| NEXT_PUBLIC_CODEBERG_ENABLED | Yes | Yes | OK |
+| ADMIN_HANDLES | Yes | Yes | OK |
+| ADMIN_SECRET | Yes | Yes | OK |
+| ALLOW_AGENT_RUN | Yes | Yes | OK |
+| CRON_SECRET | Yes | Yes | OK |
+| VERCEL_ENV | Yes | Yes | OK |
+| ANALYZE | Yes | Yes | OK |
 
-**30/30 project-specific env vars fully consistent** across CLAUDE.md, codebase, and .env.example. All sensitive vars use `.trim()`. No mismatches.
+**30/30 documented env vars present in code. 0 documented vars missing from code.**
 
----
+### Undocumented Env Vars Found in Code
 
-## Required Documents
+| Variable | Context | Action Needed |
+|----------|---------|---------------|
+| `ICEBERG_TOKEN` | Unknown integration | Investigate — document if production |
+| `SVIX_SERVER_URL` | Webhook infrastructure | Document if production dependency |
+| `SVIX_TOKEN` | Webhook infrastructure | Document if production dependency |
+| `BOOK_LANG` | Template generation | Document if production dependency |
+| `HOST` | Dev server binding | Low priority (dev-only) |
+| `MY_SERVER_PORT` | Dev server port | Low priority (dev-only) |
+| `TESTPLATFORM_CLIENT_ID` | Test fixtures | No action (test-only) |
+| `TESTPLATFORM_CLIENT_SECRET` | Test fixtures | No action (test-only) |
 
-| Document | Exists | Non-empty | Status |
-|----------|:------:|:---------:|--------|
-| `docs/impact-v4.md` | ✓ | ✓ (6.7K) | OK — marked deprecated, references v6 |
-| `docs/impact-v5.md` | ✓ | ✓ (5.1K) | OK — marked superseded by v6 |
-| `docs/impact-v6.md` | ✓ | ✓ (8.9K) | OK — current spec |
-| `docs/svg-design.md` | ✓ | ✓ (6.0K) | OK |
-| `docs/agents/shared-context.md` | ✓ | ✓ (12.1K) | OK — 7 entries, latest 2026-03-19 |
-| `README.md` | ✓ | ✓ (195 lines) | OK — full setup instructions |
+### Design System Token Accuracy
 
----
+- **Color tokens**: 50/51 documented — `--color-complement` base token defined in `:root` and `@theme` but missing explicit dark override in `[data-theme="dark"]` block
+- **Animations**: 17/18 documented — `animate-hex-cell-in` exists but duration undocumented; `animate-shimmer-sweep` missing from animation table
+- **All hex values verified accurate** against `globals.css`
+- **Dimension colors**: 10/10 match
+- **Archetype colors**: 7/7 match
 
 ## Recommendations
 
-### Priority 1 — Fix stale/incorrect docs
-1. **Update Bitbucket/Codeberg auth routes** in CLAUDE.md: replace phantom `/login` routes with actual `/connect`, `/disconnect`, `/status` pattern
-2. **Fix method mismatches**: `feature-flags` PUT→PATCH, `engagement-flags` remove PUT
+### Priority 1 — Fix Stale Route Methods (5 mismatches)
+1. Update `/api/notifications/unsubscribe` in CLAUDE.md from POST to GET
+2. Update `/api/cli/auth/poll` from GET|POST to GET
+3. Update `/api/admin/feature-flags` from GET|PATCH to PATCH
+4. Update `/api/admin/engagement-flags` from GET|PUT to GET
+5. Update `/api/admin/agents/run` from POST to POST|GET|DELETE
 
-### Priority 2 — Document new features
-3. **Add Campaign Management API** to CLAUDE.md (7 routes + 2 cron jobs)
-4. **Add OG image routes**, LLM endpoints, and `/.well-known/security.txt`
-5. **Add `--color-complement`** base token and `animate-hex-cell-in` to design-system.md
+### Priority 2 — Document Missing Route
+6. Add `POST /api/telemetry` to CLAUDE.md Key Routes section
 
-### Priority 3 — JSDoc gaps
-6. **Add JSDoc** to 4 critical validation/query functions (`isValidTelemetryPayload`, `isValidStatsShape`, `isValidInsightsUpload`, `fetchContributionData`)
+### Priority 3 — Add JSDoc to Complex Functions (3 P1 items)
+7. `lib/validation.ts::isValidTelemetryPayload` (43 lines)
+8. `lib/validation.ts::isValidBadgeConfig` (17 lines)
+9. `lib/dashboard/generate-insights.ts::generateInsights` (>30 lines, core feature)
 
-### Priority 4 — Low-priority cleanup
-7. Decide whether `/archetypes/artificer` page should be created or removed from archetype list
-8. Clarify `animate-shimmer-sweep` and `animate-terminal-type` — either add utility classes or update docs to note they're keyframe-only
+### Priority 4 — Investigate Undocumented Env Vars
+10. Determine if `ICEBERG_TOKEN`, `SVIX_SERVER_URL`, `SVIX_TOKEN`, `BOOK_LANG` are production dependencies and document accordingly
+
+### Priority 5 — Design System Polish
+11. Add `animate-shimmer-sweep` to animation table in design-system.md
+12. Clarify `animate-hex-cell-in` duration (0.45s) in design-system.md
+
+### Priority 6 — JSDoc for Campaign & Email Functions (8 P2 items)
+13. Add JSDoc to `lib/db/campaigns.ts` (4 complex functions at 9% coverage)
+14. Add JSDoc to `lib/email/score-bump.ts` and `lib/email/templates/announcement.ts`

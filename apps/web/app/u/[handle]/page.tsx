@@ -1,5 +1,6 @@
 export const revalidate = 3600;
 
+import { Suspense } from "react";
 import { after } from "next/server";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
@@ -95,6 +96,19 @@ export default async function SharePage({ params }: SharePageProps) {
     notFound();
   }
 
+  return (
+    <main id="main-content" className="min-h-screen bg-bg">
+      <Suspense fallback={<BadgeSkeleton />}>
+        <SharePageContent handle={handle} />
+      </Suspense>
+      <GlobalCommandBarLazy />
+    </main>
+  );
+}
+
+/** Data-dependent content — streams after shell via Suspense. */
+/** @internal Exported for tests — use SharePage as the page component. */
+export async function SharePageContent({ handle }: { handle: string }) {
   // ISR: No dynamic request APIs (next/headers, next/cookies) are called.
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
@@ -194,7 +208,7 @@ export default async function SharePage({ params }: SharePageProps) {
   };
 
   return (
-    <main id="main-content" className="min-h-screen bg-bg">
+    <>
       <SharePageShortcuts
         embedMarkdown={embedMarkdown}
         handle={handle}
@@ -272,8 +286,6 @@ export default async function SharePage({ params }: SharePageProps) {
           impact={impact}
         />
       </div>
-
-      <GlobalCommandBarLazy />
-    </main>
+    </>
   );
 }

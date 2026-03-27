@@ -55,7 +55,6 @@ The layout has five vertical sections: **Header**, **Body** (two columns), **Dim
 │  │  │  │  │  │   │  └────────────────┘  │
 │  └──┴──┴──┴──┘   │  [Archetype Pill]    │
 │                   │  [Score] [Tier Pill] │
-│                   │  [Confidence %]      │
 └──────────────────┴──────────────────────┘
 ```
 
@@ -115,13 +114,11 @@ SVG container: `w-[140px] h-[140px]`, `viewBox="0 0 140 140"`.
 - Text: `text-xs font-semibold text-amber`
 - Content: `{TIER_SYMBOL} {impact.archetype}` where symbols: Emerging=○, Solid=◉, High=◆, Elite=★
 
-#### Composite Score + Tier + Confidence (`flex flex-col items-center gap-1`)
+#### Composite Score + Tier (`flex flex-col items-center gap-1`)
 
 Score row (`flex items-baseline gap-2`):
 - Score value: `ScoreEffectText` component with `text-3xl font-heading font-bold tracking-tighter leading-none`. Wrapped in `<div data-score-effect={scoreEffect}>`.
 - Tier pill: `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border w-fit` + `tierPillClasses(tier)`.
-
-Confidence: `text-xs text-text-secondary`. Content: `{confidence}% Confidence`.
 
 ---
 

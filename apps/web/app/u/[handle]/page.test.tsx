@@ -175,7 +175,7 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 // Import the page after all mocks
 // ---------------------------------------------------------------------------
 
-import SharePage, { generateMetadata } from "./page";
+import SharePage, { generateMetadata, SharePageContent } from "./page";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -207,10 +207,9 @@ const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="6
 const FAKE_SNAPSHOT = { adjustedComposite: 60, date: "2026-01-01" };
 
 async function renderPage(handle = "testuser") {
-  return SharePage({
-    params: Promise.resolve({ handle }),
-    searchParams: Promise.resolve({}),
-  });
+  // Test the data-dependent content directly (SharePageContent).
+  // SharePage is a thin Suspense wrapper around SharePageContent.
+  return SharePageContent({ handle });
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +462,10 @@ describe("SharePage /u/[handle]", () => {
   describe("edge cases", () => {
     it("calls notFound for invalid handle", async () => {
       mockIsValidHandle.mockReturnValue(false);
-      await expect(renderPage("bad!!handle")).rejects.toThrow("NOT_FOUND");
+      // notFound() validation is in the outer SharePage wrapper, not SharePageContent
+      await expect(
+        SharePage({ params: Promise.resolve({ handle: "bad!!handle" }) }),
+      ).rejects.toThrow("NOT_FOUND");
       expect(mockNotFound).toHaveBeenCalled();
     });
 

@@ -20,6 +20,9 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
 export function verifyCronSecret(request: Request): NextResponse | null {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) {
+    console.warn(
+      "[cron] CRON_SECRET not configured — cron endpoints are unprotected"
+    );
     return null;
   }
 

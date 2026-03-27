@@ -17,6 +17,17 @@ describe("verifyCronSecret", () => {
     expect(result).toBeNull();
   });
 
+  it("logs a warning when CRON_SECRET is not set", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { verifyCronSecret } = await import("@/lib/auth/cron");
+    const req = new NextRequest("https://example.com/api/cron/test");
+    verifyCronSecret(req);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[cron] CRON_SECRET not configured — cron endpoints are unprotected"
+    );
+    warnSpy.mockRestore();
+  });
+
   it("returns 401 when Authorization header is missing", async () => {
     process.env.CRON_SECRET = "test-secret";
     const { verifyCronSecret } = await import("@/lib/auth/cron");

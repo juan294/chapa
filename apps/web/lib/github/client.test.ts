@@ -853,6 +853,43 @@ describe("getStats", () => {
       expect(result).toEqual(cached);
     });
 
+    it("includes Bitbucket in linkedPlatforms when linked in DB but stats fetch returns null (fixes #632)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(true);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          if (platform === "bitbucket") {
+            return Promise.resolve({
+              remoteLogin: "bb-user",
+              tokens: {
+                accessToken: "bb-token",
+                refreshToken: "bb-refresh",
+                expiresAt: new Date("2027-12-31"),
+              },
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+      mockIsTokenExpired.mockReturnValue(false);
+      mockFetchBitbucketStats.mockResolvedValue(null); // API returns null
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(50); // GitHub-only (no BB stats to merge)
+      expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+      expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    });
+
     it("caches Bitbucket stats separately", async () => {
       const github = makeStats({ commitsTotal: 50 });
       const bb = makeStats({ commitsTotal: 30 });
@@ -1161,6 +1198,36 @@ describe("getStats", () => {
       expect(result!.linkedPlatforms).toEqual(["codeberg"]);
     });
 
+    it("includes Codeberg in linkedPlatforms when linked in DB but stats fetch returns null (fixes #632)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null) // bitbucket cache
+        .mockResolvedValueOnce(null) // codeberg cache
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "cb-user",
+        tokens: {
+          accessToken: "cb-token",
+          refreshToken: null,
+          expiresAt: null,
+        },
+      });
+      mockIsTokenExpired.mockReturnValue(true);
+      mockFetchCodebergStats.mockResolvedValue(null); // fetch failed
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(50); // GitHub-only
+      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+      expect(result!.linkedPlatformLogins).toEqual({ codeberg: "cb-user" });
+    });
+
     it("sets linkedPlatforms to ['bitbucket', 'codeberg'] when both linked", async () => {
       const github = makeStats({ commitsTotal: 50 });
       const bb = makeStats({ commitsTotal: 20 });
@@ -1344,9 +1411,10 @@ describe("getStats", () => {
       const result = await getStats("test-user");
 
       // Should still return GitHub + Codeberg stats (BB error is swallowed)
+      // BB is still in linkedPlatforms because it's linked in DB (#632)
       expect(result).not.toBeNull();
       expect(result!.commitsTotal).toBe(65); // 50 + 15
-      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+      expect(result!.linkedPlatforms).toEqual(["bitbucket", "codeberg"]);
     });
 
     it("Codeberg error does not block Bitbucket fetch", async () => {
@@ -1398,9 +1466,10 @@ describe("getStats", () => {
       const result = await getStats("test-user");
 
       // Should still return GitHub + Bitbucket stats (CB error is swallowed)
+      // CB is still in linkedPlatforms because it's linked in DB (#632)
       expect(result).not.toBeNull();
       expect(result!.commitsTotal).toBe(70); // 50 + 20
-      expect(result!.linkedPlatforms).toEqual(["bitbucket"]);
+      expect(result!.linkedPlatforms).toEqual(["bitbucket", "codeberg"]);
     });
 
     it("handles Codeberg fetch failure gracefully (returns GitHub-only)", async () => {
@@ -1429,7 +1498,8 @@ describe("getStats", () => {
       const result = await getStats("test-user");
 
       expect(result!.commitsTotal).toBe(50); // GitHub-only
-      expect(result!.linkedPlatforms).toBeUndefined();
+      // Codeberg still appears in linkedPlatforms because it's linked in DB (#632)
+      expect(result!.linkedPlatforms).toEqual(["codeberg"]);
     });
 
     it("caches Codeberg stats separately", async () => {

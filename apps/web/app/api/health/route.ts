@@ -24,9 +24,11 @@ export async function GET(request: NextRequest) {
     pingSupabase(),
   ]);
 
-  // Both Redis and Supabase are critical — either failing triggers degraded
+  // "skipped" = env vars not configured (preview deploys) — not degraded.
+  // Only "error" = configured but failing — triggers 503.
+  const isHealthy = (s: string) => s === "ok" || s === "skipped";
   const status =
-    redisStatus === "ok" && supabaseStatus === "ok" ? "ok" : "degraded";
+    isHealthy(redisStatus) && isHealthy(supabaseStatus) ? "ok" : "degraded";
   const httpStatus = status === "ok" ? 200 : 503;
 
   return NextResponse.json(

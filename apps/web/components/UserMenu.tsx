@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync, isBitbucketEnabledSync, isCodebergEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
@@ -132,30 +132,25 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       if (platformStatusCache.codeberg) setCbStatus(platformStatusCache.codeberg);
       return;
     }
-    if (isBitbucketEnabledSync()) {
-      fetch("/api/auth/bitbucket/status")
+    // Server returns { enabled: false } if flag is off — no client-side
+    // sync flag checks needed. Fixes #632.
+    function fetchPlatformStatus(
+      platform: "bitbucket" | "codeberg",
+      setter: typeof setBbStatus,
+    ) {
+      fetch(`/api/auth/${platform}/status`)
         .then((r) => r.json())
         .then((data) => {
           if (data.enabled) {
             const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-            platformStatusCache.bitbucket = status;
-            setBbStatus(status);
+            platformStatusCache[platform] = status;
+            setter(status);
           }
         })
         .catch(() => {}); // Graceful — menu works without status
     }
-    if (isCodebergEnabledSync()) {
-      fetch("/api/auth/codeberg/status")
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.enabled) {
-            const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-            platformStatusCache.codeberg = status;
-            setCbStatus(status);
-          }
-        })
-        .catch(() => {}); // Graceful
-    }
+    fetchPlatformStatus("bitbucket", setBbStatus);
+    fetchPlatformStatus("codeberg", setCbStatus);
     platformStatusCache.fetched = true;
   }, []);
 
@@ -344,7 +339,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 />
               </button>
             )}
-            {isBitbucketEnabledSync() && bbStatus && (
+            {bbStatus && (
               bbStatus.linked ? (
                 <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
                   <a
@@ -379,7 +374,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 </a>
               )
             )}
-            {isCodebergEnabledSync() && cbStatus && (
+            {cbStatus && (
               cbStatus.linked ? (
                 <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
                   <a

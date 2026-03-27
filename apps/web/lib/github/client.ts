@@ -138,19 +138,31 @@ async function _fetchAndCache(
     stats = mergeStats(stats, supplemental.stats);
   }
 
-  // Set linkedPlatforms after all merges (so it survives EMU merge)
+  // Build linkedPlatforms from DB link status (source of truth), not stats fetch
+  // success. Platforms appear in Data Sources even when their stats fetch
+  // temporarily fails (expired token, API error). Fixes #632.
+  const [bbDbLink, cbDbLink] = await Promise.all([
+    bbStats ? null : isBitbucketEnabled().then((ok) =>
+      ok ? dbGetLinkedPlatform(handle, "bitbucket") : null,
+    ),
+    cbStats ? null : isCodebergEnabled().then((ok) =>
+      ok ? dbGetLinkedPlatform(handle, "codeberg") : null,
+    ),
+  ]);
+
   const linkedPlatforms: Platform[] = [];
-  if (bbStats) linkedPlatforms.push("bitbucket");
-  if (cbStats) linkedPlatforms.push("codeberg");
+  if (bbStats || bbDbLink) linkedPlatforms.push("bitbucket");
+  if (cbStats || cbDbLink) linkedPlatforms.push("codeberg");
+
   if (linkedPlatforms.length > 0) {
-    // Also fetch remote usernames for profile URLs (parallel DB queries)
-    const [bbLinked, cbLinked] = await Promise.all([
-      bbStats ? dbGetLinkedPlatform(handle, "bitbucket") : null,
-      cbStats ? dbGetLinkedPlatform(handle, "codeberg") : null,
+    // bbDbLink/cbDbLink already have remoteLogin; only re-fetch for stats-path
+    const [bbLogin, cbLogin] = await Promise.all([
+      bbDbLink ?? (bbStats ? dbGetLinkedPlatform(handle, "bitbucket") : null),
+      cbDbLink ?? (cbStats ? dbGetLinkedPlatform(handle, "codeberg") : null),
     ]);
     const linkedPlatformLogins: Record<string, string> = {};
-    if (bbLinked) linkedPlatformLogins.bitbucket = bbLinked.remoteLogin;
-    if (cbLinked) linkedPlatformLogins.codeberg = cbLinked.remoteLogin;
+    if (bbLogin) linkedPlatformLogins.bitbucket = bbLogin.remoteLogin;
+    if (cbLogin) linkedPlatformLogins.codeberg = cbLogin.remoteLogin;
 
     stats = {
       ...stats,

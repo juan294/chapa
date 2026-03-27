@@ -36,6 +36,10 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
   - Load/save Creator Studio badge customization (GET to load, PUT to save)
 - GET `/api/history/:handle`
   - Score history, trend analysis, and snapshot diffs (public, rate-limited)
+- GET `/api/profile/:handle`
+  - Public impact profile snapshot (rate-limited, CORS-enabled)
+- GET `/api/health`
+  - Health check (Redis dbsize + Supabase query, rate-limited)
 
 ## Data refresh
 - Default refresh schedule: once per day per handle.
@@ -45,9 +49,9 @@ As a developer, I want a **beautiful, embeddable badge** that shows my multi-dim
 
 ## Metrics displayed (badge)
 - Heatmap (13 weeks of daily activity, left column)
-- Radar chart (4 dimensions: Delivery, Quality, Consistency, Breadth — center column)
+- Radar chart (4–5 dimensions: Delivery, Quality, Consistency, Breadth + optional Craft — pentagon when Craft present, diamond fallback)
 - Score ring with adjusted composite score (0-100) + tier (right column)
-- Archetype label (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
+- Archetype label (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
 - Stars, forks, watchers metric pills
 - Impact tier (Emerging/Solid/High/Elite)
 
@@ -72,8 +76,8 @@ Optional display:
 
 The badge and share page display a multi-dimensional developer profile:
 
-- **4 dimensions** (each 0-100): Delivery, Quality, Consistency, Breadth
-- **Archetype**: Derived from dimension shape (Builder, Quality Champion, Marathoner, Polymath, Balanced, Emerging)
+- **4–5 dimensions** (each 0-100): Delivery, Quality, Consistency, Breadth + optional Craft (AI tool insights)
+- **Archetype**: Derived from dimension shape (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
 - **Composite score**: Average of all four dimensions
 - **Confidence** (50-100): Signal clarity rating with transparent, non-accusatory explanations
 - **Adjusted score**: Composite gently weighted by confidence
