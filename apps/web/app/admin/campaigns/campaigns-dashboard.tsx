@@ -897,7 +897,15 @@ export function CampaignsDashboard() {
               {campaigns.map((c) => (
                 <tr
                   key={c.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => openDetail(c)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openDetail(c);
+                    }
+                  }}
                   className="cursor-pointer border-b border-stroke/50 hover:bg-amber/5 transition-colors"
                 >
                   <td className="px-4 py-3 text-text-primary">
