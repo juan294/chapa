@@ -132,28 +132,25 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       if (platformStatusCache.codeberg) setCbStatus(platformStatusCache.codeberg);
       return;
     }
-    // Always check platform status — server returns { enabled: false } if flag
-    // is off, so the client doesn't need sync flag checks. Fixes #632.
-    fetch("/api/auth/bitbucket/status")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.enabled) {
-          const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-          platformStatusCache.bitbucket = status;
-          setBbStatus(status);
-        }
-      })
-      .catch(() => {}); // Graceful — menu works without status
-    fetch("/api/auth/codeberg/status")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.enabled) {
-          const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-          platformStatusCache.codeberg = status;
-          setCbStatus(status);
-        }
-      })
-      .catch(() => {}); // Graceful
+    // Server returns { enabled: false } if flag is off — no client-side
+    // sync flag checks needed. Fixes #632.
+    function fetchPlatformStatus(
+      platform: "bitbucket" | "codeberg",
+      setter: typeof setBbStatus,
+    ) {
+      fetch(`/api/auth/${platform}/status`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.enabled) {
+            const status = { linked: data.linked, remoteLogin: data.remoteLogin };
+            platformStatusCache[platform] = status;
+            setter(status);
+          }
+        })
+        .catch(() => {}); // Graceful — menu works without status
+    }
+    fetchPlatformStatus("bitbucket", setBbStatus);
+    fetchPlatformStatus("codeberg", setCbStatus);
     platformStatusCache.fetched = true;
   }, []);
 

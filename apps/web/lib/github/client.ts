@@ -139,38 +139,30 @@ async function _fetchAndCache(
   }
 
   // Build linkedPlatforms from DB link status (source of truth), not stats fetch
-  // success. This ensures platforms appear in Data Sources and badge footer even
-  // when their stats fetch temporarily fails (expired token, API error). Fixes #632.
-  const linkedPlatforms: Platform[] = [];
-  let bbDbLink: Awaited<ReturnType<typeof dbGetLinkedPlatform>> = null;
-  let cbDbLink: Awaited<ReturnType<typeof dbGetLinkedPlatform>> = null;
+  // success. Platforms appear in Data Sources even when their stats fetch
+  // temporarily fails (expired token, API error). Fixes #632.
+  const [bbDbLink, cbDbLink] = await Promise.all([
+    bbStats ? null : isBitbucketEnabled().then((ok) =>
+      ok ? dbGetLinkedPlatform(handle, "bitbucket") : null,
+    ),
+    cbStats ? null : isCodebergEnabled().then((ok) =>
+      ok ? dbGetLinkedPlatform(handle, "codeberg") : null,
+    ),
+  ]);
 
-  if (bbStats) {
-    linkedPlatforms.push("bitbucket");
-  } else if (await isBitbucketEnabled()) {
-    bbDbLink = await dbGetLinkedPlatform(handle, "bitbucket");
-    if (bbDbLink) linkedPlatforms.push("bitbucket");
-  }
-  if (cbStats) {
-    linkedPlatforms.push("codeberg");
-  } else if (await isCodebergEnabled()) {
-    cbDbLink = await dbGetLinkedPlatform(handle, "codeberg");
-    if (cbDbLink) linkedPlatforms.push("codeberg");
-  }
+  const linkedPlatforms: Platform[] = [];
+  if (bbStats || bbDbLink) linkedPlatforms.push("bitbucket");
+  if (cbStats || cbDbLink) linkedPlatforms.push("codeberg");
 
   if (linkedPlatforms.length > 0) {
-    // Fetch remote usernames for profile URLs (reuse DB results when available)
-    const [bbLinked, cbLinked] = await Promise.all([
-      linkedPlatforms.includes("bitbucket")
-        ? (bbDbLink ?? dbGetLinkedPlatform(handle, "bitbucket"))
-        : null,
-      linkedPlatforms.includes("codeberg")
-        ? (cbDbLink ?? dbGetLinkedPlatform(handle, "codeberg"))
-        : null,
+    // bbDbLink/cbDbLink already have remoteLogin; only re-fetch for stats-path
+    const [bbLogin, cbLogin] = await Promise.all([
+      bbDbLink ?? (bbStats ? dbGetLinkedPlatform(handle, "bitbucket") : null),
+      cbDbLink ?? (cbStats ? dbGetLinkedPlatform(handle, "codeberg") : null),
     ]);
     const linkedPlatformLogins: Record<string, string> = {};
-    if (bbLinked) linkedPlatformLogins.bitbucket = bbLinked.remoteLogin;
-    if (cbLinked) linkedPlatformLogins.codeberg = cbLinked.remoteLogin;
+    if (bbLogin) linkedPlatformLogins.bitbucket = bbLogin.remoteLogin;
+    if (cbLogin) linkedPlatformLogins.codeberg = cbLogin.remoteLogin;
 
     stats = {
       ...stats,

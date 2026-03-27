@@ -25,10 +25,11 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabledSync: vi.fn(() => false),
-  isBitbucketEnabledSync: vi.fn(() => false),
-  isCodebergEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
 }));
+
+// Static import gets the mocked module (vi.mock is hoisted)
+import * as featureFlags from "@/lib/feature-flags";
 
 let dropdownOpen = false;
 const setIsOpenMock = vi.fn((updater: boolean | ((prev: boolean) => boolean)) => {
@@ -151,8 +152,8 @@ describe("UserMenu — admin link", () => {
 
 describe("UserMenu — Bitbucket integration", () => {
   it("fetches Bitbucket status on mount (server decides if enabled)", () => {
-    expect(SOURCE).toContain("/api/auth/bitbucket/status");
-    expect(SOURCE).toContain("useEffect");
+    expect(SOURCE).toContain("/api/auth/${platform}/status");
+    expect(SOURCE).toContain("fetchPlatformStatus");
   });
 
   it("renders Link Bitbucket item when status is loaded", () => {
@@ -205,8 +206,8 @@ describe("UserMenu — Bitbucket integration", () => {
 
 describe("UserMenu — Codeberg integration", () => {
   it("fetches Codeberg status on mount (server decides if enabled)", () => {
-    expect(SOURCE).toContain("/api/auth/codeberg/status");
-    expect(SOURCE).toContain("useEffect");
+    expect(SOURCE).toContain("fetchPlatformStatus");
+    expect(SOURCE).toContain('"codeberg"');
   });
 
   it("renders Link Codeberg item when status is loaded", () => {
@@ -458,10 +459,6 @@ describe("UserMenu — Bitbucket disconnect handler (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/bitbucket/status")) {
@@ -515,10 +512,6 @@ describe("UserMenu — Codeberg disconnect handler (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/codeberg/status")) {
@@ -566,10 +559,6 @@ describe("UserMenu — status fetch on mount (runtime)", () => {
   beforeEach(async () => {
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/bitbucket/status")) {
@@ -607,10 +596,6 @@ describe("UserMenu — status fetch error handling (runtime)", () => {
   beforeEach(async () => {
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       return Promise.reject(new Error("Network error"));
     });
@@ -639,10 +624,6 @@ describe("UserMenu — cache invalidation after unlink (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -700,10 +681,6 @@ describe("UserMenu — loading state during unlink (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -771,10 +748,6 @@ describe("UserMenu — Codeberg disconnect callback details (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/codeberg/status")) {
@@ -829,10 +802,6 @@ describe("UserMenu — Codeberg disconnect loading state (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -892,10 +861,6 @@ describe("UserMenu — Codeberg disconnect failure (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/codeberg/status")) {
@@ -948,10 +913,6 @@ describe("UserMenu — Bitbucket disconnect failure (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -1010,10 +971,6 @@ describe("UserMenu — Bitbucket not-linked state (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/bitbucket/status")) {
@@ -1048,10 +1005,6 @@ describe("UserMenu — Codeberg not-linked state (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -1092,10 +1045,6 @@ describe("UserMenu — Bitbucket linked state display (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/bitbucket/status")) {
@@ -1132,10 +1081,6 @@ describe("UserMenu — Codeberg linked state display (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -1177,10 +1122,6 @@ describe("UserMenu — cancel Bitbucket unlink confirm (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -1236,10 +1177,6 @@ describe("UserMenu — cancel Codeberg unlink confirm (runtime)", () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
-
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
       if (urlStr.includes("/api/auth/codeberg/status")) {
@@ -1291,11 +1228,7 @@ describe("UserMenu — Studio menu item when enabled (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
   });
 
@@ -1312,11 +1245,7 @@ describe("UserMenu — Studio hidden when disabled (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
   });
 
@@ -1331,11 +1260,7 @@ describe("UserMenu — Admin Panel link (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
   });
 
@@ -1358,11 +1283,7 @@ describe("UserMenu — Insights menu item (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
   });
 
@@ -1373,7 +1294,7 @@ describe("UserMenu — Insights menu item (runtime)", () => {
   });
 
   it("does not render Import Claude Code Insights when insights flag is disabled", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
 
     render(<UserMenu {...baseProps} />);
@@ -1393,11 +1314,7 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
@@ -1548,9 +1465,6 @@ describe("UserMenu — avatar image error fallback (runtime)", () => {
     dropdownOpen = false;
     clearPlatformStatusCache();
 
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
   });
 
   it("shows fallback letter when image fails to load", () => {
@@ -1573,10 +1487,6 @@ describe("UserMenu — platform status cache (runtime)", () => {
 
   beforeEach(async () => {
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
