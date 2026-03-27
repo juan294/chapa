@@ -1,12 +1,12 @@
-# Pre-Launch Audit Report (v38)
+# Pre-Launch Audit Report (v39)
 
-> Generated on 2026-03-24 | Branch: `develop` | Commit: `4b484da`
-> 5,787 tests | 347 test files | 42 API routes | Next.js 16.2.1 (Turbopack)
-> CI: ALL GREEN | 6 parallel specialists
+> Generated on 2026-03-27 | Branch: `develop` | Commit: `2848ef3`
+> 6,354 tests | 372 test files | 83 routes | Next.js 16.2.1 (Turbopack)
+> CI: ALL GREEN (last 5 runs) | 6 parallel specialists
 
 ## Verdict: CONDITIONAL
 
-No blockers. 5 warnings — all operational (unpushed commits, untracked migration, stale worktrees, minor a11y). Release is safe once warnings are addressed.
+No blockers. 8 warnings — flaky test (W1), unpushed commits (W2), missing docs for new endpoint (W3), minor a11y (W4-W5), dev dependency vulns (W6), history API leaks confidence data (W7), MPL-2.0 license not in stated policy (W8). Release is safe once W1-W3 are addressed.
 
 ## Blockers
 
@@ -16,101 +16,100 @@ None.
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | 6 commits on local `develop` not pushed to `origin/develop` | WARNING | devops | Release PR would miss these changes |
-| W2 | Untracked `supabase/migrations/018_fix_tool_insights_rls.sql` not committed | WARNING | architect, devops | RLS security fix not in version control |
-| W3 | 9 stale worktree directories in `.worktrees/` (Mar 8-10, branches already deleted) | WARNING | devops | Disk waste, potential confusion |
-| W4 | vitest/coverage/jsdom lockfile behind wanted versions (patch/minor) | WARNING | architect | Stale lockfile |
-| W5 | Range input in number-counters experiment not associated with label element | WARNING | ux-reviewer | Screen reader accessibility |
+| W1 | Flaky test: `BadgeToolbar.render.test.tsx` "strips @keyframes..." — timing race in mock Image src setter | Medium | qa-lead | Spurious CI failures on release branch |
+| W2 | 4 commits on local `develop` not pushed to `origin/develop` (includes new profile endpoint) | Medium | devops | CI has not validated latest code |
+| W3 | New `/api/profile/[handle]` route not documented in CLAUDE.md Key Routes section | Low | devops | External devs/agents may not discover it |
+| W4 | `<tr onClick>` in campaigns dashboard lacks `tabIndex`, `role`, and `onKeyDown` | Medium | ux-reviewer | Keyboard users can't activate campaign rows (admin-only) |
+| W5 | Unsubscribe route HTML missing `lang="en"` and viewport meta | Low | ux-reviewer | Screen reader language detection, mobile rendering |
+| W6 | 5 dev-only dependency vulns: picomatch ReDoS (2 high, 2 moderate), brace-expansion DoS (1 moderate) | Low | security-reviewer | Dev-only — not in production bundle |
+| W7 | `/api/history/:handle` exposes `confidence` and `confidencePenalties` — CLAUDE.md says confidence is internal-only | Medium | security-reviewer | Penalty flags like `burst_activity` could be perceived as accusatory |
+| W8 | `lightningcss` is MPL-2.0 — stated policy allows MIT/Apache/BSD/ISC only | Low | security-reviewer | Weak copyleft, build-only dep — low real risk |
 
 ## Recommendations
 
 | # | Recommendation | Found by | Priority |
 |---|---------------|----------|----------|
-| R1 | Extract generic platform OAuth handler to reduce Bitbucket/Codeberg duplication | architect | Low |
-| R2 | Extract shared test fixtures for platform auth tests | architect | Low |
-| R3 | Extract `adminAuthSetup()` helper for campaign route tests | architect | Low |
-| R4 | Improve function coverage above 85% (currently 81.25%) | qa-lead | Low |
-| R5 | Add render test for `BadgeSkeleton.tsx` | qa-lead | Low |
-| R6 | Investigate Turbopack NFT trace warning in `agents-summary/route.ts` | performance-eng, devops | Low |
-| R7 | Add `priority` prop to avatar `next/image` on share page for LCP hint | performance-eng | Low |
-| R8 | Dynamically import Vercel Analytics/SpeedInsights in root layout | performance-eng | Low |
-| R9 | Consider increasing HMAC verification hash from 64 to 128 bits | security-reviewer | Low |
-| R10 | Add `type="button"` to UserMenu trigger and unlink buttons | ux-reviewer | Low |
-| R11 | Add `htmlFor`/`id` pairing on number-counters experiment slider | ux-reviewer | Low |
+| R1 | Migrate 4 admin routes to use `adminAuth()` helper (users, feature-flags, engagement-flags, agents-summary) | architect | Low |
+| R2 | Bump vitest 4.1.1 → 4.1.2 (patch) | architect | Low |
+| R3 | Improve share page test coverage (84% stmts → target 90%+) | qa-lead | Low |
+| R4 | Exclude `**/fonts/**` from coverage config to reduce noise | qa-lead | Low |
+| R5 | Run `ANALYZE=true pnpm build` periodically — Turbopack no longer shows per-route sizes | performance-eng | Low |
+| R6 | Add MPL-2.0 to accepted licenses in CLAUDE.md or document in accepted-risks.md | security-reviewer | Low |
 
 ## Detailed Findings
 
-### 1. Quality Assurance (qa-lead) — GREEN
+### 1. Quality Assurance (qa-lead) — YELLOW
 
-- **5,787 tests pass** across 347 test files (0 failures, 0 flaky)
+- **6,354 tests pass** across 372 test files (1 flaky failure in initial run, passed on retry)
 - TypeScript strict mode: clean
 - ESLint: clean
-- **Coverage:** 89.2% statements, 90.5% lines, 84.7% branches, 81.3% functions
+- **Coverage:** 92.36% statements, 93.76% lines, 88.15% branches, 87.69% functions
 - Critical path coverage:
-  - Scoring pipeline: 240 tests
-  - SVG rendering: 235 tests
-  - OAuth: 152 tests
-  - Badge route: 39 tests
-  - Cache layer: 70 tests
+  - Scoring pipeline (`lib/impact/`): 99.46% stmts, 100% lines
+  - SVG rendering (`lib/render/`): 100% stmts, 100% lines
+  - Database access (`lib/db/`): 96.86% stmts, 99.38% lines
+  - Authentication (`lib/auth/`): 96.27% stmts, 98.87% lines
+  - Profile endpoint: 100% across all metrics
+- **Flaky test** (W1): `BadgeToolbar.render.test.tsx` — async race in mock Image `src` setter
 - All external service failures have fail-open behavior with tests
-- Every API route (42) has a corresponding test file
-- Public release readiness validated by 23-assertion acceptance test
+- Every critical API route has a corresponding test file
 
 ### 2. Security (security-reviewer) — GREEN
 
-- `pnpm audit`: 0 vulnerabilities
-- No hardcoded secrets in source (test fixtures only)
+- `pnpm audit`: 5 vulnerabilities (all dev-only — picomatch, brace-expansion)
+- No hardcoded secrets in source
 - No secrets in `NEXT_PUBLIC_*` env vars
-- OAuth: AES-256-GCM encrypted cookies, CSRF via timing-safe state tokens, open redirect protection
-- SVG XSS: all user input escaped via `escapeXml()`
-- Avatar URLs: hostname whitelist (GitHub only), content-type validation
-- Supabase: parameterized queries only, RLS + FORCE on all tables, deny-all anon policies
-- Security headers: HSTS (2yr + preload), CSP, X-Frame-Options DENY, nosniff, strict referrer
-- CORS: wildcard only on public verify endpoint (accepted risk #596)
-- Licenses: MIT/BSD/Apache/ISC — no GPL/AGPL. MPL-2.0 on resvg-js (accepted risk #464)
-- All accepted risks documented in `docs/accepted-risks.md`
+- OAuth: AES-256-GCM encrypted cookies, CSRF via `crypto.timingSafeEqual`, safe redirect validation
+- SVG XSS: all user input escaped via `escapeXml()` (5 XML special chars)
+- CSP headers: strict, no `unsafe-eval` in production
+- HSTS: 2-year with preload + subdomains
+- CORS: wildcard only on public read-only endpoints (profile, verify) — rate-limited
+- New profile endpoint: verified clean — does NOT expose confidence or penalties
+- Licenses: MIT/BSD/Apache/ISC dominant. MPL-2.0 only on lightningcss (build-only)
+- Webhook HMAC (Svix), error telemetry sanitization, security.txt all present
 
-### 3. Infrastructure (devops) — YELLOW
+### 3. Infrastructure (devops) — GREEN
 
-- **Build:** succeeds (63 routes, 0 errors)
-- **CI:** all 5 recent runs passed (CI, Bundle Size, Security Scan, Dead Code, Secret Scanning)
-- **Env vars:** code and docs fully aligned, all vars `.trim()`'d
-- **Error pages:** 404, error, global-error all exist
-- **Health endpoint:** `{"status":"ok"}` with Redis + Supabase healthy
-- **Vercel config:** 3 crons correctly configured with auth + maxDuration
-- **GitHub Actions:** 7 workflows (CI, Security, Secrets, Bundle, Dead Code, Claude Review, Lighthouse)
-- **Git state:** 6 unpushed commits, 1 untracked migration, 9 stale worktrees
+- **Build:** succeeds (83 routes, 63 static pages, 0 errors, 7.2s compile)
+- **CI:** all 5 recent runs passed (CI, Bundle Size, Dead Code, Security Scan, Secret Scanning)
+- **Env vars:** all 32 project vars documented and `.trim()`'d — code and docs fully aligned
+- **Error pages:** not-found.tsx, error.tsx, global-error.tsx all exist
+- **Health endpoint:** checks actual data access (Redis ping + Supabase query), returns "degraded" on failure
+- **Vercel config:** 3 crons with `verifyCronSecret()` auth + `maxDuration: 300`
+- **Git state:** clean working tree, no stale worktrees, 4 unpushed commits (W2)
+- **New profile endpoint:** confirmed present with 18 test cases
 
 ### 4. Architecture (architect) — GREEN
 
 - TypeScript: strict mode, clean across all workspaces
-- Dependencies: 3 dev deps slightly behind lockfile (patch/minor)
+- Dependencies: only vitest patch behind (4.1.1 → 4.1.2)
 - Dead code (knip): 0 findings
-- Circular dependencies: 0 (223 lib files, 319 app files scanned)
-- Code duplication: 4.2% (within acceptable range). Concentrated in Bitbucket/Codeberg OAuth routes (structural similarity)
+- Circular dependencies (madge): 0 across 695 files
+- Code duplication: minor — 5 admin routes inline auth instead of using `adminAuth()` helper (R1)
+- DB access properly centralized through `getSupabase()`
+- Platform OAuth properly factored via shared handler factories
 
 ### 5. Performance (performance-eng) — GREEN
 
-- **Bundle:** largest chunk ~227KB (React runtime), no route exceeds 500KB
-- **"use client":** no client directives on layouts or pages (main routes)
-- **Dynamic imports:** heavy components properly lazy-loaded (canvas-confetti, posthog-js, ShareBadgePreview, GlobalCommandBar)
-- **useEffect:** 122 occurrences across 47 files, all appropriate
-- **Fonts:** `display: "swap"`, self-hosted via `next/font/google`, latin subset
-- **Images:** `next/image` with explicit dimensions, no raw `<img>` in UI
-- **Loading states:** 13 loading.tsx files covering all routes
-- **Reduced motion:** 33 files respect `prefers-reduced-motion`
-- **Resource hints:** preconnect + dns-prefetch for GitHub API and PostHog
-- **Deps:** 12 production deps, all heavy libs dynamically imported
+- **Bundle:** largest client chunk 228 KB — all well under 500 KB threshold
+- **Client JS total:** 2.0 MB across all chunks
+- **"use client":** no directives on layouts; only on interactive leaf components
+- **Root layout:** server component — ThemeProvider/PostHog/Keyboard properly isolated as children
+- **Parallel I/O:** profile endpoint uses `Promise.all`; badge route uses `Promise.allSettled`
+- **Fonts:** `display: "swap"`, preconnect hints for GitHub/PostHog
+- **`after()` deferred work:** badge route defers snapshot insert, verification, analytics to post-response
+- **Reduced motion:** 2 CSS global blocks + 14+ JS component checks
+- **Dynamic imports:** PostHog, canvas-confetti, heavy components all lazy-loaded
 
 ### 6. UX/Accessibility (ux-reviewer) — GREEN
 
-- **Headings:** proper h1 → h2 → h3 hierarchy on all pages
-- **ARIA:** comprehensive labeling (nav, toggles, inputs, dialogs, badges, menus)
-- **Focus:** global `:focus-visible` outline + skip-to-content link
-- **Reduced motion:** universal catch-all + specific animation overrides
-- **Alt text:** all images/SVGs have descriptive labels, decorative icons have `aria-hidden`
-- **Keyboard:** all handlers on native interactive elements, focus traps in modals
-- **Error states:** 12 route-specific error boundaries + global error/not-found
-- **Loading states:** 13 loading boundaries covering every route group
-- **Design tokens:** 0 hardcoded hex colors in production pages — full design system adherence
-- **Empty states:** handled in admin table, heatmap, coaching insights, sparkline, autocomplete
+- **Headings:** proper h1 → h2 → h3 hierarchy on all production pages (verified via sr-only h1/h2 pattern)
+- **ARIA:** comprehensive — ThemeToggle, UserMenu, MobileNav, CopyButton, BadgeToolbar, InfoTooltip, RadarChart, AutocompleteDropdown, ConfirmDialog, DimensionCard all labeled
+- **Focus:** global `:focus-visible` outline (2px amber) + skip-to-content link
+- **Reduced motion:** universal catch-all at CSS level + per-component JS checks
+- **Alt text:** all images/SVGs have descriptive labels; decorative icons have `aria-hidden`
+- **Keyboard:** all handlers on native interactive elements; full keyboard support in autocomplete, radar chart, dimension cards
+- **Error states:** 13 route-specific error.tsx + global-error.tsx
+- **Loading states:** 13 loading.tsx covering all route groups
+- **Design tokens:** 0 hardcoded hex colors in production components — full design system adherence
+- **One gap:** campaigns `<tr onClick>` missing keyboard support (W4, admin-only)
