@@ -98,10 +98,10 @@ describe("GET /api/admin/users", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 401 when NEXTAUTH_SECRET is not set", async () => {
+  it("returns 500 when NEXTAUTH_SECRET is not set", async () => {
     vi.stubEnv("NEXTAUTH_SECRET", "");
     const res = await GET(makeRequest());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
   });
 
   it("returns 403 when user is not admin", async () => {

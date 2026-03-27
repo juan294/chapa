@@ -1,8 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
-import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
-import { getClientIp } from "@/lib/http/client-ip";
+import { adminAuth } from "@/lib/auth/admin-route";
 import {
   dbGetAdminUsers,
   type AdminSortField,
@@ -32,32 +29,8 @@ const VALID_SORT_FIELDS: AdminSortField[] = [
  * Data comes from Supabase `admin_users` view (users + latest snapshot).
  */
 export async function GET(request: NextRequest) {
-  // Rate limit: 10 requests per IP per 60 seconds
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-users:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  // Auth: require session cookie
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Admin check
-  if (!isAdminHandle(session.login)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authError = await adminAuth(request, "ratelimit:admin-users");
+  if (authError) return authError;
 
   // Parse query params
   const url = new URL(request.url);

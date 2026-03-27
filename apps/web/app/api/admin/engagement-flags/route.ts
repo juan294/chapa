@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
-import { isAdminHandle } from "@/lib/auth/admin";
+import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
-import { rateLimit } from "@/lib/cache/redis";
-import { getClientIp } from "@/lib/http/client-ip";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 
 /** Feature flag keys that belong to the Engagement section. */
@@ -16,29 +13,8 @@ const ENGAGEMENT_KEYS = new Set(["score_notifications"]);
  * Rate limited: 10 requests per IP per 60 seconds.
  */
 export async function GET(request: NextRequest) {
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-engagement:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!isAdminHandle(session.login)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authError = await adminAuth(request, "ratelimit:admin-engagement");
+  if (authError) return authError;
 
   const allFlags = await dbTimeoutOr504(dbGetFeatureFlags(), "dbGetFeatureFlags");
   if (allFlags instanceof NextResponse) return allFlags;
