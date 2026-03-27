@@ -22,8 +22,6 @@ vi.mock("next/link", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   isStudioEnabledSync: vi.fn(() => false),
-  isBitbucketEnabledSync: vi.fn(() => false),
-  isCodebergEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
 }));
 
@@ -151,11 +149,9 @@ describe("UserMenu — all buttons have explicit type attribute", () => {
   it("every <button> in the component has type='button' or type='submit'", async () => {
     dropdownOpen = true;
 
-    // Enable all conditional sections so every button renders
+    // Enable conditional sections so every button renders
     const featureFlags = await import("@/lib/feature-flags");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
 
     clearPlatformStatusCache();
     vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
@@ -191,8 +187,6 @@ describe("UserMenu — all buttons have explicit type attribute", () => {
 
     // Reset feature flag mocks to prevent leaking into subsequent tests
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
   });
 });
 
@@ -203,10 +197,6 @@ describe("UserMenu — platform status caching", () => {
 
   beforeEach(async () => {
     clearPlatformStatusCache();
-
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
       const urlStr = typeof url === "string" ? url : url.toString();
@@ -617,8 +607,6 @@ describe("UserMenu — Bitbucket link/unlink in dropdown", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -838,8 +826,6 @@ describe("UserMenu — Codeberg link/unlink in dropdown", () => {
   beforeEach(async () => {
     dropdownOpen = true;
     clearPlatformStatusCache();
-    const featureFlags = await import("@/lib/feature-flags");
-    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
   });
 
   afterEach(() => {

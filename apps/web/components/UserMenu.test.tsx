@@ -150,18 +150,13 @@ describe("UserMenu — admin link", () => {
 });
 
 describe("UserMenu — Bitbucket integration", () => {
-  it("imports isBitbucketEnabledSync from feature-flags", () => {
-    expect(SOURCE).toContain("isBitbucketEnabledSync");
-    expect(SOURCE).toContain("@/lib/feature-flags");
-  });
-
-  it("fetches Bitbucket status on mount when feature enabled", () => {
+  it("fetches Bitbucket status on mount (server decides if enabled)", () => {
     expect(SOURCE).toContain("/api/auth/bitbucket/status");
     expect(SOURCE).toContain("useEffect");
   });
 
-  it("renders Link Bitbucket item conditionally on feature flag", () => {
-    expect(SOURCE).toContain("isBitbucketEnabledSync()");
+  it("renders Link Bitbucket item when status is loaded", () => {
+    expect(SOURCE).toContain("bbStatus");
     expect(SOURCE).toContain("Link Bitbucket");
     expect(SOURCE).toContain('href="/api/auth/bitbucket/connect"');
   });
@@ -209,18 +204,13 @@ describe("UserMenu — Bitbucket integration", () => {
 });
 
 describe("UserMenu — Codeberg integration", () => {
-  it("imports isCodebergEnabledSync from feature-flags", () => {
-    expect(SOURCE).toContain("isCodebergEnabledSync");
-    expect(SOURCE).toContain("@/lib/feature-flags");
-  });
-
-  it("fetches Codeberg status on mount when feature enabled", () => {
+  it("fetches Codeberg status on mount (server decides if enabled)", () => {
     expect(SOURCE).toContain("/api/auth/codeberg/status");
-    expect(SOURCE).toContain("isCodebergEnabledSync()");
+    expect(SOURCE).toContain("useEffect");
   });
 
-  it("renders Link Codeberg item conditionally on feature flag", () => {
-    expect(SOURCE).toContain("isCodebergEnabledSync()");
+  it("renders Link Codeberg item when status is loaded", () => {
+    expect(SOURCE).toContain("cbStatus");
     expect(SOURCE).toContain("Link Codeberg");
     expect(SOURCE).toContain('href="/api/auth/codeberg/connect"');
   });
