@@ -67,6 +67,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ### Public API
 - GET `/api/verify/:hash` Badge verification endpoint
+- GET `/api/profile/:handle` Public impact profile snapshot (rate-limited, CORS-enabled)
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
 - GET `/api/health` Health check (Redis + Supabase ping, rate-limited)
 - GET `/api/feature-flags` Public feature flag values
