@@ -1,6 +1,62 @@
-import { describe, it, expect } from "vitest";
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { render, screen, cleanup } from "@testing-library/react";
+import type { StatsData, ImpactV4Result, ImpactTier } from "@chapa/shared";
+import { getBadgeContentCSS } from "./BadgeContent";
+
+// ---------------------------------------------------------------------------
+// Mock heavy dependencies to allow render-based tests in jsdom
+// ---------------------------------------------------------------------------
+
+vi.mock("next/image", () => ({
+  __esModule: true,
+  default: (props: Record<string, unknown>) => {
+    const { fill, priority, ...rest } = props;
+    void fill;
+    void priority;
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...(rest as React.ImgHTMLAttributes<HTMLImageElement>)} />;
+  },
+}));
+
+vi.mock("@/lib/effects/text/ScoreEffectText", () => ({
+  ScoreEffectText: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <span className={className} data-testid="score-effect-text">{children}</span>
+  ),
+  SCORE_EFFECT_CSS: ".score-effect-stub {}",
+}));
+
+vi.mock("@/lib/effects/tier/TierVisuals", () => ({
+  tierPillClasses: (tier: string) => `tier-pill-${tier.toLowerCase()}`,
+  SparkleDots: () => <div data-testid="sparkle-dots" />,
+  TIER_VISUALS_CSS: ".tier-visuals-stub {}",
+}));
+
+vi.mock("@/lib/effects/heatmap/HeatmapGrid", () => ({
+  HeatmapGrid: ({ animation }: { animation: string }) => (
+    <div data-testid="heatmap-grid" data-animation={animation} />
+  ),
+  HEATMAP_GRID_CSS: ".heatmap-stub {}",
+}));
+
+vi.mock("@/lib/effects/counters/use-animated-counter", () => ({
+  useAnimatedCounter: (target: number) => ({ value: target }),
+}));
+
+vi.mock("@/lib/effects/counters/use-in-view", () => ({
+  useInView: () => true,
+}));
+
+vi.mock("@/lib/render/theme", () => ({
+  WARM_AMBER: { accent: "#8B5CF6" },
+}));
+
+// Lazy import after mocks are set up
+const { BadgeContent } = await import("./BadgeContent");
+
+afterEach(cleanup);
 
 const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "BadgeContent.tsx"),
@@ -243,5 +299,315 @@ describe("getBadgeContentCSS", () => {
   it("accepts scoreEffect and tierTreatment options", () => {
     expect(SOURCE).toContain('scoreEffect?: BadgeConfig["scoreEffect"]');
     expect(SOURCE).toContain('tierTreatment?: BadgeConfig["tierTreatment"]');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Render-based tests — exercise actual component branches
+// ---------------------------------------------------------------------------
+
+function makeStats(overrides?: Partial<StatsData>): StatsData {
+  return {
+    handle: "testuser",
+    displayName: "Test User",
+    avatarUrl: "https://example.com/avatar.jpg",
+    commitsTotal: 100,
+    activeDays: 50,
+    prsMergedCount: 20,
+    prsMergedWeight: 40,
+    reviewsSubmittedCount: 10,
+    issuesClosedCount: 5,
+    linesAdded: 5000,
+    linesDeleted: 2000,
+    reposContributed: 3,
+    topRepoShare: 0.6,
+    maxCommitsIn10Min: 5,
+    totalStars: 100,
+    totalForks: 20,
+    totalWatchers: 15,
+    heatmapData: [{ date: "2025-01-01", count: 5 }],
+    fetchedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function makeImpact(overrides?: Partial<ImpactV4Result>): ImpactV4Result {
+  return {
+    handle: "testuser",
+    profileType: "collaborative",
+    dimensions: {
+      delivery: 80,
+      quality: 70,
+      consistency: 60,
+      breadth: 50,
+    },
+    archetype: "Builder",
+    compositeScore: 65,
+    confidence: 85,
+    confidencePenalties: [],
+    adjustedComposite: 62,
+    tier: "Solid" as ImpactTier,
+    computedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+describe("BadgeContent — render-based", () => {
+  describe("avatar rendering", () => {
+    it("renders an img element when avatarUrl is present", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const img = screen.getByAltText("testuser's avatar");
+      expect(img).toBeDefined();
+      expect(img.getAttribute("src")).toBe("https://example.com/avatar.jpg");
+    });
+
+    it("renders a placeholder div when avatarUrl is undefined", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats({ avatarUrl: undefined })} impact={makeImpact()} />,
+      );
+      // No img with avatar alt text
+      expect(screen.queryByAltText("testuser's avatar")).toBeNull();
+      // Placeholder div with bg-amber/20 class
+      const placeholder = container.querySelector(".rounded-full.bg-amber\\/20");
+      expect(placeholder).not.toBeNull();
+    });
+  });
+
+  describe("displayName fallback", () => {
+    it("shows displayName when present", () => {
+      render(
+        <BadgeContent stats={makeStats({ displayName: "Jane Doe" })} impact={makeImpact()} />,
+      );
+      expect(screen.getByText("Jane Doe")).toBeDefined();
+    });
+
+    it("falls back to @handle when displayName is undefined", () => {
+      render(
+        <BadgeContent stats={makeStats({ displayName: undefined })} impact={makeImpact()} />,
+      );
+      expect(screen.getByText("@testuser")).toBeDefined();
+    });
+  });
+
+  describe("tier sparkle dots", () => {
+    it("renders SparkleDots when tierTreatment=enhanced and tier=High", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ tier: "High" })}
+          tierTreatment="enhanced"
+        />,
+      );
+      expect(screen.getByTestId("sparkle-dots")).toBeDefined();
+    });
+
+    it("renders SparkleDots when tierTreatment=enhanced and tier=Elite", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ tier: "Elite" })}
+          tierTreatment="enhanced"
+        />,
+      );
+      expect(screen.getByTestId("sparkle-dots")).toBeDefined();
+    });
+
+    it("does NOT render SparkleDots when tierTreatment=enhanced but tier=Emerging", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ tier: "Emerging" })}
+          tierTreatment="enhanced"
+        />,
+      );
+      expect(screen.queryByTestId("sparkle-dots")).toBeNull();
+    });
+
+    it("does NOT render SparkleDots when tierTreatment=enhanced but tier=Solid", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ tier: "Solid" })}
+          tierTreatment="enhanced"
+        />,
+      );
+      expect(screen.queryByTestId("sparkle-dots")).toBeNull();
+    });
+
+    it("does NOT render SparkleDots when tierTreatment=standard even with High tier", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({ tier: "High" })}
+          tierTreatment="standard"
+        />,
+      );
+      expect(screen.queryByTestId("sparkle-dots")).toBeNull();
+    });
+  });
+
+  describe("score effect data attribute", () => {
+    it("sets data-score-effect to 'standard' by default", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const el = container.querySelector("[data-score-effect]");
+      expect(el).not.toBeNull();
+      expect(el!.getAttribute("data-score-effect")).toBe("standard");
+    });
+
+    it("sets data-score-effect to the provided scoreEffect prop", () => {
+      const { container } = render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} scoreEffect="gold-shimmer" />,
+      );
+      const el = container.querySelector("[data-score-effect]");
+      expect(el).not.toBeNull();
+      expect(el!.getAttribute("data-score-effect")).toBe("gold-shimmer");
+    });
+  });
+
+  describe("adjusted composite score display", () => {
+    it("renders the adjusted composite score", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ adjustedComposite: 77 })} />,
+      );
+      const scoreEl = screen.getByTestId("score-effect-text");
+      expect(scoreEl.textContent).toBe("77");
+    });
+  });
+
+  describe("archetype and tier display", () => {
+    it("renders archetype label", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ archetype: "Marathoner" })} />,
+      );
+      expect(screen.getByText(/Marathoner/)).toBeDefined();
+    });
+
+    it("renders tier symbol and name in archetype pill", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ tier: "Elite" })} />,
+      );
+      // TIER_SYMBOLS for Elite is ★
+      expect(screen.getByText(/\u2605/)).toBeDefined();
+    });
+
+    it("renders the tier pill with correct text", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact({ tier: "High" })} />,
+      );
+      expect(screen.getByText("High")).toBeDefined();
+    });
+  });
+
+  describe("dimension stat cards", () => {
+    it("renders all 4 dimension cards with correct values", () => {
+      render(
+        <BadgeContent
+          stats={makeStats()}
+          impact={makeImpact({
+            dimensions: { delivery: 90, quality: 75, consistency: 60, breadth: 45 },
+          })}
+        />,
+      );
+      expect(screen.getByText("90")).toBeDefined();
+      expect(screen.getByText("75")).toBeDefined();
+      expect(screen.getByText("60")).toBeDefined();
+      expect(screen.getByText("45")).toBeDefined();
+    });
+
+    it("renders dimension labels", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      // "Delivery" and "Quality" appear both as radar axis labels and stat card labels
+      expect(screen.getAllByText("Delivery").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Quality").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Consistency").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Breadth").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("heatmap animation prop passthrough", () => {
+    it("passes heatmapAnimation to HeatmapGrid", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} heatmapAnimation="ripple" />,
+      );
+      const grid = screen.getByTestId("heatmap-grid");
+      expect(grid.getAttribute("data-animation")).toBe("ripple");
+    });
+
+    it("defaults heatmapAnimation to fade-in", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const grid = screen.getByTestId("heatmap-grid");
+      expect(grid.getAttribute("data-animation")).toBe("fade-in");
+    });
+  });
+
+  describe("className and style passthrough", () => {
+    it("applies className to the root element", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} className="custom-class" />,
+      );
+      const root = screen.getByTestId("badge-content");
+      expect(root.className).toContain("custom-class");
+    });
+
+    it("applies style to the root element", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} style={{ maxWidth: "400px" }} />,
+      );
+      const root = screen.getByTestId("badge-content");
+      expect(root.style.maxWidth).toBe("400px");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getBadgeContentCSS — actual function call tests
+// ---------------------------------------------------------------------------
+
+describe("getBadgeContentCSS — invocation tests", () => {
+  it("always includes heatmap CSS", () => {
+    const css = getBadgeContentCSS({});
+    expect(css.length).toBeGreaterThanOrEqual(1);
+    expect(css[0]).toContain("heatmap");
+  });
+
+  it("includes score effect CSS for non-standard effect", () => {
+    const css = getBadgeContentCSS({ scoreEffect: "gold-shimmer" });
+    expect(css.some((s) => s.includes("score-effect"))).toBe(true);
+  });
+
+  it("does not include score effect CSS for standard effect", () => {
+    const css = getBadgeContentCSS({ scoreEffect: "standard" });
+    expect(css.some((s) => s.includes("score-effect"))).toBe(false);
+  });
+
+  it("does not include score effect CSS when scoreEffect is undefined", () => {
+    const css = getBadgeContentCSS({});
+    expect(css.some((s) => s.includes("score-effect"))).toBe(false);
+  });
+
+  it("includes tier visuals CSS for enhanced tier treatment", () => {
+    const css = getBadgeContentCSS({ tierTreatment: "enhanced" });
+    expect(css.some((s) => s.includes("tier-visuals"))).toBe(true);
+  });
+
+  it("does not include tier visuals CSS for standard tier treatment", () => {
+    const css = getBadgeContentCSS({ tierTreatment: "standard" });
+    expect(css.some((s) => s.includes("tier-visuals"))).toBe(false);
+  });
+
+  it("includes both when both options are non-default", () => {
+    const css = getBadgeContentCSS({
+      scoreEffect: "chrome",
+      tierTreatment: "enhanced",
+    });
+    expect(css.length).toBe(3);
   });
 });

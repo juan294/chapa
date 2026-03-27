@@ -769,3 +769,868 @@ describe("UserMenu — loading state during unlink (runtime)", () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// Codeberg disconnect callback: loading, success, failure (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — Codeberg disconnect callback details (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/disconnect")) {
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("updates Codeberg status to unlinked and calls router.refresh after disconnect", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-title")).toBe("Unlink Codeberg?");
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    // After disconnect, Unlink button should be gone (status reset)
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Unlink Codeberg account")).toBeNull();
+    });
+
+    // router.refresh() should have been called
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+});
+
+describe("UserMenu — Codeberg disconnect loading state (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let resolveDisconnect: (value: Response) => void;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/disconnect")) {
+        return new Promise<Response>((resolve) => {
+          resolveDisconnect = resolve;
+        });
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("shows loading on Codeberg confirm dialog while disconnect is pending", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+
+    expect(screen.getByTestId("confirm-dialog").getAttribute("data-loading")).toBe("false");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-loading")).toBe("true");
+    });
+
+    // Resolve to clean up
+    await act(async () => {
+      resolveDisconnect(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    });
+  });
+});
+
+describe("UserMenu — Codeberg disconnect failure (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/disconnect")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("does not crash when Codeberg disconnect fails (graceful failure)", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    // Component should still be rendered; loading should revert to false
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-loading")).toBe("false");
+    });
+
+    // Status should remain linked (not reset since disconnect failed)
+    expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+  });
+});
+
+describe("UserMenu — Bitbucket disconnect failure (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("does not crash when Bitbucket disconnect fails (graceful failure)", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    // Loading should revert to false after failure
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-loading")).toBe("false");
+    });
+
+    // Status should remain linked (disconnect failed)
+    expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Bitbucket/Codeberg "Link" state rendering (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — Bitbucket not-linked state (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("renders 'Link Bitbucket' link when Bitbucket is not linked", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Link Bitbucket")).toBeDefined();
+    });
+
+    const link = screen.getByText("Link Bitbucket").closest("a");
+    expect(link?.getAttribute("href")).toBe("/api/auth/bitbucket/connect");
+  });
+});
+
+describe("UserMenu — Codeberg not-linked state (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("renders 'Link Codeberg' link when Codeberg is not linked", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Link Codeberg")).toBeDefined();
+    });
+
+    const link = screen.getByText("Link Codeberg").closest("a");
+    expect(link?.getAttribute("href")).toBe("/api/auth/codeberg/connect");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Linked Bitbucket/Codeberg display (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — Bitbucket linked state display (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("shows Bitbucket remoteLogin as clickable link to bitbucket.org profile", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("bb-user")).toBeDefined();
+    });
+
+    const link = screen.getByText("bb-user").closest("a");
+    expect(link?.getAttribute("href")).toBe("https://bitbucket.org/bb-user");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+});
+
+describe("UserMenu — Codeberg linked state display (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("shows Codeberg remoteLogin as clickable link to codeberg.org profile", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("cb-user")).toBeDefined();
+    });
+
+    const link = screen.getByText("cb-user").closest("a");
+    expect(link?.getAttribute("href")).toBe("https://codeberg.org/cb-user");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Cancel unlink confirm dialog (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — cancel Bitbucket unlink confirm (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("cancelling the confirm dialog dismisses it without disconnecting", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+
+    // Cancel the dialog
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+
+    // Dialog should be dismissed
+    await waitFor(() => {
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    // Unlink button should still be visible (no disconnect happened)
+    expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    // Disconnect endpoint should NOT have been called
+    const disconnectCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/bitbucket/disconnect"),
+    );
+    expect(disconnectCalls.length).toBe(0);
+  });
+});
+
+describe("UserMenu — cancel Codeberg unlink confirm (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("cancelling the Codeberg confirm dialog dismisses it without disconnecting", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Codeberg account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+    const disconnectCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/codeberg/disconnect"),
+    );
+    expect(disconnectCalls.length).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Feature flag gating — Studio, Admin, Insights menu items (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — Studio menu item when enabled (runtime)", () => {
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+  });
+
+  it("renders Creator Studio link when studio flag is enabled", () => {
+    render(<UserMenu {...baseProps} />);
+
+    expect(screen.getByText("Creator Studio")).toBeDefined();
+    const link = screen.getByText("Creator Studio").closest("a");
+    expect(link?.getAttribute("href")).toBe("/studio");
+  });
+});
+
+describe("UserMenu — Studio hidden when disabled (runtime)", () => {
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+  });
+
+  it("does not render Creator Studio link when studio flag is disabled", () => {
+    render(<UserMenu {...baseProps} />);
+
+    expect(screen.queryByText("Creator Studio")).toBeNull();
+  });
+});
+
+describe("UserMenu — Admin Panel link (runtime)", () => {
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+  });
+
+  it("renders Admin Panel link when isAdmin is true", () => {
+    render(<UserMenu {...baseProps} isAdmin={true} />);
+
+    expect(screen.getByText("Admin Panel")).toBeDefined();
+    const link = screen.getByText("Admin Panel").closest("a");
+    expect(link?.getAttribute("href")).toBe("/admin");
+  });
+
+  it("does not render Admin Panel link when isAdmin is false", () => {
+    render(<UserMenu {...baseProps} isAdmin={false} />);
+
+    expect(screen.queryByText("Admin Panel")).toBeNull();
+  });
+});
+
+describe("UserMenu — Insights menu item (runtime)", () => {
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+  });
+
+  it("renders Import Claude Code Insights button when insights flag is enabled", () => {
+    render(<UserMenu {...baseProps} />);
+
+    expect(screen.getByText("Import Claude Code Insights")).toBeDefined();
+  });
+
+  it("does not render Import Claude Code Insights when insights flag is disabled", async () => {
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(false);
+
+    render(<UserMenu {...baseProps} />);
+
+    expect(screen.queryByText("Import Claude Code Insights")).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Insights upload flow (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — insights file upload flow (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let reloadSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "High" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 85, craftScore: 72, craftTier: "High" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    // Mock window.location.reload
+    reloadSpy = vi.fn() as unknown as ReturnType<typeof vi.spyOn>;
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { ...window.location, reload: reloadSpy },
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+    vi.useRealTimers();
+  });
+
+  it("shows error toast for oversized files", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input).toBeDefined();
+
+    // Create a file exceeding 10MB
+    const bigFile = new File(["x".repeat(11 * 1024 * 1024)], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [bigFile] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.textContent).toContain("File too large");
+      expect(toast.getAttribute("data-type")).toBe("error");
+    });
+  });
+
+  it("shows processing toast and then success toast after upload", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input).toBeDefined();
+
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    // Eventually the success toast should appear
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("success");
+      expect(toast.textContent).toContain("Craft");
+    });
+  });
+
+  it("shows error toast when upload fails", async () => {
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      return Promise.reject(new Error("Network error"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.textContent).toContain("Import failed");
+      expect(toast.getAttribute("data-type")).toBe("error");
+    });
+  });
+
+  it("does nothing when no file is selected", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [] } });
+    });
+
+    // No toast should appear
+    expect(screen.queryByTestId("toast")).toBeNull();
+  });
+
+  it("shows fallback success toast when recalculate fails", async () => {
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "High" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(new Response("{}", { status: 500 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("success");
+      expect(toast.textContent).toContain("Craft");
+      expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Image fallback (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — avatar image error fallback (runtime)", () => {
+  beforeEach(async () => {
+    dropdownOpen = false;
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+  });
+
+  it("shows fallback letter when image fails to load", () => {
+    render(<UserMenu {...baseProps} />);
+
+    const img = screen.getByTestId("avatar");
+    fireEvent.error(img);
+
+    // Fallback letter should appear (first letter of login, uppercased)
+    expect(screen.getByText("T")).toBeDefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Platform status cache reuse (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — platform status cache (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    clearPlatformStatusCache();
+
+    const featureFlags = await import("@/lib/feature-flags");
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("uses cached status on second mount instead of fetching again", async () => {
+    dropdownOpen = true;
+
+    // First mount — fetches status
+    const { unmount } = render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/status");
+    });
+
+    const fetchCountAfterFirst = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/bitbucket/status"),
+    ).length;
+
+    unmount();
+
+    // Second mount — should use cache
+    render(<UserMenu {...baseProps} />);
+
+    // Wait for effects to run
+    await new Promise((r) => setTimeout(r, 50));
+
+    const fetchCountAfterSecond = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/bitbucket/status"),
+    ).length;
+
+    // No additional fetch — cache was used
+    expect(fetchCountAfterSecond).toBe(fetchCountAfterFirst);
+  });
+});

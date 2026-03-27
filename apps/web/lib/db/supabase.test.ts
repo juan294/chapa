@@ -130,4 +130,71 @@ describe("pingSupabase", () => {
     const result = await pingSupabase();
     expect(result).toBe("error");
   });
+
+  it("returns 'error' when query rejects (timeout or network failure)", async () => {
+    const mockSelect = vi.fn().mockReturnValue({
+      limit: vi.fn().mockRejectedValue(new Error("ping timeout")),
+    });
+    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+
+    const result = await pingSupabase();
+    expect(result).toBe("error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lazy singleton edge cases
+// ---------------------------------------------------------------------------
+
+describe("getSupabase lazy singleton", () => {
+  it("caches null and does not log warning on subsequent calls", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+
+    // First call: logs warning and caches null
+    const first = getSupabase();
+    expect(first).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    // Second call: returns cached null, no additional warning
+    const second = getSupabase();
+    expect(second).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(1); // still only 1
+
+    warnSpy.mockRestore();
+  });
+
+  it("returns cached client without calling createClient again", () => {
+    const fakeClient = { from: vi.fn() };
+    mockCreateClient.mockReturnValue(fakeClient);
+
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+
+    getSupabase();
+    getSupabase();
+    getSupabase();
+
+    expect(mockCreateClient).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when SUPABASE_URL is undefined", () => {
+    delete process.env.SUPABASE_URL;
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+
+    expect(getSupabase()).toBeNull();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
+
+  it("returns null when SUPABASE_SERVICE_ROLE_KEY is undefined", () => {
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    expect(getSupabase()).toBeNull();
+    expect(mockCreateClient).not.toHaveBeenCalled();
+  });
 });

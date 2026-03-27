@@ -138,6 +138,115 @@ describe("ImpactBreakdown", () => {
   });
 });
 
+describe("ImpactBreakdown — null guard branch", () => {
+  it("renders fallback message when impact is null", () => {
+    // @ts-expect-error — testing runtime null guard
+    render(<ImpactBreakdown impact={null} stats={SAMPLE_STATS} />);
+    expect(screen.getByText("No impact data available")).toBeDefined();
+  });
+
+  it("renders fallback message when stats is null", () => {
+    // @ts-expect-error — testing runtime null guard
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={null} />);
+    expect(screen.getByText("No impact data available")).toBeDefined();
+  });
+
+  it("renders fallback message when both props are undefined", () => {
+    // @ts-expect-error — testing runtime null guard
+    render(<ImpactBreakdown impact={undefined} stats={undefined} />);
+    expect(screen.getByText("No impact data available")).toBeDefined();
+  });
+});
+
+describe("ImpactBreakdown — craft dimension visibility", () => {
+  it("renders 5 dimension cards when craft is present", () => {
+    const impactWithCraft: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      dimensions: { delivery: 85, quality: 42, consistency: 70, breadth: 55, craft: 60 },
+    };
+    render(<ImpactBreakdown impact={impactWithCraft} stats={SAMPLE_STATS} />);
+    expect(screen.getByText("Craft")).toBeDefined();
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars).toHaveLength(5);
+  });
+
+  it("renders only 4 dimension cards when craft is absent", () => {
+    render(<ImpactBreakdown impact={SAMPLE_IMPACT} stats={SAMPLE_STATS} />);
+    expect(screen.queryByText("Craft")).toBeNull();
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars).toHaveLength(4);
+  });
+
+  it("shows craft score value when craft is present", () => {
+    const impactWithCraft: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      dimensions: { delivery: 85, quality: 42, consistency: 70, breadth: 55, craft: 73 },
+    };
+    render(<ImpactBreakdown impact={impactWithCraft} stats={SAMPLE_STATS} />);
+    expect(screen.getByText("73")).toBeDefined();
+  });
+});
+
+describe("ImpactBreakdown — solo profile type", () => {
+  const SOLO_IMPACT: ImpactV4Result = {
+    ...SAMPLE_IMPACT,
+    profileType: "solo",
+  };
+
+  it("shows solo-specific subtitle for quality dimension", () => {
+    render(<ImpactBreakdown impact={SOLO_IMPACT} stats={SAMPLE_STATS} />);
+    // Solo quality subtitle should be about PR descriptions, branch discipline, issue linkage
+    expect(screen.getByText(/PR descriptions/)).toBeDefined();
+  });
+
+  it("still shows standard subtitles for non-overridden dimensions", () => {
+    render(<ImpactBreakdown impact={SOLO_IMPACT} stats={SAMPLE_STATS} />);
+    // Delivery subtitle is the same for solo and collaborative
+    expect(screen.getByText(/PRs merged/)).toBeDefined();
+  });
+});
+
+describe("getArchetypeProfile — Artificer archetype", () => {
+  it("returns profile with craft description for Artificer", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      archetype: "Artificer",
+      dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 30, craft: 92 },
+    };
+    const result = getArchetypeProfile(impact);
+    expect(result).toContain("defined by craft");
+    // Weakest is breadth (30)
+    expect(result).toContain("Breadth");
+  });
+});
+
+describe("getArchetypeProfile — solo profile tips", () => {
+  it("uses solo quality tip when profileType is solo and quality is weakest", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      profileType: "solo",
+      archetype: "Builder",
+      dimensions: { delivery: 90, quality: 10, consistency: 70, breadth: 55 },
+    };
+    const result = getArchetypeProfile(impact);
+    // Solo quality tip mentions PR descriptions and feature branches
+    expect(result).toContain("PR descriptions");
+    expect(result).toContain("feature branches");
+  });
+
+  it("falls back to standard tip for non-quality dimensions even in solo mode", () => {
+    const impact: ImpactV4Result = {
+      ...SAMPLE_IMPACT,
+      profileType: "solo",
+      archetype: "Marathoner",
+      dimensions: { delivery: 10, quality: 40, consistency: 90, breadth: 55 },
+    };
+    const result = getArchetypeProfile(impact);
+    // Weakest is delivery (10), and there's no solo override for delivery
+    expect(result).toContain("opening and merging more pull requests");
+  });
+});
+
 describe("DataSources", () => {
   it("renders GitHub as default data source", () => {
     render(<DataSources stats={SAMPLE_STATS} handle="testuser" />);
@@ -171,5 +280,40 @@ describe("DataSources", () => {
     expect(screen.getByText("Codeberg")).toBeDefined();
     const link = screen.getByText("Codeberg").closest("a");
     expect(link?.getAttribute("href")).toBe("https://codeberg.org/cbuser");
+  });
+
+  it("renders platform as span (not link) when no username is available", () => {
+    const stats: StatsData = {
+      ...SAMPLE_STATS,
+      linkedPlatforms: ["github", "bitbucket"],
+      // No linkedPlatformLogins for bitbucket — so no URL can be built
+    };
+    render(<DataSources stats={stats} handle="testuser" />);
+    const bitbucketLabel = screen.getByText("Bitbucket");
+    // Should be inside a span, not an anchor
+    expect(bitbucketLabel.closest("a")).toBeNull();
+    expect(bitbucketLabel.closest("span")).not.toBeNull();
+  });
+
+  it("renders only GitHub when linkedPlatforms is undefined", () => {
+    const stats: StatsData = {
+      ...SAMPLE_STATS,
+      linkedPlatforms: undefined,
+    };
+    render(<DataSources stats={stats} handle="testuser" />);
+    expect(screen.getByText("GitHub")).toBeDefined();
+    expect(screen.queryByText("Bitbucket")).toBeNull();
+    expect(screen.queryByText("Codeberg")).toBeNull();
+  });
+
+  it("renders Bitbucket link with correct URL from linkedPlatformLogins", () => {
+    const stats: StatsData = {
+      ...SAMPLE_STATS,
+      linkedPlatforms: ["github", "bitbucket"],
+      linkedPlatformLogins: { bitbucket: "mybbuser" },
+    };
+    render(<DataSources stats={stats} handle="testuser" />);
+    const link = screen.getByText("Bitbucket").closest("a");
+    expect(link?.getAttribute("href")).toBe("https://bitbucket.org/mybbuser");
   });
 });
