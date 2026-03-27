@@ -143,4 +143,20 @@ describe("SharePage", () => {
       expect(SOURCE).toContain("SharePageOwnerContent");
     });
   });
+
+  // #635 — Suspense boundary for streaming
+  describe("Suspense streaming", () => {
+    it("imports Suspense from react", () => {
+      expect(SOURCE).toContain('import { Suspense }');
+    });
+
+    it("wraps content in Suspense with BadgeSkeleton fallback", () => {
+      expect(SOURCE).toContain("<Suspense");
+      expect(SOURCE).toContain("BadgeSkeleton");
+    });
+
+    it("extracts data-dependent content into SharePageContent", () => {
+      expect(SOURCE).toContain("SharePageContent");
+    });
+  });
 });
