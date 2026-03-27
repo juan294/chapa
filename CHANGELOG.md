@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-03-27
+
+### Added
+- Share page Suspense boundary for progressive streaming — page shell renders immediately, badge content loads asynchronously with `BadgeSkeleton` fallback (#635)
+- 43 new tests: 6 new test files (5 loading.tsx + ClientAnalytics), heading hierarchy regression tests, health endpoint coverage; total test count: 6,414 (#637)
+
+### Fixed
+- Linked platforms now appear in Data Sources and badge footer even when stats fetch temporarily fails (expired token, API error) — DB link status is the source of truth (#632)
+- Health endpoint uses `dbsize()` instead of `ping()` for actual Redis data-access check; returns `"skipped"` (200 OK) instead of `"unavailable"` (503) when services are not configured (#634)
+- Cron auth logs a warning when `CRON_SECRET` is not set, making unprotected endpoints visible in logs (#633)
+- Heading hierarchy corrected in experiment pages — `h1` now precedes `h2` in DOM order (#636)
+- E2E health test updated to accept `"skipped"` status
+
+### Changed
+- UserMenu platform visibility driven by server-side status API instead of client-side sync flags — eliminates env var / DB flag mismatches
+- Parallelized linked-platform DB fallback checks via `Promise.all`; extracted `fetchPlatformStatus()` helper in UserMenu
+- 6 minor/patch dependency updates: @supabase/supabase-js, posthog-js, svix, @next/bundle-analyzer, @types/node, eslint-config-next (#638)
+
+### Documentation
+- Updated README test counts, CLAUDE.md health endpoint + agent report descriptions
+- Updated spec.md with Craft dimension, Artificer archetype, profile API + health endpoints
+- Updated badge specs: "Platform Branding" (was "GitHub Branding"), 4/5-axis radar chart, 3 missing render files
+- Removed stale Confidence references from badge design doc
+- Added CHANGELOG link reference definitions for all versions
+
 ## [2.4.0] - 2026-03-27
 
 ### Added
@@ -234,3 +259,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test suite (130+ test files, 2100+ tests)
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
+
+[2.4.1]: https://github.com/juan294/chapa/compare/v2.4.0...v2.4.1
+[2.4.0]: https://github.com/juan294/chapa/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/juan294/chapa/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/juan294/chapa/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/juan294/chapa/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/juan294/chapa/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/juan294/chapa/releases/tag/v1.0.0

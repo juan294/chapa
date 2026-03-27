@@ -55,24 +55,23 @@
 - [Documentation]: Previous knip/unused-exports documentation item RESOLVED (0 findings now). No remaining performance-documentation concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation timestamp=2026-03-20T09:00:00Z -->
-## Documentation Agent — 2026-03-20
+<!-- ENTRY:START agent=documentation timestamp=2026-03-27T10:00:00Z -->
+## Documentation Agent — 2026-03-27
 - **Status**: YELLOW
-- Route coverage: 38/58+ routes documented in CLAUDE.md (~65%). 20+ undocumented routes: entire campaigns API (7 routes), platform connect/disconnect/status (6), OG images (2), LLM endpoints (2), campaign crons (2), well-known (1), pages (3).
-- **Phantom routes**: 2 documented routes don't exist (`/api/auth/bitbucket/login`, `/api/auth/codeberg/login`) — actual routes are `/connect`, `/disconnect`, `/status`.
-- **Method mismatches**: 2 — `feature-flags` docs say PUT, code is PATCH; `engagement-flags` docs say GET|PUT, code has GET only.
-- Design system: 50/51 tokens documented (98%). `--color-complement` base token undocumented. 17/18 animations documented — `animate-hex-cell-in` missing. All hex values accurate.
-- Env vars: **30/30 fully consistent** across CLAUDE.md, codebase, and .env.example. All `.trim()`ed. Previous `NEXT_PUBLIC_INSIGHTS_ENABLED` gap resolved.
-- JSDoc coverage: ~78% of exported functions in `lib/`. Auth, render, impact, history all 95–100%. 4 critical complex functions still lack JSDoc: `isValidTelemetryPayload`, `isValidStatsShape`, `isValidInsightsUpload` (130+ lines), `fetchContributionData`.
-- All 6 required docs exist and are non-empty. README has full setup instructions (195 lines). Shared-context has 7 entries, latest 2026-03-19.
-- Archetype naming: CLAUDE.md correctly documents "Quality Champion" display name vs "guardian" internal route. No `/archetypes/artificer` page despite archetype being listed.
+- Route coverage: **41/42 API routes documented** in CLAUDE.md (98%). 1 undocumented: `POST /api/telemetry`. Previous phantom routes (`bitbucket/login`, `codeberg/login`) RESOLVED. Campaign API routes now fully documented.
+- **Method mismatches**: 5 — `/api/cli/auth/poll` (docs: GET|POST, actual: GET), `/api/admin/feature-flags` (docs: GET|PATCH, actual: PATCH), `/api/admin/engagement-flags` (docs: GET|PUT, actual: GET), `/api/admin/agents/run` (docs: POST, actual: POST|GET|DELETE), `/api/notifications/unsubscribe` (docs: POST, actual: GET).
+- Design system: 50/51 tokens documented (98%). `--color-complement` base token still lacks explicit dark override. 17/18 animations documented — `animate-hex-cell-in` has undocumented 0.45s duration; `animate-shimmer-sweep` missing from animation table. All hex values accurate.
+- Env vars: **30/30 fully consistent**. 8 undocumented env vars found in code (ICEBERG_TOKEN, SVIX_SERVER_URL, SVIX_TOKEN, BOOK_LANG, HOST, MY_SERVER_PORT, TESTPLATFORM_CLIENT_ID/SECRET). Most are dev/test-only; SVIX_* and ICEBERG_TOKEN need investigation.
+- JSDoc coverage: **84% (284/338 exports)**. Up from ~78%. Previously flagged `isValidInsightsUpload`, `isValidStatsShape`, `fetchContributionData` all RESOLVED. Remaining P1 gaps: `isValidTelemetryPayload` (43 lines), `isValidBadgeConfig` (17 lines), `generateInsights` (>30 lines).
+- All 6 required docs exist and are non-empty. README has 215 lines with full setup. `/archetypes/artificer` page now exists.
+- Shared-context has 7 entries, latest 2026-03-27.
 
 **Cross-agent recommendations:**
-- [QA]: 2 phantom routes (`bitbucket/login`, `codeberg/login`) may have stale integration tests. `feature-flags` method mismatch (PUT vs PATCH) could affect admin tests. Archetype "artificer" listed but no page exists.
-- [Security]: Auth cookie functions now have JSDoc (resolved). No security-related doc gaps.
-- [Coverage]: 4 undocumented complex validation functions overlap with files at lower coverage. Priority JSDoc: `lib/insights/validation.ts` (79.5%, 130+ lines undocumented), `lib/utils/validation.ts` (2 functions ~40 lines each).
-- [Performance]: Design system token documentation nearly complete (98%). No remaining performance-documentation concerns.
-- [Cost Analyst]: Campaign API routes (7) and cron jobs (2) fully undocumented — ensure cost model includes campaign email sends.
+- [QA]: 5 method mismatches in CLAUDE.md may cause stale integration test expectations. `/api/notifications/unsubscribe` is GET in code but POST in docs — verify tests use correct method.
+- [Security]: No security-related doc gaps. Undocumented SVIX_* and ICEBERG_TOKEN env vars should be verified for production exposure.
+- [Coverage]: 11 complex undocumented functions overlap with lower-coverage files. Priority JSDoc: `lib/validation.ts` (2 functions), `lib/dashboard/generate-insights.ts`, `lib/db/campaigns.ts` (4 functions).
+- [Performance]: Design system token documentation at 98%. No performance-documentation concerns.
+- [Cost Analyst]: Campaign API routes now fully documented. Undocumented SVIX_* env vars may indicate webhook infrastructure costs not captured in cost model.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security timestamp=2026-03-23T10:00:00Z -->

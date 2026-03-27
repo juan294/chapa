@@ -652,7 +652,7 @@ The `rotate(-90)` makes the arc start from the top (12 o'clock position).
 <line x1="60" y1="560" x2="1140" y2="560" stroke="rgba(139,92,246,0.12)" stroke-width="1"/>
 ```
 
-### 8b. GitHub Branding (left side)
+### 8b. Platform Branding (left side)
 
 Group transform: `translate(60, 583)` (i.e., `PAD`, `footerY - 2`)
 
@@ -965,13 +965,16 @@ Source files (in `apps/web/lib/render/`):
 | File | Responsibility |
 |------|---------------|
 | `BadgeSvg.tsx` | Main layout, header, pills, score ring, footer — orchestrates all sections |
-| `RadarChart.ts` | 4-axis diamond radar chart |
+| `RadarChart.ts` | 4/5-axis radar chart (pentagon when Craft present, diamond fallback) |
 | `heatmap.ts` | 13×7 heatmap grid cells + animation |
 | `theme.ts` | Color palette, tier colors, archetype colors, heatmap color mapping |
 | `BadgeBranding.tsx` | Footer branding: "Forged from purpose. Driven by curiosity." + dynamic platform logos |
 | `VerificationStrip.ts` | Right-edge verification seal |
 | `avatar.ts` | Avatar URL → base64 data URI conversion |
 | `escape.ts` | XML entity escaping for user-controlled text |
+| `svg-to-png.ts` | SVG → PNG conversion (for download) |
+| `demoData.ts` | Demo stats/impact data for preview |
+| `archetypeDemoData.ts` | Per-archetype demo data for guide pages |
 
 Route handler: `apps/web/app/u/[handle]/badge.svg/route.ts`
 
