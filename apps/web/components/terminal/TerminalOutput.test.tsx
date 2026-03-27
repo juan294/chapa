@@ -81,3 +81,101 @@ describe("TerminalOutput", () => {
     expect(prefixSpans.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Line-type color mapping tests (branch coverage for TYPE_STYLES)
+// ---------------------------------------------------------------------------
+
+describe("TerminalOutput — line type color classes", () => {
+  const typeStyleMap: Array<[OutputLine["type"], string]> = [
+    ["input", "text-amber"],
+    ["success", "text-terminal-green"],
+    ["error", "text-terminal-red"],
+    ["warning", "text-terminal-yellow"],
+    ["system", "text-text-secondary"],
+    ["info", "text-text-primary"],
+    ["dim", "text-terminal-dim"],
+  ];
+
+  it.each(typeStyleMap)(
+    "applies %s style class: %s",
+    (type, expectedClass) => {
+      const lines: OutputLine[] = [makeLine(type, `${type} message`, `id-${type}`)];
+      render(<TerminalOutput lines={lines} />);
+
+      // Find the line div by its text content and check className
+      const lineText = screen.getByText(`${type} message`);
+      const lineDiv = lineText.closest("div");
+      expect(lineDiv).not.toBeNull();
+      expect(lineDiv!.className).toContain(expectedClass);
+
+      cleanup();
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Line-type prefix mapping tests (branch coverage for TYPE_PREFIX)
+// ---------------------------------------------------------------------------
+
+describe("TerminalOutput — line type prefix characters", () => {
+  const typePrefixMap: Array<[OutputLine["type"], string]> = [
+    ["input", "> "],
+    ["success", "  "],
+    ["error", "! "],
+    ["warning", "~ "],
+    ["system", "$ "],
+    ["info", "  "],
+    ["dim", "  "],
+  ];
+
+  it.each(typePrefixMap)(
+    "renders correct prefix for %s: '%s'",
+    (type, expectedPrefix) => {
+      const lines: OutputLine[] = [makeLine(type, `test-${type}`, `id-${type}`)];
+      const { container } = render(<TerminalOutput lines={lines} />);
+
+      // The prefix is in a .text-terminal-dim span
+      const prefixSpan = container.querySelector(".text-terminal-dim.select-none");
+      expect(prefixSpan).not.toBeNull();
+      expect(prefixSpan!.textContent).toBe(expectedPrefix);
+
+      cleanup();
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Fallback for unknown line types (default branch of ?? operators)
+// ---------------------------------------------------------------------------
+
+describe("TerminalOutput — unknown type fallback", () => {
+  it("defaults to text-text-primary for an unknown line type", () => {
+    // Force an unknown type to exercise the ?? fallback
+    const lines: OutputLine[] = [
+      { id: "unknown-1", type: "custom" as OutputLine["type"], text: "unknown line" },
+    ];
+    render(<TerminalOutput lines={lines} />);
+
+    const lineText = screen.getByText("unknown line");
+    const lineDiv = lineText.closest("div");
+    expect(lineDiv).not.toBeNull();
+    // Should use fallback class text-text-primary
+    expect(lineDiv!.className).toContain("text-text-primary");
+  });
+
+  it("defaults to double-space prefix for an unknown line type", () => {
+    const lines: OutputLine[] = [
+      { id: "unknown-2", type: "other" as OutputLine["type"], text: "other line" },
+    ];
+    render(<TerminalOutput lines={lines} />);
+
+    const lineText = screen.getByText("other line");
+    const lineDiv = lineText.closest("div");
+    expect(lineDiv).not.toBeNull();
+    // The prefix span is the first child
+    const prefixSpan = lineDiv!.querySelector("span");
+    expect(prefixSpan).not.toBeNull();
+    expect(prefixSpan!.textContent).toBe("  ");
+  });
+});

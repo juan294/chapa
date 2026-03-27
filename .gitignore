@@ -60,6 +60,9 @@ CLAUDE.local.md
 # product hunt launch assets
 producthunt/
 
+# agent operational markers
+docs/agents/.last-triage
+
 # agent logs (root-level ephemeral logs from launchd)
 logs/
 # but track docs/logs/ (error/success learning framework)

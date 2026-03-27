@@ -11,6 +11,7 @@
 
 import type { ImpactV4Result } from "@chapa/shared";
 import { getResend } from "./resend";
+import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getBaseUrl } from "@/lib/env";
 
@@ -84,13 +85,17 @@ export async function notifyFirstBadge(
     ].join("\n");
 
     // 6. Send
-    const { error } = await resend.emails.send({
-      from: "Chapa Notifications <notifications@chapa.thecreativetoken.com>",
-      to: [to],
-      subject,
-      html,
-      text,
-    });
+    const { error } = await withTimeout(
+      resend.emails.send({
+        from: "Chapa Notifications <notifications@chapa.thecreativetoken.com>",
+        to: [to],
+        subject,
+        html,
+        text,
+      }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "notifyFirstBadge",
+    );
 
     if (error) {
       console.error("[email] notifyFirstBadge send failed:", error);

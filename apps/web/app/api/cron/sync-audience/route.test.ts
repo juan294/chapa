@@ -188,3 +188,125 @@ describe("sync-audience logic", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// listAllContacts (tested through GET handler)
+// ---------------------------------------------------------------------------
+
+describe("listAllContacts behavior", () => {
+  beforeEach(() => {
+    vi.mocked(ensureSegment).mockResolvedValue("seg-123");
+    vi.mocked(dbGetUsersWithEmail).mockResolvedValue([]);
+  });
+
+  it("paginates through multiple pages of contacts", async () => {
+    const mockList = vi.fn()
+      .mockResolvedValueOnce({
+        data: {
+          data: [
+            { id: "c-1", email: "a@example.com", unsubscribed: false },
+            { id: "c-2", email: "b@example.com", unsubscribed: false },
+          ],
+          has_more: true,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          data: [
+            { id: "c-3", email: "c@example.com", unsubscribed: false },
+          ],
+          has_more: false,
+        },
+        error: null,
+      });
+
+    vi.mocked(getResend).mockReturnValue({
+      contacts: { list: mockList },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.totalContacts).toBe(3);
+    // Second call should have cursor = last id from first page
+    expect(mockList).toHaveBeenCalledTimes(2);
+    expect(mockList).toHaveBeenNthCalledWith(2, { limit: 100, after: "c-2" });
+  });
+
+  it("handles empty data array from contacts list", async () => {
+    vi.mocked(getResend).mockReturnValue({
+      contacts: {
+        list: vi.fn().mockResolvedValue({
+          data: { data: [], has_more: false },
+          error: null,
+        }),
+      },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.totalContacts).toBe(0);
+  });
+
+  it("handles error from resend during contact listing", async () => {
+    vi.mocked(getResend).mockReturnValue({
+      contacts: {
+        list: vi.fn().mockResolvedValue({
+          data: null,
+          error: { message: "API error", statusCode: 500, name: "server_error" },
+        }),
+      },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    // On error, listAllContacts returns [] — totalContacts = 0
+    expect(body.totalContacts).toBe(0);
+  });
+
+  it("returns empty contacts when getResend returns null", async () => {
+    vi.mocked(getResend).mockReturnValue(null);
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.totalContacts).toBe(0);
+  });
+
+  it("handles listAllContacts timeout by returning empty contacts", async () => {
+    // Mock a very slow contacts.list that takes longer than the timeout
+    vi.mocked(getResend).mockReturnValue({
+      contacts: {
+        list: vi.fn().mockImplementation(
+          () => new Promise((resolve) => {
+            // Never resolves within the timeout — simulate a hang
+            setTimeout(() => resolve({
+              data: { data: [{ id: "c-1", email: "a@example.com", unsubscribed: false }], has_more: false },
+              error: null,
+            }), 60_000);
+          }),
+        ),
+      },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    // We need to use fake timers to test the timeout path
+    vi.useFakeTimers();
+
+    const promise = GET(makeRequest("test-secret"));
+
+    // Advance past the 30s LIST_CONTACTS_TIMEOUT_MS
+    await vi.advanceTimersByTimeAsync(31_000);
+
+    const res = await promise;
+    const body = await res.json();
+
+    // Timeout triggers catch → returns [] → totalContacts = 0
+    expect(body.totalContacts).toBe(0);
+    expect(body.status).toBe("ok");
+
+    vi.useRealTimers();
+  });
+});

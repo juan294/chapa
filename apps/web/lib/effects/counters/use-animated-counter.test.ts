@@ -167,4 +167,170 @@ describe("useAnimatedCounter advanced", () => {
     expect(rafSpy).toHaveBeenCalled();
     rafSpy.mockRestore();
   });
+
+  it("animation completes and sets final value when progress reaches 1", () => {
+    let frameCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation((cb) => {
+      frameCallback = cb;
+      return 1;
+    });
+    const cancelSpy = vi.spyOn(global, "cancelAnimationFrame").mockImplementation(() => {});
+    const perfSpy = vi.spyOn(performance, "now");
+
+    const { result } = renderHook(() => useAnimatedCounter(100, 1000, "linear"));
+
+    // Start animation
+    const startTime = 1000;
+    perfSpy.mockReturnValue(startTime);
+    act(() => {
+      result.current.animate();
+    });
+    expect(result.current.isAnimating).toBe(true);
+
+    // Simulate intermediate frame (50% progress)
+    perfSpy.mockReturnValue(startTime + 500);
+    expect(frameCallback).not.toBeNull();
+    act(() => {
+      frameCallback!(startTime + 500);
+    });
+    expect(result.current.value).toBe(50); // linear easing at 50%
+    expect(result.current.isAnimating).toBe(true);
+
+    // Simulate final frame (100% progress)
+    perfSpy.mockReturnValue(startTime + 1000);
+    act(() => {
+      frameCallback!(startTime + 1000);
+    });
+    expect(result.current.value).toBe(100);
+    expect(result.current.isAnimating).toBe(false);
+
+    rafSpy.mockRestore();
+    cancelSpy.mockRestore();
+    perfSpy.mockRestore();
+  });
+
+  it("animation beyond duration clamps progress to 1", () => {
+    let frameCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation((cb) => {
+      frameCallback = cb;
+      return 1;
+    });
+    const cancelSpy = vi.spyOn(global, "cancelAnimationFrame").mockImplementation(() => {});
+    const perfSpy = vi.spyOn(performance, "now");
+
+    const { result } = renderHook(() => useAnimatedCounter(80, 500, "linear"));
+
+    const startTime = 2000;
+    perfSpy.mockReturnValue(startTime);
+    act(() => {
+      result.current.animate();
+    });
+
+    // Simulate frame well past the duration
+    perfSpy.mockReturnValue(startTime + 2000);
+    act(() => {
+      frameCallback!(startTime + 2000);
+    });
+    expect(result.current.value).toBe(80);
+    expect(result.current.isAnimating).toBe(false);
+
+    rafSpy.mockRestore();
+    cancelSpy.mockRestore();
+    perfSpy.mockRestore();
+  });
+
+  it("cleans up animation frame on unmount during animation", () => {
+    let frameCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation((cb) => {
+      frameCallback = cb;
+      return 42;
+    });
+    const cancelSpy = vi.spyOn(global, "cancelAnimationFrame").mockImplementation(() => {});
+    const perfSpy = vi.spyOn(performance, "now").mockReturnValue(1000);
+
+    const { result, unmount } = renderHook(() => useAnimatedCounter(100, 1000, "linear"));
+
+    // Start animation
+    act(() => {
+      result.current.animate();
+    });
+    expect(result.current.isAnimating).toBe(true);
+
+    // Unmount while animation is in progress — should call cancelAnimationFrame
+    unmount();
+    expect(cancelSpy).toHaveBeenCalled();
+
+    // Suppress lint: frameCallback exists but unused after unmount
+    void frameCallback;
+
+    rafSpy.mockRestore();
+    cancelSpy.mockRestore();
+    perfSpy.mockRestore();
+  });
+
+  it("startOnMount cleanup cancels animation frame on unmount", () => {
+    const cancelSpy = vi.spyOn(global, "cancelAnimationFrame").mockImplementation(() => {});
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation(() => {
+      return 99;
+    });
+
+    const { unmount } = renderHook(() =>
+      useAnimatedCounter(50, 1000, "easeOut", true),
+    );
+
+    // Unmount — should trigger cleanup of the startOnMount requestAnimationFrame
+    unmount();
+    expect(cancelSpy).toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
+  it("falls back to easeOut for unknown easing name", () => {
+    let frameCallback: FrameRequestCallback | null = null;
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation((cb) => {
+      frameCallback = cb;
+      return 1;
+    });
+    const cancelSpy = vi.spyOn(global, "cancelAnimationFrame").mockImplementation(() => {});
+    const perfSpy = vi.spyOn(performance, "now");
+
+    // Use a non-existent easing name
+    const { result } = renderHook(() => useAnimatedCounter(100, 1000, "nonExistentEasing"));
+
+    const startTime = 5000;
+    perfSpy.mockReturnValue(startTime);
+    act(() => {
+      result.current.animate();
+    });
+
+    // At t=0.5 with easeOut: 1 - (1 - 0.5)^3 = 1 - 0.125 = 0.875 => Math.round(0.875 * 100) = 88
+    perfSpy.mockReturnValue(startTime + 500);
+    act(() => {
+      frameCallback!(startTime + 500);
+    });
+
+    // easeOut at 50% gives 0.875 => 88 (same as if we explicitly used easeOut)
+    expect(result.current.value).toBe(88);
+
+    rafSpy.mockRestore();
+    cancelSpy.mockRestore();
+    perfSpy.mockRestore();
+  });
+
+  it("non-startOnMount cleanup returns cancelAnimationFrame for rafRef", () => {
+    const cancelSpy = vi.spyOn(global, "cancelAnimationFrame").mockImplementation(() => {});
+    const rafSpy = vi.spyOn(global, "requestAnimationFrame").mockImplementation(() => 1);
+
+    const { unmount } = renderHook(() =>
+      useAnimatedCounter(50, 1000, "easeOut", false),
+    );
+
+    // Unmount — the else branch in the useEffect cleanup should call cancelAnimationFrame(rafRef.current)
+    unmount();
+    expect(cancelSpy).toHaveBeenCalled();
+
+    rafSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
 });

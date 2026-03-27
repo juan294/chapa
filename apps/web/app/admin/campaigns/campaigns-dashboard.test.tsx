@@ -1256,3 +1256,53 @@ describe("CampaignsDashboard — a11y label associations", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// KEYBOARD ACCESSIBILITY — issue #624
+// ---------------------------------------------------------------------------
+
+describe("CampaignsDashboard — keyboard accessibility (#624)", () => {
+  it("campaign rows have role='button' and tabIndex=0", async () => {
+    render(<CampaignsDashboard />);
+    const cell = await screen.findByText("March Update");
+    const row = cell.closest("tr")!;
+
+    expect(row.getAttribute("role")).toBe("button");
+    expect(row.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("pressing Enter on a campaign row opens the detail view", async () => {
+    render(<CampaignsDashboard />);
+    const cell = await screen.findByText("March Update");
+    const row = cell.closest("tr")!;
+
+    fireEvent.keyDown(row, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Back to campaigns/)).toBeTruthy();
+    });
+  });
+
+  it("pressing Space on a campaign row opens the detail view", async () => {
+    render(<CampaignsDashboard />);
+    const cell = await screen.findByText("March Update");
+    const row = cell.closest("tr")!;
+
+    fireEvent.keyDown(row, { key: " " });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Back to campaigns/)).toBeTruthy();
+    });
+  });
+
+  it("other keys on a campaign row do NOT open the detail view", async () => {
+    render(<CampaignsDashboard />);
+    const cell = await screen.findByText("March Update");
+    const row = cell.closest("tr")!;
+
+    fireEvent.keyDown(row, { key: "Tab" });
+
+    // Should still be in list view — no "Back to campaigns" button
+    expect(screen.queryByText(/Back to campaigns/)).toBeNull();
+  });
+});

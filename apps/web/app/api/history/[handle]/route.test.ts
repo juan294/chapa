@@ -283,6 +283,38 @@ describe("GET /api/history/[handle]", () => {
     expect(mockComputeTrend).toHaveBeenCalledWith(snapshots, 7);
   });
 
+  it("strips confidence and confidencePenalties from snapshot objects", async () => {
+    const s1 = makeSnapshot({
+      date: "2025-06-14",
+      confidence: 85,
+      confidencePenalties: [{ flag: "burst_activity", penalty: 10 }],
+    });
+    const s2 = makeSnapshot({
+      date: "2025-06-15",
+      confidence: 90,
+      confidencePenalties: [],
+    });
+    mockGetSnapshots.mockResolvedValue([s1, s2]);
+    mockComputeTrend.mockReturnValue({
+      direction: "improving",
+      avgDelta: 5,
+      compositeValues: [],
+      dimensions: {},
+    });
+
+    const res = await GET(makeRequest("testuser"), {
+      params: Promise.resolve({ handle: "testuser" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.snapshots).toHaveLength(2);
+    for (const snapshot of body.snapshots) {
+      expect(snapshot).not.toHaveProperty("confidence");
+      expect(snapshot).not.toHaveProperty("confidencePenalties");
+    }
+  });
+
   it("returns 500 when an unexpected error is thrown", async () => {
     mockGetSnapshots.mockRejectedValue(new Error("unexpected boom"));
 

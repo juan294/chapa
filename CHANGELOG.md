@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-03-27
+
+### Added
+- Public profile API endpoint (`GET /api/profile/:handle`) — read-only, rate-limited (60 req/IP/min), CORS-enabled, 1h CDN cache; returns latest impact dimensions, archetype, tier, and optional craft score for external consumers (portfolio sites)
+- 17 new tests across profile endpoint, history API, campaigns a11y, unsubscribe HTML, share page coverage; total test count: 6,371
+- Share page test coverage boosted from 84% to 100% statements
+
+### Changed
+- History API (`/api/history/:handle`) strips `confidence` and `confidencePenalties` from response (internal-only data, per CLAUDE.md policy)
+- 4 admin routes (users, feature-flags, engagement-flags, agents-summary) migrated to shared `adminAuth()` helper (-105 lines)
+- Profile endpoint queries parallelized via `Promise.all` and typed with shared `DimensionScores`
+- Dev dependencies: vitest bumped to 4.1.2, pnpm overrides for picomatch (>=4.0.4) and brace-expansion (>=5.0.5) — 0 audit vulnerabilities
+- Font files excluded from coverage reporting (binary .ttf noise)
+
+### Fixed
+- Flaky `BadgeToolbar.render.test.tsx` test: replaced `setTimeout` with `queueMicrotask` in MockImage callback to eliminate async race
+- Campaigns dashboard: added keyboard support (`role="button"`, `tabIndex`, Enter/Space `onKeyDown`) to table rows
+- Unsubscribe HTML: added `lang="en"` attribute to `<html>` tag
+
+### Documentation
+- `CLAUDE.md`: added `GET /api/profile/:handle` to Public API routes
+- `docs/accepted-risks.md`: documented lightningcss MPL-2.0 license as accepted build-only dependency
+
 ## [2.3.0] - 2026-03-24
 
 ### Added

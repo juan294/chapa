@@ -221,6 +221,26 @@ describe("addContact", () => {
     expect(id).toBeNull();
   });
 
+  it("returns null when 409 conflict and subsequent updateContact also fails", async () => {
+    mockContactsCreate.mockResolvedValue({
+      data: null,
+      error: { message: "Conflict", statusCode: 409, name: "conflict" },
+    });
+    mockContactsUpdate.mockResolvedValue({
+      data: null,
+      error: { message: "Update failed", statusCode: 500, name: "server_error" },
+    });
+
+    const id = await addContact("dev@example.com");
+
+    // updateContact returns null on error, so addContact returns null too
+    expect(id).toBeNull();
+    expect(mockContactsUpdate).toHaveBeenCalledWith({
+      email: "dev@example.com",
+      unsubscribed: false,
+    });
+  });
+
   it("returns null on non-409 error", async () => {
     mockContactsCreate.mockResolvedValue({
       data: null,
@@ -282,6 +302,13 @@ describe("updateContact", () => {
     const id = await updateContact("dev@example.com", {});
     expect(id).toBeNull();
   });
+
+  it("returns null when contacts.update throws an exception", async () => {
+    mockContactsUpdate.mockRejectedValue(new Error("Connection reset"));
+
+    const id = await updateContact("dev@example.com", { unsubscribed: true });
+    expect(id).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -313,6 +340,13 @@ describe("removeContact", () => {
 
   it("returns false when Resend is unavailable", async () => {
     vi.mocked(getResend).mockReturnValueOnce(null);
+
+    const result = await removeContact("dev@example.com");
+    expect(result).toBe(false);
+  });
+
+  it("returns false when contacts.remove throws an exception", async () => {
+    mockContactsRemove.mockRejectedValue(new Error("Network failure"));
 
     const result = await removeContact("dev@example.com");
     expect(result).toBe(false);

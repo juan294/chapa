@@ -12,6 +12,7 @@
 import { Resend } from "resend";
 import { Webhook } from "svix";
 import { escapeHtml } from "@/lib/utils/escape";
+import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 // Re-export so existing consumers (score-bump.ts, unsubscribe/route.ts) keep working
 export { escapeHtml };
 
@@ -199,14 +200,18 @@ export async function forwardEmail(
   ].join("\n");
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: "Chapa Support <support@chapa.thecreativetoken.com>",
-      to: [forwardTo],
-      replyTo: params.from,
-      subject: `Fwd: ${params.subject}`,
-      html: forwardedHtml,
-      text: forwardedText,
-    });
+    const { data, error } = await withTimeout(
+      resend.emails.send({
+        from: "Chapa Support <support@chapa.thecreativetoken.com>",
+        to: [forwardTo],
+        replyTo: params.from,
+        subject: `Fwd: ${params.subject}`,
+        html: forwardedHtml,
+        text: forwardedText,
+      }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "forwardEmail",
+    );
 
     if (error || !data) {
       console.error("[email] Forward failed:", error);

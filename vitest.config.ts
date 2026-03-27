@@ -25,6 +25,7 @@ export default defineConfig({
         "**/*.md",
         "**/node_modules.nosync/**",
         "**/__fixtures__/**",
+        "**/fonts/**",
       ],
       thresholds: {
         statements: 75,

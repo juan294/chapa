@@ -77,11 +77,19 @@ export async function GET(request: NextRequest, context: Params) {
     // Fetch snapshots
     const snapshots = await getSnapshots(handle, from, to);
 
+    // Strip internal-only fields (confidence is internal; penalty flags could
+    // be perceived as accusatory if discovered by end-users).
+    const publicSnapshots = snapshots.map((s) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { confidence, confidencePenalties, ...publicSnapshot } = s;
+      return publicSnapshot;
+    });
+
     // Build response
     const response: Record<string, unknown> = { handle };
 
     if (includes.has("snapshots")) {
-      response.snapshots = snapshots;
+      response.snapshots = publicSnapshots;
     }
 
     if (includes.has("trend")) {

@@ -86,6 +86,14 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** None (cosmetic build warning)
 - **Accepted:** 2026-03-22
 
+## MPL-2.0 License (lightningcss) (#627)
+
+- **Risk:** `lightningcss` and `lightningcss-darwin-arm64` are licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
+- **Accepted because:** MPL-2.0 is a weak copyleft that only requires sharing modifications to MPL-licensed files themselves — not the entire project. lightningcss is a build-time dependency (Tailwind CSS processor) that is not bundled into the production application. No MPL-licensed code is distributed to end users.
+- **Mitigation:** None required. The dependency is transitive via Tailwind and not directly imported.
+- **Severity:** Low
+- **Accepted:** 2026-03-27
+
 ---
 
 ## Infrastructure

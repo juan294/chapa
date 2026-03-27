@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 /** Default timeout for database/external service calls (10 seconds). */
 export const DB_TIMEOUT_MS = 10_000;
 
+/** Default timeout for outbound email sends via Resend (10 seconds). */
+export const EMAIL_SEND_TIMEOUT_MS = 10_000;
+
 /**
  * Custom error thrown when a promise exceeds the specified timeout.
  */

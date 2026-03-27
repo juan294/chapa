@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-03-24 | 4 reports processed | 10 action items
+> Generated on 2026-03-26 | 4 reports processed | 10 action items
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -7,35 +7,48 @@ None — all agents ran successfully.
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cc-rpi-update-report.md | cc-rpi Update | GREEN | 0 (sync completed, new conflict resolution patterns) |
-| 2 | cost-analyst-report.md | Cost Analyst | GREEN | 0 (all systems stable, no material changes) |
-| 3 | coverage-report.md | Coverage | GREEN | 10 (branch coverage for 4 critical-path files + 6 server pages) |
-| 4 | security-report.md | Security | GREEN | 0 (clean audit, 0 vulnerabilities) |
+| 1 | coverage-report.md | Coverage | GREEN | 9 (Priority 1: 6, Priority 2: 4, minus 1 accepted JSDOM limitation) |
+| 2 | qa-report.md | QA | GREEN | 2 (error boundary, docs mismatch — 1 already resolved) |
+| 3 | cost-analyst-report.md | Cost Analyst | GREEN | 1 code fix + 2 monitor/carry |
+| 4 | cc-rpi-update-report.md | cc-rpi Update | N/A | 0 — already at v1.12.0 |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Server page test for `app/page.tsx` | Coverage P1 | Already exists | Verified |
-| 2 | Server page test for `app/studio/page.tsx` | Coverage P1 | 16 tests (new file) | Done |
-| 3 | Server page test for `app/admin/page.tsx` | Coverage P1 | Already exists | Verified |
-| 4 | Server page test for `app/about/verification/page.tsx` | Coverage P1 | Already exists | Verified |
-| 5 | Server page test for `app/about/scoring/page.tsx` | Coverage P1 | Already exists | Verified |
-| 6 | Server page test for `app/generating/[handle]/page.tsx` | Coverage P1 | Already exists | Verified |
-| 7 | `AdminDashboardClient.tsx` branch coverage (71.0%) | Coverage P2 | Render tests already exist | Verified |
-| 8 | `campaigns-dashboard.tsx` branch coverage (75.1%) | Coverage P2 | 22 tests (edit, test email, engagement) | Done |
-| 9 | `lib/db/user-platforms.ts` branch coverage (81.8%) | Coverage P2 | 8 tests (null/error branches) | Done |
-| 10 | `campaigns/[id]/test/route.ts` coverage (83.3%) | Coverage P2 | 3 tests (invalid JSON, engagement, throw) | Done |
+| 1 | useAdminDashboard.ts branch coverage | Coverage | +14 tests | DONE |
+| 2 | terminal-display.tsx branch coverage | Coverage | +7 tests | DONE |
+| 3 | HeatmapGrid.tsx branch coverage | Coverage | +18 tests | DONE |
+| 4 | email/campaigns.ts edge cases | Coverage | +7 tests | DONE |
+| 5 | BadgePreviewCard.tsx runtime tests | Coverage | +15 tests | DONE |
+| 6 | UserMenu.tsx runtime tests | Coverage | +12 tests | DONE |
+| 7 | RadarChartInteractive.tsx branch coverage | Coverage | +20 tests | DONE |
+| 8 | ActivityHeatmap.tsx branch coverage | Coverage | +12 tests | DONE |
+| 9 | /cli/authorize error boundary | QA | +7 tests | DONE |
+| 10 | Resend emails.send() timeout | Cost Analyst | +1 test | DONE |
+
+### Skipped with justification
+| Item | Reason |
+|------|--------|
+| campaigns-dashboard.tsx (79.7% funcs) | Exploration agent found all handlers fully covered — remaining gap is JSX lambdas, not meaningful action handlers |
+| CLAUDE.md studio/config docs mismatch | Already resolved — CLAUDE.md says GET\|PUT which matches implementation. QA finding stale since 2026-03-18 |
+| ParticleBackground.tsx (72.2% branch) | JSDOM canvas limitation — same accepted category as experiments/HolographicOverlay |
+| OG image blob storage | Future scale concern (50K+ users), no code change now |
+| sync-audience pagination | Working correctly, monitor at scale |
+| Supabase SDK chunk dedup | Minor optimization, import audit only — no meaningful bundle savings |
 
 ## Verification
-- [x] All tests passing (5,767 tests, 346 files)
+- [x] All 6,129 tests passing (370 files)
 - [x] Typecheck clean (0 errors)
-- [x] Lint clean (0 issues)
-- [x] CI green (pushed to develop, monitoring)
+- [x] Lint clean (0 errors, 0 warnings)
+- [x] CI monitoring (background)
 
 ## Carried Items
-| Item | Since | Priority | Notes |
-|------|-------|----------|-------|
-| Server page 0% coverage (V8 limitation) | 2026-03-23 | Info | Source-inspection tests exist but V8 doesn't track `fs.readFileSync` reads. Accepted pattern. |
-| `/api/studio/config` docs mismatch | 2026-03-18 (QA) | Low | Docs say POST, code has GET+PUT. Documentation agent domain. |
+| Item | Since | Risk |
+|------|-------|------|
+| OG image blob storage | 2026-03-12 | LOW — revisit at 50K+ users |
+| sync-audience pagination | 2026-03-18 | LOW — working correctly |
+
+## Summary
+All 4 reports GREEN. Added 97 tests across 10 files (+1 new test file, +1 new error boundary). Added 10s timeout to all Resend email send calls. Test count: 6,032 → 6,129. No blockers, no regressions.

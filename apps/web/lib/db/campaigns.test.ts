@@ -22,7 +22,7 @@ const mockFrom = vi.fn((): any => ({
       eq: () => chainable,
       in: () => Promise.resolve(queryResult),
       maybeSingle: () => Promise.resolve(queryResult),
-      limit: () => Promise.resolve(queryResult),
+      limit: () => chainable,
       then: (resolve: (v: unknown) => void) => resolve(queryResult),
     };
     return chainable;
@@ -61,6 +61,13 @@ vi.mock("./supabase", () => ({
   getSupabase: vi.fn(() => ({ from: mockFrom })),
 }));
 
+const mockCacheGet = vi.fn();
+const mockCacheSet = vi.fn();
+vi.mock("../cache/redis", () => ({
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
+  cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+}));
+
 import { getSupabase } from "./supabase";
 import {
   dbGetCampaigns,
@@ -73,6 +80,7 @@ import {
   dbMarkSendsSent,
   dbMarkSendsFailed,
   dbGetCampaignStats,
+  dbGetActiveEngagementCampaign,
 } from "./campaigns";
 
 beforeEach(() => {
@@ -191,6 +199,23 @@ describe("dbGetCampaigns", () => {
     const result = await dbGetCampaigns("sending");
     expect(result).toHaveLength(1);
     expect(result[0]!.status).toBe("sending");
+  });
+
+  it("accepts optional type filter", async () => {
+    queryResult = { data: [{ ...fullRow, type: "engagement" }], error: null };
+
+    const result = await dbGetCampaigns(undefined, "engagement");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.type).toBe("engagement");
+  });
+
+  it("accepts both status and type filters", async () => {
+    queryResult = { data: [{ ...fullRow, type: "engagement", status: "draft" }], error: null };
+
+    const result = await dbGetCampaigns("draft", "engagement");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.type).toBe("engagement");
+    expect(result[0]!.status).toBe("draft");
   });
 });
 
@@ -583,5 +608,88 @@ describe("dbGetCampaignStats", () => {
     queryResult = { data: [], error: null };
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbGetActiveEngagementCampaign
+// ---------------------------------------------------------------------------
+
+describe("dbGetActiveEngagementCampaign", () => {
+  beforeEach(() => {
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(undefined);
+  });
+
+  it("returns cached campaign on cache hit", async () => {
+    const cached = {
+      id: "c-cached",
+      type: "engagement",
+      name: "Cached Campaign",
+      subject: "Subject",
+      previewText: null,
+      headline: "Head",
+      bodyText: "Body",
+      features: [],
+      ctaText: "CTA",
+      ctaUrl: "https://example.com",
+      status: "sent",
+      totalRecipients: 10,
+      sentCount: 10,
+      failedCount: 0,
+      createdAt: "2026-03-15T00:00:00Z",
+      startedAt: null,
+      completedAt: null,
+    };
+    mockCacheGet.mockResolvedValue(cached);
+
+    const result = await dbGetActiveEngagementCampaign();
+
+    expect(result).toEqual(cached);
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("fetches from DB on cache miss and caches result", async () => {
+    const engagementRow = { ...fullRow, type: "engagement" };
+    queryResult = { data: engagementRow, error: null };
+
+    const result = await dbGetActiveEngagementCampaign();
+
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe("engagement");
+    expect(mockCacheGet).toHaveBeenCalledWith("campaign:active-engagement");
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "campaign:active-engagement",
+      expect.objectContaining({ type: "engagement" }),
+      3600,
+    );
+  });
+
+  it("returns null when DB returns no data (cache miss)", async () => {
+    queryResult = { data: null, error: null };
+
+    const result = await dbGetActiveEngagementCampaign();
+
+    expect(result).toBeNull();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("returns null on DB error (catch block)", async () => {
+    queryResult = { data: null, error: new Error("DB connection lost") };
+
+    const result = await dbGetActiveEngagementCampaign();
+
+    expect(result).toBeNull();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("returns null when Supabase is unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+
+    const result = await dbGetActiveEngagementCampaign();
+
+    expect(result).toBeNull();
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 });

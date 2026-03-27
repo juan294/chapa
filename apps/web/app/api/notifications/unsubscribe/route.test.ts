@@ -148,4 +148,84 @@ describe("GET /api/notifications/unsubscribe", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
   });
+
+  it("does not call Resend sync when dbGetUserEmail rejects (catch returns null)", async () => {
+    mockDbGetUserEmail.mockRejectedValue(new Error("DB unreachable"));
+
+    const res = await GET(makeRequest("testuser"));
+
+    // Should still succeed (fail-open)
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when markUnsubscribed rejects (fire-and-forget)", async () => {
+    mockDbGetUserEmail.mockResolvedValue({
+      email: "dev@example.com",
+      emailNotifications: true,
+    });
+    mockMarkUnsubscribed.mockRejectedValue(new Error("Resend down"));
+
+    const res = await GET(makeRequest("testuser"));
+
+    expect(res.status).toBe(200);
+    // Wait for the fire-and-forget promise to settle
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockMarkUnsubscribed).toHaveBeenCalledWith("dev@example.com");
+  });
+
+  it("does not call Resend sync when email field is empty string", async () => {
+    mockDbGetUserEmail.mockResolvedValue({ email: "", emailNotifications: true });
+
+    await GET(makeRequest("testuser"));
+
+    await new Promise((r) => setTimeout(r, 10));
+    // Empty string is falsy, so markUnsubscribed should not be called
+    expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
+  });
+
+  it("does not call Resend sync when email field is undefined", async () => {
+    mockDbGetUserEmail.mockResolvedValue({ emailNotifications: true });
+
+    await GET(makeRequest("testuser"));
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
+  });
+
+  it("still updates DB even when dbGetUserEmail fails", async () => {
+    mockDbGetUserEmail.mockRejectedValue(new Error("query fail"));
+
+    await GET(makeRequest("testuser"));
+
+    // dbUpdate should still have been called (Promise.all runs both)
+    expect(mockDbUpdateEmailNotifications).toHaveBeenCalledWith("testuser", false);
+  });
+
+  it("passes the rate limit key with the client IP", async () => {
+    await GET(makeRequest("testuser"));
+
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      "ratelimit:unsubscribe:127.0.0.1",
+      10,
+      60,
+    );
+  });
+
+  it("includes lang attribute on html tag", async () => {
+    const res = await GET(makeRequest("testuser"));
+    const body = await res.text();
+
+    expect(body).toContain('<html lang="en">');
+  });
+
+  it("includes viewport meta tag", async () => {
+    const res = await GET(makeRequest("testuser"));
+    const body = await res.text();
+
+    expect(body).toContain(
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    );
+  });
 });

@@ -997,7 +997,10 @@ describe("BadgeToolbar render", () => {
       });
       vi.stubGlobal("fetch", mockFetch);
 
-      // Use class-based Image mock to avoid vitest warning
+      // Use class-based Image mock to avoid vitest warning.
+      // Use queueMicrotask (not setTimeout) so the onerror fires within the
+      // same act() flush — setTimeout schedules a macrotask that act() won't
+      // drain, causing a race where capturedSrc is still empty at assertion time.
       class MockImage {
         width = 0;
         height = 0;
@@ -1009,9 +1012,9 @@ describe("BadgeToolbar render", () => {
           this._src = val;
           capturedSrc = val;
           // Trigger error to force SVG fallback
-          setTimeout(() => {
+          queueMicrotask(() => {
             this.onerror?.(new Event("error"));
-          }, 0);
+          });
         }
       }
       const origImage = globalThis.Image;
@@ -1023,6 +1026,9 @@ describe("BadgeToolbar render", () => {
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+        // Let the microtask (onerror) and subsequent promise rejection
+        // settle within act() so handleDownload completes fully
+        await new Promise((r) => setTimeout(r, 0));
       });
 
       // The data URI src should have animations stripped

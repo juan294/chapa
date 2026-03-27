@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { NextResponse } from "next/server";
-import { withTimeout, dbTimeoutOr504, TimeoutError, DB_TIMEOUT_MS } from "./with-timeout";
+import { withTimeout, dbTimeoutOr504, TimeoutError, DB_TIMEOUT_MS, EMAIL_SEND_TIMEOUT_MS } from "./with-timeout";
 
 describe("withTimeout", () => {
   it("resolves when the promise completes within the timeout", async () => {
@@ -48,6 +48,10 @@ describe("withTimeout", () => {
 
   it("exports DB_TIMEOUT_MS as 10_000", () => {
     expect(DB_TIMEOUT_MS).toBe(10_000);
+  });
+
+  it("exports EMAIL_SEND_TIMEOUT_MS as 10_000", () => {
+    expect(EMAIL_SEND_TIMEOUT_MS).toBe(10_000);
   });
 
   it("clears the internal timer when the promise resolves before timeout", async () => {

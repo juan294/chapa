@@ -16,6 +16,7 @@
 import type { SnapshotDiff } from "@/lib/history/diff";
 import type { SignificantChange } from "@/lib/history/significant-change";
 import { getResend, escapeHtml } from "./resend";
+import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import { EMAIL_FROM, buildEmailContent } from "./campaigns";
 import {
   buildAnnouncementHtml,
@@ -127,13 +128,17 @@ export async function notifyScoreBump(
     }
 
     // 6. Send
-    const { error } = await resend.emails.send({
-      from: EMAIL_FROM,
-      to: [userEmail.email],
-      subject,
-      html,
-      text,
-    });
+    const { error } = await withTimeout(
+      resend.emails.send({
+        from: EMAIL_FROM,
+        to: [userEmail.email],
+        subject,
+        html,
+        text,
+      }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "notifyScoreBump",
+    );
 
     if (error) {
       console.error("[email] notifyScoreBump send failed:", error);
