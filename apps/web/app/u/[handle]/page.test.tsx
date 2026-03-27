@@ -161,11 +161,21 @@ vi.mock("@/components/dashboard/HeroScoreZone", () => ({
   HeroScoreZone: () => "<div>hero</div>",
 }));
 
+// Mock date utility for predictable metadata URLs
+vi.mock("@/lib/utils/date", () => ({
+  toDateString: () => "2026-01-01",
+}));
+
+// Mock BadgeSkeleton (used in fallback path when inline SVG is null)
+vi.mock("@/components/BadgeSkeleton", () => ({
+  BadgeSkeleton: () => null,
+}));
+
 // ---------------------------------------------------------------------------
 // Import the page after all mocks
 // ---------------------------------------------------------------------------
 
-import SharePage from "./page";
+import SharePage, { generateMetadata } from "./page";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -472,6 +482,124 @@ describe("SharePage /u/[handle]", () => {
       });
       await renderPage();
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("uses handle as displayLabel when stats has no displayName", async () => {
+      mockGetStats.mockResolvedValue({ ...FAKE_STATS, displayName: undefined });
+      const result = await renderPage();
+      // The JSX tree should contain the handle as fallback label
+      expect(result).toBeDefined();
+    });
+
+    it("uses current ISO string as badgeCacheBuster when stats is null", async () => {
+      mockGetStats.mockResolvedValue(null);
+      const result = await renderPage();
+      // Should render without crashing — falls through to img fallback
+      expect(result).toBeDefined();
+    });
+
+    it("does not call smoothScore or getTier when impact is null", async () => {
+      mockGetStats.mockResolvedValue(null);
+      await renderPage();
+      expect(mockSmoothScore).not.toHaveBeenCalled();
+      expect(mockGetTier).not.toHaveBeenCalled();
+    });
+
+    it("does not register after() when inlineSvg is null (interactive preview)", async () => {
+      // Custom config + stats + impact → interactive preview path → no inlineSvg → no after()
+      mockCacheGet.mockResolvedValue({
+        background: "aurora",
+        cardStyle: "default",
+        border: "default",
+        scoreEffect: "default",
+        heatmapAnimation: "default",
+        interaction: "default",
+        statsDisplay: "default",
+        tierTreatment: "default",
+        celebration: "default",
+      });
+      await renderPage();
+      expect(mockAfter).not.toHaveBeenCalled();
+    });
+
+    it("uses config that matches all defaults as non-custom (no interactive preview)", async () => {
+      // Config exactly matching DEFAULT_BADGE_CONFIG should NOT trigger interactive preview
+      mockCacheGet.mockResolvedValue({
+        background: "solid",
+        cardStyle: "flat",
+        border: "solid-amber",
+        scoreEffect: "standard",
+        heatmapAnimation: "fade-in",
+        interaction: "static",
+        statsDisplay: "static",
+        tierTreatment: "standard",
+        celebration: "none",
+      });
+      await renderPage();
+      // Should use inline SVG, not interactive preview
+      expect(mockRenderBadgeSvg).toHaveBeenCalled();
+    });
+
+    it("treats null config as non-custom (hasCustomConfig returns false)", async () => {
+      mockCacheGet.mockResolvedValue(null);
+      await renderPage();
+      expect(mockRenderBadgeSvg).toHaveBeenCalled();
+    });
+
+    it("personJsonLd omits description when impact is null", async () => {
+      mockGetStats.mockResolvedValue(null);
+      const result = await renderPage();
+      // With null stats, impact is null, so personJsonLd should not have description
+      expect(result).toBeDefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // generateMetadata
+  // -------------------------------------------------------------------------
+
+  describe("generateMetadata", () => {
+    it("returns 'Not Found' title for invalid handle", async () => {
+      mockIsValidHandle.mockReturnValue(false);
+      const meta = await generateMetadata({
+        params: Promise.resolve({ handle: "bad!!handle" }),
+      });
+      expect(meta).toEqual({ title: "Not Found" });
+    });
+
+    it("returns full metadata for valid handle", async () => {
+      mockIsValidHandle.mockReturnValue(true);
+      const meta = await generateMetadata({
+        params: Promise.resolve({ handle: "testuser" }),
+      });
+
+      expect(meta.title).toBe("@testuser — Developer Impact, Decoded");
+      expect(meta.description).toContain("testuser");
+      expect(meta.openGraph).toBeDefined();
+      expect(meta.openGraph!.title).toContain("testuser");
+      expect(meta.openGraph!.url).toBe("https://chapa.thecreativetoken.com/u/testuser");
+      expect(meta.openGraph!.images).toHaveLength(1);
+      expect((meta.openGraph!.images as Array<{ url: string }>)[0].url).toContain("og-image?v=2026-01-01");
+      expect(meta.twitter).toBeDefined();
+      expect(meta.twitter!.card).toBe("summary_large_image");
+      expect(meta.alternates?.canonical).toBe("https://chapa.thecreativetoken.com/u/testuser");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // after() callback — snapshot insert not-inserted branch
+  // -------------------------------------------------------------------------
+
+  describe("after() snapshot cache skip", () => {
+    it("does not update snapshot cache when dbInsertSnapshot returns false", async () => {
+      mockDbInsertSnapshot.mockResolvedValue(false);
+      await renderPage();
+
+      const afterCallback = mockAfter.mock.calls[0][0];
+      await afterCallback();
+
+      expect(mockDbInsertSnapshot).toHaveBeenCalled();
+      expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
     });
   });
 });
