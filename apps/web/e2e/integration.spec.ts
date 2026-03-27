@@ -228,22 +228,23 @@ test.describe("Integration — Health endpoint (/api/health)", () => {
     expect(body.dependencies).toHaveProperty("redis");
     expect(body.dependencies).toHaveProperty("supabase");
 
-    // Each dependency reports "ok", "error", or "unavailable" (when not configured)
-    expect(["ok", "error", "unavailable"]).toContain(body.dependencies.redis);
-    expect(["ok", "error", "unavailable"]).toContain(body.dependencies.supabase);
+    // Each dependency reports "ok", "error", "unavailable", or "skipped" (env vars not configured)
+    expect(["ok", "error", "unavailable", "skipped"]).toContain(body.dependencies.redis);
+    expect(["ok", "error", "unavailable", "skipped"]).toContain(body.dependencies.supabase);
   });
 
   test("status is 'ok' only when all dependencies are healthy", async ({ request }) => {
     const response = await request.get("/api/health");
     const body = await response.json();
 
-    // Per the route handler: status is "ok" only if both deps are "ok"
+    // Per the route handler: status is "ok" when both deps are healthy ("ok" or "skipped")
+    const isHealthy = (s: string) => s === "ok" || s === "skipped";
     if (body.status === "ok") {
-      expect(body.dependencies.redis).toBe("ok");
-      expect(body.dependencies.supabase).toBe("ok");
+      expect(isHealthy(body.dependencies.redis)).toBe(true);
+      expect(isHealthy(body.dependencies.supabase)).toBe(true);
     }
-    // Any non-"ok" dependency means degraded
-    if (body.dependencies.redis !== "ok" || body.dependencies.supabase !== "ok") {
+    // Any non-healthy dependency means degraded
+    if (!isHealthy(body.dependencies.redis) || !isHealthy(body.dependencies.supabase)) {
       expect(body.status).toBe("degraded");
     }
   });
