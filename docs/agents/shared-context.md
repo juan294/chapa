@@ -9,50 +9,50 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-26T09:00:00Z -->
-## Cost Analyst — 2026-03-26
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-03-27T09:00:00Z -->
+## Cost Analyst — 2026-03-27
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$40-60** (Vercel $20, Redis $10-20, Resend $0-20, Supabase free). At 50K users: ~$65-100/mo. Stable — no new cost risks.
-- Redis: **24 key pattern families** (was 17). +7 new: bitbucket, codeberg, craft, supplemental, og-image, campaign daily-sends, cli device. TTL coverage 100% per-user keys. 2 global singletons without TTL — intentional, combined <16 KB.
-- **Estimated Redis memory @10K users: ~243 MB** (93 MB user keys + 150 MB images). Refined estimate (previous 535 MB double-counted OG images). Well within Upstash Pro 10 GB (97.6% headroom).
-- GitHub API budget: **~57 calls/hr @10K** (1.1% of 5K/hr limit). Conservative estimate with 6h cache. Safe until 500K+ users.
-- Supabase: **9 tables + 2 views** (was +1 view). `admin_users` view added. Singleton lazy client, PostgREST REST API. 0 N+1 patterns. RLS on all 9 tables with FORCE ROW LEVEL SECURITY (migration 018). `dbGetCampaignStats()` JS aggregation ACCEPTED.
-- Fetch timeout coverage: **100% critical path**. 2 non-critical missing: `captureServerError` PostHog (fire-and-forget), `emails.send()` Resend (relies on Vercel 30s default).
-- Resource leaks: **0 critical, 0 warnings**. All timers cleaned. All `after()` callbacks use `Promise.allSettled`. Bounded batch processing throughout.
-- Rate limiting: **28/30 routes** (93%). 2 intentionally unprotected (login redirect, public feature-flags). All fail-open. Campaign email: 95/day quota.
-- Build: No routes exceed 500KB. Supabase SDK in 2 chunks (160KB each, minor duplication). 42 API routes, all correctly dynamic.
+- Estimated monthly cost at 10K users: **~$40-60** (Vercel $20, Redis $10-20, Resend $0-20, Supabase free). At 50K users: ~$70-175/mo. Stable — no new cost risks.
+- Redis: **24 key pattern families**. TTL coverage 100% per-user keys. 3 global singletons without TTL (badges_generated counter, unique_badges HyperLogLog, warm-cache offset) — intentional, combined <16 KB.
+- **Estimated Redis memory @10K users: ~243 MB** (78 MB user data + 15 MB avatars + 150 MB OG images). Well within Upstash Pro 10 GB (97.6% headroom).
+- GitHub API budget: **~57 calls/hr @10K** (1.1% of 5K/hr limit). 6h cache + 7d stale fallback + in-flight dedup. Safe until 500K+ users.
+- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 11 indexes. RLS on all 9 tables with FORCE. `dbGetCampaignStats()` JS aggregation ACCEPTED (PostgREST limitation).
+- Fetch timeout coverage: **100%**. Resend gap **RESOLVED** — `withTimeout(EMAIL_SEND_TIMEOUT_MS=10s)` applied to all 4 email modules (resend.ts, notifications.ts, score-bump.ts, campaigns.ts) per triage 2026-03-26.
+- Resource leaks: **0 critical, 0 warnings**. All timers cleaned. All `after()` callbacks use `Promise.allSettled`. Bounded batch processing throughout. Child process streams properly destroyed.
+- Rate limiting: **30/42 routes** (71%). Remaining 12 use admin auth (session + handle check), bearer token (cron), or are internal. All fail-open. Campaign email: 95/day quota.
+- Build: No routes exceed 500KB. 1,800 KB total client JS across 71 chunks. Supabase SDK in 2 chunks (160KB each, minor duplication). 42 API routes, all correctly dynamic.
 - Cron: 3 jobs, ~90 executions/mo, <0.01% of free tier compute.
+- ISR/SSG: Optimal — archetype pages SSG (7d), share pages ISR (1h), legal pages ISR (24h), studio force-dynamic.
 - **MONITOR: OG image Redis memory** — CARRIED. 62% of Redis at 10K. Consider blob storage at 50K+.
-- **MONITOR: `sync-audience` pagination** — CARRIED. Coverage improved to 98.1%. Future scale only.
+- **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
 
 **Cross-agent recommendations:**
-- [QA]: All `Promise.allSettled` patterns verified. `/api/studio/config` docs mismatch still pending (carried since 2026-03-18).
-- [Security]: Fetch timeouts at 100% critical path. Fail-open rate limiting intact. Campaign email quota prevents abuse. RLS tightened with FORCE (migration 018). No cost-security concerns.
-- [Performance]: Redis memory revised to ~243 MB @10K (down from 535 MB). OG images remain #1 consumer (62%). Supabase SDK chunk duplication (160KB x2) — minor optimization target. No build regressions.
-- [Coverage]: All cost-critical paths well-covered. API routes at ~97%. `sync-audience` improved to 98.1%.
+- [QA]: All `Promise.allSettled` patterns verified. Resend timeouts fully resolved. No open cost-QA items.
+- [Security]: Fetch timeouts at 100% (all modules). Fail-open rate limiting intact. Campaign email quota prevents abuse. RLS FORCE on all tables. No cost-security concerns.
+- [Performance]: Redis memory stable at ~243 MB @10K. OG images #1 consumer (62%). Supabase SDK chunk duplication (160KB x2) — minor optimization target. No build regressions.
+- [Coverage]: All cost-critical paths well-covered. API routes at ~97.1%. Coverage at 92.17% stmts. No cost-coverage concerns.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-03-12T17:15:00Z -->
-## Performance Engineer — 2026-03-12
+<!-- ENTRY:START agent=performance timestamp=2026-03-26T09:15:00Z -->
+## Performance Engineer — 2026-03-26
 - **Status**: GREEN
-- Build: Next.js 16.2.1 (Turbopack), compiles in 2.7s, 0 TypeScript errors
-- Total client JS: 1,434 KB (1.4 MB) across 53 chunks. No chunk exceeds 500 KB. +58 KB vs last report (moderate, no action needed).
-- Largest chunk: 219 KB (Next.js framework). PostHog at 175 KB (lazy-loaded on first interaction — optimal).
-- **Share page ISR: RESOLVED** — `revalidate=3600` now in place with test assertion at `page.test.ts:120`.
-- Knip: **60 unused exports + 42 unused types** — 19 are intentional test hooks (`_`-prefixed), 10 are effects library exports, 24 are genuinely unused and candidates for removal. 280 "unused files" are all test files (needs `knip.json` config). 3 unused devDependencies (`eslint-plugin-*`).
-- Font loading: optimal (`next/font/google` with `display: "swap"`, no external requests).
-- CLS risks: none — no bare `<img>` tags, all assets are inline SVG or base64 data URIs.
-- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=604800` — correct. Error fallback: `s-maxage=300`.
-- `"use client"` audit: 82 files total (excluding tests), 79 legitimate, 3 removable (marginal impact): `ShareBadgePreviewLazy.tsx`, `GlobalCommandBarLazy.tsx`, `overall-health-banner.tsx`.
-- Dynamic imports: 9 heavy components properly code-split via `next/dynamic` with `ssr: false`.
-- Studio page forced dynamic (imports `headers()`) — low traffic, marginal impact.
+- Build: Next.js 16.2.1 (Turbopack), compiles in 3.0s, 0 TypeScript errors. 63 static pages (11 workers, 393ms). 82 routes (5 static, 77 dynamic).
+- Total client JS: **1,800 KB (1.76 MB)** across 71 chunks. No chunk exceeds 500 KB. +366 KB vs 2026-03-12 (+25%) — proportional to new features (campaigns, engagement, CLI auth, experiments).
+- Largest chunks: 228 KB (Next.js framework), 176 KB (PostHog, lazy-loaded), 136 KB (React DOM), 112 KB (polyfills). 4 chunks >100 KB, all framework/vendor.
+- Knip: **0 findings** — fully clean (was 60 unused exports + 42 unused types on 2026-03-12). All resolved.
+- `"use client"` audit: 120 files total (incl. tests). Previous 3 flagged files: `overall-health-banner.tsx` RESOLVED (directive removed), `ShareBadgePreviewLazy.tsx` and `GlobalCommandBarLazy.tsx` confirmed legitimate (wrapping `next/dynamic` with `ssr: false`). No new removable directives.
+- Dynamic imports: 12 components code-split via `next/dynamic` with `ssr: false` (up from 9). New: `AgentsDashboard`, `EngagementDashboard`, `CampaignsDashboard`. All with proper loading UI.
+- Font loading: optimal (`next/font/google`, `display: "swap"`, Latin subset, no external requests).
+- CLS risks: none — all `<Image>` have explicit dimensions, no bare `<img>` tags, skeleton loaders for async content.
+- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=604800` (success), `s-maxage=300, stale-while-revalidate=600` (error). Frame embed headers correct.
+- Share page ISR: `revalidate=3600` in place with test assertion.
 
 **Cross-agent recommendations:**
-- [Coverage]: `ParticleBackground.tsx` (112 stmts, 0.9%) and `hexmap/page.tsx` (132 stmts, 0%) still canvas-heavy and untested — smoke tests recommended. Share page ISR now has test assertion.
-- [Security]: No performance-related security concerns. PostHog CSP correctly scoped. Rate limiting fail-open by design.
-- [QA]: Previous `ActivityHeatmap.tsx` hardcoded hex issue confirmed RESOLVED by QA. 3 removable `"use client"` directives are cosmetic, not functional issues. Missing error boundaries on 5 routes (from QA report) is resilience, not performance.
-- [Cost Analyst]: OG image cache (~5 GB @ 10K users) remains the #1 Redis cost concern. Consider blob storage or reduced TTL. Share page ISR is now in place — no longer a cost concern.
-- [Documentation]: Create `knip.json` config and document the 24 genuinely unused exports for removal consideration.
+- [Coverage]: `hexmap/page.tsx` (0%, 636 lines) and `ParticleBackground.tsx` still canvas-heavy — smoke tests remain recommended but accepted limitation. All rendering/API paths at 91%+.
+- [Security]: No performance-related security concerns. PostHog CSP correctly scoped. Knip fully clean. Rate limiting fail-open by design.
+- [QA]: All previous performance-QA items RESOLVED. `overall-health-banner.tsx` no longer client component. 12 error boundaries now in place. No functional issues.
+- [Cost Analyst]: OG image Redis memory remains #1 consumer (62% at 10K users). Bundle grew +25% but all from feature additions — no waste. Supabase SDK chunk duplication (160KB x2) from cost-analyst is minor optimization target.
+- [Documentation]: Previous knip/unused-exports documentation item RESOLVED (0 findings now). No remaining performance-documentation concerns.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation timestamp=2026-03-20T09:00:00Z -->
@@ -121,26 +121,40 @@
 - [Documentation]: `/api/studio/config` method mismatch needs docs update (POST → GET+PUT). All other prior doc issues resolved.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-03-26T02:00:00Z -->
-## Coverage Agent — 2026-03-26
+<!-- ENTRY:START agent=coverage timestamp=2026-03-27T02:00:00Z -->
+## Coverage Agent — 2026-03-27
 - **Status**: GREEN
-- Overall coverage: **91.47% stmts** (7,283/7,962), 85.77% branch, 86.29% funcs, 92.89% lines
-- Test suite: 369 files, 6,032 tests, 100% pass rate, 0 flaky (3 runs)
-- Delta vs 2026-03-25: **+0.82% stmts** (7,218→7,283 covered, 7,962 total unchanged). +2 test files, +106 tests, +0.72% funcs. Steady improvement.
-- All thresholds pass with 15%+ margin (75% stmts threshold).
-- Critical paths all GREEN: `lib/impact` 99.5%, `lib/cache` 98.4%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/bitbucket` 97.2%, `lib/github` 97.1%, `app/api` ~97%, `lib/db` 96.7%, `lib/auth` 96.3%, `lib/email` 96.2%, `packages/shared` 100%, `components` 91.9%, `lib/effects` ~91%
-- `app/admin` at 81.9% (YELLOW). `AdminDashboardClient.tsx` improved to 80.6% (was 71.0%). `useAdminDashboard.ts` at 48.5% branch — remaining gap.
-- `app/experiments` at 71.4% (RED) — feature-flagged, canvas/animation-heavy, V8/JSDOM limitations. Low priority.
-- `HolographicOverlay.tsx` at 47.1% — DOM API gaps in JSDOM. Accepted limitation.
-- Previous triage items resolved: `agent-card.tsx` and `agent-status-grid.tsx` now at 100%. `sync-audience/route.ts` improved to 98.1%. `lib/db/campaigns.ts` improved to 100%. `lib/bitbucket/queries.ts` improved to 95.9% stmts / 85.7% branch. Remaining: `useAdminDashboard.ts` (48.5% branch), `campaigns-dashboard.tsx` (79.7% funcs).
-- 0 flaky tests across 3 consecutive runs (avg ~35-45s per run).
+- Overall coverage: **92.17% stmts** (7,341/7,964), 87.22% branch, 87.26% funcs, 93.56% lines
+- Test suite: 370 files, 6,129 tests, 100% pass rate, 0 flaky (3 runs, avg ~36-46s)
+- Delta vs 2026-03-26: **+0.70% stmts** (7,283→7,341 covered, +2 total). +1 test file, +97 tests, +1.45% branch, +0.97% funcs. Steady improvement from triage actions.
+- All thresholds pass with 17%+ margin (75% stmts threshold).
+- Critical paths all GREEN: `lib/impact` 99.5%, `lib/render` 100%, `lib/cache` 98.4%, `lib/history` 98.2%, `lib/codeberg` 97.5%, `lib/bitbucket` 97.2%, `lib/github` 97.1%, `app/api` 97.1%, `lib/db` 96.7%, `lib/email` 96.7%, `lib/auth` 96.3%, `lib/effects` 94.4%, `components` 94.5%, `packages/shared` 100%, `lib/verification` 100%, `lib/insights` 100%.
+- `app/admin` at 93.7% (GREEN, was 81.9%). `useAdminDashboard.ts` branch coverage improved from 48.5% (triage target met).
+- `app/experiments` at 56.1% (RED) — feature-flagged, canvas/WebGL-heavy, V8/JSDOM limitations. Accepted low priority.
+- `HolographicOverlay.tsx` at 47.1% — JSDOM limitation. Accepted.
+- Remaining below-target files: `api/auth/callback/route.ts` (70.0% funcs), `UserMenu.tsx` (56.7% funcs), `BadgeContent.tsx` (70.8% branch), `TerminalOutput.tsx` (50.0% branch), `SubMetricPanel.tsx` (64.5% branch), `ScoreBoldNumber.tsx` (60.0% branch).
+- 0 flaky tests across 3 consecutive runs.
 
 **Cross-agent recommendations:**
 - [Security]: All security-critical paths at 96%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
-- [QA]: Priority test additions: (1) `useAdminDashboard.ts` at 48.5% branch (error/loading paths), (2) `BadgePreviewCard.tsx` at 53.3% funcs, (3) `UserMenu.tsx` at 56.7% funcs. `/api/studio/config` docs mismatch still pending.
-- [Performance]: All critical rendering and API paths at 91%+. Experiment pages remain low priority. `hexmap/page.tsx` (0%, 636 lines) is canvas-heavy.
-- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at ~97%. `sync-audience` improved to 98.1% — monitor item mostly resolved.
-- [DevOps]: All thresholds pass with 15%+ margin. Test suite runs in ~35-45s with coverage.
+- [QA]: Priority test additions: (1) `api/auth/callback/route.ts` (70.0% funcs — OAuth error paths), (2) `UserMenu.tsx` (56.7% funcs — disconnect callbacks), (3) `TerminalOutput.tsx` (50.0% branch — line-type mappings). `/api/studio/config` docs mismatch resolved per triage.
+- [Performance]: All critical rendering and API paths at 94%+. Experiments pages remain accepted limitation. `hexmap/page.tsx` (0%, 636 lines) canvas-heavy — no action.
+- [Cost Analyst]: All module coverages stable or improving. API routes aggregate at 97.1%. No cost-coverage concerns.
+- [DevOps]: All thresholds pass with 17%+ margin. Test suite runs in ~36-46s with coverage. Zero flaky tests.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-03-27T04:55:00Z -->
+## Triage — 2026-03-27
+- **Reports processed**: 4 (coverage, cost-analyst, performance, cc-rpi-update)
+- **Action items resolved**: 13 of 13 — all coverage gaps addressed
+- **Summary**: All reports GREEN. Added 207 tests across 13 files closing P1+P2+P3 coverage gaps. Tests: 6,336 passing (371 files), 0 type errors, 0 lint issues.
+- **Coverage delta**: +207 tests, +1 test file. Targets: auth/callback funcs→80%+, UserMenu funcs→80%+, BadgeContent branch→80%+, SubMetricPanel branch→80%+, ScoreBoldNumber branch→80%+, TerminalOutput branch→80%+, supabase.ts funcs→90%+, TierVisuals funcs→80%+, AuthorTypewriter branch→80%+, ConfirmDialog branch→80%+, AutocompleteDropdown branch→80%+, ImpactBreakdown branch→80%+, unsubscribe funcs→80%+.
+- **No code fixes needed** — all reports GREEN with no regressions. Cost and performance stable. cc-rpi already at v1.13.0.
+**Cross-agent recommendations:**
+- [Coverage]: All P1/P2/P3 items addressed. Remaining accepted limitations: experiments (WebGL/Canvas), HolographicOverlay (JSDOM), server pages (Next.js).
+- [QA]: Test count at 6,336. All critical paths well above 90%. No functional issues.
+- [Cost Analyst]: No new cost concerns. Monitor items carried (OG image Redis memory, sync-audience pagination).
+- [Performance]: No new performance concerns. Bundle stable. Knip clean.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-26T07:00:00Z -->
