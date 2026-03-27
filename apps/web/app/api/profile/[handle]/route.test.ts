@@ -170,12 +170,13 @@ describe("GET /api/profile/:handle", () => {
     expect(body.error).toContain("No profile found");
   });
 
-  it("does not query tool_insights when no snapshot exists", async () => {
+  it("queries both snapshot and craft in parallel (even on 404)", async () => {
     mockDbGetLatestSnapshot.mockResolvedValue(null);
 
     await GET(makeRequest("unknown"), makeParams("unknown"));
 
-    expect(mockDbGetToolInsights).not.toHaveBeenCalled();
+    expect(mockDbGetLatestSnapshot).toHaveBeenCalledWith("unknown");
+    expect(mockDbGetToolInsights).toHaveBeenCalledWith("unknown");
   });
 
   // --- Validation ---

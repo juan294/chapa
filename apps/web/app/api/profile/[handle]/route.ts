@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import type { DimensionScores } from "@chapa/shared";
 
 const CORS_HEADERS = { "Access-Control-Allow-Origin": "*" } as const;
 
@@ -37,7 +38,11 @@ export async function GET(
       );
     }
 
-    const snapshot = await dbGetLatestSnapshot(handle);
+    const [snapshot, craftResult] = await Promise.all([
+      dbGetLatestSnapshot(handle),
+      dbGetToolInsights(handle),
+    ]);
+
     if (!snapshot) {
       return NextResponse.json(
         { error: "No profile found for this handle" },
@@ -45,19 +50,13 @@ export async function GET(
       );
     }
 
-    // Only query craft data if we have a snapshot
-    const craftResult = await dbGetToolInsights(handle);
-
-    const dimensions: Record<string, number> = {
+    const dimensions: DimensionScores = {
       delivery: snapshot.delivery,
       quality: snapshot.quality,
       consistency: snapshot.consistency,
       breadth: snapshot.breadth,
+      ...(craftResult && { craft: craftResult.craftScore }),
     };
-
-    if (craftResult) {
-      dimensions.craft = craftResult.craftScore;
-    }
 
     return NextResponse.json(
       {
