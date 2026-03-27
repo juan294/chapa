@@ -46,4 +46,19 @@ describe("number-counters experiment page", () => {
     });
     expect(container!.querySelector("div")).toBeTruthy();
   });
+
+  it("renders h1 before any h2 in DOM order", async () => {
+    const { default: Page } = await import("./page");
+    let container: HTMLElement;
+    await act(async () => {
+      const result = render(<Page />);
+      container = result.container;
+    });
+    const headings = container!.querySelectorAll("h1, h2");
+    expect(headings.length).toBeGreaterThanOrEqual(2);
+    expect(headings[0]!.tagName).toBe("H1");
+    for (let i = 1; i < headings.length; i++) {
+      expect(headings[i]!.tagName).toBe("H2");
+    }
+  });
 });
