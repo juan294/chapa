@@ -33,7 +33,58 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run test
+
+      - name: Test with coverage
+        id: test
+        run: |
+          # Run tests with coverage and capture counts from output
+          OUTPUT=$(pnpm run test:coverage 2>&1) || true
+          echo "$OUTPUT"
+
+          # Extract test counts from Vitest output
+          # Vitest prints: "Tests  42 passed | 1 failed (43)"
+          PASSED=$(echo "$OUTPUT" | grep -oP 'Tests\s+\K\d+(?=\s+passed)' || echo "0")
+          FAILED=$(echo "$OUTPUT" | grep -oP '\|\s+\K\d+(?=\s+failed)' || echo "0")
+          TOTAL=$((PASSED + FAILED))
+
+          echo "test_count=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "tests_passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "tests_failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+          # Fail the step if any tests failed
+          if [ "$FAILED" -gt 0 ]; then exit 1; fi
+
+      - name: Report coverage to portfolio
+        if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        continue-on-error: true
+        env:
+          COVERAGE_SECRET: ${{ secrets.COVERAGE_SECRET }}
+        run: |
+          COVERAGE_JSON="coverage/coverage-summary.json"
+          if [ ! -f "$COVERAGE_JSON" ]; then
+            echo "No coverage summary found — skipping report."
+            exit 0
+          fi
+
+          BODY=$(node -e "
+            const c = require('./${COVERAGE_JSON}').total;
+            console.log(JSON.stringify({
+              repo: '${{ github.repository }}',
+              testCount: ${{ steps.test.outputs.test_count }},
+              coveragePercent: parseFloat(c.lines.pct.toFixed(2)),
+              passing: ${{ steps.test.outputs.tests_passed }},
+              failing: ${{ steps.test.outputs.tests_failed }}
+            }));
+          ")
+
+          SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$COVERAGE_SECRET" -hex | awk '{print $NF}')
+
+          curl -sf -X POST https://portfolio.thecreativetoken.com/api/coverage \
+            -H 'Content-Type: application/json' \
+            -H "X-Coverage-Signature-256: sha256=${SIG}" \
+            -d "$BODY"
+
+          echo "Coverage reported: $(echo "$BODY" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.testCount+' tests, '+d.coveragePercent+'% coverage')")"
 
   build:
     name: Build

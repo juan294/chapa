@@ -12,7 +12,7 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",
-      reporter: ["text-summary"],
+      reporter: ["text-summary", "json-summary"],
       include: [
         "apps/web/lib/**",
         "apps/web/app/**",
