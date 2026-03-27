@@ -19,7 +19,7 @@ const mockExpire = vi.fn();
 const mockPfadd = vi.fn();
 const mockPfcount = vi.fn();
 const mockMget = vi.fn();
-const mockPing = vi.fn();
+const mockDbsize = vi.fn();
 
 vi.mock("@upstash/redis", () => ({
   Redis: class MockRedis {
@@ -32,7 +32,7 @@ vi.mock("@upstash/redis", () => ({
     pfadd = mockPfadd;
     pfcount = mockPfcount;
     mget = mockMget;
-    ping = mockPing;
+    dbsize = mockDbsize;
   },
 }));
 
@@ -60,32 +60,32 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("pingRedis", () => {
-  it("returns 'ok' when Redis responds to PING", async () => {
-    mockPing.mockResolvedValueOnce("PONG");
+  it("returns 'ok' when Redis responds to DBSIZE", async () => {
+    mockDbsize.mockResolvedValueOnce(42);
 
     const result = await pingRedis();
 
     expect(result).toBe("ok");
-    expect(mockPing).toHaveBeenCalled();
+    expect(mockDbsize).toHaveBeenCalled();
   });
 
-  it("returns 'error' when Redis PING fails", async () => {
-    mockPing.mockRejectedValueOnce(new Error("Connection refused"));
+  it("returns 'error' when Redis DBSIZE fails", async () => {
+    mockDbsize.mockRejectedValueOnce(new Error("Connection refused"));
 
     const result = await pingRedis();
 
     expect(result).toBe("error");
   });
 
-  it("returns 'unavailable' when Redis client is null (no env vars)", async () => {
+  it("returns 'skipped' when Redis client is null (no env vars)", async () => {
     _resetClient();
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
     const result = await pingRedis();
 
-    expect(result).toBe("unavailable");
-    expect(mockPing).not.toHaveBeenCalled();
+    expect(result).toBe("skipped");
+    expect(mockDbsize).not.toHaveBeenCalled();
   });
 });
 

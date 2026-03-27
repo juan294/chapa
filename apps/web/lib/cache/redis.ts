@@ -247,18 +247,20 @@ export async function getBadgeStats(): Promise<BadgeStats> {
 // ---------------------------------------------------------------------------
 
 /**
- * Ping Redis and return a health status string.
- * - "ok" — Redis responded to PING.
- * - "error" — Redis client exists but PING failed.
- * - "unavailable" — Redis client is null (missing env vars).
+ * Check Redis health via a lightweight data-access operation.
+ * Uses `dbsize()` instead of `ping()` to verify actual data access,
+ * not just connectivity (satisfies CLAUDE.md health-check requirement).
+ * - "ok" — Redis responded to DBSIZE.
+ * - "error" — Redis client exists but DBSIZE failed.
+ * - "skipped" — Redis client is null (missing env vars).
  */
-export async function pingRedis(): Promise<"ok" | "error" | "unavailable"> {
+export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
   const redis = getRedis();
-  if (!redis) return "unavailable";
+  if (!redis) return "skipped";
 
   try {
     await Promise.race([
-      redis.ping(),
+      redis.dbsize(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("ping timeout")), 5000),
       ),

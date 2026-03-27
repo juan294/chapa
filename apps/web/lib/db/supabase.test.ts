@@ -110,12 +110,12 @@ describe("pingSupabase", () => {
     expect(result).toBe("ok");
   });
 
-  it("returns 'unavailable' when env vars are missing", async () => {
+  it("returns 'skipped' when env vars are missing", async () => {
     vi.stubEnv("SUPABASE_URL", "");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
 
     const result = await pingSupabase();
-    expect(result).toBe("unavailable");
+    expect(result).toBe("skipped");
   });
 
   it("returns 'error' when query fails", async () => {
