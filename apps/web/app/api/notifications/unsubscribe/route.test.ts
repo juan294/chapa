@@ -212,4 +212,20 @@ describe("GET /api/notifications/unsubscribe", () => {
       60,
     );
   });
+
+  it("includes lang attribute on html tag", async () => {
+    const res = await GET(makeRequest("testuser"));
+    const body = await res.text();
+
+    expect(body).toContain('<html lang="en">');
+  });
+
+  it("includes viewport meta tag", async () => {
+    const res = await GET(makeRequest("testuser"));
+    const body = await res.text();
+
+    expect(body).toContain(
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    );
+  });
 });
