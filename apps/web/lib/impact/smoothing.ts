@@ -10,6 +10,7 @@
  */
 
 import { toDateString } from "@/lib/utils/date";
+import { clampScore } from "./utils";
 
 const EMA_ALPHA = 0.15;
 
@@ -30,7 +31,7 @@ export function applyEMA(
   }
 
   const smoothed = EMA_ALPHA * currentScore + (1 - EMA_ALPHA) * previousSmoothedScore;
-  return Math.round(Math.max(0, Math.min(100, smoothed)));
+  return clampScore(smoothed);
 }
 
 /**
