@@ -85,22 +85,22 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/recalculate` Recalculate impact scores
 - GET `/api/insights/:handle` AI tool insights for a user
 - POST `/api/insights` Submit tool insights data
-- GET|POST `/api/cli/auth/poll` CLI device auth polling
+- GET `/api/cli/auth/poll` CLI device auth polling
 - POST `/api/cli/auth/approve` CLI device auth approval
 
 ### Admin API
 - GET `/api/admin/users` Admin user list (session auth + admin check)
 - GET `/api/admin/stats` Admin stats (bearer token auth via `ADMIN_SECRET`)
-- POST `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
+- POST|GET|DELETE `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
 - GET `/api/admin/agents-summary` Agent run summaries
-- GET|PATCH `/api/admin/feature-flags` Manage feature flags
+- PATCH `/api/admin/feature-flags` Manage feature flags
 - GET `/api/admin/engagement-flags` Manage engagement flags
 - GET|POST `/api/admin/campaigns` Campaign list and creation (admin auth)
 - GET|PATCH|DELETE `/api/admin/campaigns/:id` Campaign CRUD (admin auth, draft only)
 - GET `/api/admin/campaigns/:id/preview` Campaign email preview (admin auth)
 - POST `/api/admin/campaigns/:id/send` Initiate campaign send (admin auth)
 - POST `/api/admin/campaigns/:id/test` Send test email for campaign draft (admin auth)
-- POST `/api/notifications/unsubscribe` Email unsubscribe
+- GET `/api/notifications/unsubscribe` Email unsubscribe
 
 ### Webhooks & Cron
 - POST `/api/webhooks/resend` Resend email webhook (HMAC verified)

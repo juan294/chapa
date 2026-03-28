@@ -96,6 +96,7 @@ import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { computeImpactV4 } from "@/lib/impact/v4";
+import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { GET } from "./route";
 
 const mockedDbGetUsers = vi.mocked(dbGetUsers);
@@ -292,6 +293,21 @@ describe("GET /api/cron/warm-cache", () => {
         "alice",
         expect.objectContaining({ date: "2025-01-01" }),
       );
+    });
+
+    it("swallows updateSnapshotCache rejection via .catch() (fire-and-forget)", async () => {
+      mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
+      mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
+      vi.mocked(dbInsertSnapshot).mockResolvedValue(true);
+      // updateSnapshotCache rejects — the .catch(() => {}) should swallow it
+      vi.mocked(updateSnapshotCache).mockRejectedValue(new Error("Redis write failed"));
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      // Should still report the handle as warmed with a snapshot recorded
+      expect(body.warmed).toBe(1);
+      expect(body.snapshots).toBe(1);
     });
   });
 

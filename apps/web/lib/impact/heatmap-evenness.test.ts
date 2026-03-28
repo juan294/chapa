@@ -135,4 +135,42 @@ describe("computeHeatmapEvenness(heatmapData)", () => {
     const b = makeHeatmap([0, 0, 0, 0, 0, 10, 10, 10, 0, 0, 0, 0, 0]);
     expect(computeHeatmapEvenness(a)).toBeCloseTo(computeHeatmapEvenness(b), 1);
   });
+
+  it("handles heatmap with exactly 7 days (1 week)", () => {
+    const oneWeek = makeHeatmapFromDays([3, 3, 3, 3, 3, 3, 3]);
+    const score = computeHeatmapEvenness(oneWeek);
+    // Single week with uniform activity = perfectly even (1 week, stddev = 0)
+    expect(score).toBeCloseTo(1.0, 1);
+  });
+
+  it("handles non-multiple-of-7 length (partial last week)", () => {
+    // 10 days = 1 full week + 3 days in second week
+    const partial = makeHeatmapFromDays([1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    const score = computeHeatmapEvenness(partial);
+    // Two weeks: week 1 = 7, week 2 = 3 — somewhat uneven
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThan(1);
+  });
+
+  it("handles very large counts without issues", () => {
+    const large = makeHeatmap([1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]);
+    const score = computeHeatmapEvenness(large);
+    expect(score).toBeCloseTo(1.0, 1);
+  });
+
+  it("handles exactly 2 days (partial single week)", () => {
+    const tiny = makeHeatmapFromDays([5, 0]);
+    const score = computeHeatmapEvenness(tiny);
+    // 1 week with total of 5; stddev = 0 since there's only 1 week
+    expect(score).toBeCloseTo(1.0, 1);
+  });
+
+  it("handles all activity on a single day only", () => {
+    const days = new Array(91).fill(0).map((_, i) => ({
+      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+      count: i === 0 ? 100 : 0,
+    }));
+    const score = computeHeatmapEvenness(days);
+    expect(score).toBeLessThan(0.3);
+  });
 });

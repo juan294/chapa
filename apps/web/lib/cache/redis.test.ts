@@ -13,6 +13,8 @@ const mockExpire = vi.fn();
 const mockPfadd = vi.fn();
 const mockPfcount = vi.fn();
 const mockMget = vi.fn();
+const mockIncrby = vi.fn();
+const mockDbsize = vi.fn();
 
 vi.mock("@upstash/redis", () => ({
   Redis: class MockRedis {
@@ -24,6 +26,8 @@ vi.mock("@upstash/redis", () => ({
     pfadd = mockPfadd;
     pfcount = mockPfcount;
     mget = mockMget;
+    incrby = mockIncrby;
+    dbsize = mockDbsize;
   },
 }));
 
@@ -36,6 +40,8 @@ import {
   trackBadgeGenerated,
   getBadgeStats,
   cacheMGet,
+  pingRedis,
+  cacheIncr,
   _resetClient,
 } from "./redis";
 
@@ -391,6 +397,134 @@ describe("cacheMGet", () => {
     const result = await cacheMGet(["key1"]);
 
     expect(result).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pingRedis
+// ---------------------------------------------------------------------------
+
+describe("pingRedis", () => {
+  it("returns 'ok' when dbsize succeeds", async () => {
+    mockDbsize.mockResolvedValueOnce(42);
+
+    const result = await pingRedis();
+
+    expect(result).toBe("ok");
+    expect(mockDbsize).toHaveBeenCalled();
+  });
+
+  it("returns 'skipped' when Redis is unavailable (no env vars)", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await pingRedis();
+
+    expect(result).toBe("skipped");
+    expect(mockDbsize).not.toHaveBeenCalled();
+  });
+
+  it("returns 'error' when dbsize throws", async () => {
+    mockDbsize.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const result = await pingRedis();
+
+    expect(result).toBe("error");
+  });
+
+  it("returns 'error' when dbsize times out", async () => {
+    vi.useFakeTimers();
+
+    // Query never resolves — setTimeout callback must fire
+    mockDbsize.mockImplementation(() => new Promise(() => {}));
+
+    const resultPromise = pingRedis();
+
+    // Advance timers past the 5000ms timeout
+    await vi.advanceTimersByTimeAsync(5001);
+
+    const result = await resultPromise;
+    expect(result).toBe("error");
+
+    vi.useRealTimers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cacheIncr
+// ---------------------------------------------------------------------------
+
+describe("cacheIncr", () => {
+  it("increments by default amount of 1", async () => {
+    mockIncrby.mockResolvedValueOnce(5);
+
+    const result = await cacheIncr("counter:test");
+
+    expect(result).toBe(5);
+    expect(mockIncrby).toHaveBeenCalledWith("counter:test", 1);
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("increments by a custom amount", async () => {
+    mockIncrby.mockResolvedValueOnce(10);
+
+    const result = await cacheIncr("counter:test", 3);
+
+    expect(result).toBe(10);
+    expect(mockIncrby).toHaveBeenCalledWith("counter:test", 3);
+  });
+
+  it("sets TTL when ttlSeconds is provided", async () => {
+    mockIncrby.mockResolvedValueOnce(1);
+    mockExpire.mockResolvedValueOnce(1);
+
+    const result = await cacheIncr("counter:test", 1, 3600);
+
+    expect(result).toBe(1);
+    expect(mockExpire).toHaveBeenCalledWith("counter:test", 3600);
+  });
+
+  it("does not set TTL when ttlSeconds is undefined", async () => {
+    mockIncrby.mockResolvedValueOnce(2);
+
+    await cacheIncr("counter:test", 1);
+
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("returns 0 when Redis is unavailable (no env vars)", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await cacheIncr("counter:test");
+
+    expect(result).toBe(0);
+    expect(mockIncrby).not.toHaveBeenCalled();
+  });
+
+  it("returns 0 when Redis throws (graceful degradation)", async () => {
+    mockIncrby.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const result = await cacheIncr("counter:test");
+
+    expect(result).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cacheSet with TTL=0 (no expiry)
+// ---------------------------------------------------------------------------
+
+describe("cacheSet with TTL=0", () => {
+  it("calls set without expiry options when TTL is 0", async () => {
+    mockSet.mockResolvedValueOnce("OK");
+
+    const result = await cacheSet("persistent:key", { data: true }, 0);
+
+    expect(result).toBe(true);
+    expect(mockSet).toHaveBeenCalledWith("persistent:key", { data: true });
   });
 });
 

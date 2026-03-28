@@ -251,6 +251,107 @@ describe("dbCleanExpiredVerifications", () => {
 // Runtime row validation (parseRow integration)
 // ---------------------------------------------------------------------------
 
+describe("rowToRecord edge cases", () => {
+  it("returns record without displayName when display_name is null", async () => {
+    const row = {
+      hash: "abc12345",
+      handle: "testuser",
+      display_name: null,
+      adjusted_composite: 52,
+      confidence: 85,
+      tier: "Solid",
+      archetype: "Builder",
+      profile_type: "collaborative",
+      building: 70,
+      guarding: 50,
+      consistency: 60,
+      breadth: 40,
+      commits_total: 200,
+      prs_merged_count: 30,
+      reviews_submitted: 50,
+      generated_at: "2025-06-15",
+    };
+    terminalResolve = { data: row, error: null };
+
+    const result = await dbGetVerification("abc12345");
+
+    expect(result).not.toBeNull();
+    // displayName should NOT be present since display_name is null
+    expect(result!.displayName).toBeUndefined();
+    expect(result!.handle).toBe("testuser");
+  });
+
+  it("includes displayName when display_name is non-null", async () => {
+    const row = {
+      hash: "abc12345",
+      handle: "testuser",
+      display_name: "Some Name",
+      adjusted_composite: 52,
+      confidence: 85,
+      tier: "Solid",
+      archetype: "Builder",
+      profile_type: "collaborative",
+      building: 70,
+      guarding: 50,
+      consistency: 60,
+      breadth: 40,
+      commits_total: 200,
+      prs_merged_count: 30,
+      reviews_submitted: 50,
+      generated_at: "2025-06-15",
+    };
+    terminalResolve = { data: row, error: null };
+
+    const result = await dbGetVerification("abc12345");
+
+    expect(result).not.toBeNull();
+    expect(result!.displayName).toBe("Some Name");
+  });
+});
+
+describe("dbStoreVerification — displayName edge cases", () => {
+  it("stores display_name as null when displayName is undefined", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+
+    const recordWithoutDisplayName: VerificationRecord = {
+      handle: "testuser",
+      adjustedComposite: 52,
+      confidence: 85,
+      tier: "Solid",
+      archetype: "Builder",
+      profileType: "collaborative",
+      dimensions: { delivery: 70, quality: 50, consistency: 60, breadth: 40 },
+      commitsTotal: 200,
+      prsMergedCount: 30,
+      reviewsSubmittedCount: 50,
+      generatedAt: "2025-06-15",
+    };
+
+    await dbStoreVerification("abc12345", recordWithoutDisplayName);
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ display_name: null }),
+      expect.any(Object),
+    );
+  });
+});
+
+describe("dbCleanExpiredVerifications — data null edge case", () => {
+  it("returns 0 when data is null (no rows to delete)", async () => {
+    terminalResolve = { data: null, error: null };
+
+    const result = await dbCleanExpiredVerifications();
+    expect(result).toBe(0);
+  });
+
+  it("returns 0 when data is empty array", async () => {
+    terminalResolve = { data: [], error: null };
+
+    const result = await dbCleanExpiredVerifications();
+    expect(result).toBe(0);
+  });
+});
+
 describe("runtime row validation", () => {
   it("dbGetVerification returns null for a malformed row (missing required key)", async () => {
     // Row missing the "tier" field

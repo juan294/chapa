@@ -91,11 +91,15 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Get eligible users from DB and existing contacts from Resend
-  const [users, existingContacts] = await Promise.all([
+  // Get eligible users from DB and existing contacts from Resend.
+  // Promise.allSettled ensures one failure doesn't block the other.
+  const [usersResult, contactsResult] = await Promise.allSettled([
     dbGetUsersWithEmail(),
     listAllContacts(),
   ]);
+  const users = usersResult.status === "fulfilled" ? usersResult.value : [];
+  const existingContacts =
+    contactsResult.status === "fulfilled" ? contactsResult.value : [];
 
   const existingByEmail = new Map(existingContacts.map((c) => [c.email, c]));
   const eligibleEmails = new Set(users.map((u) => u.email));

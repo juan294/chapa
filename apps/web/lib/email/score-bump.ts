@@ -43,6 +43,16 @@ function interpolate(template: string, vars: Record<string, string>): string {
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Send a branded score-bump email when a developer's impact changes significantly.
+ *
+ * Guarded by: `score_notifications` feature flag, user email opt-in, and a
+ * 7-day Redis dedup marker. Fire-and-forget — never throws.
+ *
+ * @param handle       - GitHub handle of the developer
+ * @param diff         - Snapshot diff with tier/dimension changes
+ * @param significance - Classification of the change (tier upgrade, score jump, etc.)
+ */
 export async function notifyScoreBump(
   handle: string,
   diff: SnapshotDiff,

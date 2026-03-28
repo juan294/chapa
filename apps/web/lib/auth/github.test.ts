@@ -463,6 +463,184 @@ describe("GitHub OAuth fetch AbortSignal timeout", () => {
 // readSessionCookie — shape validation
 // ---------------------------------------------------------------------------
 
+describe("readSessionCookie — additional edge cases", () => {
+  const secret = "secret-key-for-test-32-chars!!!!";
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+  });
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+  });
+
+  it("returns null when cookie header has no chapa_session cookie", () => {
+    const result = readSessionCookie("other_cookie=value123", secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when decryptToken returns null (tampered value)", () => {
+    const cookieHeader = "chapa_session=not-a-valid-encrypted-value";
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when decrypted JSON is not valid JSON", () => {
+    // Encrypt something that isn't valid JSON
+    const encrypted = encryptToken("not-json{{{", secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when decrypted JSON is a non-object value (string)", () => {
+    const encrypted = encryptToken('"just a string"', secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when decrypted JSON is null", () => {
+    const encrypted = encryptToken("null", secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when session has missing avatar_url field", () => {
+    const badPayload = JSON.stringify({ token: "t", login: "user", name: "Test" });
+    const encrypted = encryptToken(badPayload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when name is not string or null (boolean)", () => {
+    const badPayload = JSON.stringify({ token: "t", login: "user", name: true, avatar_url: "url" });
+    const encrypted = encryptToken(badPayload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+});
+
+describe("decryptToken — additional edge cases", () => {
+  const secret = "test-secret-key-at-least-32-chars!!";
+
+  it("returns null when encrypted string has fewer than 3 parts", () => {
+    const result = decryptToken("only-one-part", secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when encrypted string has more than 3 parts", () => {
+    const result = decryptToken("a:b:c:d", secret);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    const result = decryptToken("", secret);
+    expect(result).toBeNull();
+  });
+});
+
+describe("validateState — additional edge cases", () => {
+  it("returns false when cookie header has cookies but none match state name", () => {
+    const result = validateState("other=abc; another=def", "some-state");
+    expect(result).toBe(false);
+  });
+
+  it("returns false when state values have different lengths", () => {
+    // cookie state is shorter than query state
+    const cookieHeader = "chapa_oauth_state=short";
+    const result = validateState(cookieHeader, "this-is-a-longer-query-state");
+    expect(result).toBe(false);
+  });
+});
+
+describe("fetchGitHubUser — additional edge cases", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns null when fetch throws a network error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network failure")),
+    );
+
+    const user = await fetchGitHubUser("gho_token");
+    expect(user).toBeNull();
+  });
+
+  it("returns user with null name when GitHub returns null name", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            login: "noname",
+            name: null,
+            avatar_url: "https://avatars.githubusercontent.com/u/456",
+          }),
+      }),
+    );
+
+    const user = await fetchGitHubUser("gho_token");
+    expect(user).not.toBeNull();
+    expect(user!.name).toBeNull();
+  });
+});
+
+describe("exchangeCodeForToken — additional edge cases", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns null when response has no access_token and no error field", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ token_type: "bearer" }),
+      }),
+    );
+
+    const token = await exchangeCodeForToken("code", "cid", "csecret");
+    expect(token).toBeNull();
+  });
+});
+
+describe("cookie Secure flag — env var edge cases", () => {
+  const originalEnv = process.env.NEXT_PUBLIC_BASE_URL;
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.NEXT_PUBLIC_BASE_URL = originalEnv;
+    } else {
+      delete process.env.NEXT_PUBLIC_BASE_URL;
+    }
+  });
+
+  it("omits Secure when NEXT_PUBLIC_BASE_URL is undefined", () => {
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+    const { cookie } = createStateCookie();
+    expect(cookie).not.toContain("Secure");
+  });
+
+  it("omits Secure when NEXT_PUBLIC_BASE_URL is empty string", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "";
+    const { cookie } = createStateCookie();
+    expect(cookie).not.toContain("Secure");
+  });
+
+  it("omits Secure when NEXT_PUBLIC_BASE_URL has trailing whitespace", () => {
+    process.env.NEXT_PUBLIC_BASE_URL = "  ";
+    const { cookie } = createStateCookie();
+    expect(cookie).not.toContain("Secure");
+  });
+});
+
 describe("readSessionCookie — shape validation", () => {
   const secret = "secret-key-for-test-32-chars!!!!";
 

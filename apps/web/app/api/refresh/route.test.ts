@@ -55,10 +55,17 @@ vi.mock("@/lib/history/history", () => ({
   invalidateHistoryCache: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: vi.fn(),
+}));
+
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { invalidateHistoryCache } from "@/lib/history/history";
+import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
+import { captureServerError } from "@/lib/analytics/server-errors";
 
 const SESSION = {
   token: "tok",
@@ -238,6 +245,160 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe("Internal server error");
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("executes snapshot insert .then() callback to update cache on success", async () => {
+    // Use a deferred promise so we can await the fire-and-forget chain
+    let resolveFn: (val: boolean) => void;
+    const deferredPromise = new Promise<boolean>((resolve) => {
+      resolveFn = resolve;
+    });
+
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockResolvedValue({
+      handle: "testuser",
+      commitsTotal: 10,
+      activeDays: 5,
+      prsMergedCount: 1,
+      prsMergedWeight: 2,
+      reviewsSubmittedCount: 3,
+      issuesClosedCount: 1,
+      linesAdded: 100,
+      linesDeleted: 50,
+      reposContributed: 1,
+      topRepoShare: 1,
+      maxCommitsIn10Min: 1,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
+      heatmapData: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    vi.mocked(dbInsertSnapshot).mockReturnValue(deferredPromise);
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    // Resolve the deferred promise to trigger the .then() callback
+    resolveFn!(true);
+    // Flush microtasks so the .then() callback runs
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(updateSnapshotCache).toHaveBeenCalledWith(
+      "testuser",
+      expect.objectContaining({ date: "2025-01-01" }),
+    );
+  });
+
+  it("does not update snapshot cache when insert returns false", async () => {
+    let resolveFn: (val: boolean) => void;
+    const deferredPromise = new Promise<boolean>((resolve) => {
+      resolveFn = resolve;
+    });
+
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockResolvedValue({
+      handle: "testuser",
+      commitsTotal: 10,
+      activeDays: 5,
+      prsMergedCount: 1,
+      prsMergedWeight: 2,
+      reviewsSubmittedCount: 3,
+      issuesClosedCount: 1,
+      linesAdded: 100,
+      linesDeleted: 50,
+      reposContributed: 1,
+      topRepoShare: 1,
+      maxCommitsIn10Min: 1,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
+      heatmapData: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    vi.mocked(dbInsertSnapshot).mockReturnValue(deferredPromise);
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    // Resolve with false — snapshot was a duplicate
+    resolveFn!(false);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(updateSnapshotCache).not.toHaveBeenCalled();
+  });
+
+  it("handles snapshot insert rejection gracefully via .catch()", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockResolvedValue({
+      handle: "testuser",
+      commitsTotal: 10,
+      activeDays: 5,
+      prsMergedCount: 1,
+      prsMergedWeight: 2,
+      reviewsSubmittedCount: 3,
+      issuesClosedCount: 1,
+      linesAdded: 100,
+      linesDeleted: 50,
+      reposContributed: 1,
+      topRepoShare: 1,
+      maxCommitsIn10Min: 1,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
+      heatmapData: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    // Make the insert reject — the .catch(() => {}) should swallow the error
+    vi.mocked(dbInsertSnapshot).mockRejectedValue(new Error("DB down"));
+
+    const res = await POST(makeRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    // Flush microtasks so the .catch() callback executes
+    await new Promise((r) => setTimeout(r, 0));
+
+    // The response should still be successful
+    const body = await res.json();
+    expect(body.stats).toBeDefined();
+    expect(body.impact).toBeDefined();
+  });
+
+  it("calls captureServerError when GitHub fetch fails (502)", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockResolvedValue(null);
+
+    await POST(makeRequest("testuser"));
+
+    expect(captureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/refresh",
+        statusCode: 502,
+      }),
+    );
+  });
+
+  it("calls captureServerError on unhandled exception (500)", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    vi.mocked(getStats).mockRejectedValue(new Error("unexpected boom"));
+
+    await POST(makeRequest("testuser"));
+
+    expect(captureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/refresh",
+        statusCode: 500,
+      }),
+    );
 
     consoleErrorSpy.mockRestore();
   });

@@ -97,6 +97,20 @@ describe("getCachedLatestSnapshot", () => {
     expect(dbGetLatestSnapshot).toHaveBeenCalledWith("testuser");
   });
 
+  it("swallows cacheSet error when caching a DB result (fire-and-forget)", async () => {
+    const snapshot = makeSnapshot();
+    vi.mocked(cacheGet).mockResolvedValueOnce(null);
+    vi.mocked(dbGetLatestSnapshot).mockResolvedValueOnce(snapshot);
+    // cacheSet rejects — the .catch(() => {}) on the fire-and-forget should swallow it
+    vi.mocked(cacheSet).mockRejectedValueOnce(new Error("Redis write failed"));
+
+    const result = await getCachedLatestSnapshot("testuser");
+
+    expect(result).toEqual(snapshot);
+    // Flush microtasks so the .catch() callback runs
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
   it("returns null when both Redis and DB fail", async () => {
     vi.mocked(cacheGet).mockRejectedValueOnce(new Error("Redis down"));
     vi.mocked(dbGetLatestSnapshot).mockResolvedValueOnce(null);

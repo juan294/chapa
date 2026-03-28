@@ -281,4 +281,174 @@ describe("AuthorTypewriter", () => {
       expect(event.stopPropagation).not.toHaveBeenCalled();
     });
   });
+
+  describe("animation cycle — mid-cycle cancellation", () => {
+    it("cancels during erase phase", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance past HOME_HOLD to enter the erase phase
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Advance partway through erase (3 chars erased out of 6)
+      await vi.advanceTimersByTimeAsync(3 * 80);
+
+      // Unmount mid-erase — should not throw
+      expect(() => unmount()).not.toThrow();
+
+      // Advancing timers after unmount should be safe
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during empty pause after erase", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance past HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Complete erase of HOME_TEXT (6 chars * 80ms)
+      await vi.advanceTimersByTimeAsync(6 * 80);
+
+      // Now in EMPTY_PAUSE — unmount during this pause
+      await vi.advanceTimersByTimeAsync(100);
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during type phase of next message", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance past HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Complete erase (6 * 80ms) + EMPTY_PAUSE (300ms)
+      await vi.advanceTimersByTimeAsync(6 * 80 + 300);
+
+      // Advance partway through typing the next message (5 chars)
+      await vi.advanceTimersByTimeAsync(5 * 80);
+
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during MSG_HOLD after typing a message", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+      screen.getByText("</> JG");
+
+      // Advance past HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Complete erase (6 * 80ms) + EMPTY_PAUSE (300ms)
+      await vi.advanceTimersByTimeAsync(6 * 80 + 300);
+
+      // Complete typing message 1: "built with ♥ in the EU" = 22 chars = 22 * 80ms
+      await vi.advanceTimersByTimeAsync(22 * 80);
+
+      // Now in MSG_HOLD (4000ms) — unmount during hold
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during erase of the rotating message", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance past HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Erase HOME_TEXT (6 * 80ms) + EMPTY_PAUSE (300ms) + type msg1 (22 * 80ms) + MSG_HOLD (4000ms)
+      await vi.advanceTimersByTimeAsync(6 * 80 + 300 + 22 * 80 + 4000);
+
+      // Now erasing the rotating message — advance partway
+      await vi.advanceTimersByTimeAsync(5 * 80);
+
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during second empty pause before typing HOME_TEXT back", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Advance past HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Full cycle: erase HOME(6*80) + EMPTY_PAUSE(300) + type msg(22*80) + MSG_HOLD(4000) + erase msg(22*80)
+      await vi.advanceTimersByTimeAsync(6 * 80 + 300 + 22 * 80 + 4000 + 22 * 80);
+
+      // Now in second EMPTY_PAUSE — unmount
+      await vi.advanceTimersByTimeAsync(100);
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during typing HOME_TEXT back", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Full half-cycle: HOME_HOLD + erase HOME + pause + type msg + MSG_HOLD + erase msg + pause
+      await vi.advanceTimersByTimeAsync(
+        30_000 + 6 * 80 + 300 + 22 * 80 + 4000 + 22 * 80 + 300,
+      );
+
+      // Now typing HOME_TEXT back — advance partway (3 chars)
+      await vi.advanceTimersByTimeAsync(3 * 80);
+
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    it("cancels during HOME_HOLD at end of cycle before next rotation", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Full cycle: HOME_HOLD + erase HOME(6*80) + pause(300) + type msg(22*80)
+      //   + MSG_HOLD(4000) + erase msg(22*80) + pause(300) + type HOME(6*80)
+      await vi.advanceTimersByTimeAsync(
+        30_000 + 6 * 80 + 300 + 22 * 80 + 4000 + 22 * 80 + 300 + 6 * 80,
+      );
+
+      // Now in the second HOME_HOLD — advance partway
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(() => unmount()).not.toThrow();
+
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+  });
+
+  describe("reduced motion — early exit from animation effect", () => {
+    it("does not start cycle when reduced motion is detected", async () => {
+      matchMediaMock.mockReturnValue({ matches: true });
+      const { container } = render(<AuthorTypewriter />);
+      const textSpan = container.querySelector("span span") as HTMLElement;
+
+      // First useEffect sets prefersReducedMotion to true
+      // Second useEffect checks and returns early
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      // Text should remain as the initial HOME_TEXT
+      expect(textSpan.textContent).toBe("</> JG");
+    });
+  });
+
+  describe("complete cycle wraps back to message index 1", () => {
+    it("completes a full erase-type-hold-erase-type cycle and returns to home text", async () => {
+      render(<AuthorTypewriter />);
+      const textSpan = screen.getByText("</> JG");
+
+      // Advance past HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Full first rotation: erase HOME(6*80) + pause(300) + type msg(22*80)
+      //   + MSG_HOLD(4000) + erase msg(22*80) + pause(300) + type HOME(6*80)
+      const fullRotation = 6 * 80 + 300 + 22 * 80 + 4000 + 22 * 80 + 300 + 6 * 80;
+      await vi.advanceTimersByTimeAsync(fullRotation);
+
+      // Should be back to HOME_TEXT
+      expect(textSpan.textContent).toBe("</> JG");
+    });
+  });
 });

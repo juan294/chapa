@@ -37,6 +37,16 @@ function getBaseUrl(): string {
 // HTML template
 // ---------------------------------------------------------------------------
 
+/**
+ * Build the HTML email body for an announcement or engagement campaign.
+ *
+ * Renders a dark-themed, inline-styled HTML email matching the Chapa brand
+ * (JetBrains Mono headings, Plus Jakarta Sans body, purple accent). All
+ * user-controlled text is escaped via `escapeHtml()`.
+ *
+ * @param data - Announcement content (handle, headline, body, features, CTA)
+ * @returns Complete HTML string ready for Resend
+ */
 export function buildAnnouncementHtml(data: AnnouncementData): string {
   const handle = escapeHtml(data.handle);
   const headline = escapeHtml(data.headline);

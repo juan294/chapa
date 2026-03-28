@@ -46,8 +46,14 @@ export function isValidEmuHandle(handle: string): boolean {
 }
 
 /**
- * Validate a BadgeConfig object.
- * Ensures every field is present with a recognized value, and no extra fields exist.
+ * Validate a BadgeConfig object from the Creator Studio.
+ *
+ * Ensures every field defined in `BADGE_CONFIG_OPTIONS` is present with a
+ * recognized value, and rejects payloads with extra or missing fields.
+ * Used by PUT /api/studio/config to guard user-submitted configurations.
+ *
+ * @param value - The candidate object to validate
+ * @returns `true` if the object matches the expected BadgeConfig schema exactly
  */
 import { BADGE_CONFIG_OPTIONS } from "@chapa/shared";
 

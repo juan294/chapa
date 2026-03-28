@@ -276,6 +276,29 @@ describe("listAllContacts behavior", () => {
     expect(body.totalContacts).toBe(0);
   });
 
+  it("proceeds with empty users when dbGetUsersWithEmail rejects", async () => {
+    vi.mocked(dbGetUsersWithEmail).mockRejectedValue(new Error("DB connection lost"));
+    vi.mocked(getResend).mockReturnValue({
+      contacts: {
+        list: vi.fn().mockResolvedValue({
+          data: {
+            data: [{ id: "c-1", email: "a@example.com", unsubscribed: false }],
+            has_more: false,
+          },
+          error: null,
+        }),
+      },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    // Should still return ok with contacts data even though users fetch failed
+    expect(body.status).toBe("ok");
+    expect(body.totalEligible).toBe(0);
+    expect(body.totalContacts).toBe(1);
+  });
+
   it("handles listAllContacts timeout by returning empty contacts", async () => {
     // Mock a very slow contacts.list that takes longer than the timeout
     vi.mocked(getResend).mockReturnValue({

@@ -792,4 +792,52 @@ describe("GET /api/auth/callback — audience sync", () => {
       avatarUrl: null,
     });
   });
+
+  it("swallows dbUpsertUser rejection via .catch() (fire-and-forget)", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue(null);
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+    // dbUpsertUser rejects — the .catch(() => {}) should swallow it
+    mockDbUpsertUser.mockRejectedValue(new Error("DB down"));
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    // Should still redirect successfully despite dbUpsertUser failure
+    expect(res.status).toBe(307);
+    // Flush microtasks so .catch() runs
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  it("swallows addContact rejection via .catch() (fire-and-forget)", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockFetchGitHubUserEmail.mockResolvedValue("octocat@github.com");
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+    // addContact rejects — the .catch(() => {}) should swallow it
+    mockAddContact.mockRejectedValue(new Error("Email service down"));
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    // Should still redirect successfully despite addContact failure
+    expect(res.status).toBe(307);
+    // Flush microtasks so .catch() runs
+    await new Promise((r) => setTimeout(r, 0));
+  });
 });

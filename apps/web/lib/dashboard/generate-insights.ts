@@ -84,6 +84,18 @@ const MAX_INSIGHTS = 5;
 // Main function
 // ---------------------------------------------------------------------------
 
+/**
+ * Generate personalized developer insights from impact profile, trend, and diff data.
+ *
+ * Applies 6 prioritized rules: tier change, overall trend, dimension improvements,
+ * weakest-dimension tip, next-tier guidance, and archetype context. Results are
+ * sorted by priority and capped at 5. Used by the share page insights panel.
+ *
+ * @param impact - Current impact profile (dimensions, archetype, tier, composite)
+ * @param trend  - Optional trend summary (direction, avgDelta, dimension trends)
+ * @param diff   - Optional snapshot diff (tier/dimension changes since last snapshot)
+ * @returns Up to 5 insights sorted by priority (1 = highest)
+ */
 export function generateInsights(
   impact: ImpactV4Result,
   trend: TrendSummary | null,
