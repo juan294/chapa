@@ -8,6 +8,7 @@ import {
   deriveArchetype,
   detectProfileType,
   computeImpactV4,
+  computeLeadTimeModifier,
 } from "./v4";
 import type { StatsData, DimensionScores } from "@chapa/shared";
 import { makeStats as _makeStats } from "../test-helpers/fixtures";
@@ -130,6 +131,106 @@ describe("computeDelivery(stats)", () => {
       commitsTotal: 1500,
     });
     expect(computeDelivery(stats)).toBe(100);
+  });
+
+  it("boosts delivery for fast lead time", () => {
+    const stats = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+      medianPrLeadTimeHours: 2, // very fast → 1.05x
+    });
+    const withoutLead = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    });
+    expect(computeDelivery(stats)).toBeGreaterThan(computeDelivery(withoutLead));
+  });
+
+  it("penalizes delivery for slow lead time", () => {
+    const stats = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+      medianPrLeadTimeHours: 200, // very slow → 0.95x
+    });
+    const withoutLead = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    });
+    expect(computeDelivery(stats)).toBeLessThan(computeDelivery(withoutLead));
+  });
+
+  it("leaves delivery unchanged when no lead time data", () => {
+    const stats = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    });
+    // No medianPrLeadTimeHours → modifier = 1.0
+    const baseScore = computeDelivery(stats);
+    const withNeutral = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+      medianPrLeadTimeHours: 26, // ~midpoint → modifier ≈ 1.0
+    });
+    // The neutral point is around 26h; without data should be exactly 1.0x
+    expect(baseScore).toBe(computeDelivery(makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    })));
+  });
+
+  it("does not exceed 100 even with fast lead time boost", () => {
+    const stats = makeStats({
+      prsMergedWeight: 300,
+      issuesClosedCount: 200,
+      commitsTotal: 1500,
+      medianPrLeadTimeHours: 1, // max boost
+    });
+    expect(computeDelivery(stats)).toBeLessThanOrEqual(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeLeadTimeModifier(medianHours)
+// ---------------------------------------------------------------------------
+
+describe("computeLeadTimeModifier(medianHours)", () => {
+  it("returns 1.05 for median ≤ 4 hours", () => {
+    expect(computeLeadTimeModifier(0)).toBe(1.05);
+    expect(computeLeadTimeModifier(4)).toBe(1.05);
+  });
+
+  it("returns 1.0 for median = 48 hours", () => {
+    expect(computeLeadTimeModifier(48)).toBeCloseTo(1.0, 5);
+  });
+
+  it("returns 0.95 for median ≥ 168 hours", () => {
+    expect(computeLeadTimeModifier(168)).toBeCloseTo(0.95, 5);
+    expect(computeLeadTimeModifier(500)).toBe(0.95);
+  });
+
+  it("interpolates linearly between 4-48h", () => {
+    // Midpoint at 26h → (1.05 + 1.0) / 2 = 1.025
+    expect(computeLeadTimeModifier(26)).toBeCloseTo(1.025, 2);
+  });
+
+  it("interpolates linearly between 48-168h", () => {
+    // Midpoint at 108h → (1.0 + 0.95) / 2 = 0.975
+    expect(computeLeadTimeModifier(108)).toBeCloseTo(0.975, 2);
+  });
+
+  it("returns 1.0 when medianHours is undefined", () => {
+    expect(computeLeadTimeModifier(undefined)).toBe(1.0);
+  });
+
+  it("returns 1.0 when medianHours is null-ish", () => {
+    expect(computeLeadTimeModifier(undefined)).toBe(1.0);
   });
 });
 

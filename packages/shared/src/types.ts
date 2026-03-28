@@ -24,6 +24,7 @@ export interface StatsData {
   maxCommitsIn10Min: number; // derived from commit timestamps
   microCommitRatio?: number; // optional, 0..1
   batchSizeScore?: number; // optional, 0..1 — fraction of merged PRs in the reviewable sweet spot (20-500 lines)
+  medianPrLeadTimeHours?: number; // optional — median PR lead time in hours (creation → merge)
   docsOnlyPrRatio?: number; // optional, 0..1
   prDescriptionRate?: number; // optional, 0..1 — fraction of merged PRs with non-empty body
   featureBranchRate?: number; // optional, 0..1 — fraction of merged PRs from feature branches
@@ -119,6 +120,8 @@ export interface RawContributionData {
       merged: boolean;
       body: string | null;
       headRefName: string;
+      createdAt?: string; // ISO timestamp — when the PR was created
+      mergedAt?: string | null; // ISO timestamp — when the PR was merged (null if not merged)
       closingIssuesCount: number;
     }[];
   };

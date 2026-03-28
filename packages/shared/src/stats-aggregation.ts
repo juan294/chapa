@@ -65,6 +65,19 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
       }).length / prsMergedCount
     : undefined;
 
+  // 5e. Median PR lead time (creation → merge) in hours
+  const leadTimes = mergedPRs
+    .filter((pr) => pr.createdAt && pr.mergedAt)
+    .map((pr) => {
+      const created = new Date(pr.createdAt!).getTime();
+      const merged = new Date(pr.mergedAt!).getTime();
+      return Math.max(0, (merged - created) / (1000 * 60 * 60));
+    })
+    .sort((a, b) => a - b);
+  const medianPrLeadTimeHours = leadTimes.length > 0
+    ? leadTimes[Math.floor(leadTimes.length / 2)]
+    : undefined;
+
   // 6. Reviews and issues
   const reviewsSubmittedCount = raw.reviews.totalCount;
   const issuesClosedCount = raw.issues.totalCount;
@@ -129,6 +142,7 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ...(issueLinkageRate !== undefined && { issueLinkageRate }),
     ...(microCommitRatio !== undefined && { microCommitRatio }),
     ...(batchSizeScore !== undefined && { batchSizeScore }),
+    ...(medianPrLeadTimeHours !== undefined && { medianPrLeadTimeHours }),
     totalStars,
     totalForks,
     totalWatchers,

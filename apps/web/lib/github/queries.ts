@@ -93,6 +93,8 @@ export async function fetchContributionData(
                 merged: boolean;
                 body: string | null;
                 headRefName: string;
+                createdAt: string;
+                mergedAt: string | null;
                 closingIssuesReferences?: { totalCount: number };
               };
             }) => ({
@@ -102,6 +104,8 @@ export async function fetchContributionData(
               merged: n.pullRequest.merged,
               body: n.pullRequest.body,
               headRefName: n.pullRequest.headRefName,
+              createdAt: n.pullRequest.createdAt,
+              mergedAt: n.pullRequest.mergedAt,
               closingIssuesCount: n.pullRequest.closingIssuesReferences?.totalCount ?? 0,
             }),
           ),

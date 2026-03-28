@@ -17,8 +17,34 @@ import { computeRecencyRatio, applyRecencyWeight } from "./recency";
 const CAPS = SCORING_CAPS;
 
 // ---------------------------------------------------------------------------
+// Lead time modifier for Delivery
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a ±5% modifier based on median PR lead time (hours).
+ *
+ * - ≤ 4h: 1.05 (fast flow bonus)
+ * - 4–48h: linear interpolation 1.05 → 1.0
+ * - 48–168h: linear interpolation 1.0 → 0.95
+ * - > 168h: 0.95 (slow flow penalty)
+ * - undefined: 1.0 (neutral — no data available)
+ */
+export function computeLeadTimeModifier(medianHours?: number): number {
+  if (medianHours == null) return 1.0;
+  if (medianHours <= 4) return 1.05;
+  if (medianHours <= 48) {
+    return 1.05 - 0.05 * ((medianHours - 4) / (48 - 4));
+  }
+  if (medianHours <= 168) {
+    return 1.0 - 0.05 * ((medianHours - 48) / (168 - 48));
+  }
+  return 0.95;
+}
+
+// ---------------------------------------------------------------------------
 // Delivery: shipping meaningful changes
 // prsMergedWeight (70%), issuesClosedCount (20%), commitsTotal (10%)
+// + lead time modifier (±5%)
 // ---------------------------------------------------------------------------
 
 /**
@@ -26,6 +52,7 @@ const CAPS = SCORING_CAPS;
  *
  * Weighted formula: prsMergedWeight (70%) + issuesClosedCount (20%) + commitsTotal (10%).
  * Each input is normalized against its cap before weighting.
+ * A ±5% lead time modifier is applied based on median PR lead time.
  *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @returns Clamped score between 0 and 100
@@ -36,7 +63,8 @@ export function computeDelivery(stats: StatsData): number {
   const commits = normalize(stats.commitsTotal, CAPS.commits);
 
   const raw = 100 * (0.7 * pr + 0.2 * issues + 0.1 * commits);
-  return clampScore(raw);
+  const modifier = computeLeadTimeModifier(stats.medianPrLeadTimeHours);
+  return clampScore(raw * modifier);
 }
 
 // ---------------------------------------------------------------------------

@@ -678,6 +678,14 @@ describe("batchSizeScore", () => {
     expect(result.batchSizeScore).toBe(1);
   });
 
+  it("returns undefined batchSizeScore when no merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: { totalCount: 0, nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBeUndefined();
+  });
+
   it("excludes unmerged PRs from batchSizeScore", () => {
     const raw = makeRaw({
       pullRequests: {
@@ -692,5 +700,89 @@ describe("batchSizeScore", () => {
     const result = buildStatsFromRaw(raw);
     // Only 2 merged: 1 in sweet spot, 1 micro → 0.5
     expect(result.batchSizeScore).toBeCloseTo(0.5, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// medianPrLeadTimeHours
+// ---------------------------------------------------------------------------
+
+describe("medianPrLeadTimeHours", () => {
+  it("computes median from merged PRs with timestamps", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 3,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T14:00:00Z" }, // 4h
+          { additions: 30, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0, createdAt: "2026-01-02T10:00:00Z", mergedAt: "2026-01-03T10:00:00Z" }, // 24h
+          { additions: 80, deletions: 20, changedFiles: 5, merged: true, body: "x", headRefName: "feat/c", closingIssuesCount: 0, createdAt: "2026-01-04T10:00:00Z", mergedAt: "2026-01-06T10:00:00Z" }, // 48h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    // Sorted: [4, 24, 48] → median = 24
+    expect(result.medianPrLeadTimeHours).toBe(24);
+  });
+
+  it("returns undefined when no merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: { totalCount: 0, nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBeUndefined();
+  });
+
+  it("returns undefined when PRs lack timestamps", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 30, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBeUndefined();
+  });
+
+  it("handles single PR", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 1,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T18:00:00Z" }, // 8h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(8);
+  });
+
+  it("ignores unmerged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T14:00:00Z" }, // 4h
+          { additions: 30, deletions: 5, changedFiles: 2, merged: false, body: "x", headRefName: "feat/b", closingIssuesCount: 0, createdAt: "2026-01-02T10:00:00Z", mergedAt: null },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(4);
+  });
+
+  it("handles zero-duration merges (instant)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 1,
+        nodes: [
+          { additions: 10, deletions: 5, changedFiles: 1, merged: true, body: "x", headRefName: "fix/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T10:00:00Z" }, // 0h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(0);
   });
 });

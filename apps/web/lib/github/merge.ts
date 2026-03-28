@@ -63,6 +63,10 @@ export function mergeStats(
       primary.batchSizeScore, primary.prsMergedCount,
       supplemental.batchSizeScore, supplemental.prsMergedCount,
     ),
+    medianPrLeadTimeHours: mergeOptionalWeightedAvg(
+      primary.medianPrLeadTimeHours, primary.prsMergedCount,
+      supplemental.medianPrLeadTimeHours, supplemental.prsMergedCount,
+    ),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),
     heatmapData: mergedHeatmap,
     hasSupplementalData: options?.markAsSupplemental ?? true,
