@@ -276,6 +276,16 @@ export default function ScoringMethodologyPage() {
               from 0 to 10, so trivial or empty PRs contribute zero weight while
               normal PRs are unaffected.
             </p>
+            <p>
+              Delivery also includes a{" "}
+              <strong className="text-text-primary">
+                flow efficiency modifier
+              </strong>{" "}
+              (±5%) based on median PR lead time — how quickly your PRs go from
+              creation to merge. Fast turnaround (≤4 hours) earns a 5% boost;
+              slow flow (&gt;7 days) applies a 5% penalty. This aligns with the
+              DORA &quot;lead time for changes&quot; metric.
+            </p>
 
             {/* Quality */}
             <SubHeading>
@@ -283,9 +293,10 @@ export default function ScoringMethodologyPage() {
             </SubHeading>
             <p>
               Quality is measured differently depending on your profile type.
-              Collaborative developers (those with code reviews) are scored on
-              review behavior. Solo developers (zero reviews) are scored on
-              engineering discipline signals visible in their PR workflow.
+              Collaborative developers (those who actively review others&apos;
+              code) are scored on review behavior. Solo developers — those with
+              a review-to-PR ratio below 15% — are scored on engineering
+              discipline signals visible in their PR workflow.
             </p>
             <SubHeading>Collaborative Quality</SubHeading>
             <Table
@@ -302,9 +313,9 @@ export default function ScoringMethodologyPage() {
                   "A high ratio means you review more than you ship, signaling a quality-focused role. Capped at 5:1",
                 ],
                 [
-                  "Inverse Micro-commit Ratio",
+                  "Batch Size Score",
                   "15%",
-                  "Low micro-commit ratio indicates thoughtful, well-structured changes rather than many tiny commits",
+                  "Fraction of PRs in the reviewable sweet spot (20-500 lines). Rewards small, focused changes; penalizes both micro and oversized PRs",
                 ],
               ]}
             />
@@ -328,9 +339,9 @@ export default function ScoringMethodologyPage() {
                   "Percentage of PRs that close at least one issue — connects code to tracked work",
                 ],
                 [
-                  "Inverse Micro-commit Ratio",
+                  "Batch Size Score",
                   "15%",
-                  "Low micro-commit ratio indicates thoughtful, well-structured changes",
+                  "Fraction of PRs in the reviewable sweet spot (20-500 lines). Rewards small, focused changes",
                 ],
               ]}
             />
@@ -359,9 +370,9 @@ export default function ScoringMethodologyPage() {
                   "Measures how evenly activity is distributed across weeks. A steady rhythm scores higher than concentrated bursts",
                 ],
                 [
-                  "Inverse Burst Activity",
+                  "Week Coverage",
                   "15%",
-                  "Penalizes high max-commits-in-10-minutes. Steady work patterns produce higher consistency scores",
+                  "Fraction of weeks with at least one contribution — captures sustainable cadence, how regularly you show up",
                 ],
               ]}
             />
@@ -374,8 +385,11 @@ export default function ScoringMethodologyPage() {
               momentum — 50 active days scores 37% instead of 14% — while
               preserving the full range for dedicated daily contributors.
               Heatmap evenness uses the inverted coefficient of variation across
-              weekly totals. Perfectly uniform activity scores 1.0; a single
-              burst week scores ~0.2.
+              weekly totals, with outlier weeks clipped at 3&times; the median
+              to prevent a single ultra-productive week from dominating the
+              variance. Week coverage measures what fraction of weeks had any
+              activity at all — rewarding developers who show up consistently
+              regardless of daily output volume.
             </p>
 
             {/* Breadth */}

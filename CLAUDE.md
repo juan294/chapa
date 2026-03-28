@@ -111,7 +111,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
-- `StatsData` — aggregated GitHub stats (23 fields)
+- `StatsData` — aggregated GitHub stats (25 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
 - `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
@@ -172,6 +172,10 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
 - Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).
+- Solo profile detection uses review-to-PR ratio threshold (0.15), not binary reviews === 0.
+- Consistency dimension uses week coverage (active weeks / total weeks) instead of inverse burst.
+- Quality dimension uses batch size score (fraction of PRs in 20-500 line sweet spot) instead of inverse micro-commit ratio.
+- Delivery dimension applies a ±5% lead time modifier based on median PR open-to-merge duration.
 
 ## Engineering rules
 - Prefer pure functions for scoring & rendering.

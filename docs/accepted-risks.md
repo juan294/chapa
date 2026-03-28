@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-03-24 | Audit: v38
+> Last reviewed: 2026-03-28 | Audit: v39
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -129,6 +129,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** Intentional design. Experiment pages are visual demos for badge effects (particles, 3D tilt, aurora, hexmap, etc.) that rely heavily on canvas, requestAnimationFrame, and interactive state — SSR provides no benefit for these. All 13 pages are gated behind the `experiments_enabled` feature flag (disabled by default in production). They are internal prototyping tools, not user-facing production features.
 - **Severity:** None
 - **Accepted:** 2026-03-22
+
+---
+
+## Profile type threshold boundary (0.15 review-to-PR ratio)
+
+- **Risk:** A developer with exactly 15% review rate sits on the solo/collaborative boundary. Crossing the threshold changes which Quality formula is used and whether Quality is included in the composite.
+- **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
+- **Severity:** Low
+- **Accepted:** 2026-03-28
 
 ---
 
