@@ -171,12 +171,6 @@ describe("computeDelivery(stats)", () => {
     });
     // No medianPrLeadTimeHours → modifier = 1.0
     const baseScore = computeDelivery(stats);
-    const withNeutral = makeStats({
-      prsMergedWeight: 30,
-      issuesClosedCount: 10,
-      commitsTotal: 80,
-      medianPrLeadTimeHours: 26, // ~midpoint → modifier ≈ 1.0
-    });
     // The neutral point is around 26h; without data should be exactly 1.0x
     expect(baseScore).toBe(computeDelivery(makeStats({
       prsMergedWeight: 30,
