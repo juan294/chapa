@@ -93,6 +93,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/admin/stats` Admin stats (bearer token auth via `ADMIN_SECRET`)
 - POST|GET|DELETE `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
 - GET `/api/admin/agents-summary` Agent run summaries
+- POST `/api/admin/bulk-recalculate` Force-recalculate impact scores for all or specified users (bearer token auth via `ADMIN_SECRET`)
 - PATCH `/api/admin/feature-flags` Manage feature flags
 - GET `/api/admin/engagement-flags` Manage engagement flags
 - GET|POST `/api/admin/campaigns` Campaign list and creation (admin auth)
