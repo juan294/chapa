@@ -23,6 +23,7 @@ export interface StatsData {
   topRepoShare: number; // 0..1
   maxCommitsIn10Min: number; // derived from commit timestamps
   microCommitRatio?: number; // optional, 0..1
+  batchSizeScore?: number; // optional, 0..1 — fraction of merged PRs in the reviewable sweet spot (20-500 lines)
   docsOnlyPrRatio?: number; // optional, 0..1
   prDescriptionRate?: number; // optional, 0..1 — fraction of merged PRs with non-empty body
   featureBranchRate?: number; // optional, 0..1 — fraction of merged PRs from feature branches

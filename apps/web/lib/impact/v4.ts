@@ -75,26 +75,25 @@ export function computeQuality(stats: StatsData, profileType?: ProfileType): num
     reviewRatio = 1;
   }
 
-  // Inverse micro-commit ratio: low micro-commit ratio → high quality
-  // Default 0.3 when unknown (no free points — assumes moderate micro-commit activity)
-  const microRatio = stats.microCommitRatio ?? 0.3;
-  const inverseMicro = 1 - microRatio;
+  // Batch size score: fraction of PRs in the reviewable sweet spot (20-500 lines)
+  // Default 0.3 when unknown (no free points)
+  const batchSize = stats.batchSizeScore ?? 0.3;
 
-  const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * inverseMicro);
+  const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * batchSize);
   return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
 // Solo Quality: engineering discipline signals for developers without reviews
 // prDescriptionRate (40%), featureBranchRate (25%), issueLinkageRate (20%),
-// inverseMicroCommitRatio (15%)
+// batchSizeScore (15%)
 // ---------------------------------------------------------------------------
 
 /**
  * Solo quality fallback (0–100): used when no code reviews exist.
  *
  * Weighted formula: prDescriptionRate (40%) + featureBranchRate (25%) +
- * issueLinkageRate (20%) + inverse microCommitRatio (15%).
+ * issueLinkageRate (20%) + batchSizeScore (15%).
  * Returns 0 when no PRs have been merged.
  *
  * @param stats - Aggregated GitHub stats for the scoring window
@@ -106,10 +105,9 @@ function computeSoloQuality(stats: StatsData): number {
   const descRate = stats.prDescriptionRate ?? 0;
   const branchRate = stats.featureBranchRate ?? 0;
   const linkageRate = stats.issueLinkageRate ?? 0;
-  const microRatio = stats.microCommitRatio ?? 0.3;
-  const inverseMicro = 1 - microRatio;
+  const batchSize = stats.batchSizeScore ?? 0.3;
 
-  const raw = 100 * (0.40 * descRate + 0.25 * branchRate + 0.20 * linkageRate + 0.15 * inverseMicro);
+  const raw = 100 * (0.40 * descRate + 0.25 * branchRate + 0.20 * linkageRate + 0.15 * batchSize);
   return clampScore(raw);
 }
 

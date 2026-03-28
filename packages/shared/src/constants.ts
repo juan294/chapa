@@ -42,6 +42,12 @@ export const MICRO_PR_LINE_THRESHOLD = 10;
  */
 export const SOLO_REVIEW_RATIO_THRESHOLD = 0.15;
 
+/** Minimum lines changed for a PR to be in the "reviewable sweet spot". */
+export const BATCH_SIZE_MIN = 20;
+
+/** Maximum lines changed for a PR to be in the "reviewable sweet spot". */
+export const BATCH_SIZE_MAX = 500;
+
 /**
  * All four scoring dimension keys in canonical order.
  * Used by v4 scoring, heatmap coloring, and archetype derivation.

@@ -1,6 +1,6 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
-import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
+import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD, BATCH_SIZE_MIN, BATCH_SIZE_MAX } from "./constants";
 
 /** Branch names that indicate a direct push (not a feature branch). */
 const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
@@ -55,6 +55,14 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold
   const microCommitRatio = prsMergedCount > 0
     ? mergedPRs.filter((pr) => pr.additions + pr.deletions < MICRO_PR_LINE_THRESHOLD).length / prsMergedCount
+    : undefined;
+
+  // 5d. Batch size score: fraction of merged PRs in the reviewable sweet spot
+  const batchSizeScore = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => {
+        const total = pr.additions + pr.deletions;
+        return total >= BATCH_SIZE_MIN && total <= BATCH_SIZE_MAX;
+      }).length / prsMergedCount
     : undefined;
 
   // 6. Reviews and issues
@@ -120,6 +128,7 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ...(featureBranchRate !== undefined && { featureBranchRate }),
     ...(issueLinkageRate !== undefined && { issueLinkageRate }),
     ...(microCommitRatio !== undefined && { microCommitRatio }),
+    ...(batchSizeScore !== undefined && { batchSizeScore }),
     totalStars,
     totalForks,
     totalWatchers,

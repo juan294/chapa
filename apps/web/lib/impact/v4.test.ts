@@ -155,7 +155,7 @@ describe("computeQuality(stats)", () => {
     const reviewOnly = makeStats({ reviewsSubmittedCount: 180 });
     const score = computeQuality(reviewOnly);
     // 60% from reviews, 25% from ratio (no PRs → pure reviewer → max ratio = 1),
-    // ~10.5% from inverse micro (default 0.3 → inverseMicro = 0.7 → 15% * 0.7)
+    // ~4.5% from batchSize (default 0.3 → 15% * 0.3)
     expect(score).toBeGreaterThanOrEqual(60);
   });
 
@@ -166,10 +166,10 @@ describe("computeQuality(stats)", () => {
     expect(computeQuality(highRatio)).toBeGreaterThan(computeQuality(lowRatio));
   });
 
-  it("penalizes high microCommitRatio", () => {
-    const clean = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0.1 });
-    const micro = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0.9 });
-    expect(computeQuality(clean)).toBeGreaterThan(computeQuality(micro));
+  it("rewards high batchSizeScore", () => {
+    const good = makeStats({ reviewsSubmittedCount: 30, batchSizeScore: 0.9 });
+    const bad = makeStats({ reviewsSubmittedCount: 30, batchSizeScore: 0.1 });
+    expect(computeQuality(good)).toBeGreaterThan(computeQuality(bad));
   });
 
   it("returns an integer", () => {
@@ -177,31 +177,31 @@ describe("computeQuality(stats)", () => {
     expect(Number.isInteger(computeQuality(stats))).toBe(true);
   });
 
-  it("handles missing microCommitRatio with conservative default (0.3)", () => {
+  it("handles missing batchSizeScore with conservative default (0.3)", () => {
     const stats = makeStats({ reviewsSubmittedCount: 30 });
     const score = computeQuality(stats);
     expect(score).toBeGreaterThan(0);
 
-    // With microCommitRatio=0.3, inverseMicro=0.7 → 15% * 0.7 = 10.5% contribution
-    // With microCommitRatio=0 (explicit), inverseMicro=1.0 → 15% * 1.0 = 15% contribution
-    const explicitZero = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0 });
-    expect(computeQuality(explicitZero)).toBeGreaterThan(score);
+    // With default 0.3 → 15% * 0.3 = 4.5% contribution
+    // With explicit 1.0 → 15% * 1.0 = 15% contribution
+    const maxBatch = makeStats({ reviewsSubmittedCount: 30, batchSizeScore: 1.0 });
+    expect(computeQuality(maxBatch)).toBeGreaterThan(score);
   });
 
-  it("scores lower with unknown microCommitRatio than with explicit 0", () => {
-    // This validates the anti-gaming default: unknown → 0.3 (no free points)
+  it("scores lower with unknown batchSizeScore than with explicit 1.0", () => {
+    // Validates the conservative default: unknown → 0.3 (no free points)
     const unknown = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30 });
-    const clean = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30, microCommitRatio: 0 });
-    const scoreDiff = computeQuality(clean) - computeQuality(unknown);
-    // ~4.5 point difference (15% * 0.3 * 100)
-    expect(scoreDiff).toBeGreaterThanOrEqual(3);
-    expect(scoreDiff).toBeLessThanOrEqual(6);
+    const perfect = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30, batchSizeScore: 1.0 });
+    const scoreDiff = computeQuality(perfect) - computeQuality(unknown);
+    // ~10.5 point difference (15% * 0.7 * 100)
+    expect(scoreDiff).toBeGreaterThanOrEqual(8);
+    expect(scoreDiff).toBeLessThanOrEqual(12);
   });
 
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ reviewsSubmittedCount: 180, prsMergedCount: 5, microCommitRatio: 0 }),
+      makeStats({ reviewsSubmittedCount: 180, prsMergedCount: 5, batchSizeScore: 1.0 }),
       makeStats({ reviewsSubmittedCount: 300, prsMergedCount: 1 }),
     ];
     for (const s of scenarios) {
@@ -936,6 +936,7 @@ describe("solo developer composite scoring", () => {
       featureBranchRate: 1.0,
       issueLinkageRate: 1.0,
       microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     const result = computeImpactV4(stats);
     expect(result.compositeScore).toBeGreaterThanOrEqual(90);
@@ -1020,14 +1021,14 @@ describe("computeQuality — solo path", () => {
     expect(computeQuality(stats)).toBe(0);
   });
 
-  it("applies solo formula weights: 40% desc, 25% branch, 20% linkage, 15% micro", () => {
+  it("applies solo formula weights: 40% desc, 25% branch, 20% linkage, 15% batchSize", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 0,
       prsMergedCount: 10,
       prDescriptionRate: 1.0,
       featureBranchRate: 0,
       issueLinkageRate: 0,
-      microCommitRatio: 1.0, // inverseMicro = 0
+      batchSizeScore: 0,
     });
     // Only prDescriptionRate contributes: 40% * 1.0 * 100 = 40
     expect(computeQuality(stats)).toBe(40);
@@ -1040,7 +1041,7 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 0,
       featureBranchRate: 1.0,
       issueLinkageRate: 0,
-      microCommitRatio: 1.0,
+      batchSizeScore: 0,
     });
     expect(computeQuality(stats)).toBe(25);
   });
@@ -1052,19 +1053,19 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 0,
       featureBranchRate: 0,
       issueLinkageRate: 1.0,
-      microCommitRatio: 1.0,
+      batchSizeScore: 0,
     });
     expect(computeQuality(stats)).toBe(20);
   });
 
-  it("inverseMicroCommitRatio at 15% weight", () => {
+  it("batchSizeScore at 15% weight", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 0,
       prsMergedCount: 10,
       prDescriptionRate: 0,
       featureBranchRate: 0,
       issueLinkageRate: 0,
-      microCommitRatio: 0, // inverseMicro = 1.0
+      batchSizeScore: 1.0,
     });
     expect(computeQuality(stats)).toBe(15);
   });
@@ -1076,28 +1077,28 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 1.0,
       featureBranchRate: 1.0,
       issueLinkageRate: 1.0,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     expect(computeQuality(stats)).toBe(100);
   });
 
-  it("defaults undefined rates to 0 (no free points)", () => {
+  it("defaults undefined rates to 0, batchSizeScore to 0.3 (no free points)", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 0,
       prsMergedCount: 10,
       // prDescriptionRate, featureBranchRate, issueLinkageRate all undefined
-      microCommitRatio: 0.3,
+      // batchSizeScore undefined → defaults to 0.3
     });
     const score = computeQuality(stats);
-    // Only inverseMicro contributes: 15% * (1 - 0.3) * 100 = 10.5 → 11
-    expect(score).toBe(11);
+    // Only batchSize contributes: 15% * 0.3 * 100 = 4.5 → 5
+    expect(score).toBe(5);
   });
 
   it("collaborative quality path is unchanged (reviews > 0, high ratio)", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 80,
       prsMergedCount: 20,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     // Collaborative formula: 60% * (80/80) + 25% * min(80/20, 5)/5 + 15% * 1.0
     // = 60 + 25 * (4/5) + 15 = 60 + 20 + 15 = 95
@@ -1111,11 +1112,11 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 1.0,
       featureBranchRate: 0.5,
       issueLinkageRate: 0.3,
-      microCommitRatio: 0.1,
+      batchSizeScore: 0.8,
     });
     // ratio = 5/67 = 0.075 < 0.15 → solo path
-    // Solo: 40% * 1.0 + 25% * 0.5 + 20% * 0.3 + 15% * 0.9 = 40 + 12.5 + 6 + 13.5 = 72
-    expect(computeQuality(stats)).toBe(72);
+    // Solo: 40% * 1.0 + 25% * 0.5 + 20% * 0.3 + 15% * 0.8 = 40 + 12.5 + 6 + 12 = 70.5 → 71
+    expect(computeQuality(stats)).toBe(71);
   });
 });
 
@@ -1131,7 +1132,7 @@ describe("computeQuality with profileType parameter", () => {
       prDescriptionRate: 1.0,
       featureBranchRate: 1.0,
       issueLinkageRate: 1.0,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     // Forced solo: 40% + 25% + 20% + 15% = 100
     expect(computeQuality(stats, "solo")).toBe(100);
@@ -1141,7 +1142,7 @@ describe("computeQuality with profileType parameter", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 80,
       prsMergedCount: 20,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     // Forced collaborative: same as normal collaborative path
     expect(computeQuality(stats, "collaborative")).toBe(95);
@@ -1154,7 +1155,7 @@ describe("computeQuality with profileType parameter", () => {
       prDescriptionRate: 1.0,
       featureBranchRate: 1.0,
       issueLinkageRate: 1.0,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     // reviews=0 → auto-detects solo → 100
     expect(computeQuality(stats)).toBe(100);
