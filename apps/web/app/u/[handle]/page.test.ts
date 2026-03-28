@@ -65,12 +65,8 @@ describe("SharePage", () => {
       expect(SOURCE).toContain("BadgeToolbar");
     });
 
-    it("passes studioEnabled to toolbar", () => {
-      expect(SOURCE).toContain("studioEnabled");
-    });
-
-    it("passes isOwner to toolbar", () => {
-      expect(SOURCE).toContain("isOwner");
+    it("passes handle to toolbar", () => {
+      expect(SOURCE).toContain("handle=");
     });
   });
 

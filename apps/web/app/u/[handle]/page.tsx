@@ -18,7 +18,6 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
-import { isStudioEnabled } from "@/lib/feature-flags";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getBaseUrl } from "@/lib/env";
 import { toDateString } from "@/lib/utils/date";
@@ -114,12 +113,11 @@ export async function SharePageContent({ handle }: { handle: string }) {
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
   // Fetch stats, config, snapshot, craft score, and feature flags in parallel
-  const [stats, savedConfig, latestSnapshot, craftResult, studioEnabled] = await Promise.all([
+  const [stats, savedConfig, latestSnapshot, craftResult] = await Promise.all([
     getStats(handle),
     cacheGet<BadgeConfig>(`config:${handle}`),
     getCachedLatestSnapshot(handle),
     getCachedCraftScore(handle),
-    isStudioEnabled(),
   ]);
 
   const impact = stats ? computeImpactV4(stats, craftResult?.craftScore ?? undefined) : null;
@@ -212,7 +210,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
       <SharePageShortcuts
         embedMarkdown={embedMarkdown}
         handle={handle}
-        isOwner={false}
+
       />
       {/* SAFETY: JSON-LD uses JSON.stringify (auto-escapes quotes/special chars) + explicit < escape to prevent </script> injection. User handle is a URL param but only appears as a JSON string value, never raw HTML. */}
       <script
@@ -274,8 +272,6 @@ export async function SharePageContent({ handle }: { handle: string }) {
         <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
           <BadgeToolbar
             handle={handle}
-            isOwner={false}
-            studioEnabled={studioEnabled}
           />
         </div>
 

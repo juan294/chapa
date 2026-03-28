@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useKeyboardShortcutsContext } from "./KeyboardShortcutsListener";
 
 interface SharePageShortcutsProps {
   embedMarkdown: string;
   handle: string;
-  isOwner: boolean;
 }
 
 /**
@@ -16,8 +15,17 @@ interface SharePageShortcutsProps {
 export function SharePageShortcuts({
   embedMarkdown,
   handle,
-  isOwner,
 }: SharePageShortcutsProps) {
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data: { user: { login: string } | null }) => {
+        setIsOwner(data.user?.login === handle);
+      })
+      .catch(() => setIsOwner(false));
+  }, [handle]);
   const { registerPageShortcuts } = useKeyboardShortcutsContext();
 
   const handler = useCallback(
