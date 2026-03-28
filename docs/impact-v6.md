@@ -163,11 +163,11 @@ Rate limits: insights upload 10/day, recalculate 20/hour.
 
 ## Solo Profile Exception
 
-Solo developers (zero code reviews) receive a modified composite calculation:
+Solo developers (review-to-PR ratio below 0.15) receive a modified composite calculation:
 
 - **Composite**: `avg(Delivery, Consistency, Breadth [, Craft])` — Quality excluded
 - **Quality dimension**: Computed via `computeSoloQuality()` (PR descriptions, branch strategy,
-  issue linkage, micro-commit ratio) — displayed on radar/cards for informational purposes
+  issue linkage, batch size score) — displayed on radar/cards for informational purposes
 - **Archetype**: Quality Champion is excluded for solo profiles
 - **Rationale**: Solo quality is a proxy metric based on engineering discipline signals,
   not peer review activity. Including it in the composite would unfairly penalize solo
