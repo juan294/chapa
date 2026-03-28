@@ -225,47 +225,59 @@ describe("computeConsistency(stats)", () => {
     const stats = makeStats({
       activeDays: 340,
       heatmapData: makeUniformHeatmap(14), // 2/day for 13 weeks
-      maxCommitsIn10Min: 3,
     });
     const score = computeConsistency(stats);
     expect(score).toBeGreaterThan(80);
   });
 
-  it("V5: weights sqrt streak at 45%", () => {
+  it("weights sqrt streak at 45%", () => {
     const stats = makeStats({
       activeDays: 365,
-      heatmapData: [], // no heatmap data → evenness = 0
-      maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
+      heatmapData: [], // no heatmap data → evenness = 0, weekCoverage = 0
     });
     const score = computeConsistency(stats);
     // sqrt(365/365) = 1.0; 45% * 1.0 * 100 = 45
     expect(score).toBe(45);
   });
 
-  it("V5: sqrt curve boosts moderate active days significantly", () => {
-    // 120 active days: V4 streak = 32.9%, V5 streak = sqrt(120/365) = 57.3%
+  it("sqrt curve boosts moderate active days significantly", () => {
+    // 120 active days: sqrt(120/365) = 57.3%
     const stats = makeStats({
       activeDays: 120,
-      heatmapData: [], // no heatmap data → evenness = 0
-      maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
+      heatmapData: [], // no heatmap data → evenness = 0, weekCoverage = 0
     });
     const score = computeConsistency(stats);
     // sqrt(120/365) ≈ 0.573; 0.573 * 45 ≈ 25.8 → 26
     expect(score).toBe(26);
   });
 
-  it("penalizes burst activity", () => {
-    const steady = makeStats({
+  it("no longer penalizes high daily contribution counts", () => {
+    // Two profiles with identical heatmaps but different maxCommitsIn10Min
+    // should score the same (burst is no longer a factor)
+    const low = makeStats({
       activeDays: 60,
       heatmapData: makeUniformHeatmap(10),
       maxCommitsIn10Min: 3,
     });
-    const bursty = makeStats({
+    const high = makeStats({
       activeDays: 60,
-      heatmapData: makeBurstHeatmap(130),
-      maxCommitsIn10Min: 25,
+      heatmapData: makeUniformHeatmap(10),
+      maxCommitsIn10Min: 300,
     });
-    expect(computeConsistency(steady)).toBeGreaterThan(computeConsistency(bursty));
+    expect(computeConsistency(low)).toBe(computeConsistency(high));
+  });
+
+  it("scores higher when more weeks have activity (week coverage)", () => {
+    // 13 active weeks vs 3 active weeks (same total activity)
+    const manyWeeks = makeStats({
+      activeDays: 91,
+      heatmapData: makeUniformHeatmap(7), // all 13 weeks active
+    });
+    const fewWeeks = makeStats({
+      activeDays: 21,
+      heatmapData: makeBurstHeatmap(91), // only 1 week active
+    });
+    expect(computeConsistency(manyWeeks)).toBeGreaterThan(computeConsistency(fewWeeks));
   });
 
   it("rewards even distribution over bursty heatmap", () => {
@@ -288,14 +300,44 @@ describe("computeConsistency(stats)", () => {
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ activeDays: 365, heatmapData: makeUniformHeatmap(20), maxCommitsIn10Min: 0 }),
-      makeStats({ activeDays: 1, heatmapData: makeBurstHeatmap(100), maxCommitsIn10Min: 50 }),
+      makeStats({ activeDays: 365, heatmapData: makeUniformHeatmap(20) }),
+      makeStats({ activeDays: 1, heatmapData: makeBurstHeatmap(100) }),
     ];
     for (const s of scenarios) {
       const score = computeConsistency(s);
       expect(score).toBeGreaterThanOrEqual(0);
       expect(score).toBeLessThanOrEqual(100);
     }
+  });
+
+  it("scores > 90 with uniform activity across 52 weeks", () => {
+    // Build a 52-week heatmap (364 days) with uniform activity
+    const days: { date: string; count: number }[] = [];
+    for (let i = 0; i < 364; i++) {
+      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count: 3 });
+    }
+    const stats = makeStats({
+      activeDays: 364,
+      heatmapData: days,
+    });
+    expect(computeConsistency(stats)).toBeGreaterThan(90);
+  });
+
+  it("scores well with 134 active days despite high max daily contributions", () => {
+    // Simulate a high-output solo dev: active ~134 days, variable intensity
+    // Key: maxCommitsIn10Min no longer penalizes the score
+    const days: { date: string; count: number }[] = [];
+    for (let i = 0; i < 365; i++) {
+      const count = i < 134 ? (i % 7 === 0 ? 50 : 5) : 0;
+      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count });
+    }
+    const stats = makeStats({
+      activeDays: 134,
+      heatmapData: days,
+      maxCommitsIn10Min: 300,
+    });
+    // Should score ~50 (up from ~40 with old burst penalty)
+    expect(computeConsistency(stats)).toBeGreaterThanOrEqual(45);
   });
 });
 

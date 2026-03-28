@@ -7,7 +7,7 @@ import type {
 } from "@chapa/shared";
 import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS, SOLO_REVIEW_RATIO_THRESHOLD } from "@chapa/shared";
 import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
-import { computeHeatmapEvenness } from "./heatmap-evenness";
+import { computeHeatmapEvenness, computeWeekCoverage } from "./heatmap-evenness";
 import { computeRecencyRatio, applyRecencyWeight } from "./recency";
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,8 @@ function computeSoloQuality(stats: StatsData): number {
 
 // ---------------------------------------------------------------------------
 // Consistency: reliable, sustained contributions
-// V5: sqrt(activeDays/365) (45%), heatmap evenness (40%), inverse burst (15%)
+// V6.1: sqrt(activeDays/365) (45%), heatmap evenness with clipping (40%),
+//        week coverage (15%). Burst sub-signal replaced with week coverage.
 // sqrt curve: easier to start, harder to climb — 120 days ≈ 57% (was 33% linear)
 // ---------------------------------------------------------------------------
 
@@ -123,8 +124,12 @@ function computeSoloQuality(stats: StatsData): number {
  * Compute Consistency dimension (0–100): measures sustained contribution.
  *
  * Weighted formula: sqrt(activeDays/365) (45%) + heatmap evenness (40%) +
- * inverse burst activity (15%). The sqrt curve makes early days count more
- * and later days harder to climb — 120 active days yields ~57%.
+ * week coverage (15%). The sqrt curve makes early days count more and later
+ * days harder to climb — 120 active days yields ~57%.
+ *
+ * V6.1: Replaced inverse burst sub-signal with week coverage (fraction of
+ * weeks with any activity). This better captures "sustainable cadence" per
+ * DORA/DX research without penalizing legitimately productive days.
  *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @returns Clamped score between 0 and 100; returns 0 when activeDays is 0
@@ -134,13 +139,9 @@ export function computeConsistency(stats: StatsData): number {
 
   const streak = Math.sqrt(Math.min(stats.activeDays, SCORING_WINDOW_DAYS) / SCORING_WINDOW_DAYS);
   const evenness = computeHeatmapEvenness(stats.heatmapData);
+  const weekCoverage = computeWeekCoverage(stats.heatmapData);
 
-  // Inverse burst: low maxCommitsIn10Min → steady work
-  // Cap at 30 for normalization; 0 bursts → 1.0, 30+ → 0.0
-  const burstCap = 30;
-  const inverseBurst = 1 - Math.min(stats.maxCommitsIn10Min, burstCap) / burstCap;
-
-  const raw = 100 * (0.45 * streak + 0.40 * evenness + 0.15 * inverseBurst);
+  const raw = 100 * (0.45 * streak + 0.40 * evenness + 0.15 * weekCoverage);
   return clampScore(raw);
 }
 
