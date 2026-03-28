@@ -91,16 +91,6 @@ describe("BadgeToolbar", () => {
     });
   });
 
-  describe("customize link", () => {
-    it("links to /studio", () => {
-      expect(SOURCE).toContain('href="/studio"');
-    });
-
-    it("is gated behind studioEnabled", () => {
-      expect(SOURCE).toContain("studioEnabled");
-    });
-  });
-
   describe("dropdown behavior (via useDropdownMenu hook)", () => {
     it("uses useRef for dropdown container", () => {
       expect(SOURCE).toContain("useRef");

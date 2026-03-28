@@ -41,9 +41,21 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+/** Mock session fetch — defaults to owner. Override with mockSessionAs(). */
+function mockSessionAs(login: string | null) {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+    if (typeof url === "string" && url.includes("/api/auth/session")) {
+      return new Response(JSON.stringify({ user: login ? { login } : null }));
+    }
+    // Default passthrough for other fetches (refresh, badge.svg, etc.)
+    return new Response("ok");
+  });
+}
+
 beforeEach(() => {
   dropdownOpen = false;
   setIsOpenMock.mockClear();
+  mockSessionAs("testuser"); // default: logged in as the handle used in tests
 });
 
 afterEach(() => {
@@ -55,7 +67,7 @@ describe("BadgeToolbar render", () => {
   describe("smoke test", () => {
     it("renders Share and Download buttons", () => {
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       expect(screen.getByLabelText("Share badge")).toBeDefined();
       expect(screen.getByLabelText("Download badge as PNG")).toBeDefined();
@@ -63,184 +75,146 @@ describe("BadgeToolbar render", () => {
   });
 
   describe("owner-only controls", () => {
-    it("shows Refresh button when isOwner", () => {
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
-      );
-      expect(screen.getByLabelText("Refresh badge data")).toBeDefined();
+    it("shows Refresh button when session matches handle", async () => {
+      mockSessionAs("testuser");
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => {
+        expect(screen.getByLabelText("Refresh badge data")).toBeDefined();
+      });
     });
 
-    it("hides Refresh button when not owner", () => {
-      render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
-      );
-      expect(screen.queryByLabelText("Refresh badge data")).toBeNull();
+    it("hides Refresh button when not owner", async () => {
+      mockSessionAs("otheruser");
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => {
+        expect(screen.queryByLabelText("Refresh badge data")).toBeNull();
+      });
     });
 
-    it("shows Customize link when isOwner and studioEnabled", () => {
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={true} />,
-      );
-      expect(screen.getByText("Customize")).toBeDefined();
-    });
-
-    it("hides Customize link when not owner", () => {
-      render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={true} />,
-      );
-      expect(screen.queryByText("Customize")).toBeNull();
-    });
-
-    it("hides Customize when studioEnabled is false", () => {
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
-      );
-      expect(screen.queryByText("Customize")).toBeNull();
+    it("hides Refresh button when not logged in", async () => {
+      mockSessionAs(null);
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => {
+        expect(screen.queryByLabelText("Refresh badge data")).toBeNull();
+      });
     });
   });
 
+  /** Mock that returns session for the session call, and a custom response for refresh */
+  function mockSessionAndRefresh(handle: string, refreshResponse: Promise<{ ok: boolean }> | { ok: boolean } | Error) {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (typeof url === "string" && url.includes("/api/auth/session")) {
+        return new Response(JSON.stringify({ user: { login: handle } }));
+      }
+      if (refreshResponse instanceof Error) throw refreshResponse;
+      const result = refreshResponse instanceof Promise ? await refreshResponse : refreshResponse;
+      return new Response(null, { status: result.ok ? 200 : 500 });
+    });
+  }
+
   describe("refresh flow", () => {
     it("calls refresh API on click", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", mockFetch);
-
-      render(
-        <BadgeToolbar handle="myuser" isOwner={true} studioEnabled={false} />,
-      );
+      mockSessionAndRefresh("myuser", { ok: true });
+      render(<BadgeToolbar handle="myuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
-      expect(mockFetch).toHaveBeenCalledWith("/api/refresh?handle=myuser", {
+      expect(globalThis.fetch).toHaveBeenCalledWith("/api/refresh?handle=myuser", {
         method: "POST",
       });
-      vi.unstubAllGlobals();
     });
 
     it("shows loading state during refresh", async () => {
-      const mockFetch = vi.fn(
-        () =>
-          new Promise<{ ok: boolean }>((resolve) =>
-            setTimeout(() => resolve({ ok: true }), 200),
-          ),
-      );
-      vi.stubGlobal("fetch", mockFetch);
+      mockSessionAndRefresh("testuser", new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 200)));
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
-      );
       fireEvent.click(screen.getByLabelText("Refresh badge data"));
-
       await waitFor(() => {
         expect(screen.getByText(/Refreshing/)).toBeDefined();
       });
-
-      vi.unstubAllGlobals();
     });
 
     it("shows error state on refresh failure", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: false });
-      vi.stubGlobal("fetch", mockFetch);
-
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
-      );
+      mockSessionAndRefresh("testuser", { ok: false });
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
       expect(screen.getByText("Failed")).toBeDefined();
-      vi.unstubAllGlobals();
     });
 
     it("shows error state on network failure", async () => {
-      const mockFetch = vi
-        .fn()
-        .mockRejectedValue(new Error("network error"));
-      vi.stubGlobal("fetch", mockFetch);
-
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
-      );
+      mockSessionAndRefresh("testuser", new Error("network error"));
+      render(<BadgeToolbar handle="testuser" />);
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
       expect(screen.getByText("Failed")).toBeDefined();
-      vi.unstubAllGlobals();
     });
 
     it("disables refresh button during loading", async () => {
-      const mockFetch = vi.fn(
-        () =>
-          new Promise<{ ok: boolean }>((resolve) =>
-            setTimeout(() => resolve({ ok: true }), 200),
-          ),
-      );
-      vi.stubGlobal("fetch", mockFetch);
+      mockSessionAndRefresh("testuser", new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 200)));
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
       const refreshBtn = screen.getByLabelText("Refresh badge data");
       fireEvent.click(refreshBtn);
 
       await waitFor(() => {
         expect(refreshBtn.hasAttribute("disabled")).toBe(true);
       });
-
-      vi.unstubAllGlobals();
     });
 
     it("sets aria-busy during refresh loading", async () => {
-      const mockFetch = vi.fn(
-        () =>
-          new Promise<{ ok: boolean }>((resolve) =>
-            setTimeout(() => resolve({ ok: true }), 200),
-          ),
-      );
-      vi.stubGlobal("fetch", mockFetch);
+      mockSessionAndRefresh("testuser", new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 200)));
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
       const refreshBtn = screen.getByLabelText("Refresh badge data");
       fireEvent.click(refreshBtn);
 
       await waitFor(() => {
         expect(refreshBtn.getAttribute("aria-busy")).toBe("true");
       });
-
-      vi.unstubAllGlobals();
     });
 
     it("encodes handle in refresh API URL", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", mockFetch);
+      mockSessionAndRefresh("user name", { ok: true });
 
       render(
-        <BadgeToolbar handle="user name" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="user name" />,
       );
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         "/api/refresh?handle=user%20name",
         { method: "POST" },
       );
-      vi.unstubAllGlobals();
     });
   });
 
   describe("download flow", () => {
     it("shows Download text by default", () => {
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       expect(screen.getByText("Download")).toBeDefined();
     });
@@ -253,7 +227,7 @@ describe("BadgeToolbar render", () => {
       vi.stubGlobal("fetch", mockFetch);
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -273,7 +247,7 @@ describe("BadgeToolbar render", () => {
       vi.stubGlobal("fetch", mockFetch);
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -303,7 +277,7 @@ describe("BadgeToolbar render", () => {
       vi.stubGlobal("fetch", mockFetch);
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const downloadBtn = screen.getByLabelText("Download badge as PNG");
       fireEvent.click(downloadBtn);
@@ -319,7 +293,7 @@ describe("BadgeToolbar render", () => {
   describe("share dropdown", () => {
     it("share button has aria-haspopup", () => {
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const shareBtn = screen.getByLabelText("Share badge");
       expect(shareBtn.getAttribute("aria-haspopup")).toBe("true");
@@ -327,7 +301,7 @@ describe("BadgeToolbar render", () => {
 
     it("share button has aria-expanded", () => {
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const shareBtn = screen.getByLabelText("Share badge");
       expect(shareBtn.getAttribute("aria-expanded")).toBeDefined();
@@ -335,7 +309,7 @@ describe("BadgeToolbar render", () => {
 
     it("clicking share button toggles dropdown", () => {
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const shareBtn = screen.getByLabelText("Share badge");
       fireEvent.click(shareBtn);
@@ -346,7 +320,7 @@ describe("BadgeToolbar render", () => {
     it("renders share menu when open", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       expect(screen.getByRole("menu")).toBeDefined();
       expect(screen.getByText("Copy link")).toBeDefined();
@@ -355,7 +329,7 @@ describe("BadgeToolbar render", () => {
     it("share menu has aria-label", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       expect(
         screen.getByRole("menu").getAttribute("aria-label"),
@@ -365,7 +339,7 @@ describe("BadgeToolbar render", () => {
     it("renders social share links (X, LinkedIn, Bluesky)", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const menuItems = screen.getAllByRole("menuitem");
       expect(menuItems.length).toBeGreaterThanOrEqual(4); // X, LinkedIn, Bluesky, Copy link
@@ -374,7 +348,7 @@ describe("BadgeToolbar render", () => {
     it("social links open in new tab", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen
         .getAllByRole("menuitem")
@@ -396,7 +370,7 @@ describe("BadgeToolbar render", () => {
       const { trackEvent } = await import("@/lib/analytics/posthog");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -414,7 +388,7 @@ describe("BadgeToolbar render", () => {
       Object.assign(navigator, { clipboard: { writeText } });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -435,7 +409,7 @@ describe("BadgeToolbar render", () => {
       });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -451,7 +425,7 @@ describe("BadgeToolbar render", () => {
     it("X link includes correct intent URL with handle", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
       const xLink = links.find((l) => l.href.includes("x.com"));
@@ -462,7 +436,7 @@ describe("BadgeToolbar render", () => {
     it("LinkedIn link includes correct share URL", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
       const linkedinLink = links.find((l) => l.href.includes("linkedin.com"));
@@ -473,7 +447,7 @@ describe("BadgeToolbar render", () => {
     it("Bluesky link includes compose intent", () => {
       dropdownOpen = true;
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
       const bskyLink = links.find((l) => l.href.includes("bsky.app"));
@@ -486,7 +460,7 @@ describe("BadgeToolbar render", () => {
       const { trackEvent } = await import("@/lib/analytics/posthog");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
       const xLink = links.find((l) => l.href.includes("x.com"));
@@ -502,7 +476,7 @@ describe("BadgeToolbar render", () => {
       const { trackEvent } = await import("@/lib/analytics/posthog");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
       const linkedinLink = links.find((l) => l.href.includes("linkedin.com"));
@@ -518,7 +492,7 @@ describe("BadgeToolbar render", () => {
       const { trackEvent } = await import("@/lib/analytics/posthog");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const links = screen.getAllByRole("menuitem").filter((el) => el.tagName === "A") as HTMLAnchorElement[];
       const bskyLink = links.find((l) => l.href.includes("bsky.app"));
@@ -535,7 +509,7 @@ describe("BadgeToolbar render", () => {
       Object.assign(navigator, { clipboard: { writeText } });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -556,7 +530,7 @@ describe("BadgeToolbar render", () => {
       });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       // Should not throw
@@ -602,7 +576,7 @@ describe("BadgeToolbar render", () => {
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -660,7 +634,7 @@ describe("BadgeToolbar render", () => {
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -702,7 +676,7 @@ describe("BadgeToolbar render", () => {
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -734,7 +708,7 @@ describe("BadgeToolbar render", () => {
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -762,7 +736,7 @@ describe("BadgeToolbar render", () => {
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -798,7 +772,7 @@ describe("BadgeToolbar render", () => {
       vi.stubGlobal("fetch", mockFetch);
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       fireEvent.click(screen.getByLabelText("Download badge as PNG"));
 
@@ -826,7 +800,7 @@ describe("BadgeToolbar render", () => {
       vi.stubGlobal("fetch", mockFetch);
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
       const btn = screen.getByLabelText("Download badge as PNG");
       fireEvent.click(btn);
@@ -841,8 +815,7 @@ describe("BadgeToolbar render", () => {
 
   describe("refresh success state", () => {
     it("shows Refreshed! text on success", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", mockFetch);
+      mockSessionAndRefresh("testuser", { ok: true });
 
       // Prevent reload
       Object.defineProperty(window, "location", {
@@ -851,21 +824,19 @@ describe("BadgeToolbar render", () => {
       });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
       expect(screen.getByText("Refreshed!")).toBeDefined();
-
-      vi.unstubAllGlobals();
     });
 
     it("disables refresh button after success", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", mockFetch);
+      mockSessionAndRefresh("testuser", { ok: true });
 
       Object.defineProperty(window, "location", {
         value: { ...window.location, reload: vi.fn() },
@@ -873,8 +844,9 @@ describe("BadgeToolbar render", () => {
       });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
@@ -882,18 +854,6 @@ describe("BadgeToolbar render", () => {
 
       const btn = screen.getByLabelText("Refresh badge data");
       expect(btn.hasAttribute("disabled")).toBe(true);
-
-      vi.unstubAllGlobals();
-    });
-  });
-
-  describe("customize link", () => {
-    it("customize link points to /studio", () => {
-      render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={true} />,
-      );
-      const link = screen.getByText("Customize").closest("a");
-      expect(link?.getAttribute("href")).toBe("/studio");
     });
   });
 
@@ -911,7 +871,7 @@ describe("BadgeToolbar render", () => {
       });
 
       const { rerender } = render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -920,7 +880,7 @@ describe("BadgeToolbar render", () => {
 
       // Force re-render with dropdown still open to see Copied! text
       rerender(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       expect(screen.getByText("Copied!")).toBeDefined();
@@ -929,19 +889,20 @@ describe("BadgeToolbar render", () => {
 
   describe("refresh error resets to idle after timeout", () => {
     it("returns to idle state after error timeout", async () => {
-      vi.useFakeTimers();
-      const mockFetch = vi.fn().mockResolvedValue({ ok: false });
-      vi.stubGlobal("fetch", mockFetch);
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mockSessionAndRefresh("testuser", { ok: false });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
+
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
-      expect(screen.getByText("Failed")).toBeDefined();
+      await waitFor(() => expect(screen.getByText("Failed")).toBeDefined());
 
       // After 3000ms, status resets to idle
       await act(async () => {
@@ -951,23 +912,29 @@ describe("BadgeToolbar render", () => {
       expect(screen.getByText("Refresh")).toBeDefined();
 
       vi.useRealTimers();
-      vi.unstubAllGlobals();
     });
 
     it("returns to idle after network error timeout", async () => {
-      vi.useFakeTimers();
-      const mockFetch = vi.fn().mockRejectedValue(new Error("network"));
-      vi.stubGlobal("fetch", mockFetch);
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      // Session succeeds, but refresh rejects
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (typeof url === "string" && url.includes("/api/auth/session")) {
+          return new Response(JSON.stringify({ user: { login: "testuser" } }));
+        }
+        throw new Error("network");
+      });
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={true} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
+
+      await waitFor(() => expect(screen.getByLabelText("Refresh badge data")).toBeDefined());
 
       await act(async () => {
         fireEvent.click(screen.getByLabelText("Refresh badge data"));
       });
 
-      expect(screen.getByText("Failed")).toBeDefined();
+      await waitFor(() => expect(screen.getByText("Failed")).toBeDefined());
 
       await act(async () => {
         vi.advanceTimersByTime(3000);
@@ -976,7 +943,6 @@ describe("BadgeToolbar render", () => {
       expect(screen.getByText("Refresh")).toBeDefined();
 
       vi.useRealTimers();
-      vi.unstubAllGlobals();
     });
   });
 
@@ -991,11 +957,15 @@ describe("BadgeToolbar render", () => {
       </svg>`;
 
       let capturedSrc = "";
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve(svgWithAnimations),
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (typeof url === "string" && url.includes("/api/auth/session")) {
+          return new Response(JSON.stringify({ user: { login: "testuser" } }));
+        }
+        return {
+          ok: true,
+          text: () => Promise.resolve(svgWithAnimations),
+        } as Response;
       });
-      vi.stubGlobal("fetch", mockFetch);
 
       // Use class-based Image mock to avoid vitest warning.
       // Use queueMicrotask (not setTimeout) so the onerror fires within the
@@ -1021,7 +991,7 @@ describe("BadgeToolbar render", () => {
       vi.stubGlobal("Image", MockImage);
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -1038,18 +1008,21 @@ describe("BadgeToolbar render", () => {
       expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
 
       vi.stubGlobal("Image", origImage);
-      vi.unstubAllGlobals();
     });
   });
 
   describe("successful PNG download (full canvas path)", () => {
     it("creates a PNG blob and downloads it", async () => {
       const svgText = '<svg><rect width="100" height="100"/></svg>';
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve(svgText),
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (typeof url === "string" && url.includes("/api/auth/session")) {
+          return new Response(JSON.stringify({ user: { login: "testuser" } }));
+        }
+        return {
+          ok: true,
+          text: () => Promise.resolve(svgText),
+        } as Response;
       });
-      vi.stubGlobal("fetch", mockFetch);
 
       const mockBlob = new Blob(["png-data"], { type: "image/png" });
       const mockCtx = { scale: vi.fn(), drawImage: vi.fn() };
@@ -1097,7 +1070,7 @@ describe("BadgeToolbar render", () => {
       const removeChildSpy = vi.spyOn(document.body, "removeChild");
 
       render(
-        <BadgeToolbar handle="testuser" isOwner={false} studioEnabled={false} />,
+        <BadgeToolbar handle="testuser" />,
       );
 
       await act(async () => {
@@ -1126,7 +1099,6 @@ describe("BadgeToolbar render", () => {
       appendChildSpy.mockRestore();
       removeChildSpy.mockRestore();
       vi.stubGlobal("Image", origImage);
-      vi.unstubAllGlobals();
     });
   });
 });

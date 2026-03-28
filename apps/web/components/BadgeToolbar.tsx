@@ -1,21 +1,26 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
-import Link from "next/link";
 
 interface BadgeToolbarProps {
   handle: string;
-  isOwner: boolean;
-  studioEnabled: boolean;
 }
 
 export function BadgeToolbar({
   handle,
-  isOwner,
-  studioEnabled,
 }: BadgeToolbarProps) {
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data: { user: { login: string } | null }) => {
+        setIsOwner(data.user?.login === handle);
+      })
+      .catch(() => setIsOwner(false));
+  }, [handle]);
   const [refreshStatus, setRefreshStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -326,24 +331,6 @@ export function BadgeToolbar({
         {downloadStatus === "loading" ? "Downloading\u2026" : "Download"}
       </button>
 
-      {/* Customize (owner + studio enabled) */}
-      {isOwner && studioEnabled && (
-        <Link href="/studio" className={btnClass}>
-          <svg
-            className="w-3.5 h-3.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 3l1.912 5.813h6.088l-4.956 3.574 1.912 5.813L12 14.626 7.044 18.2l1.912-5.813L4 8.813h6.088z" />
-          </svg>
-          Customize
-        </Link>
-      )}
     </div>
   );
 }
