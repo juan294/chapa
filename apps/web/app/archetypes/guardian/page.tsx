@@ -107,7 +107,7 @@ export default function GuardianPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
-                  <span className="text-text-secondary text-sm">Code hygiene &mdash; inverse of noisy micro-commit patterns.</span>
+                  <span className="text-text-secondary text-sm">Batch size &mdash; fraction of PRs in the reviewable sweet spot (20-500 lines).</span>
                 </div>
               </div>
 

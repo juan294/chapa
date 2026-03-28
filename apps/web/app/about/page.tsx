@@ -53,8 +53,8 @@ export default function AboutPage() {
             <p>
               <strong className="text-text-primary">Delivery</strong> — shipping meaningful changes
               (PRs merged, issues closed).{" "}
-              <strong className="text-text-primary">Quality</strong> — reviewing and quality
-              gatekeeping.{" "}
+              <strong className="text-text-primary">Quality</strong> — engineering discipline
+              (code reviews on teams, PR hygiene and structured workflow when solo).{" "}
               <strong className="text-text-primary">Consistency</strong> — reliable, sustained
               contributions over time.{" "}
               <strong className="text-text-primary">Breadth</strong> — cross-project influence and

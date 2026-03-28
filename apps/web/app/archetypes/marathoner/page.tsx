@@ -63,8 +63,8 @@ export default function MarathonerPage() {
 
               <p>
                 The Consistency dimension in Chapa measures exactly this. It looks at how often
-                you show up, how evenly your contributions are spread across weeks, and whether
-                your work arrives in a measured cadence or frantic bursts. The active days signal
+                you show up, how evenly your contributions spread across weeks, and how many
+                weeks you&apos;re active overall. The active days signal
                 uses a concave curve that rewards getting started generously &mdash; coding a few
                 days a week builds real momentum &mdash; while the climb from good to great
                 remains meaningful. You don&apos;t need to code every single day to score well.
@@ -86,9 +86,9 @@ export default function MarathonerPage() {
               <p>
                 To earn the Marathoner archetype, your Consistency dimension must be strong and
                 your most dominant trait. The algorithm rewards developers who maintain a regular
-                cadence of contributions without relying on burst activity. It specifically
-                distinguishes between genuine sustained work and automated or batch activity
-                patterns that inflate contribution counts artificially.
+                cadence of contributions across weeks. It values showing up consistently over
+                raw daily output volume &mdash; a developer active most weeks will outscore one
+                who ships intensely but irregularly.
               </p>
 
               <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
@@ -105,7 +105,7 @@ export default function MarathonerPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
-                  <span className="text-text-secondary text-sm">Burst detection (inverse) &mdash; penalizes artificial commit floods.</span>
+                  <span className="text-text-secondary text-sm">Week coverage &mdash; fraction of weeks with at least one contribution.</span>
                 </div>
               </div>
 

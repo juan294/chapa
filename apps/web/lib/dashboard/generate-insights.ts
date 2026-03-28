@@ -53,7 +53,7 @@ const DIMENSION_TIPS: Record<string, string> = {
   quality:
     "To strengthen Quality, start reviewing teammates' pull requests more often — thoughtful code reviews are the fastest way to grow this dimension.",
   consistency:
-    "To strengthen Consistency, aim for regular contributions across more days — even small commits on consecutive days build this dimension faster than occasional bursts.",
+    "To strengthen Consistency, aim for regular contributions across more weeks — showing up consistently matters more than output volume on any given day.",
   breadth:
     "To strengthen Breadth, contribute to repos outside your main project — opening issues, submitting PRs, or reviewing code in other repositories all count.",
   craft:

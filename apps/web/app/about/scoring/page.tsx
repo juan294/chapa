@@ -560,8 +560,8 @@ export default function ScoringMethodologyPage() {
                 [
                   "Burst activity",
                   "-15",
-                  "20+ commits in a 10-minute window",
-                  "Activity concentrated in short bursts reduces timing confidence",
+                  "100+ contributions in a single day",
+                  "Extreme daily spikes reduce timing confidence",
                 ],
                 [
                   "Micro-commits",

@@ -12,11 +12,11 @@ Chapa is a free, open web application that generates live, embeddable SVG badges
 
 ### Core Dimensions (each scored 0-100)
 
-1. **Delivery** — Measures shipping capability. Inputs: pull requests merged, issues closed, commit frequency to non-fork repos. A high Delivery score indicates a developer who consistently ships meaningful changes.
+1. **Delivery** — Measures shipping capability. Inputs: pull requests merged, issues closed, commit frequency. A ±5% flow efficiency modifier rewards fast PR turnaround (median creation-to-merge time). A high Delivery score indicates a developer who consistently ships meaningful changes.
 
-2. **Quality** — Measures code review and quality gatekeeping. Inputs: pull request reviews given, review comments, approval/change-request ratio. A high Quality score indicates someone who actively improves code quality through reviews.
+2. **Quality** — Measures engineering discipline. For collaborative developers (review-to-PR ratio ≥ 15%), inputs are code reviews submitted and review-to-PR ratio. For solo developers (ratio < 15%), inputs are PR description rate, feature branch usage, issue linkage, and batch size score (fraction of PRs in the 20-500 line reviewable sweet spot). A high Quality score indicates someone who actively maintains engineering standards.
 
-3. **Consistency** — Measures sustained contribution over time. Inputs: active weeks (out of 52), contribution distribution across months, absence of long gaps. A high Consistency score means reliable, steady contributions rather than sporadic bursts.
+3. **Consistency** — Measures sustained contribution over time. Inputs: active days (sqrt curve), heatmap evenness (weekly distribution with outlier clipping), and week coverage (fraction of weeks with any activity). A high Consistency score means reliable, regular contributions across weeks.
 
 4. **Breadth** — Measures cross-project influence. Inputs: number of distinct repositories contributed to, diversity of organizations, contributions outside owned repos. A high Breadth score indicates influence across multiple projects and teams.
 
