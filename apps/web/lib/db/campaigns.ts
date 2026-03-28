@@ -139,6 +139,12 @@ export async function dbGetCampaign(id: string): Promise<Campaign | null> {
   }
 }
 
+/**
+ * Insert a new campaign in "draft" status.
+ *
+ * @param campaign - Campaign content fields (type, name, subject, body, CTA, etc.)
+ * @returns The new campaign's UUID, or `null` if the insert failed
+ */
 export async function dbCreateCampaign(
   campaign: Omit<
     Campaign,
@@ -180,6 +186,13 @@ export async function dbCreateCampaign(
   }
 }
 
+/**
+ * Partially update a campaign's mutable fields (content, status, send counts).
+ *
+ * @param id      - Campaign UUID
+ * @param updates - Partial field set to merge (only provided keys are written)
+ * @returns `true` on success, `false` on error or missing DB
+ */
 export async function dbUpdateCampaign(
   id: string,
   updates: Partial<
@@ -242,6 +255,14 @@ export async function dbUpdateCampaign(
 const ENGAGEMENT_CACHE_KEY = "campaign:active-engagement";
 const ENGAGEMENT_CACHE_TTL = 3600; // 1 hour
 
+/**
+ * Fetch the most recent engagement campaign (cached 1h in Redis).
+ *
+ * Used during cron batch processing to avoid N+1 DB queries when
+ * checking engagement campaign eligibility for each user.
+ *
+ * @returns The latest engagement campaign, or `null` if none exists
+ */
 export async function dbGetActiveEngagementCampaign(): Promise<Campaign | null> {
   // Check cache first — avoids N+1 queries during cron batch processing
   const cached = await cacheGet<Campaign>(ENGAGEMENT_CACHE_KEY);
@@ -392,6 +413,15 @@ export async function dbMarkSendsFailed(
   }
 }
 
+/**
+ * Aggregate send status counts for a campaign via client-side counting.
+ *
+ * Uses JS aggregation instead of SQL GROUP BY because PostgREST does not
+ * support GROUP BY. Acceptable at current scale (<1K sends/campaign).
+ *
+ * @param id - Campaign UUID
+ * @returns Counts of sent, pending, and failed sends (defaults to 0)
+ */
 export async function dbGetCampaignStats(
   id: string,
 ): Promise<{ sent: number; pending: number; failed: number }> {

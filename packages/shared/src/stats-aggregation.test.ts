@@ -500,6 +500,7 @@ describe("buildStatsFromRaw", () => {
     expect(result.featureBranchRate).toBeUndefined();
     expect(result.issueLinkageRate).toBeUndefined();
     expect(result.microCommitRatio).toBeUndefined();
+    expect(result.batchSizeScore).toBeUndefined();
   });
 
   // --- Micro-commit ratio ---
@@ -575,5 +576,213 @@ describe("buildStatsFromRaw", () => {
     });
     const result = buildStatsFromRaw(raw);
     expect(result.microCommitRatio).toBeCloseTo(0.5, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// batchSizeScore
+// ---------------------------------------------------------------------------
+
+describe("batchSizeScore", () => {
+  it("returns fraction of PRs in 20-500 line range", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 4,
+        nodes: [
+          { additions: 15, deletions: 10, changedFiles: 2, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 }, // 25 lines → sweet spot
+          { additions: 200, deletions: 50, changedFiles: 5, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 }, // 250 lines → sweet spot
+          { additions: 3, deletions: 1, changedFiles: 1, merged: true, body: "x", headRefName: "fix/c", closingIssuesCount: 0 }, // 4 lines → micro
+          { additions: 1000, deletions: 500, changedFiles: 20, merged: true, body: "x", headRefName: "feat/d", closingIssuesCount: 0 }, // 1500 lines → oversized
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    // 2 out of 4 in sweet spot
+    expect(result.batchSizeScore).toBeCloseTo(0.5, 2);
+  });
+
+  it("returns 0 when all PRs are micro (< 20 lines)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 3, deletions: 1, changedFiles: 1, merged: true, body: "x", headRefName: "fix/a", closingIssuesCount: 0 },
+          { additions: 5, deletions: 2, changedFiles: 1, merged: true, body: "x", headRefName: "fix/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBe(0);
+  });
+
+  it("returns 0 when all PRs are oversized (> 500 lines)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 400, deletions: 200, changedFiles: 10, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 800, deletions: 100, changedFiles: 15, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBe(0);
+  });
+
+  it("returns 1.0 when all PRs are in sweet spot", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 3,
+        nodes: [
+          { additions: 30, deletions: 10, changedFiles: 2, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 200, deletions: 100, changedFiles: 5, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 },
+          { additions: 300, deletions: 150, changedFiles: 8, merged: true, body: "x", headRefName: "feat/c", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBe(1);
+  });
+
+  it("returns undefined when no merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: { totalCount: 0, nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBeUndefined();
+  });
+
+  it("treats exactly 20 lines as in sweet spot (lower boundary)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 1,
+        nodes: [
+          { additions: 15, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 }, // exactly 20
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBe(1);
+  });
+
+  it("treats exactly 500 lines as in sweet spot (upper boundary)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 1,
+        nodes: [
+          { additions: 300, deletions: 200, changedFiles: 10, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 }, // exactly 500
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBe(1);
+  });
+
+  it("returns undefined batchSizeScore when no merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: { totalCount: 0, nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.batchSizeScore).toBeUndefined();
+  });
+
+  it("excludes unmerged PRs from batchSizeScore", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 3,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 }, // 60 → sweet spot
+          { additions: 50, deletions: 10, changedFiles: 3, merged: false, body: "x", headRefName: "feat/b", closingIssuesCount: 0 }, // unmerged
+          { additions: 3, deletions: 1, changedFiles: 1, merged: true, body: "x", headRefName: "fix/c", closingIssuesCount: 0 }, // 4 → micro
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    // Only 2 merged: 1 in sweet spot, 1 micro → 0.5
+    expect(result.batchSizeScore).toBeCloseTo(0.5, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// medianPrLeadTimeHours
+// ---------------------------------------------------------------------------
+
+describe("medianPrLeadTimeHours", () => {
+  it("computes median from merged PRs with timestamps", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 3,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T14:00:00Z" }, // 4h
+          { additions: 30, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0, createdAt: "2026-01-02T10:00:00Z", mergedAt: "2026-01-03T10:00:00Z" }, // 24h
+          { additions: 80, deletions: 20, changedFiles: 5, merged: true, body: "x", headRefName: "feat/c", closingIssuesCount: 0, createdAt: "2026-01-04T10:00:00Z", mergedAt: "2026-01-06T10:00:00Z" }, // 48h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    // Sorted: [4, 24, 48] → median = 24
+    expect(result.medianPrLeadTimeHours).toBe(24);
+  });
+
+  it("returns undefined when no merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: { totalCount: 0, nodes: [] },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBeUndefined();
+  });
+
+  it("returns undefined when PRs lack timestamps", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0 },
+          { additions: 30, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0 },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBeUndefined();
+  });
+
+  it("handles single PR", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 1,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T18:00:00Z" }, // 8h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(8);
+  });
+
+  it("ignores unmerged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 2,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T14:00:00Z" }, // 4h
+          { additions: 30, deletions: 5, changedFiles: 2, merged: false, body: "x", headRefName: "feat/b", closingIssuesCount: 0, createdAt: "2026-01-02T10:00:00Z", mergedAt: null },
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(4);
+  });
+
+  it("handles zero-duration merges (instant)", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 1,
+        nodes: [
+          { additions: 10, deletions: 5, changedFiles: 1, merged: true, body: "x", headRefName: "fix/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T10:00:00Z" }, // 0h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(0);
   });
 });

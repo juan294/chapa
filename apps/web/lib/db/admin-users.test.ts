@@ -329,6 +329,100 @@ describe("dbGetAdminUsers", () => {
     expect(mockOr).not.toHaveBeenCalled();
   });
 
+  it("clamps limit to minimum 1", async () => {
+    terminalResolve = { data: [], error: null, count: 0 };
+
+    const result = await dbGetAdminUsers(defaultQuery({ limit: 0 }));
+
+    expect(result.limit).toBe(1);
+    expect(mockRange).toHaveBeenCalledWith(0, 0); // 1 item range
+  });
+
+  it("clamps negative limit to 1", async () => {
+    terminalResolve = { data: [], error: null, count: 0 };
+
+    const result = await dbGetAdminUsers(defaultQuery({ limit: -5 }));
+
+    expect(result.limit).toBe(1);
+  });
+
+  it("defaults total to 0 when count is null", async () => {
+    terminalResolve = { data: [makeAdminRow()], error: null, count: null };
+
+    const result = await dbGetAdminUsers(defaultQuery());
+
+    expect(result.total).toBe(0);
+    expect(result.totalPages).toBe(0);
+  });
+
+  it("calculates totalPages correctly from count", async () => {
+    terminalResolve = { data: [], error: null, count: 27 };
+
+    const result = await dbGetAdminUsers(defaultQuery({ limit: 10 }));
+
+    expect(result.totalPages).toBe(3); // ceil(27 / 10)
+  });
+
+  it("clamps negative page to 1", async () => {
+    terminalResolve = { data: [], error: null, count: 0 };
+
+    const result = await dbGetAdminUsers(defaultQuery({ page: -3 }));
+
+    expect(result.page).toBe(1);
+    expect(mockRange).toHaveBeenCalledWith(0, 24);
+  });
+
+  it("maps null snapshot fields correctly in admin user entry", async () => {
+    const rowWithNulls = makeAdminRow({
+      display_name: null,
+      snapshot_date: null,
+      snapshot_captured_at: null,
+      commits_total: null,
+      prs_merged_count: null,
+      reviews_submitted: null,
+      repos_contributed: null,
+      active_days: null,
+      total_stars: null,
+      archetype: null,
+      tier: null,
+      adjusted_composite: null,
+      composite_score: null,
+      confidence: null,
+    });
+
+    terminalResolve = { data: [rowWithNulls], error: null, count: 1 };
+
+    const result = await dbGetAdminUsers(defaultQuery());
+
+    expect(result.users[0]!.displayName).toBeNull();
+    expect(result.users[0]!.lastSnapshotDate).toBeNull();
+    expect(result.users[0]!.fetchedAt).toBeNull();
+    expect(result.users[0]!.commitsTotal).toBeNull();
+    expect(result.users[0]!.archetype).toBeNull();
+    expect(result.users[0]!.tier).toBeNull();
+    expect(result.users[0]!.adjustedComposite).toBeNull();
+    expect(result.users[0]!.rawScore).toBeNull();
+    expect(result.users[0]!.confidence).toBeNull();
+  });
+
+  it("does not apply tier filter when tier is undefined", async () => {
+    terminalResolve = { data: [], error: null, count: 0 };
+
+    await dbGetAdminUsers(defaultQuery({ tier: undefined }));
+
+    // mockEq should not be called for tier
+    expect(mockEq).not.toHaveBeenCalledWith("tier", expect.anything());
+  });
+
+  it("does not apply archetype filter when archetype is undefined", async () => {
+    terminalResolve = { data: [], error: null, count: 0 };
+
+    await dbGetAdminUsers(defaultQuery({ archetype: undefined }));
+
+    // mockEq should not be called for archetype
+    expect(mockEq).not.toHaveBeenCalledWith("archetype", expect.anything());
+  });
+
   it("maps all sort fields to valid DB columns", async () => {
     const sortFields: Array<{ field: string; dbCol: string }> = [
       { field: "handle", dbCol: "handle" },

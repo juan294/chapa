@@ -37,6 +37,8 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
             merged
             body
             headRefName
+            createdAt
+            mergedAt
             closingIssuesReferences(first: 1) { totalCount }
           }
         }

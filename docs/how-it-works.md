@@ -79,12 +79,18 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 
 | Dimension | What it measures | Signals & weights |
 |-----------|-----------------|-------------------|
-| **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
-| **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), inverse micro-commit ratio (15%) |
-| **Consistency** | Reliable, sustained contributions | sqrt(activeDays/365) (45%), heatmap evenness (40%), inverse burst activity (15%) |
+| **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%), lead time modifier (±5%) |
+| **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), batch size score (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), batch size score (15%) |
+| **Consistency** | Reliable, sustained contributions | sqrt(activeDays/365) (45%), heatmap evenness (40%), week coverage (15%) |
 | **Breadth** | Cross-project influence | Repos contributed (40%), inverse top-repo share (25%), docs-only PR ratio (15%), stars (10%), forks (5%) |
 
-Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers (zero reviews) are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Solo Quality returns 0 only if you have zero merged PRs.
+Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Profile type is determined by review-to-PR ratio — developers with fewer than 15% reviews relative to merged PRs are classified as solo. Solo Quality returns 0 only if you have zero merged PRs.
+
+Delivery includes a **lead time modifier** based on median PR open-to-merge duration: fast merges (≤4h) earn a 5% boost, while slow merges (≥168h) incur a 5% penalty. When lead time data is unavailable, the modifier is neutral (1.0x).
+
+**Batch size score** measures the fraction of merged PRs in the reviewable sweet spot (20–500 lines changed). This replaces the old micro-commit ratio and aligns with research showing that small, reviewable changes are a top code quality signal.
+
+**Week coverage** measures the fraction of weeks with any contribution activity, capturing sustainable cadence without penalizing productive days. Heatmap evenness clips weekly totals at 3× the median before computing the coefficient of variation, preventing a single outlier week from dominating the score.
 
 ### Optional fifth dimension: Craft
 
@@ -148,7 +154,7 @@ Confidence starts at 100 and can be reduced by detected patterns:
 
 | Pattern | Penalty | Trigger condition | What it means |
 |---------|---------|-------------------|---------------|
-| Burst activity | -15 | 20+ commits in a 10-minute window | Activity concentrated in short bursts reduces timing confidence |
+| Burst activity | -15 | 100+ commits in a 10-minute window | Activity concentrated in short bursts reduces timing confidence |
 | Micro-commits | -10 | 60%+ of commits are very small | Many tiny changes reduce signal clarity |
 | Generated changes | -15 | 20,000+ lines changed AND fewer than 3 reviews | Large volume with limited review suggests possible automation |
 | Low collaboration | -10 | 10+ PRs merged AND 1 or fewer reviews given | Significant output without peer interaction |

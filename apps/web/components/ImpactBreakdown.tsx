@@ -188,7 +188,7 @@ const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
 const DIMENSION_TIPS: Record<string, string> = {
   delivery: "To strengthen Delivery, focus on opening and merging more pull requests \u2014 even small, focused PRs that close open issues count significantly.",
   quality: "To strengthen Quality, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
-  consistency: "To strengthen Consistency, aim for regular contributions across more days \u2014 even small commits on consecutive days build this dimension faster than occasional bursts.",
+  consistency: "To strengthen Consistency, aim for regular contributions across more weeks \u2014 showing up consistently matters more than output volume on any given day.",
   breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
   craft: "To strengthen Craft, explore AI coding tools more deeply \u2014 use them for complex refactoring, test generation, and code review to build proficiency and sophistication.",
 };

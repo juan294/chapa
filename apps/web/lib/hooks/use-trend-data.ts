@@ -19,6 +19,15 @@ export interface UseTrendDataResult {
 // Hook
 // ---------------------------------------------------------------------------
 
+/**
+ * Fetch trend and diff data for a developer's impact history.
+ *
+ * Calls `GET /api/history/:handle?include=trend,diff&window=30` on mount and
+ * returns loading/error state alongside the parsed `TrendSummary` and `SnapshotDiff`.
+ *
+ * @param handle - GitHub handle to fetch history for
+ * @returns `{ trend, diff, isLoading, error }` — null values until loaded
+ */
 export function useTrendData(handle: string): UseTrendDataResult {
   const [trend, setTrend] = useState<TrendSummary | null>(null);
   const [diff, setDiff] = useState<SnapshotDiff | null>(null);

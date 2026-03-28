@@ -19,6 +19,17 @@ export const easings: { linear: EasingFn; easeOut: EasingFn; easeInOut: EasingFn
   },
 };
 
+/**
+ * React hook that animates a number from 0 to a target value using requestAnimationFrame.
+ *
+ * Respects `prefers-reduced-motion` — skips animation and sets value immediately.
+ * Returns the current animated value, animation state, and a `start()` trigger.
+ *
+ * @param target       - The target number to animate towards
+ * @param duration     - Animation duration in ms (default 2000)
+ * @param easing       - Easing function name from `easings` (default "easeOut")
+ * @param startOnMount - If true, start animation on mount; otherwise wait for `start()`
+ */
 export function useAnimatedCounter(
   target: number,
   duration: number = 2000,

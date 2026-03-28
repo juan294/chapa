@@ -68,6 +68,49 @@ describe("DEMO_IMPACT", () => {
   });
 });
 
+describe("DEMO_STATS heatmap data mapping", () => {
+  it("maps all heatmap count values to known LEVEL_TO_COUNT outputs", () => {
+    // The only valid count values from LEVEL_TO_COUNT are 0, 1, 4, 8, 12.
+    // The ?? 0 fallback would produce 0 for unknown levels.
+    const validCounts = new Set([0, 1, 4, 8, 12]);
+    for (const day of DEMO_STATS.heatmapData) {
+      expect(validCounts.has(day.count)).toBe(true);
+    }
+  });
+
+  it("includes dates that are sequential across 91 days", () => {
+    const dates = DEMO_STATS.heatmapData.map((d) => d.date);
+    expect(dates[0]).toBe("2025-01-01");
+    // Verify last date is 90 days after start
+    const lastDate = new Date("2025-01-01");
+    lastDate.setDate(lastDate.getDate() + 90);
+    expect(dates[dates.length - 1]).toBe(lastDate.toISOString().slice(0, 10));
+  });
+});
+
+describe("DEMO_STATS linked platforms", () => {
+  it("includes linkedPlatforms array", () => {
+    expect(DEMO_STATS.linkedPlatforms).toEqual(["bitbucket", "codeberg"]);
+  });
+
+  it("includes linkedPlatformLogins", () => {
+    expect(DEMO_STATS.linkedPlatformLogins).toEqual({
+      bitbucket: "developer",
+      codeberg: "developer",
+    });
+  });
+});
+
+describe("DEMO_IMPACT craft dimension", () => {
+  it("includes craft dimension score", () => {
+    expect(DEMO_IMPACT.dimensions.craft).toBe(72);
+  });
+
+  it("has profileType collaborative", () => {
+    expect(DEMO_IMPACT.profileType).toBe("collaborative");
+  });
+});
+
 describe("renderBadgeSvg with demo data", () => {
   it("returns a valid SVG string", () => {
     const svg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {

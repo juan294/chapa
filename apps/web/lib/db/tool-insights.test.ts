@@ -221,6 +221,20 @@ describe("dbUpsertToolInsights", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null on non-throwing upsert error (resolved with error field)", async () => {
+    // Error is present in the resolved value, not thrown
+    terminalResolve = {
+      data: null,
+      error: { message: "unique constraint violation" },
+      throwOnError: false,
+    };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbUpsertToolInsights("testuser", validUpload, validScores);
+
+    expect(result).toBeNull();
+  });
+
   it("normalizes invalid craft_tier to Novice in returned result", async () => {
     const rowWithBadTier = { ...validRow, craft_tier: "InvalidTier" };
     terminalResolve = { data: rowWithBadTier, error: null };
@@ -371,6 +385,20 @@ describe("dbGetToolInsights", () => {
 
   it("returns null when data is null (not an error)", async () => {
     terminalResolve = { data: null, error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbGetToolInsights("testuser");
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null on non-PGRST116 non-throwing error (resolved with error)", async () => {
+    // Error is present but not thrown — the source `if (error) ... throw error` catches it
+    terminalResolve = {
+      data: null,
+      error: { code: "42P01", message: "relation does not exist" },
+      throwOnError: false, // resolves, doesn't reject
+    };
     mockGetSupabase.mockReturnValue({ from: mockFrom });
 
     const result = await dbGetToolInsights("testuser");

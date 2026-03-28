@@ -5,9 +5,9 @@ import type {
   ImpactV4Result,
   ProfileType,
 } from "@chapa/shared";
-import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS } from "@chapa/shared";
+import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS, SOLO_REVIEW_RATIO_THRESHOLD } from "@chapa/shared";
 import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
-import { computeHeatmapEvenness } from "./heatmap-evenness";
+import { computeHeatmapEvenness, computeWeekCoverage } from "./heatmap-evenness";
 import { computeRecencyRatio, applyRecencyWeight } from "./recency";
 
 // ---------------------------------------------------------------------------
@@ -17,8 +17,34 @@ import { computeRecencyRatio, applyRecencyWeight } from "./recency";
 const CAPS = SCORING_CAPS;
 
 // ---------------------------------------------------------------------------
+// Lead time modifier for Delivery
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a ±5% modifier based on median PR lead time (hours).
+ *
+ * - ≤ 4h: 1.05 (fast flow bonus)
+ * - 4–48h: linear interpolation 1.05 → 1.0
+ * - 48–168h: linear interpolation 1.0 → 0.95
+ * - > 168h: 0.95 (slow flow penalty)
+ * - undefined: 1.0 (neutral — no data available)
+ */
+export function computeLeadTimeModifier(medianHours?: number): number {
+  if (medianHours == null) return 1.0;
+  if (medianHours <= 4) return 1.05;
+  if (medianHours <= 48) {
+    return 1.05 - 0.05 * ((medianHours - 4) / (48 - 4));
+  }
+  if (medianHours <= 168) {
+    return 1.0 - 0.05 * ((medianHours - 48) / (168 - 48));
+  }
+  return 0.95;
+}
+
+// ---------------------------------------------------------------------------
 // Delivery: shipping meaningful changes
 // prsMergedWeight (70%), issuesClosedCount (20%), commitsTotal (10%)
+// + lead time modifier (±5%)
 // ---------------------------------------------------------------------------
 
 /**
@@ -26,6 +52,7 @@ const CAPS = SCORING_CAPS;
  *
  * Weighted formula: prsMergedWeight (70%) + issuesClosedCount (20%) + commitsTotal (10%).
  * Each input is normalized against its cap before weighting.
+ * A ±5% lead time modifier is applied based on median PR lead time.
  *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @returns Clamped score between 0 and 100
@@ -36,7 +63,8 @@ export function computeDelivery(stats: StatsData): number {
   const commits = normalize(stats.commitsTotal, CAPS.commits);
 
   const raw = 100 * (0.7 * pr + 0.2 * issues + 0.1 * commits);
-  return clampScore(raw);
+  const modifier = computeLeadTimeModifier(stats.medianPrLeadTimeHours);
+  return clampScore(raw * modifier);
 }
 
 // ---------------------------------------------------------------------------
@@ -50,13 +78,15 @@ export function computeDelivery(stats: StatsData): number {
  *
  * Collaborative profile: reviewsSubmittedCount (60%) + review-to-PR ratio (25%) +
  * inverse microCommitRatio (15%). Delegates to {@link computeSoloQuality} when
- * `reviewsSubmittedCount` is 0.
+ * the profile type is "solo".
  *
  * @param stats - Aggregated GitHub stats for the scoring window
+ * @param profileType - Override profile type; auto-detects when omitted
  * @returns Clamped score between 0 and 100
  */
-export function computeQuality(stats: StatsData): number {
-  if (stats.reviewsSubmittedCount === 0) {
+export function computeQuality(stats: StatsData, profileType?: ProfileType): number {
+  const effectiveType = profileType ?? detectProfileType(stats);
+  if (effectiveType === "solo") {
     return computeSoloQuality(stats);
   }
 
@@ -73,26 +103,25 @@ export function computeQuality(stats: StatsData): number {
     reviewRatio = 1;
   }
 
-  // Inverse micro-commit ratio: low micro-commit ratio → high quality
-  // Default 0.3 when unknown (no free points — assumes moderate micro-commit activity)
-  const microRatio = stats.microCommitRatio ?? 0.3;
-  const inverseMicro = 1 - microRatio;
+  // Batch size score: fraction of PRs in the reviewable sweet spot (20-500 lines)
+  // Default 0.3 when unknown (no free points)
+  const batchSize = stats.batchSizeScore ?? 0.3;
 
-  const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * inverseMicro);
+  const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * batchSize);
   return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
 // Solo Quality: engineering discipline signals for developers without reviews
 // prDescriptionRate (40%), featureBranchRate (25%), issueLinkageRate (20%),
-// inverseMicroCommitRatio (15%)
+// batchSizeScore (15%)
 // ---------------------------------------------------------------------------
 
 /**
  * Solo quality fallback (0–100): used when no code reviews exist.
  *
  * Weighted formula: prDescriptionRate (40%) + featureBranchRate (25%) +
- * issueLinkageRate (20%) + inverse microCommitRatio (15%).
+ * issueLinkageRate (20%) + batchSizeScore (15%).
  * Returns 0 when no PRs have been merged.
  *
  * @param stats - Aggregated GitHub stats for the scoring window
@@ -104,16 +133,16 @@ function computeSoloQuality(stats: StatsData): number {
   const descRate = stats.prDescriptionRate ?? 0;
   const branchRate = stats.featureBranchRate ?? 0;
   const linkageRate = stats.issueLinkageRate ?? 0;
-  const microRatio = stats.microCommitRatio ?? 0.3;
-  const inverseMicro = 1 - microRatio;
+  const batchSize = stats.batchSizeScore ?? 0.3;
 
-  const raw = 100 * (0.40 * descRate + 0.25 * branchRate + 0.20 * linkageRate + 0.15 * inverseMicro);
+  const raw = 100 * (0.40 * descRate + 0.25 * branchRate + 0.20 * linkageRate + 0.15 * batchSize);
   return clampScore(raw);
 }
 
 // ---------------------------------------------------------------------------
 // Consistency: reliable, sustained contributions
-// V5: sqrt(activeDays/365) (45%), heatmap evenness (40%), inverse burst (15%)
+// V6.1: sqrt(activeDays/365) (45%), heatmap evenness with clipping (40%),
+//        week coverage (15%). Burst sub-signal replaced with week coverage.
 // sqrt curve: easier to start, harder to climb — 120 days ≈ 57% (was 33% linear)
 // ---------------------------------------------------------------------------
 
@@ -121,8 +150,12 @@ function computeSoloQuality(stats: StatsData): number {
  * Compute Consistency dimension (0–100): measures sustained contribution.
  *
  * Weighted formula: sqrt(activeDays/365) (45%) + heatmap evenness (40%) +
- * inverse burst activity (15%). The sqrt curve makes early days count more
- * and later days harder to climb — 120 active days yields ~57%.
+ * week coverage (15%). The sqrt curve makes early days count more and later
+ * days harder to climb — 120 active days yields ~57%.
+ *
+ * V6.1: Replaced inverse burst sub-signal with week coverage (fraction of
+ * weeks with any activity). This better captures "sustainable cadence" per
+ * DORA/DX research without penalizing legitimately productive days.
  *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @returns Clamped score between 0 and 100; returns 0 when activeDays is 0
@@ -132,13 +165,9 @@ export function computeConsistency(stats: StatsData): number {
 
   const streak = Math.sqrt(Math.min(stats.activeDays, SCORING_WINDOW_DAYS) / SCORING_WINDOW_DAYS);
   const evenness = computeHeatmapEvenness(stats.heatmapData);
+  const weekCoverage = computeWeekCoverage(stats.heatmapData);
 
-  // Inverse burst: low maxCommitsIn10Min → steady work
-  // Cap at 30 for normalization; 0 bursts → 1.0, 30+ → 0.0
-  const burstCap = 30;
-  const inverseBurst = 1 - Math.min(stats.maxCommitsIn10Min, burstCap) / burstCap;
-
-  const raw = 100 * (0.45 * streak + 0.40 * evenness + 0.15 * inverseBurst);
+  const raw = 100 * (0.45 * streak + 0.40 * evenness + 0.15 * weekCoverage);
   return clampScore(raw);
 }
 
@@ -179,12 +208,13 @@ export function computeBreadth(stats: StatsData): number {
  *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @param craftScore - Optional pre-computed Craft dimension score (from AI tool insights)
+ * @param profileType - Override profile type for Quality path selection; auto-detects when omitted
  * @returns A {@link DimensionScores} object with delivery, quality, consistency, breadth, and optionally craft
  */
-export function computeDimensions(stats: StatsData, craftScore?: number): DimensionScores {
+export function computeDimensions(stats: StatsData, craftScore?: number, profileType?: ProfileType): DimensionScores {
   const dims: DimensionScores = {
     delivery: computeDelivery(stats),
-    quality: computeQuality(stats),
+    quality: computeQuality(stats, profileType),
     consistency: computeConsistency(stats),
     breadth: computeBreadth(stats),
   };
@@ -199,16 +229,24 @@ export function computeDimensions(stats: StatsData, craftScore?: number): Dimens
 // ---------------------------------------------------------------------------
 
 /**
- * Detect whether a developer is "solo" (no reviews) or "collaborative" (has reviews).
+ * Detect whether a developer is "solo" or "collaborative" based on the
+ * ratio of reviews submitted to PRs merged.
+ *
+ * A developer with a review-to-PR ratio below {@link SOLO_REVIEW_RATIO_THRESHOLD}
+ * (0.15, roughly 1 review per 7 PRs) is classified as "solo" — below this
+ * threshold, reviews are incidental, not systematic code review participation.
  *
  * Affects quality scoring (solo uses PR description signals instead of reviews)
  * and archetype eligibility (solo profiles cannot earn Quality Champion).
  *
  * @param stats - Aggregated GitHub stats for the scoring window
- * @returns `"solo"` when reviewsSubmittedCount is 0, `"collaborative"` otherwise
+ * @returns `"solo"` when review-to-PR ratio is below threshold, `"collaborative"` otherwise
  */
 export function detectProfileType(stats: StatsData): ProfileType {
-  return stats.reviewsSubmittedCount === 0 ? "solo" : "collaborative";
+  if (stats.reviewsSubmittedCount === 0) return "solo";
+  const prCount = Math.max(stats.prsMergedCount, 1);
+  const ratio = stats.reviewsSubmittedCount / prCount;
+  return ratio < SOLO_REVIEW_RATIO_THRESHOLD ? "solo" : "collaborative";
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +333,7 @@ export function deriveArchetype(
  */
 export function computeImpactV4(stats: StatsData, craftScore?: number): ImpactV4Result {
   const profileType = detectProfileType(stats);
-  const dimensions = computeDimensions(stats, craftScore);
+  const dimensions = computeDimensions(stats, craftScore, profileType);
   const archetype = deriveArchetype(dimensions, profileType);
 
   // Solo profiles exclude quality from composite (quality is display-only for solo)

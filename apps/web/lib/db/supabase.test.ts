@@ -143,6 +143,30 @@ describe("pingSupabase", () => {
     const result = await pingSupabase();
     expect(result).toBe("error");
   });
+
+  it("returns 'error' when query hangs and setTimeout fires", async () => {
+    vi.useFakeTimers();
+
+    // Query never resolves — setTimeout callback must fire
+    const mockSelect = vi.fn().mockReturnValue({
+      limit: vi.fn().mockReturnValue(new Promise(() => {})),
+    });
+    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+    _resetClient();
+
+    const resultPromise = pingSupabase();
+
+    // Advance timers past the 5000ms timeout
+    await vi.advanceTimersByTimeAsync(5001);
+
+    const result = await resultPromise;
+    expect(result).toBe("error");
+
+    vi.useRealTimers();
+  });
 });
 
 // ---------------------------------------------------------------------------

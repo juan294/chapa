@@ -163,11 +163,11 @@ Rate limits: insights upload 10/day, recalculate 20/hour.
 
 ## Solo Profile Exception
 
-Solo developers (zero code reviews) receive a modified composite calculation:
+Solo developers (review-to-PR ratio below 0.15) receive a modified composite calculation:
 
 - **Composite**: `avg(Delivery, Consistency, Breadth [, Craft])` — Quality excluded
 - **Quality dimension**: Computed via `computeSoloQuality()` (PR descriptions, branch strategy,
-  issue linkage, micro-commit ratio) — displayed on radar/cards for informational purposes
+  issue linkage, batch size score) — displayed on radar/cards for informational purposes
 - **Archetype**: Quality Champion is excluded for solo profiles
 - **Rationale**: Solo quality is a proxy metric based on engineering discipline signals,
   not peer review activity. Including it in the composite would unfairly penalize solo
@@ -205,3 +205,66 @@ Adding a new AI tool (e.g., Cursor):
 | `apps/web/components/dashboard/*` | Craft dimension in cards, radar, sub-metrics |
 | `apps/web/styles/globals.css` | Craft/Artificer CSS color variables |
 | `docs/svg-design.md` | Badge v3 spec |
+
+---
+
+## V6.1 Changes (2026-03-28)
+
+V6.1 fixes three scoring fairness issues and adds two new signals informed by high-efficiency developer research (DORA, SPACE, DX Core 4).
+
+### Profile Type Detection
+- Changed from binary (`reviewsSubmittedCount === 0` → solo) to ratio-based
+- Solo threshold: `reviewsSubmittedCount / max(prsMergedCount, 1) < 0.15`
+- Constant: `SOLO_REVIEW_RATIO_THRESHOLD = 0.15`
+- `computeQuality()` now accepts an optional `profileType` parameter; `computeDimensions()` threads it through
+- Rationale: Prevents a handful of incidental reviews from triggering the collaborative scoring path, which penalizes solo developers whose Quality is dominated by review volume (60% weight)
+
+### Consistency Dimension
+- Replaced inverse burst sub-signal (15%) with **week coverage**: `activeWeeks / totalWeeks`
+- Week coverage captures "sustainable cadence" — did you show up regularly?
+- Added outlier clipping to heatmap evenness: weekly totals capped at 3× median before computing CV
+- Raised `burst_activity` confidence penalty threshold from 20 to 100
+- Rationale: Old burst detection (threshold 30) penalized legitimately productive days common in agent-driven workflows
+
+Updated formula:
+| Signal | Weight | Normalization |
+|--------|--------|---------------|
+| sqrt(activeDays/365) | 45% | Square root |
+| Heatmap evenness (clipped) | 40% | 1/(1+CV) on 3×median-clipped weekly totals |
+| Week coverage | 15% | Linear (activeWeeks/totalWeeks) |
+
+### Quality Dimension
+- Replaced `inverseMicroCommitRatio` (15%) with **batch size score** in both collaborative and solo formulas
+- `batchSizeScore` = fraction of merged PRs in the reviewable sweet spot (20-500 lines changed)
+- Constants: `BATCH_SIZE_MIN = 20`, `BATCH_SIZE_MAX = 500`
+- `microCommitRatio` still computed for the `micro_commit_pattern` confidence penalty (orthogonal)
+- Rationale: Aligns with DORA/Google guidance that small, reviewable changes are a top quality signal; penalizes both micro PRs and oversized PRs
+
+### Delivery Dimension
+- Added **lead time modifier** (±5%) based on `medianPrLeadTimeHours`
+- `computeLeadTimeModifier()`: ≤4h → 1.05x, 48h → 1.0x, ≥168h → 0.95x, undefined → 1.0x
+- Applied after base delivery computation: `delivery = clamp(baseDelivery × modifier)`
+- Rationale: Implements DORA lead time signal without changing existing dimension weights; rewards fast flow
+
+### New StatsData Fields
+| Field | Type | Source |
+|-------|------|--------|
+| `batchSizeScore` | `number?` (0-1) | Computed from merged PR line counts |
+| `medianPrLeadTimeHours` | `number?` | Computed from PR `createdAt` → `mergedAt` |
+
+### GraphQL Query Changes
+- Added `createdAt` and `mergedAt` to the PR node in `CONTRIBUTION_QUERY`
+
+### Files Modified in V6.1
+
+| File | Change |
+|------|--------|
+| `packages/shared/src/constants.ts` | `SOLO_REVIEW_RATIO_THRESHOLD`, `BATCH_SIZE_MIN`, `BATCH_SIZE_MAX` |
+| `packages/shared/src/types.ts` | `batchSizeScore`, `medianPrLeadTimeHours` in StatsData; `createdAt`/`mergedAt` in PR node |
+| `packages/shared/src/stats-aggregation.ts` | Batch size and lead time computation |
+| `packages/shared/src/github-query.ts` | `createdAt`, `mergedAt` in PR query |
+| `apps/web/lib/impact/v4.ts` | Ratio-based `detectProfileType`, `computeLeadTimeModifier`, batch size in Quality |
+| `apps/web/lib/impact/heatmap-evenness.ts` | Outlier clipping, `computeWeekCoverage` |
+| `apps/web/lib/impact/utils.ts` | `burst_activity` threshold raised to 100 |
+| `apps/web/lib/github/queries.ts` | Map `createdAt`/`mergedAt` from response |
+| `apps/web/lib/github/merge.ts` | Weighted average merging for new fields |

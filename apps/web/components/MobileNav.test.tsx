@@ -74,6 +74,16 @@ describe("MobileNav", () => {
     });
   });
 
+  describe("aria-current on active links", () => {
+    it("uses usePathname to determine active link", () => {
+      expect(SOURCE).toContain("usePathname");
+    });
+
+    it("adds aria-current='page' to the active link", () => {
+      expect(SOURCE).toContain("aria-current");
+    });
+  });
+
   describe("design system compliance", () => {
     it("uses card background for the mobile menu", () => {
       expect(SOURCE).toMatch(/bg-card/);

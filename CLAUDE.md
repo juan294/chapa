@@ -85,22 +85,23 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/recalculate` Recalculate impact scores
 - GET `/api/insights/:handle` AI tool insights for a user
 - POST `/api/insights` Submit tool insights data
-- GET|POST `/api/cli/auth/poll` CLI device auth polling
+- GET `/api/cli/auth/poll` CLI device auth polling
 - POST `/api/cli/auth/approve` CLI device auth approval
 
 ### Admin API
 - GET `/api/admin/users` Admin user list (session auth + admin check)
 - GET `/api/admin/stats` Admin stats (bearer token auth via `ADMIN_SECRET`)
-- POST `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
+- POST|GET|DELETE `/api/admin/agents/run` Run an agent (requires `ALLOW_AGENT_RUN=true`)
 - GET `/api/admin/agents-summary` Agent run summaries
-- GET|PATCH `/api/admin/feature-flags` Manage feature flags
+- POST `/api/admin/bulk-recalculate` Force-recalculate impact scores for all or specified users (bearer token auth via `ADMIN_SECRET`)
+- PATCH `/api/admin/feature-flags` Manage feature flags
 - GET `/api/admin/engagement-flags` Manage engagement flags
 - GET|POST `/api/admin/campaigns` Campaign list and creation (admin auth)
 - GET|PATCH|DELETE `/api/admin/campaigns/:id` Campaign CRUD (admin auth, draft only)
 - GET `/api/admin/campaigns/:id/preview` Campaign email preview (admin auth)
 - POST `/api/admin/campaigns/:id/send` Initiate campaign send (admin auth)
 - POST `/api/admin/campaigns/:id/test` Send test email for campaign draft (admin auth)
-- POST `/api/notifications/unsubscribe` Email unsubscribe
+- GET `/api/notifications/unsubscribe` Email unsubscribe
 
 ### Webhooks & Cron
 - POST `/api/webhooks/resend` Resend email webhook (HMAC verified)
@@ -111,7 +112,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
-- `StatsData` — aggregated GitHub stats (23 fields)
+- `StatsData` — aggregated GitHub stats (25 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
 - `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
@@ -172,6 +173,10 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Admin dashboard at `/admin` shows user table with refresh, sortable columns, and command bar.
 - Badge and breakdown elements have explanatory tooltips (hover/tap/keyboard accessible).
 - Lifetime metric snapshots are recorded automatically (cron, badge route, refresh).
+- Solo profile detection uses review-to-PR ratio threshold (0.15), not binary reviews === 0.
+- Consistency dimension uses week coverage (active weeks / total weeks) instead of inverse burst.
+- Quality dimension uses batch size score (fraction of PRs in 20-500 line sweet spot) instead of inverse micro-commit ratio.
+- Delivery dimension applies a ±5% lead time modifier based on median PR open-to-merge duration.
 
 ## Engineering rules
 - Prefer pure functions for scoring & rendering.
@@ -183,117 +188,27 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Production deploys from `main` only. Changes pushed to `develop` must be merged to `main` via PR before they go live.
 - Always confirm the target branch before pushing — if the goal is production deployment, ensure the PR targets `main`.
 
-<important if="you are merging PRs, merging branches to main, deploying, or handling dependency updates">
-### Deployment Safety
-
-- **Merging to `main` IS deploying to production.** Every merge triggers a production deployment. No exceptions.
-- **Dependabot PRs target `main` by default.** Never merge them directly. Cherry-pick to `develop`, close the PR, release normally.
-- **Every CI run and deployment costs money.** Before starting: estimate how many runs/deploys this will trigger. If more than 2-3, batch the work.
-- **Framework upgrades (Next.js, React, etc.) require preview deployment verification.** CI passing is NOT sufficient. Deploy to a preview URL and verify before merging to production.
-- **When production is down:** Roll back immediately. Investigate on non-production. Fix forward on `develop`. Never deploy to diagnose. Never promote broken deployments "briefly."
-- **Batch dependency updates** into a single branch and PR. Never merge N PRs one-by-one (causes O(n^2) CI waste from rebase cascades).
-- **Justify every external action** — before any CI run, deployment, or API call: Is this needed? Is this justified? Is this verifiable? If any answer is "no," stop.
-</important>
-
-<important if="you are writing Supabase migrations or creating tables in Supabase">
-### Supabase Migration Rules
-
-- **Every migration that creates a public-facing table must include explicit grants:**
-  ```sql
-  GRANT SELECT ON table_name TO anon, authenticated;
-  ```
-- **Add `ALTER DEFAULT PRIVILEGES` in the initial setup migration** so all future tables automatically get anon SELECT. Never rely on Supabase dashboard-granted defaults for migration-created tables.
-- **Fallback data paths must log at ERROR level.** If a query fails and the code falls back to default/placeholder data, log `[TABLE_FALLBACK]` at ERROR — not INFO. Silent fallbacks hide permission bugs for days.
-- **Health endpoints must check actual data access**, not just connectivity. Return `"degraded"` if primary tables are inaccessible.
-</important>
-
-<important if="you are creating or modifying Supabase database migrations">
-### Supabase Migration Safety
-
-Always test migrations locally before pushing to the remote project.
-
-```bash
-# 1. Ensure local Supabase is running (requires Docker Desktop)
-supabase start
-
-# 2. Apply all migrations to the local Postgres instance
-supabase db reset
-
-# 3. Verify the migration worked (query the local database)
-docker exec supabase_db_<project> psql -U postgres -c "<verification query>"
-
-# 4. Only after local verification succeeds, push to remote
-supabase db push
-```
-
-- The local instance is a full Postgres with RLS, extensions, and auth — treat it as your UAT environment.
-- If `supabase start` fails, check that Docker Desktop is running.
-- The container name follows the pattern `supabase_db_<project>` where `<project>` is the Supabase project name from `supabase/config.toml`.
-- Never push a migration to remote without testing it locally first.
-</important>
-
 ## Language & Tone
 - All user-facing content for the Asturias project must be in Spanish unless explicitly stated otherwise.
 - For social media copy: keep tone confident and positive — avoid pitying, resentful, or overly dramatic language. Never mention unreleased/unpublished features.
 
 ---
 
-# RPI Workflow
+## RPI Workflow
 
-This project follows the Research-Plan-Implement (RPI) methodology.
-All significant changes go through four phases:
-1. `/research` — Understand the codebase as-is
-2. `/plan` — Create a phased implementation spec
-3. `/implement` — Execute one phase at a time with review gates
-4. `/validate` — Verify implementation against the plan
+This project follows Research-Plan-Implement (RPI).
 
-## Context Management
+1. /research -- Understand the codebase as-is
+2. /plan -- Create a phased implementation spec
+3. /implement -- Execute one phase at a time with review gates
+4. /validate -- Verify implementation against the plan
 
-- Each RPI phase should be its own conversation. Don't run research + plan + implement in one session.
-- Use `/clear` between unrelated tasks. Use `/compact` when context is heavy but the task continues.
-- Subagents are context control mechanisms — they search/read in their window and return only distilled results.
-- Research and planning happen on `develop`. Implementation happens in worktrees.
-- If research comes back wrong, throw it out and restart with more specific steering.
-
-## Rules for All Phases
-
-- Read all mentioned files COMPLETELY before doing anything else.
-- Never suggest improvements during research — only document what exists (documentarian rule).
-- Every code reference must include `file:line`.
-- Spawn parallel subagents for independent research tasks.
-- Wait for ALL subagents before synthesizing.
-- Never write documents with placeholder values.
-
-## Rules for Implementation
-
-- Follow the atomic loop: implement → review (plan compliance) → fix → approve → `/simplify` (code quality) → verify.
-- Run `/simplify` after reviewer approval — it handles code reuse, quality, and efficiency in one native pass.
-- Check for `[batch-eligible]` phases in the plan — use `/batch` to execute independent phases in parallel.
-- Run ALL automated verification after each phase.
-- STOP after each phase and wait for human confirmation.
-- Never auto-proceed to the next phase.
-- If the plan doesn't match reality, STOP and explain the mismatch.
-
-### Pre-Release Workflow
-
-```
-/pre-launch -> /remediate -> /update-docs -> /release
-```
-
-- `/remediate` -- resolve all pre-launch findings with parallel TDD agents, CI verification
-- `/update-docs` -- refreshes all documentation, diagrams, version references, and inline code docs
-- `/release` -- version bump, CHANGELOG, tag, GitHub release, registry publish advisory
-
-## Testing Philosophy
-
-- Prefer automated verification over manual testing.
-- Manual testing is ONLY for: sudo, hardware, new installs, truly visual-only validation.
-- If you can verify it with a command or tool, do so automatically.
-- Don't use Claude for linting/formatting — use automated tools and hooks instead.
+Each phase is its own conversation. STOP after each phase.
+Use /clear between tasks, /compact when context is heavy.
 
 ## Project File Locations
 
-Go directly to these paths — never search the codebase for them.
+Go directly to these paths -- never search for them.
 
 | Topic | Path | Notes |
 |-------|------|-------|
@@ -318,6 +233,7 @@ Go directly to these paths — never search the codebase for them.
 3. Release to production via PR: `develop` → `main`
 4. Always run checks before committing (pre-commit hooks enforce this)
 5. Always `git pull --rebase` before pushing
+6. Run verification sequentially with `;` or `&&`, never as parallel Bash calls
 
 ### Commit Messages
 
@@ -451,23 +367,6 @@ GitHub Issues is the single source of truth for planned work. Every issue gets *
 
 Reference issues in commits with `Fixes #N` or `Refs #N`.
 
-## Conditional Blocks for Context-Specific Rules
-
-As this file grows, wrap domain-specific sections in `<important if="condition">` tags.
-The agent activates these only when the condition matches the current task, reducing noise.
-Keep universal content (stack, structure, git workflow) unwrapped.
-
-```markdown
-<important if="you are writing or modifying tests">
-- Use `createTestApp()` helper for integration tests
-- Mock database with `dbMock` from `packages/db/test`
-- Test fixtures live in `__fixtures__/` directories
-</important>
-```
-
-- **Be specific.** `"you are writing tests"` is good. `"you are writing code"` matches everything and defeats the purpose.
-- **Group by domain.** One block per domain (testing, deployment, database) — don't wrap individual lines.
-
 ## Working Patterns
 
 <examples>
@@ -477,15 +376,6 @@ Commit before pulling — hook blocks dirty pulls.
 ```bash
 git add src/feature.ts && git commit -m "feat: add feature"
 git pull --rebase && git push
-```
-
-</example>
-
-<example name="verification">
-Run checks sequentially, never as parallel tool calls.
-
-```bash
-pnpm run typecheck 2>&1; pnpm run lint 2>&1; pnpm run test 2>&1
 ```
 
 </example>
@@ -509,15 +399,7 @@ cd /Users/dev/project && pnpm run test
 </example>
 </examples>
 
-Domain-specific rules (git, CI, deployment, Python, macOS, Supabase, GitHub CLI, multi-agent) are in `.claude/skills/` — loaded automatically when relevant.
-
-<important if="you are pushing code to a remote">
-### Push Accountability
-
-After pushing to the development branch, spawn a background agent to monitor CI.
-If CI fails, the background agent investigates, fixes, and re-pushes.
-Main terminal continues working — push verification is non-blocking.
-</important>
+Rules load from `.claude/rules/` and `.claude/skills/` automatically.
 
 ## TDD Protocol
 
@@ -528,13 +410,10 @@ All code changes follow Red-Green-Refactor:
 
 No exceptions. Bug fixes need a regression test. Refactors need existing coverage. No "tests later."
 
-## Agent Autonomy
+## Agent Behavior
 
-Exhaust CLI tools, shell commands, and file tools before asking the user. Only escalate when genuinely impossible. Production-affecting actions need explicit human authorization.
-
-## Memory Management
-
-Save operational lessons to auto memory immediately — CI failure patterns, environment quirks, project conventions, permission issues. Don't wait to be asked.
+Exhaust tools before asking the user. Production actions need human authorization.
+Save operational lessons to auto memory immediately. Don't wait to be asked.
 
 ## Tool & API Awareness
 - You CAN set Vercel environment variables via CLI — do not claim otherwise.

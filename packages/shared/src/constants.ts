@@ -35,6 +35,20 @@ export const REPO_DEPTH_THRESHOLD = 3;
 export const MICRO_PR_LINE_THRESHOLD = 10;
 
 /**
+ * Review-to-PR ratio below which a profile is classified as "solo".
+ * A developer needs roughly 1 review per 7 PRs (0.15) to be treated as
+ * "collaborative" — below this threshold, reviews are incidental, not
+ * systematic code review participation.
+ */
+export const SOLO_REVIEW_RATIO_THRESHOLD = 0.15;
+
+/** Minimum lines changed for a PR to be in the "reviewable sweet spot". */
+export const BATCH_SIZE_MIN = 20;
+
+/** Maximum lines changed for a PR to be in the "reviewable sweet spot". */
+export const BATCH_SIZE_MAX = 500;
+
+/**
  * All four scoring dimension keys in canonical order.
  * Used by v4 scoring, heatmap coloring, and archetype derivation.
  */

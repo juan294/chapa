@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
 
 interface NavLink {
   label: string;
@@ -14,6 +15,7 @@ interface MobileNavProps {
 export function MobileNav({ links }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -110,6 +112,7 @@ export function MobileNav({ links }: MobileNavProps) {
                 href={link.href}
                 className="rounded-lg px-4 py-2.5 text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
                 onClick={() => setOpen(false)}
+                {...(pathname === link.href ? { "aria-current": "page" as const } : {})}
               >
                 <span className="text-amber/50">/</span> {link.label.toLowerCase()}
               </a>

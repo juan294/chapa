@@ -1,7 +1,20 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+
+const { mockUsePathname } = vi.hoisted(() => ({
+  mockUsePathname: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: mockUsePathname,
+}));
+
 import { MobileNav } from "./MobileNav";
+
+beforeEach(() => {
+  mockUsePathname.mockReturnValue("/");
+});
 
 afterEach(cleanup);
 
@@ -155,6 +168,32 @@ describe("MobileNav", () => {
       // Menu is already closed; Escape should be a no-op
       fireEvent.keyDown(document, { key: "Escape" });
       expect(screen.queryByRole("navigation")).toBeNull();
+    });
+  });
+
+  describe("aria-current on active links", () => {
+    it("sets aria-current='page' on the link matching the current pathname", () => {
+      mockUsePathname.mockReturnValue("/about");
+
+      render(<MobileNav links={LINKS} />);
+      fireEvent.click(screen.getByLabelText("Toggle navigation"));
+
+      const nav = screen.getByRole("navigation");
+      const aboutLink = nav.querySelector('a[href="/about"]')!;
+      expect(aboutLink.getAttribute("aria-current")).toBe("page");
+    });
+
+    it("does NOT set aria-current on links that do not match the pathname", () => {
+      mockUsePathname.mockReturnValue("/about");
+
+      render(<MobileNav links={LINKS} />);
+      fireEvent.click(screen.getByLabelText("Toggle navigation"));
+
+      const nav = screen.getByRole("navigation");
+      const homeLink = nav.querySelector('a[href="/"]')!;
+      const studioLink = nav.querySelector('a[href="/studio"]')!;
+      expect(homeLink.getAttribute("aria-current")).toBeNull();
+      expect(studioLink.getAttribute("aria-current")).toBeNull();
     });
   });
 });

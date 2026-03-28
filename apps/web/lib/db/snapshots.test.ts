@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { makeSnapshot } from "../test-helpers/fixtures";
+import type { MetricsSnapshot } from "../history/types";
 
 // ---------------------------------------------------------------------------
 // Mock Supabase client — builder pattern stubs
@@ -502,5 +503,184 @@ describe("dbCleanOldSnapshots", () => {
     terminalResolve = { data: null, error: new Error("timeout") };
     const result = await dbCleanOldSnapshots();
     expect(result).toBe(0);
+  });
+
+  it("returns 0 when data is null (no rows matched)", async () => {
+    terminalResolve = { data: null, error: null };
+    const result = await dbCleanOldSnapshots();
+    expect(result).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// snapshotToRow edge cases (via dbInsertSnapshot/dbReplaceSnapshot)
+// ---------------------------------------------------------------------------
+
+describe("snapshotToRow edge cases", () => {
+  it("serializes confidencePenalties to non-null when present", async () => {
+    const penalties = [{ flag: "low_activity", penalty: 10 }];
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot(
+      "testuser",
+      makeSnapshot({
+        confidencePenalties: penalties as MetricsSnapshot["confidencePenalties"],
+      }),
+    );
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.confidence_penalties).toEqual(penalties);
+  });
+
+  it("serializes confidencePenalties to null when empty array", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot(
+      "testuser",
+      makeSnapshot({ confidencePenalties: [] }),
+    );
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.confidence_penalties).toBeNull();
+  });
+
+  it("serializes confidencePenalties to null when undefined", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot(
+      "testuser",
+      makeSnapshot({ confidencePenalties: undefined }),
+    );
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.confidence_penalties).toBeNull();
+  });
+
+  it("serializes microCommitRatio when present", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot(
+      "testuser",
+      makeSnapshot({ microCommitRatio: 0.42 }),
+    );
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.micro_commit_ratio).toBe(0.42);
+  });
+
+  it("serializes microCommitRatio to null when undefined", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot("testuser", makeSnapshot());
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.micro_commit_ratio).toBeNull();
+  });
+
+  it("serializes docsOnlyPrRatio when present", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot(
+      "testuser",
+      makeSnapshot({ docsOnlyPrRatio: 0.15 }),
+    );
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.docs_only_pr_ratio).toBe(0.15);
+  });
+
+  it("serializes docsOnlyPrRatio to null when undefined", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot("testuser", makeSnapshot());
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.docs_only_pr_ratio).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rowToSnapshot additional edge cases
+// ---------------------------------------------------------------------------
+
+describe("rowToSnapshot additional edge cases", () => {
+  it("includes microCommitRatio when DB row has non-null value", async () => {
+    terminalResolve = {
+      data: makeRow({ micro_commit_ratio: 0.35 }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.microCommitRatio).toBe(0.35);
+  });
+
+  it("omits microCommitRatio when DB row has null value", async () => {
+    terminalResolve = {
+      data: makeRow({ micro_commit_ratio: null }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.microCommitRatio).toBeUndefined();
+  });
+
+  it("includes docsOnlyPrRatio when DB row has non-null value", async () => {
+    terminalResolve = {
+      data: makeRow({ docs_only_pr_ratio: 0.2 }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.docsOnlyPrRatio).toBe(0.2);
+  });
+
+  it("omits docsOnlyPrRatio when DB row has null value", async () => {
+    terminalResolve = {
+      data: makeRow({ docs_only_pr_ratio: null }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.docsOnlyPrRatio).toBeUndefined();
+  });
+
+  it("maps non-null max_commits_in_10min correctly", async () => {
+    terminalResolve = {
+      data: makeRow({ max_commits_in_10min: 5 }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.maxCommitsIn10Min).toBe(5);
+  });
+
+  it("omits confidencePenalties when null in DB", async () => {
+    terminalResolve = {
+      data: makeRow({ confidence_penalties: null }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.confidencePenalties).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dbGetLatestSnapshot additional error paths
+// ---------------------------------------------------------------------------
+
+describe("dbGetLatestSnapshot error paths", () => {
+  it("returns null on query error and logs", async () => {
+    terminalResolve = { data: null, error: new Error("connection refused") };
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await dbGetLatestSnapshot("testuser");
+
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[db] dbGetLatestSnapshot failed:",
+      "connection refused",
+    );
+    consoleSpy.mockRestore();
   });
 });

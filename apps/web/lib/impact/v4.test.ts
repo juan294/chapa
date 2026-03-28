@@ -8,6 +8,7 @@ import {
   deriveArchetype,
   detectProfileType,
   computeImpactV4,
+  computeLeadTimeModifier,
 } from "./v4";
 import type { StatsData, DimensionScores } from "@chapa/shared";
 import { makeStats as _makeStats } from "../test-helpers/fixtures";
@@ -131,6 +132,100 @@ describe("computeDelivery(stats)", () => {
     });
     expect(computeDelivery(stats)).toBe(100);
   });
+
+  it("boosts delivery for fast lead time", () => {
+    const stats = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+      medianPrLeadTimeHours: 2, // very fast → 1.05x
+    });
+    const withoutLead = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    });
+    expect(computeDelivery(stats)).toBeGreaterThan(computeDelivery(withoutLead));
+  });
+
+  it("penalizes delivery for slow lead time", () => {
+    const stats = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+      medianPrLeadTimeHours: 200, // very slow → 0.95x
+    });
+    const withoutLead = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    });
+    expect(computeDelivery(stats)).toBeLessThan(computeDelivery(withoutLead));
+  });
+
+  it("leaves delivery unchanged when no lead time data", () => {
+    const stats = makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    });
+    // No medianPrLeadTimeHours → modifier = 1.0
+    const baseScore = computeDelivery(stats);
+    // The neutral point is around 26h; without data should be exactly 1.0x
+    expect(baseScore).toBe(computeDelivery(makeStats({
+      prsMergedWeight: 30,
+      issuesClosedCount: 10,
+      commitsTotal: 80,
+    })));
+  });
+
+  it("does not exceed 100 even with fast lead time boost", () => {
+    const stats = makeStats({
+      prsMergedWeight: 300,
+      issuesClosedCount: 200,
+      commitsTotal: 1500,
+      medianPrLeadTimeHours: 1, // max boost
+    });
+    expect(computeDelivery(stats)).toBeLessThanOrEqual(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeLeadTimeModifier(medianHours)
+// ---------------------------------------------------------------------------
+
+describe("computeLeadTimeModifier(medianHours)", () => {
+  it("returns 1.05 for median ≤ 4 hours", () => {
+    expect(computeLeadTimeModifier(0)).toBe(1.05);
+    expect(computeLeadTimeModifier(4)).toBe(1.05);
+  });
+
+  it("returns 1.0 for median = 48 hours", () => {
+    expect(computeLeadTimeModifier(48)).toBeCloseTo(1.0, 5);
+  });
+
+  it("returns 0.95 for median ≥ 168 hours", () => {
+    expect(computeLeadTimeModifier(168)).toBeCloseTo(0.95, 5);
+    expect(computeLeadTimeModifier(500)).toBe(0.95);
+  });
+
+  it("interpolates linearly between 4-48h", () => {
+    // Midpoint at 26h → (1.05 + 1.0) / 2 = 1.025
+    expect(computeLeadTimeModifier(26)).toBeCloseTo(1.025, 2);
+  });
+
+  it("interpolates linearly between 48-168h", () => {
+    // Midpoint at 108h → (1.0 + 0.95) / 2 = 0.975
+    expect(computeLeadTimeModifier(108)).toBeCloseTo(0.975, 2);
+  });
+
+  it("returns 1.0 when medianHours is undefined", () => {
+    expect(computeLeadTimeModifier(undefined)).toBe(1.0);
+  });
+
+  it("returns 1.0 when medianHours is null-ish", () => {
+    expect(computeLeadTimeModifier(undefined)).toBe(1.0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -138,7 +233,7 @@ describe("computeDelivery(stats)", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeQuality(stats)", () => {
-  it("returns 0 for zero reviews", () => {
+  it("returns 0 for solo profile with no merged PRs", () => {
     expect(computeQuality(makeStats())).toBe(0);
   });
 
@@ -155,7 +250,7 @@ describe("computeQuality(stats)", () => {
     const reviewOnly = makeStats({ reviewsSubmittedCount: 180 });
     const score = computeQuality(reviewOnly);
     // 60% from reviews, 25% from ratio (no PRs → pure reviewer → max ratio = 1),
-    // ~10.5% from inverse micro (default 0.3 → inverseMicro = 0.7 → 15% * 0.7)
+    // ~4.5% from batchSize (default 0.3 → 15% * 0.3)
     expect(score).toBeGreaterThanOrEqual(60);
   });
 
@@ -166,10 +261,10 @@ describe("computeQuality(stats)", () => {
     expect(computeQuality(highRatio)).toBeGreaterThan(computeQuality(lowRatio));
   });
 
-  it("penalizes high microCommitRatio", () => {
-    const clean = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0.1 });
-    const micro = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0.9 });
-    expect(computeQuality(clean)).toBeGreaterThan(computeQuality(micro));
+  it("rewards high batchSizeScore", () => {
+    const good = makeStats({ reviewsSubmittedCount: 30, batchSizeScore: 0.9 });
+    const bad = makeStats({ reviewsSubmittedCount: 30, batchSizeScore: 0.1 });
+    expect(computeQuality(good)).toBeGreaterThan(computeQuality(bad));
   });
 
   it("returns an integer", () => {
@@ -177,31 +272,31 @@ describe("computeQuality(stats)", () => {
     expect(Number.isInteger(computeQuality(stats))).toBe(true);
   });
 
-  it("handles missing microCommitRatio with conservative default (0.3)", () => {
+  it("handles missing batchSizeScore with conservative default (0.3)", () => {
     const stats = makeStats({ reviewsSubmittedCount: 30 });
     const score = computeQuality(stats);
     expect(score).toBeGreaterThan(0);
 
-    // With microCommitRatio=0.3, inverseMicro=0.7 → 15% * 0.7 = 10.5% contribution
-    // With microCommitRatio=0 (explicit), inverseMicro=1.0 → 15% * 1.0 = 15% contribution
-    const explicitZero = makeStats({ reviewsSubmittedCount: 30, microCommitRatio: 0 });
-    expect(computeQuality(explicitZero)).toBeGreaterThan(score);
+    // With default 0.3 → 15% * 0.3 = 4.5% contribution
+    // With explicit 1.0 → 15% * 1.0 = 15% contribution
+    const maxBatch = makeStats({ reviewsSubmittedCount: 30, batchSizeScore: 1.0 });
+    expect(computeQuality(maxBatch)).toBeGreaterThan(score);
   });
 
-  it("scores lower with unknown microCommitRatio than with explicit 0", () => {
-    // This validates the anti-gaming default: unknown → 0.3 (no free points)
+  it("scores lower with unknown batchSizeScore than with explicit 1.0", () => {
+    // Validates the conservative default: unknown → 0.3 (no free points)
     const unknown = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30 });
-    const clean = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30, microCommitRatio: 0 });
-    const scoreDiff = computeQuality(clean) - computeQuality(unknown);
-    // ~4.5 point difference (15% * 0.3 * 100)
-    expect(scoreDiff).toBeGreaterThanOrEqual(3);
-    expect(scoreDiff).toBeLessThanOrEqual(6);
+    const perfect = makeStats({ reviewsSubmittedCount: 100, prsMergedCount: 30, batchSizeScore: 1.0 });
+    const scoreDiff = computeQuality(perfect) - computeQuality(unknown);
+    // ~10.5 point difference (15% * 0.7 * 100)
+    expect(scoreDiff).toBeGreaterThanOrEqual(8);
+    expect(scoreDiff).toBeLessThanOrEqual(12);
   });
 
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ reviewsSubmittedCount: 180, prsMergedCount: 5, microCommitRatio: 0 }),
+      makeStats({ reviewsSubmittedCount: 180, prsMergedCount: 5, batchSizeScore: 1.0 }),
       makeStats({ reviewsSubmittedCount: 300, prsMergedCount: 1 }),
     ];
     for (const s of scenarios) {
@@ -225,47 +320,59 @@ describe("computeConsistency(stats)", () => {
     const stats = makeStats({
       activeDays: 340,
       heatmapData: makeUniformHeatmap(14), // 2/day for 13 weeks
-      maxCommitsIn10Min: 3,
     });
     const score = computeConsistency(stats);
     expect(score).toBeGreaterThan(80);
   });
 
-  it("V5: weights sqrt streak at 45%", () => {
+  it("weights sqrt streak at 45%", () => {
     const stats = makeStats({
       activeDays: 365,
-      heatmapData: [], // no heatmap data → evenness = 0
-      maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
+      heatmapData: [], // no heatmap data → evenness = 0, weekCoverage = 0
     });
     const score = computeConsistency(stats);
     // sqrt(365/365) = 1.0; 45% * 1.0 * 100 = 45
     expect(score).toBe(45);
   });
 
-  it("V5: sqrt curve boosts moderate active days significantly", () => {
-    // 120 active days: V4 streak = 32.9%, V5 streak = sqrt(120/365) = 57.3%
+  it("sqrt curve boosts moderate active days significantly", () => {
+    // 120 active days: sqrt(120/365) = 57.3%
     const stats = makeStats({
       activeDays: 120,
-      heatmapData: [], // no heatmap data → evenness = 0
-      maxCommitsIn10Min: 30, // max burst → inverseBurst = 0
+      heatmapData: [], // no heatmap data → evenness = 0, weekCoverage = 0
     });
     const score = computeConsistency(stats);
     // sqrt(120/365) ≈ 0.573; 0.573 * 45 ≈ 25.8 → 26
     expect(score).toBe(26);
   });
 
-  it("penalizes burst activity", () => {
-    const steady = makeStats({
+  it("no longer penalizes high daily contribution counts", () => {
+    // Two profiles with identical heatmaps but different maxCommitsIn10Min
+    // should score the same (burst is no longer a factor)
+    const low = makeStats({
       activeDays: 60,
       heatmapData: makeUniformHeatmap(10),
       maxCommitsIn10Min: 3,
     });
-    const bursty = makeStats({
+    const high = makeStats({
       activeDays: 60,
-      heatmapData: makeBurstHeatmap(130),
-      maxCommitsIn10Min: 25,
+      heatmapData: makeUniformHeatmap(10),
+      maxCommitsIn10Min: 300,
     });
-    expect(computeConsistency(steady)).toBeGreaterThan(computeConsistency(bursty));
+    expect(computeConsistency(low)).toBe(computeConsistency(high));
+  });
+
+  it("scores higher when more weeks have activity (week coverage)", () => {
+    // 13 active weeks vs 3 active weeks (same total activity)
+    const manyWeeks = makeStats({
+      activeDays: 91,
+      heatmapData: makeUniformHeatmap(7), // all 13 weeks active
+    });
+    const fewWeeks = makeStats({
+      activeDays: 21,
+      heatmapData: makeBurstHeatmap(91), // only 1 week active
+    });
+    expect(computeConsistency(manyWeeks)).toBeGreaterThan(computeConsistency(fewWeeks));
   });
 
   it("rewards even distribution over bursty heatmap", () => {
@@ -288,14 +395,44 @@ describe("computeConsistency(stats)", () => {
   it("is bounded 0-100", () => {
     const scenarios = [
       makeStats(),
-      makeStats({ activeDays: 365, heatmapData: makeUniformHeatmap(20), maxCommitsIn10Min: 0 }),
-      makeStats({ activeDays: 1, heatmapData: makeBurstHeatmap(100), maxCommitsIn10Min: 50 }),
+      makeStats({ activeDays: 365, heatmapData: makeUniformHeatmap(20) }),
+      makeStats({ activeDays: 1, heatmapData: makeBurstHeatmap(100) }),
     ];
     for (const s of scenarios) {
       const score = computeConsistency(s);
       expect(score).toBeGreaterThanOrEqual(0);
       expect(score).toBeLessThanOrEqual(100);
     }
+  });
+
+  it("scores > 90 with uniform activity across 52 weeks", () => {
+    // Build a 52-week heatmap (364 days) with uniform activity
+    const days: { date: string; count: number }[] = [];
+    for (let i = 0; i < 364; i++) {
+      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count: 3 });
+    }
+    const stats = makeStats({
+      activeDays: 364,
+      heatmapData: days,
+    });
+    expect(computeConsistency(stats)).toBeGreaterThan(90);
+  });
+
+  it("scores well with 134 active days despite high max daily contributions", () => {
+    // Simulate a high-output solo dev: active ~134 days, variable intensity
+    // Key: maxCommitsIn10Min no longer penalizes the score
+    const days: { date: string; count: number }[] = [];
+    for (let i = 0; i < 365; i++) {
+      const count = i < 134 ? (i % 7 === 0 ? 50 : 5) : 0;
+      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count });
+    }
+    const stats = makeStats({
+      activeDays: 134,
+      heatmapData: days,
+      maxCommitsIn10Min: 300,
+    });
+    // Should score ~50 (up from ~40 with old burst penalty)
+    expect(computeConsistency(stats)).toBeGreaterThanOrEqual(45);
   });
 });
 
@@ -753,12 +890,37 @@ describe("detectProfileType(stats)", () => {
     expect(detectProfileType(makeStats({ reviewsSubmittedCount: 0 }))).toBe("solo");
   });
 
-  it("returns 'collaborative' when reviewsSubmittedCount is 1", () => {
-    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 1 }))).toBe("collaborative");
+  it("returns 'solo' when review-to-PR ratio < 0.15 (e.g., 5 reviews, 67 PRs)", () => {
+    // 5/67 = 0.075, below 0.15 threshold → solo
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 5, prsMergedCount: 67 }))).toBe("solo");
+  });
+
+  it("returns 'collaborative' when review-to-PR ratio >= 0.15 (e.g., 15 reviews, 67 PRs)", () => {
+    // 15/67 = 0.224, above 0.15 threshold → collaborative
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 15, prsMergedCount: 67 }))).toBe("collaborative");
+  });
+
+  it("returns 'collaborative' when review-to-PR ratio is 1.0 (pure reviewer)", () => {
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 30, prsMergedCount: 30 }))).toBe("collaborative");
   });
 
   it("returns 'collaborative' when reviewsSubmittedCount is high", () => {
     expect(detectProfileType(makeStats({ reviewsSubmittedCount: 100 }))).toBe("collaborative");
+  });
+
+  it("handles edge case: 0 PRs with some reviews → collaborative", () => {
+    // reviews / max(0, 1) = reviews/1 → ratio = reviews, which is >= 0.15
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 1, prsMergedCount: 0 }))).toBe("collaborative");
+  });
+
+  it("returns 'solo' at exactly the threshold boundary (ratio = 0.14)", () => {
+    // 7/50 = 0.14, below 0.15 → solo
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 7, prsMergedCount: 50 }))).toBe("solo");
+  });
+
+  it("returns 'collaborative' at the threshold (ratio = 0.15)", () => {
+    // 3/20 = 0.15, at threshold → collaborative (>= comparison)
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 3, prsMergedCount: 20 }))).toBe("collaborative");
   });
 });
 
@@ -869,6 +1031,7 @@ describe("solo developer composite scoring", () => {
       featureBranchRate: 1.0,
       issueLinkageRate: 1.0,
       microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     const result = computeImpactV4(stats);
     expect(result.compositeScore).toBeGreaterThanOrEqual(90);
@@ -953,14 +1116,14 @@ describe("computeQuality — solo path", () => {
     expect(computeQuality(stats)).toBe(0);
   });
 
-  it("applies solo formula weights: 40% desc, 25% branch, 20% linkage, 15% micro", () => {
+  it("applies solo formula weights: 40% desc, 25% branch, 20% linkage, 15% batchSize", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 0,
       prsMergedCount: 10,
       prDescriptionRate: 1.0,
       featureBranchRate: 0,
       issueLinkageRate: 0,
-      microCommitRatio: 1.0, // inverseMicro = 0
+      batchSizeScore: 0,
     });
     // Only prDescriptionRate contributes: 40% * 1.0 * 100 = 40
     expect(computeQuality(stats)).toBe(40);
@@ -973,7 +1136,7 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 0,
       featureBranchRate: 1.0,
       issueLinkageRate: 0,
-      microCommitRatio: 1.0,
+      batchSizeScore: 0,
     });
     expect(computeQuality(stats)).toBe(25);
   });
@@ -985,19 +1148,19 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 0,
       featureBranchRate: 0,
       issueLinkageRate: 1.0,
-      microCommitRatio: 1.0,
+      batchSizeScore: 0,
     });
     expect(computeQuality(stats)).toBe(20);
   });
 
-  it("inverseMicroCommitRatio at 15% weight", () => {
+  it("batchSizeScore at 15% weight", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 0,
       prsMergedCount: 10,
       prDescriptionRate: 0,
       featureBranchRate: 0,
       issueLinkageRate: 0,
-      microCommitRatio: 0, // inverseMicro = 1.0
+      batchSizeScore: 1.0,
     });
     expect(computeQuality(stats)).toBe(15);
   });
@@ -1009,32 +1172,88 @@ describe("computeQuality — solo path", () => {
       prDescriptionRate: 1.0,
       featureBranchRate: 1.0,
       issueLinkageRate: 1.0,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     expect(computeQuality(stats)).toBe(100);
   });
 
-  it("defaults undefined rates to 0 (no free points)", () => {
+  it("defaults undefined rates to 0, batchSizeScore to 0.3 (no free points)", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 0,
       prsMergedCount: 10,
       // prDescriptionRate, featureBranchRate, issueLinkageRate all undefined
-      microCommitRatio: 0.3,
+      // batchSizeScore undefined → defaults to 0.3
     });
     const score = computeQuality(stats);
-    // Only inverseMicro contributes: 15% * (1 - 0.3) * 100 = 10.5 → 11
-    expect(score).toBe(11);
+    // Only batchSize contributes: 15% * 0.3 * 100 = 4.5 → 5
+    expect(score).toBe(5);
   });
 
-  it("collaborative quality path is unchanged (reviews > 0)", () => {
+  it("collaborative quality path is unchanged (reviews > 0, high ratio)", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 80,
       prsMergedCount: 20,
-      microCommitRatio: 0,
+      batchSizeScore: 1.0,
     });
     // Collaborative formula: 60% * (80/80) + 25% * min(80/20, 5)/5 + 15% * 1.0
     // = 60 + 25 * (4/5) + 15 = 60 + 20 + 15 = 95
     expect(computeQuality(stats)).toBe(95);
+  });
+
+  it("uses solo formula when review ratio is below threshold even with some reviews", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 5,
+      prsMergedCount: 67,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 0.5,
+      issueLinkageRate: 0.3,
+      batchSizeScore: 0.8,
+    });
+    // ratio = 5/67 = 0.075 < 0.15 → solo path
+    // Solo: 40% * 1.0 + 25% * 0.5 + 20% * 0.3 + 15% * 0.8 = 40 + 12.5 + 6 + 12 = 70.5 → 71
+    expect(computeQuality(stats)).toBe(71);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeQuality with explicit profileType override
+// ---------------------------------------------------------------------------
+
+describe("computeQuality with profileType parameter", () => {
+  it("uses solo formula when profileType is solo even with non-zero reviews", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 50,
+      prsMergedCount: 10,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 1.0,
+      batchSizeScore: 1.0,
+    });
+    // Forced solo: 40% + 25% + 20% + 15% = 100
+    expect(computeQuality(stats, "solo")).toBe(100);
+  });
+
+  it("uses collaborative formula when profileType is collaborative", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 80,
+      prsMergedCount: 20,
+      batchSizeScore: 1.0,
+    });
+    // Forced collaborative: same as normal collaborative path
+    expect(computeQuality(stats, "collaborative")).toBe(95);
+  });
+
+  it("defaults to detectProfileType when profileType not provided", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 1.0,
+      batchSizeScore: 1.0,
+    });
+    // reviews=0 → auto-detects solo → 100
+    expect(computeQuality(stats)).toBe(100);
   });
 });
 

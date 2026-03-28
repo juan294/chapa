@@ -17,11 +17,11 @@ const ARCHETYPES = [
   },
   {
     name: "guardian",
-    signals: ["Code reviews submitted", "Review-to-PR ratio", "Code hygiene"],
+    signals: ["Code reviews submitted", "Review-to-PR ratio", "Batch size"],
   },
   {
     name: "marathoner",
-    signals: ["Active days", "Heatmap evenness", "Burst detection"],
+    signals: ["Active days", "Heatmap evenness", "Week coverage"],
   },
   {
     name: "polymath",

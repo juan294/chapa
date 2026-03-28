@@ -1,6 +1,6 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
-import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "./constants";
+import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD, BATCH_SIZE_MIN, BATCH_SIZE_MAX } from "./constants";
 
 /** Branch names that indicate a direct push (not a feature branch). */
 const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
@@ -55,6 +55,27 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold
   const microCommitRatio = prsMergedCount > 0
     ? mergedPRs.filter((pr) => pr.additions + pr.deletions < MICRO_PR_LINE_THRESHOLD).length / prsMergedCount
+    : undefined;
+
+  // 5d. Batch size score: fraction of merged PRs in the reviewable sweet spot
+  const batchSizeScore = prsMergedCount > 0
+    ? mergedPRs.filter((pr) => {
+        const total = pr.additions + pr.deletions;
+        return total >= BATCH_SIZE_MIN && total <= BATCH_SIZE_MAX;
+      }).length / prsMergedCount
+    : undefined;
+
+  // 5e. Median PR lead time (creation → merge) in hours
+  const leadTimes = mergedPRs
+    .filter((pr) => pr.createdAt && pr.mergedAt)
+    .map((pr) => {
+      const created = new Date(pr.createdAt!).getTime();
+      const merged = new Date(pr.mergedAt!).getTime();
+      return Math.max(0, (merged - created) / (1000 * 60 * 60));
+    })
+    .sort((a, b) => a - b);
+  const medianPrLeadTimeHours = leadTimes.length > 0
+    ? leadTimes[Math.floor(leadTimes.length / 2)]
     : undefined;
 
   // 6. Reviews and issues
@@ -120,6 +141,8 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ...(featureBranchRate !== undefined && { featureBranchRate }),
     ...(issueLinkageRate !== undefined && { issueLinkageRate }),
     ...(microCommitRatio !== undefined && { microCommitRatio }),
+    ...(batchSizeScore !== undefined && { batchSizeScore }),
+    ...(medianPrLeadTimeHours !== undefined && { medianPrLeadTimeHours }),
     totalStars,
     totalForks,
     totalWatchers,

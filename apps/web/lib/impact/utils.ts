@@ -121,7 +121,7 @@ export function computeConfidence(
   const penalties: ConfidencePenalty[] = [];
   let score = 100;
 
-  if (stats.maxCommitsIn10Min >= 20) {
+  if (stats.maxCommitsIn10Min >= 100) {
     penalties.push({
       flag: "burst_activity",
       penalty: 15,

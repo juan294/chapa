@@ -1,39 +1,52 @@
 # Documentation Update Report
 
-> Generated on 2026-03-27 | Branch: `develop` | Changes since v2.4.0
+> Generated on 2026-03-28 | Branch: `develop` | Changes since v2.4.1
 
 ## Summary
-- 6 documents updated
-- 3 diagrams/tables refreshed
-- 7 version/count references corrected
-- 0 inline doc blocks updated (none existed for changed code)
+- 5 documents updated
+- 0 diagrams refreshed (all current or covered by v6.1 spec section)
+- 0 version references corrected (all intentional)
+- 0 inline doc blocks updated (all already current)
 - 0 items flagged [NEEDS REVIEW]
 
 ## Changes by File
 
-### 1. `README.md`
-- Updated test count: "367+ files, 5,920+ tests" → "378+ files, 6,400+ tests"
+### docs/how-it-works.md
+- **Quality dimension table**: "inverse micro-commit ratio (15%)" → "batch size score (15%)" in both collaborative and solo paths
+- **Consistency dimension table**: "inverse burst activity (15%)" → "week coverage (15%)"
+- **Delivery dimension table**: Added "lead time modifier (±5%)"
+- **Solo detection**: "zero reviews" → ratio-based (review-to-PR ratio < 0.15)
+- **Explanatory paragraphs**: Added 3 new paragraphs explaining lead time modifier, batch size score, and week coverage with outlier clipping
+- **Confidence table**: Burst activity threshold "20+" → "100+"
 
-### 2. `CLAUDE.md`
-- Fixed agent reports description: "Gitignored. Local-only. Never committed" → "Committed to repo for team visibility" (reports are tracked in git)
-- Updated health endpoint description: "Redis + Supabase ping" → "Redis dbsize + Supabase query; returns 'skipped' for unconfigured services"
+### docs/scoring-explainer-video.md
+- **Delivery section**: Added lead time modifier paragraph (DORA flow efficiency)
+- **Quality collaborative**: "Inverse Micro-Commit Ratio" → "Batch Size Score" with research context
+- **Quality solo**: Same micro-commit → batch size update
+- **Profile type detection**: Binary ("at least one code review") → ratio-based (0.15 threshold)
+- **Consistency section**: "Inverse Burst Activity" → "Week Coverage"; added outlier clipping to heatmap evenness
+- **Confidence table**: Burst threshold "20+" → "100+" with rationale
+- **Anti-gaming section**: "Unknown micro-commit ratio default" → "Batch size scoring"
+- **Solo Philosophy**: Updated detection description and quality rubric list
+- **Pipeline steps**: Updated step 2 profile detection description
 
-### 3. `docs/spec.md`
-- Updated radar chart description: "4 dimensions" → "4–5 dimensions" with Craft mention
-- Added Artificer to archetype list
-- Added `/api/profile/:handle` and `/api/health` to public endpoints list
+### README.md
+- **Dimension table**: Updated all 4 dimension descriptions to reflect v6.1 signals (lead time, batch size, week coverage, cross-project influence)
 
-### 4. `docs/badge-svg-spec-v1.2.md`
-- Renamed section 8b: "GitHub Branding" → "Platform Branding"
-- Updated RadarChart table entry: "4-axis diamond" → "4/5-axis (pentagon/diamond)"
-- Added 3 missing files to Implementation Reference: `svg-to-png.ts`, `demoData.ts`, `archetypeDemoData.ts`
+### docs/impact-v6.md
+- **Solo Profile Exception**: "zero code reviews" → "review-to-PR ratio below 0.15"
+- **Solo Quality signals**: "micro-commit ratio" → "batch size score"
 
-### 5. `docs/badge-design-v1.md`
-- Removed `[Confidence %]` from ASCII layout diagram (confidence display was removed from rendering)
-- Removed "Confidence" text reference from section heading and description
+### CHANGELOG.md
+- Added v2.5.0 entry with Added/Changed/Documentation sections covering all v6.1 changes
+- Added link reference for v2.5.0
 
-### 6. `CHANGELOG.md`
-- Added link reference definitions for all 6 versions (v1.0.0 through v2.4.0) — previously all `[X.Y.Z]` header links were broken
+## Discovery Process
+4 parallel agents investigated:
+- **change-analyst**: 20 commits, categorized by area (scoring, API, docs, tests, config)
+- **doc-inventory**: 40+ doc files mapped; 3 flagged for update
+- **diagram-analyzer**: 11 diagrams found; all current or covered by existing v6.1 section
+- **version-scanner**: All scoring version refs checked; function name `computeImpactV4` confirmed intentional
 
 ## Flagged for Review
 None.

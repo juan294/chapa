@@ -53,7 +53,7 @@ const DIMENSION_TIPS: Record<string, string> = {
   quality:
     "To strengthen Quality, start reviewing teammates' pull requests more often — thoughtful code reviews are the fastest way to grow this dimension.",
   consistency:
-    "To strengthen Consistency, aim for regular contributions across more days — even small commits on consecutive days build this dimension faster than occasional bursts.",
+    "To strengthen Consistency, aim for regular contributions across more weeks — showing up consistently matters more than output volume on any given day.",
   breadth:
     "To strengthen Breadth, contribute to repos outside your main project — opening issues, submitting PRs, or reviewing code in other repositories all count.",
   craft:
@@ -84,6 +84,18 @@ const MAX_INSIGHTS = 5;
 // Main function
 // ---------------------------------------------------------------------------
 
+/**
+ * Generate personalized developer insights from impact profile, trend, and diff data.
+ *
+ * Applies 6 prioritized rules: tier change, overall trend, dimension improvements,
+ * weakest-dimension tip, next-tier guidance, and archetype context. Results are
+ * sorted by priority and capped at 5. Used by the share page insights panel.
+ *
+ * @param impact - Current impact profile (dimensions, archetype, tier, composite)
+ * @param trend  - Optional trend summary (direction, avgDelta, dimension trends)
+ * @param diff   - Optional snapshot diff (tier/dimension changes since last snapshot)
+ * @returns Up to 5 insights sorted by priority (1 = highest)
+ */
 export function generateInsights(
   impact: ImpactV4Result,
   trend: TrendSummary | null,

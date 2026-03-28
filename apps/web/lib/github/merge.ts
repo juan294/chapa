@@ -59,6 +59,14 @@ export function mergeStats(
     totalWatchers: Math.max(primary.totalWatchers, supplemental.totalWatchers),
     maxCommitsIn10Min: Math.max(primary.maxCommitsIn10Min, supplemental.maxCommitsIn10Min),
     microCommitRatio: mergeOptionalMax(primary.microCommitRatio, supplemental.microCommitRatio),
+    batchSizeScore: mergeOptionalWeightedAvg(
+      primary.batchSizeScore, primary.prsMergedCount,
+      supplemental.batchSizeScore, supplemental.prsMergedCount,
+    ),
+    medianPrLeadTimeHours: mergeOptionalWeightedAvg(
+      primary.medianPrLeadTimeHours, primary.prsMergedCount,
+      supplemental.medianPrLeadTimeHours, supplemental.prsMergedCount,
+    ),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),
     heatmapData: mergedHeatmap,
     hasSupplementalData: options?.markAsSupplemental ?? true,
@@ -110,4 +118,23 @@ function mergeOptionalMax(
   if (a === undefined) return b;
   if (b === undefined) return a;
   return Math.max(a, b);
+}
+
+/**
+ * Merge two optional ratio values by weighted average (by count).
+ *
+ * Used for ratio fields like `batchSizeScore` where the value should be
+ * averaged across platforms proportional to the number of items (PRs)
+ * each platform contributed.
+ */
+function mergeOptionalWeightedAvg(
+  aVal: number | undefined, aCount: number,
+  bVal: number | undefined, bCount: number,
+): number | undefined {
+  if (aVal === undefined && bVal === undefined) return undefined;
+  const totalCount = aCount + bCount;
+  if (totalCount === 0) return undefined;
+  const aContrib = (aVal ?? 0) * aCount;
+  const bContrib = (bVal ?? 0) * bCount;
+  return (aContrib + bContrib) / totalCount;
 }

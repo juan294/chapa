@@ -71,8 +71,8 @@ export default function BuilderPage() {
               </p>
 
               <p>
-                This means a developer who merges thoughtful pull requests will outscore one who
-                pushes hundreds of micro-commits that never leave a feature branch. Builders understand
+                This means a developer who merges focused, reviewable pull requests will outscore one who
+                pushes hundreds of tiny changes that never leave a feature branch. Builders understand
                 that code has no value sitting in a branch. The goal is always the merge, the deploy,
                 the user seeing the change.
               </p>
