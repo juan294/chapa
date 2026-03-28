@@ -100,9 +100,9 @@ describe("computeConfidence", () => {
 
   // --- burst_activity ---
   describe("burst_activity flag", () => {
-    it("applies -15 when maxCommitsIn10Min >= 20", () => {
+    it("applies -15 when maxCommitsIn10Min >= 100", () => {
       const { confidence, penalties } = computeConfidence(
-        makeStats({ maxCommitsIn10Min: 20 }),
+        makeStats({ maxCommitsIn10Min: 100 }),
       );
       expect(confidence).toBe(85);
       expect(penalties).toHaveLength(1);
@@ -110,9 +110,17 @@ describe("computeConfidence", () => {
       expect(penalties[0]!.penalty).toBe(15);
     });
 
-    it("does NOT apply when maxCommitsIn10Min is 19", () => {
+    it("does NOT apply when maxCommitsIn10Min is 99", () => {
       const { confidence, penalties } = computeConfidence(
-        makeStats({ maxCommitsIn10Min: 19 }),
+        makeStats({ maxCommitsIn10Min: 99 }),
+      );
+      expect(confidence).toBe(100);
+      expect(penalties.find((p) => p.flag === "burst_activity")).toBeUndefined();
+    });
+
+    it("does NOT apply at old threshold of 20 (threshold raised)", () => {
+      const { confidence, penalties } = computeConfidence(
+        makeStats({ maxCommitsIn10Min: 20 }),
       );
       expect(confidence).toBe(100);
       expect(penalties.find((p) => p.flag === "burst_activity")).toBeUndefined();
@@ -396,7 +404,7 @@ describe("computeConfidence", () => {
   it("clamps confidence to 50 when maximum penalties fire (7 simultaneous)", () => {
     const { confidence, penalties } = computeConfidence(
       makeStats({
-        maxCommitsIn10Min: 30, // burst_activity: -15
+        maxCommitsIn10Min: 100, // burst_activity: -15
         microCommitRatio: 0.9, // micro_commit_pattern: -10
         linesAdded: 25000, // generated_change_pattern: -15
         linesDeleted: 0, //   (25000 >= 20000)
@@ -419,7 +427,7 @@ describe("computeConfidence", () => {
   it("includes reason strings on all penalties", () => {
     const { penalties } = computeConfidence(
       makeStats({
-        maxCommitsIn10Min: 25,
+        maxCommitsIn10Min: 150,
         microCommitRatio: 0.8,
       }),
     );
@@ -461,7 +469,7 @@ describe("computeConfidence", () => {
 
     it("still applies burst_activity for solo profiles", () => {
       const { penalties } = computeConfidence(
-        makeStats({ maxCommitsIn10Min: 25 }),
+        makeStats({ maxCommitsIn10Min: 150 }),
         "solo",
       );
       expect(penalties.find((p) => p.flag === "burst_activity")).toBeDefined();

@@ -87,7 +87,7 @@ const NEUTRAL_WORDS = [
 // ---------------------------------------------------------------------------
 
 const PENALTY_TRIGGERS: Record<ConfidenceFlag, Partial<StatsData>> = {
-  burst_activity: { maxCommitsIn10Min: 25 },
+  burst_activity: { maxCommitsIn10Min: 150 },
   micro_commit_pattern: { microCommitRatio: 0.8 },
   generated_change_pattern: {
     linesAdded: 25000,

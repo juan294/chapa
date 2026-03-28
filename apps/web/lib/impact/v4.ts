@@ -5,7 +5,7 @@ import type {
   ImpactV4Result,
   ProfileType,
 } from "@chapa/shared";
-import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS } from "@chapa/shared";
+import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS, SOLO_REVIEW_RATIO_THRESHOLD } from "@chapa/shared";
 import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness } from "./heatmap-evenness";
 import { computeRecencyRatio, applyRecencyWeight } from "./recency";
@@ -50,13 +50,15 @@ export function computeDelivery(stats: StatsData): number {
  *
  * Collaborative profile: reviewsSubmittedCount (60%) + review-to-PR ratio (25%) +
  * inverse microCommitRatio (15%). Delegates to {@link computeSoloQuality} when
- * `reviewsSubmittedCount` is 0.
+ * the profile type is "solo".
  *
  * @param stats - Aggregated GitHub stats for the scoring window
+ * @param profileType - Override profile type; auto-detects when omitted
  * @returns Clamped score between 0 and 100
  */
-export function computeQuality(stats: StatsData): number {
-  if (stats.reviewsSubmittedCount === 0) {
+export function computeQuality(stats: StatsData, profileType?: ProfileType): number {
+  const effectiveType = profileType ?? detectProfileType(stats);
+  if (effectiveType === "solo") {
     return computeSoloQuality(stats);
   }
 
@@ -179,12 +181,13 @@ export function computeBreadth(stats: StatsData): number {
  *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @param craftScore - Optional pre-computed Craft dimension score (from AI tool insights)
+ * @param profileType - Override profile type for Quality path selection; auto-detects when omitted
  * @returns A {@link DimensionScores} object with delivery, quality, consistency, breadth, and optionally craft
  */
-export function computeDimensions(stats: StatsData, craftScore?: number): DimensionScores {
+export function computeDimensions(stats: StatsData, craftScore?: number, profileType?: ProfileType): DimensionScores {
   const dims: DimensionScores = {
     delivery: computeDelivery(stats),
-    quality: computeQuality(stats),
+    quality: computeQuality(stats, profileType),
     consistency: computeConsistency(stats),
     breadth: computeBreadth(stats),
   };
@@ -199,16 +202,24 @@ export function computeDimensions(stats: StatsData, craftScore?: number): Dimens
 // ---------------------------------------------------------------------------
 
 /**
- * Detect whether a developer is "solo" (no reviews) or "collaborative" (has reviews).
+ * Detect whether a developer is "solo" or "collaborative" based on the
+ * ratio of reviews submitted to PRs merged.
+ *
+ * A developer with a review-to-PR ratio below {@link SOLO_REVIEW_RATIO_THRESHOLD}
+ * (0.15, roughly 1 review per 7 PRs) is classified as "solo" — below this
+ * threshold, reviews are incidental, not systematic code review participation.
  *
  * Affects quality scoring (solo uses PR description signals instead of reviews)
  * and archetype eligibility (solo profiles cannot earn Quality Champion).
  *
  * @param stats - Aggregated GitHub stats for the scoring window
- * @returns `"solo"` when reviewsSubmittedCount is 0, `"collaborative"` otherwise
+ * @returns `"solo"` when review-to-PR ratio is below threshold, `"collaborative"` otherwise
  */
 export function detectProfileType(stats: StatsData): ProfileType {
-  return stats.reviewsSubmittedCount === 0 ? "solo" : "collaborative";
+  if (stats.reviewsSubmittedCount === 0) return "solo";
+  const prCount = Math.max(stats.prsMergedCount, 1);
+  const ratio = stats.reviewsSubmittedCount / prCount;
+  return ratio < SOLO_REVIEW_RATIO_THRESHOLD ? "solo" : "collaborative";
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +306,7 @@ export function deriveArchetype(
  */
 export function computeImpactV4(stats: StatsData, craftScore?: number): ImpactV4Result {
   const profileType = detectProfileType(stats);
-  const dimensions = computeDimensions(stats, craftScore);
+  const dimensions = computeDimensions(stats, craftScore, profileType);
   const archetype = deriveArchetype(dimensions, profileType);
 
   // Solo profiles exclude quality from composite (quality is display-only for solo)

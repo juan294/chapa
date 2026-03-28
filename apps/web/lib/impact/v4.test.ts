@@ -138,7 +138,7 @@ describe("computeDelivery(stats)", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeQuality(stats)", () => {
-  it("returns 0 for zero reviews", () => {
+  it("returns 0 for solo profile with no merged PRs", () => {
     expect(computeQuality(makeStats())).toBe(0);
   });
 
@@ -753,12 +753,37 @@ describe("detectProfileType(stats)", () => {
     expect(detectProfileType(makeStats({ reviewsSubmittedCount: 0 }))).toBe("solo");
   });
 
-  it("returns 'collaborative' when reviewsSubmittedCount is 1", () => {
-    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 1 }))).toBe("collaborative");
+  it("returns 'solo' when review-to-PR ratio < 0.15 (e.g., 5 reviews, 67 PRs)", () => {
+    // 5/67 = 0.075, below 0.15 threshold → solo
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 5, prsMergedCount: 67 }))).toBe("solo");
+  });
+
+  it("returns 'collaborative' when review-to-PR ratio >= 0.15 (e.g., 15 reviews, 67 PRs)", () => {
+    // 15/67 = 0.224, above 0.15 threshold → collaborative
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 15, prsMergedCount: 67 }))).toBe("collaborative");
+  });
+
+  it("returns 'collaborative' when review-to-PR ratio is 1.0 (pure reviewer)", () => {
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 30, prsMergedCount: 30 }))).toBe("collaborative");
   });
 
   it("returns 'collaborative' when reviewsSubmittedCount is high", () => {
     expect(detectProfileType(makeStats({ reviewsSubmittedCount: 100 }))).toBe("collaborative");
+  });
+
+  it("handles edge case: 0 PRs with some reviews → collaborative", () => {
+    // reviews / max(0, 1) = reviews/1 → ratio = reviews, which is >= 0.15
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 1, prsMergedCount: 0 }))).toBe("collaborative");
+  });
+
+  it("returns 'solo' at exactly the threshold boundary (ratio = 0.14)", () => {
+    // 7/50 = 0.14, below 0.15 → solo
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 7, prsMergedCount: 50 }))).toBe("solo");
+  });
+
+  it("returns 'collaborative' at the threshold (ratio = 0.15)", () => {
+    // 3/20 = 0.15, at threshold → collaborative (>= comparison)
+    expect(detectProfileType(makeStats({ reviewsSubmittedCount: 3, prsMergedCount: 20 }))).toBe("collaborative");
   });
 });
 
@@ -1026,7 +1051,7 @@ describe("computeQuality — solo path", () => {
     expect(score).toBe(11);
   });
 
-  it("collaborative quality path is unchanged (reviews > 0)", () => {
+  it("collaborative quality path is unchanged (reviews > 0, high ratio)", () => {
     const stats = makeStats({
       reviewsSubmittedCount: 80,
       prsMergedCount: 20,
@@ -1035,6 +1060,62 @@ describe("computeQuality — solo path", () => {
     // Collaborative formula: 60% * (80/80) + 25% * min(80/20, 5)/5 + 15% * 1.0
     // = 60 + 25 * (4/5) + 15 = 60 + 20 + 15 = 95
     expect(computeQuality(stats)).toBe(95);
+  });
+
+  it("uses solo formula when review ratio is below threshold even with some reviews", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 5,
+      prsMergedCount: 67,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 0.5,
+      issueLinkageRate: 0.3,
+      microCommitRatio: 0.1,
+    });
+    // ratio = 5/67 = 0.075 < 0.15 → solo path
+    // Solo: 40% * 1.0 + 25% * 0.5 + 20% * 0.3 + 15% * 0.9 = 40 + 12.5 + 6 + 13.5 = 72
+    expect(computeQuality(stats)).toBe(72);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeQuality with explicit profileType override
+// ---------------------------------------------------------------------------
+
+describe("computeQuality with profileType parameter", () => {
+  it("uses solo formula when profileType is solo even with non-zero reviews", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 50,
+      prsMergedCount: 10,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 1.0,
+      microCommitRatio: 0,
+    });
+    // Forced solo: 40% + 25% + 20% + 15% = 100
+    expect(computeQuality(stats, "solo")).toBe(100);
+  });
+
+  it("uses collaborative formula when profileType is collaborative", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 80,
+      prsMergedCount: 20,
+      microCommitRatio: 0,
+    });
+    // Forced collaborative: same as normal collaborative path
+    expect(computeQuality(stats, "collaborative")).toBe(95);
+  });
+
+  it("defaults to detectProfileType when profileType not provided", () => {
+    const stats = makeStats({
+      reviewsSubmittedCount: 0,
+      prsMergedCount: 10,
+      prDescriptionRate: 1.0,
+      featureBranchRate: 1.0,
+      issueLinkageRate: 1.0,
+      microCommitRatio: 0,
+    });
+    // reviews=0 → auto-detects solo → 100
+    expect(computeQuality(stats)).toBe(100);
   });
 });
 
