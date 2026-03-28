@@ -267,6 +267,55 @@ describe("mergeStats", () => {
     });
   });
 
+  describe("solo quality fields (prDescriptionRate, featureBranchRate, issueLinkageRate)", () => {
+    it("merges solo quality fields by weighted average", () => {
+      const primary = makeStats({
+        prsMergedCount: 10,
+        prDescriptionRate: 0.8,
+        featureBranchRate: 0.9,
+        issueLinkageRate: 0.6,
+      });
+      const supplemental = makeStats({
+        prsMergedCount: 5,
+        prDescriptionRate: 0.4,
+        featureBranchRate: 0.6,
+        issueLinkageRate: 0.0,
+      });
+
+      const merged = mergeStats(primary, supplemental);
+      // weighted avg: (10*0.8 + 5*0.4) / 15 = 10/15 ≈ 0.667
+      expect(merged.prDescriptionRate).toBeCloseTo(0.667, 2);
+      // (10*0.9 + 5*0.6) / 15 = 12/15 = 0.8
+      expect(merged.featureBranchRate).toBeCloseTo(0.8, 2);
+      // (10*0.6 + 5*0.0) / 15 = 6/15 = 0.4
+      expect(merged.issueLinkageRate).toBeCloseTo(0.4, 2);
+    });
+
+    it("preserves solo quality fields when only primary has them", () => {
+      const primary = makeStats({
+        prsMergedCount: 10,
+        prDescriptionRate: 0.7,
+        featureBranchRate: 0.85,
+        issueLinkageRate: 0.5,
+      });
+      const supplemental = makeStats({ prsMergedCount: 0 });
+
+      const merged = mergeStats(primary, supplemental);
+      expect(merged.prDescriptionRate).toBeCloseTo(0.7, 2);
+      expect(merged.featureBranchRate).toBeCloseTo(0.85, 2);
+      expect(merged.issueLinkageRate).toBeCloseTo(0.5, 2);
+    });
+
+    it("returns undefined when neither side has solo quality fields", () => {
+      const primary = makeStats({});
+      const supplemental = makeStats({});
+      const merged = mergeStats(primary, supplemental);
+      expect(merged.prDescriptionRate).toBeUndefined();
+      expect(merged.featureBranchRate).toBeUndefined();
+      expect(merged.issueLinkageRate).toBeUndefined();
+    });
+  });
+
   describe("determinism", () => {
     it("produces the same output for the same inputs", () => {
       const primary = makeStats({ commitsTotal: 50, prsMergedWeight: 15 });

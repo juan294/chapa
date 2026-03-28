@@ -68,6 +68,18 @@ export function mergeStats(
       supplemental.medianPrLeadTimeHours, supplemental.prsMergedCount,
     ),
     docsOnlyPrRatio: mergeOptionalMax(primary.docsOnlyPrRatio, supplemental.docsOnlyPrRatio),
+    prDescriptionRate: mergeOptionalWeightedAvg(
+      primary.prDescriptionRate, primary.prsMergedCount,
+      supplemental.prDescriptionRate, supplemental.prsMergedCount,
+    ),
+    featureBranchRate: mergeOptionalWeightedAvg(
+      primary.featureBranchRate, primary.prsMergedCount,
+      supplemental.featureBranchRate, supplemental.prsMergedCount,
+    ),
+    issueLinkageRate: mergeOptionalWeightedAvg(
+      primary.issueLinkageRate, primary.prsMergedCount,
+      supplemental.issueLinkageRate, supplemental.prsMergedCount,
+    ),
     heatmapData: mergedHeatmap,
     hasSupplementalData: options?.markAsSupplemental ?? true,
   };
