@@ -163,7 +163,7 @@ const HOTSPOTS: Hotspot[] = [
   {
     id: "badge-tier",
     tooltip:
-      "Impact tier: Emerging (0\u201339), Solid (40\u201369), High (70\u201384), Elite (85\u2013100).",
+      "Impact tier: Emerging (0\u201329), Solid (30\u201369), High (70\u201384), Elite (85\u2013100).",
     position: "top",
     // Label at (870, ~530) → center (864, 524)
     top: "80%",

@@ -13,7 +13,7 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 - **Impact v6 Profile**: A composite developer impact score (0-100) based on four core dimensions — Delivery, Quality, Consistency, and Breadth — plus an optional fifth Craft dimension (AI tool mastery), computed from 12 months of public development activity across linked platforms.
 - **Dimensions**: Delivery measures shipping (PRs merged, issues closed, flow efficiency). Quality measures engineering discipline (code reviews for teams, PR hygiene for solo devs). Consistency measures sustained contributions across weeks. Breadth measures cross-project influence. Craft (optional) measures AI tool collaboration patterns.
 - **Developer Archetypes**: Based on dimension shape, developers are classified as Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, or Emerging. Each archetype reflects a distinct contribution pattern.
-- **Tier System**: Four tiers based on adjusted score — Emerging (0-39), Solid (40-69), High (70-84), and Elite (85-100).
+- **Tier System**: Four tiers based on adjusted score — Emerging (0-29), Solid (30-69), High (70-84), and Elite (85-100).
 - **Confidence Rating**: A quality signal (50-100) based on data diversity and consistency.
 - **Badge Verification**: Every badge includes a cryptographic HMAC-SHA256 hash proving data authenticity.
 
