@@ -99,10 +99,10 @@ function renderOgSvg(): string {
   <rect width="${W}" height="${H}" fill="${bg}"/>
 
   <!-- Logo: Chapa_ — centered -->
-  <text x="${W / 2}" y="200" fill="${textPrimary}" font-family="JetBrains Mono, monospace" font-size="88" font-weight="800" text-anchor="middle" letter-spacing="-3">Chapa<tspan fill="${accent}">_</tspan></text>
+  <text x="${W / 2}" y="200" fill="${textPrimary}" font-family="JetBrains Mono, monospace" font-size="88" font-weight="700" text-anchor="middle" letter-spacing="-3">Chapa<tspan fill="${accent}">_</tspan></text>
 
   <!-- Tagline — centered -->
-  <text x="${W / 2}" y="260" fill="${textSecondary}" font-family="Plus Jakarta Sans, sans-serif" font-size="24" font-weight="500" text-anchor="middle">Developer Impact, Decoded</text>
+  <text x="${W / 2}" y="260" fill="${textSecondary}" font-family="Plus Jakarta Sans, sans-serif" font-size="24" font-weight="600" text-anchor="middle">Developer Impact, Decoded</text>
 
   <!-- Heatmap grid — centered, full year width -->
   ${heatmapSvg}

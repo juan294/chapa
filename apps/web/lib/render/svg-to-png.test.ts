@@ -52,6 +52,14 @@ describe("getFontPaths", () => {
     expect(names).toContain("JetBrainsMono-Regular.ttf");
     expect(names).toContain("JetBrainsMono-Bold.ttf");
   });
+
+  it("resolves to font files that exist on disk", async () => {
+    const { existsSync } = await import("fs");
+    const paths = getFontPaths();
+    for (const p of paths) {
+      expect(existsSync(p), `font file should exist: ${p}`).toBe(true);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

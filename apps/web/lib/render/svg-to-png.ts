@@ -6,6 +6,7 @@
  */
 
 import { Resvg } from "@resvg/resvg-js";
+import { existsSync } from "fs";
 import { join } from "path";
 
 /**
@@ -25,12 +26,17 @@ const FONT_FILES = [
 /**
  * Resolve absolute paths to the bundled TTF font files.
  *
- * Uses `path.join(__dirname, "fonts", ...)` so Next.js output file tracing
- * can detect the dependency and include the font files in the serverless
- * function bundle on Vercel.
+ * Turbopack rewrites `__dirname` to the compiled chunk directory
+ * (`.next/server/chunks/`), where the font files don't exist. We use
+ * `process.cwd()` instead, which resolves to the app root (`apps/web`)
+ * in Next.js dev/production. For test runners invoked from the monorepo
+ * root, we fall back to `apps/web/` prefixed paths.
  */
 export function getFontPaths(): string[] {
-  return FONT_FILES.map((f) => join(__dirname, "fonts", f));
+  const appRelative = join(process.cwd(), "lib", "render", "fonts");
+  const monoRelative = join(process.cwd(), "apps", "web", "lib", "render", "fonts");
+  const fontsDir = existsSync(appRelative) ? appRelative : monoRelative;
+  return FONT_FILES.map((f) => join(fontsDir, f));
 }
 
 /**
