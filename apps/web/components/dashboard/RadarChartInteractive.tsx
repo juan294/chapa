@@ -336,7 +336,7 @@ export function RadarChartInteractive({
           );
         })}
 
-        {/* Invisible hit areas for each axis (hover + click) */}
+        {/* Invisible hit areas for each axis (hover + click + keyboard) */}
         {AXES.map((axis) => {
           // Create a wider hit area along the axis line
           const [ex, ey] = toPoint(axis.angle, radius + labelOffset, cx, cy);
@@ -362,8 +362,18 @@ export function RadarChartInteractive({
               fill="transparent"
               stroke="none"
               style={{ cursor: "pointer" }}
+              tabIndex={0}
+              role="button"
+              aria-label={`Select ${axis.label} dimension`}
+              focusable="true"
               onMouseEnter={() => handleAxisHover(axis.key)}
               onClick={() => handleAxisClick(axis.key)}
+              onKeyDown={(e) => handleVertexKeyDown(axis.key, e)}
+              onFocus={() => handleAxisHover(axis.key)}
+              onBlur={() => {
+                setInternalActive(null);
+                onDimensionHover?.(null);
+              }}
             />
           );
         })}
