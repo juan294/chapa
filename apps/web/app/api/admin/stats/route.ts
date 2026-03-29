@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { safeEqual } from "@/lib/crypto/safe-equal";
+import { verifyAdminSecret } from "@/lib/auth/admin";
 import { getBadgeStats, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
@@ -22,17 +22,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Auth: Bearer token must match ADMIN_SECRET
-  const secret = process.env.ADMIN_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const authHeader = request.headers.get("Authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-
-  if (!token || !safeEqual(token, secret)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = verifyAdminSecret(request);
+  if (denied) return denied;
 
   const badges = await dbTimeoutOr504(getBadgeStats(), "getBadgeStats");
   if (badges instanceof NextResponse) return badges;
