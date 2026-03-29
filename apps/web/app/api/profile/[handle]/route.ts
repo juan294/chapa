@@ -50,12 +50,16 @@ export async function GET(
       );
     }
 
+    // Prefer snapshot.craft (computed at same time as other dimensions) for consistency.
+    // Fall back to tool insights craft score for legacy rows without the craft column.
+    const craftScore = snapshot.craft ?? (craftResult ? craftResult.craftScore : undefined);
+
     const dimensions: DimensionScores = {
       delivery: snapshot.delivery,
       quality: snapshot.quality,
       consistency: snapshot.consistency,
       breadth: snapshot.breadth,
-      ...(craftResult && { craft: craftResult.craftScore }),
+      ...(craftScore != null && { craft: craftScore }),
     };
 
     return NextResponse.json(
@@ -80,7 +84,7 @@ export async function GET(
         headers: {
           ...CORS_HEADERS,
           "Cache-Control":
-            "public, s-maxage=3600, stale-while-revalidate=86400",
+            "public, s-maxage=300, stale-while-revalidate=3600",
         },
       },
     );

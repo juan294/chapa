@@ -600,6 +600,53 @@ describe("snapshotToRow edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Craft dimension persistence
+// ---------------------------------------------------------------------------
+
+describe("craft dimension persistence", () => {
+  it("serializes craft score to row when present", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot(
+      "testuser",
+      makeSnapshot({ craft: 75 }),
+    );
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.craft).toBe(75);
+  });
+
+  it("serializes craft to null when undefined", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot("testuser", makeSnapshot());
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.craft).toBeNull();
+  });
+
+  it("reads craft from DB row when non-null", async () => {
+    terminalResolve = {
+      data: makeRow({ craft: 82 }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.craft).toBe(82);
+  });
+
+  it("omits craft when DB row has null value", async () => {
+    terminalResolve = {
+      data: makeRow({ craft: null }),
+      error: null,
+    };
+
+    const result = await dbGetLatestSnapshot("testuser");
+    expect(result!.craft).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // rowToSnapshot additional edge cases
 // ---------------------------------------------------------------------------
 

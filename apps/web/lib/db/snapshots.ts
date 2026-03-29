@@ -43,6 +43,7 @@ interface SnapshotRow {
   guarding: number;
   consistency: number;
   breadth: number;
+  craft: number | null;
   archetype: string;
   profile_type: string;
   composite_score: number;
@@ -84,6 +85,7 @@ function rowToSnapshot(row: SnapshotRow): MetricsSnapshot {
     quality: row.guarding,
     consistency: row.consistency,
     breadth: row.breadth,
+    ...(row.craft != null && { craft: row.craft }),
     archetype: row.archetype as MetricsSnapshot["archetype"],
     profileType: row.profile_type as MetricsSnapshot["profileType"],
     compositeScore: row.composite_score,
@@ -126,6 +128,7 @@ function snapshotToRow(
     guarding: s.quality,
     consistency: s.consistency,
     breadth: s.breadth,
+    craft: s.craft ?? null,
     archetype: s.archetype,
     profile_type: s.profileType,
     composite_score: s.compositeScore,
@@ -192,6 +195,7 @@ const SNAPSHOT_COLUMNS = [
   "guarding",
   "consistency",
   "breadth",
+  "craft",
   "archetype",
   "profile_type",
   "composite_score",
