@@ -330,6 +330,7 @@ ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (opt
 ALLOW_AGENT_RUN=               # Set to "true" to allow /api/admin/agents/run endpoint (optional, disabled by default)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
+WARM_CACHE_PRIORITY_HANDLES=   # Comma-separated GitHub handles always included in warm-cache cron (optional)
 
 VERCEL_ENV=                    # Auto-injected by Vercel (production/preview/development — do not set manually)
 ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer in next.config.ts (dev-only)
