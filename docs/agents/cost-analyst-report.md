@@ -1,209 +1,161 @@
 # Cost Analyst Report
-> Generated: 2026-03-28 | Health status: GREEN
+> Generated: 2026-03-29 | Health status: GREEN
 
 ## Executive Summary
 
-Infrastructure costs remain stable and well-optimized. No new cost risks since last audit. All external calls have timeouts. Redis memory is bounded by TTLs. 43 API routes, all properly dynamic. OG image Redis memory remains the #1 monitor item for future scale. One minor finding: `sync-audience` cron uses `Promise.all()` instead of `Promise.allSettled()` — a resilience concern, not a cost concern.
+Infrastructure costs remain stable with no new risk vectors since the 2026-03-28 report. The scoring v6.1 changes (batch size score, lead time modifier, week coverage) added a new `bulk-recalculate` endpoint but it's properly rate-limited and auth-gated. The `sync-audience` `Promise.all()` resilience issue from the prior report has been resolved (now uses `Promise.allSettled`). Estimated monthly cost at 10K users: **~$40-60**. No regressions.
+
+## Delta vs 2026-03-28 Report
+
+| Item | Previous | Current | Status |
+|------|----------|---------|--------|
+| API routes | 43 (+1 agents-summary) | 44 (+1 agents-summary) | +1 (`bulk-recalculate`) |
+| Client JS | 1,800 KB / 71 chunks | 1,800 KB / 71 chunks | STABLE |
+| Test count | 6,414 | 6,609 | +195 |
+| Coverage | 92.43% stmts | 92.69% stmts | +0.26% |
+| sync-audience resilience | `Promise.all()` ⚠️ | `Promise.allSettled()` ✓ | RESOLVED |
+| Resource leaks | 0 critical, 1 minor | 0 critical, 0 minor | RESOLVED |
 
 ## Redis Usage
 
-### Key Pattern Families: 24
+### Key Pattern Families (25 total, +1 vs prior)
 
-| # | Pattern | TTL | Growth Risk | Notes |
-|---|---------|-----|-------------|-------|
-| 1 | `stats:v2:merged:${handle}` | 6h | Medium | Per-user merged stats |
-| 2 | `stats:v2:stale:${handle}` | 7d | Medium | Stale fallback |
-| 3 | `stats:v2:github:${handle}` | 6h | Medium | GitHub platform stats |
-| 4 | `stats:v2:bitbucket:${handle}` | 6h | Medium | Bitbucket platform stats |
-| 5 | `stats:v2:codeberg:${handle}` | 6h | Medium | Codeberg platform stats |
-| 6 | `supplemental:${handle}` | 6h | Medium | EMU supplemental data |
-| 7 | `avatar:${handle}` | 6h | Medium | Base64 avatar (~10-30 KB each) |
-| 8 | `craft:${handle}` | 1h | Medium | Tool insights score |
-| 9 | `snapshot:latest:${handle}` | 24h | Medium | Latest metrics snapshot |
-| 10 | `og-image:v1:${handle}:${date}` | 48h | **Medium-High** | Base64 PNG (~50-200 KB each) |
-| 11 | `ratelimit:badge:${IP}` | 60s | Low | Badge rate limit counter |
-| 12 | `ratelimit:cli-poll:${IP}` | 60s | Low | CLI poll rate limit |
-| 13 | `ratelimit:cli-approve:${IP}` | 60s | Low | CLI approve rate limit |
-| 14 | `cli:device:${sessionId}` | 5m | Low | CLI device auth sessions |
-| 15 | `ff:all` | 1h | Low | All feature flags |
-| 16 | `ff:key:${flagKey}` | 1h | Low | Individual feature flag |
-| 17 | `campaign:active-engagement` | 1h | Minimal | Single key |
-| 18 | `campaign:daily-sends:${date}` | 24h | Low | Daily email quota counter |
-| 19 | `score-bump:${handle}` | 7d | Medium | Email dedup marker |
-| 20 | `badge:notified:${handle}` | 365d | Medium | First-badge dedup |
-| 21 | `first-badge:${handle}` | 365d | Medium | First-badge alert dedup |
-| 22 | `stats:badges_generated` | **None** | Minimal | Global counter (~8 bytes) |
-| 23 | `stats:unique_badges` | **None** | Minimal | HyperLogLog (~12 KB max) |
-| 24 | `cron:warm-cache:offset` | **None** | Minimal | Single integer |
+| Key Pattern | TTL | Type | Size Per Key | Notes |
+|-------------|-----|------|-------------|-------|
+| `stats:v2:merged:{handle}` | 6h | JSON string | ~2-4 KB | Primary stats cache |
+| `stats:stale:{handle}` | 7d | JSON string | ~2-4 KB | Fallback on GitHub failure |
+| `stats:v2:bitbucket:{handle}` | 6h | JSON string | ~1-2 KB | Bitbucket platform stats |
+| `stats:v2:codeberg:{handle}` | 6h | JSON string | ~1-2 KB | Codeberg platform stats |
+| `supplemental:{handle}` | 6h (default) | JSON string | ~0.5-1 KB | EMU supplemental stats |
+| `snapshot:latest:{handle}` | 24h | JSON string | ~1-2 KB | MetricsSnapshot cache |
+| `craft:{handle}` | 1h | JSON string | ~0.5 KB | Tool insights scores |
+| `avatar:{handle}` | 6h | base64 string | ~1.5 KB | Avatar data URIs |
+| `og-image:v1:{handle}:{date}` | 48h | base64 PNG | ~15 KB | OG image render cache |
+| `ff:all` | 1h | JSON array | ~0.5 KB | All feature flags |
+| `ff:key:{key}` | 1h | JSON string | ~0.1 KB | Individual feature flag |
+| `campaign:active-engagement` | 1h | JSON string | ~0.5 KB | Active engagement campaign |
+| `campaign:daily-sends:{date}` | 24h | Integer | ~8 bytes | Daily email quota counter |
+| `cli:device:{sessionId}` | 5min | JSON string | ~0.2 KB | Device auth sessions |
+| `ratelimit:*:{id}` | Variable (60s-3600s) | Integer | ~8 bytes | Rate limit counters |
+| `ratelimit:admin-bulk-recalc:{ip}` | 3600s | Integer | ~8 bytes | **NEW** — bulk recalculate limiter |
+| `cron:warm-cache:offset` | **NONE** ⚠️ | Integer | ~8 bytes | Round-robin rotation offset |
+| `stats:badges_generated` | **NONE** ⚠️ | Integer | ~8 bytes | Total badge view counter |
+| `stats:unique_badges` | **NONE** ⚠️ | HyperLogLog | ~12-16 KB | Unique developer cardinality |
 
 ### TTL Coverage
-- **Per-user keys**: 100% (all have explicit TTLs from 1h to 365d)
-- **Global singletons without TTL**: 3 (badges_generated counter, unique_badges HyperLogLog, warm-cache offset) — intentional, combined <16 KB
-- **Overall TTL coverage**: ~100% for growth-relevant keys
+
+- **Per-user keys**: 100% TTL coverage (6h–48h depending on type)
+- **Global singletons without TTL**: 3 — intentional, combined <16 KB:
+  1. `cron:warm-cache:offset` (rotation state, 8 bytes)
+  2. `stats:badges_generated` (counter, 8 bytes)
+  3. `stats:unique_badges` (HyperLogLog, ~12-16 KB)
+- **Growth risk**: LOW — all per-user keys expire. The 3 persistent keys are bounded (HyperLogLog is O(1) memory regardless of cardinality).
 
 ### Estimated Redis Memory @ Scale
 
-| Users | User Data | Avatars | OG Images | Total | Upstash Pro (10 GB) |
-|-------|-----------|---------|-----------|-------|---------------------|
-| 1K | ~8 MB | ~1.5 MB | ~15 MB | ~25 MB | 99.8% headroom |
-| 10K | ~78 MB | ~15 MB | ~150 MB | ~243 MB | 97.6% headroom |
-| 50K | ~390 MB | ~75 MB | ~750 MB | ~1.2 GB | 88% headroom |
-| 100K | ~780 MB | ~150 MB | ~1.5 GB | ~2.4 GB | 76% headroom |
+| Users | User data | Avatars | OG images | Overhead | Total | Upstash Pro 10 GB |
+|-------|-----------|---------|-----------|----------|-------|-------------------|
+| 1K | ~8 MB | ~1.5 MB | ~15 MB | ~2 MB | ~27 MB | 99.7% headroom |
+| 10K | ~78 MB | ~15 MB | ~150 MB | ~10 MB | ~253 MB | 97.5% headroom |
+| 50K | ~390 MB | ~75 MB | ~750 MB | ~50 MB | ~1,265 MB | 87.7% headroom |
+| 100K | ~780 MB | ~150 MB | ~1,500 MB | ~100 MB | ~2,530 MB | 75.3% headroom |
 
-OG images remain #1 consumer at 62% of Redis memory @10K users. Consider blob storage migration at 50K+.
+**OG images remain the #1 memory consumer (59-62% of total).** Consider migrating to Vercel Blob at 50K+ users.
 
 ## Database Usage
 
-### Tables: 9 + 2 Views
-
-| Table | RLS | Indexes | Notes |
-|-------|-----|---------|-------|
-| `users` | deny_anon_all | 1 | User profiles |
-| `metrics_snapshots` | deny_anon_all | 1 | Time-series history |
-| `verification_records` | deny_anon_all | 2 | 30-day TTL |
-| `feature_flags` | deny_anon_mutations + public SELECT | 0 | Config |
-| `merge_operations` | deny_anon_all | 2 | 90-day retention |
-| `user_platforms` | deny_anon_all | 1 | Linked accounts |
-| `email_campaigns` | deny_anon_all | 1 | Campaign metadata |
-| `campaign_sends` | deny_anon_all | 1 | Per-recipient tracking |
-| `tool_insights` | deny_anon_all | 1 | AI tool scores |
-| `latest_snapshots` (view) | security_invoker | — | DISTINCT ON optimized |
-| `admin_users` (view) | security_invoker | — | LEFT JOIN for admin |
-
-### Query Patterns
-- **Connection management**: Lazy singleton (`getSupabase()`) — appropriate for serverless
-- **N+1 patterns**: 0 found. Batch operations used throughout (`dbGetLatestSnapshotBatch`, `.in("id", ids)`)
-- **Unbounded queries**: 0 critical. All paginated or bounded by campaign/handle scope
-- **JS aggregation**: 1 case (`dbGetCampaignStats`) — PostgREST limitation, <1K rows, accepted
-- **Index coverage**: 11 indexes covering all join/filter columns
-- **Retention policies**: Automatic cleanup for snapshots, merge_operations, verification_records
+- **Tables**: 9 (users, metrics_snapshots, verification_records, feature_flags, merge_operations, user_platforms, tool_insights, email_campaigns, campaign_sends)
+- **Views**: 2 (latest_snapshots, admin_users) — both with `security_invoker = true`
+- **Indexes**: 11 covering all major query paths
+- **RLS**: FORCE on all 9 tables with explicit deny policies for anon role
+- **Connection management**: Lazy singleton via `getSupabase()` — initialized once, reused across invocations
+- **Query patterns**: Batch operations throughout (`.in()` for multi-handle fetches, bulk upsert for campaign sends). 0 N+1 patterns.
+- **`dbGetCampaignStats()` JS aggregation**: ACCEPTED — PostgREST limitation, safe at <1K sends/campaign scale
+- **SELECT * in campaigns.ts**: 4 instances — low risk, not on hot paths, ~14-16 columns
 
 ## External API Calls
 
 | Route | External Service | Cached | Rate Limited | Risk |
 |-------|-----------------|--------|-------------|------|
-| `/u/[handle]/badge.svg` | GitHub, Supabase, Redis | Y (6h) | Y (100/60s) | Low — aggressive caching + dedup |
-| `/u/[handle]/og-image` | GitHub, Supabase, resvg | Y (48h Redis) | N | Medium — CPU-heavy SVG-to-PNG |
-| `/api/auth/callback` | GitHub (3 calls), Supabase, Resend | Partial | Y (10/900s) | Medium — sequential GitHub calls |
-| `/api/cron/warm-cache` | GitHub (up to 50), Supabase, Resend | Y (6h) | CRON_SECRET | Medium — batch of 50, cache-first |
-| `/api/cron/sync-audience` | Supabase, Resend (paginated) | N | CRON_SECRET | Medium — Resend pagination |
-| `/api/cron/process-campaigns` | Supabase, Resend (batch) | N | CRON_SECRET | Medium — 95/day email quota |
-| `/api/webhooks/resend` | Resend (2 calls) | N | Y (20/60s) | Low — HMAC-verified webhook |
-| `/api/generate` | GitHub | Y (6h) | Y (10/3600s) | Low — cache-first |
-| `/api/refresh` | GitHub, Supabase | Y (clears+refetch) | Y (5/3600s) | Low — strict rate limit |
-| `/api/recalculate` | GitHub, Supabase | Y (6h) | Y (20/3600s) | Low — cache-first |
-| `/api/admin/agents/run` | Node.js subprocess | N | Admin auth | Low — admin only, 5min timeout |
-| All other routes | Supabase/Redis only | Varies | Y | Low |
+| `/api/generate` | GitHub GraphQL | ✓ 6h cache + 7d stale | ✓ 10/hr | LOW |
+| `/api/refresh` | GitHub GraphQL | ✓ Cache cleared intentionally | ✓ 5/hr | LOW |
+| `/api/recalculate` | GitHub GraphQL | ✓ 6h cache + 7d stale | ✓ 20/hr | LOW |
+| `/api/admin/bulk-recalculate` | GitHub GraphQL | ✓ 6h cache + 7d stale | ✓ 5/hr (IP) | MEDIUM — **NEW** |
+| `/api/cron/warm-cache` | GitHub GraphQL | ✓ 6h cache, max 50 handles | Cron-protected | MEDIUM |
+| `/api/auth/callback` | GitHub OAuth (3 calls) | ✗ No cache (one-time) | ✓ 10/15min | LOW |
+| `/api/cron/process-campaigns` | Resend batch send | Redis 95/day quota | Cron-protected | MEDIUM |
+| `/api/admin/campaigns/[id]/send` | Resend batch send | Redis 95/day quota | Admin-protected | MEDIUM |
+| `/api/admin/campaigns/[id]/test` | Resend single send | None (test email) | Admin-protected | LOW |
+| `/api/webhooks/resend` | Resend email fetch + forward | None (webhook) | HMAC-verified | LOW |
+| `/api/cron/sync-audience` | Resend contacts API | None (sync operation) | Cron-protected | LOW |
+| `/api/telemetry` | PostHog (fire-and-forget) | None (unique events) | ✓ 10/60s | LOW |
 
 ### GitHub API Budget
-- Authenticated rate limit: 5,000 req/hr
-- Estimated usage @10K users: ~57 calls/hr (1.1% of limit)
-- 6h cache + 7d stale fallback + in-flight dedup = safe until 500K+ users
 
-### Fetch Timeout Coverage: 100%
-All external calls have `AbortSignal.timeout()` or `withTimeout()`:
-- GitHub GraphQL: 15s
-- GitHub avatar: 5s
-- SVG-to-PNG: 10s
-- Resend contacts: 30s
-- Resend email sends: 10s (`withTimeout(EMAIL_SEND_TIMEOUT_MS)`)
+- **Cache TTL**: 6h primary + 7d stale fallback
+- **In-flight deduplication**: Yes — Map-based, prevents concurrent fetches for same handle
+- **Estimated calls/hr @ 10K users**: ~57 (1.1% of 5K/hr authenticated limit)
+- **`bulk-recalculate`**: New endpoint processes in batches of 5; rate-limited to 5/hr. Uses cached stats, only fetches on cache miss. At worst, 50 handles × 1 API call = 50 calls in a single run — 1% of hourly budget.
+- **Safe until**: ~500K+ users
+
+### Resend Email Budget
+
+- **Daily quota**: 95 emails/day (tracked via Redis `campaign:daily-sends:{date}`)
+- **Batch size**: 50 per `resend.batch.send()` call
+- **Campaign sends**: Batched, quota-checked before each batch
+- **Sync-audience**: Daily cron, creates/updates contacts (no send quota impact)
 
 ## Resource Management
 
-### Resource Leaks: 0 Critical, 1 Minor
-
-**Minor — `sync-audience` uses `Promise.all()` instead of `Promise.allSettled()`** (`apps/web/app/api/cron/sync-audience/route.ts:95`)
-- If `listAllContacts()` fails, the entire cron job short-circuits
-- Not a resource leak per se, but reduces resilience
-- Impact: audience sync skipped for that day; retries next day
-
-**Previously Flagged — All Resolved:**
-- `_inflight` Map: properly cleaned via `.finally()`, bounded by upstream timeouts
-- Global `currentRun` in agents/run: properly cleaned by `cleanupProcess()`, SIGTERM/SIGKILL escalation
-- `after()` callbacks: all use `Promise.allSettled()` — verified
-- Child process streams: properly destroyed with listener cleanup
-- Log buffer: bounded at 500 lines (MAX_LOG_LINES)
-- All timers: cleaned via `.finally()` or `clearTimeout`
-- Lazy singletons: Redis and Supabase both have `_resetClient()` for tests
-
-### Positive Patterns
-- All `after()` callbacks use `Promise.allSettled()` (not `Promise.all()`)
-- Fail-open design on all cache/rate-limit operations
-- Bounded batch processing (warm-cache: 50 users, campaigns: 95/day)
-- No unbounded in-memory caches (all Redis-backed with TTLs)
+- **Resource leaks**: 0 critical, 0 minor (all resolved)
+  - `sync-audience` now uses `Promise.allSettled()` for initial data fetch ✓
+  - All timers cleaned up via `.finally()` blocks
+  - All event listeners properly removed in cleanup functions
+  - All `after()` callbacks wrapped in `Promise.allSettled()`
+  - Agent run process: hard 300s timeout with SIGTERM → 5s grace → SIGKILL, stream `.destroy()`, `removeAllListeners()`
+- **Module-level caches**: 2, both bounded:
+  - `_inflight` Map in `github/client.ts` — cleaned via `.finally()` after each request
+  - `_cachedSegmentId` in `email/audience.ts` — single string, per-process lifetime
+- **In-memory buffers**: Agent run log capped at 500 lines (`MAX_LOG_LINES`)
+- **Streaming**: No streaming responses in codebase (no ReadableStream/SSE)
+- **Fetch timeouts**: 100% coverage — all external calls use `AbortSignal.timeout()` or `withTimeout()`
 
 ## Vercel Cost Factors
 
-### Build Output
-- **43 API routes**, all correctly dynamic (`ƒ`)
-- **71 JS chunks**, 1.8 MB total client JS
-- **Largest chunk**: 227 KB (Next.js framework). No chunk exceeds 500 KB
-- **5 static pages**: `_not-found`, `apple-icon`, `coming-soon`, `icon`, `robots.txt`, `sitemap.xml`
-- **0 edge runtime** — all serverless (appropriate for this workload)
-- **No middleware** — cost-positive (no per-request overhead)
+| Factor | Value | Status |
+|--------|-------|--------|
+| Total API routes | 44 (+1 agents-summary) | STABLE (+1) |
+| Static pages | 8 prerendered (icon, robots, sitemap, etc.) | STABLE |
+| Dynamic pages | ~77 server-rendered | STABLE |
+| Total client JS | 1,800 KB across 71 chunks | STABLE |
+| Largest chunk | 232 KB (Next.js framework) | Under 500 KB ✓ |
+| Edge runtime | None — all serverless | ✓ |
+| `force-dynamic` routes | 2 (studio, experiments) | Intentional |
+| ISR pages | Archetype (7d), share pages (1h), legal (24h) | Optimal |
+| Cron jobs | 3 (warm-cache 6am, sync-audience 3:30am, process-campaigns 8am) | ~90 exec/mo |
+| `maxDuration` | 300s on cron routes + bulk-recalculate | Within Pro limits |
 
-### ISR/SSG Strategy: Optimal
-| Page Type | Revalidation | Count |
-|-----------|-------------|-------|
-| Archetype pages | 7 days | 7 |
-| Legal pages (privacy, terms) | 24 hours | 2 |
-| Share pages (`/u/[handle]`) | 1 hour | Dynamic |
-| About pages | 1 hour | 3 |
-| Home page | 1 hour | 1 |
-| Studio | force-dynamic | 1 |
-| Experiments | force-dynamic | 13 |
+### Estimated Monthly Cost @ Scale
 
-### Cron Jobs: 3 daily
-| Route | Schedule | Max Duration | Cost Driver |
-|-------|----------|-------------|-------------|
-| `warm-cache` | Daily 6:00 UTC | 300s | Heavy — up to 50 GitHub API calls |
-| `sync-audience` | Daily 3:30 UTC | 300s | Medium — Resend pagination |
-| `process-campaigns` | Daily 8:00 UTC | 300s | Variable — depends on batch |
-
-~90 invocations/month — <0.01% of free-tier compute.
-
-### Estimated Monthly Cost
-
-| Component | 1K Users | 10K Users | 50K Users |
-|-----------|----------|-----------|-----------|
-| Vercel Pro | $20 | $20 | $20 |
-| Upstash Redis | $0-5 | $10-20 | $30-50 |
-| Supabase | Free | Free | $25 |
-| Resend | $0-10 | $0-20 | $20-50 |
-| PostHog | Free | Free | $0-25 |
-| **Total** | **~$20-35** | **~$40-60** | **~$95-170** |
+| Users | Vercel | Redis (Upstash) | Resend | Supabase | Total |
+|-------|--------|-----------------|--------|----------|-------|
+| 1K | ~$20 | ~$0-5 | $0 | $0 (free) | **~$20-25** |
+| 10K | ~$20 | ~$10-20 | $0-20 | $0 (free) | **~$40-60** |
+| 50K | ~$20-40 | ~$30-50 | $20-80 | $25 | **~$95-195** |
+| 100K | ~$40-60 | ~$50-100 | $80+ | $25 | **~$195-265** |
 
 ## Recommendations
 
-### MONITOR Items (Carried)
+### Carried from Previous Report (Monitoring)
 
-1. **OG image Redis memory** — 62% of Redis at 10K users. At 50K+ consider migrating to Vercel Blob or Cloudflare R2. No action needed now.
+1. **MONITOR: OG image Redis memory** — 62% of Redis budget at 10K users. No action needed now. At 50K+, consider migrating OG image cache to Vercel Blob storage.
+2. **MONITOR: `sync-audience` pagination** — Currently fetches all contacts in one call. Future risk at 50K+ users only.
 
-2. **`sync-audience` pagination** — `listAllContacts()` paginates Resend API at 100/page. If contact list grows to 10K+, consider chunking or background processing. No action needed now.
+### New This Report
 
-### NEW Findings
+3. **INFO: `bulk-recalculate` cost profile** — New endpoint uses batches of 5 concurrent handles. At max utilization (5 calls/hr × 50 handles each = 250 GitHub API calls/hr), still only 5% of hourly budget. No cost concern at current scale.
+4. **INFO: Scoring v6.1 changes are compute-only** — New fields (`batchSizeScore`, `medianPrLeadTimeHours`, `weekCoverage`) are derived from existing cached stats data. No additional external API calls.
 
-3. **`sync-audience` `Promise.all()` resilience** (`apps/web/app/api/cron/sync-audience/route.ts:95`) — Uses `Promise.all()` for the initial data fetch. If `listAllContacts()` fails, the entire cron job fails. Consider `Promise.allSettled()` for fault tolerance so user sync can proceed even if contact list fetch fails. **Priority: Low** — retries daily, no data loss.
+### Resolved This Cycle
 
-### Previously Resolved (No Action)
-
-- Resend email timeouts: RESOLVED (10s via `withTimeout`)
-- Badge SVG `Promise.allSettled`: RESOLVED
-- All `after()` callbacks: VERIFIED using `Promise.allSettled`
-- Fetch timeout coverage: 100%
-- Rate limiting: 30/43 routes explicit + remaining 13 use admin auth/bearer token/internal
-- Campaign email quota: 95/day enforced via Redis counter
-
-## Delta vs Previous Report (2026-03-27)
-
-| Metric | Previous | Current | Change |
-|--------|----------|---------|--------|
-| API routes | 42 | 43 | +1 (`/api/admin/agents-summary`) |
-| JS chunks | 71 | 71 | Stable |
-| Client JS total | 1,800 KB | 1,800 KB | Stable |
-| Redis key families | 24 | 24 | Stable |
-| TTL coverage | 100% | 100% | Stable |
-| Fetch timeout coverage | 100% | 100% | Stable |
-| Resource leaks | 0 | 0 | Stable |
-| Tables + views | 9+2 | 9+2 | Stable |
-| Cron jobs | 3 | 3 | Stable |
+- ~~`sync-audience` `Promise.all()` resilience~~ → Fixed to `Promise.allSettled()` (triage 2026-03-28)
