@@ -242,4 +242,37 @@ describe("POST /api/supplemental", () => {
 
     expect(res.headers.get("Retry-After")).toBe("86400");
   });
+
+  // -------------------------------------------------------------------------
+  // Error handling
+  // -------------------------------------------------------------------------
+
+  it("returns 500 JSON when cacheSet throws", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockCacheSet.mockRejectedValue(new Error("Redis down"));
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toBe("Internal server error");
+  });
+
+  it("returns 500 JSON when resolveRequestAuth throws", async () => {
+    mockResolveRequestAuth.mockRejectedValue(new Error("Auth service down"));
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toBe("Internal server error");
+  });
 });

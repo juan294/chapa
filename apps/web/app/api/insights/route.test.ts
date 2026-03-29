@@ -232,4 +232,26 @@ describe("POST /api/insights", () => {
     const body = await resp.json();
     expect(body.craftScore.craftScore).toBe(60);
   });
+
+  // -------------------------------------------------------------------------
+  // Error handling
+  // -------------------------------------------------------------------------
+
+  it("returns 500 JSON when dbUpsertToolInsights throws", async () => {
+    mockDbUpsert.mockRejectedValue(new Error("DB connection lost"));
+    const resp = await POST(makePostRequest(makeValidUpload()));
+
+    expect(resp.status).toBe(500);
+    const body = await resp.json();
+    expect(body.error).toBe("Internal server error");
+  });
+
+  it("returns 500 JSON when resolveRequestAuth throws", async () => {
+    mockResolveRequestAuth.mockRejectedValue(new Error("Auth service down"));
+    const resp = await POST(makePostRequest(makeValidUpload()));
+
+    expect(resp.status).toBe(500);
+    const body = await resp.json();
+    expect(body.error).toBe("Internal server error");
+  });
 });

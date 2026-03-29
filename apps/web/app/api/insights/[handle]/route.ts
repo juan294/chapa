@@ -13,26 +13,31 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ): Promise<Response> {
-  const { handle } = await params;
+  try {
+    const { handle } = await params;
 
-  if (!isValidHandle(handle)) {
-    return NextResponse.json(
-      { error: "Invalid handle format" },
-      { status: 400 },
-    );
+    if (!isValidHandle(handle)) {
+      return NextResponse.json(
+        { error: "Invalid handle format" },
+        { status: 400 },
+      );
+    }
+
+    // Rate limit: 60 req/IP/min
+    const ip = getClientIp(request);
+    const rl = await rateLimit(`ratelimit:insights:${ip}`, 60, 60);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+
+    const craftScore = await dbGetToolInsights(handle);
+
+    return NextResponse.json({ craftScore });
+  } catch (err) {
+    console.error("[insights/:handle] Unhandled error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  // Rate limit: 60 req/IP/min
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:insights:${ip}`, 60, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const craftScore = await dbGetToolInsights(handle);
-
-  return NextResponse.json({ craftScore });
 }
