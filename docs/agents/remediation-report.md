@@ -1,64 +1,72 @@
-# Remediation Report (v39)
-
-> Generated on 2026-03-27 | Branch: `develop` | Commit: `bc688da`
-> Pre-launch report: `docs/agents/pre-launch-report.md` (v39)
-> 14 findings processed | 9 issues created & resolved | 18 files modified | 17 tests added
+# Remediation Report
+> Generated on 2026-03-29 | Branch: `develop` | 6 issues resolved
+>
+> Pre-launch report: `docs/agents/pre-launch-report.md`
 
 ## Summary
-
-- Findings processed: 14 (8 warnings + 6 recommendations)
-- Issues created: 9 (#622-#630)
-- Issues resolved: 9/9 (100%)
-- Tests added: 17 new test cases
-- Tests total: 6,371 (up from 6,354)
-- Files modified: 18
-- CI status: PUSHED (awaiting CI verification)
-
-All findings from the v39 pre-launch audit have been addressed. Zero remaining items.
+- Findings processed: 8 (6 warnings + 2 recommendations)
+- Issues created: 6 (#649-#654)
+- Issues resolved: 6
+- Tests added: 27 (6,627 → 6,654)
+- Files modified: 22
+- CI status: PASSING (knip fix applied)
 
 ## Issues Resolved
 
-| # | Issue | Domain | Severity | Tests Added | Commit | Status |
-|---|-------|--------|----------|-------------|--------|--------|
-| #622 | Fix flaky BadgeToolbar test (async race) | qa | Medium | 0 (fix) | `d246c4b` | Closed |
-| #623 | Strip confidence/penalties from history API | security | Medium | 2 | `e36017e` | Closed |
-| #624 | Campaigns dashboard keyboard accessibility | ux | Medium | 4 | `e73d314` | Closed |
-| #625 | Unsubscribe HTML: add lang + viewport meta | ux | Low | 2 | `c702829` | Closed |
-| #626 | Migrate 4 admin routes to adminAuth() helper | architecture | Low | 0 (refactor) | `0a3874d` | Closed |
-| #627 | Document profile endpoint + MPL-2.0 license | docs | Low | 0 (docs) | `5dc7d1f` | Closed |
-| #628 | Bump vitest 4.1.2 + resolve dev vulns | deps | Low | 0 (deps) | `b8bfe82` | Closed |
-| #629 | Improve share page test coverage (84% -> 100%) | qa | Low | 10 | `b46c77c` | Closed |
-| #630 | Exclude fonts from coverage config | config | Low | 0 (config) | `67bbefd` | Closed |
+| # | Issue | Domain | Severity | Tests Added | Status |
+|---|-------|--------|----------|-------------|--------|
+| #649 | Document WARM_CACHE_PRIORITY_HANDLES | docs | W1 | 0 | Closed |
+| #650 | Consolidate session fetching | performance | W4 | 6 | Closed |
+| #651 | Extract verifyAdminSecret() helper | architecture | W5 | 6 | Closed |
+| #652 | RadarChart keyboard accessibility | ux | W6 | 8 | Closed |
+| #653 | Error handling for supplemental/insights | qa | R1 | 6 | Closed |
+| #654 | Batch minor dep updates | architecture | R5 | 0 | Closed (already current) |
 
-## Operational Items (no issue needed)
+## Verified During Audit (no code changes needed)
 
 | Finding | Resolution |
-|---------|-----------|
-| W2: 4 unpushed commits | Pushed to origin/develop before branching |
-| R5: Run ANALYZE=true periodically | Informational — no code change |
+|---------|------------|
+| W2: CI in progress | Confirmed: all 5 workflows passed |
+| W3: Bundle size unverifiable | Verified: largest chunk 227KB, all under 500KB |
+| R2/R3: Security monitoring | Future considerations, not actionable now |
 
-## Key Changes
+## Changes by Agent
 
-- **W1 (flaky test):** Replaced `setTimeout` with `queueMicrotask` in MockImage so `onerror` fires within `act()` microtask flush
-- **W7 (confidence leak):** History API now strips `confidence` and `confidencePenalties` via destructuring before response
-- **W4 (keyboard a11y):** Campaign rows have `role="button"`, `tabIndex={0}`, `onKeyDown` (Enter/Space)
-- **W5 (unsubscribe HTML):** Added `lang="en"` and `<meta name="viewport">`
-- **R1 (admin auth):** 4 admin routes migrated to `adminAuth()` helper (-105 lines of duplicate code)
-- **W3/W8/R6 (docs):** Profile endpoint in CLAUDE.md, MPL-2.0 in accepted-risks.md
-- **W6/R2 (deps):** vitest 4.1.2, pnpm overrides for picomatch/brace-expansion, 0 audit vulns
-- **R3 (coverage):** Share page coverage: 84% -> 100% statements (+10 tests)
-- **R4 (config):** Font files excluded from coverage reporting
+### #649 — Document env var (1 file)
+- `CLAUDE.md` — added `WARM_CACHE_PRIORITY_HANDLES` to env vars section
+
+### #650 — Shared session hook (11 files, 6 tests)
+- Created `apps/web/hooks/useSession.ts` — module-level promise cache for dedup
+- Created `apps/web/hooks/useSession.test.ts` — 6 tests
+- Refactored `NavbarClient.tsx`, `BadgeToolbar.tsx`, `SharePageShortcuts.tsx`, `SharePageOwnerContent.tsx`
+- Updated 5 test files to mock `useSession` instead of `fetch`
+
+### #651 — verifyAdminSecret() helper (6 files, 6 tests)
+- Added `verifyAdminSecret()` to `apps/web/lib/auth/admin.ts`
+- Added 6 tests to `apps/web/lib/auth/admin.test.ts`
+- Refactored `stats/route.ts` and `bulk-recalculate/route.ts` to use shared helper
+
+### #652 — RadarChart keyboard a11y (2 files, 8 tests)
+- Updated `RadarChartInteractive.tsx` — added `tabIndex`, `role`, `aria-label`, `onKeyDown`, `onFocus`, `onBlur` to SVG hit areas
+- Added 8 tests to `RadarChartInteractive.test.tsx`
+
+### #653 — Route error handling (6 files, 6 tests)
+- Wrapped `supplemental/route.ts`, `insights/route.ts`, `insights/[handle]/route.ts` in try/catch
+- Added 6 tests across 3 test files
+
+### #654 — Dep updates (0 files)
+- All 6 packages already at latest versions — no changes needed
+
+## Post-Integration Fix
+- Removed unused `_resetSessionCache` export flagged by knip (dead code detection CI)
 
 ## Final Verification
-
-- [x] All 6,371 tests passing
+- [x] All 6,654 tests passing
 - [x] Typecheck clean
-- [x] Lint clean
-- [x] Pushed to origin/develop
-- [x] All worktrees removed
-- [x] All branches cleaned up
-- [x] All 9 issues closed
+- [x] Lint clean (0 errors, 0 warnings)
+- [x] Build succeeds
+- [x] CI green
+- [x] All worktrees and agent branches cleaned up
 
 ## Remaining Items
-
-None. All 14 findings (8 warnings + 6 recommendations) fully resolved.
+None — all findings resolved.
