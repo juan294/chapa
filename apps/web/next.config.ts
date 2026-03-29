@@ -89,6 +89,11 @@ const defaultHeaders = [
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@resvg/resvg-js"],
   transpilePackages: ["@chapa/shared"],
+  outputFileTracingIncludes: {
+    "/og-image": ["./lib/render/fonts/**/*.ttf"],
+    "/u/[handle]/og-image": ["./lib/render/fonts/**/*.ttf"],
+    "/u/[handle]/badge.svg": ["./lib/render/fonts/**/*.ttf"],
+  },
   images: {
     remotePatterns: [
       {
