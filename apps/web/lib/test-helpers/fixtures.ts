@@ -37,6 +37,32 @@ export function makeStats(overrides: Partial<StatsData> = {}): StatsData {
 }
 
 // ---------------------------------------------------------------------------
+// makeFullStats — builds a StatsData with ALL fields populated (including optional)
+// ---------------------------------------------------------------------------
+
+/**
+ * Factory that returns a StatsData with every field (required + optional)
+ * populated with realistic nonzero values. Use in tests that need to detect
+ * field loss through pipeline stages (merge, scoring, snapshot).
+ */
+export function makeFullStats(overrides: Partial<StatsData> = {}): StatsData {
+  return {
+    ...makeStats(),
+    displayName: "Test User",
+    avatarUrl: "https://example.com/avatar.png",
+    microCommitRatio: 0.15,
+    docsOnlyPrRatio: 0.1,
+    prDescriptionRate: 0.8,
+    featureBranchRate: 0.9,
+    issueLinkageRate: 0.6,
+    batchSizeScore: 0.65,
+    medianPrLeadTimeHours: 12,
+    hasSupplementalData: false,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // makeImpact — builds a valid ImpactV4Result with sensible defaults
 // ---------------------------------------------------------------------------
 
