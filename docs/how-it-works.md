@@ -80,11 +80,11 @@ This produces a value between 0 and 1. Pushing 1000 commits does not produce a s
 | Dimension | What it measures | Signals & weights |
 |-----------|-----------------|-------------------|
 | **Delivery** | Shipping meaningful changes | PR weight (70%), issues closed (20%), commits (10%) |
-| **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), inverse micro-commit ratio (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), inverse micro-commit ratio (15%) |
-| **Consistency** | Reliable, sustained contributions | sqrt(activeDays/365) (45%), heatmap evenness (40%), inverse burst activity (15%) |
+| **Quality** | Engineering discipline | **Collaborative:** Reviews (60%), review-to-PR ratio (25%), batch size score (15%). **Solo:** PR description rate (40%), feature branch rate (25%), issue linkage rate (20%), batch size score (15%) |
+| **Consistency** | Reliable, sustained contributions | sqrt(activeDays/365) (45%), heatmap evenness (40%), week coverage (15%) |
 | **Breadth** | Cross-project influence | Repos contributed (40%), inverse top-repo share (25%), docs-only PR ratio (15%), stars (10%), forks (5%) |
 
-Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers are scored on code reviews, while solo developers (zero reviews) are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Solo Quality returns 0 only if you have zero merged PRs.
+Each dimension returns 0 when the primary signal is completely absent. Quality adapts to your profile type: collaborative developers (review-to-PR ratio >= 0.15) are scored on code reviews, while solo developers are scored on PR hygiene signals (descriptions, feature branches, issue linkage). Solo Quality is excluded from the composite score — only Delivery, Consistency, and Breadth (plus optional Craft) are averaged.
 
 ### Optional fifth dimension: Craft
 

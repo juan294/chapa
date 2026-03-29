@@ -112,12 +112,12 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
-- `StatsData` — aggregated GitHub stats (25 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
+- `StatsData` — aggregated GitHub stats (29 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
 - `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
-- `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Redis sorted sets)
+- `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Supabase `metrics_snapshots` table)
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)

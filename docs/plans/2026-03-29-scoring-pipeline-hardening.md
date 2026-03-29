@@ -27,8 +27,8 @@ See `docs/plans/2026-03-29-scoring-pipeline-hardening-phases/phase-N.md` for eac
 
 ## Verification
 
-- [ ] Phase 1: Field completeness guard
-- [ ] Phase 2: Golden-file scoring tests
-- [ ] Phase 3: End-to-end pipeline test
-- [ ] Phase 4: makeFullStats() factory
-- [ ] Phase 5: Scoring change CI gate
+- [x] Phase 1: Field completeness guard
+- [x] Phase 2: Golden-file scoring tests
+- [x] Phase 3: End-to-end pipeline test
+- [x] Phase 4: makeFullStats() factory
+- [x] Phase 5: Scoring change CI gate

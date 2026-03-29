@@ -22,8 +22,8 @@ If your employer uses GitHub Enterprise Managed Users (EMU), your work contribut
 
 ## 1. Prerequisites
 
-- **Node.js 18 or later** — Check with `node --version`
-- **npm 7 or later** — Comes with Node.js. Check with `npm --version`
+- **Node.js 20 or later** — Check with `node --version`
+- **npm 10 or later** — Comes with Node.js 20+. Check with `npm --version`
 - **A Chapa account** — Sign in at [chapa.thecreativetoken.com](https://chapa.thecreativetoken.com) with your personal GitHub account
 - **Access to your EMU GitHub account** — You need to be able to create a Personal Access Token on it
 

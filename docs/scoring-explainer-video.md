@@ -81,7 +81,7 @@ If a developer has submitted at least one code review, they are classified as a 
 
 - **60% — Reviews Submitted**: How many code reviews did you do? Reviewing other people's code is one of the strongest signals of engineering discipline. It means you care about code quality beyond your own contributions. This is log-normalized with a cap of 80.
 - **25% — Review-to-PR Ratio**: How many reviews did you submit per PR you merged? A ratio of 3:1 (three reviews for every PR you merged) indicates strong collaborative habits. This is capped at a 5:1 ratio.
-- **15% — Inverse Micro-Commit Ratio**: What fraction of your commits are meaningful versus trivially small? If 60% of your commits are micro-commits (very tiny changes), that is a yellow flag. This component rewards developers who make substantial, thoughtful commits.
+- **15% — Batch Size Score**: What fraction of your merged PRs fall in the reviewable sweet spot (20–500 lines changed)? PRs that are too small (under 20 lines) or too large (over 500 lines) score lower. This rewards developers who ship well-scoped, reviewable changes.
 
 ### Solo Profile (No Code Reviews)
 
@@ -110,7 +110,7 @@ Consistency combines three signals:
 
 - **45% — Active Days**: How many days in the year did you make at least one contribution? This uses a square root curve instead of a linear one. Why? Because linear scaling would make 50 active days worth only 14% of the maximum — discouraging for anyone who does not code every single day. The square root curve gives 50 days a 37% score, and 120 days gets you to 57%. It rewards sustained activity without requiring obsessive daily commits.
 - **40% — Heatmap Evenness**: This looks at your weekly activity totals across the year and measures how evenly distributed they are. If you contributed roughly the same amount each week, your evenness is high (close to 1.0). If all your activity happened in one explosive week, your evenness is low (around 0.2). The math uses the coefficient of variation (standard deviation divided by the mean) — low variation means high evenness. This is the most nuanced signal in the Consistency dimension because it rewards genuine sustained rhythm, not just "I was active on many different days."
-- **15% — Inverse Burst Activity**: What is the maximum number of commits you made in any 10-minute window? If you once pushed 30 commits in 10 minutes, that looks like batch activity rather than organic development. This component gently penalizes burst patterns. Zero bursts gets you 100% on this signal; 30 or more bursts in a window gets you 0%.
+- **15% — Week Coverage**: What fraction of the weeks in the scoring window had at least one contribution? If you contributed in 40 out of 52 weeks, that is 77% week coverage. This rewards developers who show up consistently week over week, rather than cramming all their work into a few intense periods.
 
 ### What Consistency Really Means
 
