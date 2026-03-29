@@ -91,11 +91,3 @@ export function useSession(): UseSessionReturn {
   return { session, loading, invalidate };
 }
 
-/**
- * Reset the module-level cache. Exported for testing only.
- * @internal
- */
-export function _resetSessionCache(): void {
-  cachedPromise = null;
-  cachedResult = undefined;
-}
