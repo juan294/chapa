@@ -121,10 +121,10 @@ Chapa computes a multi-dimensional developer profile from commits, PRs, code rev
 
 | Dimension | What it measures |
 |-----------|-----------------|
-| **Delivery** | Commits landed, PRs merged, code volume |
-| **Quality** | Code reviews, review comments, review depth |
-| **Consistency** | Activity spread, heatmap evenness, streak patterns |
-| **Breadth** | Repository diversity, language variety |
+| **Delivery** | PRs merged, issues closed, commits, lead time modifier (±5%) |
+| **Quality** | Code reviews + review ratio (collaborative) or PR hygiene (solo), batch size score |
+| **Consistency** | Active days, heatmap evenness, week coverage |
+| **Breadth** | Repository diversity, cross-project influence, community signals |
 | **Craft** *(optional)* | AI tool usage patterns via Claude Code insights |
 
 An internal **confidence score** (50–100) reflects data completeness and gently adjusts the composite score to produce the final tier. Confidence is not shown on developer-facing pages — it works behind the scenes to ensure fair scoring.

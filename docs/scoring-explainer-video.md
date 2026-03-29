@@ -53,6 +53,8 @@ Delivery is calculated as a weighted combination of three signals:
 - **20% — Issues Closed**: How many issues did you resolve? This captures problem-solving that goes beyond writing code.
 - **10% — Commits**: Total commit count is the weakest signal because it is the easiest to game. It gets just 10% weight.
 
+After the base Delivery score is computed, a **lead time modifier** is applied based on the median time from PR creation to merge. Fast merges (≤4 hours) earn a 5% boost (1.05x), while slow merges (≥168 hours / 1 week) incur a 5% penalty (0.95x). Merges between 4 and 48 hours are neutral. When lead time data is unavailable, the modifier is 1.0x — no effect. This implements the DORA "lead time for changes" signal without restructuring existing dimension weights.
+
 Each of these raw values is log-normalized before being combined. Log normalization means that your first few contributions count a lot, but each additional one counts a bit less. Going from 0 to 5 PRs is a big jump. Going from 50 to 55 PRs barely moves the needle. This prevents outliers — developers with enormous volumes — from dominating the scale.
 
 ### Normalization Caps
@@ -77,20 +79,20 @@ Quality measures how carefully and rigorously a developer works. But here is an 
 
 ### Collaborative Profile (Has Code Reviews)
 
-If a developer has submitted at least one code review, they are classified as a "collaborative" profile. For these developers, Quality is measured through:
+Profile type is determined by the review-to-PR ratio: if `reviewsSubmittedCount / max(prsMergedCount, 1)` is 0.15 or higher, the developer is classified as "collaborative." Below that threshold (including zero reviews), they are "solo." This ratio-based approach prevents a handful of incidental reviews from forcing a developer into the collaborative scoring path. For collaborative developers, Quality is measured through:
 
 - **60% — Reviews Submitted**: How many code reviews did you do? Reviewing other people's code is one of the strongest signals of engineering discipline. It means you care about code quality beyond your own contributions. This is log-normalized with a cap of 80.
 - **25% — Review-to-PR Ratio**: How many reviews did you submit per PR you merged? A ratio of 3:1 (three reviews for every PR you merged) indicates strong collaborative habits. This is capped at a 5:1 ratio.
-- **15% — Batch Size Score**: What fraction of your merged PRs fall in the reviewable sweet spot (20–500 lines changed)? PRs that are too small (under 20 lines) or too large (over 500 lines) score lower. This rewards developers who ship well-scoped, reviewable changes.
+- **15% — Batch Size Score**: What fraction of your merged PRs fall in the reviewable sweet spot of 20–500 lines changed? Research from Google and DORA shows that small, reviewable changes are a top code quality signal. PRs smaller than 20 lines or larger than 500 lines score lower on this component.
 
 ### Solo Profile (No Code Reviews)
 
-Many developers work solo — on personal projects, side projects, or as the sole developer on a codebase. They have no opportunity to review anyone else's code. Chapa does not penalize them for that. Instead, it looks at different quality signals:
+Many developers work solo — on personal projects, side projects, or as the sole developer on a codebase. They have few or no code reviews relative to their PR output. Chapa does not penalize them for that. Instead, it looks at different quality signals:
 
 - **40% — PR Description Rate**: What percentage of your merged PRs have non-empty descriptions? Writing good PR descriptions shows you care about documentation and communication, even when working alone.
 - **25% — Feature Branch Rate**: What percentage of your merged PRs come from properly named feature branches? Using feature branches (instead of committing directly to main) shows disciplined workflow.
 - **20% — Issue Linkage Rate**: What percentage of your merged PRs reference and close at least one issue? Linking PRs to issues shows structured project management.
-- **15% — Inverse Micro-Commit Ratio**: Same as the collaborative profile — rewards meaningful commit sizes.
+- **15% — Batch Size Score**: Same as the collaborative profile — rewards PRs in the reviewable sweet spot (20–500 lines changed).
 
 ### The Solo Exception
 
@@ -109,12 +111,12 @@ Consistency measures the rhythm and sustainability of your contributions. Are yo
 Consistency combines three signals:
 
 - **45% — Active Days**: How many days in the year did you make at least one contribution? This uses a square root curve instead of a linear one. Why? Because linear scaling would make 50 active days worth only 14% of the maximum — discouraging for anyone who does not code every single day. The square root curve gives 50 days a 37% score, and 120 days gets you to 57%. It rewards sustained activity without requiring obsessive daily commits.
-- **40% — Heatmap Evenness**: This looks at your weekly activity totals across the year and measures how evenly distributed they are. If you contributed roughly the same amount each week, your evenness is high (close to 1.0). If all your activity happened in one explosive week, your evenness is low (around 0.2). The math uses the coefficient of variation (standard deviation divided by the mean) — low variation means high evenness. This is the most nuanced signal in the Consistency dimension because it rewards genuine sustained rhythm, not just "I was active on many different days."
-- **15% — Week Coverage**: What fraction of the weeks in the scoring window had at least one contribution? If you contributed in 40 out of 52 weeks, that is 77% week coverage. This rewards developers who show up consistently week over week, rather than cramming all their work into a few intense periods.
+- **40% — Heatmap Evenness**: This looks at your weekly activity totals across the year and measures how evenly distributed they are. If you contributed roughly the same amount each week, your evenness is high (close to 1.0). If all your activity happened in one explosive week, your evenness is low (around 0.2). The math uses the coefficient of variation (standard deviation divided by the mean) — low variation means high evenness. To prevent a single outlier week from dominating the score, weekly totals are clipped at 3× the median before computing the CV. This is the most nuanced signal in the Consistency dimension because it rewards genuine sustained rhythm, not just "I was active on many different days."
+- **15% — Week Coverage**: What fraction of weeks in the scoring window had any contribution activity? This measures sustainable cadence — did you show up regularly, week after week? A developer active in 40 out of 52 weeks scores 77% on this signal. This replaced the old "inverse burst" signal because it captures consistency without penalizing legitimately productive days (common in agent-driven development workflows).
 
 ### What Consistency Really Means
 
-A developer with 150 active days, even weekly activity, and no burst patterns would score around 72 in Consistency. That says "this person shows up reliably and contributes at a sustainable pace." Compare that to someone with 300 commits but only 20 active days — they would score poorly in Consistency because all that work was crammed into a few sessions.
+A developer with 150 active days, even weekly activity, and broad week coverage would score around 72 in Consistency. That says "this person shows up reliably and contributes at a sustainable pace." Compare that to someone with 300 commits but only 20 active days — they would score poorly in Consistency because all that work was crammed into a few sessions.
 
 ---
 
@@ -222,7 +224,7 @@ Confidence starts at 100 and gets reduced by penalties when certain patterns are
 
 | Pattern | Penalty | Why It Reduces Confidence |
 |---------|---------|--------------------------|
-| **Burst activity** | -15 | 20+ commits in a 10-minute window. Activity concentrated in short bursts gives the system less temporal signal to work with. |
+| **Burst activity** | -15 | 100+ commits in a 10-minute window. Activity concentrated in short bursts gives the system less temporal signal to work with. The threshold was raised from 20 to 100 to accommodate agent-driven development workflows where high commit volumes in short windows are normal. |
 | **Micro-commit pattern** | -10 | 60%+ of commits are micro-sized. Many tiny changes make it harder to assess the real substance of contributions. |
 | **Generated change pattern** | -15 | 20,000+ lines changed with 2 or fewer reviews. Very large volumes with minimal peer review suggest possible automation, which reduces signal clarity. Only applies to collaborative profiles. |
 | **Low collaboration signal** | -10 | 10+ PRs merged with 1 or fewer reviews. Significant output without peer interaction means less external validation signal. Only applies to collaborative profiles. |
@@ -325,7 +327,7 @@ The scoring system includes several defenses against manipulation:
 - **PR size multiplier**: Pull requests with fewer than 10 total line changes get zero weight. You cannot inflate your Delivery score with empty or trivial PRs.
 - **Repo depth threshold**: Repositories with fewer than 3 commits do not count toward the Breadth dimension. Drive-by single-commit contributions to many repos will not boost your Breadth score.
 - **Logarithmic normalization**: As described above, volume inflation has sharply diminishing returns.
-- **Unknown micro-commit ratio default**: If the system cannot determine your micro-commit ratio (e.g., for cached data missing that metric), it defaults to 0.3 rather than 0. This prevents benefiting from data gaps.
+- **Batch size scoring**: The Quality dimension rewards PRs in the 20–500 line sweet spot. Both micro PRs and oversized PRs score lower, discouraging artificial splitting or bundling of changes.
 - **Confidence penalties**: Patterns like burst commits, generated changes, and review imbalances are flagged and reduce the confidence rating, which in turn slightly reduces the adjusted score.
 
 ---
@@ -334,9 +336,9 @@ The scoring system includes several defenses against manipulation:
 
 Chapa has a strong opinion about solo developers: they should never be penalized for working alone. In the era of AI-assisted development, a solo developer with high line counts and AI-assisted pull requests represents the new normal, not an anomaly.
 
-When Chapa detects a solo profile (zero code reviews submitted), it:
+When Chapa detects a solo profile (review-to-PR ratio below 0.15), it:
 
-1. Switches to a PR-based quality rubric (description quality, branch naming, issue linkage) instead of review-based quality.
+1. Switches to a PR-based quality rubric (description quality, branch naming, issue linkage, batch size) instead of review-based quality.
 2. Excludes Quality from the composite score calculation.
 3. Blocks the Quality Champion archetype (since it is fundamentally about peer review).
 4. Skips review-related confidence penalties (like "generated change pattern" and "low collaboration signal").
@@ -363,7 +365,7 @@ One snapshot per user per day is enforced by a unique constraint. Multiple badge
 Here is the complete journey from raw data to displayed score:
 
 1. **Collect data**: Gather 365 days of activity from GitHub (and optionally Bitbucket, Codeberg).
-2. **Detect profile type**: Solo (zero reviews) or Collaborative (at least one review).
+2. **Detect profile type**: Solo (review-to-PR ratio < 0.15) or Collaborative (ratio ≥ 0.15).
 3. **Compute 4 core dimensions**: Delivery, Quality, Consistency, Breadth — each 0 to 100.
 4. **Optionally compute Craft**: If AI tool insights are available.
 5. **Derive archetype**: Based on dimension shape and thresholds.
