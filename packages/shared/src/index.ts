@@ -49,3 +49,8 @@ export {
   BATCH_SIZE_MIN,
   BATCH_SIZE_MAX,
 } from "./constants";
+export {
+  STATS_DATA_KEYS,
+  CLIENT_INJECTED_KEYS,
+  MERGE_EXPECTED_KEYS,
+} from "./stats-schema";
