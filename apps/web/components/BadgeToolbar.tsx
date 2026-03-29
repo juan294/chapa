@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
+import { useSession } from "@/hooks/useSession";
 
 interface BadgeToolbarProps {
   handle: string;
@@ -11,16 +12,8 @@ interface BadgeToolbarProps {
 export function BadgeToolbar({
   handle,
 }: BadgeToolbarProps) {
-  const [isOwner, setIsOwner] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/auth/session")
-      .then((res) => res.json())
-      .then((data: { user: { login: string } | null }) => {
-        setIsOwner(data.user?.login === handle);
-      })
-      .catch(() => setIsOwner(false));
-  }, [handle]);
+  const { session } = useSession();
+  const isOwner = session?.login === handle;
   const [refreshStatus, setRefreshStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");

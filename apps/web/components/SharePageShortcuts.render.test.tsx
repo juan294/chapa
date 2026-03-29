@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, cleanup, waitFor } from "@testing-library/react";
+import { render, cleanup } from "@testing-library/react";
 import { SharePageShortcuts } from "./SharePageShortcuts";
+import type { SessionUser } from "@/hooks/useSession";
+
+interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
+const mockUseSession = vi.fn<() => UseSessionReturn>();
+
+vi.mock("@/hooks/useSession", () => ({
+  useSession: () => mockUseSession(),
+}));
 
 const mockRegister = vi.fn(() => vi.fn());
 
@@ -11,14 +19,12 @@ vi.mock("./KeyboardShortcutsListener", () => ({
   }),
 }));
 
-/** Mock session fetch — defaults to no login. */
+/** Mock session via useSession hook. */
 function mockSessionAs(login: string | null) {
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-    if (typeof url === "string" && url.includes("/api/auth/session")) {
-      return new Response(JSON.stringify({ user: login ? { login } : null }));
-    }
-    // Default passthrough for other fetches (refresh, etc.)
-    return new Response("ok");
+  mockUseSession.mockReturnValue({
+    session: login ? { login, name: null, avatar_url: "" } : null,
+    loading: false,
+    invalidate: vi.fn(),
   });
 }
 
@@ -97,14 +103,9 @@ describe("SharePageShortcuts", () => {
     expect(clickSpy).toHaveBeenCalled();
   });
 
-  it("handler handles refresh-badge shortcut when owner", async () => {
-    // Mock session returning matching handle + refresh returning ok
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-      if (typeof url === "string" && url.includes("/api/auth/session")) {
-        return new Response(JSON.stringify({ user: { login: "testuser" } }));
-      }
-      return new Response("ok");
-    });
+  it("handler handles refresh-badge shortcut when owner", () => {
+    mockSessionAs("testuser");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"));
 
     render(
       <SharePageShortcuts
@@ -113,12 +114,7 @@ describe("SharePageShortcuts", () => {
       />,
     );
 
-    // Wait for session fetch to resolve and handler to be re-registered with isOwner=true
-    await waitFor(() => {
-      expect(mockRegister.mock.calls.length).toBeGreaterThanOrEqual(2);
-    });
-
-    // Get the latest handler (registered after isOwner became true)
+    // With synchronous hook, the handler is registered with isOwner=true on first render
     const lastCall = mockRegister.mock.calls[mockRegister.mock.calls.length - 1] as unknown[];
     const handler = lastCall[1] as (id: string) => void;
     handler("refresh-badge");
@@ -129,14 +125,9 @@ describe("SharePageShortcuts", () => {
     );
   });
 
-  it("handler does not refresh when not owner", async () => {
-    // Mock session returning a different handle (not the owner)
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-      if (typeof url === "string" && url.includes("/api/auth/session")) {
-        return new Response(JSON.stringify({ user: { login: "otheruser" } }));
-      }
-      return new Response("ok");
-    });
+  it("handler does not refresh when not owner", () => {
+    mockSessionAs("otheruser");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"));
 
     render(
       <SharePageShortcuts
@@ -145,21 +136,12 @@ describe("SharePageShortcuts", () => {
       />,
     );
 
-    // Wait for the session fetch to complete (isOwner stays false since handles don't match,
-    // so the handler is not re-registered — just wait for the fetch to have been called)
-    await waitFor(() => {
-      const sessionCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
-        (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("/api/auth/session"),
-      );
-      expect(sessionCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    // Get the handler (only registered once since isOwner stayed false)
+    // Get the handler (isOwner is false since handles don't match)
     const handler = (mockRegister.mock.calls as unknown[][])[0]![1] as (id: string) => void;
     handler("refresh-badge");
 
-    // Fetch should only have been called for the session, NOT for the refresh
-    const refreshCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+    // Fetch should NOT have been called for the refresh
+    const refreshCalls = fetchSpy.mock.calls.filter(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("/api/refresh"),
     );
     expect(refreshCalls).toHaveLength(0);

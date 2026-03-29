@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { NavbarClient } from "./NavbarClient";
+import type { SessionUser } from "@/hooks/useSession";
+
+interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
+const mockUseSession = vi.fn<() => UseSessionReturn>();
+
+vi.mock("@/hooks/useSession", () => ({
+  useSession: () => mockUseSession(),
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -34,32 +42,24 @@ vi.mock("./ThemeToggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 
-let fetchSpy: ReturnType<typeof vi.spyOn>;
-
 beforeEach(() => {
-  fetchSpy = vi.spyOn(globalThis, "fetch");
+  mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
 
 afterEach(() => {
   cleanup();
-  fetchSpy.mockRestore();
+  vi.restoreAllMocks();
 });
 
 describe("NavbarClient", () => {
   // ─── Basic rendering ──────────────────────────────────────────────────
 
   it("renders nav with aria-label 'Main navigation'", () => {
-    fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ user: null })),
-    );
     render(<NavbarClient />);
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeDefined();
   });
 
   it("renders Chapa logo linking to home", () => {
-    fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ user: null })),
-    );
     render(<NavbarClient />);
     expect(screen.getByText("Chapa")).toBeDefined();
     const link = screen.getByText("Chapa").closest("a");
@@ -67,18 +67,14 @@ describe("NavbarClient", () => {
   });
 
   it("renders ThemeToggle", () => {
-    fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ user: null })),
-    );
     render(<NavbarClient />);
     expect(screen.getByTestId("theme-toggle")).toBeDefined();
   });
 
   // ─── Logged-out state ─────────────────────────────────────────────────
 
-  it("renders login link initially before fetch resolves", () => {
-    // Never resolve the fetch
-    fetchSpy.mockReturnValue(new Promise(() => {}));
+  it("renders login link when session is loading", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
     render(<NavbarClient />);
     const loginLink = screen.getByText("login");
     expect(loginLink.closest("a")?.getAttribute("href")).toBe(
@@ -86,16 +82,9 @@ describe("NavbarClient", () => {
     );
   });
 
-  it("keeps login link when fetch returns no user", async () => {
-    fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ user: null })),
-    );
+  it("keeps login link when fetch returns no user", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
     render(<NavbarClient />);
-
-    // Wait for fetch to complete
-    await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/session");
-    });
 
     expect(screen.getByText("login")).toBeDefined();
     expect(screen.queryByTestId("user-menu")).toBeNull();
@@ -103,42 +92,29 @@ describe("NavbarClient", () => {
 
   // ─── Logged-in state ──────────────────────────────────────────────────
 
-  it("shows UserMenu after successful session fetch", async () => {
-    fetchSpy.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          user: {
-            login: "testuser",
-            name: "Test User",
-            avatar_url: "https://example.com/avatar.png",
-            isAdmin: false,
-          },
-        }),
-      ),
-    );
+  it("shows UserMenu after successful session fetch", () => {
+    mockUseSession.mockReturnValue({
+      session: {
+        login: "testuser",
+        name: "Test User",
+        avatar_url: "https://example.com/avatar.png",
+        isAdmin: false,
+      },
+      loading: false,
+      invalidate: vi.fn(),
+    });
     render(<NavbarClient />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("user-menu")).toBeDefined();
-    });
-
+    expect(screen.getByTestId("user-menu")).toBeDefined();
     expect(screen.getByTestId("user-menu").textContent).toBe("testuser");
     expect(screen.queryByText("login")).toBeNull();
   });
 
   // ─── Fetch failure ────────────────────────────────────────────────────
 
-  it("stays on login link when fetch fails", async () => {
-    fetchSpy.mockRejectedValue(new Error("Network error"));
+  it("stays on login link when fetch fails", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
     render(<NavbarClient />);
-
-    // Give it time to process the rejection
-    await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/session");
-    });
-
-    // Small delay to ensure the catch handler runs
-    await new Promise((r) => setTimeout(r, 50));
 
     expect(screen.getByText("login")).toBeDefined();
     expect(screen.queryByTestId("user-menu")).toBeNull();

@@ -2,6 +2,14 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
 import { BadgeToolbar } from "./BadgeToolbar";
+import type { SessionUser } from "@/hooks/useSession";
+
+interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
+const mockUseSession = vi.fn<() => UseSessionReturn>();
+
+vi.mock("@/hooks/useSession", () => ({
+  useSession: () => mockUseSession(),
+}));
 
 vi.mock("@/lib/analytics/posthog", () => ({
   trackEvent: vi.fn(),
@@ -41,14 +49,12 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-/** Mock session fetch — defaults to owner. Override with mockSessionAs(). */
+/** Mock session via useSession hook. */
 function mockSessionAs(login: string | null) {
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-    if (typeof url === "string" && url.includes("/api/auth/session")) {
-      return new Response(JSON.stringify({ user: login ? { login } : null }));
-    }
-    // Default passthrough for other fetches (refresh, badge.svg, etc.)
-    return new Response("ok");
+  mockUseSession.mockReturnValue({
+    session: login ? { login, name: null, avatar_url: "" } : null,
+    loading: false,
+    invalidate: vi.fn(),
   });
 }
 
@@ -100,12 +106,10 @@ describe("BadgeToolbar render", () => {
     });
   });
 
-  /** Mock that returns session for the session call, and a custom response for refresh */
+  /** Mock session via useSession and fetch for refresh endpoint. */
   function mockSessionAndRefresh(handle: string, refreshResponse: Promise<{ ok: boolean }> | { ok: boolean } | Error) {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-      if (typeof url === "string" && url.includes("/api/auth/session")) {
-        return new Response(JSON.stringify({ user: { login: handle } }));
-      }
+    mockSessionAs(handle);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
       if (refreshResponse instanceof Error) throw refreshResponse;
       const result = refreshResponse instanceof Promise ? await refreshResponse : refreshResponse;
       return new Response(null, { status: result.ok ? 200 : 500 });
@@ -916,13 +920,7 @@ describe("BadgeToolbar render", () => {
 
     it("returns to idle after network error timeout", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      // Session succeeds, but refresh rejects
-      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-        if (typeof url === "string" && url.includes("/api/auth/session")) {
-          return new Response(JSON.stringify({ user: { login: "testuser" } }));
-        }
-        throw new Error("network");
-      });
+      mockSessionAndRefresh("testuser", new Error("network"));
 
       render(
         <BadgeToolbar handle="testuser" />,
@@ -957,15 +955,10 @@ describe("BadgeToolbar render", () => {
       </svg>`;
 
       let capturedSrc = "";
-      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-        if (typeof url === "string" && url.includes("/api/auth/session")) {
-          return new Response(JSON.stringify({ user: { login: "testuser" } }));
-        }
-        return {
-          ok: true,
-          text: () => Promise.resolve(svgWithAnimations),
-        } as Response;
-      });
+      vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgWithAnimations),
+      } as Response);
 
       // Use class-based Image mock to avoid vitest warning.
       // Use queueMicrotask (not setTimeout) so the onerror fires within the
@@ -1014,15 +1007,10 @@ describe("BadgeToolbar render", () => {
   describe("successful PNG download (full canvas path)", () => {
     it("creates a PNG blob and downloads it", async () => {
       const svgText = '<svg><rect width="100" height="100"/></svg>';
-      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
-        if (typeof url === "string" && url.includes("/api/auth/session")) {
-          return new Response(JSON.stringify({ user: { login: "testuser" } }));
-        }
-        return {
-          ok: true,
-          text: () => Promise.resolve(svgText),
-        } as Response;
-      });
+      vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(svgText),
+      } as Response);
 
       const mockBlob = new Blob(["png-data"], { type: "image/png" });
       const mockCtx = { scale: vi.fn(), drawImage: vi.fn() };

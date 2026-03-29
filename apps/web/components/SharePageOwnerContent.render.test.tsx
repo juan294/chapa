@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { SharePageOwnerContent } from "./SharePageOwnerContent";
 import type { ImpactV4Result, StatsData } from "@chapa/shared";
+import type { SessionUser } from "@/hooks/useSession";
+
+interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
+const mockUseSession = vi.fn<() => UseSessionReturn>();
+
+vi.mock("@/hooks/useSession", () => ({
+  useSession: () => mockUseSession(),
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -74,16 +82,14 @@ const MOCK_IMPACT = {
 } as unknown as ImpactV4Result;
 
 beforeEach(() => {
-  vi.spyOn(globalThis, "fetch").mockReset();
+  mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
 
 afterEach(cleanup);
 
 describe("SharePageOwnerContent — render", () => {
   it("shows nothing while loading session", () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(
-      () => new Promise(() => {}),
-    );
+    mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
 
     const { container } = render(
       <SharePageOwnerContent
@@ -96,10 +102,12 @@ describe("SharePageOwnerContent — render", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("shows visitor CTA when user is not the profile owner", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ user: { login: "otheruser" } })),
-    );
+  it("shows visitor CTA when user is not the profile owner", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "otheruser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
 
     render(
       <SharePageOwnerContent
@@ -109,19 +117,48 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Curious what your developer impact looks like?"),
-      ).toBeTruthy();
-    });
+    expect(
+      screen.getByText("Curious what your developer impact looks like?"),
+    ).toBeTruthy();
+    expect(screen.getByText("Discover your impact")).toBeTruthy();
+  });
+
+  it("shows visitor CTA when session fetch fails", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+      />,
+    );
+
+    expect(
+      screen.getByText("Curious what your developer impact looks like?"),
+    ).toBeTruthy();
+  });
+
+  it("shows visitor CTA when user is null", () => {
+    mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={MOCK_IMPACT}
+      />,
+    );
 
     expect(screen.getByText("Discover your impact")).toBeTruthy();
   });
 
-  it("shows visitor CTA when session fetch fails", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
-      new Error("Network error"),
-    );
+  it("shows owner content when user matches the handle", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
 
     render(
       <SharePageOwnerContent
@@ -131,57 +168,18 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Curious what your developer impact looks like?"),
-      ).toBeTruthy();
-    });
-  });
-
-  it("shows visitor CTA when user is null", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ user: null })),
-    );
-
-    render(
-      <SharePageOwnerContent
-        handle="testuser"
-        stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Discover your impact")).toBeTruthy();
-    });
-  });
-
-  it("shows owner content when user matches the handle", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ user: { login: "testuser" } })),
-    );
-
-    render(
-      <SharePageOwnerContent
-        handle="testuser"
-        stats={MOCK_STATS}
-        impact={MOCK_IMPACT}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("data-sources")).toBeTruthy();
-    });
-
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
     expect(screen.getByText("Embed This Badge")).toBeTruthy();
     expect(screen.getByText("Impact Breakdown")).toBeTruthy();
   });
 
-  it("renders embed snippets with correct handle", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ user: { login: "testuser" } })),
-    );
+  it("renders embed snippets with correct handle", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
 
     render(
       <SharePageOwnerContent
@@ -191,9 +189,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Embed This Badge")).toBeTruthy();
-    });
+    expect(screen.getByText("Embed This Badge")).toBeTruthy();
 
     const copyButtons = screen.getAllByTestId("copy-button");
     expect(copyButtons.length).toBe(2);
@@ -205,10 +201,12 @@ describe("SharePageOwnerContent — render", () => {
     );
   });
 
-  it("shows fallback message when impact data is missing", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ user: { login: "testuser" } })),
-    );
+  it("shows fallback message when impact data is missing", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
 
     render(
       <SharePageOwnerContent
@@ -218,19 +216,19 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(
-          "Could not load impact data for this user. Try again later.",
-        ),
-      ).toBeTruthy();
-    });
+    expect(
+      screen.getByText(
+        "Could not load impact data for this user. Try again later.",
+      ),
+    ).toBeTruthy();
   });
 
-  it("hides DataSources when stats is null", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ user: { login: "testuser" } })),
-    );
+  it("hides DataSources when stats is null", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
 
     render(
       <SharePageOwnerContent
@@ -240,10 +238,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Embed This Badge")).toBeTruthy();
-    });
-
+    expect(screen.getByText("Embed This Badge")).toBeTruthy();
     expect(screen.queryByTestId("data-sources")).toBeNull();
   });
 });
