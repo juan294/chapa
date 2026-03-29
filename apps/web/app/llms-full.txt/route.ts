@@ -30,8 +30,8 @@ The composite score (0-100) is the average of all dimensions (4 or 5). It is fur
 
 ### Tiers
 
-- **Emerging** (0-39): Early-stage or occasional contributor.
-- **Solid** (40-69): Regular, meaningful contributor.
+- **Emerging** (0-29): Early-stage or occasional contributor.
+- **Solid** (30-69): Regular, meaningful contributor.
 - **High** (70-84): Significant impact across multiple dimensions.
 - **Elite** (85-100): Exceptional impact — top-tier contributor.
 

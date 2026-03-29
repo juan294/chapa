@@ -158,6 +158,37 @@ describe("GET /api/profile/:handle", () => {
     expect(body.dimensions).not.toHaveProperty("craft");
   });
 
+  it("uses snapshot.craft for dimensions when present (not tool insights)", async () => {
+    // Snapshot has craft=80 stored from when it was computed
+    mockDbGetLatestSnapshot.mockResolvedValue({
+      ...MOCK_SNAPSHOT,
+      craft: 80,
+    });
+    // Tool insights returns a different score (73) — dimensions should use snapshot value
+    mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    // dimensions.craft comes from snapshot for consistency
+    expect(body.dimensions.craft).toBe(80);
+    // craft object still comes from tool insights for full details
+    expect(body.craft.score).toBe(73);
+  });
+
+  it("falls back to tool insights craft when snapshot has no craft", async () => {
+    // Snapshot without craft (legacy row before craft column was added)
+    mockDbGetLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
+    mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+    const body = await resp.json();
+
+    // Falls back to tool insights craft score
+    expect(body.dimensions.craft).toBe(73);
+  });
+
   // --- 404: no snapshot ---
 
   it("returns 404 when no snapshot exists for handle", async () => {
@@ -291,11 +322,11 @@ describe("GET /api/profile/:handle", () => {
 
   // --- Cache headers ---
 
-  it("includes Cache-Control header on success", async () => {
+  it("includes Cache-Control header with 5-minute CDN cache", async () => {
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
 
     expect(resp.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=3600, stale-while-revalidate=86400",
+      "public, s-maxage=300, stale-while-revalidate=3600",
     );
   });
 

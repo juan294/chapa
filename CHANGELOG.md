@@ -5,34 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.5.0] - 2026-03-28
+## [2.6.0] - 2026-03-29
 
 ### Added
-- **Scoring Fairness Initiative (v6.1)** — comprehensive update to Impact scoring model informed by DORA, SPACE, and DX Core 4 research
-- **Batch size score** — Quality dimension now scores PR size distribution (20–500 lines = reviewable sweet spot) instead of penalizing micro-commits; applies to both collaborative and solo paths (#640)
-- **Week coverage** — Consistency dimension uses `activeWeeks/totalWeeks` instead of inverse burst penalty, capturing sustainable cadence without penalizing productive days
-- **Lead time modifier** — Delivery dimension gets ±5% modifier based on median PR open-to-merge duration (DORA flow efficiency signal)
-- **Heatmap evenness outlier clipping** — weekly totals capped at 3× median before computing CV, preventing a single outlier week from dominating
-- **Admin bulk-recalculate endpoint** (`POST /api/admin/bulk-recalculate`) — force-recalculate impact scores for all or specified users after formula changes; bearer token auth, rate-limited (5/hr), batch processing (#640)
-- `aria-current="page"` on active mobile nav links for improved accessibility (#642)
-- 198 new tests across scoring, API, and component layers; total test count: 6,612 across 379 files
-- CI coverage reporting to portfolio dashboard with HMAC-SHA256 auth
+- **Scoring v6.1**: Batch size score replaces micro-commit ratio in Quality (15% signal); week coverage replaces inverse burst in Consistency (15% signal); ±5% lead time modifier on Delivery; ratio-based solo profile detection (threshold 0.15); burst confidence threshold raised to 100
+- **Portfolio API integration**: Reduced `/api/profile/:handle` cache from 1h to 5min CDN (`s-maxage=300`); `WARM_CACHE_PRIORITY_HANDLES` env var for guaranteed daily cache warming of specified handles; craft dimension persisted in `metrics_snapshots` table (migration 019)
+- **Admin bulk-recalculate endpoint**: `POST /api/admin/bulk-recalculate` for force-recalculating impact scores after scoring formula updates
+- **Scoring pipeline hardening**: Field completeness guard (`stats-schema.ts`), golden-file scoring tests, end-to-end pipeline integrity tests, `makeFullStats()` test factory, CI scoring integrity gate
+- **Shared `useSession()` hook**: Eliminates 3-4 redundant `/api/auth/session` fetches per page via module-level promise deduplication
+- 27 new tests; total test count: 6,654 across 382 files
+
+### Fixed
+- Tier range copy corrected across BadgeOverlay tooltip, llms.txt, llms-full.txt (Emerging 0-29, Solid 30-69)
+- Solo quality fields preserved in `mergeStats` — no longer silently dropped
+- Share page Refresh button restored via client-side session check (#647)
+- Error handling added to `/api/supplemental`, `/api/insights`, `/api/insights/:handle` — unhandled exceptions now return JSON 500 instead of raw errors (#653)
+- RadarChart SVG hit areas now keyboard-accessible: `tabIndex`, `role="button"`, `aria-label`, `onKeyDown` for Enter/Space (#652)
+- Mobile nav links include `aria-current` for active state (#642)
+- Unused `_resetSessionCache` export removed (knip dead code)
 
 ### Changed
-- **Profile type detection**: ratio-based (`reviewsSubmittedCount / max(prsMergedCount, 1) < 0.15`) instead of binary (`reviews === 0`); prevents incidental reviews from forcing collaborative scoring path (#641)
-- **Burst activity confidence threshold**: raised from 20 to 100 commits in a 10-minute window to accommodate agent-driven development workflows
-- `clampScore()` utility imported in smoothing.ts instead of inlining the clamp logic (#641)
-- Removed unused `withNeutral` test variable (#641)
-- 6 minor/patch dependency updates: @supabase/supabase-js, posthog-js, svix, @next/bundle-analyzer, @types/node, eslint-config-next (#643)
+- `verifyAdminSecret()` extracted as shared helper — deduplicates bearer-token auth in stats and bulk-recalculate routes (#651)
+- Composite score description on `/about/scoring` now documents solo profile quality exclusion
+- CI checkout uses `fetch-depth: 0` for accurate scoring file diffs
+- Supabase local dev config added (`supabase/config.toml`) with non-conflicting ports
 
 ### Documentation
-- Updated all user-facing scoring copy: about page, scoring methodology, archetype guides (builder, guardian, marathoner), LLM endpoints, impact breakdown tooltips
-- Added V6.1 Changes section to `docs/impact-v6.md` with full formula documentation
-- Added profile type threshold boundary to `docs/accepted-risks.md`
-- Updated `docs/how-it-works.md` and `docs/scoring-explainer-video.md` for v6.1 formulas
-- Added high-efficiency developer scorecard research alignment table
-- Implementation plan: `docs/plans/2026-03-28-scoring-fairness.md` with 5 phase files
-- Pre-launch audit report and remediation report
+- All scoring docs updated to match v6.1 code: how-it-works, scoring-explainer-video, spec, cli-guide
+- `WARM_CACHE_PRIORITY_HANDLES` documented in CLAUDE.md
+- StatsData field count corrected (25→29), MetricsSnapshot storage location updated
+- README verification hash length corrected (8→32 chars), test counts updated
+- Node.js version in cli-guide updated (18→20)
+- Scoring pipeline hardening plan — all 5 phases marked complete
+- Synced with cc-rpi blueprint v1.14.1
 
 ## [2.4.1] - 2026-03-27
 
@@ -289,7 +294,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[2.5.0]: https://github.com/juan294/chapa/compare/v2.4.1...v2.5.0
+[2.6.0]: https://github.com/juan294/chapa/compare/v2.4.1...v2.6.0
 [2.4.1]: https://github.com/juan294/chapa/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/juan294/chapa/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/juan294/chapa/compare/v2.2.0...v2.3.0

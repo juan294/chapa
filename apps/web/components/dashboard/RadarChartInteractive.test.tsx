@@ -456,6 +456,92 @@ describe("RadarChartInteractive", () => {
   });
 
   // -----------------------------------------------------------------------
+  // Hit area keyboard accessibility
+  // -----------------------------------------------------------------------
+  describe("hit area keyboard accessibility", () => {
+    it("hit areas have role='button' and tabIndex={0}", () => {
+      const { container } = renderChart();
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      expect(hitAreas.length).toBe(4);
+      for (const hitArea of hitAreas) {
+        expect(hitArea.getAttribute("role")).toBe("button");
+        expect(hitArea.getAttribute("tabindex")).toBe("0");
+      }
+    });
+
+    it("hit areas have descriptive aria-labels", () => {
+      const { container } = renderChart();
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      expect(hitAreas[0]?.getAttribute("aria-label")).toBe("Select Delivery dimension");
+      expect(hitAreas[1]?.getAttribute("aria-label")).toBe("Select Quality dimension");
+      expect(hitAreas[2]?.getAttribute("aria-label")).toBe("Select Consistency dimension");
+      expect(hitAreas[3]?.getAttribute("aria-label")).toBe("Select Breadth dimension");
+    });
+
+    it("hit areas have focusable='true' for SVG focus support", () => {
+      const { container } = renderChart();
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      for (const hitArea of hitAreas) {
+        expect(hitArea.getAttribute("focusable")).toBe("true");
+      }
+    });
+
+    it("Enter key on hit area triggers onDimensionClick", () => {
+      const clickFn = vi.fn();
+      const { container } = renderChart({ onDimensionClick: clickFn });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      fireEvent.keyDown(hitAreas[0]!, { key: "Enter" });
+      expect(clickFn).toHaveBeenCalledWith("delivery");
+    });
+
+    it("Space key on hit area triggers onDimensionClick", () => {
+      const clickFn = vi.fn();
+      const { container } = renderChart({ onDimensionClick: clickFn });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      fireEvent.keyDown(hitAreas[2]!, { key: " " });
+      expect(clickFn).toHaveBeenCalledWith("consistency");
+    });
+
+    it("non-activating keys on hit area do not trigger onDimensionClick", () => {
+      const clickFn = vi.fn();
+      const { container } = renderChart({ onDimensionClick: clickFn });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      fireEvent.keyDown(hitAreas[0]!, { key: "Tab" });
+      fireEvent.keyDown(hitAreas[1]!, { key: "Escape" });
+      fireEvent.keyDown(hitAreas[2]!, { key: "a" });
+      expect(clickFn).not.toHaveBeenCalled();
+    });
+
+    it("focus on hit area triggers onDimensionHover", () => {
+      const hoverFn = vi.fn();
+      const { container } = renderChart({ onDimensionHover: hoverFn });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      fireEvent.focus(hitAreas[1]!);
+      expect(hoverFn).toHaveBeenCalledWith("quality");
+    });
+
+    it("blur on hit area clears hover", () => {
+      const hoverFn = vi.fn();
+      const { container } = renderChart({ onDimensionHover: hoverFn });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      fireEvent.focus(hitAreas[0]!);
+      hoverFn.mockClear();
+      fireEvent.blur(hitAreas[0]!);
+      expect(hoverFn).toHaveBeenCalledWith(null);
+    });
+
+    it("hit areas have descriptive aria-labels in pentagon mode", () => {
+      const pentaDims: DimensionScores = {
+        delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 55,
+      };
+      const { container } = renderChart({ dimensions: pentaDims });
+      const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
+      expect(hitAreas.length).toBe(5);
+      expect(hitAreas[4]?.getAttribute("aria-label")).toBe("Select Craft dimension");
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // 5-dimension (pentagon) mode
   // -----------------------------------------------------------------------
   describe("pentagon mode (5 dimensions)", () => {

@@ -1,11 +1,10 @@
 # Pre-Launch Audit Report
-> Generated on 2026-03-28 | Branch: `develop` | 6 parallel specialists
-> 6,608 tests | 379 test files | 64 static pages | Next.js 16 (Turbopack)
-> CI: ALL GREEN (5/5 workflows)
+> Generated on 2026-03-29 | Branch: `develop` | 6 parallel specialists
+> 6,627 tests | 381 test files | 64 static pages | Next.js 16.2.1 (Turbopack)
 
 ## Verdict: CONDITIONAL
 
-No blockers. 4 warnings (all low severity). 7 recommendations.
+No blockers found. 6 warnings across 4 specialists — all low-severity items that don't risk production stability.
 
 ## Blockers (must fix before release)
 
@@ -15,78 +14,76 @@ None.
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | `POST /api/admin/bulk-recalculate` not documented in CLAUDE.md Admin API routes | Low | devops | Route table incomplete — new endpoint invisible to future developers |
-| W2 | Unused variable `withNeutral` in `v4.test.ts:174` — lint warning | Low | qa-lead | Cosmetic lint noise |
-| W3 | Duplicate session fetches from NavbarClient + SharePageOwnerContent | Low | performance-eng | Two parallel `/api/auth/session` calls on share page |
-| W4 | ESLint 10 and TypeScript 6 major versions available (deferred) | Low | architect | Known, tracked as #531 |
-
-## Recommendations
-
-| # | Recommendation | Found by |
-|---|----------------|----------|
-| R1 | Document MPL-2.0 `@resvg/resvg-js` in accepted-risks (already there as of v38) | security-reviewer |
-| R2 | Inline clamp in `smoothing.ts:33` — could import `clampScore` from utils | architect |
-| R3 | 6 minor/patch dependency updates available | architect |
-| R4 | Run `ANALYZE=true pnpm run build` periodically for bundle analysis | performance-eng |
-| R5 | Consider shared session context to deduplicate auth fetches | performance-eng |
-| R6 | Add `aria-current="page"` to active nav links | ux-reviewer |
-| R7 | Studio sub-components could be lazy-loaded if load times grow | performance-eng |
+| W1 | `WARM_CACHE_PRIORITY_HANDLES` env var not documented in CLAUDE.md | Low | devops | Operators won't know this option exists |
+| W2 | CI run still in progress for latest commit at audit time | Low | devops | Cannot confirm green CI for latest commit |
+| W3 | Bundle size unverifiable — Turbopack omits per-route JS size table | Low | performance-eng | Cannot confirm no route exceeds 500KB threshold |
+| W4 | 3-4 redundant `fetch("/api/auth/session")` calls on share page | Low | performance-eng | Wasted network roundtrips on `/u/[handle]` |
+| W5 | ADMIN_SECRET bearer-token auth duplicated in 2 admin routes | Low | architect | Inconsistent auth pattern vs shared `adminAuth()` helper |
+| W6 | RadarChartInteractive SVG hit areas lack keyboard accessibility | Low | ux-reviewer | Axis click not keyboard-reachable (redundant — DimensionCards provide same access) |
 
 ## Detailed Findings
 
 ### 1. Quality Assurance (qa-lead) — GREEN
 
-- **Tests**: 6,608 passed / 0 failed / 379 files — 100% pass rate
-- **TypeScript**: 0 errors
-- **Lint**: 0 errors, 1 warning (unused `withNeutral` variable in test)
-- **Coverage**: All critical paths tested — scoring (100+ tests), heatmap evenness (20+), bulk-recalculate (7), stats aggregation (50+), merge (20+), badge route (30+), auth callback (30+), Redis cache (30+)
-- **Graceful degradation**: Excellent — GitHub API, Redis, Supabase, Bitbucket/Codeberg all fail safely with stale fallbacks or safe defaults
+- **Tests:** 6,627 passed (100%), 381 test files, 0 failures
+- **Typecheck:** PASS (both workspaces)
+- **Lint:** PASS (1 pre-existing warning in test file — unused variable)
+- **Critical path coverage:** Excellent across all domains — impact scoring (8 test files), SVG rendering (11), auth (12), DB layer (11), cache (4), GitHub client (4)
+- **High-risk untested files:** None — all API routes and lib modules have corresponding tests
+- **Graceful degradation:** Strong — Redis fail-open, per-route try/catch, fire-and-forget side effects, health endpoint distinguishes "not configured" vs "broken"
+- **Recommendations:** Add top-level try/catch to `/api/supplemental` and `/api/insights` routes
 
 ### 2. Security (security-reviewer) — GREEN
 
-- **Dependency audit**: 0 known vulnerabilities
-- **Hardcoded secrets**: None found in production code
-- **Client-side leaks**: No server secrets in `NEXT_PUBLIC_` vars
-- **Bulk-recalculate auth**: Proper bearer token (timing-safe), rate limiting (5/hr), input validation
-- **XSS in SVG**: All user input escaped via `escapeXml()` — handle, displayName, avatarDataUri, archetypeText, tier
-- **CORS**: Only on public read-only endpoints (profile, verify)
-- **Licenses**: MPL-2.0 on `@resvg/resvg-js` — already documented in accepted-risks
+- **Dependency vulnerabilities:** 0 (clean `pnpm audit`)
+- **Hardcoded secrets:** None in production code (test fixtures only)
+- **Client-side leaks:** No secrets in `NEXT_PUBLIC_*` vars; only PostHogProvider accesses env from client
+- **OAuth:** AES-256-GCM encrypted session cookies, CSRF via crypto.randomBytes state + timingSafeEqual, open redirect protection
+- **SVG XSS:** Properly mitigated via `escapeXml()` on all user-controlled text
+- **CORS:** Wildcard only on 2 public read-only endpoints (intentional, documented)
+- **Licenses:** No GPL/AGPL; MPL-2.0 items documented in accepted-risks.md
+- **CSP:** Comprehensive headers including HSTS, nosniff, frame-ancestors, permissions-policy
+- **Recommendations:** Monitor Next.js nonce-based CSP support; consider middleware.ts for admin routes as surface grows
 
 ### 3. Infrastructure (devops) — YELLOW
 
-- **Build**: CI build green (local blocked by concurrent process)
-- **CI**: All 5 workflows passing (Security Scan, Dead Code, Secret Scanning, Bundle Size, CI suite)
-- **Git state**: Clean working tree, no stale worktrees
-- **Env vars**: All documented, all `.trim()`'d
-- **Error pages**: 404, error.tsx, global-error.tsx all present
-- **Health endpoint**: Checks Redis + Supabase, fails gracefully
-- **Missing**: `POST /api/admin/bulk-recalculate` not in CLAUDE.md route table
+- **Build:** PASS (Next.js 16.2.1 with Turbopack, 82 routes, 64 static pages)
+- **CI:** 4/5 workflows green; main CI still in progress at audit time
+- **Env vars:** `WARM_CACHE_PRIORITY_HANDLES` used but not documented in CLAUDE.md
+- **Error pages:** All present — `not-found.tsx`, `global-error.tsx`, 12 route-specific `error.tsx` boundaries
+- **Health endpoint:** Solid — returns ok/degraded/skipped with dependency status
+- **Git state:** Clean working tree, no stale worktrees or branches, 0 stashes
+- **Vercel config:** 3 cron jobs configured, comprehensive security headers, badge cache 6h/7d
 
 ### 4. Architecture (architect) — GREEN
 
-- **TypeScript**: Clean, 0 errors
-- **Circular dependencies**: None (230 files checked)
-- **Dead code**: Knip reports 0 unused files/exports/dependencies
-- **Outdated deps**: ESLint 10 + TypeScript 6 major bumps deferred; 6 minor/patch updates available
-- **Duplication**: Minor — `smoothing.ts` inlines `clampScore` instead of importing
+- **Typecheck:** PASS with `strict: true` + `noUncheckedIndexedAccess` in all configs
+- **Outdated deps:** 8 total — 6 minor/patch (within range), ESLint 10 deferred (#531), TS 6 not urgent
+- **Circular dependencies:** None (234 files checked via madge)
+- **Dead code:** None (knip clean)
+- **Duplication:** ADMIN_SECRET bearer check in 2 routes (minor); rate limit boilerplate in 17 routes (acceptable)
+- **Monorepo:** Clean separation — `packages/shared` (types, pure functions) properly consumed by `apps/web`
+- **Recommendations:** Extract shared `verifyAdminSecret()` helper; batch minor dep updates
 
-### 5. Performance (performance-eng) — GREEN
+### 5. Performance (performance-eng) — YELLOW
 
-- **Build**: 9.4s with Turbopack, 64 static pages
-- **Bundle sizes**: Largest chunk 227KB — well under 500KB threshold
-- **Code splitting**: 14 files use `next/dynamic`, excellent patterns (PostHog deferred, admin lazy-loaded, effects lazy-loaded)
-- **"use client"**: No page-level misuse on critical routes; only experiments (intentional)
-- **Images**: All use `next/image` with explicit dimensions
-- **Fonts**: `display: "swap"` on both fonts
-- **Reduced motion**: 40+ files handle `prefers-reduced-motion`
+- **Build:** PASS (10.7s compile, 408ms static generation)
+- **Bundle size:** Unverifiable from Turbopack output (no per-route JS table); needs `ANALYZE=true` run
+- **Client directives:** 121 `"use client"` files, all appropriately placed at leaf level; no client directives on layouts or core pages
+- **Good patterns:** 15+ dynamic imports with `ssr: false`, PostHog deferred to first interaction, `next/font` with `display: swap`, `next/image` for avatars, 13 `loading.tsx` files, ISR on landing/share pages
+- **Anti-patterns:** 3-4 redundant session fetches on share page
+- **Core Web Vitals:** Low risk across CLS, LCP, INP
+- **`prefers-reduced-motion`:** Supported globally + 30 component-level implementations
+- **Recommendations:** Run `ANALYZE=true` build to verify bundle sizes; consolidate session fetching with shared hook
 
 ### 6. UX/Accessibility (ux-reviewer) — GREEN
 
-- **Heading hierarchy**: No skipped levels across all 33 pages
-- **ARIA labels**: 65+ instances, all interactive elements covered, tested
-- **Focus indicators**: Global `focus-visible` rule + skip-to-content link
-- **Reduced motion**: Global + component-level support
-- **Alt text**: All images covered, SVGs wrapped with `role="img"`
-- **Keyboard nav**: All interactive divs have `role`/`tabIndex`/`onKeyDown`
-- **Error/loading states**: 13 loading + 13 error boundaries + global-error
-- **Design consistency**: v6.1 copy changes consistent across about, scoring, and all archetype pages — no contradictions
+- **Heading hierarchy:** Correct across all pages, no skipped levels
+- **ARIA labels:** All interactive elements labeled; 154 `aria-hidden` on decorative icons across 64 files
+- **Focus indicators:** Global `:focus-visible` with amber outline; skip-to-content link present
+- **Motion sensitivity:** Best-in-class — global `prefers-reduced-motion` rule + component-level checks
+- **Image accessibility:** All images have meaningful alt text
+- **Keyboard navigation:** Proper `role="button"` + `tabIndex` + `onKeyDown` on custom interactives; focus trap in mobile nav; skip-to-content link with `#main-content` on all pages
+- **State handling:** 13 error boundaries, 13 loading screens (all with `role="status"`), empty states in admin/campaigns
+- **Design system:** Excellent compliance — semantic tokens throughout, hardcoded colors only in `global-error.tsx` (intentional)
+- **Recommendations:** Add keyboard access to RadarChart SVG polygon hit areas

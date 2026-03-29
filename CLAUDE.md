@@ -112,12 +112,12 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
-- `StatsData` — aggregated GitHub stats (25 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
+- `StatsData` — aggregated GitHub stats (29 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
 - `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape
-- `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Redis sorted sets)
+- `MetricsSnapshot` — compact historical metric record (~300 bytes, stored in Supabase `metrics_snapshots` table)
 
 ## Rendering requirements
 - Default badge size: 1200×630 (wide)
@@ -330,6 +330,7 @@ ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (opt
 ALLOW_AGENT_RUN=               # Set to "true" to allow /api/admin/agents/run endpoint (optional, disabled by default)
 
 CRON_SECRET=                   # Vercel Cron auth (auto-injected by Vercel on Pro — set locally for testing)
+WARM_CACHE_PRIORITY_HANDLES=   # Comma-separated GitHub handles always included in warm-cache cron (optional)
 
 VERCEL_ENV=                    # Auto-injected by Vercel (production/preview/development — do not set manually)
 ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer in next.config.ts (dev-only)

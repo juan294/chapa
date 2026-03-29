@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
@@ -717,6 +717,86 @@ describe("GET /api/cron/warm-cache", () => {
 
       expect(body.rotation.coversAll).toBe(true);
       expect(body.rotation.totalUsers).toBe(30);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Priority handles
+  // ---------------------------------------------------------------------------
+
+  describe("priority handles", () => {
+    afterEach(() => {
+      delete process.env.WARM_CACHE_PRIORITY_HANDLES;
+    });
+
+    it("always includes priority handles even when rotation would skip them", async () => {
+      process.env.WARM_CACHE_PRIORITY_HANDLES = "juan294";
+      // 80 users, offset=60 → normally takes users 60–79 + 0–29 (no juan294 at index 40)
+      vi.mocked(cacheGet).mockResolvedValue(60);
+      const users = Array.from({ length: 80 }, (_, i) => mockUser(`user${i}`));
+      // Insert juan294 at position 40 (outside the rotation window 60–79 + 0–29)
+      users[40] = mockUser("juan294");
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.handles).toContain("juan294");
+    });
+
+    it("does not duplicate priority handles already in the rotation window", async () => {
+      process.env.WARM_CACHE_PRIORITY_HANDLES = "user5";
+      const users = Array.from({ length: 10 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      // user5 appears exactly once
+      const count = body.handles.filter((h: string) => h === "user5").length;
+      expect(count).toBe(1);
+    });
+
+    it("supports multiple comma-separated priority handles", async () => {
+      process.env.WARM_CACHE_PRIORITY_HANDLES = "alice,bob";
+      // 80 users at offset=60 — alice and bob are not in the default user list
+      vi.mocked(cacheGet).mockResolvedValue(60);
+      const users = Array.from({ length: 80 }, (_, i) => mockUser(`user${i}`));
+      users[0] = mockUser("alice");
+      users[1] = mockUser("bob");
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      expect(body.handles).toContain("alice");
+      expect(body.handles).toContain("bob");
+    });
+
+    it("ignores priority handles not in the user list", async () => {
+      process.env.WARM_CACHE_PRIORITY_HANDLES = "nonexistent";
+      const users = Array.from({ length: 10 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      const body = await res.json();
+
+      // nonexistent is not a registered user, so not added
+      expect(body.handles).not.toContain("nonexistent");
+    });
+
+    it("works without WARM_CACHE_PRIORITY_HANDLES env var", async () => {
+      // No env var set — should behave exactly as before
+      const users = Array.from({ length: 10 }, (_, i) => mockUser(`user${i}`));
+      mockedDbGetUsers.mockResolvedValue(users);
+      mockedGetStats.mockResolvedValue(null);
+
+      const res = await GET(makeRequest("test-cron-secret"));
+      expect(res.status).toBe(200);
     });
   });
 

@@ -66,7 +66,7 @@ Admin-only dashboard with user management, agent fleet monitoring, feature flags
 
 ### Badge Verification
 
-Every badge includes an 8-character HMAC-SHA256 hash. Anyone can verify a badge is authentic at `/api/verify/:hash` — no tampering possible.
+Every badge includes a 32-character HMAC-SHA256 hash. Anyone can verify a badge is authentic at `/api/verify/:hash` — no tampering possible.
 
 ## Quick Start
 
@@ -142,7 +142,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
 | Hosting | Vercel |
-| Testing | Vitest, 378+ test files, 6,400+ tests, TDD workflow |
+| Testing | Vitest, 382+ test files, 6,650+ tests, TDD workflow |
 
 ## Environment Variables
 

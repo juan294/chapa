@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { ImpactV4Result, StatsData } from "@chapa/shared";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
+import { useSession } from "@/hooks/useSession";
 
 /**
  * Client-side component that handles owner-specific sections on the share page.
  *
- * Instead of reading `headers()` server-side, this component fetches the
- * session from `/api/auth/session` on mount to determine if the viewer is
- * the profile owner. This allows the share page to use ISR (Incremental
- * Static Regeneration) since no dynamic APIs are called during server render.
+ * Uses the shared `useSession()` hook to determine if the viewer is
+ * the profile owner. This avoids redundant `/api/auth/session` fetches
+ * when multiple components on the share page need session data.
  *
  * Sections rendered:
  * - Owner: DataSources, ImpactDashboard, Embed Snippets
@@ -31,21 +30,11 @@ export function SharePageOwnerContent({
   stats,
   impact,
 }: SharePageOwnerContentProps) {
-  const [isOwner, setIsOwner] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/session")
-      .then((res) => res.json())
-      .then((data: { user: { login: string } | null }) => {
-        setIsOwner(data.user?.login === handle);
-      })
-      .catch(() => {
-        setIsOwner(false);
-      });
-  }, [handle]);
+  const { session, loading } = useSession();
+  const isOwner = session?.login === handle;
 
   // Still loading session — show nothing to avoid layout shift
-  if (isOwner === null) return null;
+  if (loading) return null;
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
   const embedHtml = `<img src="https://chapa.thecreativetoken.com/u/${handle}/badge.svg" alt="Chapa Badge for ${handle}" width="600" height="315" />`;

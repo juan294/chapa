@@ -492,9 +492,12 @@ export default function ScoringMethodologyPage() {
             {/* ---------------------------------------------------------- */}
             <SectionHeading>Composite score and tiers</SectionHeading>
             <p>
-              The composite score is the average of all dimensions (4 or 5),
-              rounded to an integer. It then passes through recency weighting
-              and confidence adjustment:
+              The composite score is the average of all active dimensions,
+              rounded to an integer. For collaborative developers, all 4 (or 5
+              with Craft) dimensions are included. For solo developers, Quality
+              is excluded from the composite — only Delivery, Consistency,
+              Breadth, and optional Craft are averaged. The score then passes
+              through recency weighting and confidence adjustment:
             </p>
             <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
               <p>recencyWeighted = composite × recencyMultiplier</p>

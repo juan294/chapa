@@ -78,7 +78,7 @@ The badge and share page display a multi-dimensional developer profile:
 
 - **4–5 dimensions** (each 0-100): Delivery, Quality, Consistency, Breadth + optional Craft (AI tool insights)
 - **Archetype**: Derived from dimension shape (Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging)
-- **Composite score**: Average of all four dimensions
+- **Composite score**: Average of all active dimensions (4 or 5 when Craft is present; quality excluded for solo profiles)
 - **Confidence** (50-100): Signal clarity rating with transparent, non-accusatory explanations
 - **Adjusted score**: Composite gently weighted by confidence
 - **Tier**: Emerging (0-39), Solid (40-69), High (70-84), Elite (85-100)

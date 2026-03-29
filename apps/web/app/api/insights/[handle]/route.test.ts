@@ -225,4 +225,26 @@ describe("GET /api/insights/:handle", () => {
     const body = await resp.json();
     expect(Object.keys(body)).toEqual(["craftScore"]);
   });
+
+  // --- Error handling ---
+
+  it("returns 500 JSON when dbGetToolInsights throws", async () => {
+    mockDbGet.mockRejectedValue(new Error("DB connection lost"));
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(resp.status).toBe(500);
+    const body = await resp.json();
+    expect(body.error).toBe("Internal server error");
+  });
+
+  it("returns 500 JSON when rateLimit throws", async () => {
+    mockRateLimit.mockRejectedValue(new Error("Redis unavailable"));
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(resp.status).toBe(500);
+    const body = await resp.json();
+    expect(body.error).toBe("Internal server error");
+  });
 });

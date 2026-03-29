@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
@@ -85,6 +87,19 @@ jobs:
             -d "$BODY"
 
           echo "Coverage reported: $(echo "$BODY" | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.testCount+' tests, '+d.coveragePercent+'% coverage')")"
+
+      - name: Scoring integrity gate
+        if: github.event_name == 'pull_request'
+        run: |
+          SCORING_FILES="apps/web/lib/impact/ apps/web/lib/github/merge.ts packages/shared/src/stats-aggregation.ts packages/shared/src/types.ts packages/shared/src/constants.ts packages/shared/src/stats-schema.ts"
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- $SCORING_FILES || true)
+          if [ -n "$CHANGED" ]; then
+            echo "::notice::Scoring files changed — running integrity tests"
+            echo "$CHANGED"
+            pnpm vitest run --reporter=verbose apps/web/lib/impact/golden-profiles.test.ts apps/web/lib/impact/pipeline.test.ts apps/web/lib/github/merge.test.ts
+          else
+            echo "No scoring files changed — skipping integrity gate"
+          fi
 
   build:
     name: Build

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mergeStats } from "./merge";
 import type { StatsData } from "@chapa/shared";
-import { makeStats as _makeStats } from "../test-helpers/fixtures";
+import { MERGE_EXPECTED_KEYS } from "@chapa/shared";
+import { makeStats as _makeStats, makeFullStats } from "../test-helpers/fixtures";
 
 /** Zero-based StatsData — merge tests need a blank slate to verify addition. */
 function makeStats(overrides: Partial<StatsData> = {}): StatsData {
@@ -323,6 +324,23 @@ describe("mergeStats", () => {
       const result1 = mergeStats(primary, supplemental);
       const result2 = mergeStats(primary, supplemental);
       expect(result1).toEqual(result2);
+    });
+  });
+
+  describe("field completeness", () => {
+    it("output contains every StatsData field when both inputs are fully populated", () => {
+      const primary = makeFullStats({ handle: "primary" });
+      const supplemental = makeFullStats({ handle: "supplemental" });
+      const merged = mergeStats(primary, supplemental);
+      const mergedKeys = Object.keys(merged).sort();
+
+      for (const key of MERGE_EXPECTED_KEYS) {
+        expect(mergedKeys, `missing field: ${key}`).toContain(key);
+        expect(
+          merged[key as keyof StatsData],
+          `field ${key} is undefined`,
+        ).not.toBeUndefined();
+      }
     });
   });
 });

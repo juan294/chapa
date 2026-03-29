@@ -70,6 +70,9 @@ export async function GET(request: NextRequest) {
     ? storedOffset
     : 0;
 
+  // Priority handles: always included regardless of rotation (e.g. "juan294,alice")
+  const priorityHandles = parsePriorityHandles(allHandles);
+
   let toWarm: string[];
   if (allHandles.length <= MAX_HANDLES) {
     // All users fit in one run — no rotation needed
@@ -81,6 +84,17 @@ export async function GET(request: NextRequest) {
     toWarm = [...remaining, ...fromStart];
   } else {
     toWarm = allHandles.slice(offset, offset + MAX_HANDLES);
+  }
+
+  // Merge priority handles into the warm list (no duplicates)
+  if (priorityHandles.length > 0) {
+    const warmSet = new Set(toWarm);
+    for (const h of priorityHandles) {
+      if (!warmSet.has(h)) {
+        toWarm.push(h);
+        warmSet.add(h);
+      }
+    }
   }
 
   const nextOffset = allHandles.length <= MAX_HANDLES
@@ -172,6 +186,22 @@ export async function GET(request: NextRequest) {
     },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+/**
+ * Parse WARM_CACHE_PRIORITY_HANDLES env var into a list of handles
+ * that must be included in every warm-cache run. Only returns handles
+ * that exist in the authoritative user list (allHandles).
+ */
+function parsePriorityHandles(allHandles: string[]): string[] {
+  const raw = process.env.WARM_CACHE_PRIORITY_HANDLES?.trim();
+  if (!raw) return [];
+
+  const handleSet = new Set(allHandles);
+  return raw
+    .split(",")
+    .map((h) => h.trim())
+    .filter((h) => h.length > 0 && handleSet.has(h));
 }
 
 /**
