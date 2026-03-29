@@ -4,7 +4,6 @@ import { computeImpactV4 } from "./v4";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { makeFullStats } from "@/lib/test-helpers/fixtures";
 import { MERGE_EXPECTED_KEYS } from "@chapa/shared";
-import type { StatsData } from "@chapa/shared";
 
 /**
  * End-to-end pipeline integrity tests.
