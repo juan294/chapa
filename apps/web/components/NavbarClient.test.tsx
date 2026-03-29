@@ -75,8 +75,8 @@ describe("NavbarClient", () => {
       expect(SOURCE).not.toContain("next/headers");
     });
 
-    it("uses useEffect or fetch for session (client-side)", () => {
-      expect(SOURCE).toContain("useEffect");
+    it("uses useSession hook for session (client-side)", () => {
+      expect(SOURCE).toContain("useSession");
     });
   });
 });

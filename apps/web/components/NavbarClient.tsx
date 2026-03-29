@@ -1,41 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 import { ThemeToggle } from "./ThemeToggle";
+import { useSession } from "@/hooks/useSession";
 
 /**
  * Client-side Navbar variant for ISR-compatible pages.
  *
  * Unlike the server-side Navbar (which reads session via `headers()`),
- * this component fetches session from `/api/auth/session` on mount.
+ * this component uses the shared `useSession()` hook which fetches
+ * `/api/auth/session` once and shares the result across all consumers.
  * This avoids calling `headers()` in the render tree, allowing Next.js
  * to serve the page via ISR (Incremental Static Regeneration).
  */
 
-interface SessionUser {
-  login: string;
-  name: string | null;
-  avatar_url: string;
-  isAdmin?: boolean;
-}
-
 export function NavbarClient() {
-  const [session, setSession] = useState<SessionUser | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/session")
-      .then((res) => res.json())
-      .then((data: { user: SessionUser | null }) => {
-        if (data.user) {
-          setSession(data.user);
-        }
-      })
-      .catch(() => {
-        // Session fetch failed — show logged-out state
-      });
-  }, []);
+  const { session } = useSession();
 
   return (
     <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">

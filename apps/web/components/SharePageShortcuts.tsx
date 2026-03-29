@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback } from "react";
 import { useKeyboardShortcutsContext } from "./KeyboardShortcutsListener";
+import { useSession } from "@/hooks/useSession";
 
 interface SharePageShortcutsProps {
   embedMarkdown: string;
@@ -16,16 +17,8 @@ export function SharePageShortcuts({
   embedMarkdown,
   handle,
 }: SharePageShortcutsProps) {
-  const [isOwner, setIsOwner] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/auth/session")
-      .then((res) => res.json())
-      .then((data: { user: { login: string } | null }) => {
-        setIsOwner(data.user?.login === handle);
-      })
-      .catch(() => setIsOwner(false));
-  }, [handle]);
+  const { session } = useSession();
+  const isOwner = session?.login === handle;
   const { registerPageShortcuts } = useKeyboardShortcutsContext();
 
   const handler = useCallback(
