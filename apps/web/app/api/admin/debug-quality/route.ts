@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { fetchContributionData } from "@/lib/github/queries";
 import { buildStatsFromRaw } from "@chapa/shared";
 import { computeImpactV4 } from "@/lib/impact/v4";
@@ -6,16 +6,24 @@ import { cacheDel, cacheSet } from "@/lib/cache/redis";
 import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { buildSnapshot } from "@/lib/history/snapshot";
+import { readSessionCookie } from "@/lib/auth/github";
 
 /**
  * GET /api/admin/debug-quality?handle=juan294
  * Temporary debug endpoint — remove after verification.
  */
-export async function GET(request: Request): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
   const url = new URL(request.url);
   const handle = url.searchParams.get("handle") ?? "juan294";
-  const token = process.env.GITHUB_TOKEN?.trim();
   const lowerHandle = handle.toLowerCase();
+
+  // Use session token (from browser cookie) or fall back to GITHUB_TOKEN
+  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  let token = process.env.GITHUB_TOKEN?.trim();
+  if (sessionSecret) {
+    const session = readSessionCookie(request.headers.get("cookie"), sessionSecret);
+    if (session?.token) token = session.token;
+  }
 
   // Clear both primary and stale cache so badge route picks up fresh data
   await cacheDel(`stats:v2:merged:${lowerHandle}`);
