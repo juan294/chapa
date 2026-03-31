@@ -24,6 +24,21 @@ vi.mock("./resend", () => ({
   getResend: vi.fn(() => mockResend),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock withTimeout — pass-through by default, track calls
+// ---------------------------------------------------------------------------
+
+const mockWithTimeout = vi.fn(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  <T>(promise: Promise<T>, ...rest: unknown[]) => promise,
+);
+
+vi.mock("@/lib/async/with-timeout", () => ({
+  withTimeout: (...args: [Promise<unknown>, number?, string?]) =>
+    mockWithTimeout(args[0], args[1], args[2]),
+  EMAIL_SEND_TIMEOUT_MS: 10_000,
+}));
+
 import { getResend } from "./resend";
 import {
   ensureSegment,
@@ -37,6 +52,8 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   _resetSegmentCache();
+  // Restore pass-through behavior after clearAllMocks wipes it
+  mockWithTimeout.mockImplementation(<T>(promise: Promise<T>) => promise);
 });
 
 // ---------------------------------------------------------------------------
@@ -371,5 +388,119 @@ describe("markUnsubscribed", () => {
       email: "dev@example.com",
       unsubscribed: true,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// withTimeout wrapping
+// ---------------------------------------------------------------------------
+
+describe("withTimeout wrapping", () => {
+  it("wraps segments.list with withTimeout", async () => {
+    mockSegmentsList.mockResolvedValue({
+      data: { data: [{ id: "seg-1", name: "Chapa Users" }], has_more: false },
+      error: null,
+    });
+
+    await ensureSegment();
+
+    expect(mockWithTimeout).toHaveBeenCalledWith(
+      expect.any(Promise),
+      10_000,
+      "ensureSegment:list",
+    );
+  });
+
+  it("wraps segments.create with withTimeout", async () => {
+    mockSegmentsList.mockResolvedValue({
+      data: { data: [], has_more: false },
+      error: null,
+    });
+    mockSegmentsCreate.mockResolvedValue({
+      data: { id: "seg-new", object: "segment", name: "Chapa Users" },
+      error: null,
+    });
+
+    await ensureSegment();
+
+    expect(mockWithTimeout).toHaveBeenCalledWith(
+      expect.any(Promise),
+      10_000,
+      "ensureSegment:create",
+    );
+  });
+
+  it("wraps contacts.create with withTimeout", async () => {
+    mockSegmentsList.mockResolvedValue({
+      data: { data: [{ id: "seg-1", name: "Chapa Users" }], has_more: false },
+      error: null,
+    });
+    mockContactsCreate.mockResolvedValue({
+      data: { object: "contact", id: "c-1" },
+      error: null,
+    });
+
+    _resetSegmentCache();
+    await addContact("dev@example.com");
+
+    expect(mockWithTimeout).toHaveBeenCalledWith(
+      expect.any(Promise),
+      10_000,
+      "addContact",
+    );
+  });
+
+  it("wraps contacts.update with withTimeout", async () => {
+    mockContactsUpdate.mockResolvedValue({
+      data: { object: "contact", id: "c-1" },
+      error: null,
+    });
+
+    await updateContact("dev@example.com", { unsubscribed: true });
+
+    expect(mockWithTimeout).toHaveBeenCalledWith(
+      expect.any(Promise),
+      10_000,
+      "updateContact",
+    );
+  });
+
+  it("wraps contacts.remove with withTimeout", async () => {
+    mockContactsRemove.mockResolvedValue({
+      data: { object: "contact", id: "c-1", deleted: true },
+      error: null,
+    });
+
+    await removeContact("dev@example.com");
+
+    expect(mockWithTimeout).toHaveBeenCalledWith(
+      expect.any(Promise),
+      10_000,
+      "removeContact",
+    );
+  });
+
+  it("returns null when a timeout occurs in addContact", async () => {
+    mockSegmentsList.mockResolvedValue({
+      data: { data: [{ id: "seg-1", name: "Chapa Users" }], has_more: false },
+      error: null,
+    });
+    // Make withTimeout reject for the contacts.create call
+    mockWithTimeout
+      .mockImplementationOnce(<T>(p: Promise<T>) => p) // segments.list pass-through
+      .mockRejectedValueOnce(new Error("addContact timed out after 10000ms"));
+
+    _resetSegmentCache();
+    const id = await addContact("dev@example.com");
+    expect(id).toBeNull();
+  });
+
+  it("returns false when a timeout occurs in removeContact", async () => {
+    mockWithTimeout.mockRejectedValueOnce(
+      new Error("removeContact timed out after 10000ms"),
+    );
+
+    const result = await removeContact("dev@example.com");
+    expect(result).toBe(false);
   });
 });

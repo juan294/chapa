@@ -100,6 +100,27 @@ beforeEach(() => {
     { handle: "alice" },
     { handle: "bob" },
   ] as Awaited<ReturnType<typeof dbGetUsers>>);
+  vi.mocked(getStats).mockResolvedValue({
+    handle: "testuser",
+    commitsTotal: 50,
+    activeDays: 30,
+    prsMergedCount: 5,
+    prsMergedWeight: 10,
+    reviewsSubmittedCount: 0,
+    issuesClosedCount: 3,
+    linesAdded: 2000,
+    linesDeleted: 500,
+    reposContributed: 4,
+    topRepoShare: 0.4,
+    maxCommitsIn10Min: 3,
+    totalStars: 0,
+    totalForks: 0,
+    totalWatchers: 0,
+    heatmapData: [],
+    fetchedAt: new Date().toISOString(),
+  });
+  vi.mocked(dbReplaceSnapshot).mockResolvedValue(true);
+  vi.mocked(invalidateSnapshotCache).mockResolvedValue(undefined);
 });
 
 function makeRequest(secret?: string, body?: object): NextRequest {
@@ -190,5 +211,165 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(body.failed).toBe(1);
     expect(body.errors).toHaveLength(1);
     expect(body.errors[0].handle).toBe("alice");
+  });
+
+  it("returns 429 with Retry-After header when rate limited", async () => {
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 6, limit: 5 });
+    const res = await POST(makeRequest(VALID_SECRET));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("3600");
+    const body = await res.json();
+    expect(body.error).toContain("Too many requests");
+  });
+
+  it("falls back to dbGetUsers when body is malformed JSON", async () => {
+    // Simulate a request with invalid JSON body by providing no body at all
+    const url = "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate";
+    const req = new NextRequest(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${VALID_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      // No body → request.json() will reject
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(dbGetUsers).toHaveBeenCalled();
+    expect(body.total).toBe(2); // alice + bob from mock
+  });
+
+  it("falls back to dbGetUsers when handles is not an array", async () => {
+    const res = await POST(makeRequest(VALID_SECRET, { handles: "not-an-array" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(dbGetUsers).toHaveBeenCalled();
+    expect(body.total).toBe(2);
+  });
+
+  it("falls back to dbGetUsers when handles is an empty array", async () => {
+    const res = await POST(makeRequest(VALID_SECRET, { handles: [] }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(dbGetUsers).toHaveBeenCalled();
+    expect(body.total).toBe(2);
+  });
+
+  it("filters out non-string and empty-string handles", async () => {
+    const res = await POST(
+      makeRequest(VALID_SECRET, {
+        handles: ["alice", 42, "", null, "bob", undefined, false],
+      }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.total).toBe(2); // only "alice" and "bob"
+    expect(dbGetUsers).not.toHaveBeenCalled();
+    expect(getStats).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports 'Stats fetch returned null' when stats fetch returns null", async () => {
+    vi.mocked(getStats).mockResolvedValueOnce(null);
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.recalculated).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.errors[0]).toEqual({
+      handle: "alice",
+      error: "Stats fetch returned null",
+    });
+  });
+
+  it("reports 'Snapshot replace failed' when dbReplaceSnapshot returns false", async () => {
+    vi.mocked(dbReplaceSnapshot).mockResolvedValue(false);
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.recalculated).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.errors[0]).toEqual({
+      handle: "alice",
+      error: "Snapshot replace failed",
+    });
+  });
+
+  it("silently catches cache invalidation failure after successful snapshot replace", async () => {
+    vi.mocked(invalidateSnapshotCache).mockRejectedValue(
+      new Error("Redis connection failed"),
+    );
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    // Should still succeed — cache invalidation failure is swallowed
+    expect(body.recalculated).toBe(1);
+    expect(body.failed).toBe(0);
+    expect(body.errors).toBeUndefined();
+  });
+
+  it("omits errors field from response when no errors occurred", async () => {
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.recalculated).toBe(1);
+    expect(body.failed).toBe(0);
+    expect(body.errors).toBeUndefined();
+    expect("errors" in body).toBe(false);
+  });
+
+  it("returns early with zeroed counts when handles list is empty after filtering", async () => {
+    // All handles filter out as non-strings/empty
+    const res = await POST(
+      makeRequest(VALID_SECRET, { handles: [42, "", null] }),
+    );
+
+    // After filtering: no valid handles remain.
+    // This falls through to dbGetUsers (because filtered array might be empty
+    // only if the original array was non-empty with all invalid entries).
+    // Actually, the code checks Array.isArray(body.handles) && body.handles.length > 0
+    // first, then filters. If filters remove all, handles is empty, and we get
+    // the early return.
+    const body = await res.json();
+
+    // dbGetUsers is NOT called here because body.handles is a non-empty array
+    // but after filtering everything out, handles becomes empty
+    expect(body.total).toBe(0);
+    expect(body.recalculated).toBe(0);
+  });
+
+  it("catches thrown errors during batch processing and reports them", async () => {
+    vi.mocked(getStats).mockRejectedValue(new Error("API timeout"));
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.recalculated).toBe(0);
+    expect(body.failed).toBe(1);
+    expect(body.errors[0]).toEqual({
+      handle: "alice",
+      error: "API timeout",
+    });
+  });
+
+  it("reports 'Unknown error' when thrown value is not an Error instance", async () => {
+    vi.mocked(getStats).mockRejectedValue("string error");
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(body.errors[0]).toEqual({
+      handle: "alice",
+      error: "Unknown error",
+    });
   });
 });

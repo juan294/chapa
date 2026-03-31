@@ -451,4 +451,145 @@ describe("AuthorTypewriter", () => {
       expect(textSpan.textContent).toBe("</> JG");
     });
   });
+
+  // =====================================================================
+  // Additional branch coverage
+  // =====================================================================
+
+  describe("reduced motion — static rendering", () => {
+    it("renders HOME_TEXT statically when prefers-reduced-motion is set", async () => {
+      matchMediaMock.mockReturnValue({ matches: true });
+      render(<AuthorTypewriter />);
+      const textSpan = screen.getByText("</> JG");
+
+      // Even after a very long time, text should remain static
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(textSpan.textContent).toBe("</> JG");
+    });
+
+    it("queries matchMedia with the correct media string", () => {
+      matchMediaMock.mockReturnValue({ matches: false });
+      render(<AuthorTypewriter />);
+      expect(matchMediaMock).toHaveBeenCalledWith(
+        "(prefers-reduced-motion: reduce)",
+      );
+    });
+  });
+
+  describe("message index cycling — skip index 0", () => {
+    it("cycles through multiple messages without repeating index 0 as a cycling target", async () => {
+      render(<AuthorTypewriter />);
+      const textSpan = screen.getByText("</> JG");
+
+      // Message at index 1: "built with ♥ in the EU" (22 chars)
+      // Message at index 2: "built by Creative Tokens" (24 chars)
+
+      // Full cycle for msg1: HOME_HOLD + erase HOME(6*80) + pause(300) + type msg1(22*80)
+      //   + MSG_HOLD(4000) + erase msg1(22*80) + pause(300) + type HOME(6*80)
+      //   + HOME_HOLD
+      const msg1Cycle = 6 * 80 + 300 + 22 * 80 + 4000 + 22 * 80 + 300 + 6 * 80;
+
+      // Advance through first HOME_HOLD + first full rotation
+      await vi.advanceTimersByTimeAsync(30_000 + msg1Cycle);
+
+      // Should be back at HOME_TEXT
+      expect(textSpan.textContent).toBe("</> JG");
+
+      // Advance through second HOME_HOLD
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      // Erase HOME_TEXT
+      await vi.advanceTimersByTimeAsync(6 * 80);
+      expect(textSpan.textContent).toBe("");
+
+      // EMPTY_PAUSE
+      await vi.advanceTimersByTimeAsync(300);
+
+      // Type message at index 2: "built by Creative Tokens" (24 chars)
+      await vi.advanceTimersByTimeAsync(24 * 80);
+      expect(textSpan.textContent).toBe("built by Creative Tokens");
+    });
+
+    it("wraps around MESSAGES array and skips index 0", async () => {
+      render(<AuthorTypewriter />);
+      const textSpan = screen.getByText("</> JG");
+
+      // There are 12 messages (index 0-11). The cycle increments messageIndex
+      // and skips 0, so it goes 1,2,3,...,11,1,2,...
+      // We need to go through 11 rotations to wrap around (indices 1-11, then back to 1).
+      // Each rotation is: erase HOME(6*80) + pause(300) + type msg + MSG_HOLD(4000) + erase msg + pause(300) + type HOME(6*80) + HOME_HOLD(30000)
+
+      // Just verify the first message is at index 1 (not 0)
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(6 * 80 + 300);
+      // Now typing — first char should be 'b' (from "built with...")
+      await vi.advanceTimersByTimeAsync(80);
+      expect(textSpan.textContent).toBe("b");
+    });
+  });
+
+  describe("HOME_TEXT displayed initially", () => {
+    it("shows HOME_TEXT as initial text content before any animation", () => {
+      render(<AuthorTypewriter />);
+      expect(screen.getByText("</> JG")).toBeDefined();
+    });
+
+    it("HOME_TEXT remains during the initial HOME_HOLD period", async () => {
+      render(<AuthorTypewriter />);
+      const textSpan = screen.getByText("</> JG");
+
+      // Advance 15 seconds — still in HOME_HOLD
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(textSpan.textContent).toBe("</> JG");
+
+      // Advance to just before HOME_HOLD ends (29.9s)
+      await vi.advanceTimersByTimeAsync(14_900);
+      expect(textSpan.textContent).toBe("</> JG");
+    });
+  });
+
+  describe("unmount during various animation phases", () => {
+    it("stops typing when unmounted during type phase", async () => {
+      const { unmount } = render(<AuthorTypewriter />);
+      const textSpan = screen.getByText("</> JG");
+
+      // Advance to typing phase
+      await vi.advanceTimersByTimeAsync(30_000 + 6 * 80 + 300);
+
+      // Type a few chars
+      await vi.advanceTimersByTimeAsync(3 * 80);
+      const textBeforeUnmount = textSpan.textContent;
+      expect(textBeforeUnmount!.length).toBeGreaterThan(0);
+
+      // Unmount — cancelled flag set, clearTimeout called
+      unmount();
+
+      // Further timer advances should be safe (no writes to unmounted ref)
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    it("clearTimeout is called on unmount", async () => {
+      const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+      const { unmount } = render(<AuthorTypewriter />);
+
+      // Start some timers
+      await vi.advanceTimersByTimeAsync(1000);
+
+      unmount();
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      clearTimeoutSpy.mockRestore();
+    });
+  });
+
+  describe("textRef null guard", () => {
+    it("handles textRef being set correctly on mount", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const textSpan = container.querySelector(
+        "span span",
+      ) as HTMLElement;
+      // textRef is set — initial content should be HOME_TEXT
+      expect(textSpan.textContent).toBe("</> JG");
+    });
+  });
 });

@@ -6,6 +6,7 @@
  */
 
 import { getResend } from "./resend";
+import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -36,7 +37,11 @@ export async function ensureSegment(): Promise<string | null> {
 
   try {
     // Try to find existing segment by name
-    const { data: listData, error: listError } = await resend.segments.list();
+    const { data: listData, error: listError } = await withTimeout(
+      resend.segments.list(),
+      EMAIL_SEND_TIMEOUT_MS,
+      "ensureSegment:list",
+    );
 
     if (listError) {
       console.error("[audience] Failed to list segments:", listError.message);
@@ -50,8 +55,11 @@ export async function ensureSegment(): Promise<string | null> {
     }
 
     // Create new segment
-    const { data: createData, error: createError } =
-      await resend.segments.create({ name: SEGMENT_NAME });
+    const { data: createData, error: createError } = await withTimeout(
+      resend.segments.create({ name: SEGMENT_NAME }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "ensureSegment:create",
+    );
 
     if (createError) {
       console.error(
@@ -93,12 +101,16 @@ export async function addContact(
   if (!segmentId) return null;
 
   try {
-    const { data, error } = await resend.contacts.create({
-      email,
-      firstName: opts?.firstName ?? opts?.handle ?? undefined,
-      unsubscribed: false,
-      segments: [{ id: segmentId }],
-    });
+    const { data, error } = await withTimeout(
+      resend.contacts.create({
+        email,
+        firstName: opts?.firstName ?? opts?.handle ?? undefined,
+        unsubscribed: false,
+        segments: [{ id: segmentId }],
+      }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "addContact",
+    );
 
     if (error) {
       // Contact already exists — update instead
@@ -128,10 +140,14 @@ export async function updateContact(
   if (!resend) return null;
 
   try {
-    const { data, error } = await resend.contacts.update({
-      email,
-      ...opts,
-    });
+    const { data, error } = await withTimeout(
+      resend.contacts.update({
+        email,
+        ...opts,
+      }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "updateContact",
+    );
 
     if (error) {
       console.error("[audience] Failed to update contact:", error.message);
@@ -154,7 +170,11 @@ export async function removeContact(email: string): Promise<boolean> {
   if (!resend) return false;
 
   try {
-    const { error } = await resend.contacts.remove({ email });
+    const { error } = await withTimeout(
+      resend.contacts.remove({ email }),
+      EMAIL_SEND_TIMEOUT_MS,
+      "removeContact",
+    );
 
     if (error) {
       console.error("[audience] Failed to remove contact:", error.message);

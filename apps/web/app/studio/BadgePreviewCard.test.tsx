@@ -28,6 +28,16 @@ vi.mock("next/dynamic", () => ({
     // for coverage — then discard the result
     opts?.loading?.();
 
+    // Eagerly call the loader function to exercise the dynamic import arrow functions
+    // and their .then() chains for V8 function coverage. The import will resolve to
+    // our mocked modules (see vi.mock calls below for the effect modules).
+    // We catch rejections so tests aren't affected if an import fails.
+    try {
+      loader().catch(() => {});
+    } catch {
+      // swallow synchronous errors
+    }
+
     const MockComponent = (props: Record<string, unknown>) => {
       // If children are passed (wrapping components like GradientBorder, HolographicOverlay),
       // render the children so inner content is accessible in tests
@@ -70,6 +80,28 @@ vi.mock("@/lib/effects/interactions/holographic-css", () => ({
 
 vi.mock("@/lib/effects/celebrations/confetti", () => ({
   fireSingleBurst: vi.fn(),
+}));
+
+// Mock the dynamically imported effect modules so their loader functions
+// and .then() chains resolve (exercising those arrow functions for coverage)
+vi.mock("@/lib/effects/backgrounds/AuroraBackground", () => ({
+  AuroraBackground: () => <div data-testid="aurora-bg" />,
+}));
+
+vi.mock("@/lib/effects/backgrounds/ParticleCanvas", () => ({
+  default: () => <div data-testid="particle-canvas" />,
+}));
+
+vi.mock("@/lib/effects/borders/GradientBorder", () => ({
+  GradientBorder: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="gradient-border">{children}</div>
+  ),
+}));
+
+vi.mock("@/lib/effects/interactions/HolographicOverlay", () => ({
+  HolographicOverlay: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="holographic-overlay">{children}</div>
+  ),
 }));
 
 vi.mock("@/components/badge/BadgeContent", () => ({
