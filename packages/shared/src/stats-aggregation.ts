@@ -45,13 +45,19 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // Exclude cross-default PRs (e.g. develop → main releases, main → develop backports)
   // from solo quality denominators — they represent integration activity, not development work.
   // When baseRefName is unavailable (old cached data), fall back to all merged PRs.
+  // Minimum development PRs needed for filtered quality metrics.
+  // Below this threshold, the token likely has limited scope (e.g. GITHUB_TOKEN
+  // seeing only public contributions) — fall back to all merged PRs.
+  const MIN_QUALITY_SAMPLE = 5;
+
   const hasBaseRefName = mergedPRs.some((pr) => pr.baseRefName != null);
-  const developmentPRs = hasBaseRefName
+  const filteredDevPRs = hasBaseRefName
     ? mergedPRs.filter(
         (pr) =>
           !(DEFAULT_BRANCH_NAMES.has(pr.headRefName) && DEFAULT_BRANCH_NAMES.has(pr.baseRefName!)),
       )
     : mergedPRs;
+  const developmentPRs = filteredDevPRs.length >= MIN_QUALITY_SAMPLE ? filteredDevPRs : mergedPRs;
   const devPrCount = developmentPRs.length;
 
   const prDescriptionRate = devPrCount > 0
