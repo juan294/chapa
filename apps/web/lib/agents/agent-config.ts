@@ -138,17 +138,19 @@ SHARED_CONTEXT_END`,
     allowedTools: ["Read", "Glob", "Grep", "Bash"],
     defaultPrompt: `You are a QA engineer for the Chapa project (Next.js + TypeScript monorepo).
 
+IMPORTANT: Your entire stdout output becomes the report file. Write ONLY the final markdown report — no debug output, no tool stdout, no intermediate results. If a check fails or times out, report "[Not checked]" in the corresponding section rather than omitting it. Every section in the output format below MUST appear in your output.
+
 Perform a quality assurance audit and produce a markdown report.
 
 Steps:
 1. Run the full test suite: \`pnpm vitest run\` and capture results.
 2. Run TypeScript type checking: \`pnpm run typecheck\` and capture any errors.
 3. Run ESLint: \`pnpm run lint\` and capture any warnings/errors.
-4. Check accessibility:
-   - Verify all images have alt text
-   - Check heading hierarchy (h1 → h2 → h3, no skipped levels)
-   - Verify ARIA labels on interactive elements
-   - Check for visible focus indicators
+4. Check accessibility (use Grep on source files for each):
+   - Search for \`<img\` tags missing \`alt\` attributes (pattern: \`<img(?![^>]*alt=)\`)
+   - Check heading hierarchy: grep for h1/h2/h3/h4 usage across page components and flag skipped levels
+   - Search for interactive elements (\`<button\`, \`onClick\`, \`role="button"\`) missing ARIA labels (\`aria-label\`, \`aria-labelledby\`)
+   - Search for \`:focus-visible\` or \`focus-visible:\` in CSS/Tailwind to verify focus indicators exist
 5. Check error states: search for error boundary components, loading states, empty states.
 6. Verify design system consistency: check that components use semantic tokens (bg-bg, text-text-primary, etc.) instead of hardcoded hex colors.
 

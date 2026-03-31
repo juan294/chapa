@@ -42,14 +42,26 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   const linesDeleted = mergedPRs.reduce((sum, pr) => sum + pr.deletions, 0);
 
   // 5b. Solo quality signals from merged PRs
-  const prDescriptionRate = prsMergedCount > 0
-    ? mergedPRs.filter((pr) => (pr.body ?? "").trim().length > 0).length / prsMergedCount
+  // Exclude cross-default PRs (e.g. develop → main releases, main → develop backports)
+  // from solo quality denominators — they represent integration activity, not development work.
+  // When baseRefName is unavailable (old cached data), fall back to all merged PRs.
+  const hasBaseRefName = mergedPRs.some((pr) => pr.baseRefName != null);
+  const developmentPRs = hasBaseRefName
+    ? mergedPRs.filter(
+        (pr) =>
+          !(DEFAULT_BRANCH_NAMES.has(pr.headRefName) && DEFAULT_BRANCH_NAMES.has(pr.baseRefName!)),
+      )
+    : mergedPRs;
+  const devPrCount = developmentPRs.length;
+
+  const prDescriptionRate = devPrCount > 0
+    ? developmentPRs.filter((pr) => (pr.body ?? "").trim().length > 0).length / devPrCount
     : undefined;
-  const featureBranchRate = prsMergedCount > 0
-    ? mergedPRs.filter((pr) => !DEFAULT_BRANCH_NAMES.has(pr.headRefName)).length / prsMergedCount
+  const featureBranchRate = devPrCount > 0
+    ? developmentPRs.filter((pr) => !DEFAULT_BRANCH_NAMES.has(pr.headRefName)).length / devPrCount
     : undefined;
-  const issueLinkageRate = prsMergedCount > 0
-    ? mergedPRs.filter((pr) => pr.closingIssuesCount > 0).length / prsMergedCount
+  const issueLinkageRate = devPrCount > 0
+    ? developmentPRs.filter((pr) => pr.closingIssuesCount > 0).length / devPrCount
     : undefined;
 
   // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold
@@ -58,11 +70,11 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     : undefined;
 
   // 5d. Batch size score: fraction of merged PRs in the reviewable sweet spot
-  const batchSizeScore = prsMergedCount > 0
-    ? mergedPRs.filter((pr) => {
+  const batchSizeScore = devPrCount > 0
+    ? developmentPRs.filter((pr) => {
         const total = pr.additions + pr.deletions;
         return total >= BATCH_SIZE_MIN && total <= BATCH_SIZE_MAX;
-      }).length / prsMergedCount
+      }).length / devPrCount
     : undefined;
 
   // 5e. Median PR lead time (creation → merge) in hours

@@ -9,8 +9,8 @@ const SOURCE = fs.readFileSync(
 
 describe("Scoring methodology page (server component)", () => {
   describe("ISR configuration", () => {
-    it("exports revalidate = 3600", () => {
-      expect(SOURCE).toContain("export const revalidate = 3600");
+    it("exports revalidate = 86400 (24h)", () => {
+      expect(SOURCE).toContain("export const revalidate = 86400");
     });
   });
 

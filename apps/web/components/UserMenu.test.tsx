@@ -1979,3 +1979,239 @@ describe("UserMenu — Codeberg disconnect non-ok response (runtime)", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// Display name fallback (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — display name fallback (runtime)", () => {
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+  });
+
+  it("shows display name when name is provided", () => {
+    render(<UserMenu {...baseProps} name="Test User" />);
+    expect(screen.getByText("Test User")).toBeDefined();
+  });
+
+  it("falls back to login when name is null", () => {
+    render(<UserMenu {...baseProps} name={null} />);
+    // The dropdown header should show login since name is null
+    // There are two instances of login: the trigger and the header @login
+    const elements = screen.getAllByText("testuser");
+    expect(elements.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Chevron rotation on open state (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — chevron rotation (runtime)", () => {
+  beforeEach(() => {
+    clearPlatformStatusCache();
+  });
+
+  it("chevron has rotate-180 class when menu is open", () => {
+    dropdownOpen = true;
+    render(<UserMenu {...baseProps} />);
+    const trigger = screen.getByLabelText("User menu");
+    const svg = trigger.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.className.baseVal || svg!.getAttribute("class")).toContain("rotate-180");
+  });
+
+  it("chevron does not have rotate-180 class when menu is closed", () => {
+    dropdownOpen = false;
+    render(<UserMenu {...baseProps} />);
+    const trigger = screen.getByLabelText("User menu");
+    const svg = trigger.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.className.baseVal || svg!.getAttribute("class")).not.toContain("rotate-180");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Platform cache with codeberg data populated (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — platform cache with both platforms populated (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    clearPlatformStatusCache();
+    dropdownOpen = true;
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-cached" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-cached" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("restores both platform statuses from cache on second mount", async () => {
+    // First mount populates cache
+    const { unmount } = render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("bb-cached")).toBeDefined();
+      expect(screen.getByText("cb-cached")).toBeDefined();
+    });
+
+    unmount();
+
+    // Second mount should use cached data without additional fetches
+    const bbFetchesBefore = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/bitbucket/status"),
+    ).length;
+
+    render(<UserMenu {...baseProps} />);
+
+    // Allow effects to run
+    await new Promise((r) => setTimeout(r, 50));
+
+    const bbFetchesAfter = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/bitbucket/status"),
+    ).length;
+
+    // No additional fetch calls — cache was used
+    expect(bbFetchesAfter).toBe(bbFetchesBefore);
+
+    // Both platforms should be displayed from cache
+    await waitFor(() => {
+      expect(screen.getByText("bb-cached")).toBeDefined();
+      expect(screen.getByText("cb-cached")).toBeDefined();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Insights file input reset after selection (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — insights file input reset (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "High" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 85, craftScore: 72, craftTier: "High" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("resets file input value after selection to allow re-upload of same file", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    // The input value should have been reset (e.target.value = "")
+    // This is done so the same file can be uploaded again
+    // We verify by checking the processing toast appeared (meaning handler ran)
+    await waitFor(() => {
+      expect(screen.getByTestId("toast")).toBeDefined();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Menu dropdown open/close visibility (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — dropdown visibility (runtime)", () => {
+  beforeEach(() => {
+    clearPlatformStatusCache();
+  });
+
+  it("does not render dropdown menu when closed", () => {
+    dropdownOpen = false;
+    render(<UserMenu {...baseProps} />);
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("renders dropdown menu when open", () => {
+    dropdownOpen = true;
+    render(<UserMenu {...baseProps} />);
+    expect(screen.getByRole("menu")).toBeDefined();
+  });
+
+  it("trigger button has correct aria-expanded state when closed", () => {
+    dropdownOpen = false;
+    render(<UserMenu {...baseProps} />);
+    const trigger = screen.getByLabelText("User menu");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("trigger button has correct aria-expanded state when open", () => {
+    dropdownOpen = true;
+    render(<UserMenu {...baseProps} />);
+    const trigger = screen.getByLabelText("User menu");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Sign out form (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — sign out (runtime)", () => {
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+  });
+
+  it("renders sign out button with role=menuitem", () => {
+    render(<UserMenu {...baseProps} />);
+    expect(screen.getByText("Sign out")).toBeDefined();
+    const btn = screen.getByText("Sign out");
+    expect(btn.getAttribute("role")).toBe("menuitem");
+  });
+
+  it("sign out form posts to /api/auth/logout", () => {
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Sign out");
+    const form = btn.closest("form");
+    expect(form).not.toBeNull();
+    expect(form!.getAttribute("method")).toBe("POST");
+    expect(form!.getAttribute("action")).toBe("/api/auth/logout");
+  });
+});

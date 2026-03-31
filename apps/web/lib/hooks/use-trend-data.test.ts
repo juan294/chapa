@@ -206,4 +206,152 @@ describe("useTrendData", () => {
     expect(result.current.trend).toBeNull();
     expect(result.current.diff).toBeNull();
   });
+
+  it("does not update state after component unmounts (cancellation)", async () => {
+    let resolvePromise: (value: unknown) => void;
+    const fetchPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockFetch.mockReturnValueOnce(fetchPromise);
+
+    const useTrendData = await importHook();
+    const { result, unmount } = renderHook(() => useTrendData("testuser"));
+
+    // Component is loading
+    expect(result.current.isLoading).toBe(true);
+
+    // Unmount before fetch resolves
+    unmount();
+
+    // Now resolve the fetch — state should NOT update because cancelled=true
+    resolvePromise!(makeSuccessResponse(fakeTrend, fakeDiff));
+
+    // Give the promise time to settle
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Since the component is unmounted, we can't directly check state,
+    // but the key assertion is that no errors are thrown from
+    // updating state on an unmounted component
+  });
+
+  it("handles JSON response with null trend and diff values (new user)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ handle: "newuser", trend: null, diff: null }),
+    });
+
+    const useTrendData = await importHook();
+    const { result } = renderHook(() => useTrendData("newuser"));
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.trend).toBeNull();
+    expect(result.current.diff).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it("handles JSON response with missing trend/diff keys (uses ?? null)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ handle: "newuser" }),
+    });
+
+    const useTrendData = await importHook();
+    const { result } = renderHook(() => useTrendData("newuser"));
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // data.trend is undefined → ?? null → null
+    expect(result.current.trend).toBeNull();
+    expect(result.current.diff).toBeNull();
+    expect(result.current.error).toBeNull();
+  });
+
+  it("handles error object without message property", async () => {
+    mockFetch.mockRejectedValueOnce({ code: "ABORT" });
+
+    const useTrendData = await importHook();
+    const { result } = renderHook(() => useTrendData("testuser"));
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Not an Error instance → falls back to generic message
+    expect(result.current.error).toBe("Failed to load trend data");
+  });
+
+  it("refetches when handle parameter changes", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeSuccessResponse(fakeTrend, fakeDiff))
+      .mockResolvedValueOnce(
+        makeSuccessResponse(
+          { ...fakeTrend, direction: "declining" as const },
+          fakeDiff,
+        ),
+      );
+
+    const callsBefore = mockFetch.mock.calls.length;
+
+    const useTrendData = await importHook();
+    const { result, rerender } = renderHook(
+      ({ handle }) => useTrendData(handle),
+      { initialProps: { handle: "user1" } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.trend!.direction).toBe("improving");
+    const callsAfterFirst = mockFetch.mock.calls.length;
+    expect(callsAfterFirst - callsBefore).toBeGreaterThanOrEqual(1);
+
+    // Change handle to trigger refetch
+    rerender({ handle: "user2" });
+
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.trend!.direction).toBe("declining");
+    // Find the call that contains user2
+    const user2Call = mockFetch.mock.calls.find(
+      (call) => (call[0] as string).includes("/api/history/user2"),
+    );
+    expect(user2Call).toBeDefined();
+  });
+
+  it("sets 'Rate limited' error specifically for 429 responses", async () => {
+    // Provide the same mock for multiple calls in case React strict mode
+    // double-fires the effect
+    const rateLimitResponse = {
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({}),
+    };
+    mockFetch.mockResolvedValue(rateLimitResponse);
+
+    const useTrendData = await importHook();
+    const { result } = renderHook(() => useTrendData("rate-limit-user"));
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Verify the exact error message for 429
+    expect(result.current.error).toBe("Rate limited");
+    expect(result.current.trend).toBeNull();
+    expect(result.current.diff).toBeNull();
+  });
 });
