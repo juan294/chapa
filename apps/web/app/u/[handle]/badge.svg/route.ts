@@ -23,7 +23,7 @@ import { captureServerError } from "@/lib/analytics/server-errors";
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
-  "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=604800",
+  "Cache-Control": "public, s-maxage=21600, stale-while-revalidate=86400",
   // Badge SVG is designed to be embedded in READMEs, iframes, etc.
   // These headers are set explicitly on the Response object to override the
   // catch-all frame-ancestors 'none' + X-Frame-Options DENY from next.config.ts,
