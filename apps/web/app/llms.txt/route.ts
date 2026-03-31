@@ -70,7 +70,7 @@ export function GET(): Response {
     status: 200,
     headers: {
       "content-type": "text/plain; charset=utf-8",
-      "cache-control": "public, s-maxage=86400, stale-while-revalidate=604800",
+      "cache-control": "public, s-maxage=86400, stale-while-revalidate=86400",
     },
   });
 }

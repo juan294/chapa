@@ -35,7 +35,7 @@ describe("GET /og-image", () => {
   it("sets Cache-Control with 24h s-maxage", async () => {
     const res = await GET();
     expect(res.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=86400, stale-while-revalidate=604800",
+      "public, s-maxage=86400, stale-while-revalidate=86400",
     );
   });
 

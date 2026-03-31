@@ -147,7 +147,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - **Lifetime metrics**: `MetricsSnapshot` records stored in Supabase `metrics_snapshots` table — permanent history. Max 1 snapshot per user per day (UNIQUE constraint on handle+date). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
 - **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
-  - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800`
+  - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`
 
 ## Code ownership areas
 - OAuth: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
