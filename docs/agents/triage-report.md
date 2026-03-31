@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-03-26 | 4 reports processed | 10 action items
+> Generated on 2026-03-30 | 7 reports processed | 17 action items
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -7,48 +7,50 @@ None — all agents ran successfully.
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | coverage-report.md | Coverage | GREEN | 9 (Priority 1: 6, Priority 2: 4, minus 1 accepted JSDOM limitation) |
-| 2 | qa-report.md | QA | GREEN | 2 (error boundary, docs mismatch — 1 already resolved) |
-| 3 | cost-analyst-report.md | Cost Analyst | GREEN | 1 code fix + 2 monitor/carry |
-| 4 | cc-rpi-update-report.md | cc-rpi Update | N/A | 0 — already at v1.12.0 |
+| 1 | coverage-report.md | Coverage | GREEN | 15 (P1: 8, P2: 7) |
+| 2 | cost-analyst-report.md | Cost Analyst | GREEN | 2 (Resend timeouts, ISR) |
+| 3 | cc-rpi-update-report.md | cc-rpi Update | GREEN | 0 (up to date v1.14.1) |
+| 4 | security-report.md | Security | GREEN | 0 (shared with cost-analyst) |
+| 5 | pre-launch-report.md | Pre-Launch | CONDITIONAL | 0 (all resolved by remediation) |
+| 6 | remediation-report.md | Remediation | COMPLETE | 0 (6 issues closed) |
+| 7 | update-docs-report.md | Documentation | COMPLETE | 0 (7 docs updated) |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | useAdminDashboard.ts branch coverage | Coverage | +14 tests | DONE |
-| 2 | terminal-display.tsx branch coverage | Coverage | +7 tests | DONE |
-| 3 | HeatmapGrid.tsx branch coverage | Coverage | +18 tests | DONE |
-| 4 | email/campaigns.ts edge cases | Coverage | +7 tests | DONE |
-| 5 | BadgePreviewCard.tsx runtime tests | Coverage | +15 tests | DONE |
-| 6 | UserMenu.tsx runtime tests | Coverage | +12 tests | DONE |
-| 7 | RadarChartInteractive.tsx branch coverage | Coverage | +20 tests | DONE |
-| 8 | ActivityHeatmap.tsx branch coverage | Coverage | +12 tests | DONE |
-| 9 | /cli/authorize error boundary | QA | +7 tests | DONE |
-| 10 | Resend emails.send() timeout | Cost Analyst | +1 test | DONE |
-
-### Skipped with justification
-| Item | Reason |
-|------|--------|
-| campaigns-dashboard.tsx (79.7% funcs) | Exploration agent found all handlers fully covered — remaining gap is JSX lambdas, not meaningful action handlers |
-| CLAUDE.md studio/config docs mismatch | Already resolved — CLAUDE.md says GET\|PUT which matches implementation. QA finding stale since 2026-03-18 |
-| ParticleBackground.tsx (72.2% branch) | JSDOM canvas limitation — same accepted category as experiments/HolographicOverlay |
-| OG image blob storage | Future scale concern (50K+ users), no code change now |
-| sync-audience pagination | Working correctly, monitor at scale |
-| Supabase SDK chunk dedup | Minor optimization, import audit only — no meaningful bundle savings |
+| 1 | BadgePreviewCard.tsx funcs 53%→100% | Coverage P1 | Updated dynamic mock | Done |
+| 2 | SharePageShortcuts.tsx — new test file | Coverage P1 | 11 tests | Done |
+| 3 | AdminDashboardClient.tsx — new test file | Coverage P1 | 34 tests | Done |
+| 4 | ParticleBackground.tsx — new test file | Coverage P1 | 31 tests | Done |
+| 5 | bulk-recalculate/route.ts edge cases | Coverage P1 | 11 tests | Done |
+| 6 | use-trend-data.ts branches | Coverage P1 | 5 tests | Done |
+| 7 | InfoTooltip.tsx interactions | Coverage P1 | 25 tests | Done |
+| 8 | UserMenu.tsx interactions | Coverage P1 | 14 tests | Done |
+| 9 | AuthorTypewriter.tsx branches | Coverage P2 | 12 tests | Done |
+| 10 | announcement.ts branches | Coverage P2 | 12 tests | Done |
+| 11 | ParticleBackground.tsx branches | Coverage P2 | (included in #4) | Done |
+| 12 | use-trend-data.ts branches | Coverage P2 | (included in #6) | Done |
+| 13 | trend.ts edge cases | Coverage P2 | 11 tests | Done |
+| 14 | ConfirmDialog.tsx branches | Coverage P2 | 15 tests | Done |
+| 15 | engagement-dashboard.tsx branches | Coverage P2 | 15 tests | Done |
+| 16 | Resend SDK withTimeout() wrappers | Cost Analyst | 7 tests | Done |
+| 17 | About pages ISR 1h→24h | Cost Analyst | 3 tests updated | Done |
 
 ## Verification
-- [x] All 6,129 tests passing (370 files)
+- [x] All 6,858 tests passing (385 files)
 - [x] Typecheck clean (0 errors)
 - [x] Lint clean (0 errors, 0 warnings)
-- [x] CI monitoring (background)
+- [x] Pushed to develop
 
-## Carried Items
-| Item | Since | Risk |
-|------|-------|------|
-| OG image blob storage | 2026-03-12 | LOW — revisit at 50K+ users |
-| sync-audience pagination | 2026-03-18 | LOW — working correctly |
+## Carried Items (monitoring only)
+| Item | Since | Risk | Notes |
+|------|-------|------|-------|
+| OG image Redis memory | 2026-03-12 | LOW | 59% at 10K users — consider blob storage at 50K+ |
+| sync-audience pagination | 2026-03-18 | LOW | Future concern at 50K+ contacts |
+| experiments coverage 56% | 2026-03-25 | ACCEPTED | Feature-flagged, canvas/WebGL, JSDOM limitation |
+| HolographicOverlay 47% | 2026-03-25 | ACCEPTED | Canvas/WebGL — JSDOM cannot execute |
 
 ## Summary
-All 4 reports GREEN. Added 97 tests across 10 files (+1 new test file, +1 new error boundary). Added 10s timeout to all Resend email send calls. Test count: 6,032 → 6,129. No blockers, no regressions.
+All 7 reports GREEN. Added 203 tests across 21 files (3 new test files). Wrapped 5 Resend SDK calls with `withTimeout()`. Updated about pages ISR 1h→24h. Test count: 6,655 → 6,858. No blockers, no regressions.
