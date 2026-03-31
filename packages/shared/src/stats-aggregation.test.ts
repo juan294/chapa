@@ -488,14 +488,16 @@ describe("buildStatsFromRaw", () => {
   // --- Release PR exclusion (cross-default PRs) ---
 
   it("excludes cross-default PRs (develop → main) from solo quality metrics", () => {
+    // 6 dev PRs (above MIN_QUALITY_SAMPLE=5) + 1 release PR + 1 unmerged
+    const devNodes = Array.from({ length: 6 }, (_, i) => ({
+      additions: 50 + i * 20, deletions: 10 + i * 5, changedFiles: 3, merged: true,
+      body: `Feature ${i}`, headRefName: `feat/f${i}`, baseRefName: "develop", closingIssuesCount: 1,
+    }));
     const raw = makeRaw({
       pullRequests: {
-        totalCount: 4,
+        totalCount: 8,
         nodes: [
-          // Feature PR: feature/xyz → develop (should be counted)
-          { additions: 100, deletions: 20, changedFiles: 5, merged: true, body: "Implements feature", headRefName: "feature/xyz", baseRefName: "develop", closingIssuesCount: 1 },
-          // Feature PR: fix/bug → develop (should be counted)
-          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "Fixes bug", headRefName: "fix/bug", baseRefName: "develop", closingIssuesCount: 1 },
+          ...devNodes,
           // Release PR: develop → main (should be EXCLUDED from quality metrics)
           { additions: 10000, deletions: 2000, changedFiles: 50, merged: true, body: "release: v2.0", headRefName: "develop", baseRefName: "main", closingIssuesCount: 0 },
           // Unmerged PR (already excluded)
@@ -504,33 +506,35 @@ describe("buildStatsFromRaw", () => {
       },
     });
     const result = buildStatsFromRaw(raw);
-    // 3 merged total, but only 2 are development PRs (release excluded)
-    // Both dev PRs are from feature branches → 100% feature branch rate
+    // 7 merged total, 6 dev PRs (release excluded, above MIN_QUALITY_SAMPLE)
     expect(result.featureBranchRate).toBe(1);
-    // Both dev PRs have descriptions → 100% description rate
     expect(result.prDescriptionRate).toBe(1);
-    // Both dev PRs link issues → 100% linkage rate
     expect(result.issueLinkageRate).toBe(1);
-    // Both dev PRs: 120 lines + 60 lines → both in 20-500 sweet spot
+    // All dev PRs: 60-160 lines → all in 20-500 sweet spot
     expect(result.batchSizeScore).toBe(1);
   });
 
   it("counts release PRs in prsMergedCount but not in solo quality denominators", () => {
+    // 5 dev PRs (at MIN_QUALITY_SAMPLE threshold) + 1 release PR
+    const devNodes = Array.from({ length: 5 }, (_, i) => ({
+      additions: 30 + i * 10, deletions: 10, changedFiles: 3, merged: true,
+      body: `Feature ${i}`, headRefName: `feat/f${i}`, baseRefName: "develop", closingIssuesCount: 1,
+    }));
     const raw = makeRaw({
       pullRequests: {
-        totalCount: 2,
+        totalCount: 6,
         nodes: [
-          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "feature", headRefName: "feat/a", baseRefName: "develop", closingIssuesCount: 1 },
+          ...devNodes,
           { additions: 5000, deletions: 1000, changedFiles: 30, merged: true, body: "release", headRefName: "develop", baseRefName: "main", closingIssuesCount: 0 },
         ],
       },
     });
     const result = buildStatsFromRaw(raw);
     // prsMergedCount includes ALL merged PRs (for Delivery, etc.)
-    expect(result.prsMergedCount).toBe(2);
-    // But solo quality metrics exclude the release PR
-    expect(result.batchSizeScore).toBe(1); // only the 60-line PR counts
-    expect(result.featureBranchRate).toBe(1); // only the feature PR counts
+    expect(result.prsMergedCount).toBe(6);
+    // But solo quality metrics exclude the release PR (5 dev PRs >= MIN_QUALITY_SAMPLE)
+    expect(result.batchSizeScore).toBe(1);
+    expect(result.featureBranchRate).toBe(1);
   });
 
   it("falls back to all merged PRs when baseRefName is absent (backward compat)", () => {
@@ -550,18 +554,44 @@ describe("buildStatsFromRaw", () => {
     expect(result.prDescriptionRate).toBeCloseTo(0.5, 2);
   });
 
+  it("falls back to all merged PRs when filtering leaves fewer than 5 dev PRs (limited token scope)", () => {
+    // Simulates GITHUB_TOKEN with limited scope: 10 PRs total, 8 release, 2 dev
+    const releasePRs = Array.from({ length: 8 }, (_, i) => ({
+      additions: 5000 + i * 1000, deletions: 1000, changedFiles: 30, merged: true,
+      body: `release v${i}`, headRefName: "develop", baseRefName: "main", closingIssuesCount: 0,
+    }));
+    const devPRs = [
+      { additions: 3000, deletions: 700, changedFiles: 15, merged: true, body: "chore", headRefName: "chore/deps", baseRefName: "develop", closingIssuesCount: 0 },
+      { additions: 2000, deletions: 500, changedFiles: 10, merged: true, body: "chore", headRefName: "chore/ci", baseRefName: "develop", closingIssuesCount: 0 },
+    ];
+    const raw = makeRaw({
+      pullRequests: { totalCount: 10, nodes: [...releasePRs, ...devPRs] },
+    });
+    const result = buildStatsFromRaw(raw);
+    // Only 2 dev PRs remain after filtering → below MIN_QUALITY_SAMPLE (5)
+    // Falls back to all 10 merged PRs (same as pre-fix behavior)
+    expect(result.prsMergedCount).toBe(10);
+    // featureBranchRate uses all 10: 2 feature / 10 total = 0.2
+    expect(result.featureBranchRate).toBeCloseTo(0.2, 2);
+  });
+
   it("excludes backport PRs (main → develop) as cross-default", () => {
+    // 5 dev PRs + 1 backport (above MIN_QUALITY_SAMPLE after filtering)
+    const devNodes = Array.from({ length: 5 }, (_, i) => ({
+      additions: 40 + i * 10, deletions: 10, changedFiles: 3, merged: true,
+      body: `Feature ${i}`, headRefName: `feat/f${i}`, baseRefName: "develop", closingIssuesCount: 1,
+    }));
     const raw = makeRaw({
       pullRequests: {
-        totalCount: 2,
+        totalCount: 6,
         nodes: [
-          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "feature", headRefName: "feat/a", baseRefName: "develop", closingIssuesCount: 1 },
+          ...devNodes,
           { additions: 20, deletions: 5, changedFiles: 2, merged: true, body: "backport", headRefName: "main", baseRefName: "develop", closingIssuesCount: 0 },
         ],
       },
     });
     const result = buildStatsFromRaw(raw);
-    // Backport (main → develop) excluded from quality metrics
+    // Backport (main → develop) excluded, 5 dev PRs remain (>= MIN_QUALITY_SAMPLE)
     expect(result.featureBranchRate).toBe(1);
     expect(result.issueLinkageRate).toBe(1);
   });
