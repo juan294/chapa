@@ -120,6 +120,7 @@ export interface RawContributionData {
       merged: boolean;
       body: string | null;
       headRefName: string;
+      baseRefName?: string; // target branch — absent in old cached data
       createdAt?: string; // ISO timestamp — when the PR was created
       mergedAt?: string | null; // ISO timestamp — when the PR was merged (null if not merged)
       closingIssuesCount: number;
