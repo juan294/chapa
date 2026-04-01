@@ -247,6 +247,28 @@ describe("mergeStats", () => {
     });
   });
 
+  describe("primaryReviewsSubmittedCount", () => {
+    it("stores primary's review count for profile type detection", () => {
+      const primary = makeStats({ reviewsSubmittedCount: 0 });
+      const supplemental = makeStats({ reviewsSubmittedCount: 6 });
+      const merged = mergeStats(primary, supplemental);
+
+      // Total reviews are summed (for quality formula)
+      expect(merged.reviewsSubmittedCount).toBe(6);
+      // Primary reviews stored separately (for profile type detection)
+      expect(merged.primaryReviewsSubmittedCount).toBe(0);
+    });
+
+    it("stores primary reviews when both have reviews", () => {
+      const primary = makeStats({ reviewsSubmittedCount: 10 });
+      const supplemental = makeStats({ reviewsSubmittedCount: 5 });
+      const merged = mergeStats(primary, supplemental);
+
+      expect(merged.reviewsSubmittedCount).toBe(15);
+      expect(merged.primaryReviewsSubmittedCount).toBe(10);
+    });
+  });
+
   describe("hasSupplementalData flag", () => {
     it("sets hasSupplementalData to true by default (backward compat)", () => {
       const merged = mergeStats(makeStats(), makeStats());
@@ -314,6 +336,50 @@ describe("mergeStats", () => {
       expect(merged.prDescriptionRate).toBeUndefined();
       expect(merged.featureBranchRate).toBeUndefined();
       expect(merged.issueLinkageRate).toBeUndefined();
+    });
+
+    it("does NOT dilute primary quality rates when supplemental has undefined rates but many PRs", () => {
+      // Bug regression: supplemental with 21 PRs but no quality rates
+      // was diluting primary rates by treating undefined as 0 in weighted avg.
+      // e.g. featureBranchRate: (0.9 * 10 + 0 * 21) / 31 = 0.29 instead of 0.9
+      const primary = makeStats({
+        prsMergedCount: 10,
+        prDescriptionRate: 0.8,
+        featureBranchRate: 0.9,
+        issueLinkageRate: 0.5,
+        batchSizeScore: 0.6,
+        medianPrLeadTimeHours: 4.0,
+      });
+      const supplemental = makeStats({
+        prsMergedCount: 21,
+        // All quality rates intentionally omitted (undefined)
+      });
+
+      const merged = mergeStats(primary, supplemental);
+
+      // Primary rates must be preserved — not diluted by supplemental's undefined values
+      expect(merged.prDescriptionRate).toBeCloseTo(0.8, 2);
+      expect(merged.featureBranchRate).toBeCloseTo(0.9, 2);
+      expect(merged.issueLinkageRate).toBeCloseTo(0.5, 2);
+      expect(merged.batchSizeScore).toBeCloseTo(0.6, 2);
+      expect(merged.medianPrLeadTimeHours).toBeCloseTo(4.0, 2);
+    });
+
+    it("does NOT dilute supplemental quality rates when primary has undefined rates but many PRs", () => {
+      const primary = makeStats({
+        prsMergedCount: 15,
+        // Quality rates omitted
+      });
+      const supplemental = makeStats({
+        prsMergedCount: 8,
+        featureBranchRate: 0.75,
+        prDescriptionRate: 0.5,
+      });
+
+      const merged = mergeStats(primary, supplemental);
+
+      expect(merged.featureBranchRate).toBeCloseTo(0.75, 2);
+      expect(merged.prDescriptionRate).toBeCloseTo(0.5, 2);
     });
   });
 

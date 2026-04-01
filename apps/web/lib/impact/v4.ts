@@ -243,9 +243,13 @@ export function computeDimensions(stats: StatsData, craftScore?: number, profile
  * @returns `"solo"` when review-to-PR ratio is below threshold, `"collaborative"` otherwise
  */
 export function detectProfileType(stats: StatsData): ProfileType {
-  if (stats.reviewsSubmittedCount === 0) return "solo";
+  // Use primary-only reviews when available (after merge with supplemental data).
+  // This prevents supplemental reviews from an EMU/enterprise account from
+  // flipping a solo developer's profile to collaborative.
+  const reviews = stats.primaryReviewsSubmittedCount ?? stats.reviewsSubmittedCount;
+  if (reviews === 0) return "solo";
   const prCount = Math.max(stats.prsMergedCount, 1);
-  const ratio = stats.reviewsSubmittedCount / prCount;
+  const ratio = reviews / prCount;
   return ratio < SOLO_REVIEW_RATIO_THRESHOLD ? "solo" : "collaborative";
 }
 

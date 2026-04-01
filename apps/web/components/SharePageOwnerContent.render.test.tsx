@@ -12,6 +12,10 @@ vi.mock("@/hooks/useSession", () => ({
   useSession: () => mockUseSession(),
 }));
 
+vi.mock("@/hooks/useOwnerCacheWarm", () => ({
+  useOwnerCacheWarm: vi.fn(),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     children,
