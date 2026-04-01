@@ -59,6 +59,10 @@ vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
@@ -66,6 +70,7 @@ import { invalidateHistoryCache } from "@/lib/history/history";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { revalidatePath } from "next/cache";
 
 const SESSION = {
   token: "tok",
@@ -401,5 +406,44 @@ describe("POST /api/refresh", () => {
     );
 
     consoleErrorSpy.mockRestore();
+  });
+
+  // ISR revalidation — Phase 1 of share-page-oauth-fix plan
+  describe("ISR revalidation", () => {
+    it("calls revalidatePath for the user's share page after successful refresh", async () => {
+      vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 15 });
+      vi.mocked(getStats).mockResolvedValue({
+        handle: "testuser",
+        commitsTotal: 10,
+        activeDays: 5,
+        prsMergedCount: 1,
+        prsMergedWeight: 2,
+        reviewsSubmittedCount: 3,
+        issuesClosedCount: 1,
+        linesAdded: 100,
+        linesDeleted: 50,
+        reposContributed: 1,
+        topRepoShare: 1,
+        maxCommitsIn10Min: 1,
+        totalStars: 0,
+        totalForks: 0,
+        totalWatchers: 0,
+        heatmapData: [],
+        fetchedAt: new Date().toISOString(),
+      });
+
+      const res = await POST(makeRequest("testuser"));
+      expect(res.status).toBe(200);
+      expect(revalidatePath).toHaveBeenCalledWith("/u/testuser");
+    });
+
+    it("does not call revalidatePath when stats fetch fails", async () => {
+      vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 15 });
+      vi.mocked(getStats).mockResolvedValue(null);
+
+      const res = await POST(makeRequest("testuser"));
+      expect(res.status).toBe(502);
+      expect(revalidatePath).not.toHaveBeenCalled();
+    });
   });
 });

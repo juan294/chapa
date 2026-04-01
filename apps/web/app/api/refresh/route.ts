@@ -9,6 +9,7 @@ import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { invalidateHistoryCache } from "@/lib/history/history";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { revalidatePath } from "next/cache";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -81,6 +82,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         if (inserted) updateSnapshotCache(handle, snapshot);
       })
       .catch(() => {});
+
+    // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
+    revalidatePath(`/u/${handle}`);
 
     return NextResponse.json({ stats, impact });
   } catch (err) {

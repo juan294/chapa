@@ -6,6 +6,7 @@ import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
+import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
 
 /**
  * Client-side component that handles owner-specific sections on the share page.
@@ -31,7 +32,10 @@ export function SharePageOwnerContent({
   impact,
 }: SharePageOwnerContentProps) {
   const { session, loading } = useSession();
-  const isOwner = session?.login === handle;
+  const isOwner = !loading && session?.login === handle;
+
+  // Warm cache with OAuth data when owner visits (once per session)
+  useOwnerCacheWarm(handle, isOwner);
 
   // Still loading session — show nothing to avoid layout shift
   if (loading) return null;
