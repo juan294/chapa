@@ -5,7 +5,7 @@ import { getStats } from "@/lib/github/client";
 import { computeImpactV4 } from "@/lib/impact/v4";
 import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { invalidateHistoryCache } from "@/lib/history/history";
 import { captureServerError } from "@/lib/analytics/server-errors";
@@ -75,11 +75,14 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const impact = computeImpactV4(stats);
 
-    // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
+    // Replace today's snapshot — a user-initiated refresh means the score has
+    // legitimately changed (e.g. after a scoring fix). dbReplaceSnapshot uses
+    // UPSERT so it overwrites the existing same-day row instead of silently
+    // skipping via ON CONFLICT DO NOTHING.
     const snapshot = buildSnapshot(stats, impact);
-    dbInsertSnapshot(handle, snapshot)
-      .then((inserted) => {
-        if (inserted) updateSnapshotCache(handle, snapshot);
+    dbReplaceSnapshot(handle, snapshot)
+      .then((replaced) => {
+        if (replaced) updateSnapshotCache(handle, snapshot);
       })
       .catch(() => {});
 

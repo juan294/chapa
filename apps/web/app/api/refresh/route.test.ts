@@ -43,7 +43,7 @@ vi.mock("@/lib/history/snapshot", () => ({
 }));
 
 vi.mock("@/lib/db/snapshots", () => ({
-  dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
+  dbReplaceSnapshot: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -67,7 +67,7 @@ import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { invalidateHistoryCache } from "@/lib/history/history";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { revalidatePath } from "next/cache";
@@ -282,7 +282,7 @@ describe("POST /api/refresh", () => {
       fetchedAt: new Date().toISOString(),
     });
 
-    vi.mocked(dbInsertSnapshot).mockReturnValue(deferredPromise);
+    vi.mocked(dbReplaceSnapshot).mockReturnValue(deferredPromise);
 
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(200);
@@ -325,7 +325,7 @@ describe("POST /api/refresh", () => {
       fetchedAt: new Date().toISOString(),
     });
 
-    vi.mocked(dbInsertSnapshot).mockReturnValue(deferredPromise);
+    vi.mocked(dbReplaceSnapshot).mockReturnValue(deferredPromise);
 
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(200);
@@ -360,7 +360,7 @@ describe("POST /api/refresh", () => {
     });
 
     // Make the insert reject — the .catch(() => {}) should swallow the error
-    vi.mocked(dbInsertSnapshot).mockRejectedValue(new Error("DB down"));
+    vi.mocked(dbReplaceSnapshot).mockRejectedValue(new Error("DB down"));
 
     const res = await POST(makeRequest("testuser"));
     expect(res.status).toBe(200);
