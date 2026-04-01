@@ -138,15 +138,20 @@ function mergeOptionalMax(
  * Used for ratio fields like `batchSizeScore` where the value should be
  * averaged across platforms proportional to the number of items (PRs)
  * each platform contributed.
+ *
+ * When one side is `undefined` (metric not computed), the other side's
+ * value is returned as-is — the undefined side is excluded from the
+ * denominator. This prevents supplemental data with many PRs but no
+ * quality metrics from diluting the primary's rates toward zero.
  */
 function mergeOptionalWeightedAvg(
   aVal: number | undefined, aCount: number,
   bVal: number | undefined, bCount: number,
 ): number | undefined {
   if (aVal === undefined && bVal === undefined) return undefined;
+  if (bVal === undefined) return aVal;
+  if (aVal === undefined) return bVal;
   const totalCount = aCount + bCount;
   if (totalCount === 0) return undefined;
-  const aContrib = (aVal ?? 0) * aCount;
-  const bContrib = (bVal ?? 0) * bCount;
-  return (aContrib + bContrib) / totalCount;
+  return (aVal * aCount + bVal * bCount) / totalCount;
 }
