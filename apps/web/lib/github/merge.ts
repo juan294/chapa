@@ -49,6 +49,7 @@ export function mergeStats(
     prsMergedCount: primary.prsMergedCount + supplemental.prsMergedCount,
     prsMergedWeight: Math.min(primary.prsMergedWeight + supplemental.prsMergedWeight, PR_WEIGHT_AGG_CAP),
     reviewsSubmittedCount: primary.reviewsSubmittedCount + supplemental.reviewsSubmittedCount,
+    primaryReviewsSubmittedCount: primary.reviewsSubmittedCount,
     issuesClosedCount: primary.issuesClosedCount + supplemental.issuesClosedCount,
     linesAdded: primary.linesAdded + supplemental.linesAdded,
     linesDeleted: primary.linesDeleted + supplemental.linesDeleted,

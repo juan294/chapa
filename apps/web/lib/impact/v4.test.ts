@@ -922,6 +922,25 @@ describe("detectProfileType(stats)", () => {
     // 3/20 = 0.15, at threshold → collaborative (>= comparison)
     expect(detectProfileType(makeStats({ reviewsSubmittedCount: 3, prsMergedCount: 20 }))).toBe("collaborative");
   });
+
+  it("uses primaryReviewsSubmittedCount for profile detection when present", () => {
+    // Total reviews = 6 (from supplemental EMU), PRs = 31 → ratio 6/31 = 0.194 → collaborative
+    // But primaryReviewsSubmittedCount = 0 → ratio 0/31 = 0 → solo
+    // Profile type should be based on the primary account's reviews, not the merged total.
+    expect(detectProfileType(makeStats({
+      reviewsSubmittedCount: 6,
+      prsMergedCount: 31,
+      primaryReviewsSubmittedCount: 0,
+    }))).toBe("solo");
+  });
+
+  it("falls back to reviewsSubmittedCount when primaryReviewsSubmittedCount is absent", () => {
+    // No primaryReviewsSubmittedCount → uses reviewsSubmittedCount (backward compat)
+    expect(detectProfileType(makeStats({
+      reviewsSubmittedCount: 6,
+      prsMergedCount: 31,
+    }))).toBe("collaborative");
+  });
 });
 
 // ---------------------------------------------------------------------------

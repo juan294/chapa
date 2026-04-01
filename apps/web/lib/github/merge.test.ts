@@ -247,6 +247,28 @@ describe("mergeStats", () => {
     });
   });
 
+  describe("primaryReviewsSubmittedCount", () => {
+    it("stores primary's review count for profile type detection", () => {
+      const primary = makeStats({ reviewsSubmittedCount: 0 });
+      const supplemental = makeStats({ reviewsSubmittedCount: 6 });
+      const merged = mergeStats(primary, supplemental);
+
+      // Total reviews are summed (for quality formula)
+      expect(merged.reviewsSubmittedCount).toBe(6);
+      // Primary reviews stored separately (for profile type detection)
+      expect(merged.primaryReviewsSubmittedCount).toBe(0);
+    });
+
+    it("stores primary reviews when both have reviews", () => {
+      const primary = makeStats({ reviewsSubmittedCount: 10 });
+      const supplemental = makeStats({ reviewsSubmittedCount: 5 });
+      const merged = mergeStats(primary, supplemental);
+
+      expect(merged.reviewsSubmittedCount).toBe(15);
+      expect(merged.primaryReviewsSubmittedCount).toBe(10);
+    });
+  });
+
   describe("hasSupplementalData flag", () => {
     it("sets hasSupplementalData to true by default (backward compat)", () => {
       const merged = mergeStats(makeStats(), makeStats());

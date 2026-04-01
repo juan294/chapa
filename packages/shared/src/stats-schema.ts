@@ -14,6 +14,7 @@ const _STATS_DATA_KEYS = [
   "prsMergedCount",
   "prsMergedWeight",
   "reviewsSubmittedCount",
+  "primaryReviewsSubmittedCount",
   "issuesClosedCount",
   "linesAdded",
   "linesDeleted",

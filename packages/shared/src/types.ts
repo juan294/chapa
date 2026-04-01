@@ -16,6 +16,7 @@ export interface StatsData {
   prsMergedCount: number;
   prsMergedWeight: number; // cap 120
   reviewsSubmittedCount: number; // cap 180
+  primaryReviewsSubmittedCount?: number; // primary account reviews only (for profile type detection after merge)
   issuesClosedCount: number; // cap 80
   linesAdded: number;
   linesDeleted: number;
