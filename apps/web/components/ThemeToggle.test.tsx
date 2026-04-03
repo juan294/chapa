@@ -80,7 +80,7 @@ describe("ThemeToggle — icon transition (Phase 6)", () => {
   it("renders both theme icons for CSS cross-fade transition", () => {
     const svgCount = (THEME_TOGGLE_SOURCE.match(/<svg/g) ?? []).length;
     expect(svgCount).toBeGreaterThanOrEqual(2);
-    expect(THEME_TOGGLE_SOURCE).toContain("transition-all duration-150");
+    expect(THEME_TOGGLE_SOURCE).toContain("transition-[opacity,transform] duration-200");
   });
 
   it("uses opacity and scale for icon cross-fade", () => {

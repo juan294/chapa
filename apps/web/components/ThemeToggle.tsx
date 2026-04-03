@@ -28,7 +28,7 @@ export function ThemeToggle() {
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
     >
       <span
-        className={`absolute inset-0 flex items-center justify-center transition-all duration-150 ${
+        className={`absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-200 ${
           isDark ? "opacity-100 scale-100" : "opacity-0 scale-75"
         }`}
       >
@@ -54,7 +54,7 @@ export function ThemeToggle() {
         </svg>
       </span>
       <span
-        className={`flex items-center justify-center transition-all duration-150 ${
+        className={`flex items-center justify-center transition-[opacity,transform] duration-200 ${
           isDark ? "opacity-0 scale-75" : "opacity-100 scale-100"
         }`}
       >
