@@ -66,18 +66,6 @@ const STATS = [
 
 /* ── Icons ─────────────────────────────────────────────────────── */
 
-function ClaudeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M12 2l2.4 7.4 7.6 0-6.1 4.5 2.3 7.1L12 17.2l-6.2 3.8 2.3-7.1L2 9.4l7.6 0z" />
-    </svg>
-  );
-}
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -480,9 +468,9 @@ export default async function Home({
                 href="https://claude.ai/code"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
+                className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-amber transition-colors"
               >
-                <ClaudeIcon className="w-3 h-3" />
+                <span aria-hidden="true" className="font-heading">*</span>
                 <span>Claude Code</span>
               </a>
             </div>
