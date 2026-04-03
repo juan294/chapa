@@ -8,9 +8,12 @@ type State = {
 type Action = "open" | "start_exit" | "unmounted";
 
 function reducer(state: State, action: Action): State {
-  if (action === "open") return { shouldRender: true, isAnimatingOut: false };
-  if (action === "start_exit") return { shouldRender: true, isAnimatingOut: true };
-  if (action === "unmounted") return { shouldRender: false, isAnimatingOut: false };
+  if (action === "open")
+    return state.shouldRender && !state.isAnimatingOut ? state : { shouldRender: true, isAnimatingOut: false };
+  if (action === "start_exit")
+    return state.shouldRender && state.isAnimatingOut ? state : { shouldRender: true, isAnimatingOut: true };
+  if (action === "unmounted")
+    return !state.shouldRender && !state.isAnimatingOut ? state : { shouldRender: false, isAnimatingOut: false };
   return state;
 }
 
@@ -39,7 +42,10 @@ export function useAnimatedUnmount(isOpen: boolean, duration = 200) {
       }, duration);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, duration, shouldRender]);
+  // shouldRender excluded: it only changes as a result of this effect,
+  // so including it would cause an extra no-op run after each dispatch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, duration]);
 
   return { shouldRender, isAnimatingOut };
 }

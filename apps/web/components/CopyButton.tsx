@@ -20,7 +20,6 @@ export function CopyButton({ text }: { text: string }) {
       className="relative min-h-[44px] min-w-[44px] p-2.5 rounded-lg text-text-secondary hover:text-amber transition-colors"
     >
       <span aria-live="polite" className="sr-only">{copied ? "Copied!" : "Copy"}</span>
-      {/* Copy icon — visible when not copied */}
       <span
         className={`absolute inset-0 flex items-center justify-center transition-all duration-150 ${
           copied ? "opacity-0 scale-75" : "opacity-100 scale-100"
@@ -31,7 +30,6 @@ export function CopyButton({ text }: { text: string }) {
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       </span>
-      {/* Check icon — visible when copied */}
       <span
         className={`flex items-center justify-center transition-all duration-150 ${
           copied ? "opacity-100 scale-100" : "opacity-0 scale-75"

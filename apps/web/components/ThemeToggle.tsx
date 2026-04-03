@@ -27,7 +27,6 @@ export function ThemeToggle() {
       className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg text-terminal-dim transition-colors hover:text-amber"
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
     >
-      {/* Sun icon — shown in dark mode (click to switch to light) */}
       <span
         className={`absolute inset-0 flex items-center justify-center transition-all duration-150 ${
           isDark ? "opacity-100 scale-100" : "opacity-0 scale-75"
@@ -54,7 +53,6 @@ export function ThemeToggle() {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
         </svg>
       </span>
-      {/* Moon icon — shown in light mode (click to switch to dark) */}
       <span
         className={`flex items-center justify-center transition-all duration-150 ${
           isDark ? "opacity-0 scale-75" : "opacity-100 scale-100"
