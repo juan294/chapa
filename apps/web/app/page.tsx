@@ -483,7 +483,7 @@ export default async function Home({
                 className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
               >
                 <ClaudeIcon className="w-3 h-3" />
-                <span>+ Claude Code</span>
+                <span>Claude Code</span>
               </a>
             </div>
 
