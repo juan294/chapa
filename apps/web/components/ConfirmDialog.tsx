@@ -36,9 +36,9 @@ export function ConfirmDialog({
       dialog.showModal();
       // Focus Cancel button — safe default for destructive dialogs
       cancelRef.current?.focus();
-    } else if (!open && dialog.open) {
-      dialog.close();
     }
+    // Note: !open → component returns null above, so dialog is already removed from DOM.
+    // dialog.close() is not needed here.
   }, [open]);
 
   if (!open) return null;

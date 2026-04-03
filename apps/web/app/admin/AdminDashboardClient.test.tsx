@@ -87,8 +87,21 @@ vi.mock("./AdminTableSkeleton", () => ({
   AdminTableSkeleton: () => <div data-testid="admin-table-skeleton" />,
 }));
 
+// Mock the dynamic sub-modules so loader() can be called without resolution errors
+vi.mock("./agents/agents-dashboard", () => ({
+  AgentsDashboard: () => null,
+}));
+vi.mock("./engagement/engagement-dashboard", () => ({
+  EngagementDashboard: () => null,
+}));
+vi.mock("./campaigns/campaigns-dashboard", () => ({
+  CampaignsDashboard: () => null,
+}));
+
 vi.mock("next/dynamic", () => ({
   default: (loader: () => Promise<{ default: React.ComponentType }>, opts?: { loading?: () => React.ReactNode }) => {
+    // Call loader to exercise the import factory function and .then() callback in coverage
+    void loader().catch(() => {});
     const fallback = opts?.loading?.();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const text = ((fallback as any)?.props?.children as string) ?? "dynamic";

@@ -42,9 +42,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    // Rate limit: 15 refreshes per handle per hour (normalize key)
+    // Rate limit: 5 refreshes per handle per hour (normalize key)
     const normalizedHandle = handle.toLowerCase();
-    const rl = await rateLimit(`ratelimit:refresh:${normalizedHandle}`, 15, 3600);
+    const rl = await rateLimit(`ratelimit:refresh:${normalizedHandle}`, 5, 3600);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many refreshes. Please try again later." },

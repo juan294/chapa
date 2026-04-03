@@ -27,7 +27,7 @@ vi.mock("next/link", () => ({
 }));
 
 import { getVerificationRecord } from "@/lib/verification/store";
-import VerifyPage from "./page";
+import VerifyPage, { generateMetadata } from "./page";
 
 afterEach(() => {
   cleanup();
@@ -53,6 +53,34 @@ const MOCK_RECORD = {
   generatedAt: "2026-03-22",
   profileType: "verified",
 };
+
+// ---------------------------------------------------------------------------
+// generateMetadata — covers HASH_PATTERN true/false branches
+// ---------------------------------------------------------------------------
+
+describe("generateMetadata", () => {
+  it("returns verified title for a valid 8-char hex hash", async () => {
+    const meta = await generateMetadata({
+      params: Promise.resolve({ hash: "a1b2c3d4" }),
+    });
+    expect(meta.title).toContain("Verify Badge");
+    expect(meta.title).toContain("a1b2c3d4");
+  });
+
+  it("returns 'Invalid Hash' title for a non-hex hash", async () => {
+    const meta = await generateMetadata({
+      params: Promise.resolve({ hash: "not-valid!" }),
+    });
+    expect(meta.title).toContain("Invalid Hash");
+  });
+
+  it("disables robots indexing for all verify pages", async () => {
+    const meta = await generateMetadata({
+      params: Promise.resolve({ hash: "a1b2c3d4" }),
+    });
+    expect((meta.robots as { index: boolean }).index).toBe(false);
+  });
+});
 
 describe("VerifyPage", () => {
   describe("invalid hash", () => {
