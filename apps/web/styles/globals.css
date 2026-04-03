@@ -30,6 +30,13 @@
 
   --color-track: #0000000F;
 
+  --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.06),
+                 0px 1px 2px -1px rgba(0, 0, 0, 0.06),
+                 0px 2px 4px 0px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0px 0px 0px 1px rgba(0, 0, 0, 0.08),
+                       0px 2px 4px -1px rgba(0, 0, 0, 0.08),
+                       0px 4px 8px 0px rgba(0, 0, 0, 0.06);
+
   /* Dimension colors — data visualization accents for the impact dimensions */
   --color-dimension-delivery: #22c55e;
   --color-dimension-quality: #f97316;
@@ -83,6 +90,13 @@
 
   --color-track: rgba(0, 0, 0, 0.06);
 
+  --shadow-card: 0px 0px 0px 1px rgba(0, 0, 0, 0.06),
+                 0px 1px 2px -1px rgba(0, 0, 0, 0.06),
+                 0px 2px 4px 0px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0px 0px 0px 1px rgba(0, 0, 0, 0.08),
+                       0px 2px 4px -1px rgba(0, 0, 0, 0.08),
+                       0px 4px 8px 0px rgba(0, 0, 0, 0.06);
+
   --color-dimension-delivery: #22c55e;
   --color-dimension-quality: #f97316;
   --color-dimension-consistency: #06b6d4;
@@ -125,6 +139,13 @@
   --color-terminal-dim: #4A4A5E;
 
   --color-track: rgba(255, 255, 255, 0.06);
+
+  --shadow-card: 0px 0px 0px 1px rgba(139, 92, 246, 0.08),
+                 0px 1px 2px -1px rgba(0, 0, 0, 0.20),
+                 0px 2px 4px 0px rgba(0, 0, 0, 0.15);
+  --shadow-card-hover: 0px 0px 0px 1px rgba(139, 92, 246, 0.12),
+                       0px 2px 4px -1px rgba(0, 0, 0, 0.25),
+                       0px 4px 8px 0px rgba(0, 0, 0, 0.20);
 
   --color-dimension-delivery: #22c55e;
   --color-dimension-quality: #f97316;
@@ -203,6 +224,21 @@ html {
     opacity: 1;
     transform: none;
   }
+}
+
+@keyframes fade-out-up {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.animate-fade-out-up {
+  animation: fade-out-up 0.2s ease-in forwards;
 }
 
 @keyframes pulse-glow-amber {
@@ -465,4 +501,31 @@ html {
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 92, 246, 0.25);
+}
+
+/* ── Collapsible panel (grid-row height transition) ──── */
+
+.collapse-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease-out;
+}
+
+.collapse-grid[data-expanded="true"] {
+  grid-template-rows: 1fr;
+}
+
+.collapse-grid > * {
+  overflow: hidden;
+}
+
+/* ── Image outlines ────────────────────────────────────── */
+
+.img-outline {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+
+[data-theme="dark"] .img-outline {
+  outline-color: rgba(255, 255, 255, 0.1);
 }

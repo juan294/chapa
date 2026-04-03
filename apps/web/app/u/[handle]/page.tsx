@@ -228,7 +228,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
         </h1>
 
         {/* ── Badge Section Title ──────────────────────────────── */}
-        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:150ms]">
+        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:150ms] text-balance">
           Your Impact, Decoded
         </h2>
 

@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { StatsData } from "@chapa/shared";
+
+const SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "DimensionCard.tsx"),
+  "utf-8",
+);
 import { DimensionCard } from "./DimensionCard";
 
 // ---------------------------------------------------------------------------
@@ -364,5 +371,19 @@ describe("DimensionCard", () => {
     expect(
       screen.getByText("PRs merged \u00B7 issues closed \u00B7 commits"),
     ).toBeTruthy();
+  });
+
+  // ----------------------------------------------------------------
+  // Phase 1 — tabular-nums for stable counter animation
+  // ----------------------------------------------------------------
+  it("score display uses tabular-nums for stable counter animation", () => {
+    expect(SOURCE).toContain("tabular-nums");
+  });
+
+  // ----------------------------------------------------------------
+  // Phase 5 — shadow-card replaces border for card elevation
+  // ----------------------------------------------------------------
+  it("uses shadow-card instead of border for card elevation", () => {
+    expect(SOURCE).toContain("shadow-card");
   });
 });

@@ -136,13 +136,13 @@ export default async function Home({
               <span className="text-text-secondary">chapa</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
-              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95]">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95] text-balance">
                 Developer Impact,
                 <br />
                 <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-2 font-heading text-text-secondary">
-                <p className="text-base text-text-primary font-medium"><span className="text-amber select-none">&gt;</span> The new way to <span className="bg-amber/10 px-1 rounded">quantify</span> your <span className="bg-amber/10 px-1 rounded">impact</span> in AI&#8209;assisted coding.</p>
+                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> The new way to <span className="bg-amber/10 px-1 rounded">quantify</span> your <span className="bg-amber/10 px-1 rounded">impact</span> in AI&#8209;assisted coding.</p>
                 <div className="pl-5 space-y-1 text-sm">
                   <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the complete story anymore.</p>
                   <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
@@ -152,7 +152,7 @@ export default async function Home({
               <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
                   href="/api/auth/login"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                 >
                   <GitHubIcon className="w-4 h-4" />
                   Get Your Badge
@@ -160,7 +160,7 @@ export default async function Home({
                 </a>
                 <Link
                   href="/verify"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
                 >
                   <ShieldCheckIcon className="w-4 h-4" />
                   Verify a Badge
@@ -277,7 +277,7 @@ export default async function Home({
                 <h3 className="font-heading text-sm text-text-primary font-medium">
                   What we measure
                 </h3>
-                <p className="text-text-secondary text-sm">
+                <p className="text-text-secondary text-sm text-pretty">
                   Chapa scores four core dimensions of your development activity from the last 12 months, plus an optional Craft dimension for AI tool mastery. Your unique combination determines your developer archetype:{" "}
                   <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
                   <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
@@ -320,7 +320,7 @@ export default async function Home({
                 <h3 className="font-heading text-lg tracking-tight text-text-primary">
                   GitHub <span className="text-amber">Enterprise Managed Users</span>
                 </h3>
-                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl">
+                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl text-pretty">
                   Work at a company that uses GitHub Enterprise? Your corporate contributions
                   (commits, PRs, reviews) live in a separate EMU namespace and don&apos;t show up
                   on your personal profile. Chapa can merge them into your badge.
@@ -400,7 +400,7 @@ export default async function Home({
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-4 font-heading text-sm">
                 {STATS.map((stat, i) => (
                   <span key={stat.label} className="flex items-baseline gap-2">
-                    <span className="text-3xl sm:text-4xl tracking-tight text-amber">
+                    <span className="text-3xl sm:text-4xl tracking-tight text-amber tabular-nums">
                       {stat.value}
                     </span>
                     <span className="text-text-secondary">{stat.label}</span>
@@ -426,7 +426,7 @@ export default async function Home({
               </p>
               <a
                 href="/api/auth/login"
-                className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-8 pr-7 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 <GitHubIcon className="w-5 h-5" />
                 Get Your Badge

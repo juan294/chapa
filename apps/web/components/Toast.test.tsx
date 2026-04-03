@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { Toast } from "./Toast";
+
+const SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "Toast.tsx"),
+  "utf-8",
+);
 
 describe("Toast", () => {
   beforeEach(() => {
@@ -75,5 +82,10 @@ describe("Toast", () => {
     render(<Toast message="Test" type="success" />);
     const toast = document.body.querySelector('[role="status"]');
     expect(toast?.getAttribute("aria-live")).toBe("polite");
+  });
+
+  // Phase 5 — shadow-card for toast elevation
+  it("uses shadow-card for toast elevation", () => {
+    expect(SOURCE).toContain("shadow-card");
   });
 });

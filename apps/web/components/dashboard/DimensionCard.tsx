@@ -167,7 +167,7 @@ export function DimensionCard({
       ref={containerRef}
       role="article"
       aria-label={`${label} dimension score: ${score}`}
-      className={`rounded-xl border border-stroke bg-card transition-colors duration-200 hover:border-amber/20 animate-fade-in-up ${className}`}
+      className={`rounded-xl bg-card shadow-card transition-shadow duration-200 hover:shadow-card-hover animate-fade-in-up ${className}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       {/* Header */}
@@ -178,7 +178,7 @@ export function DimensionCard({
           </span>
           <InfoTooltip id={tooltip.id} content={tooltip.tip} />
         </div>
-        <span className="font-heading text-3xl font-extrabold text-text-primary">
+        <span className="font-heading text-3xl font-extrabold text-text-primary tabular-nums">
           {displayScore}
         </span>
       </div>

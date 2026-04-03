@@ -125,7 +125,7 @@ describe("ImpactBreakdown", () => {
       // tooltip z-index. Cards must elevate on interaction so the active
       // tooltip renders above adjacent cards.
       const dimCardMatch = SOURCE.match(
-        /className="[^"]*rounded-xl border border-stroke bg-card p-4 animate-fade-in-up[^"]*"/,
+        /className="[^"]*rounded-xl bg-card shadow-card p-4 animate-fade-in-up[^"]*"/,
       );
       expect(dimCardMatch).not.toBeNull();
       expect(dimCardMatch![0]).toContain("hover:z-10");
@@ -134,7 +134,7 @@ describe("ImpactBreakdown", () => {
 
     it("stat cards elevate z-index on hover and focus-within", () => {
       const statCardMatch = SOURCE.match(
-        /className="[^"]*rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up[^"]*"/,
+        /className="[^"]*rounded-xl bg-card shadow-card px-3 py-4 text-center animate-fade-in-up[^"]*"/,
       );
       expect(statCardMatch).not.toBeNull();
       expect(statCardMatch![0]).toContain("hover:z-10");
@@ -259,6 +259,27 @@ describe("ImpactBreakdown", () => {
 
     it("renders a fallback message when data is missing", () => {
       expect(SOURCE).toContain("No impact data available");
+    });
+  });
+
+  // Phase 1 — tabular-nums for stable score display
+  describe("tabular numbers (Phase 1)", () => {
+    it("dimension scores use tabular-nums", () => {
+      expect(SOURCE).toContain("tabular-nums");
+    });
+  });
+
+  // Phase 2 — text-balance on section headings
+  describe("text wrap balance (Phase 2)", () => {
+    it("section headings use text-balance for even line distribution", () => {
+      expect(SOURCE).toContain("text-balance");
+    });
+  });
+
+  // Phase 5 — shadow-card on dimension and stat cards
+  describe("layered shadows (Phase 5)", () => {
+    it("dimension cards use shadow-card for elevation", () => {
+      expect(SOURCE).toContain("shadow-card");
     });
   });
 

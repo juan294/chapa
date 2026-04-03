@@ -47,15 +47,15 @@ export function SharePageOwnerContent({
     return (
       <section className="mb-10 animate-fade-in-up [animation-delay:300ms]">
         <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
-          <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2">
+          <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
             Curious what your developer impact looks like?
           </h2>
-          <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto">
+          <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto text-pretty">
             Decode your coding DNA in seconds. See your archetype, impact score, and how you compare.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
           >
             Discover your impact
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
