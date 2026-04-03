@@ -469,24 +469,22 @@ export default async function Home({
               </span>
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-text-secondary">
-              <span>Powered by</span>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
-                <GitHubIcon className="w-3 h-3" />
-                <span>GitHub</span>
-              </a>
-              <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
-                <BitbucketIcon className="w-3 h-3" />
-                <span>Bitbucket</span>
-              </a>
-              <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
-                <CodebergIcon className="w-3 h-3" />
-                <span>Codeberg</span>
-              </a>
-              <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
-                <span aria-hidden="true" className="font-heading">*</span>
-                <span>Claude Code</span>
-              </a>
+            <div className="flex items-center gap-3 text-text-secondary">
+              <span className="text-xs">Powered by</span>
+              <div className="flex items-center gap-2.5">
+                <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber transition-colors">
+                  <GitHubIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="hover:text-amber transition-colors">
+                  <BitbucketIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber transition-colors">
+                  <CodebergIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber transition-colors">
+                  *
+                </a>
+              </div>
             </div>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
