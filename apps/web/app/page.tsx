@@ -66,6 +66,21 @@ const STATS = [
 
 /* ── Icons ─────────────────────────────────────────────────────── */
 
+function BitbucketIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" />
+    </svg>
+  );
+}
+
+function CodebergIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
+    </svg>
+  );
+}
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -454,22 +469,21 @@ export default async function Home({
               </span>
             </div>
 
-            <div className="flex items-center gap-4">
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
-              >
+            <div className="flex items-center gap-3 text-xs text-text-secondary">
+              <span>Powered by</span>
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
                 <GitHubIcon className="w-3 h-3" />
-                <span>Powered by GitHub</span>
+                <span>GitHub</span>
               </a>
-              <a
-                href="https://claude.ai/code"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-amber transition-colors"
-              >
+              <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
+                <BitbucketIcon className="w-3 h-3" />
+                <span>Bitbucket</span>
+              </a>
+              <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
+                <CodebergIcon className="w-3 h-3" />
+                <span>Codeberg</span>
+              </a>
+              <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-amber transition-colors">
                 <span aria-hidden="true" className="font-heading">*</span>
                 <span>Claude Code</span>
               </a>
