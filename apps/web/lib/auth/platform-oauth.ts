@@ -265,10 +265,11 @@ export function createDisconnectHandler(config: PlatformOAuthConfig) {
     // 4. Delete linked platform
     const success = await dbDeleteLinkedPlatform(handle, config.platform);
 
-    // 5. Invalidate stats cache
+    // 5. Invalidate stats cache + supplemental EMU data
     const lh = handle.toLowerCase();
     void cacheDel(`stats:v2:merged:${lh}`);
     void cacheDel(`stats:v2:${config.platform}:${lh}`);
+    void cacheDel(`supplemental:${lh}`);
 
     // 6. Return result
     return NextResponse.json({ success });
