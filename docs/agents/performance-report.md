@@ -1,110 +1,77 @@
 # Performance Report
-> Generated: 2026-03-26 | Health status: GREEN
+> Generated: 2026-04-02 | Health status: green
 
 ## Executive Summary
-
-Build compiles in 3.0s (Turbopack) with 0 TypeScript errors. Total client JS is 1,800 KB (1.76 MB) across 71 chunks — no chunk exceeds 500 KB. Knip reports **0 findings** (fully clean). Font loading, CLS prevention, badge caching, and dynamic imports are all optimal. No regressions since last report (2026-03-12); total JS increased by ~366 KB (+25%) due to new features (campaigns, engagement dashboards, additional experiments), which is proportional growth with no individual chunk exceeding thresholds.
+Build is healthy — total client JS decreased 8% to 1,663 KB vs 1,800 KB last cycle (2026-03-26). No chunk exceeds 232 KB, zero knip findings, all caching headers correct. One Turbopack NFT warning for the OG image route is low-severity.
 
 ## Build Output
 
-- **Compiler**: Next.js 16.2.1 (Turbopack)
-- **Compile time**: 3.0s
-- **TypeScript errors**: 0
-- **Static pages generated**: 63 (11 workers, 393ms)
-- **Total routes**: 82 (5 static, 77 dynamic)
+**Build stats:** Next.js 16.2.1 (Turbopack) · compiled 5.4s · TypeScript 8.0s · 0 errors · 64 static pages · 84 routes (5 static, 79 dynamic)
 
-| Chunk | Size (KB) | Contents | Status |
-|-------|-----------|----------|--------|
-| `0x~..e.8sn6o..js` | 228 | Next.js framework / runtime | GREEN |
-| `08ejob94x411n.js` | 176 | PostHog analytics SDK | GREEN |
-| `0qg7f~h3ny-im.js` | 136 | React DOM streaming runtime | GREEN |
-| `03~yq9q893hmn.js` | 112 | Core-js / polyfills | GREEN |
-| `0reyiuqw~c4-k.js` | 64 | Application code | GREEN |
-| `12imygs--7n__.js` | 60 | Application code | GREEN |
-| `0q5ms8d.aw1ps.js` | 60 | Application code | GREEN |
-| `0s9.cqo3ngzzb.js` | 56 | Application code | GREEN |
-| All remaining (63) | <52 each | Various | GREEN |
+| Route / Chunk | Size (First Load JS) | Status |
+|--------------|---------------------|--------|
+| Largest chunk (framework) | 232 KB | GREEN |
+| 2nd largest (PostHog, lazy) | 179 KB | GREEN |
+| 3rd (React DOM) | 137 KB | GREEN |
+| 4th (polyfills) | 113 KB | GREEN |
+| 5th | 64 KB | GREEN |
+| All remaining chunks | < 60 KB each | GREEN |
 
-**No chunk exceeds 500 KB.** Largest is 228 KB (Next.js framework).
+No route or chunk exceeds the 500 KB threshold. No chunk exceeds 300 KB.
+
+**Note:** Turbopack does not emit a per-route First Load JS table (unlike webpack mode). Sizes above are the raw production static chunk files from `.next/static/chunks/`.
+
+**Turbopack warning (low severity):** `svg-to-png.ts` uses `path.join(process.cwd(), ...)` at lines 36–37, causing the OG image route to trace the entire project via NFT. This is cosmetic in dev but may produce a slightly larger Lambda bundle on Vercel for `/u/[handle]/og-image`. Fix: add `/*turbopackIgnore: true*/` comment to the `process.cwd()` calls if the path is always statically resolvable.
 
 ## Bundle Analysis
-
-- **Total client JS**: 1,800 KB (1.76 MB) across 71 chunks
-- **Largest chunk**: 228 KB (Next.js framework runtime)
-- **Chunks >100 KB**: 4 (framework: 228 KB, PostHog: 176 KB, React DOM: 136 KB, polyfills: 112 KB)
-- **Unused exports (knip)**: 0 — fully clean (resolved from 60 unused exports + 42 unused types in 2026-03-12)
-- **Delta vs 2026-03-12**: +366 KB total (+25%). Proportional to new features added (campaigns dashboard, engagement dashboard, CLI auth, additional experiments). No individual regressions.
+- **Total First Load JS:** 1,663 KB (1.63 MB) — down 137 KB (-8%) from 1,800 KB on 2026-03-26
+- **Largest chunks:** 232 KB (Next.js framework), 179 KB (PostHog lazy-loaded), 137 KB (React DOM), 113 KB (polyfills)
+- **Chunks >100 KB:** 4 — all framework/vendor, not application code
+- **Unused exports (knip):** 0 production findings. 384 test files flagged as false positives (expected — test files are not in the production entry graph); same result as previous cycle.
+- **Dynamic imports:** `ShareBadgePreviewLazy.tsx` and `GlobalCommandBarLazy.tsx` confirmed using `next/dynamic` with `ssr: false`. Additional dynamic splits for admin sub-dashboards (AgentsDashboard, EngagementDashboard, CampaignsDashboard) from previous cycle still in place.
 
 ## Client/Server Boundary
 
-**120 files** with `"use client"` directive (including test files).
+56 non-test files with `"use client"` (41 in `components/`, 15 in `lib/`). All appear appropriate:
 
-**Previously flagged files (2026-03-12) — all resolved:**
-- `overall-health-banner.tsx` — `"use client"` **removed** (now a server component). RESOLVED.
-- `ShareBadgePreviewLazy.tsx` — Retains `"use client"` correctly (wraps `next/dynamic` with `ssr: false`, which requires client context). Legitimate.
-- `GlobalCommandBarLazy.tsx` — Same pattern as above. Legitimate.
+- **Error boundaries** (`error.tsx` files) — required by Next.js App Router
+- **Admin dashboard** (`AdminDashboardClient.tsx`, agents, campaigns, engagement sub-views) — interactive tables/charts with client state
+- **Studio** (`StudioClient.tsx`, `BadgePreviewCard.tsx`, `QuickControls.tsx`) — live badge customization with controlled form state
+- **Share page** (`ShareBadgePreviewLazy.tsx`) — wraps a `next/dynamic` to avoid SSR of heavy canvas component
+- **Experiments** (`app/experiments/**`) — all canvas/WebGL demos; client rendering is required
+- **Terminal/global UI** (`TerminalInput.tsx`, `AutocompleteDropdown.tsx`, `GlobalCommandBarLazy.tsx`) — keyboard state, autocomplete, command bar
+- **Hooks/effects** (`lib/effects/**`, `lib/hooks/`) — `useState`/`useEffect` patterns
 
-**Current audit**: All 120 `"use client"` files examined. No unnecessary directives found. Pattern is correct: client directives are on leaf interactive components (event handlers, hooks, browser APIs) and lazy-loading wrappers.
-
-## Dynamic Imports (Code Splitting)
-
-9 components properly code-split via `next/dynamic` with `ssr: false`:
-
-| Component | Location | Loading UI |
-|-----------|----------|------------|
-| `AuroraBackground` | `BadgePreviewCard.tsx` | Empty div |
-| `ParticleCanvas` | `BadgePreviewCard.tsx` | Empty div |
-| `GradientBorder` | `BadgePreviewCard.tsx` | Empty div |
-| `HolographicOverlay` | `BadgePreviewCard.tsx` | Empty div |
-| `AgentsDashboard` | `AdminDashboardClient.tsx` | "Loading agents..." |
-| `EngagementDashboard` | `AdminDashboardClient.tsx` | "Loading engagement..." |
-| `CampaignsDashboard` | `AdminDashboardClient.tsx` | "Loading campaigns..." |
-| `GlobalCommandBar` | `GlobalCommandBarLazy.tsx` | None |
-| `ShareBadgePreview` | `ShareBadgePreviewLazy.tsx` | Skeleton placeholder |
-| `ShortcutCheatSheet` | `KeyboardShortcutsListener.tsx` | None |
-| `Analytics` | `ClientAnalytics.tsx` | None |
-| `SpeedInsights` | `ClientAnalytics.tsx` | None |
-
-All heavy visual effects and admin dashboards are properly deferred.
-
-## Font Loading
-
-- **Status**: OPTIMAL
-- Uses `next/font/google` for both fonts (self-hosted, no external requests)
-- `JetBrains Mono`: weights 400, 500, 700, 800; `display: "swap"`; Latin subset
-- `Plus Jakarta Sans`: weights 400–700; `display: "swap"`; Latin subset
-- No `@import url()` or external `<link>` font tags found
-- Fonts injected as CSS variables: `--font-jetbrains-mono`, `--font-plus-jakarta`
-
-## CLS Risks
-
-- **Status**: NONE
-- All `<Image>` components have explicit `width`/`height` attributes
-- No bare `<img>` tags without dimensions
-- All visual assets are inline SVG or base64 data URIs
-- Share page uses `<BadgeSkeleton />` during loading (prevents layout shift)
-- Share page uses ISR (`revalidate=3600`) — content typically pre-rendered
+No high-level `"use client"` directives found that should be pushed deeper. `ShareBadgePreviewLazy` and `GlobalCommandBarLazy` are correctly the shallowest boundaries with server parents above them.
 
 ## Caching & Headers
 
-### Badge SVG (`/u/[handle]/badge.svg`)
-- **Success**: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=604800` (6h cache, 7d SWR)
-- **Error fallback**: `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` (5min cache, 10min SWR)
-- **Embed headers**: `Content-Security-Policy: frame-ancestors *`, `X-Frame-Options: ALLOWALL`
-- Correctly differentiated caching for success vs. error states
+| Route | Cache-Control | Status |
+|-------|--------------|--------|
+| `/u/[handle]/badge.svg` (success) | `public, s-maxage=21600, stale-while-revalidate=86400` | GREEN |
+| `/u/[handle]/badge.svg` (error fallback) | `public, s-maxage=300, stale-while-revalidate=600` | GREEN |
+| `/u/[handle]/og-image` | ISR `revalidate=3600` | GREEN |
+| `/about`, `/about/scoring`, `/about/verification` | ISR `revalidate=86400` | GREEN |
 
-### Share Page (`/u/[handle]`)
-- ISR with `revalidate=3600` (1 hour) — prevents unnecessary server renders
+Badge SVG frame-ancestors set to `*` via explicit `Content-Security-Policy` override — correct for embeddable asset.
+
+## Font Loading
+
+- `next/font/google` with `display: "swap"`, Latin subset for both JetBrains Mono and Plus Jakarta Sans
+- No external `<link rel="stylesheet" href="fonts.googleapis.com/...">` in layout — no render-blocking font requests
+- Server-side TTF files for `svg-to-png.ts` (resvg OG image rendering) are scoped to `lib/render/fonts/` — not exposed to browsers
+
+## CLS Risks
+
+- **None found.** All 4 `<Image>` components (UserMenu.tsx ×2, BadgeContent.tsx, AdminUserTable.tsx) have explicit `width` and `height` attributes
+- No bare `<img>` tags in production components
+- Skeleton loaders present for async content (confirmed from previous cycles)
+- `display: "swap"` on fonts prevents FOIT; FOUT is acceptable
 
 ## Recommendations
 
-No action items. All metrics are within healthy thresholds:
+| Priority | Item | File | Action |
+|----------|------|------|--------|
+| LOW | Turbopack NFT warning | `lib/render/svg-to-png.ts:36-37` | Add `/*turbopackIgnore: true*/` to `process.cwd()` calls to scope NFT tracing. Cosmetic — does not affect functionality. |
 
-1. ~~Remove 3 unnecessary `"use client"` directives~~ — **RESOLVED** (1 removed, 2 confirmed legitimate)
-2. ~~Clean up 60+ unused exports flagged by knip~~ — **RESOLVED** (knip now fully clean, 0 findings)
-3. ~~Add ISR to share page~~ — **RESOLVED** (`revalidate=3600` in place with test assertion)
-
-**Monitoring items (carried):**
-- **OG image Redis memory**: ~62% of estimated Redis usage at 10K users. Consider blob storage at 50K+ users. (Source: cost-analyst 2026-03-26)
-- **PostHog chunk**: 176 KB, lazy-loaded on first interaction. Optimal but worth monitoring if SDK grows.
-- **Total JS growth**: +25% vs last report. Expected given feature additions. Monitor for sustained growth beyond feature scope.
+All other metrics are GREEN. No immediate action required.
