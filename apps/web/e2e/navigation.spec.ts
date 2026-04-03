@@ -52,9 +52,10 @@ test.describe("Navigation — navbar and footer", () => {
     await expect(footer.locator('a[href="/privacy"]')).toBeVisible();
   });
 
-  test("footer shows copyright and GitHub branding", async ({ page }) => {
+  test("footer shows copyright and platform branding", async ({ page }) => {
     const footer = page.locator("footer");
     await expect(footer).toContainText("Chapa");
-    await expect(footer).toContainText("Powered by GitHub");
+    await expect(footer).toContainText("Powered by");
+    await expect(footer).toContainText("GitHub");
   });
 });
