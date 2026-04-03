@@ -66,6 +66,19 @@ const STATS = [
 
 /* ── Icons ─────────────────────────────────────────────────────── */
 
+function ClaudeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 2l2.4 7.4 7.6 0-6.1 4.5 2.3 7.1L12 17.2l-6.2 3.8 2.3-7.1L2 9.4l7.6 0z" />
+    </svg>
+  );
+}
+
 function GitHubIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -453,15 +466,26 @@ export default async function Home({
               </span>
             </div>
 
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
-            >
-              <GitHubIcon className="w-3 h-3" />
-              <span>Powered by GitHub</span>
-            </a>
+            <div className="flex items-center gap-4">
+              <a
+                href="https://github.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
+              >
+                <GitHubIcon className="w-3 h-3" />
+                <span>Powered by GitHub</span>
+              </a>
+              <a
+                href="https://claude.ai/code"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
+              >
+                <ClaudeIcon className="w-3 h-3" />
+                <span>+ Claude Code</span>
+              </a>
+            </div>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <Link href="/about" className="hover:text-amber transition-colors">About</Link>
