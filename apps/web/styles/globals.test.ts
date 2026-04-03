@@ -102,4 +102,34 @@ describe("globals.css", () => {
       });
     }
   });
+
+  // Phase 3 — img-outline utility
+  describe("image outline utility (Phase 3)", () => {
+    it("defines .img-outline utility class", () => {
+      expect(SOURCE).toContain(".img-outline");
+    });
+  });
+
+  // Phase 4 — layered shadow tokens
+  describe("shadow tokens (Phase 4)", () => {
+    it("defines --shadow-card and --shadow-card-hover tokens", () => {
+      expect(SOURCE).toContain("--shadow-card:");
+      expect(SOURCE).toContain("--shadow-card-hover:");
+    });
+
+    it("defines shadow tokens in @theme block for Tailwind utility generation", () => {
+      const themeBlock = SOURCE.match(/@theme\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+      expect(themeBlock).toContain("--shadow-card:");
+      expect(themeBlock).toContain("--shadow-card-hover:");
+    });
+  });
+
+  // Phase 8 — collapse-grid utility
+  describe("collapse-grid utility (Phase 8)", () => {
+    it("defines collapse-grid utility for smooth expand/collapse", () => {
+      expect(SOURCE).toContain(".collapse-grid");
+      expect(SOURCE).toContain("grid-template-rows");
+    });
+  });
+
 });

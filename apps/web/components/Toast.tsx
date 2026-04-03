@@ -119,8 +119,8 @@ export function Toast({
       aria-live="polite"
       className={`
         fixed top-5 right-5 z-[9998] flex items-start gap-3
-        rounded-xl border border-stroke bg-card px-4 py-3
-        shadow-xl shadow-stroke/20 backdrop-blur-sm
+        rounded-xl bg-card px-4 py-3
+        shadow-card backdrop-blur-sm
         max-w-sm min-w-[280px]
         ${visible ? "animate-scale-in" : "animate-toast-out"}
       `}

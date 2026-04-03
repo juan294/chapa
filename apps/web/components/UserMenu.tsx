@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { isStudioEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
+import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
 
@@ -39,6 +40,8 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
+  const { shouldRender: showDropdown, isAnimatingOut: dropdownExiting } =
+    useAnimatedUnmount(open, 200);
 
   const [bbStatus, setBbStatus] = useState<{
     linked: boolean;
@@ -211,7 +214,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             alt={`${login}'s avatar`}
             width={32}
             height={32}
-            className="h-8 w-8 rounded-full"
+            className="h-8 w-8 rounded-full img-outline"
             onError={() => setImgError(true)}
           />
         )}
@@ -233,11 +236,11 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       </button>
 
       {/* Dropdown */}
-      {open && (
+      {showDropdown && (
         <div
           role="menu"
           aria-label="User menu options"
-          className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-stroke bg-card shadow-xl shadow-stroke animate-scale-in"
+          className={`absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-card shadow-card ${dropdownExiting ? "animate-fade-out-up" : "animate-scale-in"}`}
         >
           {/* Header */}
           <div className="border-b border-stroke px-4 py-3">
@@ -252,7 +255,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   alt={`${login}'s avatar`}
                   width={40}
                   height={40}
-                  className="h-10 w-10 rounded-full"
+                  className="h-10 w-10 rounded-full img-outline"
                   onError={() => setImgError(true)}
                 />
               )}

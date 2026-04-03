@@ -2214,4 +2214,18 @@ describe("UserMenu — sign out (runtime)", () => {
     expect(form!.getAttribute("method")).toBe("POST");
     expect(form!.getAttribute("action")).toBe("/api/auth/logout");
   });
+
+  // Phase 3 — avatar images use img-outline class
+  it("avatar images use img-outline class for visual boundary", () => {
+    expect(SOURCE).toContain("img-outline");
+  });
+
+  // Phase 7 — exit animation for dropdown
+  it("imports useAnimatedUnmount for exit animation", () => {
+    expect(SOURCE).toContain("useAnimatedUnmount");
+  });
+
+  it("applies animate-fade-out-up during dropdown exit", () => {
+    expect(SOURCE).toContain("animate-fade-out-up");
+  });
 });

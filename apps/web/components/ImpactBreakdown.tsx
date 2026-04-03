@@ -243,7 +243,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
     <div className="space-y-10">
       {/* ── Dimension Cards ────────────────────────────────── */}
       <div>
-        <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4">
+        <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 text-balance">
           Performance Dimensions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -251,7 +251,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
             (key, i) => (
               <div
                 key={key}
-                className="rounded-xl border border-stroke bg-card p-4 animate-fade-in-up relative hover:z-10 focus-within:z-10"
+                className="rounded-xl bg-card shadow-card p-4 animate-fade-in-up relative hover:z-10 focus-within:z-10 transition-shadow hover:shadow-card-hover"
                 style={{ animationDelay: `${400 + i * 100}ms` }}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -262,7 +262,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                       content={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.tip : undefined) ?? DIMENSION_TOOLTIPS[key]!.tip}
                     />
                   </span>
-                  <span className="font-heading text-3xl font-extrabold text-text-primary leading-none">
+                  <span className="font-heading text-3xl font-extrabold text-text-primary leading-none tabular-nums">
                     {dims[key]}
                   </span>
                 </div>
@@ -308,10 +308,10 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
           ].map((stat, i) => (
             <div
               key={stat.label}
-              className="rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up relative hover:z-10 focus-within:z-10"
+              className="rounded-xl bg-card shadow-card px-3 py-4 text-center animate-fade-in-up relative hover:z-10 focus-within:z-10 transition-shadow hover:shadow-card-hover"
               style={{ animationDelay: `${700 + i * 60}ms` }}
             >
-              <div className="font-heading text-2xl font-extrabold text-text-primary leading-none">
+              <div className="font-heading text-2xl font-extrabold text-text-primary leading-none tabular-nums">
                 {formatCompact(stat.value)}
               </div>
               <div className="text-xs text-text-secondary uppercase tracking-wider mt-1.5 flex items-center justify-center gap-1">

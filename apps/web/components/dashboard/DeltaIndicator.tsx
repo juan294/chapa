@@ -44,7 +44,7 @@ export function DeltaIndicator({
       aria-label={ariaLabel}
     >
       <span aria-hidden="true">{arrow}</span>
-      <span className="font-heading">{displayValue}</span>
+      <span className="font-heading tabular-nums">{displayValue}</span>
       {label && <span className="font-body">{label}</span>}
     </span>
   );

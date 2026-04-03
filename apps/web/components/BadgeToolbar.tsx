@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
+import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { useSession } from "@/hooks/useSession";
 
 interface BadgeToolbarProps {
@@ -19,6 +20,8 @@ export function BadgeToolbar({
   >("idle");
   const shareRef = useRef<HTMLDivElement>(null);
   const { isOpen: shareOpen, setIsOpen: setShareOpen } = useDropdownMenu(shareRef);
+  const { shouldRender: showShare, isAnimatingOut: shareExiting } =
+    useAnimatedUnmount(shareOpen, 200);
 
   async function handleRefresh() {
     setRefreshStatus("loading");
@@ -199,9 +202,9 @@ export function BadgeToolbar({
           Share
         </button>
 
-        {shareOpen && (
+        {showShare && (
           <div
-            className="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl border border-stroke bg-card shadow-xl shadow-black/20 p-1.5 z-20 animate-terminal-fade-in"
+            className={`absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl bg-card shadow-card p-1.5 z-20 ${shareExiting ? "animate-fade-out-up" : "animate-terminal-fade-in"}`}
             role="menu"
             aria-label="Share options"
           >

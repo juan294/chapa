@@ -33,4 +33,18 @@ describe("CopyButton", () => {
       expect(SOURCE).not.toContain("p-1.5");
     });
   });
+
+  // Phase 6 — icon cross-fade transition
+  describe("icon transition animation (Phase 6)", () => {
+    it("renders both icon states for CSS transition (not conditional mount)", () => {
+      const svgCount = (SOURCE.match(/<svg/g) ?? []).length;
+      expect(svgCount).toBeGreaterThanOrEqual(2);
+      expect(SOURCE).toContain("transition-all duration-150");
+    });
+
+    it("uses opacity and scale for icon cross-fade", () => {
+      expect(SOURCE).toContain("opacity-0 scale-75");
+      expect(SOURCE).toContain("opacity-100 scale-100");
+    });
+  });
 });
