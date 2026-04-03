@@ -8,6 +8,7 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+import { ClaudeCodeStar } from "@/components/ClaudeCodeStar";
 import Link from "next/link";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
@@ -482,7 +483,7 @@ export default async function Home({
                   <CodebergIcon className="w-3.5 h-3.5" />
                 </a>
                 <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber transition-colors">
-                  *
+                  <ClaudeCodeStar />
                 </a>
               </div>
             </div>
