@@ -57,14 +57,14 @@ afterEach(cleanup);
 // Mock data
 // ---------------------------------------------------------------------------
 
-import type { ImpactV4Result, StatsData } from "@chapa/shared";
+import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { useTrendData } from "@/lib/hooks/use-trend-data";
 
 const mockUseTrendData = vi.mocked(useTrendData);
 
-const mockImpact: ImpactV4Result = {
+const mockImpact: ImpactV6Result = {
   handle: "testuser",
   profileType: "collaborative",
   dimensions: { delivery: 85, quality: 60, consistency: 70, breadth: 50 },

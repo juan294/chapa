@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-04-04
+
+### Added
+- **Craft dimension scoring page**: New "Craft — AI tool mastery" section on `/about/scoring` explaining how to unlock Craft, the 2-week upload cadence, sub-dimensions, and friction exclusion rationale
+- **Insights import cooldown**: Disables "Import Insights" button for 14 days after upload, matching Claude Code's generation cycle; shows re-enable date in tooltip
+- **Claude Code footer attribution**: "Powered by Claude Code" with animated star spinner in landing page footer; platform logos (GitHub, Bitbucket, Codeberg) in icons-only layout
+- **Owner cache warm on share page**: When badge owners visit their own `/u/:handle`, a client hook silently calls `/api/refresh` with their OAuth token to warm cache and trigger ISR rebuild
+- **9 UI polish improvements**: `tabular-nums` on scores, `text-balance`/`text-pretty`, `.img-outline` for avatars, `shadow-card`/`shadow-card-hover` CSS properties, icon cross-fade transitions, `useAnimatedUnmount` hook, `collapse-grid` utility, asymmetric CTA padding
+- 41 new test files; total test count: 6,955 across 389 files
+
+### Fixed
+- **Craft scoring fairness (critical)**: Excluded friction events (wrong approach, buggy code, misunderstood request) and tool errors from Effectiveness sub-score — these are the AI tool's mistakes, not the developer's. Weights redistributed to achievement rate (55%) + satisfaction rate (45%)
+- **Release PR filtering**: Cross-default PRs (develop→main) no longer dilute featureBranchRate, batchSizeScore, issueLinkageRate, prDescriptionRate for solo quality metrics
+- **Solo profile detection**: Uses `primaryReviewsSubmittedCount` instead of combined total, preventing supplemental EMU reviews from flipping solo devs to collaborative
+- **Merge quality rate preservation**: `mergeOptionalWeightedAvg` no longer treats `undefined` as 0, which was dragging primary quality rates toward zero
+- **Minimum sample guard**: Falls back to all merged PRs when fewer than 5 dev PRs remain after release PR filtering
+- **ADMIN_SECRET fail-secure**: Returns 503 when env var unset (was 401, confusable with invalid token)
+- **Heatmap keyboard accessibility**: Added keyboard navigation and accessible descriptions to heatmap grid
+- **WCAG blockers**: Replaced `div[role=button]` with native `<button>` in DimensionCard; moved progressbar ARIA to outer container
+- **BadgeOverlay tooltip**: Screen reader announcement on desktop
+- **Score snapshot upsert**: Refresh endpoint uses `dbReplaceSnapshot` (UPSERT) so corrected scores overwrite stale same-day snapshots
+- **Badge freshness**: Reduced `stale-while-revalidate` from 7 days to 1 day; added `revalidatePath()` to refresh endpoint
+- **OG image font paths**: Use `process.cwd()` instead of `__dirname` for Turbopack compatibility
+- **Feature flag caching**: 5-minute TTL eliminates redundant Supabase queries
+
+### Changed
+- **Impact v4 → v6 rename**: `computeImpactV4` → `computeImpactV6`, `ImpactV4Result` → `ImpactV6Result`, `v4.ts` → `v6.ts` across 71 files — aligns code naming with spec version
+- **TypeScript 6.0**: Upgraded from 5.9.3 to 6.0.2; zero type errors, all tests pass
+- **Next.js 16.2.2**: PPR DoS security fix
+- **`noUnusedLocals` + `noUnusedParameters`**: Enabled in both tsconfigs
+- Platform OAuth status rate limit raised from 20/15min to 120/15min
+
+### Documentation
+- All living specs updated: impact-v6.md (effectiveness formula, consistency table, v4→v6), svg-design.md (heatmap palette, type rename)
+- CRON_SECRET fail-open documented as accepted risk (#685)
+- Architecture diagram (`docs/chapa-architecture.drawio`) added
+- Pre-launch audit report (6 specialists, all GREEN)
+- MetricsSnapshot JSDoc corrected (Redis → Supabase)
+- StatsData field count updated (29 → 30)
+- README badges and test counts refreshed
+
 ## [2.6.0] - 2026-03-29
 
 ### Added
@@ -294,6 +335,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
+[2.7.0]: https://github.com/juan294/chapa/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/juan294/chapa/compare/v2.4.1...v2.6.0
 [2.4.1]: https://github.com/juan294/chapa/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/juan294/chapa/compare/v2.3.0...v2.4.0

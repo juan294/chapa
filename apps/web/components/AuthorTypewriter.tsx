@@ -87,7 +87,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
     if (!textRef.current) return;
 
     let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     let messageIndex = 0;
 
     const setText = (text: string) => {
@@ -149,7 +149,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
 
     return () => {
       cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, []);
 

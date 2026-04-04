@@ -1,137 +1,107 @@
 # Coverage Report
-> Generated: 2026-03-31 | Health status: GREEN
+> Generated: 2026-04-04 | Health status: green
 
 ## Executive Summary
-Overall test coverage remains strong at **92.72% statements** (7,491/8,079) across 382 test files and 6,655 tests with a 100% pass rate. All critical paths (scoring, rendering, API, database, auth) are above 96%. Zero flaky tests detected across 3 consecutive runs.
+
+All critical paths remain GREEN with overall statements at 93.12% (+0.13pp) and functions at 90.04% (+0.46pp). The long-standing P1 — `AdminDashboardClient.tsx` functions at 68.42% — is **confirmed resolved** at 100% across all metrics this cycle. One intermittent flaky test detected in full-suite runs only (passes in isolation).
+
+---
 
 ## Coverage by Module
 
-### Critical Paths (all GREEN)
 | Module | Stmts | Branch | Funcs | Lines | Status |
 |--------|-------|--------|-------|-------|--------|
-| `lib/impact` (scoring) | 100.0% | 98.5% | 100.0% | 100.0% | GREEN |
-| `lib/render` (SVG) | 100.0% | 92.7% | 100.0% | 100.0% | GREEN |
-| `lib/verification` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `lib/insights` | 100.0% | 92.6% | 100.0% | 100.0% | GREEN |
-| `packages/shared` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `lib/cache` | 99.2% | 97.9% | 95.8% | 100.0% | GREEN |
-| `lib/history` | 98.2% | 94.1% | 100.0% | 99.0% | GREEN |
-| `lib/auth` | 98.1% | 96.4% | 100.0% | 99.2% | GREEN |
-| `lib/db` | 97.7% | 95.4% | 100.0% | 100.0% | GREEN |
-| `lib/codeberg` | 97.5% | 95.7% | 96.2% | 100.0% | GREEN |
-| `lib/bitbucket` | 97.2% | 89.5% | 96.3% | 100.0% | GREEN |
-| `lib/github` | 96.8% | 91.3% | 96.2% | 97.5% | GREEN |
-| `lib/email` | 96.7% | 93.4% | 100.0% | 97.5% | GREEN |
-| `components` | 95.4% | 89.1% | 92.2% | 97.7% | GREEN |
-| `lib/effects` | 94.6% | 90.8% | 94.7% | 95.8% | GREEN |
+| **Overall** | **93.12%** | **89.78%** | **90.04%** | **94.29%** | 🟢 |
+| `lib/impact` | 100% | 98.5% | 100% | 100% | 🟢 |
+| `lib/render` | 100% | 92.68% | 100% | 100% | 🟢 |
+| `lib/cache` | 99.18% | 97.91% | 95.83% | 100% | 🟢 |
+| `lib/history` | 98.23% | 96.47% | 100% | 99% | 🟢 |
+| `lib/auth` | 98.06% | 96.39% | 100% | 99.17% | 🟢 |
+| `lib/email` | 97.75% | 96.29% | 100% | 97.93% | 🟢 |
+| `lib/db` | 97.69% | 95.36% | 100% | 100% | 🟢 |
+| `app/api` | ~97% | ~93% | ~99% | ~97% | 🟢 |
+| `lib/github` | 96.79% | 91.94% | 96.15% | 97.54% | 🟢 |
+| `lib/insights` | 100% | 92.64% | 100% | 100% | 🟢 |
+| `app/admin` | 93.78% | 86.87% | 98.38% | 94.83% | 🟢 |
+| `components` | 93.79% | 90.16% | 88.94% | 97.31% | 🟢 |
+| `packages/shared` | 100% | 100% | 100% | 100% | 🟢 |
+| `app/experiments` | ~65% | ~58% | ~55% | ~70% | 🔴 (accepted) |
 
-### API Routes (all GREEN)
-| Module | Stmts | Branch | Funcs | Lines | Status |
-|--------|-------|--------|-------|-------|--------|
-| `app/api/auth` | 99.2% | 97.0% | 100.0% | 100.0% | GREEN |
-| `app/api/cron` | 98.7% | 93.1% | 100.0% | 99.3% | GREEN |
-| `app/api/cli` | 97.3% | 100.0% | 100.0% | 97.2% | GREEN |
-| `app/api/insights` | 97.3% | 100.0% | 100.0% | 97.3% | GREEN |
-| `app/api/webhooks` | 96.7% | 95.2% | 100.0% | 96.7% | GREEN |
-| `app/api/admin` | 95.8% | 91.2% | 93.2% | 96.0% | GREEN |
-| `app/api/history` | 95.6% | 91.4% | 100.0% | 95.6% | GREEN |
-| `app/api/supplemental` | 93.5% | 94.7% | 100.0% | 93.5% | GREEN |
-| `app/api/studio` | 92.3% | 85.7% | 100.0% | 92.0% | GREEN |
-| `app/api/generate` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/health` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/profile` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/recalculate` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/refresh` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/verify` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/telemetry` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/feature-flags` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
-| `app/api/notifications` | 100.0% | 100.0% | 100.0% | 100.0% | GREEN |
+---
 
-### Pages & UI
-| Module | Stmts | Branch | Funcs | Lines | Status |
-|--------|-------|--------|-------|-------|--------|
-| `app/admin` | 93.7% | 89.4% | 87.2% | 95.6% | GREEN |
-| `app/studio` | 87.6% | 83.3% | 87.1% | 87.6% | GREEN |
-| `app/experiments` | 56.1% | 51.2% | 52.6% | 59.7% | RED (accepted) |
-| `lib/hooks` | 87.1% | 72.2% | 75.0% | 96.4% | YELLOW |
+## Delta vs Previous Cycle (2026-04-03)
 
-### Other (GREEN)
-| Module | Stmts | Status |
-|--------|-------|--------|
-| `lib/agents`, `lib/async`, `lib/crypto`, `lib/env`, `lib/feature-flags`, `lib/keyboard`, `lib/test-helpers`, `lib/utils`, `lib/validation`, `lib/dashboard`, `lib/analytics`, `lib/http` | 96-100% | GREEN |
+| Metric | 2026-04-03 | 2026-04-04 | Delta |
+|--------|-----------|-----------|-------|
+| Statements | 92.99% | 93.12% | +0.13pp |
+| Branches | 89.65% | 89.78% | +0.13pp |
+| Functions | 89.58% | 90.04% | **+0.46pp** |
+| Lines | 94.19% | 94.29% | +0.10pp |
+| Test count | 6,883 | 6,915 | +32 |
+| Test files | 386 | 388 | +2 |
+
+**Resolved this cycle:**
+- `AdminDashboardClient.tsx` funcs: 68.42% → **100%** ✅ (P1, open 4 cycles)
+- `app/verify/[hash]/page.tsx` branches: 75% → **100%** ✅
+- `ConfirmDialog.tsx` branches: 75% → 93.75% ✅ (dead `else if` removed)
+
+---
 
 ## Gaps & Recommendations
 
-### P1 — Functions coverage <80% (actionable)
-| File | Stmts | Funcs | Issue |
-|------|-------|-------|-------|
-| `app/studio/BadgePreviewCard.tsx` | 81.1% | **53.3%** | Interaction callbacks untested |
-| `app/admin/AdminDashboardClient.tsx` | 80.6% | **68.4%** | Event handler branches untested |
-| `components/SharePageShortcuts.tsx` | 100% | **66.7%** | No test file exists (60 lines) |
-| `app/api/admin/bulk-recalculate/route.ts` | 85.4% | **71.4%** | Edge case branches |
-| `lib/hooks/use-trend-data.ts` | 87.1% | **75.0%** | Hook branch paths |
-| `components/InfoTooltip.tsx` | 91.3% | **76.5%** | Some interaction paths |
-| `lib/effects/backgrounds/ParticleBackground.tsx` | 90.3% | **77.8%** | Canvas/animation paths |
-| `components/UserMenu.tsx` | 94.0% | **78.6%** | Menu interaction handlers |
+### P2 — Should fix
 
-### P2 — Branch coverage <80% (lower priority)
-| File | Branch | Issue |
-|------|--------|-------|
-| `components/AuthorTypewriter.tsx` | 66.7% | Animation timing branches |
-| `lib/email/templates/announcement.ts` | 68.8% | Template conditional branches |
-| `lib/effects/backgrounds/ParticleBackground.tsx` | 72.2% | Canvas feature detection |
-| `lib/hooks/use-trend-data.ts` | 72.2% | Data state branches |
-| `lib/history/trend.ts` | 75.0% | Edge case paths |
-| `components/ConfirmDialog.tsx` | 75.0% | Dialog state branches |
-| `app/admin/engagement/engagement-dashboard.tsx` | 75.0% | Dashboard filter branches |
+- **`AuthorTypewriter.tsx` branch 67.5%** (lines 106, 114, 126–143): Most significant branch gap remaining. Despite null guard removal in last triage cycle, animation/timeout branch paths are still uncovered. These drive the typewriter effect and error states.
 
-### Accepted Limitations (no action needed)
-| File | Stmts | Reason |
-|------|-------|--------|
-| `app/experiments/*` (all pages) | 0-81% | Feature-flagged, canvas/WebGL-heavy, JSDOM limitations |
-| `lib/effects/interactions/HolographicOverlay.tsx` | 47.0% | Canvas/WebGL — JSDOM cannot execute |
-| `app/layout.tsx`, `app/icon.tsx`, `app/apple-icon.tsx` | 0% | Next.js server components — tested via integration |
-| `app/admin/page.tsx`, `app/studio/page.tsx` | 0% | Server page wrappers — logic in client components |
-| `components/ClientAnalytics.tsx` | 0% | PostHog wrapper — no testable logic |
-| `components/ShareBadgePreviewLazy.tsx` | 40% | `next/dynamic` wrapper with `ssr: false` |
-| `components/GlobalCommandBarLazy.tsx` | 50% | `next/dynamic` wrapper with `ssr: false` |
+- **`BadgeOverlay.tsx` branch 78.57%** (lines 236–237, 311): 3 uncovered branches in the overlay's positioning / dismiss logic. Low risk as it's a tooltip overlay, but below 80% branch threshold.
 
-## Untested Files
-| File | Lines | Risk |
-|------|-------|------|
-| `packages/shared/src/types.ts` | 361 | None — type definitions only |
-| `lib/bitbucket/types.ts` | 91 | None — type definitions only |
-| `lib/codeberg/types.ts` | 69 | None — type definitions only |
-| `components/SharePageShortcuts.tsx` | 60 | **LOW** — has testable keyboard shortcut logic |
-| `packages/shared/src/index.ts` | 56 | None — re-exports only |
-| `packages/shared/src/stats-schema.ts` | 52 | None — Zod schema (tested via validators) |
-| `app/api/auth/bitbucket/config.ts` | 29 | None — config constants |
-| `app/api/auth/codeberg/config.ts` | 24 | None — config constants |
-| `lib/verification/types.ts` | 19 | None — type definitions only |
-| `packages/shared/src/platforms.ts` | 9 | None — constants |
-| `lib/history/types.ts` | 3 | None — type definitions only |
+- **`lib/render/svg-to-png.ts` branch 66.66%** (line 38): Single uncovered branch — the `turbopackIgnore` path for `path.join(process.cwd(), ...)`. The file is otherwise 100% covered; only the conditional font-path resolution branch is missed.
 
-Only `SharePageShortcuts.tsx` (60 lines) has testable logic among untested files.
+- **`UserMenu.tsx` funcs 78.57%** (lines 259, 295–317, 415): 3 action handlers untested — likely the disconnect flows for Bitbucket/Codeberg and the profile-copy function. Worth covering given OAuth account management is security-adjacent.
+
+- **`lib/insights/parser.ts` branch 83.5%** (lines 158, 166, 185, 190): 4 uncovered branches in the AI insights parser. Parsing edge cases (malformed LLM responses) are the likely gap.
+
+### P3 — Low risk / accepted
+
+- `app/admin/AdminDashboard.ts` branch 84.84% (lines 80–82, 118, 156) — orchestrator loading states
+- `components/dashboard/DimensionCard.tsx` branch 82.75% (lines 134–144, 154–158)
+- `Toast.tsx` stmts 85.71% (lines 140–141) — auto-dismiss edge case
+- `ThemeToggle.tsx` stmts 85.71% (line 19) — SSR hydration guard
+- `MobileNav.tsx` branch 89.28% (lines 38, 44, 64) — mobile-only interaction paths
+- `GlobalCommandBarLazy.tsx` stmts 50% — lazy wrapper, only the `ssr: false` module boundary matters
+- `ShareBadgePreviewLazy.tsx` stmts 40% — same pattern
+- `lib/impact/heatmap-evenness.ts` branch 87.5% (line 46) — edge-case boundary
+- `lib/render/demoData.ts` + `archetypeDemoData.ts` branch 50% — conditional demo path, no production path impact
+
+### Untested files (no .test.ts counterpart)
+
+These are all expected — no tests needed:
+
+| File | Reason |
+|------|--------|
+| `app/admin/agents-types.ts` | Type declarations only |
+| `app/api/auth/bitbucket/config.ts` | OAuth config constants |
+| `app/api/auth/codeberg/config.ts` | OAuth config constants |
+| `app/apple-icon.tsx`, `app/icon.tsx` | Next.js static asset generators |
+| `app/archetypes/*/page.tsx` (7 files) | Static content pages, no logic |
+| `app/studio/QuickControls.tsx` | UI component, no dedicated test |
+| `lib/*/types.ts` (bitbucket, codeberg, history, verification) | Type-only files |
+
+### Accepted limitations (permanent)
+
+- `app/experiments/**/page.tsx` (13 pages, 0–95%): WebGL/Canvas/complex animations. JSDOM cannot execute these. The `hexmap/page.tsx` (0%, 636 lines) is the largest single untested file.
+- `app/layout.tsx`: Next.js root layout — server component, no unit-testable logic
+- `packages/shared/index.ts`, `platforms.ts`: Re-export barrels
+
+---
 
 ## Flaky Tests
-None detected. 3 consecutive runs: 6,655/6,655 passed each time (25-38s per run).
 
-## Delta vs Previous Report (2026-03-30)
-| Metric | Previous | Current | Delta |
-|--------|----------|---------|-------|
-| Statements | 92.72% | 92.72% | +0.00% |
-| Branches | 89.05% | 89.05% | +0.00% |
-| Functions | 88.57% | 88.57% | +0.00% |
-| Lines | 93.99% | 93.99% | +0.00% |
-| Test files | 382 | 382 | +0 |
-| Tests | 6,655 | 6,655 | +0 |
-| Flaky tests | 0 | 0 | -- |
+**1 intermittent flaky test detected:**
 
-No changes since last report. Coverage is stable.
-
-## Thresholds
-All thresholds pass with comfortable margin:
-- Statements: 92.72% (threshold: 75%, margin: +17.72%)
-- Branches: 89.05% (threshold: 70%, margin: +19.05%)
-- Functions: 88.57% (threshold: 65%, margin: +23.57%)
-- Lines: 93.99% (threshold: 75%, margin: +18.99%)
+- **File**: `apps/web/components/BadgeToolbar.render.test.tsx`
+- **Test**: `BadgeToolbar render > download strips SVG animations > strips @keyframes, animation properties, and SMIL animate elements`
+- **Behavior**: Failed in 1 of 3 full-suite runs (run 3). Passed 5/5 runs in isolation.
+- **Root cause**: Timing race — the test coordinates `fetch` mock + `Image` mock with `queueMicrotask` for microtask-level flush. In a full 388-file suite run, shared microtask queue congestion can cause the `onerror` callback to fire after the `act()` flush window.
+- **Risk**: LOW — only affects download-animation stripping in badge export, not correctness of the badge SVG itself. The logic is correct; the test coordination is fragile under suite-wide concurrency.
+- **Recommendation**: Replace `queueMicrotask` with a manual `Promise.resolve()` chain or use `waitFor()` with a condition check instead of a single `act()` flush.

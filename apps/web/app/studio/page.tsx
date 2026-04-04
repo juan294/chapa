@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { readSessionCookie } from "@/lib/auth/github";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { cacheGet } from "@/lib/cache/redis";
 import { Navbar } from "@/components/Navbar";
 import { toDateString } from "@/lib/utils/date";
@@ -83,7 +83,7 @@ export default async function StudioPage() {
   // Compute impact (fallback to empty stats if fetch failed)
   const effectiveStats: StatsData = stats ?? buildEmptyStats(session);
 
-  const impact = computeImpactV4(effectiveStats);
+  const impact = computeImpactV6(effectiveStats);
   const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;
 
   return (

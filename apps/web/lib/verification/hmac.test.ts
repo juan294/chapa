@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildPayload, computeHash, generateVerificationCode } from "./hmac";
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 
 const baseStats: StatsData = {
   handle: "TestUser",
@@ -23,7 +23,7 @@ const baseStats: StatsData = {
   fetchedAt: "2025-01-15T00:00:00Z",
 };
 
-const baseImpact: ImpactV4Result = {
+const baseImpact: ImpactV6Result = {
   handle: "TestUser",
   profileType: "collaborative",
   dimensions: { delivery: 70, quality: 50, consistency: 60, breadth: 40 },

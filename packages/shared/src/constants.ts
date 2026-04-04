@@ -5,7 +5,7 @@ export const SCORING_WINDOW_DAYS = 365;
 export const PR_WEIGHT_AGG_CAP = 120;
 
 /**
- * Scoring dimension caps — used by computeImpactV4.
+ * Scoring dimension caps — used by computeImpactV6.
  * V5 recalibration: caps target P50-P75 developers (was P99 in V4).
  * Calibrated for a 365-day window.
  */

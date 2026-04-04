@@ -57,6 +57,38 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // WCAG #667 — B2: role="progressbar" and aria-label must be on the container, not the fill div
+  describe("WCAG progressbar placement (#667)", () => {
+    it("role=progressbar is on the outer track element, not the fill div", () => {
+      // The container div (track) must have role=progressbar.
+      // The fill div must NOT have role=progressbar.
+      // Pattern: outer div has role + aria attrs, inner div has only style/class.
+      // outer: <div ... role="progressbar" aria-valuenow ... aria-label ...>
+      // inner: <div ... style={{ width, background }} />
+      // We check: the element with role="progressbar" must NOT also contain "animate-bar-fill"
+      // on itself — that class belongs to the fill child.
+      const progressbarMatch = SOURCE.match(
+        /<div[^>]*role="progressbar"[^>]*>/g,
+      );
+      expect(progressbarMatch).not.toBeNull();
+      // Each progressbar container should NOT have animate-bar-fill (that's on the fill child)
+      for (const tag of progressbarMatch!) {
+        expect(tag).not.toContain("animate-bar-fill");
+      }
+    });
+
+    it("aria-label is on the progressbar container, not the fill div", () => {
+      // The fill div (the one with animate-bar-fill) must NOT carry aria-label
+      const fillDivMatch = SOURCE.match(
+        /<div[^>]*animate-bar-fill[^>]*>/g,
+      );
+      expect(fillDivMatch).not.toBeNull();
+      for (const tag of fillDivMatch!) {
+        expect(tag).not.toContain("aria-label");
+      }
+    });
+  });
+
   // Issue #202 — accepts StatsData for extended stats display
   describe("athlete dashboard (#202)", () => {
     it("accepts stats: StatsData prop", () => {
@@ -125,7 +157,7 @@ describe("ImpactBreakdown", () => {
       // tooltip z-index. Cards must elevate on interaction so the active
       // tooltip renders above adjacent cards.
       const dimCardMatch = SOURCE.match(
-        /className="[^"]*rounded-xl border border-stroke bg-card p-4 animate-fade-in-up[^"]*"/,
+        /className="[^"]*rounded-xl bg-card shadow-card p-4 animate-fade-in-up[^"]*"/,
       );
       expect(dimCardMatch).not.toBeNull();
       expect(dimCardMatch![0]).toContain("hover:z-10");
@@ -134,7 +166,7 @@ describe("ImpactBreakdown", () => {
 
     it("stat cards elevate z-index on hover and focus-within", () => {
       const statCardMatch = SOURCE.match(
-        /className="[^"]*rounded-xl border border-stroke bg-card px-3 py-4 text-center animate-fade-in-up[^"]*"/,
+        /className="[^"]*rounded-xl bg-card shadow-card px-3 py-4 text-center animate-fade-in-up[^"]*"/,
       );
       expect(statCardMatch).not.toBeNull();
       expect(statCardMatch![0]).toContain("hover:z-10");
@@ -259,6 +291,27 @@ describe("ImpactBreakdown", () => {
 
     it("renders a fallback message when data is missing", () => {
       expect(SOURCE).toContain("No impact data available");
+    });
+  });
+
+  // Phase 1 — tabular-nums for stable score display
+  describe("tabular numbers (Phase 1)", () => {
+    it("dimension scores use tabular-nums", () => {
+      expect(SOURCE).toContain("tabular-nums");
+    });
+  });
+
+  // Phase 2 — text-balance on section headings
+  describe("text wrap balance (Phase 2)", () => {
+    it("section headings use text-balance for even line distribution", () => {
+      expect(SOURCE).toContain("text-balance");
+    });
+  });
+
+  // Phase 5 — shadow-card on dimension and stat cards
+  describe("layered shadows (Phase 5)", () => {
+    it("dimension cards use shadow-card for elevation", () => {
+      expect(SOURCE).toContain("shadow-card");
     });
   });
 

@@ -102,4 +102,12 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("/archetypes/emerging");
     });
   });
+
+  // Phase 9 — optical icon alignment on CTA buttons
+  describe("optical icon alignment (Phase 9)", () => {
+    it("CTA buttons use asymmetric padding for optical icon alignment", () => {
+      // Hero buttons should have pl-6 pr-5 (not symmetric px-6)
+      expect(SOURCE).toContain("pl-6 pr-5");
+    });
+  });
 });

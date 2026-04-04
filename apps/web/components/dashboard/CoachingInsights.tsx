@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { generateInsights } from "@/lib/dashboard/generate-insights";
@@ -12,7 +12,7 @@ import { InsightCard } from "./InsightCard";
 // ---------------------------------------------------------------------------
 
 interface CoachingInsightsProps {
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   trend: TrendSummary | null;
   diff: SnapshotDiff | null;
   className?: string;

@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { StatsData } from "@chapa/shared";
+
+const SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "DimensionCard.tsx"),
+  "utf-8",
+);
 import { DimensionCard } from "./DimensionCard";
 
 // ---------------------------------------------------------------------------
@@ -364,5 +371,80 @@ describe("DimensionCard", () => {
     expect(
       screen.getByText("PRs merged \u00B7 issues closed \u00B7 commits"),
     ).toBeTruthy();
+  });
+
+  // ----------------------------------------------------------------
+  // Phase 1 — tabular-nums for stable counter animation
+  // ----------------------------------------------------------------
+  it("score display uses tabular-nums for stable counter animation", () => {
+    expect(SOURCE).toContain("tabular-nums");
+  });
+
+  // ----------------------------------------------------------------
+  // Phase 5 — shadow-card replaces border for card elevation
+  // ----------------------------------------------------------------
+  it("uses shadow-card instead of border for card elevation", () => {
+    expect(SOURCE).toContain("shadow-card");
+  });
+
+  // ----------------------------------------------------------------
+  // WCAG #667 — B1: expand toggle must be a native button element
+  // ----------------------------------------------------------------
+  it("expand toggle is a native button element, not a div", () => {
+    const { container } = render(
+      <DimensionCard dimension="delivery" score={85} stats={mockStats} />,
+    );
+
+    // Must NOT use div[role="button"]
+    const divButton = container.querySelector("div[role='button']");
+    expect(divButton).toBeNull();
+
+    // Must use a native <button>
+    const nativeButton = container.querySelector("button[aria-expanded]");
+    expect(nativeButton).not.toBeNull();
+    expect(nativeButton!.tagName.toLowerCase()).toBe("button");
+  });
+
+  // ----------------------------------------------------------------
+  // WCAG #667 — W14: toggle button has descriptive aria-label
+  // ----------------------------------------------------------------
+  it("toggle button has descriptive aria-label including dimension name", () => {
+    const { container } = render(
+      <DimensionCard dimension="delivery" score={85} stats={mockStats} />,
+    );
+
+    const toggleButton = container.querySelector("button[aria-expanded]") as HTMLButtonElement;
+    expect(toggleButton).not.toBeNull();
+    expect(toggleButton!.getAttribute("aria-label")).toBe("Toggle Delivery breakdown");
+  });
+
+  it("toggle button aria-label uses correct dimension name for quality", () => {
+    const { container } = render(
+      <DimensionCard dimension="quality" score={72} stats={mockStats} />,
+    );
+
+    const toggleButton = container.querySelector("button[aria-expanded]") as HTMLButtonElement;
+    expect(toggleButton!.getAttribute("aria-label")).toBe("Toggle Quality breakdown");
+  });
+
+  // ----------------------------------------------------------------
+  // WCAG #667 — B2: progressbar container has aria-label
+  // ----------------------------------------------------------------
+  it("progressbar container has aria-label with dimension name", () => {
+    render(
+      <DimensionCard dimension="delivery" score={85} stats={mockStats} />,
+    );
+
+    const progressbar = screen.getByRole("progressbar");
+    expect(progressbar.getAttribute("aria-label")).toBe("Delivery score");
+  });
+
+  it("progressbar container aria-label uses correct dimension for consistency", () => {
+    render(
+      <DimensionCard dimension="consistency" score={70} stats={mockStats} />,
+    );
+
+    const progressbar = screen.getByRole("progressbar");
+    expect(progressbar.getAttribute("aria-label")).toBe("Consistency score");
   });
 });

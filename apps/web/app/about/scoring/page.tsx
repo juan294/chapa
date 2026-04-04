@@ -433,6 +433,53 @@ export default function ScoringMethodologyPage() {
             </p>
 
             {/* ---------------------------------------------------------- */}
+            {/* Craft dimension                                             */}
+            {/* ---------------------------------------------------------- */}
+            <SectionHeading>Craft — AI tool mastery (optional)</SectionHeading>
+            <p>
+              Craft is an optional fifth dimension that measures how effectively
+              you use AI coding tools like Claude Code. It appears on your badge
+              as a pentagon axis when you upload an insights report.
+            </p>
+            <SubHeading>How to unlock Craft</SubHeading>
+            <p>
+              In Claude Code, run <code className="bg-card px-1.5 py-0.5 rounded text-sm font-heading">/insights</code> to
+              generate your insights report. Then upload it to Chapa from the
+              user menu. Claude Code updates your insights every two weeks, so
+              you can re-upload on that cadence to keep your Craft score fresh.
+            </p>
+            <SubHeading>What Craft measures</SubHeading>
+            <p>
+              Craft is the average of three sub-dimensions, each scored 0 to 100:
+            </p>
+            <Table
+              headers={["Sub-dimension", "What it measures", "Key signals"]}
+              rows={[
+                [
+                  "Proficiency",
+                  "Tool mastery & feature adoption",
+                  "Tool diversity, agent usage, multi-clauding, session type diversity, engagement depth",
+                ],
+                [
+                  "Effectiveness",
+                  "Outcome quality",
+                  "Achievement rate (55%), satisfaction rate (45%)",
+                ],
+                [
+                  "Sophistication",
+                  "Workflow complexity",
+                  "Complex session rate, lines per session, multi-clauding intensity, files per session",
+                ],
+              ]}
+            />
+            <p>
+              Friction events (wrong approach, buggy code) and tool errors are
+              excluded from scoring. These reflect the AI tool&apos;s behavior, not
+              your skill as a developer. Only your outcomes and satisfaction
+              count.
+            </p>
+
+            {/* ---------------------------------------------------------- */}
             {/* Archetypes                                                  */}
             {/* ---------------------------------------------------------- */}
             <SectionHeading>Developer archetypes</SectionHeading>
@@ -692,7 +739,7 @@ export default function ScoringMethodologyPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
                 >
-                  Reach out on X (@juang294)
+                  Reach out on Twitter (@juang294)
                 </a>
                 <a
                   href="mailto:support@chapa.thecreativetoken.com"

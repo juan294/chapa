@@ -73,6 +73,21 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 - Cards use `bg-card` with `border-stroke`.
 - Button text on purple background: always `text-white`.
 
+## Shadows
+
+| Token | Usage | Tailwind class |
+|-------|-------|----------------|
+| `--shadow-card` | Default card/panel elevation | `shadow-card` |
+| `--shadow-card-hover` | Hover state elevation | `shadow-card-hover` |
+
+### Shadow rules
+
+- Use `shadow-card` on data cards, dropdown menus, tooltips, and toasts. These replace `border border-stroke` on non-terminal components.
+- Use `shadow-card-hover` as hover state via `hover:shadow-card-hover` with `transition-shadow`.
+- Terminal-aesthetic components (TerminalInput, TerminalOutput, GlobalCommandBar, Navbar) keep `border border-stroke` — sharp lines are part of the terminal look.
+- The first shadow layer (0px spread, 1px ring) replaces the border — don't combine `border` with `shadow-card`.
+- Dark mode shadows use purple-tinted ring + deeper black spread.
+
 ## Typography
 
 Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
@@ -93,6 +108,8 @@ Two fonts loaded via `next/font/google` in `apps/web/app/layout.tsx`:
 - Terminal output uses `font-heading` throughout for monospace consistency.
 - Accent text in headings uses `text-amber`.
 - Use `tracking-tight` on headings. Use `leading-relaxed` on body paragraphs.
+- Use `text-balance` on all `<h1>`-`<h3>` elements to prevent orphaned words.
+- Use `text-pretty` on body paragraphs longer than one sentence.
 
 ## Spacing & Layout
 
@@ -151,6 +168,13 @@ hover:border-amber/20 hover:text-text-primary
 - **TerminalInput**: `chapa >` or `studio >` prompt in amber, blinking cursor, input with placeholder
 - **AutocompleteDropdown**: `role="listbox"`, shows on `/` keystroke, purple accent on active item
 - **QuickControls**: Collapsible panel with clickable chips that insert terminal commands
+
+### Images
+
+All avatar and user-uploaded images use the `.img-outline` utility class:
+- 1px semi-transparent outline (`rgba(0,0,0,0.1)` light / `rgba(255,255,255,0.1)` dark)
+- `outline-offset: -1px` so the outline sits inside the image boundary
+- Prevents avatars from visually bleeding into matching backgrounds
 
 ### Code blocks
 

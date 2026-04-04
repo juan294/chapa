@@ -2,11 +2,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { ImpactBreakdown, DataSources, getArchetypeProfile } from "./ImpactBreakdown";
-import type { ImpactV4Result, StatsData } from "@chapa/shared";
+import type { ImpactV6Result, StatsData } from "@chapa/shared";
 
 afterEach(cleanup);
 
-const SAMPLE_IMPACT: ImpactV4Result = {
+const SAMPLE_IMPACT: ImpactV6Result = {
   handle: "testuser",
   profileType: "collaborative",
   dimensions: { delivery: 85, quality: 42, consistency: 70, breadth: 55 },
@@ -49,7 +49,7 @@ describe("getArchetypeProfile", () => {
   });
 
   it("returns profile with tip for Quality Champion", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       archetype: "Quality Champion",
       dimensions: { delivery: 30, quality: 90, consistency: 50, breadth: 40 },
@@ -61,7 +61,7 @@ describe("getArchetypeProfile", () => {
   });
 
   it("returns profile with tip for Marathoner", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       archetype: "Marathoner",
       dimensions: { delivery: 40, quality: 20, consistency: 92, breadth: 35 },
@@ -71,7 +71,7 @@ describe("getArchetypeProfile", () => {
   });
 
   it("returns profile with tip for Polymath", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       archetype: "Polymath",
       dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 88 },
@@ -81,7 +81,7 @@ describe("getArchetypeProfile", () => {
   });
 
   it("returns profile without tip for Balanced archetype", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       archetype: "Balanced",
       dimensions: { delivery: 70, quality: 68, consistency: 72, breadth: 66 },
@@ -93,7 +93,7 @@ describe("getArchetypeProfile", () => {
   });
 
   it("returns profile without tip for Emerging archetype", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       archetype: "Emerging",
       dimensions: { delivery: 15, quality: 10, consistency: 12, breadth: 8 },
@@ -160,7 +160,7 @@ describe("ImpactBreakdown — null guard branch", () => {
 
 describe("ImpactBreakdown — craft dimension visibility", () => {
   it("renders 5 dimension cards when craft is present", () => {
-    const impactWithCraft: ImpactV4Result = {
+    const impactWithCraft: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       dimensions: { delivery: 85, quality: 42, consistency: 70, breadth: 55, craft: 60 },
     };
@@ -178,7 +178,7 @@ describe("ImpactBreakdown — craft dimension visibility", () => {
   });
 
   it("shows craft score value when craft is present", () => {
-    const impactWithCraft: ImpactV4Result = {
+    const impactWithCraft: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       dimensions: { delivery: 85, quality: 42, consistency: 70, breadth: 55, craft: 73 },
     };
@@ -188,7 +188,7 @@ describe("ImpactBreakdown — craft dimension visibility", () => {
 });
 
 describe("ImpactBreakdown — solo profile type", () => {
-  const SOLO_IMPACT: ImpactV4Result = {
+  const SOLO_IMPACT: ImpactV6Result = {
     ...SAMPLE_IMPACT,
     profileType: "solo",
   };
@@ -208,7 +208,7 @@ describe("ImpactBreakdown — solo profile type", () => {
 
 describe("getArchetypeProfile — Artificer archetype", () => {
   it("returns profile with craft description for Artificer", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       archetype: "Artificer",
       dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 30, craft: 92 },
@@ -222,7 +222,7 @@ describe("getArchetypeProfile — Artificer archetype", () => {
 
 describe("getArchetypeProfile — solo profile tips", () => {
   it("uses solo quality tip when profileType is solo and quality is weakest", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       profileType: "solo",
       archetype: "Builder",
@@ -235,7 +235,7 @@ describe("getArchetypeProfile — solo profile tips", () => {
   });
 
   it("falls back to standard tip for non-quality dimensions even in solo mode", () => {
-    const impact: ImpactV4Result = {
+    const impact: ImpactV6Result = {
       ...SAMPLE_IMPACT,
       profileType: "solo",
       archetype: "Marathoner",

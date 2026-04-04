@@ -27,13 +27,13 @@ vi.mock("@/lib/env", () => ({
 // Import after mocks are set up
 import { notifyFirstBadge } from "./notifications";
 import { _resetClient } from "./resend";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const sampleImpact: ImpactV4Result = {
+const sampleImpact: ImpactV6Result = {
   handle: "TestUser",
   profileType: "solo",
   dimensions: { delivery: 80, quality: 60, consistency: 70, breadth: 50 },

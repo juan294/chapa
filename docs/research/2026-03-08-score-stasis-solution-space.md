@@ -46,7 +46,7 @@ But an **insights upload is a deliberate user action**. The user chose to genera
 │  2. dbGetToolInsights(handle) ─── fresh craft from DB            │
 │  3. getCachedLatestSnapshot(handle) ─── STALE from Redis ⚠️     │
 │                                                                  │
-│  4. computeImpactV4(stats, craftScore) → raw composite ~61       │
+│  4. computeImpactV6(stats, craftScore) → raw composite ~61       │
 │                                                                  │
 │  5. smoothScore(61, staleSnapshot) ──┐                           │
 │     │ staleSnapshot.date === today   │                           │
@@ -168,13 +168,13 @@ Create a dedicated endpoint that the client calls after upload to force-recalcul
 ### For snapshot replacement (Options A, B, D):
 - `buildSnapshot()` at `history/snapshot.ts:12` — pure function, safe to call repeatedly
 - `updateSnapshotCache()` at `snapshot-cache.ts:62` — updates Redis cache
-- `computeImpactV4()` at `impact/v4.ts:206` — pure function, accepts optional craftScore
+- `computeImpactV6()` at `impact/v6.ts:206` — pure function, accepts optional craftScore
 - `getStats()` at `github/client.ts` — cache-first with fallback to API
 - `dbGetToolInsights()` at `db/tool-insights.ts` — fetches craft from Supabase
 
 ### For client-side feedback (Option C):
 - `computeCraftScore()` at `insights/scoring.ts:167` — already called in upload route, result returned
-- `computeImpactV4()` — could be called server-side in the upload route for a projected score
+- `computeImpactV6()` — could be called server-side in the upload route for a projected score
 - `GeneratingProgress` at `generating/[handle]/GeneratingProgress.tsx` — multi-step progress pattern
 - `ErrorBanner` at `components/ErrorBanner.tsx` — existing persistent banner component
 - Design system tokens: `text-terminal-green` for success, `animate-fade-in-up` for entrance
@@ -239,7 +239,7 @@ The badge SVG has `Cache-Control: public, s-maxage=21600, stale-while-revalidate
 | Need | Exists? | Location |
 |------|---------|----------|
 | Craft score computation | Yes | `insights/scoring.ts:167` |
-| Impact computation with craft | Yes | `impact/v4.ts:206` |
+| Impact computation with craft | Yes | `impact/v6.ts:206` |
 | Snapshot building | Yes | `history/snapshot.ts:12` |
 | Snapshot cache update | Yes | `cache/snapshot-cache.ts:62` |
 | Snapshot cache invalidation | **No** | Needs `cacheDel("snapshot:latest:{handle}")` |

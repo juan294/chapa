@@ -145,6 +145,17 @@ describe("RadarChartInteractive", () => {
       expect(text).toContain("Breadth");
       expect(text).toContain("68");
     });
+
+    it("W16: axis labels use CSS variable for font family instead of hardcoded string", () => {
+      const { container } = renderChart();
+      const labels = container.querySelectorAll("[data-testid='axis-label']");
+      expect(labels.length).toBeGreaterThan(0);
+      for (const el of labels) {
+        const fontFamily = el.getAttribute("font-family");
+        expect(fontFamily).toBe("var(--font-plus-jakarta)");
+        expect(fontFamily).not.toContain("Plus Jakarta Sans");
+      }
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -478,11 +489,11 @@ describe("RadarChartInteractive", () => {
       expect(hitAreas[3]?.getAttribute("aria-label")).toBe("Select Breadth dimension");
     });
 
-    it("hit areas have focusable='true' for SVG focus support", () => {
+    it("W15: hit areas do not have focusable attribute (non-standard, tabIndex handles focusability)", () => {
       const { container } = renderChart();
       const hitAreas = container.querySelectorAll("[data-testid='axis-hit-area']");
       for (const hitArea of hitAreas) {
-        expect(hitArea.getAttribute("focusable")).toBe("true");
+        expect(hitArea.hasAttribute("focusable")).toBe(false);
       }
     });
 

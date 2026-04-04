@@ -33,8 +33,8 @@ const FONT_FILES = [
  * root, we fall back to `apps/web/` prefixed paths.
  */
 export function getFontPaths(): string[] {
-  const appRelative = join(process.cwd(), "lib", "render", "fonts");
-  const monoRelative = join(process.cwd(), "apps", "web", "lib", "render", "fonts");
+  const appRelative = join(/* turbopackIgnore: true */ process.cwd(), "lib", "render", "fonts");
+  const monoRelative = join(/* turbopackIgnore: true */ process.cwd(), "apps", "web", "lib", "render", "fonts");
   const fontsDir = existsSync(appRelative) ? appRelative : monoRelative;
   return FONT_FILES.map((f) => join(fontsDir, f));
 }

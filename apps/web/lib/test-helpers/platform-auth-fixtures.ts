@@ -55,10 +55,10 @@ export const RATE_LIMIT_ALLOWED = { allowed: true, current: 1, limit: 10 } as co
 export const RATE_LIMIT_BLOCKED = { allowed: false, current: 11, limit: 10 } as const;
 
 /**
- * Status route uses a higher limit (20).
+ * Status route uses a higher limit (120) — read-only navbar check.
  */
-export const RATE_LIMIT_STATUS_ALLOWED = { allowed: true, current: 1, limit: 20 } as const;
-export const RATE_LIMIT_STATUS_BLOCKED = { allowed: false, current: 21, limit: 20 } as const;
+export const RATE_LIMIT_STATUS_ALLOWED = { allowed: true, current: 1, limit: 120 } as const;
+export const RATE_LIMIT_STATUS_BLOCKED = { allowed: false, current: 121, limit: 120 } as const;
 
 // ---------------------------------------------------------------------------
 // Bitbucket-specific fixtures

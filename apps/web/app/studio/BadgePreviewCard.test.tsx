@@ -134,7 +134,7 @@ vi.mock("@/components/badge/BadgeContent", () => ({
 }));
 
 import { BadgePreviewCard } from "./BadgePreviewCard";
-import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 import { glassStyle } from "@/lib/effects/cards/glass-presets";
 import { fireSingleBurst } from "@/lib/effects/celebrations/confetti";
 import { useTilt } from "@/lib/effects/interactions/use-tilt";
@@ -173,7 +173,7 @@ const stats: StatsData = {
   fetchedAt: new Date().toISOString(),
 };
 
-const impact: ImpactV4Result = {
+const impact: ImpactV6Result = {
   handle: "testuser",
   profileType: "solo",
   dimensions: { delivery: 60, quality: 70, consistency: 80, breadth: 50 },
@@ -220,8 +220,8 @@ describe("BadgePreviewCard", () => {
       expect(SOURCE).toContain("stats: StatsData");
     });
 
-    it("accepts ImpactV4Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV4Result");
+    it("accepts ImpactV6Result prop", () => {
+      expect(SOURCE).toContain("impact: ImpactV6Result");
     });
 
     it("has optional interactive flag", () => {

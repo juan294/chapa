@@ -15,11 +15,11 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
  * than a user session (e.g. `/api/admin/stats`, `/api/admin/bulk-recalculate`).
  *
  * @returns `null` on success (caller should continue), or a ready-to-return
- *          `NextResponse` with 401 status on failure.
+ *          `NextResponse` with an error status on failure.
  *
- * When `ADMIN_SECRET` is not configured the function returns `null`
- * (pass-through) with a console warning — matching the `verifyCronSecret`
- * pattern for unconfigured environments.
+ * When `ADMIN_SECRET` is not configured the function returns a 503 response
+ * (fail-secure) — endpoints must not be publicly accessible due to a missing
+ * environment variable.
  *
  * Usage:
  * ```ts
@@ -31,10 +31,13 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
 export function verifyAdminSecret(request: Request): NextResponse | null {
   const secret = process.env.ADMIN_SECRET?.trim();
   if (!secret) {
-    console.warn(
-      "[admin] ADMIN_SECRET not configured — admin secret endpoints are unprotected",
+    console.error(
+      "[admin] ADMIN_SECRET not configured — rejecting request (fail-secure)",
     );
-    return null;
+    return NextResponse.json(
+      { error: "Admin secret not configured" },
+      { status: 503 },
+    );
   }
 
   const authHeader = request.headers.get("Authorization") ?? "";

@@ -6,7 +6,7 @@ import { dbGetUsers } from "@/lib/db/users";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         return;
       }
 
-      const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
+      const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
       const snapshot = buildSnapshot(stats, impact);
 
       const replaced = await dbReplaceSnapshot(handle, snapshot);

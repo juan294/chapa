@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { ImpactV4Result, StatsData, DimensionScores } from "@chapa/shared";
+import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCardsRow } from "./DimensionCardsRow";
@@ -43,7 +43,7 @@ const mockDimensions: DimensionScores = {
 
 const mockImpact = {
   dimensions: mockDimensions,
-} as ImpactV4Result;
+} as ImpactV6Result;
 
 const mockStats: StatsData = {
   handle: "testuser",
@@ -280,7 +280,7 @@ describe("DimensionCardsRow", () => {
     const impactWithoutCraft = {
       ...mockImpact,
       dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68 },
-    } as ImpactV4Result;
+    } as ImpactV6Result;
 
     render(<DimensionCardsRow impact={impactWithoutCraft} stats={mockStats} />);
 
@@ -296,7 +296,7 @@ describe("DimensionCardsRow", () => {
     const impactWithCraft = {
       ...mockImpact,
       dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 45 },
-    } as ImpactV4Result;
+    } as ImpactV6Result;
 
     render(<DimensionCardsRow impact={impactWithCraft} stats={mockStats} />);
 
@@ -312,7 +312,7 @@ describe("DimensionCardsRow", () => {
     const impactWithCraft = {
       ...mockImpact,
       dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68, craft: 45 },
-    } as ImpactV4Result;
+    } as ImpactV6Result;
 
     const { container } = render(
       <DimensionCardsRow impact={impactWithCraft} stats={mockStats} />,

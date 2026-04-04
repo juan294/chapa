@@ -1,7 +1,7 @@
 {
-  "lastSyncCommit": "e6a187092fcc5bd169b9812aaa787dafc572ee1e",
-  "lastSyncDate": "2026-03-29",
-  "blueprintVersion": "v1.14.1",
+  "lastSyncCommit": "0baad91b90f8b0ecd7fa26338dca5107260b8d36",
+  "lastSyncDate": "2026-04-04",
+  "blueprintVersion": "v1.14.4",
   "rulesSynced": ["rpi-details.md","push-accountability.md","testing.md","deployment-safety.md","supabase.md"],
   "rulesCustom": []
 }

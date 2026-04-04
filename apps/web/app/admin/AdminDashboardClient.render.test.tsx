@@ -70,7 +70,7 @@ vi.mock("./AdminTableSkeleton", () => ({
 }));
 
 vi.mock("next/dynamic", () => ({
-  default: (loader: () => Promise<{ default: React.ComponentType }>, opts?: { loading?: () => React.ReactNode }) => {
+  default: (_loader: () => Promise<{ default: React.ComponentType }>, opts?: { loading?: () => React.ReactNode }) => {
     // Return a component that just renders a testid based on the loading fallback text
     const fallback = opts?.loading?.();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

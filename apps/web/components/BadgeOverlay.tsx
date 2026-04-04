@@ -340,9 +340,16 @@ export function BadgeOverlay() {
           onMouseLeave={() => setActiveLeaderLine(null)}
           onFocus={() => setActiveLeaderLine(hotspot.id)}
           onBlur={() => setActiveLeaderLine(null)}
-          aria-describedby={activeLeaderLine === hotspot.id ? `${hotspot.id}-panel` : undefined}
+          aria-describedby={`${hotspot.id}-desc`}
           aria-label={`${hotspot.id.replace("badge-", "")} info`}
         >
+          {/* Always-present sr-only description for screen readers (W5).
+              aria-describedby must point to a DOM element that is always
+              present — the lazy-rendered leader-line panel only exists while
+              active, which is too late for the AT to read on focus. */}
+          <span id={`${hotspot.id}-desc`} className="sr-only">
+            {hotspot.tooltip}
+          </span>
           {/* Mobile: standard InfoTooltip (hidden on desktop via md:hidden) */}
           <InfoTooltip
             id={hotspot.id}

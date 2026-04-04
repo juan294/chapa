@@ -23,8 +23,8 @@ vi.mock("@/lib/validation", () => ({
   isValidHandle: vi.fn().mockReturnValue(true),
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: vi.fn().mockReturnValue({
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: vi.fn().mockReturnValue({
     handle: "testuser",
     profileType: "collaborative",
     adjustedComposite: 72,

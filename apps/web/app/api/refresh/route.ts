@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
@@ -42,9 +42,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    // Rate limit: 15 refreshes per handle per hour (normalize key)
+    // Rate limit: 5 refreshes per handle per hour (normalize key)
     const normalizedHandle = handle.toLowerCase();
-    const rl = await rateLimit(`ratelimit:refresh:${normalizedHandle}`, 15, 3600);
+    const rl = await rateLimit(`ratelimit:refresh:${normalizedHandle}`, 5, 3600);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many refreshes. Please try again later." },
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    const impact = computeImpactV4(stats);
+    const impact = computeImpactV6(stats);
 
     // Replace today's snapshot — a user-initiated refresh means the score has
     // legitimately changed (e.g. after a scoring fix). dbReplaceSnapshot uses

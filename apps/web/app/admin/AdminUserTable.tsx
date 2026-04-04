@@ -36,7 +36,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
               alt={`${user.handle}'s avatar`}
               width={28}
               height={28}
-              className="h-7 w-7 rounded-full"
+              className="h-7 w-7 rounded-full img-outline"
               onError={() => onImgError(user.handle)}
             />
           ) : (

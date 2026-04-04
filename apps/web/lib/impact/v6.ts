@@ -2,7 +2,7 @@ import type {
   StatsData,
   DimensionScores,
   DeveloperArchetype,
-  ImpactV4Result,
+  ImpactV6Result,
   ProfileType,
 } from "@chapa/shared";
 import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS, SOLO_REVIEW_RATIO_THRESHOLD } from "@chapa/shared";
@@ -325,7 +325,7 @@ export function deriveArchetype(
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the full Impact v4 profile from aggregated GitHub stats.
+ * Compute the full Impact v6 profile from aggregated GitHub stats.
  *
  * Orchestrates the scoring pipeline: detects profile type, computes all
  * dimensions, derives archetype, calculates composite score (with recency
@@ -333,9 +333,9 @@ export function deriveArchetype(
  *
  * @param stats - Aggregated GitHub stats for the scoring window (365 days)
  * @param craftScore - Optional pre-computed Craft dimension score (from AI tool insights)
- * @returns Complete {@link ImpactV4Result} with dimensions, archetype, composite, confidence, and tier
+ * @returns Complete {@link ImpactV6Result} with dimensions, archetype, composite, confidence, and tier
  */
-export function computeImpactV4(stats: StatsData, craftScore?: number): ImpactV4Result {
+export function computeImpactV6(stats: StatsData, craftScore?: number): ImpactV6Result {
   const profileType = detectProfileType(stats);
   const dimensions = computeDimensions(stats, craftScore, profileType);
   const archetype = deriveArchetype(dimensions, profileType);

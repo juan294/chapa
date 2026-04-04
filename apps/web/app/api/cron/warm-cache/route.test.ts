@@ -19,8 +19,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: vi.fn(),
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: vi.fn(() => ({
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: vi.fn(() => ({
     handle: "mock",
     profileType: "collaborative",
     dimensions: { delivery: 50, quality: 50, consistency: 50, breadth: 50 },
@@ -95,7 +95,7 @@ import { notifyScoreBump } from "@/lib/email/score-bump";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getAvatarBase64 } from "@/lib/render/avatar";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { GET } from "./route";
 
@@ -908,7 +908,7 @@ describe("GET /api/cron/warm-cache", () => {
       expect(vi.mocked(getCachedCraftScore)).toHaveBeenCalledWith("alice");
     });
 
-    it("passes craft score to computeImpactV4 when available", async () => {
+    it("passes craft score to computeImpactV6 when available", async () => {
       mockedDbGetUsers.mockResolvedValue([mockUser("alice")]);
       mockedGetStats.mockResolvedValue({ handle: "alice" } as never);
       vi.mocked(getCachedCraftScore).mockResolvedValue({
@@ -922,7 +922,7 @@ describe("GET /api/cron/warm-cache", () => {
 
       await GET(makeRequest("test-cron-secret"));
 
-      expect(vi.mocked(computeImpactV4)).toHaveBeenCalledWith(
+      expect(vi.mocked(computeImpactV6)).toHaveBeenCalledWith(
         expect.objectContaining({ handle: "alice" }),
         75,
       );

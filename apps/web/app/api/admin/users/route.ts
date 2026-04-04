@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Single Supabase call replaces: dbGetUsers + cacheMGet + computeImpactV4 + EMA
+  // Single Supabase call replaces: dbGetUsers + cacheMGet + computeImpactV6 + EMA
   const result = await dbTimeoutOr504(
     dbGetAdminUsers({ page, limit, sort, dir, search, tier, archetype }),
     "dbGetAdminUsers",

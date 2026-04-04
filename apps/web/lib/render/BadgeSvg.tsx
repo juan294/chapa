@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV4Result, Platform } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, Platform } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
@@ -26,13 +26,13 @@ interface BadgeOptions {
  * The badge always renders in dark theme regardless of the site's current theme.
  *
  * @param stats - Aggregated GitHub stats providing handle, metrics, and heatmap data
- * @param impact - Computed Impact v4 result with dimensions, archetype, tier, and score
+ * @param impact - Computed Impact v6 result with dimensions, archetype, tier, and score
  * @param options - Visual options: branding toggle, avatar data URI, verification hash/date, demo mode
  * @returns A complete SVG document as a string, ready for HTTP response or embedding
  */
 export function renderBadgeSvg(
   stats: StatsData,
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
   const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false } = options;

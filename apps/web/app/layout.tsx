@@ -73,6 +73,7 @@ export default function RootLayout({
       lang="en"
       className={`${jetbrainsMono.variable} ${plusJakarta.variable}`}
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
     >
       <head>
         <link rel="preconnect" href="https://api.github.com" />

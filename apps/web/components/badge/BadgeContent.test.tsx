@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { StatsData, ImpactV4Result, ImpactTier } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, ImpactTier } from "@chapa/shared";
 import { getBadgeContentCSS } from "./BadgeContent";
 
 // ---------------------------------------------------------------------------
@@ -75,8 +75,8 @@ describe("BadgeContent", () => {
       expect(SOURCE).toContain("stats: StatsData");
     });
 
-    it("accepts ImpactV4Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV4Result");
+    it("accepts ImpactV6Result prop", () => {
+      expect(SOURCE).toContain("impact: ImpactV6Result");
     });
 
     it("has optional scoreEffect prop", () => {
@@ -331,7 +331,7 @@ function makeStats(overrides?: Partial<StatsData>): StatsData {
   };
 }
 
-function makeImpact(overrides?: Partial<ImpactV4Result>): ImpactV4Result {
+function makeImpact(overrides?: Partial<ImpactV6Result>): ImpactV6Result {
   return {
     handle: "testuser",
     profileType: "collaborative",

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { readSessionCookie } from "@/lib/auth/github";
@@ -99,7 +99,7 @@ export async function GET(
     }
 
     // Fetch craft score, snapshot, and avatar in parallel — all are independent
-    // I/O operations. Craft score feeds into computeImpactV4 as the 5th dimension.
+    // I/O operations. Craft score feeds into computeImpactV6 as the 5th dimension.
     // Uses allSettled so a single DB/network error doesn't crash the entire badge.
     const [craftSettled, snapshotSettled, avatarSettled] = await Promise.allSettled([
       getCachedCraftScore(handle),
@@ -113,7 +113,7 @@ export async function GET(
     const avatarDataUri = avatarSettled.status === "fulfilled" ? avatarSettled.value : undefined;
 
     // Compute impact (craft score feeds into the 5th pentagon dimension)
-    const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
+    const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
 
     // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
     // on same-day repeated requests (smoothScore returns cached value for today).

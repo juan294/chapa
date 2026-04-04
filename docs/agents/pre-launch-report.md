@@ -1,10 +1,10 @@
 # Pre-Launch Audit Report
-> Generated on 2026-03-29 | Branch: `develop` | 6 parallel specialists
-> 6,627 tests | 381 test files | 64 static pages | Next.js 16.2.1 (Turbopack)
+> Generated on 2026-04-04 | Branch: `develop` | 6 parallel specialists
+> 6,955 tests | 389 test files | Next.js 16 (Turbopack)
 
 ## Verdict: CONDITIONAL
 
-No blockers found. 6 warnings across 4 specialists — all low-severity items that don't risk production stability.
+One warning found across all 6 specialists. No blockers. The warning is mitigated by Vercel's auto-injection of `CRON_SECRET` in production but should be documented for defense in depth.
 
 ## Blockers (must fix before release)
 
@@ -14,76 +14,82 @@ None.
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | `WARM_CACHE_PRIORITY_HANDLES` env var not documented in CLAUDE.md | Low | devops | Operators won't know this option exists |
-| W2 | CI run still in progress for latest commit at audit time | Low | devops | Cannot confirm green CI for latest commit |
-| W3 | Bundle size unverifiable — Turbopack omits per-route JS size table | Low | performance-eng | Cannot confirm no route exceeds 500KB threshold |
-| W4 | 3-4 redundant `fetch("/api/auth/session")` calls on share page | Low | performance-eng | Wasted network roundtrips on `/u/[handle]` |
-| W5 | ADMIN_SECRET bearer-token auth duplicated in 2 admin routes | Low | architect | Inconsistent auth pattern vs shared `adminAuth()` helper |
-| W6 | RadarChartInteractive SVG hit areas lack keyboard accessibility | Low | ux-reviewer | Axis click not keyboard-reachable (redundant — DimensionCards provide same access) |
+| W1 | `verifyCronSecret()` fail-open when `CRON_SECRET` unset | WARNING | security-reviewer, devops | Cron endpoints (`/api/cron/warm-cache`, `/api/cron/sync-audience`, `/api/cron/process-campaigns`) become publicly accessible if `CRON_SECRET` env var is missing. Mitigated on Vercel Pro (auto-injected), but not documented in `docs/accepted-risks.md`. |
+| W2 | TypeScript 6.0 available | WARNING | architect | Major version bump from 5.9.3 to 6.0.2. May introduce new strict checks. Not blocking — 5.9.x compiles cleanly — but should be evaluated in a dedicated branch. |
+
+## Recommendations (not blocking)
+
+| # | Issue | Found by |
+|---|-------|----------|
+| R1 | ESLint 10 upgrade deferred per #531 — revisit when ecosystem stabilizes | architect |
+| R2 | Batch minor dep updates: posthog-js, @playwright/test, @supabase/supabase-js, resend, svix, @types/node | architect |
+| R3 | Run `ANALYZE=true pnpm run build` for visual bundle verification | performance-eng |
+| R4 | Consider `React.memo` for DimensionCard/InsightCard in list renders | performance-eng |
+| R5 | `InfoTooltip.tsx` has 3 useEffects — acceptable but monitor if many appear simultaneously | performance-eng |
+| R6 | No edge middleware for admin routes — documented as accepted risk #402 | security-reviewer |
 
 ## Detailed Findings
 
 ### 1. Quality Assurance (qa-lead) — GREEN
 
-- **Tests:** 6,627 passed (100%), 381 test files, 0 failures
-- **Typecheck:** PASS (both workspaces)
-- **Lint:** PASS (1 pre-existing warning in test file — unused variable)
-- **Critical path coverage:** Excellent across all domains — impact scoring (8 test files), SVG rendering (11), auth (12), DB layer (11), cache (4), GitHub client (4)
-- **High-risk untested files:** None — all API routes and lib modules have corresponding tests
-- **Graceful degradation:** Strong — Redis fail-open, per-route try/catch, fire-and-forget side effects, health endpoint distinguishes "not configured" vs "broken"
-- **Recommendations:** Add top-level try/catch to `/api/supplemental` and `/api/insights` routes
+- **6,955 tests pass**, 0 failures, 0 skipped (389 test files, 35.3s)
+- TypeScript: 0 errors. Lint: 0 errors.
+- **100% API route test coverage** — all 44 route handlers have test files
+- Critical path coverage: scoring (128 tests), OAuth (34 tests), badge SVG (39 tests), share page (31 tests), craft scoring (38 tests), admin (12 test files)
+- Graceful degradation verified for Redis (fail-open), GitHub (stale-data fallback), Supabase (skip when unconfigured)
+- No high-risk untested files identified
 
 ### 2. Security (security-reviewer) — GREEN
 
-- **Dependency vulnerabilities:** 0 (clean `pnpm audit`)
-- **Hardcoded secrets:** None in production code (test fixtures only)
-- **Client-side leaks:** No secrets in `NEXT_PUBLIC_*` vars; only PostHogProvider accesses env from client
-- **OAuth:** AES-256-GCM encrypted session cookies, CSRF via crypto.randomBytes state + timingSafeEqual, open redirect protection
-- **SVG XSS:** Properly mitigated via `escapeXml()` on all user-controlled text
-- **CORS:** Wildcard only on 2 public read-only endpoints (intentional, documented)
-- **Licenses:** No GPL/AGPL; MPL-2.0 items documented in accepted-risks.md
-- **CSP:** Comprehensive headers including HSTS, nosniff, frame-ancestors, permissions-policy
-- **Recommendations:** Monitor Next.js nonce-based CSP support; consider middleware.ts for admin routes as surface grows
+- `pnpm audit`: **0 vulnerabilities**
+- No hardcoded secrets in source (all test fixtures use dummy values)
+- OAuth: CSRF via timing-safe state cookies, AES-256-GCM token encryption, 24h session TTL
+- XSS: `escapeXml()` applied to all user input in SVG rendering, `dangerouslySetInnerHTML` usage reviewed (15+ instances, all safe)
+- No secrets in `NEXT_PUBLIC_*` env vars. Server-side secrets properly isolated.
+- CORS: Wildcard only on public read-only endpoints (verify, profile) — intentional and rate-limited
+- Licenses: No GPL/AGPL. MPL-2.0 (lightningcss, resvg-js) documented as accepted risks
+- Security headers: HSTS, CSP, X-Frame-Options, Permissions-Policy all configured
+- **Warning W1**: `verifyCronSecret()` fail-open when env var unset
 
-### 3. Infrastructure (devops) — YELLOW
+### 3. Infrastructure (devops) — GREEN
 
-- **Build:** PASS (Next.js 16.2.1 with Turbopack, 82 routes, 64 static pages)
-- **CI:** 4/5 workflows green; main CI still in progress at audit time
-- **Env vars:** `WARM_CACHE_PRIORITY_HANDLES` used but not documented in CLAUDE.md
-- **Error pages:** All present — `not-found.tsx`, `global-error.tsx`, 12 route-specific `error.tsx` boundaries
-- **Health endpoint:** Solid — returns ok/degraded/skipped with dependency status
-- **Git state:** Clean working tree, no stale worktrees or branches, 0 stashes
-- **Vercel config:** 3 cron jobs configured, comprehensive security headers, badge cache 6h/7d
+- Production build succeeds (84 routes, 64 static pages)
+- CI: All workflows green (CI, Bundle Size, Dead Code, Secret Scanning, Security Scan)
+- **All 33 env vars documented** in CLAUDE.md match actual usage. All security-critical vars use `.trim()`
+- Error pages: 404, 500, and global-error all present with proper styling
+- Health endpoint returns valid JSON with dependency status
+- Git state: clean working tree, no stale worktrees
+- Vercel config: 3 cron jobs, comprehensive security headers, proper CSP
+- **Warning W1**: Same CRON_SECRET finding as security-reviewer
 
 ### 4. Architecture (architect) — GREEN
 
-- **Typecheck:** PASS with `strict: true` + `noUncheckedIndexedAccess` in all configs
-- **Outdated deps:** 8 total — 6 minor/patch (within range), ESLint 10 deferred (#531), TS 6 not urgent
-- **Circular dependencies:** None (234 files checked via madge)
-- **Dead code:** None (knip clean)
-- **Duplication:** ADMIN_SECRET bearer check in 2 routes (minor); rate limit boilerplate in 17 routes (acceptable)
-- **Monorepo:** Clean separation — `packages/shared` (types, pure functions) properly consumed by `apps/web`
-- **Recommendations:** Extract shared `verifyAdminSecret()` helper; batch minor dep updates
+- TypeScript strict mode everywhere. 0 errors.
+- `pnpm audit`: 0 vulnerabilities
+- **0 circular dependencies** across 719 files (verified with madge)
+- **No dead code** detected by knip
+- Auth patterns well-factored (5 distinct strategies, factory functions for platform OAuth)
+- Lean dependency tree: 14 production deps, 11 dev deps
+- **Warning W2**: TypeScript 6.0.2 available (current: 5.9.3)
 
-### 5. Performance (performance-eng) — YELLOW
+### 5. Performance (performance-eng) — GREEN
 
-- **Build:** PASS (10.7s compile, 408ms static generation)
-- **Bundle size:** Unverifiable from Turbopack output (no per-route JS table); needs `ANALYZE=true` run
-- **Client directives:** 121 `"use client"` files, all appropriately placed at leaf level; no client directives on layouts or core pages
-- **Good patterns:** 15+ dynamic imports with `ssr: false`, PostHog deferred to first interaction, `next/font` with `display: swap`, `next/image` for avatars, 13 `loading.tsx` files, ISR on landing/share pages
-- **Anti-patterns:** 3-4 redundant session fetches on share page
-- **Core Web Vitals:** Low risk across CLS, LCP, INP
-- **`prefers-reduced-motion`:** Supported globally + 30 component-level implementations
-- **Recommendations:** Run `ANALYZE=true` build to verify bundle sizes; consolidate session fetching with shared hook
+- Build succeeds with no size warnings
+- All heavy deps lazy-loaded: posthog-js (interaction-triggered), canvas-confetti (dynamic import), @vercel/analytics (ssr: false)
+- Excellent code-splitting: no page-level `"use client"` on production routes
+- Server-side inline SVG rendering eliminates LCP round-trip for badge
+- Fonts via `next/font/google` with `display: "swap"` — minimal CLS risk
+- Parallel data fetching everywhere (`Promise.all`/`Promise.allSettled`)
+- `prefers-reduced-motion` respected across 15+ animation modules
+- No N+1 patterns, no hot-path bloat
 
 ### 6. UX/Accessibility (ux-reviewer) — GREEN
 
-- **Heading hierarchy:** Correct across all pages, no skipped levels
-- **ARIA labels:** All interactive elements labeled; 154 `aria-hidden` on decorative icons across 64 files
-- **Focus indicators:** Global `:focus-visible` with amber outline; skip-to-content link present
-- **Motion sensitivity:** Best-in-class — global `prefers-reduced-motion` rule + component-level checks
-- **Image accessibility:** All images have meaningful alt text
-- **Keyboard navigation:** Proper `role="button"` + `tabIndex` + `onKeyDown` on custom interactives; focus trap in mobile nav; skip-to-content link with `#main-content` on all pages
-- **State handling:** 13 error boundaries, 13 loading screens (all with `role="status"`), empty states in admin/campaigns
-- **Design system:** Excellent compliance — semantic tokens throughout, hardcoded colors only in `global-error.tsx` (intentional)
-- **Recommendations:** Add keyboard access to RadarChart SVG polygon hit areas
+- Heading hierarchy correct across all pages (h1→h2→h3, no skips)
+- Comprehensive ARIA: `role`, `aria-label`, `aria-expanded`, `aria-live` on all interactive components
+- Global `:focus-visible` with amber outline. Skip-to-content link in root layout.
+- `prefers-reduced-motion`: global disable + component-level checks (AuthorTypewriter)
+- Alt text on all images. Decorative SVGs use `aria-hidden="true"`
+- Keyboard nav: terminal input (ArrowUp/Down history), autocomplete (listbox pattern), MobileNav (focus trap + Escape), InfoTooltip (Escape close)
+- Error/empty/loading states on all key pages (404, 500, BadgeSkeleton, Suspense boundaries)
+- Design system adherence: correct fonts, semantic color tokens, no hardcoded hex in production components

@@ -81,7 +81,7 @@ export function InfoTooltip({
     <span
       id={id}
       role="tooltip"
-      className="fixed z-[9999] w-max max-w-[240px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none"
+      className="fixed z-[9999] w-max max-w-[240px] rounded-lg bg-card/95 backdrop-blur-xl shadow-card p-3 text-xs text-text-secondary font-body leading-relaxed normal-case tracking-normal text-center pointer-events-none"
       style={{
         left: coords.x,
         top: position === "top" ? coords.y - 8 : coords.y + 8,

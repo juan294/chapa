@@ -167,7 +167,7 @@ export function DimensionCard({
       ref={containerRef}
       role="article"
       aria-label={`${label} dimension score: ${score}`}
-      className={`rounded-xl border border-stroke bg-card transition-colors duration-200 hover:border-amber/20 animate-fade-in-up ${className}`}
+      className={`rounded-xl bg-card shadow-card transition-shadow duration-200 hover:shadow-card-hover animate-fade-in-up ${className}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       {/* Header */}
@@ -178,7 +178,7 @@ export function DimensionCard({
           </span>
           <InfoTooltip id={tooltip.id} content={tooltip.tip} />
         </div>
-        <span className="font-heading text-3xl font-extrabold text-text-primary">
+        <span className="font-heading text-3xl font-extrabold text-text-primary tabular-nums">
           {displayScore}
         </span>
       </div>
@@ -190,6 +190,7 @@ export function DimensionCard({
           aria-valuenow={score}
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-label={`${label} score`}
           className="h-1.5 overflow-hidden rounded-full bg-stroke/30"
         >
           <div
@@ -219,14 +220,14 @@ export function DimensionCard({
       )}
 
       {/* Footer row — expand/collapse toggle */}
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
+        aria-label={`Toggle ${label} breakdown`}
         onClick={toggle}
         onKeyDown={handleKeyDown}
-        className="flex cursor-pointer items-center justify-between p-4 pt-3"
+        className="flex w-full cursor-pointer items-center justify-between p-4 pt-3 text-left"
       >
         <span className="text-xs text-text-secondary">{subtitle}</span>
         <svg
@@ -246,7 +247,7 @@ export function DimensionCard({
             strokeLinejoin="round"
           />
         </svg>
-      </div>
+      </button>
 
       {/* Expanded panel */}
       <div id={panelId} className={isExpanded ? "border-t border-stroke" : ""}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeImpactV4 } from "./v4";
+import { computeImpactV6 } from "./v6";
 import { mergeStats } from "@/lib/github/merge";
 import { makeFullStats, makeStats } from "@/lib/test-helpers/fixtures";
 
@@ -33,7 +33,7 @@ describe("golden profiles", () => {
       heatmapData: generateHeatmap(150),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -76,7 +76,7 @@ describe("golden profiles", () => {
       heatmapData: generateHeatmap(100),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -116,7 +116,7 @@ describe("golden profiles", () => {
       heatmapData: generateHeatmap(15),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -179,7 +179,7 @@ describe("golden profiles", () => {
     });
 
     const merged = mergeStats(primary, supplemental);
-    const result = computeImpactV4(merged);
+    const result = computeImpactV6(merged);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -194,7 +194,7 @@ describe("golden profiles", () => {
         "archetype": "Builder",
         "breadth": 47,
         "compositeScore": 69,
-        "consistency": 78,
+        "consistency": 79,
         "delivery": 98,
         "profileType": "collaborative",
         "quality": 53,
@@ -213,10 +213,13 @@ function generateHeatmap(
   startOffset = 0,
 ): { date: string; count: number }[] {
   const days: { date: string; count: number }[] = [];
-  const baseDate = new Date("2025-01-01");
+  // Use UTC epoch arithmetic to avoid timezone-induced date shifts.
+  // new Date("2025-01-01") is midnight UTC; adding whole-day milliseconds
+  // keeps us on UTC midnight so toISOString() always returns the intended date.
+  const baseMs = Date.UTC(2025, 0, 1);
+  const msPerDay = 86400000;
   for (let i = 0; i < activeDays; i++) {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() + i + startOffset);
+    const d = new Date(baseMs + (i + startOffset) * msPerDay);
     days.push({
       date: d.toISOString().slice(0, 10),
       count: 1 + (i % 5), // varying counts: 1-5

@@ -178,7 +178,7 @@ export function ActivityHeatmap({
       )}
 
       <div className="rounded-xl border border-stroke bg-card p-4">
-        <DotTimeline data={enriched} peakDate={insights.peakDay.date} />
+        <DotTimeline data={enriched} peakDate={insights.peakDay.date} activeDays={activeDays} />
       </div>
 
       {/* Legends */}
@@ -248,7 +248,11 @@ function StreakCard({
             Current streak
           </span>
         </div>
-        <div className="flex gap-1 items-center">
+        <div
+          className="flex gap-1 items-center"
+          aria-label="Last 7 days activity"
+          role="img"
+        >
           {last7.map((active, i) => (
             <div
               key={i}
@@ -449,7 +453,15 @@ function ChartTooltip({ tip }: { tip: ChartTooltipData }) {
 
 const DOW_HEADERS = ["M", "T", "W", "T", "F", "S", "S"];
 
-function DotTimeline({ data, peakDate }: { data: EnrichedDay[]; peakDate: string }) {
+function DotTimeline({
+  data,
+  peakDate,
+  activeDays,
+}: {
+  data: EnrichedDay[];
+  peakDate: string;
+  activeDays: number;
+}) {
   const maxCount = useMemo(
     () => Math.max(1, ...data.map((d) => d.count)),
     [data]
@@ -475,8 +487,11 @@ function DotTimeline({ data, peakDate }: { data: EnrichedDay[]; peakDate: string
 
   const handleLeave = useCallback(() => setTooltip(null), []);
 
+  const dayWord = activeDays === 1 ? "day" : "days";
+  const timelineLabel = `Activity heatmap: ${activeDays} active ${dayWord} over the past year`;
+
   return (
-    <div role="img" aria-label="Activity dot timeline">
+    <div role="img" aria-label={timelineLabel}>
       {/* Day-of-week column headers */}
       <div className="flex items-center gap-2 mb-1">
         <span className="w-12 shrink-0" />

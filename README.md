@@ -3,7 +3,7 @@
 [![CI](https://github.com/juan294/chapa/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/juan294/chapa/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/juan294/chapa/actions/workflows/security.yml/badge.svg?branch=develop)](https://github.com/juan294/chapa/actions/workflows/security.yml)
 [![Secret Scanning](https://github.com/juan294/chapa/actions/workflows/gitleaks.yml/badge.svg?branch=develop)](https://github.com/juan294/chapa/actions/workflows/gitleaks.yml)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)
 ![Node.js](https://img.shields.io/badge/Node.js-20%2B-43853d)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -142,7 +142,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
 | Hosting | Vercel |
-| Testing | Vitest, 382+ test files, 6,650+ tests, TDD workflow |
+| Testing | Vitest, 389+ test files, 6,950+ tests, TDD workflow |
 
 ## Environment Variables
 

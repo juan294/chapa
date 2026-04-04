@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import type { MetricsSnapshot } from "./types";
 import { toDateString } from "@/lib/utils/date";
 
@@ -11,7 +11,7 @@ import { toDateString } from "@/lib/utils/date";
  */
 export function buildSnapshot(
   stats: StatsData,
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
 ): MetricsSnapshot {
   const now = new Date();
   const snapshot: MetricsSnapshot = {

@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV4Result, HeatmapDay } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, HeatmapDay } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
 
 const LEVEL_TO_COUNT: Record<number, number> = {
@@ -64,7 +64,7 @@ export const BUILDER_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const BUILDER_IMPACT: ImpactV4Result = {
+export const BUILDER_IMPACT: ImpactV6Result = {
   handle: "builder",
   profileType: "collaborative",
   dimensions: {
@@ -121,7 +121,7 @@ export const GUARDIAN_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const GUARDIAN_IMPACT: ImpactV4Result = {
+export const GUARDIAN_IMPACT: ImpactV6Result = {
   handle: "guardian",
   profileType: "collaborative",
   dimensions: {
@@ -178,7 +178,7 @@ export const MARATHONER_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const MARATHONER_IMPACT: ImpactV4Result = {
+export const MARATHONER_IMPACT: ImpactV6Result = {
   handle: "marathoner",
   profileType: "collaborative",
   dimensions: {
@@ -235,7 +235,7 @@ export const POLYMATH_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const POLYMATH_IMPACT: ImpactV4Result = {
+export const POLYMATH_IMPACT: ImpactV6Result = {
   handle: "polymath",
   profileType: "collaborative",
   dimensions: {
@@ -292,7 +292,7 @@ export const BALANCED_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const BALANCED_IMPACT: ImpactV4Result = {
+export const BALANCED_IMPACT: ImpactV6Result = {
   handle: "balanced",
   profileType: "collaborative",
   dimensions: {
@@ -349,7 +349,7 @@ export const EMERGING_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const EMERGING_IMPACT: ImpactV4Result = {
+export const EMERGING_IMPACT: ImpactV6Result = {
   handle: "emerging",
   profileType: "solo",
   dimensions: {
@@ -406,7 +406,7 @@ export const ARTIFICER_STATS: StatsData = {
   fetchedAt: "2025-01-01T00:00:00Z",
 };
 
-export const ARTIFICER_IMPACT: ImpactV4Result = {
+export const ARTIFICER_IMPACT: ImpactV6Result = {
   handle: "artificer",
   profileType: "collaborative",
   dimensions: {

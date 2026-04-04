@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 
 /**
  * POST /api/generate
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     // Compute impact (also warms any downstream caches)
-    computeImpactV4(stats);
+    computeImpactV6(stats);
 
     return NextResponse.json({ success: true, handle });
   } catch (err) {

@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { isStudioEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
+import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
 
@@ -39,6 +40,8 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
+  const { shouldRender: showDropdown, isAnimatingOut: dropdownExiting } =
+    useAnimatedUnmount(open, 200);
 
   const [bbStatus, setBbStatus] = useState<{
     linked: boolean;
@@ -62,6 +65,25 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     detail?: string;
     type: "loading" | "success" | "error" | "info";
   } | null>(null);
+
+  // Insights cooldown — read last-submitted timestamp from localStorage on mount
+  const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
+  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(null);
+  useEffect(() => {
+    const stored = localStorage.getItem(insightsStorageKey);
+    if (stored) {
+      const date = new Date(stored);
+      if (!isNaN(date.getTime())) setInsightsLastSubmitted(date);
+    }
+  }, [insightsStorageKey]);
+  const insightsCooldownActive =
+    insightsLastSubmitted !== null &&
+    Date.now() - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
+  const insightsTooltip =
+    insightsCooldownActive && insightsLastSubmitted
+      ? `Available again on ${new Date(insightsLastSubmitted.getTime() + INSIGHTS_COOLDOWN_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+      : undefined;
 
   async function handleInsightsFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -96,6 +118,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         uploadRes.json(),
         fetch("/api/recalculate", { method: "POST" }),
       ]);
+
+      const now = new Date();
+      localStorage.setItem(insightsStorageKey, now.toISOString());
+      setInsightsLastSubmitted(now);
 
       if (recalcRes.ok) {
         const recalcData = await recalcRes.json();
@@ -211,7 +237,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             alt={`${login}'s avatar`}
             width={32}
             height={32}
-            className="h-8 w-8 rounded-full"
+            className="h-8 w-8 rounded-full img-outline"
             onError={() => setImgError(true)}
           />
         )}
@@ -233,11 +259,11 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       </button>
 
       {/* Dropdown */}
-      {open && (
+      {showDropdown && (
         <div
           role="menu"
           aria-label="User menu options"
-          className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-stroke bg-card shadow-xl shadow-stroke animate-scale-in"
+          className={`absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-card shadow-card ${dropdownExiting ? "animate-fade-out-up" : "animate-scale-in"}`}
         >
           {/* Header */}
           <div className="border-b border-stroke px-4 py-3">
@@ -252,7 +278,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   alt={`${login}'s avatar`}
                   width={40}
                   height={40}
-                  className="h-10 w-10 rounded-full"
+                  className="h-10 w-10 rounded-full img-outline"
                   onError={() => setImgError(true)}
                 />
               )}
@@ -267,7 +293,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
             </div>
           </div>
 
-          {/* Your Badge + Creator Studio */}
+          {/* My Badge + Creator Studio */}
           <div className="px-2 py-1.5">
             <Link
               href={`/u/${login}`}
@@ -283,7 +309,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               >
                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
               </svg>
-              Your Badge
+              My Badge
             </Link>
             {isStudioEnabledSync() && (
               <Link
@@ -311,8 +337,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               <button
                 type="button"
                 role="menuitem"
+                disabled={insightsCooldownActive}
+                title={insightsTooltip}
                 onClick={() => insightsFileRef.current?.click()}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${insightsCooldownActive ? "cursor-not-allowed opacity-50 text-text-secondary" : "text-text-primary hover:bg-amber/[0.06]"}`}
               >
                 <svg
                   className="h-4 w-4 text-text-secondary"

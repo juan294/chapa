@@ -76,6 +76,19 @@ const THEME_TOGGLE_SOURCE = fs.readFileSync(
   "utf-8",
 );
 
+describe("ThemeToggle — icon transition (Phase 6)", () => {
+  it("renders both theme icons for CSS cross-fade transition", () => {
+    const svgCount = (THEME_TOGGLE_SOURCE.match(/<svg/g) ?? []).length;
+    expect(svgCount).toBeGreaterThanOrEqual(2);
+    expect(THEME_TOGGLE_SOURCE).toContain("transition-[opacity,transform] duration-200");
+  });
+
+  it("uses opacity and scale for icon cross-fade", () => {
+    expect(THEME_TOGGLE_SOURCE).toContain("opacity-0 scale-75");
+    expect(THEME_TOGGLE_SOURCE).toContain("opacity-100 scale-100");
+  });
+});
+
 describe("ThemeToggle — mobile responsiveness (#240)", () => {
   it("button uses h-11 w-11 for 44px touch target (WCAG 2.5.8)", () => {
     expect(THEME_TOGGLE_SOURCE).toContain("h-11 w-11");

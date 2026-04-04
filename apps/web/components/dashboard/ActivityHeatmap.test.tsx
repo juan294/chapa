@@ -59,7 +59,7 @@ describe("ActivityHeatmap", () => {
     );
 
     const grid = screen.getByRole("img", {
-      name: "Activity dot timeline",
+      name: /Activity heatmap: 42 active days/i,
     });
     expect(grid).toBeTruthy();
   });
@@ -178,7 +178,7 @@ describe("ActivityHeatmap", () => {
     );
 
     const grid = screen.getByRole("img", {
-      name: "Activity dot timeline",
+      name: /Activity heatmap: 42 active days/i,
     });
     expect(grid).toBeTruthy();
   });
@@ -225,7 +225,7 @@ describe("ActivityHeatmap", () => {
 
     /** Find all dot divs inside the timeline (rounded-full cursor-pointer). */
     function getDotElements(container: HTMLElement): HTMLElement[] {
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       if (!timeline) return [];
       // Dots are the inner divs with class "rounded-full" and "cursor-pointer"
       const allDivs = timeline.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer");
@@ -316,7 +316,7 @@ describe("ActivityHeatmap", () => {
         <ActivityHeatmap heatmapData={data} activeDays={7} dimensions={mockDimensions} />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const dots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       );
@@ -338,7 +338,7 @@ describe("ActivityHeatmap", () => {
         <ActivityHeatmap heatmapData={data} activeDays={0} />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       if (timeline) {
         const dots = Array.from(
           timeline.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
@@ -364,7 +364,7 @@ describe("ActivityHeatmap", () => {
         <ActivityHeatmap heatmapData={data} activeDays={6} dimensions={mockDimensions} />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const dots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       );
@@ -387,7 +387,7 @@ describe("ActivityHeatmap", () => {
         <ActivityHeatmap heatmapData={data} activeDays={1} dimensions={mockDimensions} />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const dots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       );
@@ -410,7 +410,7 @@ describe("ActivityHeatmap", () => {
         <ActivityHeatmap heatmapData={data} activeDays={2} dimensions={mockDimensions} />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const dots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       );
@@ -431,6 +431,71 @@ describe("ActivityHeatmap", () => {
   });
 
   // ----------------------------------------------------------------
+  // W4. DotTimeline aria-label includes active-day count
+  // ----------------------------------------------------------------
+  describe("W4 – DotTimeline accessible summary", () => {
+    it("aria-label includes the total active-days count", () => {
+      const data = makeDays("2025-03-01", [3, 0, 5, 2, 0, 8, 1]);
+      // activeDays = 5 (non-zero days)
+      render(
+        <ActivityHeatmap heatmapData={data} activeDays={5} dimensions={mockDimensions} />,
+      );
+
+      // The role="img" wrapper should expose a label with the active-day count
+      const timeline = screen.getByRole("img", {
+        name: /Activity heatmap: 5 active days/i,
+      });
+      expect(timeline).toBeTruthy();
+    });
+
+    it("aria-label says '1 active day' (singular) when activeDays is 1", () => {
+      const data = makeDays("2025-03-01", [0, 0, 0, 0, 0, 3, 0]);
+      render(<ActivityHeatmap heatmapData={data} activeDays={1} />);
+
+      const timeline = screen.getByRole("img", {
+        name: /Activity heatmap: 1 active day/i,
+      });
+      expect(timeline).toBeTruthy();
+    });
+
+    it("aria-label says '0 active days' when there is no activity", () => {
+      render(<ActivityHeatmap heatmapData={[]} activeDays={0} />);
+
+      // The DotTimeline is not rendered for empty data, so the outer section
+      // label should still be present
+      const section = screen.getByLabelText("Contribution activity");
+      expect(section).toBeTruthy();
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // W17. StreakCard mini dots have accessible description
+  // ----------------------------------------------------------------
+  describe("W17 – StreakCard mini dots accessible description", () => {
+    it("last-7-days dot container has an accessible label", () => {
+      const data = makeDays("2025-03-01", [3, 5, 2, 0, 4, 1, 8]);
+      render(
+        <ActivityHeatmap heatmapData={data} activeDays={6} dimensions={mockDimensions} />,
+      );
+
+      // The 7-dot row should have an accessible label describing what it represents
+      const dotsContainer = screen.getByLabelText(/last 7 days activity/i);
+      expect(dotsContainer).toBeTruthy();
+    });
+
+    it("last-7-days dot container is aria-hidden=false so screen readers reach it", () => {
+      const data = makeDays("2025-03-01", [3, 5, 2, 0, 4, 1, 8]);
+      render(
+        <ActivityHeatmap heatmapData={data} activeDays={6} dimensions={mockDimensions} />,
+      );
+
+      const dotsContainer = screen.getByLabelText(/last 7 days activity/i);
+      // Should NOT be aria-hidden — it carries meaning for screen readers
+      expect(dotsContainer.getAttribute("aria-hidden")).not.toBe("true");
+    });
+  });
+
+  // ----------------------------------------------------------------
   // 16. enrichDays dimension weighting
   // ----------------------------------------------------------------
   describe("enrichDays dimension weighting", () => {
@@ -447,7 +512,7 @@ describe("ActivityHeatmap", () => {
         />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const activeDots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       ).filter((d) => parseFloat(d.style.opacity) < 1); // active dots have opacity < 1
@@ -472,7 +537,7 @@ describe("ActivityHeatmap", () => {
         />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const activeDots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       ).filter((d) => parseFloat(d.style.opacity) < 1);
@@ -490,7 +555,7 @@ describe("ActivityHeatmap", () => {
         <ActivityHeatmap heatmapData={data} activeDays={14} />,
       );
 
-      const timeline = container.querySelector("[role='img'][aria-label='Activity dot timeline']");
+      const timeline = container.querySelector("[role='img'][aria-label*='Activity heatmap']");
       const activeDots = Array.from(
         timeline!.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
       ).filter((d) => parseFloat(d.style.opacity) < 1);

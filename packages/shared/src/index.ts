@@ -8,7 +8,7 @@ export type {
   ProfileType,
   DimensionScores,
   DeveloperArchetype,
-  ImpactV4Result,
+  ImpactV6Result,
   SupplementalStats,
   SnapshotPenalty,
   MetricsSnapshot,

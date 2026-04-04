@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImpactV4Result, StatsData } from "@chapa/shared";
+import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import { useTrendData } from "@/lib/hooks/use-trend-data";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
@@ -13,7 +13,7 @@ import { StatsGrid } from "./StatsGrid";
 // ---------------------------------------------------------------------------
 
 interface ImpactDashboardProps {
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   stats: StatsData;
   handle: string;
 }

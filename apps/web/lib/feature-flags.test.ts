@@ -373,6 +373,67 @@ describe("isInsightsEnabledSync", () => {
 });
 
 // ---------------------------------------------------------------------------
+// checkFlag TTL cache behavior
+// ---------------------------------------------------------------------------
+
+describe("feature flag TTL cache", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns cached result on second call without hitting DB again", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("codeberg_integration", true),
+    );
+
+    await isCodebergEnabled();
+    await isCodebergEnabled();
+
+    expect(dbGetFeatureFlag).toHaveBeenCalledTimes(1);
+  });
+
+  it("hits DB again after cache is reset", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("codeberg_integration", true),
+    );
+
+    await isCodebergEnabled();
+    _resetFlagCache();
+    await isCodebergEnabled();
+
+    expect(dbGetFeatureFlag).toHaveBeenCalledTimes(2);
+  });
+
+  it("caches separate entries per flag key", async () => {
+    vi.mocked(dbGetFeatureFlag)
+      .mockResolvedValueOnce(makeFlag("codeberg_integration", true))
+      .mockResolvedValueOnce(makeFlag("bitbucket_integration", false));
+
+    await isCodebergEnabled();
+    await isBitbucketEnabled();
+    // second calls — both should be served from cache
+    const cb = await isCodebergEnabled();
+    const bb = await isBitbucketEnabled();
+
+    expect(dbGetFeatureFlag).toHaveBeenCalledTimes(2);
+    expect(cb).toBe(true);
+    expect(bb).toBe(false);
+  });
+
+  it("caches env-var fallback result so DB is not re-queried", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "true";
+
+    await isCodebergEnabled();
+    await isCodebergEnabled();
+
+    expect(dbGetFeatureFlag).toHaveBeenCalledTimes(1);
+    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isInsightsEnabled (async, DB-backed)
 // ---------------------------------------------------------------------------
 

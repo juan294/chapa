@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { QuickControls } from "./QuickControls";
 import type { BadgeConfig } from "@chapa/shared";
+
+const SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "QuickControls.tsx"),
+  "utf-8",
+);
 
 vi.mock("@/lib/effects/defaults", () => ({
   STUDIO_PRESETS: [
@@ -176,7 +183,16 @@ describe("QuickControls", () => {
     const bgButton = screen.getByText("Background");
     fireEvent.click(bgButton);
     expect(screen.getByText("Aurora Glow")).toBeDefined();
-    fireEvent.click(bgButton);
-    expect(screen.queryByText("Aurora Glow")).toBeNull();
+  });
+
+  // Phase 6 — icon cross-fade transition
+  it("toggle button icons use cross-fade transition", () => {
+    expect(SOURCE).toContain("transition-all duration-150");
+  });
+
+  // Phase 8 — collapse-grid for smooth height transition
+  it("category options use collapse-grid for smooth height transition", () => {
+    expect(SOURCE).toContain("collapse-grid");
+    expect(SOURCE).toContain("data-expanded");
   });
 });

@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV4Result, HeatmapDay } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, HeatmapDay } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Deterministic heatmap (91 days = 13 weeks × 7 days)
@@ -51,7 +51,7 @@ export const MOCK_STATS: StatsData = {
 // Shared mock impact
 // ---------------------------------------------------------------------------
 
-export const MOCK_IMPACT: ImpactV4Result = {
+export const MOCK_IMPACT: ImpactV6Result = {
   handle: "juan294",
   profileType: "collaborative",
   dimensions: {

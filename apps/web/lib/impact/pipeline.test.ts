@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mergeStats } from "@/lib/github/merge";
-import { computeImpactV4 } from "./v4";
+import { computeImpactV6 } from "./v6";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { makeFullStats } from "@/lib/test-helpers/fixtures";
 import { MERGE_EXPECTED_KEYS } from "@chapa/shared";
@@ -28,7 +28,7 @@ describe("scoring pipeline integrity", () => {
     }
 
     // Stage 2: Score
-    const impact = computeImpactV4(merged);
+    const impact = computeImpactV6(merged);
     expect(impact.dimensions.delivery).toBeGreaterThanOrEqual(0);
     expect(impact.dimensions.delivery).toBeLessThanOrEqual(100);
     expect(impact.dimensions.quality).toBeGreaterThanOrEqual(0);
@@ -61,7 +61,7 @@ describe("scoring pipeline integrity", () => {
     });
 
     const merged = mergeStats(primary, supplemental);
-    const impact = computeImpactV4(merged);
+    const impact = computeImpactV6(merged);
 
     // Solo quality MUST be > 0 when solo quality fields are populated
     expect(impact.profileType).toBe("solo");

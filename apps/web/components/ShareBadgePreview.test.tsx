@@ -23,8 +23,8 @@ describe("ShareBadgePreview", () => {
       expect(SOURCE).toContain("stats: StatsData");
     });
 
-    it("accepts ImpactV4Result prop", () => {
-      expect(SOURCE).toContain("impact: ImpactV4Result");
+    it("accepts ImpactV6Result prop", () => {
+      expect(SOURCE).toContain("impact: ImpactV6Result");
     });
   });
 

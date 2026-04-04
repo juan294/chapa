@@ -54,7 +54,7 @@ describe("computePrWeight", () => {
       // 10 total changes: sizeMultiplier = 1.0 → full rawWeight
       const w10 = computePrWeight({ additions: 5, deletions: 3, changedFiles: 2 });
       // 20 total changes: sizeMultiplier = 1.0 → same formula, higher raw
-      const w20 = computePrWeight({ additions: 10, deletions: 5, changedFiles: 5 });
+      // (w20 would be larger only because of higher raw weight — not asserted here)
 
       // Both should get full multiplier; w20 is larger only because of higher raw weight
       const raw10 = 0.5 + 0.25 * Math.log(1 + 2) + 0.25 * Math.log(1 + 8);

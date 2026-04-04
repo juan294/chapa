@@ -196,7 +196,7 @@ vi.mock("@/components/KeyboardShortcutsListener", () => ({
 }));
 
 import { StudioClient } from "./StudioClient";
-import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 
 // ---------- Test fixtures ----------
 
@@ -232,7 +232,7 @@ const stats: StatsData = {
   fetchedAt: new Date().toISOString(),
 };
 
-const impact: ImpactV4Result = {
+const impact: ImpactV6Result = {
   handle: "testuser",
   profileType: "solo",
   dimensions: {

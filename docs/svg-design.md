@@ -47,11 +47,11 @@
 - 13 weeks x 7 days grid (91 cells)
 - Cell size ~14px with ~3px gap
 - 5 intensity colors from theme (purple-based):
-  - 0: `rgba(139,92,246,0.06)` (none)
-  - 1: `rgba(139,92,246,0.20)` (low)
-  - 2: `rgba(139,92,246,0.38)` (medium)
-  - 3: `rgba(139,92,246,0.58)` (high)
-  - 4: `rgba(139,92,246,0.85)` (intense)
+  - 0: `rgba(139,92,246,0.12)` (none)
+  - 1: `rgba(139,92,246,0.30)` (low)
+  - 2: `rgba(139,92,246,0.48)` (medium)
+  - 3: `rgba(139,92,246,0.68)` (high)
+  - 4: `rgba(139,92,246,0.92)` (intense)
 - Animation: fade-in by week group
 
 **Center column: Radar chart**
@@ -155,7 +155,7 @@ Defined in `apps/web/lib/render/theme.ts`:
 - `totalStars`, `totalForks`, `totalWatchers` (metric pills)
 - `heatmapData` (heatmap grid)
 
-**From `ImpactV4Result`:**
+**From `ImpactV6Result`:**
 - `archetype` (archetype pill)
 - `dimensions` (radar chart: delivery, quality, consistency, breadth, and optionally craft)
 - `adjustedComposite` (score ring)

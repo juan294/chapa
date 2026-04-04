@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 
 vi.mock("@/app/studio/BadgePreviewCard", () => ({
   BadgePreviewCard: () => <div data-testid="badge-preview-card" />,
@@ -43,7 +43,7 @@ const stats: StatsData = {
   fetchedAt: new Date().toISOString(),
 };
 
-const impact: ImpactV4Result = {
+const impact: ImpactV6Result = {
   handle: "testuser",
   profileType: "solo",
   dimensions: { delivery: 60, quality: 70, consistency: 80, breadth: 50 },

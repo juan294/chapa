@@ -34,7 +34,7 @@ Say:
   - stars, forks, watchers metrics
 
 Say:
-"This isn't just activity. Impact v4 measures four independent dimensions—shipping code, reviewing others, consistency, and cross-project breadth. Your archetype tells you what kind of developer you are. And the radar chart shows your profile shape at a glance."
+"This isn't just activity. Impact v6 measures up to five independent dimensions—shipping code, reviewing others, consistency, cross-project breadth, and optionally AI tool mastery. Your archetype tells you what kind of developer you are. And the radar chart shows your profile shape at a glance."
 
 ### 3) Breakdown + tooltips (20s)
 - Scroll to breakdown section

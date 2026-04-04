@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getMatchingCommands } from "./command-registry";
+import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import type { CommandDef } from "./command-registry";
 
 interface AutocompleteDropdownProps {
@@ -23,6 +24,7 @@ export function AutocompleteDropdown({
 }: AutocompleteDropdownProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { shouldRender, isAnimatingOut } = useAnimatedUnmount(visible, 150);
 
   const matching = useMemo(
     () => getMatchingCommands(partial, commands),
@@ -87,14 +89,14 @@ export function AutocompleteDropdown({
     return () => document.removeEventListener("mousedown", handleMouseDown);
   }, [visible, matching.length, onDismiss]);
 
-  if (!visible || matching.length === 0) return null;
+  if (!shouldRender || matching.length === 0) return null;
 
   return (
     <div
       ref={containerRef}
       role="listbox"
       aria-label="Command suggestions"
-      className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl"
+      className={`absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card font-terminal text-sm shadow-xl ${isAnimatingOut ? "animate-fade-out-up" : "animate-terminal-fade-in"}`}
     >
       {matching.map((cmd, i) => (
         <div

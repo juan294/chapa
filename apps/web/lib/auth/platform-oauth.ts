@@ -265,10 +265,11 @@ export function createDisconnectHandler(config: PlatformOAuthConfig) {
     // 4. Delete linked platform
     const success = await dbDeleteLinkedPlatform(handle, config.platform);
 
-    // 5. Invalidate stats cache
+    // 5. Invalidate stats cache + supplemental EMU data
     const lh = handle.toLowerCase();
     void cacheDel(`stats:v2:merged:${lh}`);
     void cacheDel(`stats:v2:${config.platform}:${lh}`);
+    void cacheDel(`supplemental:${lh}`);
 
     // 6. Return result
     return NextResponse.json({ success });
@@ -288,9 +289,9 @@ export function createStatusHandler(config: PlatformOAuthConfig) {
       return NextResponse.json({ enabled: false });
     }
 
-    // 2. Rate limit: 20 requests per IP per 15 minutes
+    // 2. Rate limit: 120 requests per IP per 15 minutes (navbar status check — read-only)
     const ip = getClientIp(request);
-    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:status:${ip}`, 20, 900);
+    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:status:${ip}`, 120, 900);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },

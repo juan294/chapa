@@ -3,7 +3,7 @@ export const revalidate = 3600;
 import { Suspense } from "react";
 import { after } from "next/server";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { smoothScore } from "@/lib/impact/smoothing";
 import { getTier } from "@/lib/impact/utils";
 import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
@@ -120,7 +120,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
     getCachedCraftScore(handle),
   ]);
 
-  const impact = stats ? computeImpactV4(stats, craftResult?.craftScore ?? undefined) : null;
+  const impact = stats ? computeImpactV6(stats, craftResult?.craftScore ?? undefined) : null;
 
   // Start avatar fetch immediately (runs concurrently with EMA computation)
   const avatarPromise = stats?.avatarUrl
@@ -228,7 +228,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
         </h1>
 
         {/* ── Badge Section Title ──────────────────────────────── */}
-        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:150ms]">
+        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:150ms] text-balance">
           Your Impact, Decoded
         </h2>
 

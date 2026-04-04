@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
   mockGetStatsData,
-  mockComputeImpactV4,
+  mockComputeImpactV6,
   mockRenderBadgeSvg,
   mockReadSessionCookie,
   mockIsValidHandle,
@@ -19,7 +19,7 @@ const {
   mockGetCachedLatestSnapshot,
 } = vi.hoisted(() => ({
   mockGetStatsData: vi.fn(),
-  mockComputeImpactV4: vi.fn(),
+  mockComputeImpactV6: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockReadSessionCookie: vi.fn(),
   mockIsValidHandle: vi.fn(),
@@ -36,8 +36,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: mockGetStatsData,
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: mockComputeImpactV4,
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: mockComputeImpactV6,
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -177,7 +177,7 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
     mockReadSessionCookie.mockReturnValue(null);
     mockGetStatsData.mockResolvedValue(FAKE_STATS);
-    mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
+    mockComputeImpactV6.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockGenerateVerificationCode.mockReturnValue(null);
@@ -240,13 +240,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
     });
 
-    it("passes stats to computeImpactV4 without craft score when no insights exist", async () => {
+    it("passes stats to computeImpactV6 without craft score when no insights exist", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, undefined);
     });
 
-    it("passes craft score to computeImpactV4 when tool insights exist", async () => {
+    it("passes craft score to computeImpactV6 when tool insights exist", async () => {
       const { getCachedCraftScore } = await import("@/lib/cache/craft-cache");
       vi.mocked(getCachedCraftScore).mockResolvedValue({
         tool: "claude-code",
@@ -258,7 +258,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       });
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, 75);
+      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, 75);
     });
 
     it("passes stats, impact, and options to renderBadgeSvg", async () => {
@@ -541,7 +541,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       const body = await res.text();
       expect(body).toBe(FAKE_SVG);
       // craft score falls back to undefined
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, undefined);
     });
 
     it("renders badge when getCachedLatestSnapshot throws (allSettled resilience)", async () => {

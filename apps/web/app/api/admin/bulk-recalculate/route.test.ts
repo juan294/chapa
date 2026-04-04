@@ -40,8 +40,8 @@ vi.mock("@/lib/github/client", () => ({
   }),
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: vi.fn().mockReturnValue({
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: vi.fn().mockReturnValue({
     handle: "testuser",
     profileType: "solo",
     dimensions: { delivery: 50, quality: 30, consistency: 40, breadth: 35 },
@@ -142,12 +142,12 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(res.status).toBe(401);
   });
 
-  it("passes through when ADMIN_SECRET is not set (unprotected)", async () => {
+  it("returns 503 when ADMIN_SECRET is not set (fail-secure)", async () => {
     vi.stubEnv("ADMIN_SECRET", "");
     const res = await POST(makeRequest(VALID_SECRET));
-    // When ADMIN_SECRET is not configured, the endpoint is unprotected
-    // (matches verifyCronSecret pattern for unconfigured environments)
-    expect(res.status).toBe(200);
+    // When ADMIN_SECRET is not configured, the endpoint must return 503
+    // (fail-secure: misconfigured environment must not expose admin operations)
+    expect(res.status).toBe(503);
   });
 
   it("returns 429 when rate limited", async () => {

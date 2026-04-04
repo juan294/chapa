@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImpactV4Result, StatsData, DimensionScores } from "@chapa/shared";
+import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
@@ -9,7 +9,7 @@ import { DimensionCard } from "./DimensionCard";
 const CORE_DIMENSIONS = ["delivery", "quality", "consistency", "breadth"] as const;
 
 export interface DimensionCardsRowProps {
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   stats: StatsData;
   trend?: TrendSummary | null;
   diff?: SnapshotDiff | null;

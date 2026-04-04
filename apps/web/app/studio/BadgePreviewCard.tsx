@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type {
   BadgeConfig,
   StatsData,
-  ImpactV4Result,
+  ImpactV6Result,
 } from "@chapa/shared";
 import type { GlassVariant } from "@/lib/effects/cards/glass-presets";
 import { glassStyle } from "@/lib/effects/cards/glass-presets";
@@ -46,7 +46,7 @@ const LazyHolographicOverlay = dynamic(
 export interface BadgePreviewCardProps {
   config: BadgeConfig;
   stats: StatsData;
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   interactive?: boolean;
 }
 

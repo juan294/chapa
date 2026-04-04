@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
@@ -22,7 +22,7 @@ import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListe
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
   stats: StatsData;
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   handle?: string;
 }
 

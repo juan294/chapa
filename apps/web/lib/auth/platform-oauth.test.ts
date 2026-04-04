@@ -60,6 +60,8 @@ import {
 // Test platform config
 // ---------------------------------------------------------------------------
 
+// NOTE: TESTPLATFORM_CLIENT_ID and TESTPLATFORM_CLIENT_SECRET are fake OAuth credentials
+// used exclusively for test scaffolding here. They are NOT production environment variables.
 function makeMockConfig(): PlatformOAuthConfig & {
   mockIsEnabled: ReturnType<typeof vi.fn>;
   mockCreateStateCookie: ReturnType<typeof vi.fn>;
@@ -511,6 +513,12 @@ describe("createDisconnectHandler", () => {
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
   });
 
+  it("clears supplemental EMU data on disconnect", async () => {
+    await POST(makeRequest());
+
+    expect(mockCacheDel).toHaveBeenCalledWith("supplemental:testuser");
+  });
+
   it("returns { success: false } when DB delete fails", async () => {
     mockDbDeleteLinkedPlatform.mockResolvedValue(false);
 
@@ -528,6 +536,7 @@ describe("createDisconnectHandler", () => {
 
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("supplemental:testuser");
   });
 });
 
@@ -571,9 +580,9 @@ describe("createStatusHandler", () => {
     expect(res.status).toBe(429);
   });
 
-  it("uses status-specific rate limit (20 per 15 min)", async () => {
+  it("uses status-specific rate limit (120 per 15 min)", async () => {
     await GET(makeRequest());
-    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:tp:status:1.2.3.4", 20, 900);
+    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:tp:status:1.2.3.4", 120, 900);
   });
 
   it("returns 401 when not authenticated", async () => {

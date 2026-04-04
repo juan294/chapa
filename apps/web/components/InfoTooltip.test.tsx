@@ -22,11 +22,11 @@ describe("InfoTooltip", () => {
 
   describe("design system compliance", () => {
     it("uses semantic color tokens (no hardcoded hex)", () => {
-      // Should use tokens like text-text-secondary, text-amber, bg-card, border-stroke
+      // Should use tokens like text-text-secondary, text-amber, bg-card, shadow-card
       expect(SOURCE).toContain("text-text-secondary");
       expect(SOURCE).toContain("text-amber");
       expect(SOURCE).toContain("bg-card");
-      expect(SOURCE).toContain("border-stroke");
+      expect(SOURCE).toContain("shadow-card");
     });
 
     it("uses font-body for tooltip text", () => {

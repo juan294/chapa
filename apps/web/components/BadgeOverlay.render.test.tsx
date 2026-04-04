@@ -81,4 +81,35 @@ describe("BadgeOverlay", () => {
     expect(screen.getByTestId("tooltip-badge-heatmap")).toBeDefined();
     expect(screen.getByTestId("tooltip-badge-github")).toBeDefined();
   });
+
+  // W5 — BadgeOverlay desktop tooltip SR announcement
+  // Each hotspot must have a permanently-present sr-only description element
+  // so aria-describedby always resolves, even before hover/focus activates the
+  // leader-line panel and regardless of viewport breakpoint.
+  it("each hotspot has a sr-only description element in DOM before any interaction", () => {
+    const { container } = render(<BadgeOverlay />);
+    // archetype hotspot must have its description always in the DOM
+    const archetypeDesc = container.querySelector(
+      "#badge-archetype-desc",
+    );
+    expect(archetypeDesc).not.toBeNull();
+    expect(archetypeDesc?.classList.contains("sr-only")).toBe(true);
+    // heatmap description must also always be present
+    const heatmapDesc = container.querySelector("#badge-heatmap-desc");
+    expect(heatmapDesc).not.toBeNull();
+    expect(heatmapDesc?.classList.contains("sr-only")).toBe(true);
+  });
+
+  it("each hotspot's aria-describedby always points to a present DOM element", () => {
+    const { container } = render(<BadgeOverlay />);
+    const hotspots = Array.from(
+      container.querySelectorAll<HTMLElement>("[tabindex='0']"),
+    );
+    for (const hotspot of hotspots) {
+      const describedById = hotspot.getAttribute("aria-describedby");
+      expect(describedById).not.toBeNull();
+      const referencedEl = container.querySelector(`#${describedById}`);
+      expect(referencedEl).not.toBeNull();
+    }
+  });
 });

@@ -11,13 +11,13 @@
 
 Add an **Insights Layer** to Chapa that lets developers import usage reports from AI coding tools (starting with Claude Code `/insights`) to enrich their Impact profile. Insights data captures *how* a developer works — tool proficiency, workflow sophistication, delegation patterns, achievement rates — complementing the existing 4 dimensions which measure *what* they produce.
 
-The Insights Layer is a **parallel score** that sits alongside the Impact v4 profile. It does NOT replace or modify the 4 existing dimensions. Instead, it adds a new "Craft Score" (0–100) with its own sub-dimensions, visible on the badge, share page, and breakdown.
+The Insights Layer is a **parallel score** that sits alongside the Impact v6 profile. It does NOT replace or modify the 4 existing dimensions. Instead, it adds a new "Craft Score" (0–100) with its own sub-dimensions, visible on the badge, share page, and breakdown.
 
 **Scope:** Claude Code insights only for v1. Architecture supports future tools (Cursor, Copilot, Windsurf, etc.).
 
 ## Why This Matters
 
-Current Impact v4 measures code activity (commits, PRs, reviews, heatmap). But modern developers increasingly work *through* AI tools — the quality of that collaboration is itself a signal of developer sophistication. A developer who orchestrates parallel agents, maintains high achievement rates, and uses advanced features is demonstrably more capable than one who uses AI as a simple autocomplete.
+Current Impact v6 measures code activity (commits, PRs, reviews, heatmap). But modern developers increasingly work *through* AI tools — the quality of that collaboration is itself a signal of developer sophistication. A developer who orchestrates parallel agents, maintains high achievement rates, and uses advanced features is demonstrably more capable than one who uses AI as a simple autocomplete.
 
 Claude Code's `/insights` report is the first structured source of this signal. It contains:
 
@@ -35,7 +35,7 @@ Claude Code's `/insights` report is the first structured source of this signal. 
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Score placement | Parallel "Craft Score" alongside Impact v4 | Non-breaking — existing users unaffected. Score is optional enrichment |
+| Score placement | Parallel "Craft Score" alongside Impact v6 | Non-breaking — existing users unaffected. Score is optional enrichment |
 | Data format | Structured JSON (parsed from HTML report) | HTML is the current format; we parse it client-side and upload JSON to the API |
 | Initial tool | Claude Code only | First mover, richest data. Architecture is tool-agnostic |
 | Score model | 3 sub-dimensions: Proficiency, Effectiveness, Sophistication | Maps cleanly to the insights data signals |

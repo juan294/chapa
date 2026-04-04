@@ -1,100 +1,85 @@
 # QA Report
-> Generated: 2026-03-25 | Health status: GREEN
+> Generated: 2026-04-01 | Health status: green
 
 ## Executive Summary
-
-All 6,032 tests pass across 369 files with zero type errors and zero lint issues. Accessibility is WCAG 2.1 AA compliant with zero violations. Design system compliance is 100% across production components. Error handling is mature with 12 error boundaries, 13 loading states, and correct Promise patterns. The codebase is production-ready.
+All 6,879 tests pass across 386 files with zero TypeScript errors and zero lint issues. Accessibility, design system compliance, and error handling remain at the high standard established in the prior cycle, with the `debug-quality` temp endpoint confirmed deleted.
 
 ## Test Results
-- Total: **6,032 tests** across **369 files**
-- Passed: **6,032** | Failed: **0** | Skipped: **0**
-- Duration: ~19s (transform 10s, setup 4s, tests 28s)
-- Delta vs 2026-03-18: **+537 tests**, **+51 files**
+- Total: 6,879 tests across 386 files
+- Passed: 6,879 | Failed: 0 | Skipped: 0
 
 ## TypeScript
-**Clean** — 0 type errors across all workspace packages (`apps/web`, `packages/shared`).
+Clean — `tsc --noEmit` passes in both `packages/shared` and `apps/web` with 0 errors.
 
 ## Linting
-**Clean** — 0 errors, 0 warnings. ESLint passes with no output.
+Clean — ESLint passes with 0 errors and 0 warnings.
 
 ## Accessibility
 
-**Status: EXCELLENT — 0 issues found. WCAG 2.1 Level AA compliant.**
+### `<img>` tags missing `alt`
+No bare `<img>` elements found. All images use Next.js `<Image>` (which enforces `alt`) or inline SVG with `aria-hidden="true"`.
 
-| Criterion | Status | Evidence |
-|-----------|--------|---------|
-| Alt text | PASS | No `<img>` tags used; all SVG icons have `aria-hidden="true"`; OG images have alt text |
-| Heading hierarchy | PASS | h1 → h2 structure maintained on all pages; sr-only headings for semantic structure |
-| ARIA labels | PASS | 15+ components with proper `aria-label`, `aria-describedby`, `aria-expanded`, `role` |
-| Focus indicators | PASS | Global `*:focus-visible` with 2px amber outline; component-specific rings |
-| Reduced motion | PASS | Global `@media (prefers-reduced-motion: reduce)` blanket + per-component JS checks |
-| Keyboard navigation | PASS | Semantic HTML throughout; focus traps in modals; full keyboard support in terminal |
+### Heading hierarchy
+All production pages use valid descending hierarchy (h1 → h2 → h3). Two experiment pages (`number-counters/page.tsx`, `gradient-border/page.tsx`) render `<h2>` before a later `<h1>` — acceptable as feature-flagged, low-traffic experiment pages.
 
-**Highlights:**
-- Skip-to-content link in layout.tsx
-- Portal-based tooltips (`createPortal`) to avoid container clipping
-- Dialog focus management (cancel button focused on open)
-- `aria-live="polite"` regions for status updates (CopyButton)
-- `aria-busy` on loading states (BadgeToolbar)
+### Interactive elements missing ARIA labels
+All buttons audited. Every icon-only button has an `aria-label`:
+- `BadgeToolbar.tsx` refresh, share, download buttons — labeled
+- `CopyButton.tsx:19` — `aria-label="Copy embed snippet"`
+- `Toast.tsx:143` — `aria-label="Dismiss notification"`
+- `ErrorBanner.tsx:47` — `aria-label="Dismiss error"`
+- `ThemeToggle.tsx` — dynamic label (light/dark toggle)
+- `MobileNav.tsx:75` — `aria-label="Toggle navigation"`
+- `InfoTooltip.tsx:108` — `aria-label="More info"`
+- `LiteYouTubeEmbed.tsx:39` — `aria-label="Play {title}"`
+- `ShortcutCheatSheet.tsx:104` — `aria-label="Close keyboard shortcuts"`
+- `SubMetricPanel.tsx:259` — `aria-label="Close breakdown panel"`
+- `UserMenu.tsx` — labeled trigger + unlink buttons; "Import Claude Code Insights" and "Sign out" buttons have visible text content (no label needed)
+- `ConfirmDialog.tsx` buttons use rendered `cancelLabel`/`confirmLabel` text (no label needed)
+- `AuthorTypewriter.tsx:200` — `aria-label="Made by {AUTHOR_NAME}"`
+- `BadgeToolbar.tsx` "Copy link" menuitem has visible text content
 
-## Error Handling
+**No ARIA label gaps found.**
 
-**Status: GOOD — mature, production-ready patterns.**
-
-### Error Boundaries (12 total)
-Root (`error.tsx`), global (`global-error.tsx`), plus 10 route segments: about, admin, archetypes, coming-soon, experiments, privacy, studio, terms, u/[handle], verify.
-
-**Missing:** `/cli/*` routes (minor — low-traffic authorization flow).
-
-### Loading States (13 total)
-Root, about, admin, archetypes, cli/authorize, coming-soon, experiments, generating/[handle], privacy, studio, terms, u/[handle], verify.
-
-### API Route Error Handling
-- 18 routes with explicit try/catch
-- 17 routes use granular validation + `dbTimeoutOr504()` helper
-- All return appropriate status codes (400, 401, 403, 429, 500)
-- Fail-open pattern for Redis documented in `redis.ts`
-
-### Empty States
-- Admin tables: "No developers" message when empty
-- Campaigns dashboard: empty state for 0 campaigns
-- Engagement dashboard: empty state for 0 flags
-- Badge SVG: fallback SVG when stats unavailable
-- Studio: fallback data with 0 values when fetch fails
-
-### Promise Patterns
-- `Promise.all()` correctly used for critical paths (page data, health checks)
-- `Promise.allSettled()` correctly used for optional operations (craft score, snapshots, cache invalidation)
-- All wrapped in proper error handling at route level
+### Focus indicators
+`focus-visible` styles confirmed in `styles/globals.css`, `InfoTooltip.tsx`, `BadgeOverlay.tsx`, `VerifyForm.tsx`. Global focus ring via CSS, component-specific `focus-visible:ring-2 focus-visible:ring-amber` on interactive elements. Coverage is comprehensive.
 
 ## Design System Compliance
+**0 violations** in production components and pages. No hardcoded hex colors found in `className` or `style` attributes outside of documented exceptions:
+- `app/apple-icon.tsx`, `app/icon.tsx` — static icon assets, correctly hardcoded
+- `app/experiments/*` — canvas/WebGL demos requiring raw color arrays; feature-flagged and accepted
+- Badge SVG pipeline — always dark, documented exception
 
-**Status: 0 violations in production components.**
+All production components use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, `text-amber`, `border-stroke`, etc.).
 
-| Check | Status | Notes |
-|-------|--------|-------|
-| Semantic tokens | PASS | All components use `bg-bg`, `text-text-primary`, `bg-card`, etc. |
-| Font usage | PASS | Only `font-heading`, `font-body`, `font-terminal` used |
-| Icon libraries | PASS | Zero icon library imports; all inline SVG |
-| `rounded-full` on text buttons | PASS | Only used on icon-only buttons and avatars |
-| Italic on monospace | PASS | No `italic` combined with `font-heading` |
-| Ambient glow | PASS | No wasteful blur effects on dark backgrounds |
-
-**Documented exceptions (correct):** Badge SVG, OG images, email templates, `global-error.tsx` (renders outside component tree — hardcoded styles intentional).
+## Error States
+- **13 error boundaries** (`error.tsx` files): root, global-error, about, admin, archetypes, cli/authorize, coming-soon, experiments, generating, privacy, studio, terms, u/[handle], verify
+- **13 loading states** (`loading.tsx` files) — full coverage across dynamic routes
+- SVG error fallback with XSS escaping in badge route
+- `debug-quality/route.ts` confirmed **deleted** — P1 item from Cost Analyst/Coverage reports resolved
 
 ## Recommendations
 
-### Priority 1 (Low — Minor Gaps)
-1. **`/cli/authorize` missing error boundary** — Add `error.tsx` to `/cli/authorize/` for completeness. Low traffic, but currently unprotected.
-2. **`/api/studio/config` docs mismatch** — CLAUDE.md documents POST, actual implementation is GET+PUT. Carried from QA 2026-03-18.
+**P1 (carry from Cost Analyst):**
+- Revert refresh rate limit from 15→5 per hour — confirmed debugging artifact (commit `fd4aeaf`). Low blast radius but should be cleaned before next release.
 
-### Priority 2 (Informational — No Action Required)
-3. **17 API routes without top-level try/catch** — These correctly use `dbTimeoutOr504()` helper and granular validation. Pattern is intentional and well-documented.
-4. **No React Suspense boundaries** — App uses server components + `Promise.all()` instead. Acceptable pattern for Next.js App Router.
-5. **`/experiments/number-counters/page.tsx`** has h1 after h2s — feature-flagged experimental page, low priority.
+**P3 (monitored, stable):**
+- `AdminDashboardClient.tsx` function coverage at 68.4% — below 80% funcs threshold. Stable, not regressing. Add interaction tests for sort/filter/pagination handlers.
+- `UserMenu.tsx` function coverage at 78.6% — borderline. Stable.
+- Experiments pages at 56.1% coverage — accepted limitation (WebGL/Canvas JSDOM constraint).
 
-### Resolved Since Last QA (2026-03-18)
-- ~~Badge SVG `Promise.all()` at route.ts:103~~ → Now uses `Promise.allSettled()` ✓
-- ~~Duplicate ` 2.ts` files~~ → Not present in current working tree ✓
-- ~~Prior coverage priorities (UserMenu, StudioClient, BadgeToolbar)~~ → All above 80% ✓
-- +537 tests added since last QA
+---
+
+SHARED_CONTEXT_START
+## QA Agent — 2026-04-01
+- **Status**: GREEN
+- Tests: 6,879/6,879 passed across 386 files, 0 failed, 0 skipped (+16 tests, +1 file vs 2026-03-30)
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all buttons labeled, focus-visible present, no bare `<img>` tags, no heading skips in production pages
+
+**Cross-agent recommendations:**
+- [Coverage]: `debug-quality/route.ts` confirmed deleted — 0% coverage gap resolved. `AdminDashboardClient.tsx` funcs at 68.4% remains the top actionable gap.
+- [Security]: No new security-related quality issues. All XSS vectors covered, all interactive elements properly accessible.
+- [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — should be reverted before next production release.
+SHARED_CONTEXT_END

@@ -142,4 +142,15 @@ describe("BadgeToolbar", () => {
       expect(SOURCE).toContain('role="menuitem"');
     });
   });
+
+  // Phase 7 — exit animation for share dropdown
+  describe("exit animation (Phase 7)", () => {
+    it("uses useAnimatedUnmount for share dropdown exit animation", () => {
+      expect(SOURCE).toContain("useAnimatedUnmount");
+    });
+
+    it("applies animate-fade-out-up during share dropdown exit", () => {
+      expect(SOURCE).toContain("animate-fade-out-up");
+    });
+  });
 });

@@ -8,6 +8,7 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+import { ClaudeCodeStar } from "@/components/ClaudeCodeStar";
 import Link from "next/link";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
@@ -56,6 +57,7 @@ const DIMENSIONS = [
   { title: "QUALITY", description: "Engineering discipline \u2014 code reviews on teams, PR hygiene and structured workflow when solo." },
   { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
   { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
+  { title: "CRAFT", description: "AI tool mastery (optional) \u2014 how effectively you use tools like Claude Code to ship better work." },
 ];
 
 const STATS = [
@@ -65,6 +67,22 @@ const STATS = [
 ];
 
 /* ── Icons ─────────────────────────────────────────────────────── */
+
+function BitbucketIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" />
+    </svg>
+  );
+}
+
+function CodebergIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
+    </svg>
+  );
+}
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -136,13 +154,13 @@ export default async function Home({
               <span className="text-text-secondary">chapa</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
-              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95]">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95] text-balance">
                 Developer Impact,
                 <br />
                 <span className="text-amber">Decoded</span>
               </h1>
               <div className="space-y-2 font-heading text-text-secondary">
-                <p className="text-base text-text-primary font-medium"><span className="text-amber select-none">&gt;</span> The new way to <span className="bg-amber/10 px-1 rounded">quantify</span> your <span className="bg-amber/10 px-1 rounded">impact</span> in AI&#8209;assisted coding.</p>
+                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> The new way to <span className="bg-amber/10 px-1 rounded">quantify</span> your <span className="bg-amber/10 px-1 rounded">impact</span> in AI&#8209;assisted coding.</p>
                 <div className="pl-5 space-y-1 text-sm">
                   <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the complete story anymore.</p>
                   <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
@@ -152,7 +170,7 @@ export default async function Home({
               <div className="pt-4 flex flex-wrap items-center gap-3">
                 <a
                   href="/api/auth/login"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                 >
                   <GitHubIcon className="w-4 h-4" />
                   Get Your Badge
@@ -160,7 +178,7 @@ export default async function Home({
                 </a>
                 <Link
                   href="/verify"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
+                  className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
                 >
                   <ShieldCheckIcon className="w-4 h-4" />
                   Verify a Badge
@@ -277,7 +295,7 @@ export default async function Home({
                 <h3 className="font-heading text-sm text-text-primary font-medium">
                   What we measure
                 </h3>
-                <p className="text-text-secondary text-sm">
+                <p className="text-text-secondary text-sm text-pretty">
                   Chapa scores four core dimensions of your development activity from the last 12 months, plus an optional Craft dimension for AI tool mastery. Your unique combination determines your developer archetype:{" "}
                   <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
                   <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
@@ -320,7 +338,7 @@ export default async function Home({
                 <h3 className="font-heading text-lg tracking-tight text-text-primary">
                   GitHub <span className="text-amber">Enterprise Managed Users</span>
                 </h3>
-                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl">
+                <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl text-pretty">
                   Work at a company that uses GitHub Enterprise? Your corporate contributions
                   (commits, PRs, reviews) live in a separate EMU namespace and don&apos;t show up
                   on your personal profile. Chapa can merge them into your badge.
@@ -400,7 +418,7 @@ export default async function Home({
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-4 font-heading text-sm">
                 {STATS.map((stat, i) => (
                   <span key={stat.label} className="flex items-baseline gap-2">
-                    <span className="text-3xl sm:text-4xl tracking-tight text-amber">
+                    <span className="text-3xl sm:text-4xl tracking-tight text-amber tabular-nums">
                       {stat.value}
                     </span>
                     <span className="text-text-secondary">{stat.label}</span>
@@ -426,7 +444,7 @@ export default async function Home({
               </p>
               <a
                 href="/api/auth/login"
-                className="group inline-flex items-center gap-2.5 rounded-lg bg-amber px-8 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
+                className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-8 pr-7 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 <GitHubIcon className="w-5 h-5" />
                 Get Your Badge
@@ -453,15 +471,23 @@ export default async function Home({
               </span>
             </div>
 
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-text-secondary hover:text-amber transition-colors"
-            >
-              <GitHubIcon className="w-3 h-3" />
-              <span>Powered by GitHub</span>
-            </a>
+            <div className="flex items-center gap-3 text-text-secondary">
+              <span className="text-xs">Powered by</span>
+              <div className="flex items-center gap-2.5">
+                <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber transition-colors">
+                  <GitHubIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://bitbucket.org" target="_blank" rel="noopener noreferrer" aria-label="Bitbucket" title="Bitbucket" className="hover:text-amber transition-colors">
+                  <BitbucketIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber transition-colors">
+                  <CodebergIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber transition-colors">
+                  <ClaudeCodeStar />
+                </a>
+              </div>
+            </div>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
               <Link href="/about" className="hover:text-amber transition-colors">About</Link>
