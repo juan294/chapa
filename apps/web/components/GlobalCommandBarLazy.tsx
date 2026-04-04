@@ -7,6 +7,6 @@ const GlobalCommandBar = dynamic(
   { ssr: false },
 );
 
-export function GlobalCommandBarLazy() {
-  return <GlobalCommandBar />;
+export function GlobalCommandBarLazy({ isAdmin }: { isAdmin?: boolean } = {}) {
+  return <GlobalCommandBar isAdmin={isAdmin} />;
 }
