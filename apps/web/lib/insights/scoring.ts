@@ -77,10 +77,19 @@ function computeProficiency(data: InsightsUpload): number {
 
 /**
  * Compute the Effectiveness sub-dimension (0–100).
- * Measures outcome quality: achievement rate, satisfaction, friction management.
+ * Measures outcome quality: achievement rate and satisfaction.
+ *
+ * Friction events (buggyCode, wrongApproach, misunderstoodRequest) and tool
+ * errors are EXCLUDED from scoring. These reflect the AI tool's mistakes,
+ * not the developer's skill. Penalizing developers for Claude's errors is
+ * unfair and actively discourages uploading fresh insights — the opposite
+ * of the behavior we want to encourage on the platform.
+ *
+ * The friction and toolErrors fields are still collected in InsightsUpload
+ * for display and diagnostics, but they have zero weight in the score.
  */
 function computeEffectiveness(data: InsightsUpload): number {
-  // Achievement rate — weighted outcomes
+  // Achievement rate — weighted outcomes (55%)
   const { fullyAchieved, mostlyAchieved, partiallyAchieved } = data.outcomes;
   const totalOutcomes = fullyAchieved + mostlyAchieved + partiallyAchieved;
   const achievementRate =
@@ -89,7 +98,7 @@ function computeEffectiveness(data: InsightsUpload): number {
         totalOutcomes
       : 0;
 
-  // Satisfaction rate
+  // Satisfaction rate (45%)
   const { dissatisfied, likelySatisfied, satisfied } = data.satisfaction;
   const totalSatisfaction = dissatisfied + likelySatisfied + satisfied;
   const satisfactionRate =
@@ -97,29 +106,10 @@ function computeEffectiveness(data: InsightsUpload): number {
       ? (satisfied + likelySatisfied) / totalSatisfaction
       : 0;
 
-  // Friction ratio (inverse) — lower friction = higher score
-  const totalFriction =
-    data.friction.buggyCode +
-    data.friction.wrongApproach +
-    data.friction.misunderstoodRequest;
-  const sessions = Math.max(data.totalSessions, 1);
-  const frictionRatio = 1 - normalize(totalFriction / sessions, 0.5);
+  // NOTE: friction events and tool errors are intentionally excluded.
+  // They are the AI tool's mistakes, not the developer's.
 
-  // Error recovery — lower error rate = higher score
-  const totalErrors = Object.values(data.toolErrors).reduce(
-    (a, b) => a + b,
-    0,
-  );
-  const toolCalls = Math.max(data.totalToolCalls, 1);
-  const errorRecovery = 1 - normalize(totalErrors / toolCalls, 0.15);
-
-  return (
-    100 *
-    (0.4 * achievementRate +
-      0.25 * satisfactionRate +
-      0.2 * frictionRatio +
-      0.15 * errorRecovery)
-  );
+  return 100 * (0.55 * achievementRate + 0.45 * satisfactionRate);
 }
 
 /**

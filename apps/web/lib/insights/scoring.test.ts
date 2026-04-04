@@ -288,44 +288,55 @@ describe("computeEffectiveness", () => {
     );
   });
 
-  it("penalizes high friction", () => {
-    const lowFriction = makeInsights({
+  it("does NOT penalize for friction events (Claude's mistakes, not the developer's)", () => {
+    const base = {
       outcomes: { fullyAchieved: 20, mostlyAchieved: 0, partiallyAchieved: 0 },
       satisfaction: { dissatisfied: 0, likelySatisfied: 10, satisfied: 10 },
-      friction: { buggyCode: 1, wrongApproach: 0, misunderstoodRequest: 0 },
       totalSessions: 20,
       totalToolCalls: 500,
+    };
+    const noFriction = makeInsights({
+      ...base,
+      friction: { buggyCode: 0, wrongApproach: 0, misunderstoodRequest: 0 },
     });
-    const highFriction = makeInsights({
-      outcomes: { fullyAchieved: 20, mostlyAchieved: 0, partiallyAchieved: 0 },
-      satisfaction: { dissatisfied: 0, likelySatisfied: 10, satisfied: 10 },
-      friction: { buggyCode: 15, wrongApproach: 12, misunderstoodRequest: 4 },
-      totalSessions: 20,
-      totalToolCalls: 500,
+    const heavyFriction = makeInsights({
+      ...base,
+      friction: { buggyCode: 50, wrongApproach: 40, misunderstoodRequest: 20 },
     });
-    expect(_computeEffectiveness(lowFriction)).toBeGreaterThan(
-      _computeEffectiveness(highFriction),
+    expect(_computeEffectiveness(noFriction)).toBe(
+      _computeEffectiveness(heavyFriction),
     );
   });
 
-  it("penalizes high error rates", () => {
-    const lowErrors = makeInsights({
+  it("does NOT penalize for tool errors (Claude's mistakes, not the developer's)", () => {
+    const base = {
       outcomes: { fullyAchieved: 10, mostlyAchieved: 0, partiallyAchieved: 0 },
       satisfaction: { dissatisfied: 0, likelySatisfied: 5, satisfied: 5 },
-      toolErrors: { "Command Failed": 5 },
       totalSessions: 10,
       totalToolCalls: 1000,
+    };
+    const noErrors = makeInsights({
+      ...base,
+      toolErrors: {},
     });
-    const highErrors = makeInsights({
-      outcomes: { fullyAchieved: 10, mostlyAchieved: 0, partiallyAchieved: 0 },
-      satisfaction: { dissatisfied: 0, likelySatisfied: 5, satisfied: 5 },
-      toolErrors: { "Command Failed": 100, Other: 50 },
-      totalSessions: 10,
-      totalToolCalls: 1000,
+    const manyErrors = makeInsights({
+      ...base,
+      toolErrors: { "Command Failed": 200, Other: 150, "Edit Failed": 50 },
     });
-    expect(_computeEffectiveness(lowErrors)).toBeGreaterThan(
-      _computeEffectiveness(highErrors),
+    expect(_computeEffectiveness(noErrors)).toBe(
+      _computeEffectiveness(manyErrors),
     );
+  });
+
+  it("uses only achievement rate (55%) and satisfaction rate (45%)", () => {
+    // Perfect achievement + perfect satisfaction = 100
+    const perfect = makeInsights({
+      outcomes: { fullyAchieved: 100, mostlyAchieved: 0, partiallyAchieved: 0 },
+      satisfaction: { dissatisfied: 0, likelySatisfied: 0, satisfied: 100 },
+      totalSessions: 100,
+      totalToolCalls: 5000,
+    });
+    expect(_computeEffectiveness(perfect)).toBe(100);
   });
 });
 
@@ -374,12 +385,12 @@ describe("computeCraftScore", () => {
     const result = computeCraftScore(makeInsights());
     // With zero data, some signals still produce non-zero scores:
     // - Proficiency: responseTimeScore(0)=1 gives engagement depth > 0 → ~10
-    // - Effectiveness: zero friction + zero errors = perfect recovery → ~35
+    // - Effectiveness: 0 (no outcomes, no satisfaction — friction/errors excluded)
     // - Sophistication: truly 0 (no sessions, no lines, no files)
     expect(result.dimensions.proficiency).toBe(10);
-    expect(result.dimensions.effectiveness).toBe(35);
+    expect(result.dimensions.effectiveness).toBe(0);
     expect(result.dimensions.sophistication).toBe(0);
-    expect(result.craftScore).toBe(15);
+    expect(result.craftScore).toBe(3);
     expect(result.tier).toBe("Novice");
   });
 
@@ -434,7 +445,7 @@ describe("computeCraftScore", () => {
     expect(result.tier).toMatch(/Expert|Master/);
   });
 
-  it("produces low score (<30) for beginner", () => {
+  it("produces low score (<35) for beginner", () => {
     const data = makeInsights({
       volume: { messages: 20, linesAdded: 50, linesDeleted: 10, files: 3, days: 2, msgsPerDay: 10 },
       toolUsage: { Bash: 20 },
@@ -449,8 +460,10 @@ describe("computeCraftScore", () => {
       totalToolCalls: 20,
     });
     const result = computeCraftScore(data);
-    expect(result.craftScore).toBeLessThan(30);
-    expect(result.tier).toBe("Novice");
+    // Score is slightly higher than before since friction/errors no longer
+    // penalize the developer (they're Claude's mistakes, not the user's).
+    expect(result.craftScore).toBeLessThan(35);
+    expect(result.tier).toBe("Practitioner");
   });
 
   it("handles edge case: no friction, no errors, no outcomes", () => {
