@@ -325,7 +325,7 @@ export function deriveArchetype(
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the full Impact v4 profile from aggregated GitHub stats.
+ * Compute the full Impact v6 profile from aggregated GitHub stats.
  *
  * Orchestrates the scoring pipeline: detects profile type, computes all
  * dimensions, derives archetype, calculates composite score (with recency

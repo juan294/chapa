@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const {
   mockGetStats,
-  mockComputeImpactV4,
+  mockComputeImpactV6,
   mockSmoothScore,
   mockGetTier,
   mockGetCachedLatestSnapshot,
@@ -26,7 +26,7 @@ const {
   mockAfter,
 } = vi.hoisted(() => ({
   mockGetStats: vi.fn(),
-  mockComputeImpactV4: vi.fn(),
+  mockComputeImpactV6: vi.fn(),
   mockSmoothScore: vi.fn((score: number) => score),
   mockGetTier: vi.fn((score: number) => {
     if (score >= 85) return "Elite";
@@ -56,7 +56,7 @@ vi.mock("@/lib/github/client", () => ({
 }));
 
 vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV4,
+  computeImpactV6: mockComputeImpactV6,
 }));
 
 vi.mock("@/lib/impact/smoothing", () => ({
@@ -223,7 +223,7 @@ describe("SharePage /u/[handle]", () => {
     mockGetStats.mockResolvedValue(FAKE_STATS);
     mockCacheGet.mockResolvedValue(null); // no saved config
     mockGetCachedLatestSnapshot.mockResolvedValue(FAKE_SNAPSHOT);
-    mockComputeImpactV4.mockReturnValue({ ...FAKE_IMPACT });
+    mockComputeImpactV6.mockReturnValue({ ...FAKE_IMPACT });
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockGenerateVerificationCode.mockReturnValue(null);
@@ -419,12 +419,12 @@ describe("SharePage /u/[handle]", () => {
         computedAt: "2025-03-01T00:00:00Z",
       });
       await renderPage();
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, 68);
+      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, 68);
     });
 
     it("passes undefined craft score when no tool insights exist", async () => {
       await renderPage();
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
+      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, undefined);
     });
 
     it("does not render CraftBreakdown component", async () => {

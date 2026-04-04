@@ -84,7 +84,7 @@ export type DeveloperArchetype =
   | "Emerging"
   | "Artificer";
 
-/** Full Impact v4 result */
+/** Full Impact v6 result */
 export interface ImpactV6Result {
   handle: string;
   profileType: ProfileType;

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const {
   mockGetStats,
-  mockComputeImpactV4,
+  mockComputeImpactV6,
   mockRenderBadgeSvg,
   mockIsValidHandle,
   mockGetAvatarBase64,
@@ -16,7 +16,7 @@ const {
   mockCacheSet,
 } = vi.hoisted(() => ({
   mockGetStats: vi.fn(),
-  mockComputeImpactV4: vi.fn(),
+  mockComputeImpactV6: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock("@/lib/github/client", () => ({
 }));
 
 vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV4,
+  computeImpactV6: mockComputeImpactV6,
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -113,7 +113,7 @@ describe("GET /u/[handle]/og-image", () => {
 
     mockIsValidHandle.mockReturnValue(true);
     mockGetStats.mockResolvedValue(FAKE_STATS);
-    mockComputeImpactV4.mockReturnValue(FAKE_IMPACT);
+    mockComputeImpactV6.mockReturnValue(FAKE_IMPACT);
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockGenerateVerificationCode.mockReturnValue(null);
@@ -152,7 +152,7 @@ describe("GET /u/[handle]/og-image", () => {
       const [req, ctx] = makeRequest("testuser");
       await GET(req, ctx);
       expect(mockGetStats).toHaveBeenCalledWith("testuser");
-      expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS);
+      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS);
       expect(mockSvgToPng).toHaveBeenCalledWith(FAKE_SVG, 1200);
     });
   });

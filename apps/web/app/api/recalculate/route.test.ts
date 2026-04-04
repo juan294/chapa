@@ -9,7 +9,7 @@ const {
   mockResolveRequestAuth,
   mockRateLimit,
   mockGetStats,
-  mockComputeImpactV4,
+  mockComputeImpactV6,
   mockDbGetToolInsights,
   mockBuildSnapshot,
   mockDbReplaceSnapshot,
@@ -19,7 +19,7 @@ const {
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetStats: vi.fn(),
-  mockComputeImpactV4: vi.fn(),
+  mockComputeImpactV6: vi.fn(),
   mockDbGetToolInsights: vi.fn(),
   mockBuildSnapshot: vi.fn(),
   mockDbReplaceSnapshot: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock("@/lib/github/client", () => ({
 }));
 
 vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV4,
+  computeImpactV6: mockComputeImpactV6,
 }));
 
 vi.mock("@/lib/cache/craft-cache", () => ({
@@ -118,7 +118,7 @@ beforeEach(() => {
   mockResolveRequestAuth.mockResolvedValue(AUTH);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
   mockGetStats.mockResolvedValue(makeStats());
-  mockComputeImpactV4.mockReturnValue(makeImpact());
+  mockComputeImpactV6.mockReturnValue(makeImpact());
   mockDbGetToolInsights.mockResolvedValue({
     craftScore: 69,
     tier: "Expert",
@@ -212,7 +212,7 @@ describe("POST /api/recalculate", () => {
   });
 
   it("uses raw adjusted composite (calls getTier, not smoothScore)", async () => {
-    mockComputeImpactV4.mockReturnValue(makeImpact({ adjustedComposite: 61 }));
+    mockComputeImpactV6.mockReturnValue(makeImpact({ adjustedComposite: 61 }));
     mockGetTier.mockReturnValue("Solid");
 
     const resp = await POST(makeRequest());
@@ -252,7 +252,7 @@ describe("POST /api/recalculate", () => {
 
     await POST(makeRequest());
 
-    expect(mockComputeImpactV4).toHaveBeenCalledWith(
+    expect(mockComputeImpactV6).toHaveBeenCalledWith(
       expect.any(Object),
       69,
     );
@@ -263,7 +263,7 @@ describe("POST /api/recalculate", () => {
 
     await POST(makeRequest());
 
-    expect(mockComputeImpactV4).toHaveBeenCalledWith(
+    expect(mockComputeImpactV6).toHaveBeenCalledWith(
       expect.any(Object),
       undefined,
     );

@@ -26,7 +26,7 @@ interface BadgeOptions {
  * The badge always renders in dark theme regardless of the site's current theme.
  *
  * @param stats - Aggregated GitHub stats providing handle, metrics, and heatmap data
- * @param impact - Computed Impact v4 result with dimensions, archetype, tier, and score
+ * @param impact - Computed Impact v6 result with dimensions, archetype, tier, and score
  * @param options - Visual options: branding toggle, avatar data URI, verification hash/date, demo mode
  * @returns A complete SVG document as a string, ready for HTTP response or embedding
  */
