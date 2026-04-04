@@ -3,6 +3,8 @@ import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
+import { dbRecomputeCraft } from "@/lib/db/tool-insights";
+import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
@@ -59,8 +61,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Invalidate history cache so next /api/history/:handle request fetches fresh data
     await invalidateHistoryCache(handle);
 
-    // Fetch fresh stats with the user's OAuth token for better rate limits
-    const stats = await getStats(handle, session.token);
+    // Fetch fresh stats and recompute craft in parallel
+    const [stats, craftResult] = await Promise.all([
+      getStats(handle, session.token),
+      dbRecomputeCraft(handle),
+    ]);
     if (!stats) {
       void captureServerError({
         route: "/api/refresh",
@@ -73,7 +78,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    const impact = computeImpactV6(stats);
+    // Update craft cache so badge views use the recomputed score
+    if (craftResult) {
+      updateCraftCache(handle, craftResult).catch(() => {});
+    }
+
+    const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
 
     // Replace today's snapshot — a user-initiated refresh means the score has
     // legitimately changed (e.g. after a scoring fix). dbReplaceSnapshot uses
