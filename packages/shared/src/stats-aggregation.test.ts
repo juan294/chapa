@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { RawContributionData, StatsData } from "./types";
+import type { RawContributionData } from "./types";
 import { buildStatsFromRaw } from "./stats-aggregation";
 
 // ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ vi.mock("./resend", () => ({
 
 const mockWithTimeout = vi.fn(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  <T>(promise: Promise<T>, ...rest: unknown[]) => promise,
+  <T>(promise: Promise<T>, ..._rest: unknown[]) => promise,
 );
 
 vi.mock("@/lib/async/with-timeout", () => ({

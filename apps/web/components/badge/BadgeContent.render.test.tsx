@@ -5,8 +5,7 @@ import { BadgeContent, getBadgeContentCSS } from "./BadgeContent";
 import type { StatsData, ImpactV4Result } from "@chapa/shared";
 
 vi.mock("next/image", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default: ({ src, alt, ...props }: { src: string; alt: string; [key: string]: unknown }) =>
+  default: ({ src, alt }: { src: string; alt: string; [key: string]: unknown }) =>
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={alt} />,
 }));
