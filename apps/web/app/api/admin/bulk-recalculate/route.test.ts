@@ -142,12 +142,12 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(res.status).toBe(401);
   });
 
-  it("passes through when ADMIN_SECRET is not set (unprotected)", async () => {
+  it("returns 503 when ADMIN_SECRET is not set (fail-secure)", async () => {
     vi.stubEnv("ADMIN_SECRET", "");
     const res = await POST(makeRequest(VALID_SECRET));
-    // When ADMIN_SECRET is not configured, the endpoint is unprotected
-    // (matches verifyCronSecret pattern for unconfigured environments)
-    expect(res.status).toBe(200);
+    // When ADMIN_SECRET is not configured, the endpoint must return 503
+    // (fail-secure: misconfigured environment must not expose admin operations)
+    expect(res.status).toBe(503);
   });
 
   it("returns 429 when rate limited", async () => {
