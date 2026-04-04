@@ -289,9 +289,9 @@ export function createStatusHandler(config: PlatformOAuthConfig) {
       return NextResponse.json({ enabled: false });
     }
 
-    // 2. Rate limit: 20 requests per IP per 15 minutes
+    // 2. Rate limit: 120 requests per IP per 15 minutes (navbar status check — read-only)
     const ip = getClientIp(request);
-    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:status:${ip}`, 20, 900);
+    const rl = await rateLimit(`ratelimit:${config.rateLimitPrefix}:status:${ip}`, 120, 900);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
