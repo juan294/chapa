@@ -86,6 +86,14 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** None (cosmetic build warning)
 - **Accepted:** 2026-03-22
 
+## LGPL-3.0 dependency (@img/sharp-libvips-darwin-arm64) (#676)
+
+- **Risk:** `@img/sharp-libvips-darwin-arm64` (a platform binary bundled with `sharp`) is licensed LGPL-3.0-or-later. LGPL requires that end users can re-link the library with a modified version of it.
+- **Accepted because:** `sharp` uses dynamic linking to libvips, which satisfies LGPL's re-linking requirement without any obligation on Chapa's part. We are not distributing the binary to end users as a standalone artifact, nor are we GPL-licensing our own code. This is the standard use pattern that LGPL explicitly permits for proprietary software.
+- **Mitigation:** None required. LGPL-3.0 with dynamic linking imposes no restrictions on Chapa's code or distribution model.
+- **Severity:** Low
+- **Accepted:** 2026-04-03
+
 ## MPL-2.0 License (lightningcss) (#627)
 
 - **Risk:** `lightningcss` and `lightningcss-darwin-arm64` are licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
