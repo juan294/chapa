@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 
-const FRAMES = ["*", "·", "|", "L"] as const;
+const FRAMES = ["*", "✶", "·", "✦"] as const;
 const INTERVAL_MS = 400;
 
 /**
  * Animates the Claude Code attribution star in the footer by cycling through
- * the same spinner characters the Claude Code CLI uses: * · | L
+ * star-shaped variants: * ✶ · ✦ (asterisk → six-pointed → dot → four-pointed)
  *
  * Respects prefers-reduced-motion — stays on "*" when motion is reduced.
  */

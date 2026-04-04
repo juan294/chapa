@@ -26,22 +26,22 @@ describe("ClaudeCodeStar", () => {
     expect(container.textContent).toBe("*");
   });
 
-  it("advances to · after one interval", () => {
+  it("advances to ✶ after one interval", () => {
     const { container } = render(<ClaudeCodeStar />);
     act(() => { vi.advanceTimersByTime(400); });
+    expect(container.textContent).toBe("✶");
+  });
+
+  it("advances to · after two intervals", () => {
+    const { container } = render(<ClaudeCodeStar />);
+    act(() => { vi.advanceTimersByTime(800); });
     expect(container.textContent).toBe("·");
   });
 
-  it("advances to | after two intervals", () => {
-    const { container } = render(<ClaudeCodeStar />);
-    act(() => { vi.advanceTimersByTime(800); });
-    expect(container.textContent).toBe("|");
-  });
-
-  it("advances to L after three intervals", () => {
+  it("advances to ✦ after three intervals", () => {
     const { container } = render(<ClaudeCodeStar />);
     act(() => { vi.advanceTimersByTime(1200); });
-    expect(container.textContent).toBe("L");
+    expect(container.textContent).toBe("✦");
   });
 
   it("wraps back to * after four intervals", () => {
