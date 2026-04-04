@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-03-28 | Audit: v39
+> Last reviewed: 2026-04-04 | Audit: v40
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -101,6 +101,14 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** None required. The dependency is transitive via Tailwind and not directly imported.
 - **Severity:** Low
 - **Accepted:** 2026-03-27
+
+## Cron auth fail-open when CRON_SECRET unset (#685)
+
+- **Risk:** `verifyCronSecret()` in `lib/auth/cron.ts` allows all requests when `CRON_SECRET` is not configured (returns `null` instead of a 401/503 response). This means cron endpoints (`/api/cron/warm-cache`, `/api/cron/sync-audience`, `/api/cron/process-campaigns`) become publicly accessible if the env var is missing.
+- **Accepted because:** On Vercel Pro (production), `CRON_SECRET` is auto-injected and cannot be accidentally deleted. The asymmetry with `ADMIN_SECRET` (which is fail-secure / 503) is intentional: cron endpoints perform read/cache operations only — no destructive writes, no data exposure. Making them fail-secure would silently break cache warming on preview deployments and local dev where `CRON_SECRET` is often unset.
+- **Mitigation:** The function logs a warning when the secret is missing. Cron endpoints are rate-limited. The warm-cache endpoint only reads public GitHub data and writes to cache. The sync-audience and process-campaigns endpoints only read from Supabase and write to Resend (both server-side, no user data exposure).
+- **Severity:** Low
+- **Accepted:** 2026-04-04
 
 ---
 
