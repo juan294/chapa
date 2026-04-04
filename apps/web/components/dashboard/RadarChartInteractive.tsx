@@ -321,7 +321,7 @@ export function RadarChartInteractive({
               data-testid="axis-label"
               x={lx + dx}
               y={ly + dy}
-              fontFamily="'Plus Jakarta Sans', system-ui, sans-serif"
+              fontFamily="var(--font-plus-jakarta)"
               fontSize={12}
               fill={
                 isActive
@@ -365,7 +365,6 @@ export function RadarChartInteractive({
               tabIndex={0}
               role="button"
               aria-label={`Select ${axis.label} dimension`}
-              focusable="true"
               onMouseEnter={() => handleAxisHover(axis.key)}
               onClick={() => handleAxisClick(axis.key)}
               onKeyDown={(e) => handleVertexKeyDown(axis.key, e)}
