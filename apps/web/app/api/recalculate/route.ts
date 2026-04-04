@@ -3,7 +3,8 @@ import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
-import { getCachedCraftScore } from "@/lib/cache/craft-cache";
+import { dbRecomputeCraft } from "@/lib/db/tool-insights";
+import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import {
@@ -14,12 +15,12 @@ import { getTier } from "@/lib/impact/utils";
 /**
  * POST /api/recalculate — Force-recalculate impact score.
  *
- * Fetches stats (cached or fresh), gets craft score from DB,
- * computes fresh impact, replaces today's snapshot, and returns
- * the new score + dimensions.
+ * Fetches stats (cached or fresh), recomputes craft score from stored
+ * raw insights data (applying the current formula), computes fresh
+ * impact, replaces today's snapshot, and returns the new score.
  *
- * Use after any deliberate user action that changes the score
- * (insights upload, platform connect/disconnect).
+ * Craft recomputation ensures formula changes are retroactively applied
+ * without requiring the user to re-upload their insights report.
  *
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
  * Rate limited: 20 requests/handle/hour.
@@ -41,10 +42,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Fetch stats and craft score in parallel (independent operations)
+  // Fetch stats and recompute craft from stored raw data in parallel.
+  // dbRecomputeCraft reads raw_data from DB, runs computeCraftScore()
+  // with the current formula, and upserts the updated scores back.
   const [stats, craftResult] = await Promise.all([
     getStats(handle, auth.token),
-    getCachedCraftScore(handle),
+    dbRecomputeCraft(handle),
   ]);
 
   if (!stats) {
@@ -54,13 +57,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Compute fresh impact with craft included
+  // Update craft cache so subsequent badge views use the recomputed score
+  if (craftResult) {
+    updateCraftCache(handle, craftResult).catch(() => {});
+  }
+
+  // Compute fresh impact with recomputed craft
   const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
 
   // For recalculate: use the RAW adjusted composite, NOT EMA-smoothed.
   // This is a deliberate action — the user wants to see the actual score.
-  // The raw adjustedComposite already has recency + confidence applied,
-  // just no EMA dampening.
   impact.tier = getTier(impact.adjustedComposite);
 
   // Build snapshot and REPLACE today's (not insert-ignore)
@@ -68,7 +74,6 @@ export async function POST(request: NextRequest): Promise<Response> {
   const replaced = await dbReplaceSnapshot(handle, snapshot);
 
   if (replaced) {
-    // Update Redis cache so subsequent badge views use the new snapshot
     await updateSnapshotCache(handle, snapshot);
   }
 

@@ -10,7 +10,8 @@ const {
   mockRateLimit,
   mockGetStats,
   mockComputeImpactV6,
-  mockDbGetToolInsights,
+  mockDbRecomputeCraft,
+  mockUpdateCraftCache,
   mockBuildSnapshot,
   mockDbReplaceSnapshot,
   mockUpdateSnapshotCache,
@@ -20,7 +21,8 @@ const {
   mockRateLimit: vi.fn(),
   mockGetStats: vi.fn(),
   mockComputeImpactV6: vi.fn(),
-  mockDbGetToolInsights: vi.fn(),
+  mockDbRecomputeCraft: vi.fn(),
+  mockUpdateCraftCache: vi.fn(),
   mockBuildSnapshot: vi.fn(),
   mockDbReplaceSnapshot: vi.fn(),
   mockUpdateSnapshotCache: vi.fn(),
@@ -43,8 +45,12 @@ vi.mock("@/lib/impact/v6", () => ({
   computeImpactV6: mockComputeImpactV6,
 }));
 
+vi.mock("@/lib/db/tool-insights", () => ({
+  dbRecomputeCraft: mockDbRecomputeCraft,
+}));
+
 vi.mock("@/lib/cache/craft-cache", () => ({
-  getCachedCraftScore: mockDbGetToolInsights,
+  updateCraftCache: mockUpdateCraftCache,
 }));
 
 vi.mock("@/lib/history/snapshot", () => ({
@@ -119,10 +125,11 @@ beforeEach(() => {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
   mockGetStats.mockResolvedValue(makeStats());
   mockComputeImpactV6.mockReturnValue(makeImpact());
-  mockDbGetToolInsights.mockResolvedValue({
+  mockDbRecomputeCraft.mockResolvedValue({
     craftScore: 69,
     tier: "Expert",
   });
+  mockUpdateCraftCache.mockResolvedValue(undefined);
   mockBuildSnapshot.mockReturnValue({ date: "2026-03-08" });
   mockDbReplaceSnapshot.mockResolvedValue(true);
   mockUpdateSnapshotCache.mockResolvedValue(undefined);
@@ -194,7 +201,7 @@ describe("POST /api/recalculate", () => {
   });
 
   it("works without craft score (no insights uploaded)", async () => {
-    mockDbGetToolInsights.mockResolvedValue(null);
+    mockDbRecomputeCraft.mockResolvedValue(null);
 
     const resp = await POST(makeRequest());
     const body = await resp.json();
@@ -237,7 +244,7 @@ describe("POST /api/recalculate", () => {
     await POST(makeRequest());
 
     expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined);
-    expect(mockDbGetToolInsights).toHaveBeenCalledWith("testuser");
+    expect(mockDbRecomputeCraft).toHaveBeenCalledWith("testuser");
     expect(mockDbReplaceSnapshot).toHaveBeenCalledWith(
       "testuser",
       expect.any(Object),
@@ -245,7 +252,7 @@ describe("POST /api/recalculate", () => {
   });
 
   it("passes craft score to computeImpactV6", async () => {
-    mockDbGetToolInsights.mockResolvedValue({
+    mockDbRecomputeCraft.mockResolvedValue({
       craftScore: 69,
       tier: "Expert",
     });
@@ -259,7 +266,7 @@ describe("POST /api/recalculate", () => {
   });
 
   it("passes undefined craft score when no insights exist", async () => {
-    mockDbGetToolInsights.mockResolvedValue(null);
+    mockDbRecomputeCraft.mockResolvedValue(null);
 
     await POST(makeRequest());
 
