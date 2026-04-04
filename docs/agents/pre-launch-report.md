@@ -1,89 +1,162 @@
 # Pre-Launch Audit Report
-> Generated on 2026-03-29 | Branch: `develop` | 6 parallel specialists
-> 6,627 tests | 381 test files | 64 static pages | Next.js 16.2.1 (Turbopack)
+> Generated on 2026-04-03 | Branch: `develop` | 6 parallel specialists
+> 6,915 tests | 388 test files | Next.js 16.2.2 (Turbopack)
 
-## Verdict: CONDITIONAL
+## Verdict: NOT READY
 
-No blockers found. 6 warnings across 4 specialists — all low-severity items that don't risk production stability.
+Two WCAG 2.1 AA violations (B1, B2 from ux-reviewer) are confirmed blockers. All other domains are green or conditional with no hard blockers.
+
+---
 
 ## Blockers (must fix before release)
 
-None.
+| # | Issue | Severity | Found by | File | Fix |
+|---|-------|----------|----------|------|-----|
+| B1 | `div[role="button"]` for expand/collapse toggle — must be native `<button>` | WCAG 4.1.2 AA | ux-reviewer | `DimensionCard.tsx:222` | Replace `<div role="button" tabIndex={0}>` with `<button>`, keep `aria-expanded`/`aria-controls` |
+| B2 | `role="progressbar"` elements missing `aria-label` — screen readers announce "progress bar 72%" with no context | WCAG 4.1.2 AA | ux-reviewer | `ImpactBreakdown.tsx:272`, `DimensionCard.tsx:189`, `SubMetricPanel.tsx:295` | Add `aria-label="Delivery score"` (etc.) to each element with `role="progressbar"`; move `aria-label` from inner fill div to the container |
+
+---
 
 ## Warnings
 
 | # | Issue | Severity | Found by | Risk |
 |---|-------|----------|----------|------|
-| W1 | `WARM_CACHE_PRIORITY_HANDLES` env var not documented in CLAUDE.md | Low | devops | Operators won't know this option exists |
-| W2 | CI run still in progress for latest commit at audit time | Low | devops | Cannot confirm green CI for latest commit |
-| W3 | Bundle size unverifiable — Turbopack omits per-route JS size table | Low | performance-eng | Cannot confirm no route exceeds 500KB threshold |
-| W4 | 3-4 redundant `fetch("/api/auth/session")` calls on share page | Low | performance-eng | Wasted network roundtrips on `/u/[handle]` |
-| W5 | ADMIN_SECRET bearer-token auth duplicated in 2 admin routes | Low | architect | Inconsistent auth pattern vs shared `adminAuth()` helper |
-| W6 | RadarChartInteractive SVG hit areas lack keyboard accessibility | Low | ux-reviewer | Axis click not keyboard-reachable (redundant — DimensionCards provide same access) |
+| W1 | Stale worktree at `../chapa-architectural-strip` (branch `feature/architectural-strip`) | Medium | devops | Open branch/worktree; clean up or merge |
+| W2 | `ADMIN_SECRET` fail-open — when env var is unset, `/api/admin/stats` and `/api/admin/bulk-recalculate` pass-through unauthenticated | Medium | security | Accidental env var omission exposes admin endpoints |
+| W3 | 4 stale Dependabot remote branches targeting `main` instead of `develop` | Medium | devops | Direct `main` merges bypass release flow |
+| W4 | Heatmap dots (`DotTimeline`) are mouse-only — no keyboard/focus access to tooltip data | Medium | ux-reviewer | `ActivityHeatmap.tsx:509` |
+| W5 | `BadgeOverlay` desktop tooltip may not be announced by screen readers — `aria-describedby` conditionally points to a possibly non-rendered panel | Medium | ux-reviewer | `BadgeOverlay.tsx:343` |
+| W6 | `aria-label` on wrong element in `ImpactBreakdown` progress bar — placed on inner fill `div`, not the `role="progressbar"` container | Medium | ux-reviewer | `ImpactBreakdown.tsx:277` (part of B2) |
+| W7 | LGPL-3.0 dependency `@img/sharp-libvips-darwin-arm64` (via `sharp`) not documented in `docs/accepted-risks.md` — conflicts with project's stated "MIT/Apache/BSD/ISC only" policy | Low | security | Policy inconsistency |
+| W8 | `escapeHtml` imported from `@/lib/email/resend` in unsubscribe route instead of canonical `@/lib/utils/escape` — indirect re-export | Low | architect | Fragile indirection; breaks silently if `resend.ts` stops re-exporting |
+| W9 | `claude-review.yml` uses `claude-sonnet-4-5-20250929`; current model is `claude-sonnet-4-6` | Low | devops | Review bot runs older model |
+| W10 | `GlobalCommandBar` on `/admin` is a static import; all other pages use `GlobalCommandBarLazy` | Low | performance-eng | Minor bundle inconsistency on internal-only page |
+| W11 | CSP `img-src` allows `https://i.ytimg.com` — mild over-permission if YouTube thumbnails no longer used | Low | security | Unnecessary allowance |
+| W12 | `HeatmapGrid.tsx` has no component render test — only pure-function tests in a `.ts` file | Low | qa-lead | Mouse/hover/tooltip interaction paths untested |
+| W13 | `noUnusedLocals` / `noUnusedParameters` not set in any tsconfig (not covered by `strict: true`) | Low | architect | Dead code not caught by tsc |
+| W14 | `DimensionCard` expand toggle missing a descriptive `aria-label` (reads inner text instead of action) | Low | ux-reviewer | `DimensionCard.tsx:222` |
+| W15 | `focusable="true"` is a non-standard attribute on SVG `<polygon>` — has no effect | Low | ux-reviewer | `RadarChartInteractive.tsx:371` |
+| W16 | `RadarChartInteractive` SVG text hardcodes font family string instead of CSS custom property | Low | ux-reviewer | `RadarChartInteractive.tsx:324` |
+| W17 | StreakCard activity dots have no accessible description | Low | ux-reviewer | `ActivityHeatmap.tsx:251` |
+
+---
 
 ## Detailed Findings
 
 ### 1. Quality Assurance (qa-lead) — GREEN
 
-- **Tests:** 6,627 passed (100%), 381 test files, 0 failures
-- **Typecheck:** PASS (both workspaces)
-- **Lint:** PASS (1 pre-existing warning in test file — unused variable)
-- **Critical path coverage:** Excellent across all domains — impact scoring (8 test files), SVG rendering (11), auth (12), DB layer (11), cache (4), GitHub client (4)
-- **High-risk untested files:** None — all API routes and lib modules have corresponding tests
-- **Graceful degradation:** Strong — Redis fail-open, per-route try/catch, fire-and-forget side effects, health endpoint distinguishes "not configured" vs "broken"
-- **Recommendations:** Add top-level try/catch to `/api/supplemental` and `/api/insights` routes
+**6,915 tests | 388 test files | 0 failures | 0 type errors | 0 lint errors**
 
-### 2. Security (security-reviewer) — GREEN
+- All 44 API route test files confirmed present
+- Critical paths tested: scoring pipeline, SVG rendering, OAuth, badge route
+- Graceful degradation confirmed: Redis fail-open, Supabase null-return, GitHub rate-limit fallback SVG
 
-- **Dependency vulnerabilities:** 0 (clean `pnpm audit`)
-- **Hardcoded secrets:** None in production code (test fixtures only)
-- **Client-side leaks:** No secrets in `NEXT_PUBLIC_*` vars; only PostHogProvider accesses env from client
-- **OAuth:** AES-256-GCM encrypted session cookies, CSRF via crypto.randomBytes state + timingSafeEqual, open redirect protection
-- **SVG XSS:** Properly mitigated via `escapeXml()` on all user-controlled text
-- **CORS:** Wildcard only on 2 public read-only endpoints (intentional, documented)
-- **Licenses:** No GPL/AGPL; MPL-2.0 items documented in accepted-risks.md
-- **CSP:** Comprehensive headers including HSTS, nosniff, frame-ancestors, permissions-policy
-- **Recommendations:** Monitor Next.js nonce-based CSP support; consider middleware.ts for admin routes as surface grows
+**Warnings only:**
+- `HeatmapGrid.tsx` has pure-function tests but no component render test (W12)
+- `pipeline.test.ts` / `non-accusatory-messaging.test.ts` naming is unconventional (no matching source file) — low risk
 
-### 3. Infrastructure (devops) — YELLOW
+---
 
-- **Build:** PASS (Next.js 16.2.1 with Turbopack, 82 routes, 64 static pages)
-- **CI:** 4/5 workflows green; main CI still in progress at audit time
-- **Env vars:** `WARM_CACHE_PRIORITY_HANDLES` used but not documented in CLAUDE.md
-- **Error pages:** All present — `not-found.tsx`, `global-error.tsx`, 12 route-specific `error.tsx` boundaries
-- **Health endpoint:** Solid — returns ok/degraded/skipped with dependency status
-- **Git state:** Clean working tree, no stale worktrees or branches, 0 stashes
-- **Vercel config:** 3 cron jobs configured, comprehensive security headers, badge cache 6h/7d
+### 2. Security (security-reviewer) — CONDITIONAL
+
+**No CVEs. No hardcoded secrets. Strong auth and SVG XSS protection.**
+
+Fully green: OAuth (AES-256-GCM session token, CSRF state, timing-safe compares), SVG XSS (`escapeXml` on all user inputs before SVG interpolation), CORS (wildcard only on public read-only routes), cache key injection (handle validated + lowercased), SSRF (avatar host allowlist + 5s timeout), webhook HMAC (Svix), SQL injection (ORM-only, no raw SQL), security headers (HSTS 2yr, CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy).
+
+**Warnings:**
+- `ADMIN_SECRET` fail-open when env var is absent (W2) — medium risk
+- LGPL dependency not documented in accepted-risks.md (W7) — low risk
+- CSP allows `i.ytimg.com` in `img-src` (W11) — low risk
+
+---
+
+### 3. Infrastructure (devops) — CONDITIONAL
+
+**CI green on develop. Build succeeds. Error pages exist. Health endpoint correct. Badge headers correct.**
+
+Confirmed green: last 5 CI runs all pass (Secret Scanning, Security Scan, Dead Code Detection, Bundle Size Analysis, CI all ✓), `not-found.tsx` and `error.tsx` exist, `/api/health` checks Redis + Supabase and returns 503 on degraded, badge `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` matches spec, badge `frame-ancestors *` + `X-Frame-Options: ALLOWALL` correct for embeddable SVG, HSTS `max-age=63072000; includeSubDomains; preload` configured, 3 Vercel crons defined.
+
+**Warnings:**
+- Stale worktree `../chapa-architectural-strip` on branch `feature/architectural-strip` (W1)
+- 4 Dependabot branches targeting `main` instead of `develop` (W3)
+- `claude-review.yml` references outdated model (W9)
+
+---
 
 ### 4. Architecture (architect) — GREEN
 
-- **Typecheck:** PASS with `strict: true` + `noUncheckedIndexedAccess` in all configs
-- **Outdated deps:** 8 total — 6 minor/patch (within range), ESLint 10 deferred (#531), TS 6 not urgent
-- **Circular dependencies:** None (234 files checked via madge)
-- **Dead code:** None (knip clean)
-- **Duplication:** ADMIN_SECRET bearer check in 2 routes (minor); rate limit boilerplate in 17 routes (acceptable)
-- **Monorepo:** Clean separation — `packages/shared` (types, pure functions) properly consumed by `apps/web`
-- **Recommendations:** Extract shared `verifyAdminSecret()` helper; batch minor dep updates
+**0 type errors. 0 circular dependencies (719 files scanned). 0 CVEs.**
 
-### 5. Performance (performance-eng) — YELLOW
+`strict: true` + `noUncheckedIndexedAccess: true` on all packages. Clean module boundaries (impact, github, cache, render, db, auth, email). `clampScore`/`normalize` centralized. `escapeXml` (SVG) and `escapeHtml` (HTML/email) correctly separate with rationale documented. React 19.2.4 + Next.js 16.2.2 within declared peer dependency ranges.
 
-- **Build:** PASS (10.7s compile, 408ms static generation)
-- **Bundle size:** Unverifiable from Turbopack output (no per-route JS table); needs `ANALYZE=true` run
-- **Client directives:** 121 `"use client"` files, all appropriately placed at leaf level; no client directives on layouts or core pages
-- **Good patterns:** 15+ dynamic imports with `ssr: false`, PostHog deferred to first interaction, `next/font` with `display: swap`, `next/image` for avatars, 13 `loading.tsx` files, ISR on landing/share pages
-- **Anti-patterns:** 3-4 redundant session fetches on share page
-- **Core Web Vitals:** Low risk across CLS, LCP, INP
-- **`prefers-reduced-motion`:** Supported globally + 30 component-level implementations
-- **Recommendations:** Run `ANALYZE=true` build to verify bundle sizes; consolidate session fetching with shared hook
+**Warnings:**
+- TS 6.0.2 and ESLint 10.1.0 major upgrades available — deferred per existing ADR
+- Minor patch updates available: `@types/node`, `posthog-js`, `@playwright/test`, `@supabase/supabase-js`, `resend`, `svix`
+- `escapeHtml` indirect re-export in unsubscribe route (W8)
+- `noUnusedLocals`/`noUnusedParameters` not set (W13)
 
-### 6. UX/Accessibility (ux-reviewer) — GREEN
+Knip false positives: `producthunt/*.mjs` (orphaned launch scripts, harmless), `.next/types/validator.ts` (build artifact), IDE/agent skill assets.
 
-- **Heading hierarchy:** Correct across all pages, no skipped levels
-- **ARIA labels:** All interactive elements labeled; 154 `aria-hidden` on decorative icons across 64 files
-- **Focus indicators:** Global `:focus-visible` with amber outline; skip-to-content link present
-- **Motion sensitivity:** Best-in-class — global `prefers-reduced-motion` rule + component-level checks
-- **Image accessibility:** All images have meaningful alt text
-- **Keyboard navigation:** Proper `role="button"` + `tabIndex` + `onKeyDown` on custom interactives; focus trap in mobile nav; skip-to-content link with `#main-content` on all pages
-- **State handling:** 13 error boundaries, 13 loading screens (all with `role="status"`), empty states in admin/campaigns
-- **Design system:** Excellent compliance — semantic tokens throughout, hardcoded colors only in `global-error.tsx` (intentional)
-- **Recommendations:** Add keyboard access to RadarChart SVG polygon hit areas
+---
+
+### 5. Performance (performance-eng) — GREEN
+
+**All routes well under 500KB threshold. Build clean.**
+
+| Route | First Load JS (uncompressed) |
+|-------|------------------------------|
+| `/u/[handle]` | 236 KB |
+| `/studio` | 216 KB |
+| `/admin` | 200 KB |
+| `/` (landing) | 180 KB |
+| `/about` | 179 KB |
+| Other routes | 113–174 KB |
+
+No heavy client libraries (no lodash, moment, recharts, d3, framer-motion). Supabase and Resend never reach client bundles. Server secrets absent from all 68 client JS chunks. `canvas-confetti` correctly lazy-loaded. 8 heavy effect components use `next/dynamic` with `ssr: false`.
+
+**Warnings:**
+- Turbopack NFT warning on `svg-to-png.ts` → OG image route (build succeeds, Turbopack 16.x bug, low risk)
+- `GlobalCommandBar` statically imported on `/admin` — inconsistent with lazy pattern elsewhere (W10)
+- PostHog 169KB uncompressed in shared bundle; deferred-interaction load mitigates TTI impact
+
+---
+
+### 6. UX/Accessibility (ux-reviewer) — RED (2 blockers)
+
+**2 WCAG 2.1 AA blockers. 8 warnings.**
+
+Confirmed green: skip link (correct), `prefers-reduced-motion` (global + per-component — thorough), focus ring (`2px solid var(--color-amber)` on `:focus-visible`), ARIA live regions (toast, alert, terminal, copy button — all correct), icon-only button labels throughout, modal/dialog implementations (native `<dialog>`, focus traps in `ShortcutCheatSheet` and `MobileNav`).
+
+**Blockers (B1, B2):** See top of report.
+
+**Notable warnings:**
+- Heatmap dots mouse-only — no keyboard/focus access (W4)
+- `BadgeOverlay` tooltip may not be announced on desktop by screen readers (W5)
+- `aria-label` misplaced on progress bar fill div (W6 — part of B2)
+- `focusable="true"` non-standard SVG attribute (W15)
+- Hardcoded font family in SVG text (W16)
+
+---
+
+## Action Plan
+
+### Fix immediately (blockers → unblock release)
+1. **B1** `DimensionCard.tsx:222` — replace `<div role="button">` with `<button>`; keep `aria-expanded`, `aria-controls`, `aria-label`
+2. **B2** `ImpactBreakdown.tsx:272`, `DimensionCard.tsx:189`, `SubMetricPanel.tsx:295` — add `aria-label="X score"` to each `role="progressbar"` container; remove misplaced label from inner fill divs
+
+### Fix before release (medium warnings)
+3. **W2** `verifyAdminSecret()` — return 401/503 when `ADMIN_SECRET` is unset instead of pass-through
+4. **W1** Remove stale worktree `../chapa-architectural-strip` and delete branch
+5. **W3** Close 4 Dependabot PRs targeting `main`; open replacements targeting `develop` as needed
+
+### Low priority (post-release backlog)
+6. **W7** Add `@img/sharp-libvips-darwin-arm64` LGPL to `docs/accepted-risks.md`
+7. **W8** Fix `escapeHtml` import in unsubscribe route → import from `@/lib/utils/escape` directly
+8. **W9** Update `claude-review.yml` model to `claude-sonnet-4-6`
+9. **W10** Lazy-load `GlobalCommandBar` on `/admin`
+10. **W12** Add render test for `HeatmapGrid.tsx` (rename to `.test.tsx`, add jsdom render + hover test)
+11. **W13** Add `noUnusedLocals`/`noUnusedParameters` to tsconfig files
+12. **W14** Add descriptive `aria-label` to `DimensionCard` expand toggle
+13. **W15** Remove `focusable="true"` from SVG polygon in `RadarChartInteractive.tsx`
+14. **W16** Replace hardcoded font family with CSS custom property in `RadarChartInteractive.tsx`
+15. **W17** Add accessible description to StreakCard activity dots

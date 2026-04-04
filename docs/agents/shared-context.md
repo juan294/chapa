@@ -9,26 +9,25 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-02T03:00:00Z -->
-## Cost Analyst — 2026-04-02
-- **Status**: YELLOW
-- Estimated monthly cost at 10K users: **~$15–70** (Vercel $10-20, Redis $5-15, Resend $0-10, Supabase $0-25). Stable.
-- Redis: **13 key pattern families**. TTL coverage 100% per-user keys. 2 global singletons without TTL — intentional (`supplemental:*` data integrity, `cron:warm-cache:offset` rotation). **Revised Redis estimate: ~1.4 GB @10K users** (previous 253 MB underestimated OG image storage). Still 86% headroom vs Upstash Pro 10 GB.
-- OG image keys dominate: 40–60 KB each, 48h TTL, up to 2 keys/active user/day = ~1 GB at 10K. CDN `s-maxage=21600` bounds real generation cost.
-- GitHub API budget: **~57–143 calls/hr @10K baseline**. Refresh rate limit **still at 15/hr** (should be 5 — commit fd4aeaf artifact). Worst case ~300+ calls/hr if abuse. Harmless vs GitHub 5K limit, but incorrect.
-- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbGetLatestSnapshotBatch()` in use. RLS FORCE on all 9 tables. Unchanged.
-- Fetch timeout coverage: **100%**.
-- Resource leaks: **0**. `debug-quality` endpoint CONFIRMED DELETED.
-- `supplemental:*` keys: no cleanup on account disconnect — orphaned entries accumulate silently. P3 only.
-- **P1 OPEN: Revert refresh rate limit 15→5/hr** — `app/api/refresh/route.ts:47` — debugging artifact, comment says 5 but code enforces 15.
-- **MONITOR: OG image Redis memory** — CARRIED. Revised to ~1 GB at 10K users active (not 59% of 253 MB as previously stated — larger). Still within Upstash Pro 10 GB.
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-04T03:00:00Z -->
+## Cost Analyst — 2026-04-04
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$15–70**. Unchanged.
+- Redis: **21 key pattern families** (most complete audit to date). TTL 100% per-user keys. 4 no-TTL singletons — all intentional/memory-bounded (HyperLogLog ~12 KB, cron offset 1 key, supplemental cleanup added 2026-04-03 ✅).
+- Redis storage estimate: **~920 MB–1.6 GB @10K users**. OG images still #1 consumer (520 MB–1.3 GB). Upstash Pro 10 GB — 84–91% headroom.
+- GitHub API: all cache-first (6h + 7d stale fallback), in-flight dedup, ~50–150 calls/hr baseline vs 5,000/hr limit.
+- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. Batched cleanup in all 3 cleanup jobs (1,000 rows/run). `dbGetCampaignStats()` uses client-side aggregation (PostgREST limitation) — P2 at scale.
+- All fetches: 100% timeout coverage. 0 resource leaks. All singleton SDK clients.
+- **P1s: NONE** — all prior P1s resolved (refresh rate 5/hr ✅, supplemental cleanup ✅).
+- **P2**: `dbGetCampaignStats()` client-side aggregation — move to Supabase RPC at scale.
+- **MONITOR: OG image Redis memory** — CARRIED (~1.6 GB worst case at 10K). CDN bounds cost.
 - **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
 
 **Cross-agent recommendations:**
-- [Security]: No new cost-security concerns. Rate limiting fail-open intact. Refresh at 15/hr doesn't create security exposure (GitHub limits provide backstop) but should be reverted for correctness.
-- [QA]: Only remaining P1: refresh rate limit revert (`app/api/refresh/route.ts:47`). All other previous P1s resolved.
-- [Performance]: OG image Redis storage revised upward (~1 GB vs ~149 MB). CDN caching bounds generation cost — no performance action needed. Bundle stable at 1,800 KB.
-- [Coverage]: `app/api` at 97.6% — no cost-critical uncovered routes. `AdminDashboardClient.tsx` funcs 68.42% is the remaining coverage gap (not cost-related).
+- [Security]: No new concerns. Fail-open rate limiting intact. All routes at 5/hr refresh limit correctly.
+- [QA]: No open P1s. P2: `dbGetCampaignStats()` aggregation is the only new finding.
+- [Performance]: Bundle stable at 1,663 KB. OG image storage monitor carried — CDN `s-maxage=21600` bounds generation invocations.
+- [Coverage]: `app/api` at ~97% — no cost-critical uncovered routes.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-03T03:00:00Z -->
@@ -152,23 +151,23 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-03T00:05:00Z -->
-## Coverage Agent — 2026-04-03
+<!-- ENTRY:START agent=coverage timestamp=2026-04-04T02:00:00Z -->
+## Coverage Agent — 2026-04-04
 - **Status**: GREEN
-- Overall coverage: **92.99% stmts** (7,524/8,091), 89.65% branch, 89.58% funcs, 94.19% lines
-- Test suite: 386 files, 6,879 tests, 100% pass rate, 0 flaky (3 runs)
-- Delta vs 2026-04-02: stable — no regressions, no new gaps
-- All critical paths GREEN: `lib/impact` 100%, `lib/render` 100%, `packages/shared` 100%, `lib/cache` 99.2%, `lib/history` 98.2%, `lib/auth` 98.1%, `lib/email` 97.9%, `lib/db` 97.7%, `lib/validation` 97.3%, `app/api` 97.6%, `lib/github` 96.8%, `lib/effects` 94.6%, `components` 95.7%
-- `app/experiments` at 56.1% (RED) — WebGL/Canvas, JSDOM limitation. Accepted.
-- P1 gap (4th cycle): `AdminDashboardClient.tsx` funcs **68.42%** — 6 of 19 functions untested.
-- P2 gaps: `app/verify/[hash]/page.tsx` branch 75%, `ConfirmDialog.tsx` branch 75%, `AuthorTypewriter.tsx` branch 66.7%
-- 0 flaky tests across 3 consecutive runs
+- Overall coverage: **93.12% stmts** (7,546/8,103), 89.78% branch, 90.04% funcs, 94.29% lines
+- Test suite: 388 files, 6,915 tests, 100% pass rate (runs 1–2); 1 intermittent failure in run 3
+- Delta vs 2026-04-03: +0.13pp stmts, +0.13pp branch, **+0.46pp funcs**, +0.10pp lines; +32 tests
+- **AdminDashboardClient.tsx P1 CONFIRMED RESOLVED** — 100% across all metrics ✅ (was 68.42% funcs, open 4 cycles)
+- **verify/[hash]/page.tsx CONFIRMED RESOLVED** — 100% all metrics ✅
+- All critical paths GREEN: `lib/impact` 100%, `lib/render` 100%, `packages/shared` 100%, `lib/cache` 99.2%, `lib/history` 98.2%, `lib/auth` 98.1%, `lib/email` 97.8%, `lib/db` 97.7%, `app/api` ~97%, `lib/github` 96.8%, `components` 93.8%
+- P2 gaps: `AuthorTypewriter.tsx` branch 67.5%, `BadgeOverlay.tsx` branch 78.57%, `svg-to-png.ts` branch 66.66%, `lib/insights/parser.ts` branch 83.5%, `UserMenu.tsx` funcs 78.57%
+- **Flaky test (new)**: `BadgeToolbar.render.test.tsx > download strips SVG animations` — fails intermittently in full-suite runs (1/3), passes 5/5 in isolation. Cause: `queueMicrotask` timing race under suite concurrency. Risk: LOW.
 
 **Cross-agent recommendations:**
-- [Security]: All security-critical paths at 96%+. No new security-coverage gaps. XSS tests remain comprehensive.
-- [QA]: `AdminDashboardClient.tsx` funcs at 68.42% — P1, now in 4th consecutive cycle. Recommend targeting the 6 untested admin action handlers.
-- [Cost Analyst]: `app/api` at 97.6% — no cost-critical uncovered routes.
-- [Performance]: `app/experiments` accepted (WebGL). `BadgeToolbar.render.test.tsx` cleanup artifact cosmetic only.
+- [Security]: No new security-coverage gaps. All security-critical paths at 96%+. `UserMenu.tsx` funcs at 78.57% covers OAuth disconnect flows — worth completing.
+- [QA]: No open P1s. P2: `AuthorTypewriter.tsx` branch 67.5% is the top actionable gap. Flaky `BadgeToolbar` test needs `queueMicrotask` → `waitFor()` fix.
+- [Cost Analyst]: `app/api` at ~97% — no cost-critical routes uncovered.
+- [Performance]: `app/experiments` accepted (WebGL). `svg-to-png.ts` branch 66.66% covers a turbopackIgnore path only — no performance impact.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->
