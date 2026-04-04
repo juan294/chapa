@@ -296,6 +296,7 @@ export function SubMetricPanel({
                 aria-valuenow={percent}
                 aria-valuemin={0}
                 aria-valuemax={100}
+                aria-label={metric.label}
                 className="h-2 w-full rounded-full bg-stroke"
               >
                 <div

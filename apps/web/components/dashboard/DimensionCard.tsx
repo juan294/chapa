@@ -190,6 +190,7 @@ export function DimensionCard({
           aria-valuenow={score}
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-label={`${label} score`}
           className="h-1.5 overflow-hidden rounded-full bg-stroke/30"
         >
           <div
@@ -219,14 +220,14 @@ export function DimensionCard({
       )}
 
       {/* Footer row — expand/collapse toggle */}
-      <div
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
+        aria-label={`Toggle ${label} breakdown`}
         onClick={toggle}
         onKeyDown={handleKeyDown}
-        className="flex cursor-pointer items-center justify-between p-4 pt-3"
+        className="flex w-full cursor-pointer items-center justify-between p-4 pt-3 text-left"
       >
         <span className="text-xs text-text-secondary">{subtitle}</span>
         <svg
@@ -246,7 +247,7 @@ export function DimensionCard({
             strokeLinejoin="round"
           />
         </svg>
-      </div>
+      </button>
 
       {/* Expanded panel */}
       <div id={panelId} className={isExpanded ? "border-t border-stroke" : ""}>

@@ -933,4 +933,63 @@ describe("SubMetricPanel", () => {
       expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("0");
     });
   });
+
+  // ----------------------------------------------------------------
+  // WCAG #667 — W6: progressbar containers have aria-label
+  // ----------------------------------------------------------------
+  describe("WCAG progressbar aria-label (#667)", () => {
+    it("each progressbar has an aria-label describing what it measures", () => {
+      render(
+        <SubMetricPanel
+          dimension="delivery"
+          stats={mockStats}
+          isOpen={true}
+          onClose={() => {}}
+        />
+      );
+
+      const progressBars = screen.getAllByRole("progressbar");
+      expect(progressBars.length).toBe(3);
+
+      // Each progressbar container must have an aria-label
+      for (const bar of progressBars) {
+        const label = bar.getAttribute("aria-label");
+        expect(label).not.toBeNull();
+        expect(label!.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("progressbar aria-labels match the sub-metric labels for delivery", () => {
+      render(
+        <SubMetricPanel
+          dimension="delivery"
+          stats={mockStats}
+          isOpen={true}
+          onClose={() => {}}
+        />
+      );
+
+      const progressBars = screen.getAllByRole("progressbar");
+      expect(progressBars[0]!.getAttribute("aria-label")).toBe("PR Weight");
+      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Issues Closed");
+      expect(progressBars[2]!.getAttribute("aria-label")).toBe("Commits");
+    });
+
+    it("progressbar aria-labels match the sub-metric labels for quality collaborative", () => {
+      render(
+        <SubMetricPanel
+          dimension="quality"
+          stats={mockStats}
+          isOpen={true}
+          onClose={() => {}}
+          profileType="collaborative"
+        />
+      );
+
+      const progressBars = screen.getAllByRole("progressbar");
+      expect(progressBars[0]!.getAttribute("aria-label")).toBe("Reviews");
+      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Review Ratio");
+      expect(progressBars[2]!.getAttribute("aria-label")).toBe("Code Cleanliness");
+    });
+  });
 });

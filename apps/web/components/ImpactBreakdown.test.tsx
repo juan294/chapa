@@ -57,6 +57,38 @@ describe("ImpactBreakdown", () => {
     });
   });
 
+  // WCAG #667 — B2: role="progressbar" and aria-label must be on the container, not the fill div
+  describe("WCAG progressbar placement (#667)", () => {
+    it("role=progressbar is on the outer track element, not the fill div", () => {
+      // The container div (track) must have role=progressbar.
+      // The fill div must NOT have role=progressbar.
+      // Pattern: outer div has role + aria attrs, inner div has only style/class.
+      // outer: <div ... role="progressbar" aria-valuenow ... aria-label ...>
+      // inner: <div ... style={{ width, background }} />
+      // We check: the element with role="progressbar" must NOT also contain "animate-bar-fill"
+      // on itself — that class belongs to the fill child.
+      const progressbarMatch = SOURCE.match(
+        /<div[^>]*role="progressbar"[^>]*>/g,
+      );
+      expect(progressbarMatch).not.toBeNull();
+      // Each progressbar container should NOT have animate-bar-fill (that's on the fill child)
+      for (const tag of progressbarMatch!) {
+        expect(tag).not.toContain("animate-bar-fill");
+      }
+    });
+
+    it("aria-label is on the progressbar container, not the fill div", () => {
+      // The fill div (the one with animate-bar-fill) must NOT carry aria-label
+      const fillDivMatch = SOURCE.match(
+        /<div[^>]*animate-bar-fill[^>]*>/g,
+      );
+      expect(fillDivMatch).not.toBeNull();
+      for (const tag of fillDivMatch!) {
+        expect(tag).not.toContain("aria-label");
+      }
+    });
+  });
+
   // Issue #202 — accepts StatsData for extended stats display
   describe("athlete dashboard (#202)", () => {
     it("accepts stats: StatsData prop", () => {

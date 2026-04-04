@@ -266,14 +266,16 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                     {dims[key]}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-track overflow-hidden">
+                <div
+                  role="progressbar"
+                  aria-valuenow={dims[key]}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`${DIMENSION_LABELS[key]} score`}
+                  className="h-1.5 rounded-full bg-track overflow-hidden"
+                >
                   <div
                     className="h-full rounded-full animate-bar-fill"
-                    role="progressbar"
-                    aria-valuenow={dims[key]}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`${DIMENSION_LABELS[key]} score`}
                     style={{
                       width: `${dims[key]}%`,
                       background: `linear-gradient(to right, ${DIMENSION_COLORS[key]!.from}, ${DIMENSION_COLORS[key]!.to})`,
