@@ -9,7 +9,7 @@
  * SVG rendering, never throws.
  */
 
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import { getResend } from "./resend";
 import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
@@ -19,7 +19,7 @@ const MARKER_TTL = 31_536_000; // 365 days in seconds
 
 export async function notifyFirstBadge(
   handle: string,
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
 ): Promise<void> {
   try {
     // 1. Production guard

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderBadgeSvg } from "./BadgeSvg";
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import {
   makeStats as _makeStats,
   makeImpact,
@@ -600,7 +600,7 @@ describe("renderBadgeSvg", () => {
   describe("SVG XSS prevention", () => {
     it("escapes special XML characters in archetype", () => {
       const maliciousImpact = makeImpact({
-        archetype: 'Builder<script>alert("xss")</script>' as unknown as ImpactV4Result["archetype"],
+        archetype: 'Builder<script>alert("xss")</script>' as unknown as ImpactV6Result["archetype"],
       });
       const svg = renderBadgeSvg(makeStats(), maliciousImpact);
       expect(svg).not.toContain('<script>');
@@ -609,7 +609,7 @@ describe("renderBadgeSvg", () => {
 
     it("escapes special XML characters in tier", () => {
       const maliciousImpact = makeImpact({
-        tier: 'Elite"onload="alert(1)' as unknown as ImpactV4Result["tier"],
+        tier: 'Elite"onload="alert(1)' as unknown as ImpactV6Result["tier"],
       });
       const svg = renderBadgeSvg(makeStats(), maliciousImpact);
       expect(svg).not.toContain('"onload=');

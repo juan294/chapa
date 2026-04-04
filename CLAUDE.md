@@ -113,7 +113,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 ## Data & types
 Shared types live in: `packages/shared/src/types.ts`
 - `StatsData` — aggregated GitHub stats (29 fields, includes `batchSizeScore` and `medianPrLeadTimeHours`)
-- `ImpactV4Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
+- `ImpactV6Result` — 4–5 dimensions (Craft optional), archetype, composite score, confidence, tier
 - `BadgeConfig` — Creator Studio visual customization (9 categories)
 - `SupplementalStats` — EMU account merge payload
 - `RawContributionData` — raw GraphQL response shape

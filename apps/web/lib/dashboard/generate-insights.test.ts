@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { generateInsights } from "./generate-insights";
@@ -8,7 +8,7 @@ import { generateInsights } from "./generate-insights";
 // Mock data
 // ---------------------------------------------------------------------------
 
-const mockImpact: ImpactV4Result = {
+const mockImpact: ImpactV6Result = {
   handle: "testuser",
   profileType: "collaborative",
   dimensions: { delivery: 85, quality: 60, consistency: 70, breadth: 50 },
@@ -237,7 +237,7 @@ describe("generateInsights", () => {
   });
 
   it("has Artificer archetype profile text", () => {
-    const artificerImpact: ImpactV4Result = {
+    const artificerImpact: ImpactV6Result = {
       ...mockImpact,
       archetype: "Artificer",
     };
@@ -250,7 +250,7 @@ describe("generateInsights", () => {
 
   it("has craft dimension tip text", () => {
     // When craft is the weakest dimension, generate-insights should provide a tip
-    const craftImpact: ImpactV4Result = {
+    const craftImpact: ImpactV6Result = {
       ...mockImpact,
       archetype: "Builder",
       dimensions: { delivery: 85, quality: 60, consistency: 70, breadth: 50, craft: 20 },

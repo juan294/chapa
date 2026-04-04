@@ -68,8 +68,8 @@ describe("Studio page (server component)", () => {
       expect(SOURCE).toContain("config:");
     });
 
-    it("computes impact with computeImpactV4", () => {
-      expect(SOURCE).toContain("computeImpactV4");
+    it("computes impact with computeImpactV6", () => {
+      expect(SOURCE).toContain("computeImpactV6");
     });
 
     it("falls back to empty stats when fetch fails", () => {

@@ -2,7 +2,7 @@
  * Exponential Moving Average (EMA) for score smoothing.
  *
  * Applied as the LAST step in the badge/share page pipeline,
- * after computeImpactV4. Uses the previous day's smoothed score
+ * after computeImpactV6. Uses the previous day's smoothed score
  * from MetricsSnapshot to dampen daily fluctuations.
  *
  * Alpha = 0.15 → half-life ~4.3 days.

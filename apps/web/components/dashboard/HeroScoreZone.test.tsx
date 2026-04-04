@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import { HeroScoreZone } from "./HeroScoreZone";
 
 vi.mock("./ScoreBoldNumber", () => ({
@@ -10,7 +10,7 @@ vi.mock("./ScoreBoldNumber", () => ({
 
 afterEach(cleanup);
 
-const mockImpact: ImpactV4Result = {
+const mockImpact: ImpactV6Result = {
   handle: "testuser",
   profileType: "solo",
   dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68 },

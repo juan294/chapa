@@ -39,8 +39,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: mockGetStats,
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: mockComputeImpactV4,
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: mockComputeImpactV4,
 }));
 
 vi.mock("@/lib/cache/craft-cache", () => ({
@@ -244,7 +244,7 @@ describe("POST /api/recalculate", () => {
     );
   });
 
-  it("passes craft score to computeImpactV4", async () => {
+  it("passes craft score to computeImpactV6", async () => {
     mockDbGetToolInsights.mockResolvedValue({
       craftScore: 69,
       tier: "Expert",

@@ -1,4 +1,4 @@
-import type { ImpactV4Result, DeveloperArchetype, StatsData, Platform, DimensionScores } from "@chapa/shared";
+import type { ImpactV6Result, DeveloperArchetype, StatsData, Platform, DimensionScores } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 
@@ -201,7 +201,7 @@ const SOLO_DIMENSION_TIPS: Partial<Record<string, string>> = {
  * Generate a rich profile description with archetype context and an
  * actionable tip for the developer\u2019s weakest dimension.
  */
-export function getArchetypeProfile(impact: ImpactV4Result): string {
+export function getArchetypeProfile(impact: ImpactV6Result): string {
   const profile = ARCHETYPE_PROFILES[impact.archetype];
   const dims = impact.dimensions;
 
@@ -219,7 +219,7 @@ export function getArchetypeProfile(impact: ImpactV4Result): string {
 }
 
 interface ImpactBreakdownProps {
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   stats: StatsData;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { BadgeConfig, StatsData, ImpactV4Result } from "@chapa/shared";
+import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 
 const ShareBadgePreview = dynamic(
   () => import("@/components/ShareBadgePreview").then(m => ({ default: m.ShareBadgePreview })),
@@ -11,7 +11,7 @@ const ShareBadgePreview = dynamic(
 export function ShareBadgePreviewLazy(props: {
   config: BadgeConfig;
   stats: StatsData;
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
 }) {
   return <ShareBadgePreview {...props} />;
 }

@@ -10,8 +10,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: vi.fn(),
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: vi.fn(),
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -21,13 +21,13 @@ vi.mock("@/lib/cache/redis", () => ({
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { rateLimit } from "@/lib/cache/redis";
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 
 const mockRequireSession = vi.mocked(requireSession);
 const mockGetStats = vi.mocked(getStats);
-const mockComputeImpact = vi.mocked(computeImpactV4);
+const mockComputeImpact = vi.mocked(computeImpactV6);
 const mockRateLimit = vi.mocked(rateLimit);
 
 function makeRequest(cookie?: string): NextRequest {
@@ -88,7 +88,7 @@ describe("POST /api/generate", () => {
   it("returns 200 with success when stats are generated", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     const fakeStats = { handle: "juan294", commitsTotal: 100 } as unknown as StatsData;
-    const fakeImpact = { archetype: "Builder", adjustedComposite: 72 } as unknown as ImpactV4Result;
+    const fakeImpact = { archetype: "Builder", adjustedComposite: 72 } as unknown as ImpactV6Result;
     mockGetStats.mockResolvedValue(fakeStats);
     mockComputeImpact.mockReturnValue(fakeImpact);
 
@@ -102,7 +102,7 @@ describe("POST /api/generate", () => {
   it("calls getStats with the session handle and token", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
-    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV4Result);
+    mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
 
     await POST(makeRequest("chapa_session=abc"));
 

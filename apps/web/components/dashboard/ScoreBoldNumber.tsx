@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter";
 import { useInView } from "@/lib/effects/counters/use-in-view";
 import {
@@ -15,7 +15,7 @@ import {
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 
 interface HeroScoreProps {
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   className?: string;
 }
 

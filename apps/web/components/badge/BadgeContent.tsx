@@ -5,7 +5,7 @@ import Image from "next/image";
 import type {
   BadgeConfig,
   StatsData,
-  ImpactV4Result,
+  ImpactV6Result,
   ImpactTier,
 } from "@chapa/shared";
 import type { ScoreEffect } from "@/lib/effects/text/ScoreEffectText";
@@ -22,7 +22,7 @@ import { WARM_AMBER } from "@/lib/render/theme";
 
 export interface BadgeContentProps {
   stats: StatsData;
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   scoreEffect?: BadgeConfig["scoreEffect"];
   heatmapAnimation?: BadgeConfig["heatmapAnimation"];
   statsDisplay?: BadgeConfig["statsDisplay"];

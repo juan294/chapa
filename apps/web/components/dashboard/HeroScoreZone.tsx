@@ -1,8 +1,8 @@
 import { ScoreBoldNumber } from "./ScoreBoldNumber";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 
 interface HeroScoreZoneProps {
-  impact: ImpactV4Result;
+  impact: ImpactV6Result;
   className?: string;
 }
 

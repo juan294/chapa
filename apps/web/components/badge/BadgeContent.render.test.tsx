@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { BadgeContent, getBadgeContentCSS } from "./BadgeContent";
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string; [key: string]: unknown }) =>
@@ -46,7 +46,7 @@ const STATS: StatsData = {
   avatarUrl: "https://example.com/avatar.png",
 };
 
-const IMPACT: ImpactV4Result = {
+const IMPACT: ImpactV6Result = {
   handle: "testuser",
   profileType: "collaborative",
   dimensions: { delivery: 80, quality: 55, consistency: 70, breadth: 45 },

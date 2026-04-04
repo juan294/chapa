@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV4Result, HeatmapDay } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, HeatmapDay } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
 
 /* ── Heatmap data (13 weeks × 7 days = 91 entries) ────────────────────────
@@ -70,7 +70,7 @@ export const DEMO_STATS: StatsData = {
   linkedPlatformLogins: { bitbucket: "developer", codeberg: "developer" },
 };
 
-export const DEMO_IMPACT: ImpactV4Result = {
+export const DEMO_IMPACT: ImpactV6Result = {
   handle: "developer",
   profileType: "collaborative",
   dimensions: {

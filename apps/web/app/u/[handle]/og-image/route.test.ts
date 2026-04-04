@@ -30,8 +30,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: mockGetStats,
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: mockComputeImpactV4,
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: mockComputeImpactV4,
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({

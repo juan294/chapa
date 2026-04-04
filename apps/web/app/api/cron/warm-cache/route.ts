@@ -8,7 +8,7 @@ import {
 } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
@@ -236,7 +236,7 @@ async function warmHandle(
 
     // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
     try {
-      const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
+      const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
       const snapshot = buildSnapshot(stats, impact);
 
       const previousSnapshot = previousSnapshots.get(handle.toLowerCase());

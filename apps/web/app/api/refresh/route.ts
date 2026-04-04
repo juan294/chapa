@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { isValidHandle } from "@/lib/validation";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    const impact = computeImpactV4(stats);
+    const impact = computeImpactV6(stats);
 
     // Replace today's snapshot — a user-initiated refresh means the score has
     // legitimately changed (e.g. after a scoring fix). dbReplaceSnapshot uses

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ImpactV4Result, StatsData } from "@chapa/shared";
+import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
@@ -23,7 +23,7 @@ import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
 interface SharePageOwnerContentProps {
   handle: string;
   stats: StatsData | null;
-  impact: ImpactV4Result | null;
+  impact: ImpactV6Result | null;
 }
 
 export function SharePageOwnerContent({

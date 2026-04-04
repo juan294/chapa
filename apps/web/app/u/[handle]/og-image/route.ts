@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
@@ -64,7 +64,7 @@ export async function GET(
       return new NextResponse("Could not load data", { status: 404 });
     }
 
-    const impact = computeImpactV4(stats);
+    const impact = computeImpactV6(stats);
 
     const avatarDataUri = stats.avatarUrl
       ? await getAvatarBase64(handle, stats.avatarUrl)

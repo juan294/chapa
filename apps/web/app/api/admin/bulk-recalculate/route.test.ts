@@ -40,8 +40,8 @@ vi.mock("@/lib/github/client", () => ({
   }),
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: vi.fn().mockReturnValue({
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: vi.fn().mockReturnValue({
     handle: "testuser",
     profileType: "solo",
     dimensions: { delivery: 50, quality: 30, consistency: 40, breadth: 35 },

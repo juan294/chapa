@@ -6,7 +6,7 @@
  * pass an `overrides` partial to customize only what the test cares about.
  */
 
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import type { MetricsSnapshot } from "../history/types";
 
 // ---------------------------------------------------------------------------
@@ -63,12 +63,12 @@ export function makeFullStats(overrides: Partial<StatsData> = {}): StatsData {
 }
 
 // ---------------------------------------------------------------------------
-// makeImpact — builds a valid ImpactV4Result with sensible defaults
+// makeImpact — builds a valid ImpactV6Result with sensible defaults
 // ---------------------------------------------------------------------------
 
 export function makeImpact(
-  overrides: Partial<ImpactV4Result> = {},
-): ImpactV4Result {
+  overrides: Partial<ImpactV6Result> = {},
+): ImpactV6Result {
   return {
     handle: "testuser",
     profileType: "collaborative",

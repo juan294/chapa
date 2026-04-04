@@ -1,4 +1,4 @@
-import type { StatsData, ImpactV4Result, Platform } from "@chapa/shared";
+import type { StatsData, ImpactV6Result, Platform } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { WARM_AMBER, getTierColor, getArchetypeColor } from "./theme";
 import { buildHeatmapCells, renderHeatmapSvg } from "./heatmap";
@@ -32,7 +32,7 @@ interface BadgeOptions {
  */
 export function renderBadgeSvg(
   stats: StatsData,
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
   const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false } = options;

@@ -21,12 +21,12 @@ afterEach(cleanup);
 // Mock data
 // ---------------------------------------------------------------------------
 
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import { generateInsights } from "@/lib/dashboard/generate-insights";
 
 const mockGenerateInsights = vi.mocked(generateInsights);
 
-const mockImpact: ImpactV4Result = {
+const mockImpact: ImpactV6Result = {
   handle: "testuser",
   profileType: "collaborative",
   dimensions: { delivery: 85, quality: 60, consistency: 70, breadth: 50 },

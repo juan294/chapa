@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { ImpactV4Result } from "@chapa/shared";
+import type { ImpactV6Result } from "@chapa/shared";
 import { ScoreBoldNumber } from "./ScoreBoldNumber";
 
 afterEach(cleanup);
@@ -18,7 +18,7 @@ vi.mock("@/lib/effects/counters/use-animated-counter", () => ({
   }),
 }));
 
-const mockImpact: ImpactV4Result = {
+const mockImpact: ImpactV6Result = {
   handle: "testuser",
   profileType: "solo",
   dimensions: { delivery: 85, quality: 72, consistency: 91, breadth: 68 },
@@ -74,7 +74,7 @@ describe("ScoreBoldNumber", () => {
   // Score = 0 edge case
   // ----------------------------------------------------------------
   it("renders score of 0 correctly", () => {
-    const zeroImpact: ImpactV4Result = {
+    const zeroImpact: ImpactV6Result = {
       ...mockImpact,
       adjustedComposite: 0,
       tier: "Emerging",
@@ -90,7 +90,7 @@ describe("ScoreBoldNumber", () => {
   // Score = 100 edge case
   // ----------------------------------------------------------------
   it("renders score of 100 correctly", () => {
-    const maxImpact: ImpactV4Result = {
+    const maxImpact: ImpactV6Result = {
       ...mockImpact,
       adjustedComposite: 100,
       tier: "Elite",
@@ -105,7 +105,7 @@ describe("ScoreBoldNumber", () => {
   // Elite tier uses ScoreEffectText (gold-shimmer)
   // ----------------------------------------------------------------
   it("uses ScoreEffectText for Elite tier", () => {
-    const eliteImpact: ImpactV4Result = {
+    const eliteImpact: ImpactV6Result = {
       ...mockImpact,
       adjustedComposite: 95,
       tier: "Elite",
@@ -156,7 +156,7 @@ describe("ScoreBoldNumber", () => {
   // Solid tier rendering
   // ----------------------------------------------------------------
   it("renders Solid tier correctly", () => {
-    const solidImpact: ImpactV4Result = {
+    const solidImpact: ImpactV6Result = {
       ...mockImpact,
       adjustedComposite: 45,
       tier: "Solid",
@@ -174,7 +174,7 @@ describe("ScoreBoldNumber", () => {
   // Emerging tier rendering
   // ----------------------------------------------------------------
   it("renders Emerging tier correctly", () => {
-    const emergingImpact: ImpactV4Result = {
+    const emergingImpact: ImpactV6Result = {
       ...mockImpact,
       adjustedComposite: 15,
       tier: "Emerging",
@@ -193,7 +193,7 @@ describe("ScoreBoldNumber", () => {
   // Balanced archetype rendering
   // ----------------------------------------------------------------
   it("renders Balanced archetype with profile text", () => {
-    const balancedImpact: ImpactV4Result = {
+    const balancedImpact: ImpactV6Result = {
       ...mockImpact,
       archetype: "Balanced",
     };
@@ -220,7 +220,7 @@ describe("ScoreBoldNumber", () => {
 
   for (const archetype of archetypes) {
     it(`renders profile text for ${archetype} archetype`, () => {
-      const impact: ImpactV4Result = {
+      const impact: ImpactV6Result = {
         ...mockImpact,
         archetype,
       };
@@ -248,7 +248,7 @@ describe("ScoreBoldNumber", () => {
   // Decimal adjusted composite (rounded by animated counter)
   // ----------------------------------------------------------------
   it("renders decimal adjusted composite as integer (from animated counter)", () => {
-    const decimalImpact: ImpactV4Result = {
+    const decimalImpact: ImpactV6Result = {
       ...mockImpact,
       adjustedComposite: 82.7,
     };

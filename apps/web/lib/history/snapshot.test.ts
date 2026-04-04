@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { buildSnapshot } from "./snapshot";
 import {
   makeStats as _makeStats,
@@ -36,7 +36,7 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   });
 }
 
-function makeImpact(overrides: Partial<ImpactV4Result> = {}): ImpactV4Result {
+function makeImpact(overrides: Partial<ImpactV6Result> = {}): ImpactV6Result {
   return _makeImpact({
     handle: "TestUser",
     dimensions: {
@@ -84,7 +84,7 @@ describe("buildSnapshot", () => {
     expect(snapshot.topRepoShare).toBe(0.4);
   });
 
-  it("extracts all impact fields from ImpactV4Result", () => {
+  it("extracts all impact fields from ImpactV6Result", () => {
     const stats = makeStats();
     const impact = makeImpact();
     const snapshot = buildSnapshot(stats, impact);

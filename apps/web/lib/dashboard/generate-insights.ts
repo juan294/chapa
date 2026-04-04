@@ -1,6 +1,6 @@
 import type {
   DimensionScores,
-  ImpactV4Result,
+  ImpactV6Result,
   ImpactTier,
 } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
@@ -97,7 +97,7 @@ const MAX_INSIGHTS = 5;
  * @returns Up to 5 insights sorted by priority (1 = highest)
  */
 export function generateInsights(
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
   trend: TrendSummary | null,
   diff: SnapshotDiff | null,
 ): Insight[] {

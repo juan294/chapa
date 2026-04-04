@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeImpactV4 } from "./v4";
+import { computeImpactV6 } from "./v6";
 import { mergeStats } from "@/lib/github/merge";
 import { makeFullStats, makeStats } from "@/lib/test-helpers/fixtures";
 
@@ -33,7 +33,7 @@ describe("golden profiles", () => {
       heatmapData: generateHeatmap(150),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -76,7 +76,7 @@ describe("golden profiles", () => {
       heatmapData: generateHeatmap(100),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -116,7 +116,7 @@ describe("golden profiles", () => {
       heatmapData: generateHeatmap(15),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,
@@ -179,7 +179,7 @@ describe("golden profiles", () => {
     });
 
     const merged = mergeStats(primary, supplemental);
-    const result = computeImpactV4(merged);
+    const result = computeImpactV6(merged);
     expect({
       delivery: result.dimensions.delivery,
       quality: result.dimensions.quality,

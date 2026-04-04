@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { SharePageOwnerContent } from "./SharePageOwnerContent";
-import type { ImpactV4Result, StatsData } from "@chapa/shared";
+import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import type { SessionUser } from "@/hooks/useSession";
 
 interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
@@ -83,7 +83,7 @@ const MOCK_IMPACT = {
   confidenceReasons: [],
   tier: "Solid",
   dimensions: [],
-} as unknown as ImpactV4Result;
+} as unknown as ImpactV6Result;
 
 beforeEach(() => {
   mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });

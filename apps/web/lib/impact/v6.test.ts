@@ -7,9 +7,9 @@ import {
   computeDimensions,
   deriveArchetype,
   detectProfileType,
-  computeImpactV4,
+  computeImpactV6,
   computeLeadTimeModifier,
-} from "./v4";
+} from "./v6";
 import type { StatsData, DimensionScores } from "@chapa/shared";
 import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
@@ -706,11 +706,11 @@ describe("deriveArchetype(dimensions) — V5 thresholds", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeImpactV4(stats) — full integration
+// computeImpactV6(stats) — full integration
 // ---------------------------------------------------------------------------
 
-describe("computeImpactV4(stats)", () => {
-  it("returns a complete ImpactV4Result", () => {
+describe("computeImpactV6(stats)", () => {
+  it("returns a complete ImpactV6Result", () => {
     const stats = makeStats({
       commitsTotal: 80,
       activeDays: 45,
@@ -726,7 +726,7 @@ describe("computeImpactV4(stats)", () => {
       heatmapData: makeUniformHeatmap(10),
     });
 
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
 
     expect(result.handle).toBe("test-user");
     expect(result.dimensions).toBeDefined();
@@ -760,7 +760,7 @@ describe("computeImpactV4(stats)", () => {
       topRepoShare: 0.4,
       heatmapData: makeUniformHeatmap(10),
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     const dims = result.dimensions;
     const expectedAvg = Math.round(
       (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
@@ -781,13 +781,13 @@ describe("computeImpactV4(stats)", () => {
       maxCommitsIn10Min: 25,
       heatmapData: makeUniformHeatmap(10),
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.adjustedComposite).toBeLessThanOrEqual(result.compositeScore);
   });
 
   it("scores inactive user as Emerging", () => {
     const stats = makeStats({ commitsTotal: 2, activeDays: 1 });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.archetype).toBe("Emerging");
     expect(result.tier).toBe("Emerging");
   });
@@ -804,7 +804,7 @@ describe("computeImpactV4(stats)", () => {
       reposContributed: 2,
       topRepoShare: 0.7,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.archetype).toBe("Builder");
   });
 
@@ -819,7 +819,7 @@ describe("computeImpactV4(stats)", () => {
       reposContributed: 2,
       topRepoShare: 0.6,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.archetype).toBe("Quality Champion");
   });
 
@@ -831,7 +831,7 @@ describe("computeImpactV4(stats)", () => {
       linesAdded: 20000,
       linesDeleted: 1000,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.confidence).toBeLessThan(100);
     expect(result.confidencePenalties.length).toBeGreaterThan(0);
   });
@@ -851,7 +851,7 @@ describe("computeImpactV4(stats)", () => {
       docsOnlyPrRatio: 0.3,
       maxCommitsIn10Min: 3,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.adjustedComposite).toBeGreaterThanOrEqual(70);
     expect(["High", "Elite"]).toContain(result.tier);
   });
@@ -865,18 +865,18 @@ describe("computeImpactV4(stats)", () => {
       topRepoShare: 0.5,
       heatmapData: makeUniformHeatmap(7),
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(Number.isInteger(result.compositeScore)).toBe(true);
     expect(Number.isInteger(result.adjustedComposite)).toBe(true);
   });
 
   it("includes computedAt timestamp", () => {
-    const result = computeImpactV4(makeStats());
+    const result = computeImpactV6(makeStats());
     expect(result.computedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it("includes profileType in result", () => {
-    const result = computeImpactV4(makeStats({ reviewsSubmittedCount: 5 }));
+    const result = computeImpactV6(makeStats({ reviewsSubmittedCount: 5 }));
     expect(result.profileType).toBe("collaborative");
   });
 });
@@ -964,7 +964,7 @@ describe("solo developer composite scoring", () => {
       featureBranchRate: 0.9,
       issueLinkageRate: 0.5,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     const dims = result.dimensions;
 
     // Solo composite = (delivery + consistency + breadth) / 3 — quality excluded
@@ -993,7 +993,7 @@ describe("solo developer composite scoring", () => {
       featureBranchRate: 0.9,
       issueLinkageRate: 0.5,
     });
-    const result = computeImpactV4(stats, 75); // craft score = 75
+    const result = computeImpactV6(stats, 75); // craft score = 75
     const dims = result.dimensions;
 
     // Solo composite = (delivery + consistency + breadth + craft) / 4
@@ -1014,7 +1014,7 @@ describe("solo developer composite scoring", () => {
       topRepoShare: 0.4,
       heatmapData: makeUniformHeatmap(10),
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     const dims = result.dimensions;
     const expectedAvg = Math.round(
       (dims.delivery + dims.quality + dims.consistency + dims.breadth) / 4
@@ -1024,7 +1024,7 @@ describe("solo developer composite scoring", () => {
   });
 
   it("solo with all zeros still scores 0", () => {
-    const result = computeImpactV4(makeStats());
+    const result = computeImpactV6(makeStats());
     expect(result.compositeScore).toBe(0);
     expect(result.profileType).toBe("solo");
     expect(result.tier).toBe("Emerging");
@@ -1052,7 +1052,7 @@ describe("solo developer composite scoring", () => {
       microCommitRatio: 0,
       batchSizeScore: 1.0,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.compositeScore).toBeGreaterThanOrEqual(90);
   });
 
@@ -1075,7 +1075,7 @@ describe("solo developer composite scoring", () => {
       featureBranchRate: 0.8,
       issueLinkageRate: 0.3,
     });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.compositeScore).toBeGreaterThanOrEqual(40);
   });
 });
@@ -1281,9 +1281,9 @@ describe("computeQuality with profileType parameter", () => {
 // ---------------------------------------------------------------------------
 
 describe("V6: Craft dimension", () => {
-  it("computeImpactV4 without craft returns same as v5 (collaborative)", () => {
+  it("computeImpactV6 without craft returns same as v5 (collaborative)", () => {
     const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5, reviewsSubmittedCount: 10 });
-    const result = computeImpactV4(stats);
+    const result = computeImpactV6(stats);
     expect(result.dimensions.craft).toBeUndefined();
     expect(result.profileType).toBe("collaborative");
     // Composite = avg of 4 dimensions (collaborative includes quality)
@@ -1291,9 +1291,9 @@ describe("V6: Craft dimension", () => {
     expect(result.compositeScore).toBe(expected);
   });
 
-  it("computeImpactV4 with craft includes 5th dimension (collaborative)", () => {
+  it("computeImpactV6 with craft includes 5th dimension (collaborative)", () => {
     const stats = makeStats({ commitsTotal: 150, activeDays: 120, prsMergedWeight: 30, reposContributed: 5, reviewsSubmittedCount: 10 });
-    const result = computeImpactV4(stats, 80);
+    const result = computeImpactV6(stats, 80);
     expect(result.dimensions.craft).toBe(80);
     expect(result.profileType).toBe("collaborative");
     // Composite = avg of 5 dimensions (collaborative includes quality + craft)
@@ -1303,23 +1303,23 @@ describe("V6: Craft dimension", () => {
 
   it("craft dimension is clamped to 0-100", () => {
     const stats = makeStats({ commitsTotal: 100, activeDays: 60 });
-    const over = computeImpactV4(stats, 150);
+    const over = computeImpactV6(stats, 150);
     expect(over.dimensions.craft).toBe(100);
-    const under = computeImpactV4(stats, -10);
+    const under = computeImpactV6(stats, -10);
     expect(under.dimensions.craft).toBe(0);
   });
 
   it("Artificer archetype triggers when craft is highest and >= 60", () => {
     const stats = makeStats({ commitsTotal: 50, activeDays: 30, prsMergedWeight: 10, reposContributed: 2 });
     // Low GitHub dimensions, high craft
-    const result = computeImpactV4(stats, 85);
+    const result = computeImpactV6(stats, 85);
     // craft=85 should be highest dimension for these low stats
     expect(result.archetype).toBe("Artificer");
   });
 
   it("Artificer does not trigger when another dimension is higher", () => {
     const stats = makeStats({ commitsTotal: 200, activeDays: 200, prsMergedWeight: 50, prsMergedCount: 20, reviewsSubmittedCount: 60, reposContributed: 8 });
-    const result = computeImpactV4(stats, 55);
+    const result = computeImpactV6(stats, 55);
     // GitHub dimensions should be higher than craft=55
     expect(result.archetype).not.toBe("Artificer");
   });
@@ -1327,7 +1327,7 @@ describe("V6: Craft dimension", () => {
   it("Balanced archetype works with 5 dimensions", () => {
     // All dimensions within 20-point range and avg >= 50
     const stats = makeStats({ commitsTotal: 150, activeDays: 150, prsMergedWeight: 30, prsMergedCount: 15, reviewsSubmittedCount: 40, reposContributed: 6, topRepoShare: 0.3, totalStars: 20, totalForks: 10, docsOnlyPrRatio: 0.15 });
-    const result = computeImpactV4(stats, 60);
+    const result = computeImpactV6(stats, 60);
     // Check if dimensions are close enough for Balanced
     const dims = result.dimensions;
     const values = [dims.delivery, dims.quality, dims.consistency, dims.breadth, dims.craft!];
@@ -1342,7 +1342,7 @@ describe("V6: Craft dimension", () => {
   it("existing archetypes unchanged when craft is absent", () => {
     // Builder: high delivery
     const builderStats = makeStats({ commitsTotal: 250, activeDays: 80, prsMergedWeight: 55, issuesClosedCount: 30, prsMergedCount: 20, reposContributed: 3 });
-    const builder = computeImpactV4(builderStats);
+    const builder = computeImpactV6(builderStats);
     expect(builder.dimensions.craft).toBeUndefined();
     expect(builder.archetype).toBe("Builder");
   });

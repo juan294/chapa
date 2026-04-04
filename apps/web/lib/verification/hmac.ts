@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import type { StatsData, ImpactV4Result } from "@chapa/shared";
+import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
 
 /**
@@ -8,7 +8,7 @@ import { toDateString } from "@/lib/utils/date";
  */
 export function buildPayload(
   stats: StatsData,
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
   date: string,
 ): string {
   return [
@@ -41,7 +41,7 @@ export function computeHash(payload: string, secret: string): string {
  */
 export function generateVerificationCode(
   stats: StatsData,
-  impact: ImpactV4Result,
+  impact: ImpactV6Result,
 ): { hash: string; date: string } | null {
   const secret = process.env.CHAPA_VERIFICATION_SECRET?.trim();
   if (!secret) return null;

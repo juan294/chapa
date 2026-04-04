@@ -36,8 +36,8 @@ vi.mock("@/lib/github/client", () => ({
   getStats: mockGetStatsData,
 }));
 
-vi.mock("@/lib/impact/v4", () => ({
-  computeImpactV4: mockComputeImpactV4,
+vi.mock("@/lib/impact/v6", () => ({
+  computeImpactV6: mockComputeImpactV4,
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -240,13 +240,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
     });
 
-    it("passes stats to computeImpactV4 without craft score when no insights exist", async () => {
+    it("passes stats to computeImpactV6 without craft score when no insights exist", async () => {
       const [req, ctx] = makeRequest("testuser", "1.2.3.4");
       await GET(req, ctx);
       expect(mockComputeImpactV4).toHaveBeenCalledWith(FAKE_STATS, undefined);
     });
 
-    it("passes craft score to computeImpactV4 when tool insights exist", async () => {
+    it("passes craft score to computeImpactV6 when tool insights exist", async () => {
       const { getCachedCraftScore } = await import("@/lib/cache/craft-cache");
       vi.mocked(getCachedCraftScore).mockResolvedValue({
         tool: "claude-code",

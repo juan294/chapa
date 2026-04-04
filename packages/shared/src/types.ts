@@ -85,7 +85,7 @@ export type DeveloperArchetype =
   | "Artificer";
 
 /** Full Impact v4 result */
-export interface ImpactV4Result {
+export interface ImpactV6Result {
   handle: string;
   profileType: ProfileType;
   dimensions: DimensionScores;

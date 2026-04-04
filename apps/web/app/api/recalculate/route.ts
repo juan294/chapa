@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
-import { computeImpactV4 } from "@/lib/impact/v4";
+import { computeImpactV6 } from "@/lib/impact/v6";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import { dbReplaceSnapshot } from "@/lib/db/snapshots";
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Compute fresh impact with craft included
-  const impact = computeImpactV4(stats, craftResult?.craftScore ?? undefined);
+  const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
 
   // For recalculate: use the RAW adjusted composite, NOT EMA-smoothed.
   // This is a deliberate action — the user wants to see the actual score.
