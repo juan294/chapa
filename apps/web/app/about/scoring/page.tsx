@@ -739,7 +739,7 @@ export default function ScoringMethodologyPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
                 >
-                  Reach out on X (@juang294)
+                  Reach out on Twitter (@juang294)
                 </a>
                 <a
                   href="mailto:support@chapa.thecreativetoken.com"
