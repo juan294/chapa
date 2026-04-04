@@ -320,9 +320,9 @@ describe("UserMenu — menu items", () => {
     dropdownOpen = true;
   });
 
-  it("renders Your Badge link pointing to /u/login", () => {
+  it("renders My Badge link pointing to /u/login", () => {
     render(<UserMenu {...baseProps} />);
-    const link = screen.getByText("Your Badge").closest("a");
+    const link = screen.getByText("My Badge").closest("a");
     expect(link?.getAttribute("href")).toBe("/u/testuser");
   });
 

@@ -61,13 +61,21 @@ export function isInsightsEnabledSync(): boolean {
 // Async (DB-backed + env-var fallback) — for server components / API routes
 // ---------------------------------------------------------------------------
 
+/** In-process TTL cache for feature flag DB lookups — 5 minutes. */
+const FLAG_CACHE_TTL_MS = 5 * 60 * 1000;
+const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
+
 async function checkFlag(
   dbKey: string,
   envVar: string | undefined,
 ): Promise<boolean> {
+  const cached = flagCache.get(dbKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+
   const flag = await dbGetFeatureFlag(dbKey);
-  if (flag !== null) return flag.enabled;
-  return envVar?.trim() === "true";
+  const value = flag !== null ? flag.enabled : envVar?.trim() === "true";
+  flagCache.set(dbKey, { value, expiresAt: Date.now() + FLAG_CACHE_TTL_MS });
+  return value;
 }
 
 /**
@@ -148,7 +156,7 @@ export async function isAgentEnabled(agentKey: string): Promise<boolean> {
   return agent?.enabled ?? false;
 }
 
-/** Reset internal state — for tests only. */
+/** Reset internal cache — for tests only. */
 export function _resetFlagCache(): void {
-  // Reserved for future caching if needed.
+  flagCache.clear();
 }

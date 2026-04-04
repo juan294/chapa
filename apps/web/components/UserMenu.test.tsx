@@ -1819,10 +1819,10 @@ describe("UserMenu — menu actions close dropdown (runtime)", () => {
     clearPlatformStatusCache();
   });
 
-  it("clicking Your Badge link calls setOpen to close the menu", () => {
+  it("clicking My Badge link calls setOpen to close the menu", () => {
     render(<UserMenu {...baseProps} />);
 
-    const link = screen.getByText("Your Badge");
+    const link = screen.getByText("My Badge");
     fireEvent.click(link);
 
     // setIsOpenMock should have been called with false (close the menu)
