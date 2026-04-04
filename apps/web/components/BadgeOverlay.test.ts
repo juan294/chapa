@@ -172,16 +172,21 @@ describe("BadgeOverlay aria-describedby resolves to visible content (#363)", () 
     expect(panelSection).not.toContain('aria-hidden="true"');
   });
 
-  it("hotspot regions use aria-describedby pointing to panel IDs", () => {
-    // Verify the linkage exists — hotspots reference panels via aria-describedby
+  it("hotspot regions use aria-describedby pointing to sr-only description IDs", () => {
+    // Verify the linkage exists — hotspots reference sr-only description spans via
+    // aria-describedby. The description element is always present in the DOM (not
+    // lazily rendered), so screen readers can resolve the reference immediately on focus.
     expect(SRC).toContain("aria-describedby");
-    expect(SRC).toContain("-panel");
+    expect(SRC).toContain("-desc");
   });
 
-  it("aria-describedby is only set when the panel is rendered (active hotspot)", () => {
-    // The panel only exists on desktop when the hotspot is active.
-    // aria-describedby should be conditional to avoid referencing a non-existent element.
-    expect(SRC).toMatch(/aria-describedby=\{activeLeaderLine === hotspot\.id/);
+  it("aria-describedby always points to the sr-only description, not the conditional panel (W5)", () => {
+    // Fix for W5: the panel is lazily rendered only when a hotspot is active, so
+    // aria-describedby must NOT point to the panel ID (which may not exist yet).
+    // Instead it always points to a permanently-present sr-only <span>.
+    expect(SRC).toMatch(/aria-describedby=\{`\$\{hotspot\.id\}-desc`\}/);
+    // The old conditional pattern must be gone
+    expect(SRC).not.toMatch(/aria-describedby=\{activeLeaderLine === hotspot\.id/);
   });
 });
 
