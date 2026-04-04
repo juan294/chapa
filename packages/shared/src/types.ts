@@ -168,7 +168,7 @@ export interface SnapshotPenalty {
 /**
  * Compact daily snapshot of a user's metrics + impact scores.
  *
- * Stored permanently in Redis sorted sets (key: `history:<handle>`).
+ * Stored permanently in Supabase `metrics_snapshots` table (UNIQUE on handle+date).
  * ~300 bytes JSON — excludes heatmapData (7KB) and mutable display
  * fields (avatarUrl, displayName). Includes explanatory fields for
  * score change analysis.

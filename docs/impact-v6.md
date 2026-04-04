@@ -15,7 +15,7 @@ A new optional dimension measuring AI tool proficiency, effectiveness, and workf
 | Sub-dimension | What it measures | Key signals |
 |---------------|-----------------|-------------|
 | **Proficiency** | Tool mastery & feature adoption | Tool diversity (entropy), agent usage rate, multi-clauding %, session type diversity, engagement depth |
-| **Effectiveness** | Outcome quality | Achievement rate, satisfaction rate, inverse friction, error recovery |
+| **Effectiveness** | Outcome quality | Achievement rate (55%), satisfaction rate (45%) — friction/errors excluded (AI tool's mistakes, not the developer's) |
 | **Sophistication** | Workflow complexity | Complex session rate, lines/session, multi-clauding intensity, files/session |
 
 `craft = round(avg(proficiency, effectiveness, sophistication))` — 0 to 100.
@@ -85,7 +85,7 @@ The badge radar chart renders as a 5-point pentagon when craft data exists, or f
 |--------|--------|---------------|
 | sqrt(activeDays/365) | 45% | Square root |
 | Heatmap evenness | 40% | 1/(1+CV) |
-| Inverse burst | 15% | Linear |
+| Week coverage | 15% | Linear |
 
 ### Breadth (0–100) — Cross-project influence
 | Signal | Weight | Cap | Normalization |
@@ -100,7 +100,7 @@ The badge radar chart renders as a 5-point pentagon when craft data exists, or f
 | Sub-dimension | Weight | Key signals |
 |---------------|--------|-------------|
 | Proficiency | 33% | Tool diversity, agent rate, multi-clauding, engagement |
-| Effectiveness | 33% | Achievement rate, satisfaction, friction, errors |
+| Effectiveness | 33% | Achievement rate (55%), satisfaction rate (45%) — friction/errors excluded |
 | Sophistication | 33% | Complex sessions, lines/session, parallelism, files/session |
 
 Source: `computeCraftScore()` in `apps/web/lib/insights/scoring.ts`
@@ -111,7 +111,7 @@ Data: Claude Code `/insights` HTML report (future: Cursor, Copilot, etc.)
 ```
 StatsData (GitHub, 365 days)  +  CraftResult? (AI tool insights)
   ↓                                ↓
-computeImpactV4(stats, craftScore?)
+computeImpactV6(stats, craftScore?)
   ├→ 4 GitHub dimensions (0-100 each)
   ├→ Optional 5th craft dimension
   ├→ compositeScore = avg(active dimensions)
@@ -121,7 +121,7 @@ computeImpactV4(stats, craftScore?)
   ├→ Archetype derivation (7 types)
   └→ Tier classification (Emerging/Solid/High/Elite)
   ↓
-ImpactV4Result (with optional craft in dimensions)
+ImpactV6Result (with optional craft in dimensions)
   ↓
 EMA smoothing (0.15 current + 0.85 previous)
   ↓
@@ -134,7 +134,7 @@ Deliberate user actions (insights upload, platform connect) trigger immediate sc
 
 1. Fetches stats (cache-first)
 2. Reads craft score from DB (latest uploaded insights)
-3. Computes fresh impact with `computeImpactV4(stats, craftScore)`
+3. Computes fresh impact with `computeImpactV6(stats, craftScore)`
 4. Uses the raw `adjustedComposite` — NO EMA smoothing (deliberate action bypass)
 5. Replaces today's snapshot via `dbReplaceSnapshot` (upsert, not ignore-duplicate)
 6. Updates the Redis snapshot cache
@@ -159,7 +159,7 @@ Rate limits: insights upload 10/day, recalculate 20/hour.
 - `DimensionScores.craft` is optional (`craft?: number`) — zero migration needed
 - `MetricsSnapshot.craft` is optional — existing snapshots remain valid
 - All UI components render 4 or 5 dimensions dynamically
-- `computeImpactV4(stats)` without craft returns identical results to V5
+- `computeImpactV6(stats)` without craft returns identical results to V5
 
 ## Solo Profile Exception
 
@@ -197,7 +197,7 @@ Adding a new AI tool (e.g., Cursor):
 |------|--------|
 | `packages/shared/src/types.ts` | `craft?` in DimensionScores, Artificer in DeveloperArchetype |
 | `packages/shared/src/constants.ts` | "craft" in DIMENSION_KEYS |
-| `apps/web/lib/impact/v4.ts` | Optional craftScore param, dynamic composite, Artificer archetype |
+| `apps/web/lib/impact/v6.ts` | Optional craftScore param, dynamic composite, Artificer archetype |
 | `apps/web/lib/render/RadarChart.ts` | Pentagon (5-axis) with diamond (4-axis) fallback |
 | `apps/web/lib/render/BadgeSvg.tsx` | Craft pill removed |
 | `apps/web/lib/render/BadgeCraft.tsx` | Deleted (superseded by radar axis) |
@@ -263,7 +263,7 @@ Updated formula:
 | `packages/shared/src/types.ts` | `batchSizeScore`, `medianPrLeadTimeHours` in StatsData; `createdAt`/`mergedAt` in PR node |
 | `packages/shared/src/stats-aggregation.ts` | Batch size and lead time computation |
 | `packages/shared/src/github-query.ts` | `createdAt`, `mergedAt` in PR query |
-| `apps/web/lib/impact/v4.ts` | Ratio-based `detectProfileType`, `computeLeadTimeModifier`, batch size in Quality |
+| `apps/web/lib/impact/v6.ts` | Ratio-based `detectProfileType`, `computeLeadTimeModifier`, batch size in Quality |
 | `apps/web/lib/impact/heatmap-evenness.ts` | Outlier clipping, `computeWeekCoverage` |
 | `apps/web/lib/impact/utils.ts` | `burst_activity` threshold raised to 100 |
 | `apps/web/lib/github/queries.ts` | Map `createdAt`/`mergedAt` from response |

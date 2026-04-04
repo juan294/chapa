@@ -1,52 +1,68 @@
 # Documentation Update Report
 
-> Generated on 2026-03-29 | Branch: `develop` | Changes since v2.5.0
+> Generated on 2026-04-04 | Branch: `develop` | Changes since v2.6.0
 
 ## Summary
-- 7 documents updated
-- 0 diagrams refreshed (no Mermaid diagrams in project; ASCII diagrams current)
-- 3 version/count references corrected
-- 0 inline doc blocks updated
+- 12 documents updated
+- 5 diagrams refreshed (v4→v6 in ASCII pipeline diagrams)
+- 3 version references corrected (TS badge, test count, StatsData field count)
+- 1 inline doc block updated (MetricsSnapshot JSDoc)
+- 1 new user-facing section added (Craft dimension on /about/scoring)
 - 0 items flagged [NEEDS REVIEW]
 
 ## Changes by File
 
+### docs/impact-v6.md
+- Effectiveness signals: removed "inverse friction, error recovery" → now "achievement rate (55%), satisfaction rate (45%) — friction/errors excluded"
+- Consistency table: "Inverse burst" → "Week coverage"
+- Pipeline diagram: 6x `computeImpactV4`/`ImpactV4Result`/`impact/v4.ts` → v6
+
+### docs/svg-design.md
+- Heatmap palette: corrected 5 opacity values to match `theme.ts` (0.06→0.12, 0.20→0.30, etc.)
+- Type reference: `ImpactV4Result` → `ImpactV6Result`
+
+### packages/shared/src/types.ts
+- MetricsSnapshot JSDoc: "Redis sorted sets" → "Supabase `metrics_snapshots` table"
+
 ### CLAUDE.md
-- **StatsData field count**: 25 → 29 (actual interface has 29 fields)
-- **MetricsSnapshot storage**: "stored in Redis sorted sets" → "stored in Supabase `metrics_snapshots` table" (migrated months ago)
+- StatsData field count: 29 → 30 (added `primaryReviewsSubmittedCount`)
+
+### docs/impact-v4.md
+- Deprecation notice: "still named computeImpactV4" → "renamed to computeImpactV6 in v6.ts"
 
 ### README.md
-- **Verification hash length**: "8-character" → "32-character" (upgraded in #617, v2.3.0)
-- **Test count**: "378+ test files, 6,400+ tests" → "382+ test files, 6,650+ tests"
+- TypeScript badge: 5.9 → 6.0
+- Test count: 382+ files / 6,650+ tests → 389+ files / 6,950+ tests
 
-### docs/how-it-works.md
-- **Quality 15% signal**: "inverse micro-commit ratio" → "batch size score" (both collaborative and solo)
-- **Consistency 15% signal**: "inverse burst activity" → "week coverage"
-- **Solo profile detection**: "zero reviews" → "review-to-PR ratio >= 0.15"
-- **Solo quality role**: clarified that solo quality is excluded from composite score
+### docs/demo.md
+- "Impact v4 measures four independent dimensions" → "Impact v6 measures up to five independent dimensions"
 
-### docs/scoring-explainer-video.md
-- **Quality 15% signal**: "Inverse Micro-Commit Ratio" → "Batch Size Score" with updated description
-- **Consistency 15% signal**: "Inverse Burst Activity" → "Week Coverage" with updated description
+### apps/web/app/about/scoring/page.tsx
+- Added new "Craft — AI tool mastery (optional)" section explaining:
+  - How to unlock Craft (run `/insights` in Claude Code, upload to Chapa)
+  - Two-week re-upload cadence (matches Claude Code's insights generation cycle)
+  - Three sub-dimensions table (Proficiency, Effectiveness, Sophistication)
+  - Explicit note that friction/errors are excluded from scoring
 
-### docs/spec.md
-- **Composite score**: "Average of all four dimensions" → "Average of all active dimensions (4 or 5 when Craft present; quality excluded for solo)"
+### docs/plans/2026-04-03-metaphor-first-badge-vision.md
+- Architecture diagram: `computeImpactV4`/`ImpactV4Result` → v6
 
-### docs/cli-guide.md
-- **Node.js version**: "18 or later" → "20 or later"
-- **npm version**: "7 or later" → "10 or later"
+### docs/research/multi-platform.md
+- All "Impact v4" naming → "Impact v6", function/type refs → v6
 
-### docs/plans/2026-03-29-scoring-pipeline-hardening.md
-- **Phase checkboxes**: All 5 phases marked complete (field guard, golden-file tests, e2e pipeline test, makeFullStats factory, CI gate)
+### docs/research/2026-03-08-score-stasis-solution-space.md
+- Pipeline refs: `computeImpactV4()` → v6, `impact/v4.ts` → v6
+
+### docs/plans/2026-03-07-insights-integration.md
+- "Impact v4" → "Impact v6" (3 occurrences)
 
 ## Verified Current (no changes needed)
-- `docs/impact-v6.md` — source of truth, already matches code
-- `docs/design-system.md` — matches current tokens/fonts
-- `docs/svg-design.md` — matches current badge rendering
-- `docs/badge-verification.md` — correct (32-char hash documented)
-- `docs/accepted-risks.md` — profile-type-threshold entry matches code (0.15 ratio)
-- `CONTRIBUTING.md` — current
-- Historical specs (v3/v4/v5) — archived, no update needed
+- `docs/design-system.md` — updated in v2.6.0 cycle
+- `docs/accepted-risks.md` — just updated with CRON_SECRET entry
+- `docs/chapa-architecture.drawio` — already says "v6 Scoring"
+- `CHANGELOG.md` — will be updated during `/release`
+- Historical specs (v3/v5) — archived, no update needed
+- 39 plan/research docs with v4 refs — historical point-in-time records
 
 ## Flagged for Review
 None.

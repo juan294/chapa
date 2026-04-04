@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-Chapa's architecture is **fundamentally platform-agnostic**. The scoring pipeline (`StatsData` → `ImpactV4Result`) contains zero GitHub-specific logic. All GitHub coupling lives in two layers: the GraphQL query and the OAuth flow. The existing `SupplementalStats` merge pattern already provides a working blueprint for multi-platform aggregation.
+Chapa's architecture is **fundamentally platform-agnostic**. The scoring pipeline (`StatsData` → `ImpactV6Result`) contains zero GitHub-specific logic. All GitHub coupling lives in two layers: the GraphQL query and the OAuth flow. The existing `SupplementalStats` merge pattern already provides a working blueprint for multi-platform aggregation.
 
 Of the 7 platforms researched, **3 are viable near-term integrations** (GitLab, Codeberg, Gitea/Forgejo), 1 is a watch-and-wait (Gitness), and 3 are not worth pursuing now (SourceHut, Radicle, OneDev).
 
@@ -169,7 +169,7 @@ Owned repos:      stargazerCount, forkCount, watchers (max 100)
 
 **Key insight:** ~20 of 23 fields are platform-agnostic. The 3 "GitHub-named" fields (stars, forks, watchers) are conceptually universal — just need field-name mapping.
 
-### Impact v4 Scoring — Zero Platform Coupling
+### Impact v6 Scoring — Zero Platform Coupling
 
 All 4 dimensions operate on `StatsData` (platform-agnostic):
 
@@ -201,7 +201,7 @@ This pattern works **today** for merging any platform's data — the only requir
 | **Raw data transform** | `packages/shared/src/stats-aggregation.ts` | Medium — `buildStatsFromRaw()` expects GitHub shape | Medium |
 | **Avatar fetching** | `apps/web/lib/render/avatar.ts` | Low — URL format differs per platform | Low |
 | **Cache keys** | `apps/web/lib/cache/redis.ts` | Low — keys are `stats:v2:<handle>` | Low (add platform prefix) |
-| **Badge rendering** | `apps/web/lib/render/` | None — operates on `StatsData` + `ImpactV4Result` | None |
+| **Badge rendering** | `apps/web/lib/render/` | None — operates on `StatsData` + `ImpactV6Result` | None |
 
 ---
 
@@ -246,8 +246,8 @@ This pattern works **today** for merging any platform's data — the only requir
                          │
                          ▼
 ┌──────────────────────────────────────────────────────────┐
-│          Impact v4 Scoring (unchanged)                    │
-│  computeImpactV4(mergedStats) → ImpactV4Result           │
+│          Impact v6 Scoring (unchanged)                    │
+│  computeImpactV6(mergedStats) → ImpactV6Result           │
 │  Pure function — no platform awareness needed             │
 └──────────────────────────────────────────────────────────┘
                          │

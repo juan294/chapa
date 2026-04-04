@@ -607,8 +607,8 @@ The x-axis must remain temporal (left = older, right = recent). The architectura
 │                     SCORING ENGINE                        │
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
-│  computeImpactV4(stats, craftScore?)                     │
-│  └→ ImpactV4Result                                       │
+│  computeImpactV6(stats, craftScore?)                     │
+│  └→ ImpactV6Result                                       │
 │     ├→ Dimensions: delivery, quality, consistency,       │
 │     │   breadth, [craft]                                 │
 │     ├→ Composite score, adjusted score                   │
@@ -634,7 +634,7 @@ The x-axis must remain temporal (left = older, right = recent). The architectura
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
 │  MetaphorMapping (parameterized)                         │
-│  ├→ Surface: ImpactV4Result → visual properties          │
+│  ├→ Surface: ImpactV6Result → visual properties          │
 │  ├→ Depth: MetricsSnapshot[] → foundation properties     │
 │  └→ Archetype config selects the mapping instance        │
 │                                                          │
