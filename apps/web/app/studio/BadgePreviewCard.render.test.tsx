@@ -21,7 +21,7 @@ Object.defineProperty(window, "matchMedia", {
 // ---------- Module mocks ----------
 
 vi.mock("next/dynamic", () => ({
-  default: (loader: () => Promise<{ default: React.ComponentType }>, opts?: { loading?: () => React.ReactNode }) => {
+  default: (_loader: () => Promise<{ default: React.ComponentType }>, opts?: { loading?: () => React.ReactNode }) => {
     // Return the loading component wrapper — dynamic imports are not resolved in test
     const MockComponent = (props: Record<string, unknown>) => {
       if (opts?.loading) {
