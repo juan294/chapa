@@ -47,12 +47,16 @@ describe("verifyAdminSecret", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
-  it("returns null when ADMIN_SECRET env var is not set", () => {
+  it("returns 503 when ADMIN_SECRET env var is not set (fail-secure)", async () => {
     vi.stubEnv("ADMIN_SECRET", "");
     const request = new NextRequest("http://localhost/api/admin/stats");
 
     const result = verifyAdminSecret(request);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(503);
+
+    const body = await result!.json();
+    expect(body.error).toBeTruthy();
   });
 
   it("trims whitespace from ADMIN_SECRET", () => {
