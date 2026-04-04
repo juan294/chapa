@@ -66,6 +66,25 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     type: "loading" | "success" | "error" | "info";
   } | null>(null);
 
+  // Insights cooldown — read last-submitted timestamp from localStorage on mount
+  const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
+  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(null);
+  useEffect(() => {
+    const stored = localStorage.getItem(insightsStorageKey);
+    if (stored) {
+      const date = new Date(stored);
+      if (!isNaN(date.getTime())) setInsightsLastSubmitted(date);
+    }
+  }, [insightsStorageKey]);
+  const insightsCooldownActive =
+    insightsLastSubmitted !== null &&
+    Date.now() - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
+  const insightsTooltip =
+    insightsCooldownActive && insightsLastSubmitted
+      ? `Available again on ${new Date(insightsLastSubmitted.getTime() + INSIGHTS_COOLDOWN_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+      : undefined;
+
   async function handleInsightsFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -99,6 +118,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         uploadRes.json(),
         fetch("/api/recalculate", { method: "POST" }),
       ]);
+
+      const now = new Date();
+      localStorage.setItem(insightsStorageKey, now.toISOString());
+      setInsightsLastSubmitted(now);
 
       if (recalcRes.ok) {
         const recalcData = await recalcRes.json();
@@ -314,8 +337,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               <button
                 type="button"
                 role="menuitem"
+                disabled={insightsCooldownActive}
+                title={insightsTooltip}
                 onClick={() => insightsFileRef.current?.click()}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${insightsCooldownActive ? "cursor-not-allowed opacity-50 text-text-secondary" : "text-text-primary hover:bg-amber/[0.06]"}`}
               >
                 <svg
                   className="h-4 w-4 text-text-secondary"

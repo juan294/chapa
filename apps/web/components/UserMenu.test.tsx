@@ -1344,6 +1344,7 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
     fetchSpy.mockRestore();
     clearPlatformStatusCache();
     vi.useRealTimers();
+    localStorage.clear();
   });
 
   it("shows error toast for oversized files", async () => {
@@ -1453,6 +1454,132 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
       expect(toast.textContent).toContain("Craft");
       expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Insights cooldown (runtime)
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — insights cooldown (runtime)", () => {
+  const INSIGHTS_KEY = "chapa_insights_last_submitted_testuser";
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it("button is enabled when no prior upload exists", () => {
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn?.disabled).toBe(false);
+  });
+
+  it("button is disabled when last upload was less than 14 days ago", () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem(INSIGHTS_KEY, sevenDaysAgo);
+
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn?.disabled).toBe(true);
+  });
+
+  it("button is enabled when last upload was exactly 14 days ago", () => {
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem(INSIGHTS_KEY, fourteenDaysAgo);
+
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn?.disabled).toBe(false);
+  });
+
+  it("button is enabled when last upload was more than 14 days ago", () => {
+    const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem(INSIGHTS_KEY, fifteenDaysAgo);
+
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn?.disabled).toBe(false);
+  });
+
+  it("disabled button has a tooltip with the available date", () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem(INSIGHTS_KEY, sevenDaysAgo);
+
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn?.title).toContain("Available again on");
+  });
+
+  it("enabled button has no tooltip", () => {
+    render(<UserMenu {...baseProps} />);
+    const btn = screen.getByText("Import Claude Code Insights").closest("button");
+    expect(btn?.title ?? "").toBe("");
+  });
+
+  it("saves timestamp to localStorage after successful upload", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "High" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 85, craftScore: 72, craftTier: "High" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { ...window.location, reload: vi.fn() },
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      expect(localStorage.getItem(INSIGHTS_KEY)).not.toBeNull();
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it("does not save timestamp to localStorage when upload fails", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
+
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("error");
+    });
+
+    expect(localStorage.getItem(INSIGHTS_KEY)).toBeNull();
+    fetchSpy.mockRestore();
   });
 });
 
