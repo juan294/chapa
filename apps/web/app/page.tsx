@@ -57,6 +57,7 @@ const DIMENSIONS = [
   { title: "QUALITY", description: "Engineering discipline \u2014 code reviews on teams, PR hygiene and structured workflow when solo." },
   { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
   { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
+  { title: "CRAFT", description: "AI tool mastery (optional) \u2014 how effectively you use tools like Claude Code to ship better work." },
 ];
 
 const STATS = [
