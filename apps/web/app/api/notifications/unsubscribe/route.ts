@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { dbUpdateEmailNotifications, dbGetUserEmail } from "@/lib/db/users";
-import { escapeHtml } from "@/lib/email/resend";
+import { escapeHtml } from "@/lib/utils/escape";
 import { markUnsubscribed } from "@/lib/email/audience";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
