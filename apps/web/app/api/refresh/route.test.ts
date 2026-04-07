@@ -59,6 +59,14 @@ vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: vi.fn(),
 }));
 
+vi.mock("@/lib/db/tool-insights", () => ({
+  dbRecomputeCraft: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/cache/craft-cache", () => ({
+  updateCraftCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
@@ -71,6 +79,8 @@ import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { revalidatePath } from "next/cache";
+import { dbRecomputeCraft } from "@/lib/db/tool-insights";
+import { updateCraftCache } from "@/lib/cache/craft-cache";
 
 const SESSION = {
   token: "tok",
@@ -444,6 +454,58 @@ describe("POST /api/refresh", () => {
       const res = await POST(makeRequest("testuser"));
       expect(res.status).toBe(502);
       expect(revalidatePath).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("craft recompute path", () => {
+    const validStats = {
+      handle: "testuser",
+      commitsTotal: 10,
+      activeDays: 5,
+      prsMergedCount: 1,
+      prsMergedWeight: 2,
+      reviewsSubmittedCount: 3,
+      issuesClosedCount: 1,
+      linesAdded: 100,
+      linesDeleted: 50,
+      reposContributed: 1,
+      topRepoShare: 1,
+      maxCommitsIn10Min: 1,
+      totalStars: 0,
+      totalForks: 0,
+      totalWatchers: 0,
+      heatmapData: [],
+      fetchedAt: new Date().toISOString(),
+    };
+
+    it("calls updateCraftCache when craft result is non-null", async () => {
+      const craftResult = { craftScore: 72, tier: "Expert" };
+      vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+      vi.mocked(getStats).mockResolvedValue(validStats);
+      vi.mocked(dbRecomputeCraft).mockResolvedValue(
+        craftResult as Parameters<typeof updateCraftCache>[1],
+      );
+
+      const res = await POST(makeRequest("testuser"));
+      expect(res.status).toBe(200);
+
+      // Give the fire-and-forget time to execute
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(updateCraftCache).toHaveBeenCalledWith("testuser", craftResult);
+    });
+
+    it("does not call updateCraftCache when craft result is null", async () => {
+      vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+      vi.mocked(getStats).mockResolvedValue(validStats);
+      vi.mocked(dbRecomputeCraft).mockResolvedValue(null);
+
+      const res = await POST(makeRequest("testuser"));
+      expect(res.status).toBe(200);
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(updateCraftCache).not.toHaveBeenCalled();
     });
   });
 });
