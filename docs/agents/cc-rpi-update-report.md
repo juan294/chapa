@@ -1,3 +1,11 @@
-No changes in cc-rpi since last sync. The HEAD commit is still `75f28d1d844716b8db60b4e14a33fba171a4e59d` and version is `v1.14.3`.
+<!-- ENTRY:START agent=cc-rpi-update timestamp=2026-04-07T03:21:00Z -->
+## cc-rpi Update — 2026-04-07
+- **Status**: GREEN
+- Synced to blueprint v1.14.4 (commit `a024b008`)
+- One commit since last sync: `feat: add drawio diagram generation skill`
+- `drawio` skill already present in project — no file changes needed
+- Only sync metadata updated (`lastSyncCommit`, `lastSyncDate`)
 
-cc-rpi sync: already up to date as of v1.14.3.
+**Cross-agent recommendations:**
+- No cross-agent actions needed — this was a metadata-only sync
+<!-- ENTRY:END -->
