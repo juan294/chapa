@@ -275,4 +275,44 @@ describe("POST /api/recalculate", () => {
       undefined,
     );
   });
+
+  describe("craft cache update path", () => {
+    it("calls updateCraftCache when craft result is non-null", async () => {
+      const craftResult = { craftScore: 69, tier: "Expert" };
+      mockDbRecomputeCraft.mockResolvedValue(craftResult);
+
+      await POST(makeRequest());
+
+      // Give fire-and-forget time to execute
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockUpdateCraftCache).toHaveBeenCalledWith("testuser", craftResult);
+    });
+
+    it("does not call updateCraftCache when craft result is null", async () => {
+      mockDbRecomputeCraft.mockResolvedValue(null);
+
+      await POST(makeRequest());
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockUpdateCraftCache).not.toHaveBeenCalled();
+    });
+
+    it("handles updateCraftCache rejection gracefully via .catch()", async () => {
+      const craftResult = { craftScore: 69, tier: "Expert" };
+      mockDbRecomputeCraft.mockResolvedValue(craftResult);
+      mockUpdateCraftCache.mockRejectedValue(new Error("Redis down"));
+
+      const resp = await POST(makeRequest());
+
+      // Flush microtasks so .catch() runs
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Route still succeeds despite cache failure
+      expect(resp.status).toBe(200);
+      const body = await resp.json();
+      expect(body.success).toBe(true);
+    });
+  });
 });

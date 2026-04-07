@@ -58,7 +58,12 @@ vi.mock("./supabase", () => ({
   getSupabase: mockGetSupabase,
 }));
 
-import { dbUpsertToolInsights, dbGetToolInsights } from "./tool-insights";
+vi.mock("@/lib/insights/scoring", () => ({
+  computeCraftScore: vi.fn(),
+}));
+
+import { dbUpsertToolInsights, dbGetToolInsights, dbRecomputeCraft } from "./tool-insights";
+import { computeCraftScore } from "@/lib/insights/scoring";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -433,5 +438,101 @@ describe("dbGetToolInsights", () => {
       reportPeriod: { start: "2024-06-01", end: "2024-09-01" },
       computedAt: "2024-09-01T00:00:00Z",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — dbRecomputeCraft
+// ---------------------------------------------------------------------------
+
+/** Create a simple chain that always resolves to `result`. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeChain(result: { data: unknown; error: unknown }): any {
+  const chain: Record<string, unknown> = {};
+  chain.select = () => chain;
+  chain.upsert = () => chain;
+  chain.eq = () => chain;
+  chain.limit = () => chain;
+  chain.single = () => chain;
+  chain.then = (resolve: (v: unknown) => void) => resolve(result);
+  return chain;
+}
+
+describe("dbRecomputeCraft", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    terminalResolve = { data: null, error: null };
+  });
+
+  it("returns null when Supabase is unavailable", async () => {
+    mockGetSupabase.mockReturnValue(null);
+    const result = await dbRecomputeCraft("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("returns null on PGRST116 (no insights uploaded)", async () => {
+    terminalResolve = {
+      data: null,
+      error: { code: "PGRST116", message: "The result contains 0 rows" },
+    };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbRecomputeCraft("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("returns null on non-PGRST116 DB error (fail-open)", async () => {
+    terminalResolve = {
+      data: null,
+      error: { code: "42501", message: "permission denied" },
+      throwOnError: true,
+    };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbRecomputeCraft("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when raw_data is missing from the row", async () => {
+    terminalResolve = { data: { raw_data: undefined }, error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    const result = await dbRecomputeCraft("testuser");
+    expect(result).toBeNull();
+  });
+
+  it("recomputes craft from stored raw data and delegates to dbUpsertToolInsights", async () => {
+    // Two sequential DB calls: select raw_data, then upsert updated scores
+    const selectChain = makeChain({ data: { raw_data: validUpload }, error: null });
+    const upsertChain = makeChain({ data: validRow, error: null });
+    const mockFromFn = vi.fn()
+      .mockImplementationOnce(() => selectChain)
+      .mockImplementationOnce(() => upsertChain);
+    mockGetSupabase.mockReturnValue({ from: mockFromFn });
+    vi.mocked(computeCraftScore).mockReturnValue(validScores);
+
+    const result = await dbRecomputeCraft("testuser");
+
+    expect(computeCraftScore).toHaveBeenCalledWith(validUpload);
+    expect(result).toEqual({
+      tool: "claude-code",
+      dimensions: { proficiency: 72, effectiveness: 65, sophistication: 58 },
+      craftScore: 65,
+      tier: "Practitioner",
+      reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
+      computedAt: "2025-03-01T12:00:00Z",
+    });
+  });
+
+  it("lowercases handle when querying DB", async () => {
+    terminalResolve = {
+      data: null,
+      error: { code: "PGRST116", message: "0 rows" },
+    };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbRecomputeCraft("TestUser");
+
+    expect(mockEq).toHaveBeenCalledWith("handle", "testuser");
   });
 });
