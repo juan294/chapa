@@ -9,45 +9,29 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-04T03:00:00Z -->
-## Cost Analyst — 2026-04-04
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-07T03:00:00Z -->
+## Cost Analyst — 2026-04-07
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$15–70**. Unchanged.
-- Redis: **21 key pattern families** (most complete audit to date). TTL 100% per-user keys. 4 no-TTL singletons — all intentional/memory-bounded (HyperLogLog ~12 KB, cron offset 1 key, supplemental cleanup added 2026-04-03 ✅).
-- Redis storage estimate: **~920 MB–1.6 GB @10K users**. OG images still #1 consumer (520 MB–1.3 GB). Upstash Pro 10 GB — 84–91% headroom.
+- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
+- Redis: **24 key pattern families** (confirmed; `craft:{handle}`, `ratelimit:recalculate`, `ratelimit:cli-approve` counted). TTL 100% on per-user keys. 2 no-TTL singletons (HyperLogLog + badge counter) + 1 intentional TTL=0 cron cursor. All memory-bounded.
+- Redis storage estimate: **~1.52 GB @10K users**. OG images #1 consumer (~1.3 GB / 81%). Upstash Pro 10 GB — **85% headroom**.
 - GitHub API: all cache-first (6h + 7d stale fallback), in-flight dedup, ~50–150 calls/hr baseline vs 5,000/hr limit.
-- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. Batched cleanup in all 3 cleanup jobs (1,000 rows/run). `dbGetCampaignStats()` uses client-side aggregation (PostgREST limitation) — P2 at scale.
-- All fetches: 100% timeout coverage. 0 resource leaks. All singleton SDK clients.
-- **P1s: NONE** — all prior P1s resolved (refresh rate 5/hr ✅, supplemental cleanup ✅).
-- **P2**: `dbGetCampaignStats()` client-side aggregation — move to Supabase RPC at scale.
-- **MONITOR: OG image Redis memory** — CARRIED (~1.6 GB worst case at 10K). CDN bounds cost.
+- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbRecomputeCraft()` adds +2 DB ops + 1 Redis write per refresh/recalculate — bounded, negligible cost.
+- Fetch timeouts: GitHub/Codeberg auth flows (4 calls) lack AbortSignal — LOW risk (rare auth events, Vercel 300s backstop).
+- Resource leaks: 0.
+- **P1s: NONE**.
+- **P2-1**: `dbGetCampaignStats()` client-side aggregation — CARRIED. Move to RPC at >5K sends/campaign.
+- **P2-2**: `dbRecomputeCraft()` 0 test cases — CARRIED (3rd cycle). Silent failure in craft paths unverified.
+- **P2-3 NEW**: Warm-cache cron timeout risk — 50 handles × ~10s = 500s vs Vercel Pro 300s limit. Add `WARM_CACHE_MAX_HANDLES` ceiling of 25 or split into two windows.
+- **MONITOR: OG image Redis memory** — CARRIED. CDN bounds cost.
 - **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
+- **MONITOR: HyperLogLog** — CARRIED. ~12KB, track quarterly.
 
 **Cross-agent recommendations:**
-- [Security]: No new concerns. Fail-open rate limiting intact. All routes at 5/hr refresh limit correctly.
-- [QA]: No open P1s. P2: `dbGetCampaignStats()` aggregation is the only new finding.
-- [Performance]: Bundle stable at 1,663 KB. OG image storage monitor carried — CDN `s-maxage=21600` bounds generation invocations.
-- [Coverage]: `app/api` at ~97% — no cost-critical uncovered routes.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-03T03:00:00Z -->
-## Cost Analyst — 2026-04-03
-- **Status**: YELLOW
-- Estimated monthly cost at 10K users: **~$15–70**. Unchanged.
-- Redis: 10 key patterns audited. TTL 100% per-user. 3 intentional no-TTL singletons (HyperLogLog counters, cron offset). OG image storage ~1.3 GB at 10K (~133 KB/key base64 encoded, 48h TTL). Upstash Pro 10 GB — 87% headroom.
-- `supplemental:*` keys: confirmed **not cleaned up** on Bitbucket/Codeberg OAuth disconnect (`platform-oauth.ts` `createDisconnectHandler()` clears merged+platform stats but not supplemental). Orphaned silently. P3.
-- GitHub API: all callers cache-first (6h). Cron warm-cache: 50 calls/run, ~50/day. In-flight dedup map prevents thundering herd. Stale 7d fallback protects availability. Budget well within 5K/hr.
-- **P1 CARRIED: Refresh rate limit comment/code mismatch** — `app/api/refresh/route.ts:47` comment says 5/hr, code enforces `15`. Revert to `5` before next release.
-- Fetch timeout coverage: 100%. Resource leaks: 0. Supabase lazy singleton. 0 N+1s.
-- Turbopack NFT warning (cosmetic): `svg-to-png.ts:36-37` — `/*turbopackIgnore*/` resolves.
-- **MONITOR: OG image Redis memory** — CARRIED (~1.3 GB at 10K). CDN bounds cost.
-- **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
-
-**Cross-agent recommendations:**
-- [Security]: No new concerns. Rate limiting fail-open intact. Refresh 15/hr doesn't create security exposure but should be reverted for correctness.
-- [QA]: Only P1: refresh rate limit revert (`app/api/refresh/route.ts:47`, change `15` → `5`).
-- [Performance]: OG image memory monitor unchanged. Bundle at 1,663 KB stable.
-- [Coverage]: `app/api` at 97.6% — no cost-critical uncovered routes.
+- [Security]: GitHub/Codeberg OAuth calls (4) lack AbortSignal — P3 hygiene. Fail-open rate limiting intact. 5/hr refresh limit confirmed.
+- [QA]: P2-2 (`dbRecomputeCraft()` untested, 3rd cycle) is top actionable item. P2-3 warm-cache timeout should be verified by checking current handle count.
+- [Performance]: Bundle at 1,663 KB stable. OG image Redis monitor carried. Warm-cache cron timeout (P2-3) is also a performance concern.
+- [Coverage]: `app/api` at 97.5%, `lib/db` at 95.2%. `tool-insights.ts` is the only sub-80% file. P2-2 drives both coverage and cost risk.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-26T09:15:00Z -->
@@ -109,29 +93,27 @@
 - [Cost Analyst]: No doc gaps affecting cost model. All routes and env vars fully documented.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-03-30T10:00:00Z -->
-## Security Scanner — 2026-03-30
+<!-- ENTRY:START agent=security timestamp=2026-04-06T10:00:00Z -->
+## Security Scanner — 2026-04-06
 - **Status**: GREEN
 - Vulnerabilities: 0 critical, 0 high, 0 medium, 0 low — `pnpm audit` clean.
-- Secret leaks: none — all 10+ server secrets isolated, `NEXT_PUBLIC_*` vars non-sensitive. Error logging scrubs tokens via regex before PostHog.
-- License issues: 1 LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`) — dynamically linked, no compliance action needed.
-- Knip: **0 findings** — fully clean.
-- XSS: 9 user-input entry points in SVG pipeline escaped via `escapeXml()` (handle, displayName, archetype, tier, avatarDataUri, fallback handle, fallback error, verification hash, verification date). Explicit XSS tests at `BadgeSvg.test.tsx:59-65`. 18 `dangerouslySetInnerHTML` uses — all safe (hardcoded demo SVG).
-- CORS: **2 routes** with wildcard `*` — `/api/verify/[hash]` (30 req/60s) + `/api/profile/[handle]` (60 req/60s, **NEW**). Both read-only, public data, rate-limited. CSP properly configured in `next.config.ts`. Global headers: HSTS (2yr+preload), nosniff, X-XSS-Protection, restrictive Permissions-Policy.
-- RLS: **all 9 Supabase tables** RLS-enabled + FORCE ROW LEVEL SECURITY + explicit deny policies. 2 views with `security_invoker = true`.
-- Hardcoded secrets: none found in source. All env vars `.trim()`ed.
-- OAuth: CSRF state validation via `timingSafeEqual()`, AES-256-GCM token encryption (fresh IV per encryption), 10s fetch timeouts. CLI tokens HMAC-SHA256 signed with 90-day expiry.
+- Secret leaks: none — all server secrets isolated, `NEXT_PUBLIC_*` vars non-sensitive. Error logging scrubs tokens via `SENSITIVE_PATTERNS` regex (9 patterns) in `lib/analytics/server-errors.ts`.
+- License issues: 1 MPL-2.0 (`@resvg/resvg-js@2.6.2`) — file-level weak copyleft, no source modifications, no compliance action needed. No GPL/AGPL found.
+- Knip `--production`: **8 false positives** — all flagged packages confirmed in use (grep verified). `vitest.setup.ts` is in `vitest.config.ts:12 setupFiles`. False positives due to `--production` excluding non-entry files.
+- XSS: **9 user-input entry points** in SVG pipeline escaped via `escapeXml()`. Explicit XSS tests at `BadgeSvg.test.tsx:59-65`. 18 `dangerouslySetInnerHTML` uses — all safe (hardcoded demo SVG).
+- CORS: **2 routes** with wildcard `*` — `/api/verify/[hash]` (30 req/60s) + `/api/profile/[handle]` (60 req/60s). Both read-only, public data, rate-limited. Intentional design.
+- RLS: **all 10 Supabase tables** RLS-enabled + FORCE ROW LEVEL SECURITY + explicit deny policies. 2 views with `security_invoker = true`.
+- OAuth: CSRF state via `timingSafeEqual()`, AES-256-GCM token encryption (fresh IV per call), 10s timeouts. CLI tokens HMAC-SHA256 signed with 90-day expiry.
 - Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`.
-- Rate limiting: **31/44 routes** (70%, up from 14+). Remaining 13 use admin auth, bearer token, or internal. All fail-open. Campaign email: 95/day quota, batch 50, Redis counter.
-- Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure` (HTTPS), 10-minute `Max-Age`.
-- Avatar URL: whitelist validation (only `avatars.githubusercontent.com`) + content-type checks.
+- Rate limiting: **31/44 routes** (70%). Remaining 13 use admin/bearer token auth or are internal. All fail-open.
+- Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`.
+- **INFO**: `dbRecomputeCraft()` (`lib/db/tool-insights.ts:149-180`) has 0 test cases — error path behavior in refresh/recalculate routes is unverified. Not a vuln, but a security-adjacent P2.
 
 **Cross-agent recommendations:**
-- [Coverage]: All security-critical paths at 96%+. XSS tests comprehensive. HMAC verification at 100%. No new security-coverage gaps.
-- [QA]: No security UX issues. New `/api/profile/[handle]` CORS endpoint is rate-limited and read-only. Promise patterns correct.
-- [Cost Analyst]: Fail-open rate limiting intact. Fetch timeouts at 100%. Campaign email quota prevents abuse. Resend SDK timeout gaps LOW risk (fire-and-forget/admin-gated).
-- [Performance]: No security-related performance concerns. Knip fully clean (0 findings). Rate limiting fail-open by design. CSP properly scoped.
-- [Documentation]: No security-documentation gaps. Undocumented SVIX_*/ICEBERG_TOKEN confirmed as false positives by triage (2026-03-28).
+- [Coverage]: Add `describe("dbRecomputeCraft")` tests — the error path from refresh/recalculate is unverified. This is a P2 security-adjacent gap.
+- [QA]: No new security UX issues. All XSS vectors covered, all interactive elements accessible. Knip `--production` false positives should not trigger package removals.
+- [Cost Analyst]: Fail-open rate limiting intact. Fetch timeouts at 100%. No new cost-security conflicts.
+- [Performance]: Knip `--production` false positives — do not remove flagged packages; they are all actively used.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-04-01T09:00:00Z -->
@@ -151,23 +133,24 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-04T02:00:00Z -->
-## Coverage Agent — 2026-04-04
+<!-- ENTRY:START agent=coverage timestamp=2026-04-07T03:00:00Z -->
+## Coverage Agent — 2026-04-07
 - **Status**: GREEN
-- Overall coverage: **93.12% stmts** (7,546/8,103), 89.78% branch, 90.04% funcs, 94.29% lines
-- Test suite: 388 files, 6,915 tests, 100% pass rate (runs 1–2); 1 intermittent failure in run 3
-- Delta vs 2026-04-03: +0.13pp stmts, +0.13pp branch, **+0.46pp funcs**, +0.10pp lines; +32 tests
-- **AdminDashboardClient.tsx P1 CONFIRMED RESOLVED** — 100% across all metrics ✅ (was 68.42% funcs, open 4 cycles)
-- **verify/[hash]/page.tsx CONFIRMED RESOLVED** — 100% all metrics ✅
-- All critical paths GREEN: `lib/impact` 100%, `lib/render` 100%, `packages/shared` 100%, `lib/cache` 99.2%, `lib/history` 98.2%, `lib/auth` 98.1%, `lib/email` 97.8%, `lib/db` 97.7%, `app/api` ~97%, `lib/github` 96.8%, `components` 93.8%
-- P2 gaps: `AuthorTypewriter.tsx` branch 67.5%, `BadgeOverlay.tsx` branch 78.57%, `svg-to-png.ts` branch 66.66%, `lib/insights/parser.ts` branch 83.5%, `UserMenu.tsx` funcs 78.57%
-- **Flaky test (new)**: `BadgeToolbar.render.test.tsx > download strips SVG animations` — fails intermittently in full-suite runs (1/3), passes 5/5 in isolation. Cause: `queueMicrotask` timing race under suite concurrency. Risk: LOW.
+- Overall coverage: **92.99% stmts** (7,568/8,138), 89.68% branch, 89.94% funcs, 94.17% lines
+- Test suite: 389 files, 6,955 tests, 100% pass rate on 4/5 runs; 1 infrastructure flake (coverage/.tmp race)
+- Delta vs 2026-04-06: **0pp all metrics** — no new code, no new tests this cycle. Coverage plateau-stable.
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98%, lib/email 97.9%, app/api 97.5%, lib/db 95.2%, lib/github 97.5%, components 95.9%
+- **P1 CARRIED**: `lib/db/tool-insights.ts::dbRecomputeCraft` (lines 149–180) — 0 test cases, 72.7% stmts, 3rd cycle without fix
+- **P1 CARRIED**: `app/api/recalculate/route.ts` — 50% funcs (fire-and-forget .catch arrow uncovered)
+- **P1 CARRIED**: `app/api/refresh/route.ts` — 75% funcs (craft dbRecomputeCraft path not mocked)
+- **Flaky RESOLVED**: BadgeToolbar download strip — 0/4 failures this cycle (was 2/4). Monitoring one more cycle.
+- **Infra flake NEW**: coverage/.tmp race condition causes occasional full-suite failure — workaround: `mkdir -p coverage/.tmp` before run.
 
 **Cross-agent recommendations:**
-- [Security]: No new security-coverage gaps. All security-critical paths at 96%+. `UserMenu.tsx` funcs at 78.57% covers OAuth disconnect flows — worth completing.
-- [QA]: No open P1s. P2: `AuthorTypewriter.tsx` branch 67.5% is the top actionable gap. Flaky `BadgeToolbar` test needs `queueMicrotask` → `waitFor()` fix.
-- [Cost Analyst]: `app/api` at ~97% — no cost-critical routes uncovered.
-- [Performance]: `app/experiments` accepted (WebGL). `svg-to-png.ts` branch 66.66% covers a turbopackIgnore path only — no performance impact.
+- [Security]: dbRecomputeCraft error paths remain untested — silent failure risk in craft refresh/recalculate. P2 security-adjacent, unchanged from last cycle.
+- [QA]: 3 P1s all stem from v2.7.x craft-recompute shipping without tests. Top priority: tool-insights.test.ts dbRecomputeCraft describe block.
+- [Cost Analyst]: app/api at 97.5%, lib/db at 95.2%. Only tool-insights.ts below 80%. No new cost-critical coverage gaps.
+- [Performance]: No performance-coverage gaps. Flaky BadgeToolbar monitor: if returns, apply waitFor() fix.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->
@@ -183,6 +166,20 @@
 - [Cost Analyst]: Refresh rate limit now correctly 5/hr. Supplemental key cleanup added — P3 orphan risk resolved.
 - [QA]: All previous P1 items resolved. No open P1s remain.
 - [Performance]: turbopackIgnore comments added to svg-to-png.ts — NFT warning should be resolved in next build.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-04-07T08:00:00Z -->
+## Triage — 2026-04-07
+- **Reports processed**: 10 (cc-rpi-update, coverage, security, cost-analyst, pre-launch, remediation, performance, documentation, qa, update-docs)
+- **Action items resolved**: 7 of 7 — all P1+P2 coverage gaps addressed
+- **Summary**: Closed 3 coverage P1s from v2.7.x craft-recompute shipping without tests. Added `dbRecomputeCraft()` unit tests (6 cases), craft path mocks to refresh+recalculate routes (5 tests), new BadgeOverlay.test.tsx (16 tests), and AdminUserTable render tests (17 tests). Tests: 7000 (+45 vs 6955), 0 type errors, 0 lint issues.
+- **Coverage delta**: `lib/db/tool-insights.ts` 72.72%→~99%+, `app/api/refresh` funcs 75%→100%, `app/api/recalculate` funcs 50%→100%, `components/BadgeOverlay` branches ~75%→~95%+, `app/admin/AdminUserTable` branches ~76%→~90%+
+
+**Cross-agent recommendations:**
+- [Coverage]: All 3 craft-recompute P1s resolved. Remaining P2: AuthorTypewriter branches 67.5% (JSDOM timing limit — accepted), UserMenu funcs 79.31% (handleInsightsFile complex — low priority). BadgeToolbar flaky test resolved — monitor one more cycle then close.
+- [Security]: `dbRecomputeCraft` error paths are now tested — graceful degradation confirmed. Craft refresh/recalculate routes verified.
+- [Cost Analyst]: `dbRecomputeCraft` P2-2 resolved — function now has full test coverage including error paths.
+- [QA]: No open P1s. Test suite at 7000 tests. All critical paths remain 95%+.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-28T06:00:00Z -->
@@ -216,6 +213,30 @@
 - [Security]: All Resend SDK calls now have timeout protection. Fetch timeout coverage at 100% including SDK calls.
 - [Performance]: No performance concerns. ISR optimization applied.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-06T03:00:00Z -->
+## Cost Analyst — 2026-04-06
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$65–70/mo**. Unchanged.
+- Redis: **21 key pattern families** (unchanged). NEW: `craft:{handle}` (1h TTL) added by v2.7.x — ~20 MB max at 10K users, negligible. TTL 100% on per-user keys. 2 no-TTL singletons (HyperLogLog + badge counter), both memory-bounded.
+- Redis storage estimate: **~1.52 GB @10K users**. OG images #1 consumer (~1.3 GB / 81%). Upstash Pro 10 GB — **85% headroom**.
+- GitHub API: all cache-first (6h + 7d stale fallback), in-flight dedup, ~50–150 calls/hr baseline vs 5,000/hr limit.
+- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbRecomputeCraft()` (v2.7.x) adds single UPDATE + Redis write — bounded, no cost risk, but **currently untested**.
+- Fetch timeouts: 100% via `AbortSignal.timeout()` or AbortController (Bitbucket). 1 intentional fire-and-forget (PostHog error capture). Bitbucket setTimeout not `clearTimeout()`d on success — hygiene issue only, LOW.
+- **P1s: NONE**.
+- **P2-1**: `dbGetCampaignStats()` client-side aggregation — CARRIED. Move to RPC at >5K sends/campaign.
+- **P2-2**: `dbRecomputeCraft()` 0 test cases — Coverage P1. Silent failure risk in craft refresh paths.
+- **MONITOR: OG image Redis memory** — CARRIED (~1.3 GB @10K). CDN `s-maxage=21600` bounds generation.
+- **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
+- **MONITOR: HyperLogLog** — CARRIED. ~12KB, sublinear growth.
+
+**Cross-agent recommendations:**
+- [Security]: No new concerns. Fail-open rate limiting intact. 5/hr refresh limit confirmed.
+- [QA]: P2-2 (`dbRecomputeCraft()` untested) is the top actionable item. Craft DB error behavior unverified.
+- [Performance]: Bundle at 1,663 KB. OG image Redis monitor carried. No new cost-performance conflicts.
+- [Coverage]: `app/api` at 97.5%, `lib/db` at 95.8%. `tool-insights.ts` is the only sub-80% file and drives the P2-2 risk.
+<!-- ENTRY:END -->
+
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-04-01T07:05:42Z -->
 ## QA Agent — 2026-04-01

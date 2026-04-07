@@ -1,107 +1,96 @@
 # Coverage Report
-> Generated: 2026-04-04 | Health status: green
+> Generated: 2026-04-07 | Branch: `develop` | Health status: green
 
 ## Executive Summary
 
-All critical paths remain GREEN with overall statements at 93.12% (+0.13pp) and functions at 90.04% (+0.46pp). The long-standing P1 — `AdminDashboardClient.tsx` functions at 68.42% — is **confirmed resolved** at 100% across all metrics this cycle. One intermittent flaky test detected in full-suite runs only (passes in isolation).
-
----
+Test suite passes at 92.99% statement coverage (6,955 tests, 389 files). Coverage is plateau-stable — zero delta vs the 2026-04-06 cycle. One critical gap remains open: `lib/db/tool-insights.ts::dbRecomputeCraft` at 72.7% stmts, carried from v2.7.x with no fix yet applied.
 
 ## Coverage by Module
 
-| Module | Stmts | Branch | Funcs | Lines | Status |
-|--------|-------|--------|-------|-------|--------|
-| **Overall** | **93.12%** | **89.78%** | **90.04%** | **94.29%** | 🟢 |
-| `lib/impact` | 100% | 98.5% | 100% | 100% | 🟢 |
-| `lib/render` | 100% | 92.68% | 100% | 100% | 🟢 |
-| `lib/cache` | 99.18% | 97.91% | 95.83% | 100% | 🟢 |
-| `lib/history` | 98.23% | 96.47% | 100% | 99% | 🟢 |
-| `lib/auth` | 98.06% | 96.39% | 100% | 99.17% | 🟢 |
-| `lib/email` | 97.75% | 96.29% | 100% | 97.93% | 🟢 |
-| `lib/db` | 97.69% | 95.36% | 100% | 100% | 🟢 |
-| `app/api` | ~97% | ~93% | ~99% | ~97% | 🟢 |
-| `lib/github` | 96.79% | 91.94% | 96.15% | 97.54% | 🟢 |
-| `lib/insights` | 100% | 92.64% | 100% | 100% | 🟢 |
-| `app/admin` | 93.78% | 86.87% | 98.38% | 94.83% | 🟢 |
-| `components` | 93.79% | 90.16% | 88.94% | 97.31% | 🟢 |
-| `packages/shared` | 100% | 100% | 100% | 100% | 🟢 |
-| `app/experiments` | ~65% | ~58% | ~55% | ~70% | 🔴 (accepted) |
+| Module | Stmts | Branches | Funcs | Status |
+|--------|-------|----------|-------|--------|
+| `lib/impact` | 100% | 98% | 100% | GREEN |
+| `lib/render` | 100% | 94% | 100% | GREEN |
+| `packages/shared` | 100% | 100% | 100% | GREEN |
+| `lib/cache` | 99.2% | 97.9% | 95.8% | GREEN |
+| `lib/email` | 97.9% | 96.7% | 100% | GREEN |
+| `lib/history` | 98.2% | 96.5% | 100% | GREEN |
+| `lib/auth` | 98.0% | 97.6% | 100% | GREEN |
+| `app/api` | 97.5% | 95.3% | 96.2% | GREEN |
+| `lib/github` | 97.5% | 93.6% | 97.4% | GREEN |
+| `lib/insights` | 100% | 92.6% | 100% | GREEN |
+| `components` | 95.9% | 90.1% | 93.9% | GREEN |
+| `lib/effects` | 94.6% | 90.8% | 94.7% | GREEN |
+| `app/other` | 94.2% | 91.0% | 93.6% | GREEN |
+| `lib/db` | 95.2% | 93.4% | 98.4% | GREEN\* |
+| `lib/other` | 89.3% | 86.4% | 87.2% | YELLOW |
+| `app/experiments` | 56.1% | 51.2% | 52.6% | RED (accepted) |
 
----
+\* `lib/db` aggregate is GREEN but contains one outlier file below threshold (see Gaps).
 
-## Delta vs Previous Cycle (2026-04-03)
-
-| Metric | 2026-04-03 | 2026-04-04 | Delta |
-|--------|-----------|-----------|-------|
-| Statements | 92.99% | 93.12% | +0.13pp |
-| Branches | 89.65% | 89.78% | +0.13pp |
-| Functions | 89.58% | 90.04% | **+0.46pp** |
-| Lines | 94.19% | 94.29% | +0.10pp |
-| Test count | 6,883 | 6,915 | +32 |
-| Test files | 386 | 388 | +2 |
-
-**Resolved this cycle:**
-- `AdminDashboardClient.tsx` funcs: 68.42% → **100%** ✅ (P1, open 4 cycles)
-- `app/verify/[hash]/page.tsx` branches: 75% → **100%** ✅
-- `ConfirmDialog.tsx` branches: 75% → 93.75% ✅ (dead `else if` removed)
-
----
+**Overall:** 92.99% stmts (7,568/8,138) · 89.68% branches (4,200/4,683) · 89.94% funcs (1,538/1,710) · 94.17% lines (6,902/7,329)
 
 ## Gaps & Recommendations
 
-### P2 — Should fix
+### P1 — Must Fix
 
-- **`AuthorTypewriter.tsx` branch 67.5%** (lines 106, 114, 126–143): Most significant branch gap remaining. Despite null guard removal in last triage cycle, animation/timeout branch paths are still uncovered. These drive the typewriter effect and error states.
+- **`apps/web/lib/db/tool-insights.ts`** — 72.7% stmts / 75% branches (12 uncovered statements)
+  - `dbRecomputeCraft` (lines 149–180) has **zero test cases**. Added in v2.7.x, carried 2 cycles.
+  - Error path at line 164 (`PGRST116` code) and the re-throw at line 165 are untested.
+  - Fix: add `describe("dbRecomputeCraft")` block in `tool-insights.test.ts` — test null-DB, PGRST116, generic error, and success paths.
 
-- **`BadgeOverlay.tsx` branch 78.57%** (lines 236–237, 311): 3 uncovered branches in the overlay's positioning / dismiss logic. Low risk as it's a tooltip overlay, but below 80% branch threshold.
+- **`apps/web/app/api/recalculate/route.ts`** — 100% stmts but 50% funcs
+  - The fire-and-forget `updateCraftCache(...).catch(() => {})` arrow at line 62 is never exercised.
+  - Fix: add a test with a non-null `craftResult` mock to exercise the `if (craftResult)` branch and confirm the `.catch` runs without throwing.
 
-- **`lib/render/svg-to-png.ts` branch 66.66%** (line 38): Single uncovered branch — the `turbopackIgnore` path for `path.join(process.cwd(), ...)`. The file is otherwise 100% covered; only the conditional font-path resolution branch is missed.
+- **`apps/web/app/api/refresh/route.ts`** — 97% stmts / 75% funcs
+  - `dbRecomputeCraft` / `updateCraftCache` calls at lines 67 and 83 are not mocked; the craft path is never exercised in tests.
+  - Fix: add 2 tests — one where `dbRecomputeCraft` returns a valid `CraftResult` and one where it returns null.
 
-- **`UserMenu.tsx` funcs 78.57%** (lines 259, 295–317, 415): 3 action handlers untested — likely the disconnect flows for Bitbucket/Codeberg and the profile-copy function. Worth covering given OAuth account management is security-adjacent.
+### P2 — Watch
 
-- **`lib/insights/parser.ts` branch 83.5%** (lines 158, 166, 185, 190): 4 uncovered branches in the AI insights parser. Parsing edge cases (malformed LLM responses) are the likely gap.
+- **`apps/web/components/AuthorTypewriter.tsx`** — branches 67.5% — early-return paths for empty/null author not fully covered.
+- **`apps/web/components/GlobalCommandBarLazy.tsx`** — 50% stmts — lazy-wrapper smoke test exists but rendering branch uncovered.
+- **`apps/web/lib/validation.ts`** — 73.3% stmts — several conditional branches around optional fields untested.
+- **`apps/web/lib/effects/interactions/HolographicOverlay.tsx`** — 47% stmts — WebGL/canvas; JSDOM limitation, accepted.
 
-### P3 — Low risk / accepted
+### Accepted Limitations (no action needed)
 
-- `app/admin/AdminDashboard.ts` branch 84.84% (lines 80–82, 118, 156) — orchestrator loading states
-- `components/dashboard/DimensionCard.tsx` branch 82.75% (lines 134–144, 154–158)
-- `Toast.tsx` stmts 85.71% (lines 140–141) — auto-dismiss edge case
-- `ThemeToggle.tsx` stmts 85.71% (line 19) — SSR hydration guard
-- `MobileNav.tsx` branch 89.28% (lines 38, 44, 64) — mobile-only interaction paths
-- `GlobalCommandBarLazy.tsx` stmts 50% — lazy wrapper, only the `ssr: false` module boundary matters
-- `ShareBadgePreviewLazy.tsx` stmts 40% — same pattern
-- `lib/impact/heatmap-evenness.ts` branch 87.5% (line 46) — edge-case boundary
-- `lib/render/demoData.ts` + `archetypeDemoData.ts` branch 50% — conditional demo path, no production path impact
-
-### Untested files (no .test.ts counterpart)
-
-These are all expected — no tests needed:
-
-| File | Reason |
-|------|--------|
-| `app/admin/agents-types.ts` | Type declarations only |
-| `app/api/auth/bitbucket/config.ts` | OAuth config constants |
-| `app/api/auth/codeberg/config.ts` | OAuth config constants |
-| `app/apple-icon.tsx`, `app/icon.tsx` | Next.js static asset generators |
-| `app/archetypes/*/page.tsx` (7 files) | Static content pages, no logic |
-| `app/studio/QuickControls.tsx` | UI component, no dedicated test |
-| `lib/*/types.ts` (bitbucket, codeberg, history, verification) | Type-only files |
-
-### Accepted limitations (permanent)
-
-- `app/experiments/**/page.tsx` (13 pages, 0–95%): WebGL/Canvas/complex animations. JSDOM cannot execute these. The `hexmap/page.tsx` (0%, 636 lines) is the largest single untested file.
-- `app/layout.tsx`: Next.js root layout — server component, no unit-testable logic
-- `packages/shared/index.ts`, `platforms.ts`: Re-export barrels
-
----
+- `app/experiments/*` — WebGL, Canvas, particle effects; JSDOM cannot exercise these (56.1% accepted).
+- `app/layout.tsx`, `app/apple-icon.tsx`, `app/icon.tsx` — Next.js server-only files; 0% by design.
+- `app/admin/page.tsx`, `app/studio/page.tsx` — Server pages, covered by integration tests only.
+- `components/ClientAnalytics.tsx` — PostHog browser-only init; 0% by design.
 
 ## Flaky Tests
 
-**1 intermittent flaky test detected:**
+One flaky run detected in 5 total (runs: 1 coverage + 4 no-coverage):
 
-- **File**: `apps/web/components/BadgeToolbar.render.test.tsx`
-- **Test**: `BadgeToolbar render > download strips SVG animations > strips @keyframes, animation properties, and SMIL animate elements`
-- **Behavior**: Failed in 1 of 3 full-suite runs (run 3). Passed 5/5 runs in isolation.
-- **Root cause**: Timing race — the test coordinates `fetch` mock + `Image` mock with `queueMicrotask` for microtask-level flush. In a full 388-file suite run, shared microtask queue congestion can cause the `onerror` callback to fire after the `act()` flush window.
-- **Risk**: LOW — only affects download-animation stripping in badge export, not correctness of the badge SVG itself. The logic is correct; the test coordination is fragile under suite-wide concurrency.
-- **Recommendation**: Replace `queueMicrotask` with a manual `Promise.resolve()` chain or use `waitFor()` with a condition check instead of a single `act()` flush.
+- **Run 3 of 5** — 1 failed / 383 files (vs 389 expected), duration 235s (vs ~16s normal). Root cause: `coverage/.tmp/` directory race condition — vitest v8 workers try to write temp coverage files to a directory that gets cleaned between runs. Workaround confirmed: `mkdir -p coverage/.tmp` before the run resolves it. This is an **infrastructure flake, not a test logic flake**.
+
+- **`BadgeToolbar.render.test.tsx > download strips SVG animations`** — Previously reported as failing 2/4 cycles (queueMicrotask timing race). **0/4 failures this cycle.** Monitoring continues — likely resolved by a dependency update. If it reappears, fix with `waitFor()`.
+
+---
+
+## SHARED_CONTEXT_ENTRY
+
+```
+<!-- ENTRY:START agent=coverage timestamp=2026-04-07T03:00:00Z -->
+## Coverage Agent — 2026-04-07
+- **Status**: GREEN
+- Overall coverage: **92.99% stmts** (7,568/8,138), 89.68% branch, 89.94% funcs, 94.17% lines
+- Test suite: 389 files, 6,955 tests, 100% pass rate on 4/5 runs; 1 infrastructure flake (coverage/.tmp race)
+- Delta vs 2026-04-06: **0pp all metrics** — no new code, no new tests this cycle. Coverage plateau-stable.
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98%, lib/email 97.9%, app/api 97.5%, lib/db 95.2%, lib/github 97.5%, components 95.9%
+- **P1 CARRIED**: `lib/db/tool-insights.ts::dbRecomputeCraft` (lines 149–180) — 0 test cases, 72.7% stmts, 3rd cycle without fix
+- **P1 CARRIED**: `app/api/recalculate/route.ts` — 50% funcs (fire-and-forget .catch arrow uncovered)
+- **P1 CARRIED**: `app/api/refresh/route.ts` — 75% funcs (craft dbRecomputeCraft path not mocked)
+- **Flaky RESOLVED**: BadgeToolbar download strip — 0/4 failures this cycle (was 2/4). Monitoring one more cycle.
+- **Infra flake NEW**: coverage/.tmp race condition causes occasional full-suite failure — workaround: `mkdir -p coverage/.tmp` before run.
+
+**Cross-agent recommendations:**
+- [Security]: dbRecomputeCraft error paths remain untested — silent failure risk in craft refresh/recalculate. P2 security-adjacent, unchanged from last cycle.
+- [QA]: 3 P1s all stem from v2.7.x craft-recompute shipping without tests. Top priority: tool-insights.test.ts dbRecomputeCraft describe block.
+- [Cost Analyst]: app/api at 97.5%, lib/db at 95.2%. Only tool-insights.ts below 80%. No new cost-critical coverage gaps.
+- [Performance]: No performance-coverage gaps. Flaky BadgeToolbar monitor: if returns, apply waitFor() fix.
+<!-- ENTRY:END -->
+```

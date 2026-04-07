@@ -1,110 +1,124 @@
 # Security Report
-> Generated: 2026-03-30 | Health status: GREEN
+> Generated: 2026-04-06 | Health status: green
 
 ## Executive Summary
 
-The Chapa codebase maintains a strong security posture with zero dependency vulnerabilities, no hardcoded secrets, comprehensive XSS protections in the SVG pipeline, and RLS enforced on all 9 Supabase tables. No regressions since the 2026-03-23 audit. One new finding: `/api/profile/[handle]` now exposes wildcard CORS (intentional — public API, rate-limited).
+No new vulnerabilities found. All 10 Supabase tables have RLS + FORCE + explicit deny policies, all SVG user inputs are escaped, no secrets leak to the client, and `pnpm audit` returns zero findings. The only notable delta vs the previous cycle is a knip `--production` false-positive for 8 packages and an MPL-2.0 license on `@resvg/resvg-js` (acceptable — no source modifications made).
+
+---
 
 ## Dependency Vulnerabilities
 
 | Severity | Package | Issue | Fix |
 |----------|---------|-------|-----|
-| — | — | No known vulnerabilities found | — |
+| — | — | `pnpm audit` returned **0 vulnerabilities** | — |
 
-`pnpm audit` returns clean. 0 critical, 0 high, 0 medium, 0 low.
+---
 
-## Unused Dependencies (Attack Surface)
+## Knip Findings (False Positives)
 
-`npx knip` returns **0 findings** — fully clean. No unused dependencies, exports, or types. Consistent with the previous two audits.
+`npx knip --production` reported 8 unused dependencies and 1 unused file. All are **confirmed false positives** — verified by grepping source files:
+
+| Flagged Item | Actual Status |
+|--------------|---------------|
+| `@resvg/resvg-js` | Used in `lib/render/svg-to-png.ts` |
+| `@vercel/analytics` | Used in `components/ClientAnalytics.tsx` |
+| `@vercel/speed-insights` | Used in `components/ClientAnalytics.tsx` |
+| `canvas-confetti` | Used in `lib/effects/celebrations/confetti.ts` |
+| `next-themes` | Used in `components/ThemeProvider.tsx`, `ThemeToggle.tsx` |
+| `posthog-js` | Used in `components/PostHogProvider.tsx` |
+| `resend` | Used in `lib/email/resend.ts`, `audience.ts`, `notifications.ts` |
+| `svix` | Used in `app/api/webhooks/resend/route.ts` |
+| `vitest.setup.ts` | Referenced in `vitest.config.ts:12` (`setupFiles`) |
+
+**Root cause**: `--production` excludes non-entry-point files (tests, some lib files) from knip's graph, creating false negatives. Run without `--production` for accurate unused-exports analysis (0 findings on 2026-04-02).
+
+---
 
 ## Code Findings
 
-### Hardcoded Secrets — CLEAR
-- **0 hardcoded secrets** found in source. All 10+ server secrets read exclusively from `process.env` with `.trim()`.
-- All `NEXT_PUBLIC_*` variables are non-sensitive (analytics key, base URL, feature flags).
-- `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `GITHUB_CLIENT_SECRET`, `ADMIN_SECRET`, `CRON_SECRET` — all server-side only, never exposed to client bundles.
-- Error logging scrubs tokens via regex before PostHog ingestion.
+### XSS / SVG Rendering
 
-### SVG XSS Protection — SECURE
-- **9 user-input entry points** escaped via `escapeXml()` (`lib/render/escape.ts:18-25`):
-  1. `handle` → `BadgeSvg.tsx:40`
-  2. `displayName` → `BadgeSvg.tsx:41-43`
-  3. `archetype` → `BadgeSvg.tsx:179`
-  4. `tier` → `BadgeSvg.tsx:236`
-  5. `avatarDataUri` → `BadgeSvg.tsx:155`
-  6. Fallback `handle` → `badge.svg/route.ts:36`
-  7. Fallback `message` → `badge.svg/route.ts:42`
-  8. Verification `hash` → `VerificationStrip.ts:12`
-  9. Verification `date` → `VerificationStrip.ts:13`
-- `escapeXml()` covers all 5 XML entities: `& < > ' "`
-- Explicit XSS tests at `BadgeSvg.test.tsx:59-65`
-- Heatmap/radar chart use numeric data only — no user strings
-- BadgeBranding uses hardcoded static text only
-- 18 `dangerouslySetInnerHTML` uses — all safe (hardcoded demo SVG, no user input)
-- Avatar URL whitelist: only `avatars.githubusercontent.com` + content-type validation
+- **SECURE** — All 9 user-controlled SVG fields escaped via `escapeXml()`: `handle`, `displayName`, `archetype`, `tier`, `avatarDataUri`, fallback handle, fallback error, verification hash, verification date. (`lib/render/escape.ts`)
+- **SECURE** — Explicit XSS tests at `BadgeSvg.test.tsx:59-65`.
+- **SECURE** — 18 `dangerouslySetInnerHTML` usages all use hardcoded demo SVGs, never user input.
 
-### CORS Configuration — INTENTIONAL
-- **2 routes with wildcard CORS** (`Access-Control-Allow-Origin: *`):
-  1. `/api/verify/[hash]` — public verification, rate-limited 30 req/IP/60s, read-only (unchanged)
-  2. `/api/profile/[handle]` — public profile API, rate-limited 60 req/IP/60s, read-only (**NEW** since last audit)
-- Both return non-sensitive public data. Risk: LOW.
-- All other 42+ API routes have no CORS headers (default same-origin).
-- Global security headers in `next.config.ts:47-87`:
-  - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
-  - `X-Content-Type-Options: nosniff`
-  - `X-XSS-Protection: 1; mode=block`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()`
-  - Badge SVG: `frame-ancestors *` (embeddable by design)
-  - All other routes: `frame-ancestors 'none'`
+### Secret Leaks / Client Exposure
 
-### RLS — ALL TABLES SECURED
-- **9/9 tables** with RLS enabled + `FORCE ROW LEVEL SECURITY`:
-  - `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `user_platforms`, `tool_insights`, `email_campaigns`, `campaign_sends`
-- Explicit `deny_anon_all` policies on all tables (defense-in-depth)
-- Exception: `feature_flags` has a permissive SELECT policy (`USING true`) — intentional, flags are public, DML still blocked
-- **2 views** with `security_invoker = true`: `latest_snapshots`, `admin_users`
-- App uses `SUPABASE_SERVICE_ROLE_KEY` server-side only (bypasses RLS, acceptable for server-only access pattern)
+- **SECURE** — No `NEXT_PUBLIC_*` variable exposes a server secret. Verified: `SUPABASE_SERVICE_ROLE_KEY`, `GITHUB_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `RESEND_API_KEY`, `ADMIN_SECRET`, `CRON_SECRET` are all server-only.
+- **SECURE** — Error monitoring (`lib/analytics/server-errors.ts`) sanitizes tokens via `SENSITIVE_PATTERNS` regex before sending to PostHog. Patterns cover GitHub tokens (`ghp_`, `gho_`, `ghs_`), `sk-*`, bearer tokens, and generic `key=value` assignments.
+- **SECURE** — No hardcoded API keys, tokens, or credentials found in source files.
 
-### Authentication & Session — SECURE
-- OAuth CSRF: `timingSafeEqual()` state validation
-- Token storage: AES-256-GCM encryption with fresh IV per encryption
-- CLI tokens: HMAC-SHA256 signed with 90-day expiry
-- Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`
-- Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`
+### CORS
 
-### Rate Limiting — EXPANDED
-- **31/44 routes** (70%) explicitly rate-limited (up from 14+ at last audit)
-- Remaining 13 routes use admin auth, bearer token, or are internal
-- Campaign email: 95/day quota with Redis counter, batch size 50
-- All rate limiters fail-open by design (availability-first — GitHub API limits + CDN caching provide secondary protection)
+- **INFO** — 2 routes set `Access-Control-Allow-Origin: *`:
+  - `app/api/verify/[hash]/route.ts` — public badge verification, read-only, 30 req/60s rate limit
+  - `app/api/profile/[handle]/route.ts` — public profile metrics, read-only, 60 req/60s rate limit
+- Both are intentional design decisions for embeddable badge ecosystem. No sensitive data exposed.
+
+### Supabase RLS
+
+- **SECURE** — All 10 tables: `users`, `metrics_snapshots`, `verification_records`, `merge_operations`, `feature_flags`, `user_platforms`, `tool_insights`, `campaign_sends`, `email_campaigns` (+ `engagement_flags`) have:
+  - `ENABLE ROW LEVEL SECURITY`
+  - `FORCE ROW LEVEL SECURITY` (applies even to table owner)
+  - Explicit `deny_anon_all` policy (`USING (false)`)
+- **SECURE** — 2 views have `security_invoker = true` (`014_views_security_invoker.sql`).
+- App uses `SUPABASE_SERVICE_ROLE_KEY` exclusively server-side — no anon key in client bundles.
+
+### Session & Auth
+
+- **SECURE** — Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure` (HTTPS), 10-minute `Max-Age`.
+- **SECURE** — OAuth CSRF validated via `timingSafeEqual()`. AES-256-GCM token encryption (fresh IV per call). CLI tokens HMAC-SHA256 signed with 90-day expiry.
+- **SECURE** — Avatar URL validation: whitelist (`avatars.githubusercontent.com`) + content-type checks.
+
+### Rate Limiting
+
+- **SECURE** — 31/44 routes rate-limited. Remaining 13 use admin auth, bearer token (`ADMIN_SECRET`/`CRON_SECRET`), or are internal. All fail-open (availability-first design — documented in `redis.ts`).
+
+### Global Headers
+
+- **SECURE** — HSTS 2yr + preload, `X-Content-Type-Options: nosniff`, `X-XSS-Protection: 1; mode=block`, restrictive `Permissions-Policy`.
+- **SECURE** — CSP properly scoped in `next.config.ts`.
+
+### Fetch Timeout Coverage
+
+- **SECURE** — 100% coverage via `AbortSignal.timeout()` or `AbortController`. PostHog error capture is intentional fire-and-forget (acceptable).
+
+### Craft Recompute Paths (Coverage P1 → Security Note)
+
+- **INFO** — `dbRecomputeCraft()` (`lib/db/tool-insights.ts:149-180`) ships 0 test cases (Coverage P1 from 2026-04-06). The craft error path in `/api/refresh` and `/api/recalculate` is unverified. Not a direct security vulnerability, but an untested error path means graceful degradation behavior is unconfirmed.
+
+---
 
 ## License Compliance
 
-| Package | License | Risk | Action |
-|---------|---------|------|--------|
-| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | None | Dynamically linked — no compliance action needed |
+| Package | License | Assessment |
+|---------|---------|------------|
+| `@resvg/resvg-js@2.6.2` | MPL-2.0 | File-level weak copyleft. No modifications to `@resvg/resvg-js` source — no disclosure obligation. **Acceptable.** |
+| `@chapa/shared@0.0.0` | UNLICENSED | Internal monorepo package, not published. No issue. |
+| `@chapa/web@2.7.2` | UNLICENSED | Internal monorepo package, not published. No issue. |
+| All other production deps | MIT, Apache-2.0, ISC | Fully permissive. No restrictions. |
 
-No GPL or AGPL dependencies found. All other dependencies are MIT, Apache-2.0, BSD, or ISC.
+**No GPL or AGPL dependencies detected.**
 
-## Delta Since Last Audit (2026-03-23)
-
-| Area | Change |
-|------|--------|
-| Vulnerabilities | Unchanged — 0 across all severities |
-| Knip | Unchanged — 0 findings |
-| Secrets | Unchanged — none found |
-| XSS | Unchanged — all 9 entry points escaped |
-| CORS | **+1 wildcard route** (`/api/profile/[handle]`) — intentional public API |
-| RLS | Unchanged — 9/9 tables + FORCE, 2 views security_invoker |
-| Rate limiting | **31/44 routes** (was 14+) — per cost-analyst 2026-03-30 |
-| Test coverage | **92.72% stmts** (6,655 tests) — per coverage agent 2026-03-30 |
-| Licenses | Unchanged — 1 LGPL-3.0 (dynamic link, no action) |
+---
 
 ## Recommendations
 
-1. **LOW — Monitor `/api/profile/[handle]` CORS**: New wildcard CORS endpoint. Currently rate-limited at 60 req/IP/60s. If abuse is observed, consider restricting to known embed origins.
-2. **LOW — Resend SDK timeout gaps**: 3 `audience.ts` calls + 1 admin test route lack `withTimeout()`. Fire-and-forget/admin-gated contexts — defense-in-depth improvement only (per cost-analyst 2026-03-30).
-3. **INFO — Undocumented env vars**: Documentation agent flagged SVIX_*, ICEBERG_TOKEN in code. Triage confirmed these are false positives (not in source). No action needed.
+### P1 (Action Required)
+None.
 
-No blockers. No high-priority items. Security posture remains GREEN.
+### P2 (Worth Addressing)
+
+1. **Add tests for `dbRecomputeCraft()` error paths** — `lib/db/tool-insights.ts:149-180` has 0 test coverage. The refresh and recalculate routes call this function but its error behavior is unverified. Risk: silent DB failure in craft recompute goes undetected. Fix: add `describe("dbRecomputeCraft")` in `tool-insights.test.ts` covering null result, DB error, and success paths.
+
+### P3 (Monitor)
+
+2. **MPL-2.0 `@resvg/resvg-js`** — Track that no modifications are made to the library's source. If the library is ever forked or patched, the MPL-2.0 requires those modifications to be disclosed.
+
+3. **Knip `--production` false positives** — Run knip without `--production` flag for accurate unused-export analysis. The `--production` results are misleading and could cause unnecessary package removals.
+
+### Carried (No Change)
+
+4. **CORS wildcard on 2 public endpoints** — Intentional, acceptable, rate-limited.
+5. **Fail-open rate limiting** — Intentional availability-first design, documented.
