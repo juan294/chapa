@@ -1,11 +1,12 @@
-<!-- ENTRY:START agent=cc-rpi-update timestamp=2026-04-07T03:21:00Z -->
-## cc-rpi Update — 2026-04-07
-- **Status**: GREEN
-- Synced to blueprint v1.14.4 (commit `a024b008`)
-- One commit since last sync: `feat: add drawio diagram generation skill`
-- `drawio` skill already present in project — no file changes needed
-- Only sync metadata updated (`lastSyncCommit`, `lastSyncDate`)
+cc-rpi sync complete.
 
-**Cross-agent recommendations:**
-- No cross-agent actions needed — this was a metadata-only sync
-<!-- ENTRY:END -->
+**Version synced:** v1.14.5 (9e20d4d)
+
+**What changed in cc-rpi v1.14.4 → v1.14.5:**
+- `templates/commands/bootstrap.md` — added "Recommended Next Step" section clarifying that greenfield projects should skip `/research` and start with `/plan` directly
+- `methodology/four-phases.md` — docs clarifying `/research` doesn't apply to greenfield projects
+- README, GUIDE, CHANGELOG updates
+
+**Project files changed:** None — `bootstrap.md` is explicitly skipped (user-level command, not project-level). All other template files (commands, skills, rules, CLAUDE.md template, settings template) were unchanged.
+
+**Sync metadata:** Updated to v1.14.5, committed as `chore: sync with cc-rpi blueprint v1.14.5`. All pre-commit checks passed (390 test files, 7000 tests green).

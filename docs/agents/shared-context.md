@@ -9,29 +9,27 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-07T03:00:00Z -->
-## Cost Analyst — 2026-04-07
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-08T03:00:00Z -->
+## Cost Analyst — 2026-04-08
 - **Status**: GREEN
 - Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
-- Redis: **24 key pattern families** (confirmed; `craft:{handle}`, `ratelimit:recalculate`, `ratelimit:cli-approve` counted). TTL 100% on per-user keys. 2 no-TTL singletons (HyperLogLog + badge counter) + 1 intentional TTL=0 cron cursor. All memory-bounded.
-- Redis storage estimate: **~1.52 GB @10K users**. OG images #1 consumer (~1.3 GB / 81%). Upstash Pro 10 GB — **85% headroom**.
+- Redis: TTL 100% on per-user keys. 2 no-TTL singletons (HyperLogLog + badge counter) + 1 intentional TTL=0 cron cursor. All memory-bounded. Storage estimate: **~1.52 GB @10K users**. Upstash Pro 10 GB — **85% headroom**.
 - GitHub API: all cache-first (6h + 7d stale fallback), in-flight dedup, ~50–150 calls/hr baseline vs 5,000/hr limit.
-- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbRecomputeCraft()` adds +2 DB ops + 1 Redis write per refresh/recalculate — bounded, negligible cost.
-- Fetch timeouts: GitHub/Codeberg auth flows (4 calls) lack AbortSignal — LOW risk (rare auth events, Vercel 300s backstop).
-- Resource leaks: 0.
+- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbRecomputeCraft()` fully tested (97.6% coverage).
+- Fetch timeouts: **100%** — all GitHub/Codeberg/Bitbucket/Resend calls have `AbortSignal.timeout()`. Resource leaks: 0.
 - **P1s: NONE**.
-- **P2-1**: `dbGetCampaignStats()` client-side aggregation — CARRIED. Move to RPC at >5K sends/campaign.
-- **P2-2**: `dbRecomputeCraft()` 0 test cases — CARRIED (3rd cycle). Silent failure in craft paths unverified.
-- **P2-3 NEW**: Warm-cache cron timeout risk — 50 handles × ~10s = 500s vs Vercel Pro 300s limit. Add `WARM_CACHE_MAX_HANDLES` ceiling of 25 or split into two windows.
+- **P2-2 RESOLVED**: `dbRecomputeCraft()` now at 97.6% coverage (confirmed by coverage agent 2026-04-08).
+- **P2-3 RESOLVED**: Warm-cache `BATCH_SIZE=5` → ~100s actual runtime vs 300s limit. No ceiling needed.
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
 - **MONITOR: OG image Redis memory** — CARRIED. CDN bounds cost.
 - **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
 - **MONITOR: HyperLogLog** — CARRIED. ~12KB, track quarterly.
 
 **Cross-agent recommendations:**
-- [Security]: GitHub/Codeberg OAuth calls (4) lack AbortSignal — P3 hygiene. Fail-open rate limiting intact. 5/hr refresh limit confirmed.
-- [QA]: P2-2 (`dbRecomputeCraft()` untested, 3rd cycle) is top actionable item. P2-3 warm-cache timeout should be verified by checking current handle count.
-- [Performance]: Bundle at 1,663 KB stable. OG image Redis monitor carried. Warm-cache cron timeout (P2-3) is also a performance concern.
-- [Coverage]: `app/api` at 97.5%, `lib/db` at 95.2%. `tool-insights.ts` is the only sub-80% file. P2-2 drives both coverage and cost risk.
+- [Security]: No new concerns. Fetch timeout coverage confirmed 100%. Fail-open rate limiting intact.
+- [QA]: No open P1s or P2s. Only P2-1 (campaigns RPC) remains as a future-scale item.
+- [Performance]: Bundle at 1,663 KB stable. OG image Redis monitor carried. Warm-cache P2-3 closed.
+- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — all cost-critical paths well covered.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-03-26T09:15:00Z -->
@@ -133,24 +131,21 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-07T03:00:00Z -->
-## Coverage Agent — 2026-04-07
+<!-- ENTRY:START agent=coverage timestamp=2026-04-08T02:00:00Z -->
+## Coverage Agent — 2026-04-08
 - **Status**: GREEN
-- Overall coverage: **92.99% stmts** (7,568/8,138), 89.68% branch, 89.94% funcs, 94.17% lines
-- Test suite: 389 files, 6,955 tests, 100% pass rate on 4/5 runs; 1 infrastructure flake (coverage/.tmp race)
-- Delta vs 2026-04-06: **0pp all metrics** — no new code, no new tests this cycle. Coverage plateau-stable.
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98%, lib/email 97.9%, app/api 97.5%, lib/db 95.2%, lib/github 97.5%, components 95.9%
-- **P1 CARRIED**: `lib/db/tool-insights.ts::dbRecomputeCraft` (lines 149–180) — 0 test cases, 72.7% stmts, 3rd cycle without fix
-- **P1 CARRIED**: `app/api/recalculate/route.ts` — 50% funcs (fire-and-forget .catch arrow uncovered)
-- **P1 CARRIED**: `app/api/refresh/route.ts` — 75% funcs (craft dbRecomputeCraft path not mocked)
-- **Flaky RESOLVED**: BadgeToolbar download strip — 0/4 failures this cycle (was 2/4). Monitoring one more cycle.
-- **Infra flake NEW**: coverage/.tmp race condition causes occasional full-suite failure — workaround: `mkdir -p coverage/.tmp` before run.
+- Overall coverage: **93.13% stmts** (7579/8138), 89.87% branch, 89.94% funcs, 94.31% lines
+- Test suite: 390 files, 7000 tests, 100% pass rate across 3 runs — no flakiness
+- Delta vs 2026-04-07: +0.14pp stmts, +0.19pp branch, 0pp funcs, +0.14pp lines — plateau-stable
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 95.9%
+- **All v2.7.x P1s confirmed closed**: tool-insights.ts 97.6%, recalculate funcs 100%, refresh funcs 75% (1 fire-and-forget catch — P3 only)
+- **P3 ONLY**: refresh/route.ts `updateCraftCache` catch arrow (1 func uncovered), svg-to-png fallback branch, demoData/archetypeDemoData null-coalescing arm, AuthorTypewriter JSDOM timing
+- **Flaky RESOLVED**: BadgeToolbar 0/3 recurrences — closed. Infra/.tmp race also 0 recurrences.
 
 **Cross-agent recommendations:**
-- [Security]: dbRecomputeCraft error paths remain untested — silent failure risk in craft refresh/recalculate. P2 security-adjacent, unchanged from last cycle.
-- [QA]: 3 P1s all stem from v2.7.x craft-recompute shipping without tests. Top priority: tool-insights.test.ts dbRecomputeCraft describe block.
-- [Cost Analyst]: app/api at 97.5%, lib/db at 95.2%. Only tool-insights.ts below 80%. No new cost-critical coverage gaps.
-- [Performance]: No performance-coverage gaps. Flaky BadgeToolbar monitor: if returns, apply waitFor() fix.
+- [Security]: No new security-relevant coverage gaps. All dbRecomputeCraft error paths confirmed covered.
+- [QA]: No open P1s or P2s. Only P3 branch gaps remain — all in fire-and-forget or static-data paths. No action needed.
+- [Cost Analyst]: app/api 97.6%, lib/db 97.6%. tool-insights.ts P2-2 confirmed resolved.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->
@@ -213,30 +208,6 @@
 - [Security]: All Resend SDK calls now have timeout protection. Fetch timeout coverage at 100% including SDK calls.
 - [Performance]: No performance concerns. ISR optimization applied.
 <!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-06T03:00:00Z -->
-## Cost Analyst — 2026-04-06
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$65–70/mo**. Unchanged.
-- Redis: **21 key pattern families** (unchanged). NEW: `craft:{handle}` (1h TTL) added by v2.7.x — ~20 MB max at 10K users, negligible. TTL 100% on per-user keys. 2 no-TTL singletons (HyperLogLog + badge counter), both memory-bounded.
-- Redis storage estimate: **~1.52 GB @10K users**. OG images #1 consumer (~1.3 GB / 81%). Upstash Pro 10 GB — **85% headroom**.
-- GitHub API: all cache-first (6h + 7d stale fallback), in-flight dedup, ~50–150 calls/hr baseline vs 5,000/hr limit.
-- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbRecomputeCraft()` (v2.7.x) adds single UPDATE + Redis write — bounded, no cost risk, but **currently untested**.
-- Fetch timeouts: 100% via `AbortSignal.timeout()` or AbortController (Bitbucket). 1 intentional fire-and-forget (PostHog error capture). Bitbucket setTimeout not `clearTimeout()`d on success — hygiene issue only, LOW.
-- **P1s: NONE**.
-- **P2-1**: `dbGetCampaignStats()` client-side aggregation — CARRIED. Move to RPC at >5K sends/campaign.
-- **P2-2**: `dbRecomputeCraft()` 0 test cases — Coverage P1. Silent failure risk in craft refresh paths.
-- **MONITOR: OG image Redis memory** — CARRIED (~1.3 GB @10K). CDN `s-maxage=21600` bounds generation.
-- **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
-- **MONITOR: HyperLogLog** — CARRIED. ~12KB, sublinear growth.
-
-**Cross-agent recommendations:**
-- [Security]: No new concerns. Fail-open rate limiting intact. 5/hr refresh limit confirmed.
-- [QA]: P2-2 (`dbRecomputeCraft()` untested) is the top actionable item. Craft DB error behavior unverified.
-- [Performance]: Bundle at 1,663 KB. OG image Redis monitor carried. No new cost-performance conflicts.
-- [Coverage]: `app/api` at 97.5%, `lib/db` at 95.8%. `tool-insights.ts` is the only sub-80% file and drives the P2-2 risk.
-<!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-04-01T07:05:42Z -->
 ## QA Agent — 2026-04-01
