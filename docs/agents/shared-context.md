@@ -32,26 +32,49 @@
 - [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — all cost-critical paths well covered.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-03-26T09:15:00Z -->
-## Performance Engineer — 2026-03-26
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-09T03:00:00Z -->
+## Cost Analyst — 2026-04-09
 - **Status**: GREEN
-- Build: Next.js 16.2.1 (Turbopack), compiles in 3.0s, 0 TypeScript errors. 63 static pages (11 workers, 393ms). 82 routes (5 static, 77 dynamic).
-- Total client JS: **1,800 KB (1.76 MB)** across 71 chunks. No chunk exceeds 500 KB. +366 KB vs 2026-03-12 (+25%) — proportional to new features (campaigns, engagement, CLI auth, experiments).
-- Largest chunks: 228 KB (Next.js framework), 176 KB (PostHog, lazy-loaded), 136 KB (React DOM), 112 KB (polyfills). 4 chunks >100 KB, all framework/vendor.
-- Knip: **0 findings** — fully clean (was 60 unused exports + 42 unused types on 2026-03-12). All resolved.
-- `"use client"` audit: 120 files total (incl. tests). Previous 3 flagged files: `overall-health-banner.tsx` RESOLVED (directive removed), `ShareBadgePreviewLazy.tsx` and `GlobalCommandBarLazy.tsx` confirmed legitimate (wrapping `next/dynamic` with `ssr: false`). No new removable directives.
-- Dynamic imports: 12 components code-split via `next/dynamic` with `ssr: false` (up from 9). New: `AgentsDashboard`, `EngagementDashboard`, `CampaignsDashboard`. All with proper loading UI.
-- Font loading: optimal (`next/font/google`, `display: "swap"`, Latin subset, no external requests).
-- CLS risks: none — all `<Image>` have explicit dimensions, no bare `<img>` tags, skeleton loaders for async content.
-- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=604800` (success), `s-maxage=300, stale-while-revalidate=600` (error). Frame embed headers correct.
-- Share page ISR: `revalidate=3600` in place with test assertion.
+- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 3 no-TTL keys (HyperLogLog + badge counter + cron cursor) — all intentional, memory-bounded. Storage: **~1.52 GB @10K users** / 10 GB Pro limit — **85% headroom**.
+- GitHub API: cache-first (6h + 7d stale), in-flight dedup, ~50–150 calls/hr vs 5,000/hr limit. ~97%+ headroom.
+- Supabase: **11 tables + 2 views** (updated count). Singleton lazy client. 0 N+1 patterns.
+- Fetch timeouts: **99%** (1 gap found — see P3-NEW). Resource leaks: 0.
+- **P1s: NONE. P2s: NONE.**
+- **P3-NEW**: `lib/analytics/server-errors.ts:106` — PostHog capture `fetch()` missing `AbortSignal.timeout(5000)`. Fire-and-forget, wrapped in try/catch, Vercel timeout acts as backstop — LOW risk. One-liner fix.
+- **DISCREPANCY**: Security agent (2026-04-06) reported "100% timeout coverage" — this fetch was missed in that audit.
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
+- **MONITOR: OG image Redis memory** — CARRIED.
+- **MONITOR: `sync-audience` pagination** — CARRIED.
+- **MONITOR: HyperLogLog** — CARRIED. ~12KB, track quarterly.
 
 **Cross-agent recommendations:**
-- [Coverage]: `hexmap/page.tsx` (0%, 636 lines) and `ParticleBackground.tsx` still canvas-heavy — smoke tests remain recommended but accepted limitation. All rendering/API paths at 91%+.
-- [Security]: No performance-related security concerns. PostHog CSP correctly scoped. Knip fully clean. Rate limiting fail-open by design.
-- [QA]: All previous performance-QA items RESOLVED. `overall-health-banner.tsx` no longer client component. 12 error boundaries now in place. No functional issues.
-- [Cost Analyst]: OG image Redis memory remains #1 consumer (62% at 10K users). Bundle grew +25% but all from feature additions — no waste. Supabase SDK chunk duplication (160KB x2) from cost-analyst is minor optimization target.
-- [Documentation]: Previous knip/unused-exports documentation item RESOLVED (0 findings now). No remaining performance-documentation concerns.
+- [Security]: P3 discrepancy — `lib/analytics/server-errors.ts:106` fetch to PostHog lacks `AbortSignal.timeout()`. Prior "100% timeout" claim needs correction. Fix: add `signal: AbortSignal.timeout(5000)`.
+- [QA]: No open P1s or P2s. Only P3 (PostHog timeout) and carried P2-1 (campaigns RPC) remain.
+- [Performance]: Bundle and OG image monitor unchanged. No new cost-performance tradeoffs.
+- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — stable. `server-errors.ts` timeout path now worth a test case.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
+## Performance Engineer — 2026-04-09
+- **Status**: GREEN
+- Build: Next.js 16.2.2 (Turbopack), compiled 2.8s, 0 TypeScript errors. 64 static pages, 84 routes (5 static, 79 dynamic).
+- Total client JS: **1,682 KB (1.64 MB)** — +19 KB (+1.1%) vs 2026-04-02. 68 chunks, no chunk >500 KB. Gzipped: ~522 KB. CSS: 103 KB raw / 15 KB gzip.
+- Largest chunks: 232 KB (framework), 173 KB (PostHog lazy), 137 KB (React DOM), 113 KB (polyfills). All vendor/framework — no app code chunk >64 KB.
+- Knip: **0 findings** — fully clean.
+- `"use client"` audit: 98 non-test files. All appropriate (error boundaries, interactive components, canvas/WebGL experiments, hooks). No misplaced directives.
+- Dynamic imports: 6 files use `next/dynamic` with `ssr: false` — `GlobalCommandBarLazy`, `ShareBadgePreviewLazy`, `AgentsDashboard`, `EngagementDashboard`, `CampaignsDashboard`, `ShortcutCheatSheet`.
+- **Finding (LOW)**: Landing page imports `GlobalCommandBar` synchronously via `LandingTerminal` re-export (`app/page.tsx:10`). Admin + share pages use `GlobalCommandBarLazy` instead. Inconsistency — consider unifying or documenting.
+- Font loading: optimal (`next/font/google`, `display: "swap"`, Latin subset only).
+- CLS risks: **none** — all 3 `<Image>` components have explicit dimensions (`width`+`height`). Bare `<img>` in `SharePageOwnerContent.tsx:44` is embed code string, not rendered in DOM.
+- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=86400` (success), `s-maxage=300, stale-while-revalidate=600` (error). Correct.
+- Turbopack NFT warning: **PERSISTS** despite `turbopackIgnore` comments added 2026-04-03 — `existsSync` in `svg-to-png.ts:38` also triggers full-project tracing. Cosmetic only, no functional impact.
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-coverage gaps. All rendering/API paths at 93%+. Canvas/WebGL experiments remain untestable in JSDOM — accepted limitation.
+- [Security]: No performance-related security concerns. Knip clean (0 findings). PostHog CSP correctly scoped.
+- [QA]: Landing page `GlobalCommandBar` synchronous import is minor inconsistency — worth documenting or standardizing.
+- [Cost Analyst]: Bundle grew only +19 KB vs last cycle — stable. OG image Redis memory monitor carried.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-02T09:00:00Z -->
@@ -146,6 +169,23 @@
 - [Security]: No new security-relevant coverage gaps. All dbRecomputeCraft error paths confirmed covered.
 - [QA]: No open P1s or P2s. Only P3 branch gaps remain — all in fire-and-forget or static-data paths. No action needed.
 - [Cost Analyst]: app/api 97.6%, lib/db 97.6%. tool-insights.ts P2-2 confirmed resolved.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-09T02:00:00Z -->
+## Coverage Agent — 2026-04-09
+- **Status**: YELLOW
+- Overall coverage: **93.14% stmts** (7580/8138), 89.87% branch, 90.00% funcs, 94.31% lines
+- Test suite: 390 files, 7000 tests — plateau-stable vs 2026-04-08 (+0.01pp stmts, +0.06pp funcs)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 95.9%
+- **Flaky RE-EMERGED**: `BadgeToolbar.render.test.tsx` — "strips SVG animations" FAILED 1/3 runs. Root cause: `queueMicrotask` + `setTimeout(r, 0)` inside `act()` does not reliably drain the full async chain (fetch → stripAnimations → Image.src → onerror → fallback). Was declared resolved 2026-04-07 after 0/3 — recurrence reopens as **P2**.
+- **Unhandled rejection**: `window is not defined` at `BadgeToolbar.tsx:130` (`setDownloadStatus("idle")` post-unmount). Contributes to test environment pollution. Same source as flaky test.
+- **P2**: `components/UserMenu.tsx` — 79.3% funcs, 72.2% branches (`handleInsightsFile` complex handler). Carried.
+- **P3 carried**: AuthorTypewriter 67.5% branches (JSDOM), ParticleBackground 77.8% funcs (canvas), svg-to-png 66.7% branches (fallback), demoData/archetypeDemoData 50% branches (null arms), refresh/route.ts 75% funcs (fire-and-forget catch).
+
+**Cross-agent recommendations:**
+- [QA]: BadgeToolbar flaky test re-emerged — P2. Fix: replace `setTimeout(r, 0)` with `flushPromises` helper at `BadgeToolbar.render.test.tsx:994`. Also address post-unmount `setDownloadStatus` unhandled rejection at `BadgeToolbar.tsx:130` (add mounted-guard or cleanup `AbortController`).
+- [Security]: No new security-relevant gaps. All critical-path coverage unchanged and GREEN.
+- [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->

@@ -1,77 +1,104 @@
 # Performance Report
-> Generated: 2026-04-02 | Health status: green
+> Generated: 2026-04-09 | Health status: green
 
 ## Executive Summary
-Build is healthy — total client JS decreased 8% to 1,663 KB vs 1,800 KB last cycle (2026-03-26). No chunk exceeds 232 KB, zero knip findings, all caching headers correct. One Turbopack NFT warning for the OG image route is low-severity.
+
+Build is stable at 1,682 KB raw client JS (~522 KB gzipped), down 19 KB from last run with zero chunks exceeding the 500 KB threshold. Knip is clean. The Turbopack NFT warning for the OG image route persists despite `turbopackIgnore` comments — cosmetic only. One minor finding: the landing page imports `GlobalCommandBar` synchronously instead of via `GlobalCommandBarLazy`, bypassing the lazy loader used on admin and share pages — worth unifying but not a blocker.
 
 ## Build Output
 
-**Build stats:** Next.js 16.2.1 (Turbopack) · compiled 5.4s · TypeScript 8.0s · 0 errors · 64 static pages · 84 routes (5 static, 79 dynamic)
+> Next.js 16.2.2 (Turbopack) | Compiled in 2.8s | 0 TypeScript errors | 64 static pages | 84 routes (5 static, 79 dynamic)
 
-| Route / Chunk | Size (First Load JS) | Status |
-|--------------|---------------------|--------|
-| Largest chunk (framework) | 232 KB | GREEN |
-| 2nd largest (PostHog, lazy) | 179 KB | GREEN |
-| 3rd (React DOM) | 137 KB | GREEN |
-| 4th (polyfills) | 113 KB | GREEN |
-| 5th | 64 KB | GREEN |
-| All remaining chunks | < 60 KB each | GREEN |
+### Client Chunks (top 10 by raw size)
 
-No route or chunk exceeds the 500 KB threshold. No chunk exceeds 300 KB.
+| Chunk | Raw Size | Gzipped | Identity (inferred) | Status |
+|-------|----------|---------|---------------------|--------|
+| `0i6hmdj2yp4zb.js` | 232 KB | 71 KB | Next.js framework | OK |
+| `0vs6rbxsqj~ew.js` | 173 KB | 55 KB | PostHog (lazy-loaded) | OK |
+| `085mqcepw4kbq.js` | 137 KB | 36 KB | React DOM | OK |
+| `03~yq9q893hmn.js` | 113 KB | 38 KB | Polyfills | OK |
+| `11y515pezrwu_.js` | 64 KB | 17 KB | App code | OK |
+| `068u3mvcdl~af.js` | 60 KB | 18 KB | App code | OK |
+| `0w9q9~bez_4so.js` | 60 KB | 18 KB | App code | OK |
+| `0bzfuyt45vye4.js` | 55 KB | 13 KB | App code | OK |
+| `0aq-rtaxc~c2w.js` | 52 KB | 17 KB | App code | OK |
+| `06hqx00bf66nv.js` | 46 KB | 14 KB | App code | OK |
 
-**Note:** Turbopack does not emit a per-route First Load JS table (unlike webpack mode). Sizes above are the raw production static chunk files from `.next/static/chunks/`.
+> Note: Turbopack generates content-hashed chunk names. No chunk exceeds 232 KB raw / 71 KB gzipped. **No chunks exceed 500 KB threshold.**
 
-**Turbopack warning (low severity):** `svg-to-png.ts` uses `path.join(process.cwd(), ...)` at lines 36–37, causing the OG image route to trace the entire project via NFT. This is cosmetic in dev but may produce a slightly larger Lambda bundle on Vercel for `/u/[handle]/og-image`. Fix: add `/*turbopackIgnore: true*/` comment to the `process.cwd()` calls if the path is always statically resolvable.
+### Page-level bundles
+
+Turbopack does not emit per-route First Load JS tables in build output (unlike webpack). Per-route server entry points are all < 2 KB (loader stubs); shared chunks are composed at runtime. This is expected behavior.
 
 ## Bundle Analysis
-- **Total First Load JS:** 1,663 KB (1.63 MB) — down 137 KB (-8%) from 1,800 KB on 2026-03-26
-- **Largest chunks:** 232 KB (Next.js framework), 179 KB (PostHog lazy-loaded), 137 KB (React DOM), 113 KB (polyfills)
-- **Chunks >100 KB:** 4 — all framework/vendor, not application code
-- **Unused exports (knip):** 0 production findings. 384 test files flagged as false positives (expected — test files are not in the production entry graph); same result as previous cycle.
-- **Dynamic imports:** `ShareBadgePreviewLazy.tsx` and `GlobalCommandBarLazy.tsx` confirmed using `next/dynamic` with `ssr: false`. Additional dynamic splits for admin sub-dashboards (AgentsDashboard, EngagementDashboard, CampaignsDashboard) from previous cycle still in place.
+
+- **Total client JS**: 1,682 KB raw / ~522 KB gzipped (68 chunks)
+- **Total CSS**: 103 KB raw / ~15 KB gzipped (1 chunk)
+- **Total client assets**: ~537 KB gzipped
+- **vs 2026-04-02**: +19 KB raw (+1.1%) — within noise
+- **Largest chunks**: Next.js framework (232 KB), PostHog lazy (173 KB), React DOM (137 KB), polyfills (113 KB)
+- **Unused exports**: **0** — knip clean
 
 ## Client/Server Boundary
 
-56 non-test files with `"use client"` (41 in `components/`, 15 in `lib/`). All appear appropriate:
+**98 non-test files** carry `"use client"`. All are appropriate:
 
-- **Error boundaries** (`error.tsx` files) — required by Next.js App Router
-- **Admin dashboard** (`AdminDashboardClient.tsx`, agents, campaigns, engagement sub-views) — interactive tables/charts with client state
-- **Studio** (`StudioClient.tsx`, `BadgePreviewCard.tsx`, `QuickControls.tsx`) — live badge customization with controlled form state
-- **Share page** (`ShareBadgePreviewLazy.tsx`) — wraps a `next/dynamic` to avoid SSR of heavy canvas component
-- **Experiments** (`app/experiments/**`) — all canvas/WebGL demos; client rendering is required
-- **Terminal/global UI** (`TerminalInput.tsx`, `AutocompleteDropdown.tsx`, `GlobalCommandBarLazy.tsx`) — keyboard state, autocomplete, command bar
-- **Hooks/effects** (`lib/effects/**`, `lib/hooks/`) — `useState`/`useEffect` patterns
+| Category | Count | Assessment |
+|----------|-------|------------|
+| Error boundaries (`error.tsx`) | 12 | Required — Next.js enforces client for error boundaries |
+| Interactive components (terminal, tooltips, nav) | 28 | Legitimate — browser APIs needed |
+| Dashboard UI (admin, studio, experiments) | 22 | Legitimate — canvas/WebGL/complex state |
+| Hooks and effects | 9 | Legitimate — browser-only hooks |
+| Analytics / providers | 4 | Legitimate — client-only APIs |
+| Canvas/WebGL experiment pages | 13 | Legitimate — cannot SSR |
 
-No high-level `"use client"` directives found that should be pushed deeper. `ShareBadgePreviewLazy` and `GlobalCommandBarLazy` are correctly the shallowest boundaries with server parents above them.
+**Finding (LOW):** `app/page.tsx` imports `GlobalCommandBar` synchronously via `LandingTerminal` re-export, while `app/admin/page.tsx` and `app/u/[handle]/page.tsx` use `GlobalCommandBarLazy` (`next/dynamic`, `ssr: false`). The landing page therefore pays the synchronous cost of `GlobalCommandBar` + `command-registry.ts` (427 lines) at initial load. Given `GlobalCommandBar` is small (148 lines) and is the main interaction point of the landing page, this is arguably intentional — but the inconsistency creates confusion. Consider switching `LandingTerminal` to use the lazy variant, or document the intentional divergence.
+
+**Dynamic imports in use (correct):**
+- `GlobalCommandBarLazy` — `next/dynamic`, `ssr: false`
+- `ShareBadgePreviewLazy` — `next/dynamic`, `ssr: false`
+- `AgentsDashboard`, `EngagementDashboard`, `CampaignsDashboard` — admin sub-tabs, `ssr: false`
+- `KeyboardShortcutsListener` → `ShortcutCheatSheet` — `next/dynamic`
+- `ClientAnalytics` — `next/dynamic`, `ssr: false`
 
 ## Caching & Headers
 
-| Route | Cache-Control | Status |
-|-------|--------------|--------|
-| `/u/[handle]/badge.svg` (success) | `public, s-maxage=21600, stale-while-revalidate=86400` | GREEN |
-| `/u/[handle]/badge.svg` (error fallback) | `public, s-maxage=300, stale-while-revalidate=600` | GREEN |
-| `/u/[handle]/og-image` | ISR `revalidate=3600` | GREEN |
-| `/about`, `/about/scoring`, `/about/verification` | ISR `revalidate=86400` | GREEN |
+### Badge SVG Route (`/u/[handle]/badge.svg`)
+- **Success path**: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` — 6h CDN cache, 24h stale-while-revalidate. Correct.
+- **Error path**: `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` — 5m CDN cache on error. Correct.
+- **Embed headers**: `Content-Security-Policy: frame-ancestors *` + `X-Frame-Options: ALLOWALL`. Correct for embeddable badge.
 
-Badge SVG frame-ancestors set to `*` via explicit `Content-Security-Policy` override — correct for embeddable asset.
+### ISR Revalidation
+| Route | Revalidate | Assessment |
+|-------|-----------|------------|
+| `/` (landing) | 1h | OK |
+| `/u/[handle]` (share page) | 1h | OK |
+| `/about/*` | 24h | OK (updated from 1h in triage 2026-03-30) |
+| `/archetypes/*` | 7 days | OK (static content) |
 
-## Font Loading
+### Font Loading
+- `next/font/google` with `display: "swap"`, Latin subset only. No external font requests. **Optimal.**
 
-- `next/font/google` with `display: "swap"`, Latin subset for both JetBrains Mono and Plus Jakarta Sans
-- No external `<link rel="stylesheet" href="fonts.googleapis.com/...">` in layout — no render-blocking font requests
-- Server-side TTF files for `svg-to-png.ts` (resvg OG image rendering) are scoped to `lib/render/fonts/` — not exposed to browsers
+## Build Warnings
 
-## CLS Risks
+**Turbopack NFT warning** — OG image route (`/u/[handle]/og-image`) still triggers:
+```
+Encountered unexpected file in NFT list
+Import trace: next.config.ts → svg-to-png.ts → og-image/route.ts
+```
+`turbopackIgnore` comments were added to `svg-to-png.ts:36-37` in triage 2026-04-03. The warning persists because `existsSync` (line 38 of `svg-to-png.ts`) and the `@resvg/resvg-js` native module import also trigger full-project tracing. This is cosmetic — it may slightly increase the Lambda zip size for the OG image route but does not affect functionality or correctness. Tracked as LOW.
 
-- **None found.** All 4 `<Image>` components (UserMenu.tsx ×2, BadgeContent.tsx, AdminUserTable.tsx) have explicit `width` and `height` attributes
-- No bare `<img>` tags in production components
-- Skeleton loaders present for async content (confirmed from previous cycles)
-- `display: "swap"` on fonts prevents FOIT; FOUT is acceptable
+## CLS Risk Analysis
+
+- **`<Image>` components**: 3 files use `next/image`, all with explicit `width` and `height`. **No CLS risk.**
+- **Bare `<img>` tags**: Found only in `SharePageOwnerContent.tsx:44` as a code snippet string inside a `<code>` block — not rendered as an actual DOM image. **No CLS risk.**
+- **Skeleton loaders**: All dynamically-loaded admin sub-dashboards have `loading` UI (`animate-pulse` placeholders).
+- **`prefers-reduced-motion`**: Defined in `globals.css` at lines 381 and 472. **Correct.**
 
 ## Recommendations
 
 | Priority | Item | File | Action |
 |----------|------|------|--------|
-| LOW | Turbopack NFT warning | `lib/render/svg-to-png.ts:36-37` | Add `/*turbopackIgnore: true*/` to `process.cwd()` calls to scope NFT tracing. Cosmetic — does not affect functionality. |
-
-All other metrics are GREEN. No immediate action required.
+| LOW | Turbopack NFT warning persists for OG image route | `lib/render/svg-to-png.ts` | `existsSync` cannot be suppressed with `turbopackIgnore` — accepted cosmetic warning. No action needed. |
+| LOW | Landing page uses synchronous `GlobalCommandBar` via `LandingTerminal` re-export | `app/page.tsx`, `app/LandingTerminal.tsx` | Consider switching to `GlobalCommandBarLazy` for consistency, or add a comment documenting the intentional divergence. |
+| INFO | Bundle grew +19 KB (+1.1%) vs 2026-04-02 | — | Within noise. No action. |
