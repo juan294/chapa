@@ -1,152 +1,127 @@
 # Documentation Report
-> Generated: 2026-04-03 | Branch: `develop` | Health status: **GREEN**
+> Generated: 2026-04-10 | Health status: **GREEN**
 
 ## Executive Summary
-
-Documentation is in excellent shape. All issues from the 2026-03-27 audit have been resolved — route method mismatches corrected, `POST /api/telemetry` added, JSDoc gaps filled, and rogue env vars confirmed as test-only false positives. No P1 or P2 items remain.
+All documentation is current and accurate — 44/44 API routes documented (100%), 38/38 color tokens verified, all required docs present and non-empty, and no stale or missing documentation detected. No action items required.
 
 ---
 
 ## Route Documentation
 
-### Pages (34 routes)
+### Status Summary
+- **Total pages documented**: 15/15 (100%)
+- **Total API routes documented**: 44/44 (100%)
+- **Mismatches found**: 0
 
-| Route | In CLAUDE.md | Status |
-|-------|-------------|--------|
-| `/` | ✓ | OK |
-| `/studio` | ✓ | OK |
-| `/admin` | ✓ | OK |
-| `/u/:handle` | ✓ | OK |
-| `/verify/:hash` | ✓ | OK |
-| `/verify` | ✓ | OK |
-| `/about` | ✓ | OK |
-| `/about/scoring` | ✓ | OK |
-| `/about/verification` | ✓ | OK |
-| `/archetypes/:type` (7 pages) | ✓ pattern | OK |
-| `/generating/:handle` | ✓ | OK |
-| `/cli/authorize` | ✓ | OK |
-| `/privacy` | ✓ | OK |
-| `/terms` | ✓ | OK |
-| `/coming-soon` | ✓ | OK |
-| `/experiments/*` (13 pages) | ✓ pattern | OK |
+### Pages
+| Route | Documented in CLAUDE.md | Exists in code | Status |
+|-------|------------------------|---------------|--------|
+| `/` | ✓ | ✓ | OK |
+| `/studio` | ✓ | ✓ | OK |
+| `/admin` | ✓ | ✓ | OK |
+| `/u/:handle` | ✓ | ✓ | OK |
+| `/verify/:hash` | ✓ | ✓ | OK |
+| `/about` | ✓ | ✓ | OK |
+| `/about/scoring` | ✓ | ✓ | OK |
+| `/about/verification` | ✓ | ✓ | OK |
+| `/archetypes/*` (7 routes) | ✓ | ✓ | OK |
+| `/generating/:handle` | ✓ | ✓ | OK |
+| `/cli/authorize` | ✓ | ✓ | OK |
+| `/privacy` | ✓ | ✓ | OK |
+| `/terms` | ✓ | ✓ | OK |
+| `/coming-soon` | ✓ | ✓ | OK |
+| `/verify` | ✓ | ✓ | OK |
+| `/experiments/*` (13 routes) | ✓ | ✓ | OK |
 
-### API Routes (44 route.ts files under `/api/`)
+### API Routes
+All 44 API routes documented and present in code:
+- **Auth routes**: 11/11 ✓
+- **Public API routes**: 10/10 ✓
+- **Authenticated API routes**: 9/9 ✓
+- **Admin API routes**: 9/9 ✓
+- **Webhooks & Cron routes**: 5/5 ✓
 
-All 44 API routes are documented in CLAUDE.md with correct HTTP methods. Five method mismatches from the 2026-03-27 audit were corrected in the 2026-03-28 triage:
+---
 
-| Route | Previous mismatch | Resolved |
-|-------|------------------|---------|
-| `GET /api/cli/auth/poll` | Was documented as `GET\|POST` | ✓ |
-| `PATCH /api/admin/feature-flags` | Was documented as `GET\|PATCH` | ✓ |
-| `GET /api/admin/engagement-flags` | Was documented as `GET\|PUT` | ✓ |
-| `POST\|GET\|DELETE /api/admin/agents/run` | Was documented as `POST` only | ✓ |
-| `GET /api/notifications/unsubscribe` | Was documented as `POST` | ✓ |
+## Color Token Audit
 
-**Route coverage: 44/44 API routes + all pages — 100%**
+### Status Summary
+- **Total tokens in globals.css**: 38
+- **Total tokens in design-system.md**: 38
+- **Mismatches**: 0
+
+All tokens verified across base colors, semantic colors, dimension colors (delivery, quality, consistency, breadth, craft + light variants), archetype colors (7), track, and shadows. All hex values in globals.css match design-system.md for both light and dark theme variants.
+
+---
+
+## Required Docs Status
+
+| File | Exists | Non-empty | Notes |
+|------|--------|-----------|-------|
+| `docs/impact-v4.md` | ✓ | ✓ | 131 lines |
+| `docs/impact-v6.md` | ✓ | ✓ | 270 lines |
+| `docs/svg-design.md` | ✓ | ✓ | 173 lines |
+| `README.md` | ✓ | ✓ | 215 lines — description, setup, key commands present |
+| `docs/design-system.md` | ✓ | ✓ | 234 lines |
+| `docs/agents/shared-context.md` | ✓ | ✓ | Latest entry: 2026-04-10 (Coverage Agent) |
 
 ---
 
 ## Stale Documentation
 
-None. All previously stale items resolved:
-
-| Item | Previous State | Current State |
-|------|---------------|---------------|
-| `POST /api/telemetry` | Undocumented | Added to CLAUDE.md |
-| 5 HTTP method mismatches | Stale | Fixed (2026-03-28 triage) |
-| `animate-shimmer-sweep` missing | Not in table | Added to `docs/design-system.md` |
-| `animate-hex-cell-in` duration | Undocumented | 0.45s added to table |
-| `--color-complement` dark override | Unconfirmed | Confirmed `#10B981` same in both themes |
+None detected. All documentation is synchronized with current code.
 
 ---
 
 ## Missing Documentation
 
-None critical.
-
-- **Internal helper JSDoc** — Non-exported helpers in `lib/dashboard/generate-insights.ts` and `lib/insights/parser.ts` lack JSDoc. Private functions; acceptable per project convention. All public exports are documented.
+None identified. JSDoc coverage is complete on all public exports across critical paths:
+- `lib/validation.ts`: all public functions documented ✓
+- `lib/cache/redis.ts`: all exported functions documented ✓
+- `lib/render/BadgeSvg.tsx`: `renderBadgeSvg` documented with param descriptions ✓
+- `packages/shared/src/types.ts`: all interfaces documented ✓
 
 ---
 
 ## Environment Variables
 
-| Variable | In CLAUDE.md | Used in code | Notes |
-|----------|-------------|-------------|-------|
-| `ADMIN_HANDLES` | ✓ | ✓ | OK |
-| `ADMIN_SECRET` | ✓ | ✓ | OK |
-| `ALLOW_AGENT_RUN` | ✓ | ✓ | OK |
-| `ANALYZE` | ✓ | ✓ | OK |
-| `BITBUCKET_CLIENT_ID` | ✓ | ✓ | OK |
-| `BITBUCKET_CLIENT_SECRET` | ✓ | ✓ | OK |
-| `CHAPA_VERIFICATION_SECRET` | ✓ | ✓ | OK |
-| `CODEBERG_CLIENT_ID` | ✓ | ✓ | OK |
-| `CODEBERG_CLIENT_SECRET` | ✓ | ✓ | OK |
-| `CRON_SECRET` | ✓ | ✓ | OK |
-| `GITHUB_CLIENT_ID` | ✓ | ✓ | OK |
-| `GITHUB_CLIENT_SECRET` | ✓ | ✓ | OK |
-| `GITHUB_TOKEN` | ✓ | ✓ | OK |
-| `NEXTAUTH_SECRET` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_BASE_URL` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_BITBUCKET_ENABLED` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_CODEBERG_ENABLED` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_EXPERIMENTS_ENABLED` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_INSIGHTS_ENABLED` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_POSTHOG_HOST` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_POSTHOG_KEY` | ✓ | ✓ | OK |
-| `NEXT_PUBLIC_STUDIO_ENABLED` | ✓ | ✓ | OK |
-| `RESEND_API_KEY` | ✓ | ✓ | OK |
-| `RESEND_WEBHOOK_SECRET` | ✓ | ✓ | OK |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | ✓ | OK |
-| `SUPABASE_URL` | ✓ | ✓ | OK |
-| `SUPPORT_FORWARD_EMAIL` | ✓ | ✓ | OK |
-| `UPSTASH_REDIS_REST_TOKEN` | ✓ | ✓ | OK |
-| `UPSTASH_REDIS_REST_URL` | ✓ | ✓ | OK |
-| `VERCEL_ENV` | ✓ | ✓ | OK |
-| `WARM_CACHE_PRIORITY_HANDLES` | ✓ | ✓ | OK |
-| `CI` | — | ✓ | Universal CI standard — no doc needed |
-| `NODE_ENV` | — | ✓ | Universal Node.js standard — no doc needed |
-| `TESTPLATFORM_CLIENT_ID` | — | test files only | Fake OAuth in `lib/auth/platform-oauth.test.ts` — test scaffolding, not a production variable |
-| `TESTPLATFORM_CLIENT_SECRET` | — | test files only | Same as above |
+### Status Summary
+- Documented in CLAUDE.md: 31 variables
+- Production vars used in code: 31 (all match)
+- Standard/test-only vars used in code: 6 (intentionally not in CLAUDE.md)
 
-**Env var coverage: 31/31 production variables documented — 100%**
+### Documented and in use (31/31 — all GREEN)
+All vars listed in CLAUDE.md lines 292–337 are actively used in production code.
+
+### In code but not documented (intentional omissions)
+| Variable | Usage | Justification |
+|----------|-------|---------------|
+| `ANALYZE` | `next.config.ts:5` | Dev-only bundle analyzer — documented inline |
+| `CI` | `playwright.config.ts` | Universal CI marker — not project-specific |
+| `NODE_ENV` | `next.config.ts:8` | Universal Node.js — not project-specific |
+| `VERCEL_ENV` | Various | Documented in CLAUDE.md line 335 |
+| `TESTPLATFORM_CLIENT_ID` | `platform-oauth.test.ts` | Test scaffolding only — confirmed prior audit |
+| `TESTPLATFORM_CLIENT_SECRET` | `platform-oauth.test.ts` | Test scaffolding only — confirmed prior audit |
+
+**Assessment**: No production env var gaps. All omissions are standard build/test vars.
 
 ---
 
-## Design System Token Coverage
+## TODO/FIXME Doc References
 
-**Color tokens: 38/38 — 100%**
-
-All `--color-*` tokens in `apps/web/styles/globals.css` match entries in `docs/design-system.md`. Light and dark values are properly defined for all tokens. `--color-complement` uses `#10B981` in both themes (intentional — confirmed in CSS).
-
-**Animation table: 18/18 — 100%**
-
-All animation classes documented with durations and descriptions.
-
----
-
-## Required Docs
-
-| File | Exists | Non-empty | Notes |
-|------|--------|-----------|-------|
-| `docs/impact-v4.md` | ✓ | ✓ | Historical v4 spec |
-| `docs/impact-v6.md` | ✓ | ✓ | Current spec, source of truth |
-| `docs/svg-design.md` | ✓ | ✓ | Badge SVG design spec |
-| `README.md` | ✓ | 215 lines | Full setup, CI badges, stack, features |
-| `docs/agents/shared-context.md` | ✓ | Active | 10 entries, latest 2026-04-03 |
-
----
-
-## TODO/FIXME Audit
-
-Zero `TODO`/`FIXME` comments referencing documentation in `apps/web/lib/` or `apps/web/app/`. No outstanding documentation debt markers.
+None found in production code. No genuine unresolved doc-related TODOs.
 
 ---
 
 ## Recommendations
 
-| Priority | Item | Action |
-|----------|------|--------|
-| P3 | `TESTPLATFORM_*` env vars | No action needed — already test-only. Optionally add an inline comment in `platform-oauth.test.ts` clarifying these are fake OAuth credentials for test scaffolding. |
-| P3 | Internal helper JSDoc | Optional — non-exported helpers in `generate-insights.ts` and `parser.ts` could get inline comments, but this is style preference only. |
+All documentation is current. No action items required.
 
-**No P1 or P2 items.**
+| Priority | Item | Status |
+|----------|------|--------|
+| — | Route documentation (44/44) | ✓ COMPLETE |
+| — | Color token verification (38/38) | ✓ COMPLETE |
+| — | Required docs (6/6) | ✓ COMPLETE |
+| — | Env var coverage (31/31 production) | ✓ COMPLETE |
+| — | JSDoc on public exports | ✓ COMPLETE |
+| CARRIED | BadgeToolbar flaky test (from coverage agent) | Not a docs issue — see coverage report |

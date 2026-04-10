@@ -97,20 +97,20 @@
 - [Cost Analyst]: Bundle reduced to 1,663 KB (-137 KB). OG image Redis memory monitor unchanged — CDN `s-maxage=21600` bounds generation. Turbopack NFT warning may slightly increase Lambda size for OG image route.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation timestamp=2026-04-03T10:00:00Z -->
-## Documentation Agent — 2026-04-03
+<!-- ENTRY:START agent=documentation timestamp=2026-04-10T10:00:00Z -->
+## Documentation Agent — 2026-04-10
 - **Status**: GREEN
-- Route coverage: **44/44 API routes documented** in CLAUDE.md (100%). All 5 previously noted method mismatches RESOLVED (triage 2026-03-28). `POST /api/telemetry` added. 34 pages documented (pattern `/experiments/*` covers 13 experiment sub-pages).
-- Design system: **38/38 color tokens** (100%) and **18/18 animations** (100%). `animate-shimmer-sweep` and `animate-hex-cell-in` 0.45s duration added. `--color-complement` dark override confirmed `#10B981` in both themes. All hex values accurate.
-- Env vars: **31/31 production vars documented** (100%). `TESTPLATFORM_CLIENT_ID/SECRET` confirmed test-only scaffolding (`platform-oauth.test.ts`) — not production vars. `CI`/`NODE_ENV` are universal standards.
-- JSDoc coverage: **~100% on public exports**. All previously flagged gaps (`isValidTelemetryPayload`, `isValidBadgeConfig`, `generateInsights`, `lib/db/campaigns.ts`) RESOLVED. Non-exported internal helpers lack JSDoc (acceptable per convention).
-- All required docs exist: `impact-v4.md`, `impact-v6.md`, `svg-design.md`, `README.md` (215 lines), `shared-context.md`. 0 TODO/FIXME comments referencing doc gaps.
-- Shared-context has 10 entries, latest 2026-04-03.
+- Route coverage: **44/44 API routes + 15 pages documented** (100%). Unchanged from 2026-04-03. No new routes added.
+- Design system: **38/38 color tokens** (100%) and **18/18 animations** (100%). All hex values verified accurate in both light and dark theme variants.
+- Env vars: **31/31 production vars documented** (100%). `TESTPLATFORM_*` confirmed test-only. `CI`/`NODE_ENV`/`ANALYZE` are standard build vars (intentional omissions).
+- JSDoc coverage: **100% on public exports**. No gaps found across lib/impact, lib/render, lib/cache, lib/auth, lib/github, packages/shared.
+- Required docs: all 6 present and non-empty (`impact-v4.md`, `impact-v6.md`, `svg-design.md`, `README.md` 215 lines, `design-system.md`, `shared-context.md`). 0 TODO/FIXME referencing doc gaps.
+- Shared-context has entries up to 2026-04-10. Stable.
 
 **Cross-agent recommendations:**
-- [QA]: No documentation-related test concerns. All method mismatches resolved — test expectations should be aligned.
-- [Security]: No security-related doc gaps. SVIX_*/ICEBERG_TOKEN confirmed false positives (not in source). TESTPLATFORM_* are test-only.
-- [Coverage]: No doc-coverage overlap gaps remaining. All previously flagged functions now have JSDoc.
+- [QA]: No documentation-related test concerns. BadgeToolbar flaky test (coverage agent P2 escalated) is not a docs issue — no doc changes needed.
+- [Security]: No security-related doc gaps. All env vars correctly scoped. `NEXT_PUBLIC_*` vars confirmed non-sensitive.
+- [Coverage]: No doc-coverage gaps remaining. All critical-path functions have JSDoc.
 - [Cost Analyst]: No doc gaps affecting cost model. All routes and env vars fully documented.
 <!-- ENTRY:END -->
 
@@ -154,23 +154,6 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-08T02:00:00Z -->
-## Coverage Agent — 2026-04-08
-- **Status**: GREEN
-- Overall coverage: **93.13% stmts** (7579/8138), 89.87% branch, 89.94% funcs, 94.31% lines
-- Test suite: 390 files, 7000 tests, 100% pass rate across 3 runs — no flakiness
-- Delta vs 2026-04-07: +0.14pp stmts, +0.19pp branch, 0pp funcs, +0.14pp lines — plateau-stable
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 95.9%
-- **All v2.7.x P1s confirmed closed**: tool-insights.ts 97.6%, recalculate funcs 100%, refresh funcs 75% (1 fire-and-forget catch — P3 only)
-- **P3 ONLY**: refresh/route.ts `updateCraftCache` catch arrow (1 func uncovered), svg-to-png fallback branch, demoData/archetypeDemoData null-coalescing arm, AuthorTypewriter JSDOM timing
-- **Flaky RESOLVED**: BadgeToolbar 0/3 recurrences — closed. Infra/.tmp race also 0 recurrences.
-
-**Cross-agent recommendations:**
-- [Security]: No new security-relevant coverage gaps. All dbRecomputeCraft error paths confirmed covered.
-- [QA]: No open P1s or P2s. Only P3 branch gaps remain — all in fire-and-forget or static-data paths. No action needed.
-- [Cost Analyst]: app/api 97.6%, lib/db 97.6%. tool-insights.ts P2-2 confirmed resolved.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage timestamp=2026-04-09T02:00:00Z -->
 ## Coverage Agent — 2026-04-09
 - **Status**: YELLOW
@@ -185,6 +168,22 @@
 **Cross-agent recommendations:**
 - [QA]: BadgeToolbar flaky test re-emerged — P2. Fix: replace `setTimeout(r, 0)` with `flushPromises` helper at `BadgeToolbar.render.test.tsx:994`. Also address post-unmount `setDownloadStatus` unhandled rejection at `BadgeToolbar.tsx:130` (add mounted-guard or cleanup `AbortController`).
 - [Security]: No new security-relevant gaps. All critical-path coverage unchanged and GREEN.
+- [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-10T02:00:00Z -->
+## Coverage Agent — 2026-04-10
+- **Status**: YELLOW
+- Overall coverage: **93.14% stmts** (7580/8138), 89.87% branch, 90.00% funcs, 94.31% lines
+- Test suite: 390 files, 7000 tests — fully plateau-stable (0pp delta vs 2026-04-09)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 95.9%
+- **Flaky PERSISTS**: `BadgeToolbar.render.test.tsx` — "strips SVG animations" FAILED **2/3 runs** today (higher rate than yesterday's 1/3). Root cause unchanged. **P2 escalated — fix is overdue.**
+- **P2 carried**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile). Low priority.
+- **P3 carried (all accepted)**: AuthorTypewriter 67.5% branches (JSDOM), ParticleBackground 72.2% branch/77.8% funcs (canvas), svg-to-png 66.7% branches (fallback), demoData/archetypeDemoData 50% branches (null arms), refresh/route.ts 75% funcs (fire-and-forget catch), server-errors.ts 87.5% branches (PostHog fetch missing AbortSignal.timeout).
+
+**Cross-agent recommendations:**
+- [QA]: BadgeToolbar flaky test now failing 2/3 runs — escalate from P2 to fix immediately. Fix: `flushPromises` at `BadgeToolbar.render.test.tsx:994` + mounted-guard at `BadgeToolbar.tsx:130`.
+- [Security]: No new gaps. All critical-path coverage unchanged GREEN. server-errors.ts PostHog timeout P3 from cost-analyst carried.
 - [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable.
 <!-- ENTRY:END -->
 
