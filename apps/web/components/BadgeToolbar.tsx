@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
@@ -19,6 +19,10 @@ export function BadgeToolbar({
     "idle" | "loading" | "success" | "error"
   >("idle");
   const shareRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
   const { isOpen: shareOpen, setIsOpen: setShareOpen } = useDropdownMenu(shareRef);
   const { shouldRender: showShare, isAnimatingOut: shareExiting } =
     useAnimatedUnmount(shareOpen, 200);
@@ -127,7 +131,9 @@ export function BadgeToolbar({
       a.click();
       document.body.removeChild(a);
     } finally {
-      setDownloadStatus("idle");
+      if (mountedRef.current) {
+        setDownloadStatus("idle");
+      }
     }
   }, [handle]);
 

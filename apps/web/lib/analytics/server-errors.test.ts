@@ -247,4 +247,19 @@ describe("captureServerError", () => {
     const props = body.properties as Record<string, unknown>;
     expect(props.stack).not.toContain("ghp_secrettoken123");
   });
+
+  it("passes an AbortSignal to the PostHog fetch call", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerError } = await import("./server-errors");
+
+    await captureServerError({
+      route: "/api/test",
+      statusCode: 500,
+      error: new Error("test"),
+    });
+
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(opts.signal).toBeInstanceOf(AbortSignal);
+  });
 });

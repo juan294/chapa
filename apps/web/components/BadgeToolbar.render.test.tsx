@@ -987,12 +987,14 @@ describe("BadgeToolbar render", () => {
         <BadgeToolbar handle="testuser" />,
       );
 
-      await act(async () => {
-        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
-        // Let the microtask (onerror) and subsequent promise rejection
-        // settle within act() so handleDownload completes fully
-        await new Promise((r) => setTimeout(r, 0));
-      });
+      fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+
+      // waitFor polls until capturedSrc is populated — more reliable than a
+      // fixed-tick setTimeout which can miss the queueMicrotask→promise chain
+      // (fetch → text() → Image → queueMicrotask(onerror) → reject → finally)
+      await waitFor(() => {
+        expect(capturedSrc).not.toBe("");
+      }, { timeout: 2000 });
 
       // The data URI src should have animations stripped
       const decodedSvg = decodeURIComponent(capturedSrc.replace("data:image/svg+xml;charset=utf-8,", ""));
