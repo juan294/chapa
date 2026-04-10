@@ -216,21 +216,21 @@
 - [QA]: No open P1s. Test suite at 7000 tests. All critical paths remain 95%+.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-03-28T06:00:00Z -->
-## Triage — 2026-03-28
-- **Reports processed**: 3 overnight (coverage, cost-analyst, cc-rpi-update) + 7 from Mar 27
-- **Action items resolved**: 11 groups — all implemented
-- **Summary**: Fixed 4 CLAUDE.md route method mismatches, corrected design-system.md animation duration, added JSDoc to 11 functions, fixed sync-audience Promise.all→Promise.allSettled (TDD), added 138 tests across 18 test files closing P1-P4 coverage gaps. Env var investigation: ICEBERG_TOKEN/SVIX_*/BOOK_LANG are false positives (not in source code).
-- **Tests**: 6,552 passing (378 files), 0 type errors, 0 lint issues
-- **Coverage delta**: +138 tests vs 6,414. P1: refresh route funcs 66.7%→100%. P2: auth/callback, warm-cache, snapshot-cache, redis, supabase all 80-85%→92-100%. P3: demoData, archetypeDemoData, github auth, snapshots, admin-users, heatmap-evenness, recency, verification, tool-insights branches→80%+. P4: BadgePreviewCard funcs→80%+, UserMenu funcs→78%+, AuthorTypewriter→100%.
-- **Code fixes**: sync-audience Promise.allSettled (defensive resilience improvement).
+<!-- ENTRY:START agent=triage timestamp=2026-04-10T17:50:00Z -->
+## Triage — 2026-04-10
+- **Reports processed**: 4 (coverage, performance, documentation, cc-rpi-update)
+- **Agent failures**: 3 (cost-analyst, cc-rpi-update, qa — all API limit/overload, no code action)
+- **Action items resolved**: 4 of 4 — all implemented
+- **Summary**: Fixed BadgeToolbar flaky test (2/3 failure rate) by replacing act()/setTimeout with waitFor; added mountedRef guard to prevent post-unmount setDownloadStatus rejection; added AbortSignal.timeout(5000) to PostHog captureServerError fetch + regression test; documented intentional synchronous GlobalCommandBar import in LandingTerminal. Tests: 7001 (+1 vs 7000), 0 type errors, 0 lint issues.
+- **Coverage delta**: +1 test (server-errors AbortSignal). BadgeToolbar flaky test stabilized — previously 2/3 failures, now 0/3.
+
 **Cross-agent recommendations:**
-- [Coverage]: All P1-P4 items addressed. Remaining accepted limitations: experiments (WebGL/Canvas), HolographicOverlay (JSDOM), server pages (Next.js).
-- [QA]: Test count at 6,552. All critical paths above 92%. No functional issues.
-- [Documentation]: 4 CLAUDE.md route mismatches fixed. animate-hex-cell-in duration corrected. JSDoc coverage improved to ~90%+.
-- [Cost Analyst]: sync-audience now uses Promise.allSettled. Monitor items carried (OG image Redis memory, sync-audience pagination).
-- [Security]: No new concerns. All defensive patterns intact.
+- [Coverage]: BadgeToolbar flaky test resolved — should be GREEN next cycle. server-errors.ts AbortSignal branch now covered. All critical paths stable.
+- [Performance]: Documented LandingTerminal sync import divergence — no bundle change, just clarified intent.
+- [Cost Analyst]: server-errors.ts PostHog fetch now has 5s timeout — P3-NEW from 2026-04-09 resolved.
+- [QA]: 3 agents failed due to API limits on 2026-04-10 — no code issues, will rerun next scheduled cycle.
 <!-- ENTRY:END -->
+
 
 <!-- ENTRY:START agent=triage timestamp=2026-03-30T06:30:00Z -->
 ## Triage — 2026-03-30
