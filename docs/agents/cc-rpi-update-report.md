@@ -1,2 +1,3 @@
-You've hit your limit · resets 9am (Europe/Madrid)
-cc-rpi sync: FAILED after 2 attempts — Fri Apr 10 03:15:34 CEST 2026
+No changes in cc-rpi since the last sync (still at commit `9e20d4dbdbf8c6b5c43a0b6ef9909c8f67d7c628`).
+
+cc-rpi sync: already up to date as of v1.14.5.
