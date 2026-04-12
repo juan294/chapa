@@ -1,34 +1,29 @@
-# cc-rpi Update Agent Report
+---
 
-## Run: 2026-04-12
+**cc-rpi sync: v1.15.0** (commit `7ef063d`) — 2 commands updated, pushed to `origin/develop`, CI green (390 test files, 7001 tests passing).
 
-**Status:** SUCCESS  
-**Blueprint version:** v1.15.0 (commit 7ef063d)  
-**Previous sync:** v1.14.5 (commit 9e20d4d, 2026-04-08)
+### What changed
 
-### Changes Applied
+**Blueprint release: v1.15.0** — Pre-launch deep-audit restructure + 3-wave remediation
 
-**Commands updated (2):**
-- `.claude/commands/pre-launch.md` - upgraded from 6-specialist to **8-specialist deep-audit**
-  - New specialists: Staff Frontend Engineer (FE), Staff Backend Engineer (BE)
-  - New structured finding ID system (AR-B1, SE-M3, etc.)
-  - 16-section report format (was ad-hoc 6-section)
+**Commands updated:**
+
+- **`/pre-launch`** — Major upgrade (6→8 specialists):
+  - Added Staff Frontend Engineer (`FE`) and Staff Backend Engineer (`BE`) as dedicated specialists
+  - Structured finding ID system: `<DOMAIN>-<SEVERITY_LETTER><COUNTER>` (e.g. `SE-B1`, `UX-M3`)
+  - 16-section report format with machine-parseable Section 14 wave index
   - Critic mindset preamble + system-map-first Domain Model per specialist
-  - Section 14 wave index drives /remediate ordering
-  - Model tier: opus for all 8 specialists
-- `.claude/commands/remediate.md` - upgraded to **3-wave processing**
-  - Wave 1: Before launch (blockers + high) - fix agents spawned
-  - Wave 2: After launch (medium) - fix agents spawned, optional defer
-  - Wave 3: Later/strategic - GitHub issues filed only, no fix agents
-  - `wave=N` argument to resume mid-run
-  - Structured finding ID parser contract
-  - Per-wave push/PR/merge/cleanup cycle with STOP gate between waves
+  - All 8 run on **opus** model
+  - Rule #73 enforced: only QA runs the full test suite in parallel audit
 
-**Unchanged:** research, plan, implement, validate, describe-pr, triage, fix-ci, release, status, update-docs, detach
+- **`/remediate`** — 3-wave processing (was single-pass):
+  - Wave 1 (Before launch): blockers + high severity — fix agents spawned
+  - Wave 2 (After launch): medium severity — optional defer with `wave=2` resume
+  - Wave 3 (Later/strategic): GitHub issues filed only, no fix agents (human architectural judgment required — documented Rule #58 exception)
+  - STOP gate between waves, per-wave push/PR/merge/cleanup cycle
 
-**Skills:** no changes (not in diff)
-
-**Rules:** no changes (not in diff)
+**Unchanged:** skills, rules, CLAUDE.md, settings.json
+ no changes (not in diff)
 
 **CLAUDE.md:** no changes needed
 

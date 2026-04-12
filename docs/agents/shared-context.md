@@ -9,29 +9,6 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-08T03:00:00Z -->
-## Cost Analyst — 2026-04-08
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 2 no-TTL singletons (HyperLogLog + badge counter) + 1 intentional TTL=0 cron cursor. All memory-bounded. Storage estimate: **~1.52 GB @10K users**. Upstash Pro 10 GB — **85% headroom**.
-- GitHub API: all cache-first (6h + 7d stale fallback), in-flight dedup, ~50–150 calls/hr baseline vs 5,000/hr limit.
-- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. `dbRecomputeCraft()` fully tested (97.6% coverage).
-- Fetch timeouts: **100%** — all GitHub/Codeberg/Bitbucket/Resend calls have `AbortSignal.timeout()`. Resource leaks: 0.
-- **P1s: NONE**.
-- **P2-2 RESOLVED**: `dbRecomputeCraft()` now at 97.6% coverage (confirmed by coverage agent 2026-04-08).
-- **P2-3 RESOLVED**: Warm-cache `BATCH_SIZE=5` → ~100s actual runtime vs 300s limit. No ceiling needed.
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
-- **MONITOR: OG image Redis memory** — CARRIED. CDN bounds cost.
-- **MONITOR: `sync-audience` pagination** — CARRIED. Future scale only.
-- **MONITOR: HyperLogLog** — CARRIED. ~12KB, track quarterly.
-
-**Cross-agent recommendations:**
-- [Security]: No new concerns. Fetch timeout coverage confirmed 100%. Fail-open rate limiting intact.
-- [QA]: No open P1s or P2s. Only P2-1 (campaigns RPC) remains as a future-scale item.
-- [Performance]: Bundle at 1,663 KB stable. OG image Redis monitor carried. Warm-cache P2-3 closed.
-- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — all cost-critical paths well covered.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-09T03:00:00Z -->
 ## Cost Analyst — 2026-04-09
 - **Status**: GREEN
@@ -53,6 +30,28 @@
 - [QA]: No open P1s or P2s. Only P3 (PostHog timeout) and carried P2-1 (campaigns RPC) remain.
 - [Performance]: Bundle and OG image monitor unchanged. No new cost-performance tradeoffs.
 - [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — stable. `server-errors.ts` timeout path now worth a test case.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-12T03:00:00Z -->
+## Cost Analyst — 2026-04-12
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 2 no-TTL HyperLogLog singletons (intentional, bounded). Full key-pattern audit complete — `avatar:{handle}` (base64 data URI, ~30 KB, 6h TTL) now included in storage model. Revised estimate: **~827 MB @10K users** (91.7% headroom). Prior 1.52 GB figure overestimated; avatar cache was previously unitemized. No unbounded growth patterns.
+- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
+- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
+- Fetch timeouts: **100%** — PostHog P3 from 2026-04-09 confirmed resolved by triage 2026-04-10.
+- Next.js upgraded to 16.2.3 (GHSA-q4gf-8mx6-v5v3). No cost impact.
+- **P1s: NONE. P2s: NONE (active).**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
+- **P3 NEW**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL) — eliminates all Resend pagination on repeat runs. ~5 lines. Low urgency.
+- **MONITOR M1 NEW**: Avatar cache Redis memory (~300 MB max @ 10K simultaneous users).
+- **MONITOR M2**: OG image Redis memory — CARRIED.
+- **MONITOR M3**: HyperLogLog — CARRIED. ~12 KB, track quarterly.
+
+**Cross-agent recommendations:**
+- [Performance]: Avatar base64 data URIs in Redis (~30 KB each) could be deferred to CDN or generated inline — minor consideration if avatar fetch latency becomes visible.
+- [Security]: `sync-audience` Resend pagination has 30s timeout backstop but no explicit rate limit. Low risk; cache contact list if Resend rate limits appear in future.
+- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — stable. No new cost-critical paths need test coverage.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
