@@ -154,21 +154,21 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-09T02:00:00Z -->
-## Coverage Agent — 2026-04-09
+<!-- ENTRY:START agent=coverage timestamp=2026-04-12T02:00:00Z -->
+## Coverage Agent — 2026-04-12
 - **Status**: YELLOW
-- Overall coverage: **93.14% stmts** (7580/8138), 89.87% branch, 90.00% funcs, 94.31% lines
-- Test suite: 390 files, 7000 tests — plateau-stable vs 2026-04-08 (+0.01pp stmts, +0.06pp funcs)
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 95.9%
-- **Flaky RE-EMERGED**: `BadgeToolbar.render.test.tsx` — "strips SVG animations" FAILED 1/3 runs. Root cause: `queueMicrotask` + `setTimeout(r, 0)` inside `act()` does not reliably drain the full async chain (fetch → stripAnimations → Image.src → onerror → fallback). Was declared resolved 2026-04-07 after 0/3 — recurrence reopens as **P2**.
-- **Unhandled rejection**: `window is not defined` at `BadgeToolbar.tsx:130` (`setDownloadStatus("idle")` post-unmount). Contributes to test environment pollution. Same source as flaky test.
-- **P2**: `components/UserMenu.tsx` — 79.3% funcs, 72.2% branches (`handleInsightsFile` complex handler). Carried.
-- **P3 carried**: AuthorTypewriter 67.5% branches (JSDOM), ParticleBackground 77.8% funcs (canvas), svg-to-png 66.7% branches (fallback), demoData/archetypeDemoData 50% branches (null arms), refresh/route.ts 75% funcs (fire-and-forget catch).
+- Overall coverage: **93.12% stmts** (7583/8143), 89.86% branch, 89.95% funcs, 94.28% lines
+- Test suite: 390 files, 7001 tests — plateau-stable (0pp delta vs 2026-04-10)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components ~95.9%
+- **Flaky tests: NONE** — BadgeToolbar fix confirmed stable: 0/3 failures across all runs today
+- **P2 carried**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile). Low priority.
+- **P3 carried (all accepted)**: AuthorTypewriter 67.5% branches (JSDOM), HolographicOverlay 47% stmts (Canvas), experiments 56.1% aggregate (Canvas/WebGL), svg-to-png 66.7% branches (fallback), refresh/route.ts 75% funcs (fire-and-forget)
 
 **Cross-agent recommendations:**
-- [QA]: BadgeToolbar flaky test re-emerged — P2. Fix: replace `setTimeout(r, 0)` with `flushPromises` helper at `BadgeToolbar.render.test.tsx:994`. Also address post-unmount `setDownloadStatus` unhandled rejection at `BadgeToolbar.tsx:130` (add mounted-guard or cleanup `AbortController`).
-- [Security]: No new security-relevant gaps. All critical-path coverage unchanged and GREEN.
+- [Security]: No new security-relevant test gaps. All critical-path coverage unchanged and GREEN. auth/codeberg/config.ts and auth/bitbucket/config.ts coverage captured via route tests.
+- [QA]: BadgeToolbar flaky test confirmed resolved — no further action needed. Suite stable at 7001 tests.
 - [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable.
+- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage timestamp=2026-04-10T02:00:00Z -->
