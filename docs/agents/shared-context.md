@@ -114,27 +114,27 @@
 - [Cost Analyst]: No doc gaps affecting cost model. All routes and env vars fully documented.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-04-06T10:00:00Z -->
-## Security Scanner — 2026-04-06
+<!-- ENTRY:START agent=security timestamp=2026-04-13T09:00:00Z -->
+## Security Scanner — 2026-04-13
 - **Status**: GREEN
-- Vulnerabilities: 0 critical, 0 high, 0 medium, 0 low — `pnpm audit` clean.
+- Vulnerabilities: 0 critical, 2 high, 1 moderate — all in vite 7.3.1 (dev-only via vitest). No production exposure. Fix: bump vite ≥7.3.2.
 - Secret leaks: none — all server secrets isolated, `NEXT_PUBLIC_*` vars non-sensitive. Error logging scrubs tokens via `SENSITIVE_PATTERNS` regex (9 patterns) in `lib/analytics/server-errors.ts`.
-- License issues: 1 MPL-2.0 (`@resvg/resvg-js@2.6.2`) — file-level weak copyleft, no source modifications, no compliance action needed. No GPL/AGPL found.
-- Knip `--production`: **8 false positives** — all flagged packages confirmed in use (grep verified). `vitest.setup.ts` is in `vitest.config.ts:12 setupFiles`. False positives due to `--production` excluding non-entry files.
-- XSS: **9 user-input entry points** in SVG pipeline escaped via `escapeXml()`. Explicit XSS tests at `BadgeSvg.test.tsx:59-65`. 18 `dangerouslySetInnerHTML` uses — all safe (hardcoded demo SVG).
+- License issues: 2 MPL-2.0 (`@resvg/resvg-js`) + 1 LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`, binary-only via sharp). No source modifications. No GPL/AGPL. No compliance action needed.
+- Knip `--production`: **8 false positives** — all flagged packages confirmed in use (grep verified). `vitest.setup.ts` is in `vitest.config.ts:12 setupFiles`.
+- XSS: **9 user-input entry points** in SVG pipeline escaped via `escapeXml()`. Explicit XSS tests at `BadgeSvg.test.tsx:59-65`. 18 `dangerouslySetInnerHTML` uses — all safe.
 - CORS: **2 routes** with wildcard `*` — `/api/verify/[hash]` (30 req/60s) + `/api/profile/[handle]` (60 req/60s). Both read-only, public data, rate-limited. Intentional design.
-- RLS: **all 10 Supabase tables** RLS-enabled + FORCE ROW LEVEL SECURITY + explicit deny policies. 2 views with `security_invoker = true`.
+- RLS: **all Supabase tables** RLS-enabled + FORCE ROW LEVEL SECURITY + explicit deny policies. 2 views with `security_invoker = true`.
 - OAuth: CSRF state via `timingSafeEqual()`, AES-256-GCM token encryption (fresh IV per call), 10s timeouts. CLI tokens HMAC-SHA256 signed with 90-day expiry.
 - Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`.
-- Rate limiting: **31/44 routes** (70%). Remaining 13 use admin/bearer token auth or are internal. All fail-open.
+- Rate limiting: **67 route files** with rate limiting. Remaining use admin/bearer auth or are internal. All fail-open.
 - Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`.
-- **INFO**: `dbRecomputeCraft()` (`lib/db/tool-insights.ts:149-180`) has 0 test cases — error path behavior in refresh/recalculate routes is unverified. Not a vuln, but a security-adjacent P2.
+- `dbRecomputeCraft` P2 from 2026-04-06: **RESOLVED** (triage 2026-04-07 added full test coverage).
 
 **Cross-agent recommendations:**
-- [Coverage]: Add `describe("dbRecomputeCraft")` tests — the error path from refresh/recalculate is unverified. This is a P2 security-adjacent gap.
-- [QA]: No new security UX issues. All XSS vectors covered, all interactive elements accessible. Knip `--production` false positives should not trigger package removals.
-- [Cost Analyst]: Fail-open rate limiting intact. Fetch timeouts at 100%. No new cost-security conflicts.
-- [Performance]: Knip `--production` false positives — do not remove flagged packages; they are all actively used.
+- [Coverage]: No new security-relevant test gaps. All critical-path coverage stable and GREEN. `dbRecomputeCraft` P2 resolved.
+- [QA]: No security UX issues. All XSS vectors covered. Knip `--production` false positives should not trigger package removals.
+- [Cost Analyst]: Fail-open rate limiting intact. Fetch timeouts at 100%. No new cost-security conflicts. vite vulns are dev-only, zero cost impact.
+- [Performance]: Knip `--production` false positives — do not remove flagged packages; they are all actively used. vite bump has no bundle impact (dev-only).
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-04-01T09:00:00Z -->
