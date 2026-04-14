@@ -9,28 +9,6 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-12T03:00:00Z -->
-## Cost Analyst — 2026-04-12
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 2 no-TTL HyperLogLog singletons (intentional, bounded). Full key-pattern audit complete — `avatar:{handle}` (base64 data URI, ~30 KB, 6h TTL) now included in storage model. Revised estimate: **~827 MB @10K users** (91.7% headroom). Prior 1.52 GB figure overestimated; avatar cache was previously unitemized. No unbounded growth patterns.
-- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
-- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
-- Fetch timeouts: **100%** — PostHog P3 from 2026-04-09 confirmed resolved by triage 2026-04-10.
-- Next.js upgraded to 16.2.3 (GHSA-q4gf-8mx6-v5v3). No cost impact.
-- **P1s: NONE. P2s: NONE (active).**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
-- **P3 NEW**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL) — eliminates all Resend pagination on repeat runs. ~5 lines. Low urgency.
-- **MONITOR M1 NEW**: Avatar cache Redis memory (~300 MB max @ 10K simultaneous users).
-- **MONITOR M2**: OG image Redis memory — CARRIED.
-- **MONITOR M3**: HyperLogLog — CARRIED. ~12 KB, track quarterly.
-
-**Cross-agent recommendations:**
-- [Performance]: Avatar base64 data URIs in Redis (~30 KB each) could be deferred to CDN or generated inline — minor consideration if avatar fetch latency becomes visible.
-- [Security]: `sync-audience` Resend pagination has 30s timeout backstop but no explicit rate limit. Low risk; cache contact list if Resend rate limits appear in future.
-- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — stable. No new cost-critical paths need test coverage.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-13T03:00:00Z -->
 ## Cost Analyst — 2026-04-13
 - **Status**: GREEN
@@ -53,6 +31,32 @@
 - [Performance]: No new cost-performance tradeoffs. Bundle stable. Homepage revalidate could increase from 1h to 6h (minor ISR optimization).
 - [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — unchanged and stable. No new cost-critical paths need test coverage.
 - [QA]: No open P1s or P2s. Dev-only vite vulns are the only new item — no production quality impact.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-14T03:00:00Z -->
+## Cost Analyst — 2026-04-14
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
+- No production code changes since 2026-04-12 — only agent report updates.
+- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~700–800 MB @10K users** (~91% headroom). Refined estimate based on full 18-key-pattern audit.
+- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
+- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 0 resource leaks. 11 indexes covering all hot queries.
+- Fetch timeouts: **100%**. Resource leaks: 0. No middleware.ts (zero per-request overhead).
+- Production vulns: **0**. Dev-only: 3 vite vulns (2 HIGH + 1 MODERATE via vitest). CARRIED.
+- **P1s: NONE. P2s: NONE (active).**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
+- **P3-1 CARRIED**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL).
+- **P3-2 CARRIED**: OG image `Promise.race()` timer not cleared (`og-image/route.ts:81-86`). Cosmetic — fires harmlessly.
+- **P3-3 CARRIED**: vite 7.3.1 dev-only vulns. Bump to >=7.3.2.
+- **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
+- **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
+- **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. Bundle stable at ~1,682 KB. ISR on `/u/[handle]` could increase from 1h to 6h (minor optimization).
+- [Security]: Fail-open rate limiting intact. Fetch timeouts at 100%. vite vulns remain dev-only, zero cost impact.
+- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — unchanged and stable. No new cost-critical paths need test coverage.
+- [QA]: No open P1s or P2s. Stable since 2026-04-12.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
