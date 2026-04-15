@@ -9,30 +9,6 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-13T03:00:00Z -->
-## Cost Analyst — 2026-04-13
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
-- No production code changes since 2026-04-12 — only dev dep bumps (vitest 4.1.4, @types/node 25.6.0, eslint 9.39.0) and cc-rpi blueprint sync (v1.15.0).
-- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~827 MB @10K users** (91.7% headroom). Unchanged.
-- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
-- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
-- Fetch timeouts: **100%**. Resource leaks: 0.
-- **P1s: NONE. P2s: NONE (active).**
-- **P3-NEW**: vite 7.3.1 (dev-only via vitest) has 3 vulns (2 HIGH + 1 MODERATE). Patched in >=7.3.2. No production exposure. Fix: `pnpm.overrides` or wait for vitest peer bump.
-- **P3-2 CARRIED**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL).
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
-- **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
-- **MONITOR M2**: OG image Redis memory. CARRIED.
-- **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
-
-**Cross-agent recommendations:**
-- [Security]: 3 dev-only vite vulns found (GHSA-v2wj-q39q-566r, GHSA-p9ff-h696-f583, GHSA-4w7w-66w2-5vf9). No production exposure — all via vitest. Recommend bumping vite to >=7.3.2.
-- [Performance]: No new cost-performance tradeoffs. Bundle stable. Homepage revalidate could increase from 1h to 6h (minor ISR optimization).
-- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — unchanged and stable. No new cost-critical paths need test coverage.
-- [QA]: No open P1s or P2s. Dev-only vite vulns are the only new item — no production quality impact.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-14T03:00:00Z -->
 ## Cost Analyst — 2026-04-14
 - **Status**: GREEN
@@ -57,6 +33,37 @@
 - [Security]: Fail-open rate limiting intact. Fetch timeouts at 100%. vite vulns remain dev-only, zero cost impact.
 - [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — unchanged and stable. No new cost-critical paths need test coverage.
 - [QA]: No open P1s or P2s. Stable since 2026-04-12.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-15T03:00:00Z -->
+## Cost Analyst — 2026-04-15
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
+- No production code changes since 2026-04-12 — only agent report updates.
+- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). Full 18-key-pattern audit confirmed.
+- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
+- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 11 indexes. 0 resource leaks.
+- Fetch timeouts: **100%**. No middleware.ts (zero per-request overhead).
+- Production vulns: **0**. Dev-only: 3 vite vulns (2 HIGH + 1 MODERATE via vitest). CARRIED.
+- Tests: **7001/7001 passed**, 0 type errors, 0 lint issues. Build: 3.0s compile, 68 chunks, no chunk >500 KB.
+- **P1s: NONE. P2s: NONE (active).**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
+- **P3-1 CARRIED**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL).
+- **P3-2 CARRIED**: OG image `Promise.race()` timer not cleared (`og-image/route.ts:81-86`). Cosmetic.
+- **P3-3 NEW**: `pingSupabase()` `Promise.race()` timer not cleared (`supabase.ts:43-48`). Same pattern as P3-2.
+- **P3-4 CARRIED**: vite 7.3.1 dev-only vulns. Bump to >=7.3.2.
+- **P3-5 NEW**: Outdated dev deps — vitest 4.1.2→4.1.4, @vitest/coverage-v8 4.1.2→4.1.4, jsdom 29.0.1→29.0.2.
+- **P3-6 NEW**: Consider partial index for `dbGetUsersWithEmail()` (email_notifications WHERE email IS NOT NULL).
+- **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
+- **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
+- **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
+- **MONITOR M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users). CARRIED.
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. Bundle stable at ~1.8 MB (68 chunks). ISR on `/u/[handle]` could increase from 1h to 6h (minor optimization).
+- [Security]: Fail-open rate limiting intact. Fetch timeouts at 100%. vite vulns remain dev-only, zero cost impact. New `pingSupabase()` timer leak is cosmetic — no security concern.
+- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — unchanged and stable. No new cost-critical paths need test coverage.
+- [QA]: No open P1s or P2s. Stable since 2026-04-12. 3 new P3 items (all minor).
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
@@ -158,23 +165,6 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-12T02:00:00Z -->
-## Coverage Agent — 2026-04-12
-- **Status**: YELLOW
-- Overall coverage: **93.12% stmts** (7583/8143), 89.86% branch, 89.95% funcs, 94.28% lines
-- Test suite: 390 files, 7001 tests — plateau-stable (0pp delta vs 2026-04-10)
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components ~95.9%
-- **Flaky tests: NONE** — BadgeToolbar fix confirmed stable: 0/3 failures across all runs today
-- **P2 carried**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile). Low priority.
-- **P3 carried (all accepted)**: AuthorTypewriter 67.5% branches (JSDOM), HolographicOverlay 47% stmts (Canvas), experiments 56.1% aggregate (Canvas/WebGL), svg-to-png 66.7% branches (fallback), refresh/route.ts 75% funcs (fire-and-forget)
-
-**Cross-agent recommendations:**
-- [Security]: No new security-relevant test gaps. All critical-path coverage unchanged and GREEN. auth/codeberg/config.ts and auth/bitbucket/config.ts coverage captured via route tests.
-- [QA]: BadgeToolbar flaky test confirmed resolved — no further action needed. Suite stable at 7001 tests.
-- [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable.
-- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage timestamp=2026-04-13T02:00:00Z -->
 ## Coverage Agent — 2026-04-13
 - **Status**: YELLOW
@@ -189,6 +179,23 @@
 - [Security]: No new security-relevant test gaps. All critical-path coverage unchanged and GREEN.
 - [QA]: BadgeToolbar flaky test stable for 3 cycles — closing this item. Suite stable at 7001 tests, 0 failures.
 - [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable.
+- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-15T02:00:00Z -->
+## Coverage Agent — 2026-04-15
+- **Status**: YELLOW
+- Overall coverage: **93.14% stmts** (7585/8143), 89.88% branch, 90.01% funcs, 94.31% lines
+- Test suite: 390 files, 7001 tests — plateau-stable (+0.02pp branch vs 2026-04-13, within rounding noise)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 96.0%
+- **Flaky tests: NONE** — 3/3 runs passed 7001/7001. BadgeToolbar fix stable for 5th consecutive cycle.
+- **P2 carried**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile). Low priority.
+- **P3 carried (all accepted)**: AuthorTypewriter 67.5% branches (JSDOM), HolographicOverlay 47% stmts (Canvas), experiments 56.1% aggregate (Canvas/WebGL), svg-to-png 66.7% branches (fallback), refresh/route.ts 75% funcs (fire-and-forget)
+
+**Cross-agent recommendations:**
+- [Security]: No new security-relevant test gaps. All critical-path coverage unchanged and GREEN.
+- [QA]: Suite stable at 7001 tests, 0 failures, 0 flaky. No regressions.
+- [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable. No new cost-critical paths need coverage.
 - [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
 <!-- ENTRY:END -->
 
