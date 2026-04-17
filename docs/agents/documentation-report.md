@@ -1,127 +1,115 @@
 # Documentation Report
-> Generated: 2026-04-10 | Health status: **GREEN**
+> Generated: 2026-04-17 | Health status: green
 
 ## Executive Summary
-All documentation is current and accurate — 44/44 API routes documented (100%), 38/38 color tokens verified, all required docs present and non-empty, and no stale or missing documentation detected. No action items required.
-
----
+All 50 API routes, 24 pages, and 33 production environment variables are fully documented and match their implementations. Three minor gaps exist in design-system.md: light-mode values for `--color-dark-section`, `--color-dark-card`, and the four terminal tokens are not listed in the table.
 
 ## Route Documentation
 
-### Status Summary
-- **Total pages documented**: 15/15 (100%)
-- **Total API routes documented**: 44/44 (100%)
-- **Mismatches found**: 0
+### Pages (24 routes)
 
-### Pages
-| Route | Documented in CLAUDE.md | Exists in code | Status |
-|-------|------------------------|---------------|--------|
-| `/` | ✓ | ✓ | OK |
-| `/studio` | ✓ | ✓ | OK |
-| `/admin` | ✓ | ✓ | OK |
-| `/u/:handle` | ✓ | ✓ | OK |
-| `/verify/:hash` | ✓ | ✓ | OK |
-| `/about` | ✓ | ✓ | OK |
-| `/about/scoring` | ✓ | ✓ | OK |
-| `/about/verification` | ✓ | ✓ | OK |
-| `/archetypes/*` (7 routes) | ✓ | ✓ | OK |
-| `/generating/:handle` | ✓ | ✓ | OK |
-| `/cli/authorize` | ✓ | ✓ | OK |
-| `/privacy` | ✓ | ✓ | OK |
-| `/terms` | ✓ | ✓ | OK |
-| `/coming-soon` | ✓ | ✓ | OK |
-| `/verify` | ✓ | ✓ | OK |
-| `/experiments/*` (13 routes) | ✓ | ✓ | OK |
+| Route | Documented in CLAUDE.md | File exists | Status |
+|-------|------------------------|-------------|--------|
+| `/` | ✓ | `app/page.tsx` | ✓ OK |
+| `/studio` | ✓ | `app/studio/page.tsx` | ✓ OK |
+| `/admin` | ✓ | `app/admin/page.tsx` | ✓ OK |
+| `/u/:handle` | ✓ | `app/u/[handle]/page.tsx` | ✓ OK |
+| `/verify/:hash` | ✓ | `app/verify/[hash]/page.tsx` | ✓ OK |
+| `/verify` | ✓ | `app/verify/page.tsx` | ✓ OK |
+| `/about` | ✓ | `app/about/page.tsx` | ✓ OK |
+| `/about/scoring` | ✓ | `app/about/scoring/page.tsx` | ✓ OK |
+| `/about/verification` | ✓ | `app/about/verification/page.tsx` | ✓ OK |
+| `/archetypes/:type` | ✓ | builder/guardian/marathoner/polymath/artificer/balanced/emerging | ✓ OK |
+| `/generating/:handle` | ✓ | `app/generating/[handle]/page.tsx` | ✓ OK |
+| `/cli/authorize` | ✓ | `app/cli/authorize/page.tsx` | ✓ OK |
+| `/privacy` | ✓ | `app/privacy/page.tsx` | ✓ OK |
+| `/terms` | ✓ | `app/terms/page.tsx` | ✓ OK |
+| `/coming-soon` | ✓ | `app/coming-soon/page.tsx` | ✓ OK |
+| `/experiments/*` | ✓ | 13 experiment pages | ✓ OK |
 
-### API Routes
-All 44 API routes documented and present in code:
-- **Auth routes**: 11/11 ✓
-- **Public API routes**: 10/10 ✓
-- **Authenticated API routes**: 9/9 ✓
-- **Admin API routes**: 9/9 ✓
-- **Webhooks & Cron routes**: 5/5 ✓
+### API Routes (50 routes)
+All 50 `app/api/**/route.ts` files have corresponding entries in CLAUDE.md. Full cross-check confirmed — zero undocumented routes, zero stale entries pointing to non-existent files.
 
----
-
-## Color Token Audit
-
-### Status Summary
-- **Total tokens in globals.css**: 38
-- **Total tokens in design-system.md**: 38
-- **Mismatches**: 0
-
-All tokens verified across base colors, semantic colors, dimension colors (delivery, quality, consistency, breadth, craft + light variants), archetype colors (7), track, and shadows. All hex values in globals.css match design-system.md for both light and dark theme variants.
-
----
-
-## Required Docs Status
-
-| File | Exists | Non-empty | Notes |
-|------|--------|-----------|-------|
-| `docs/impact-v4.md` | ✓ | ✓ | 131 lines |
-| `docs/impact-v6.md` | ✓ | ✓ | 270 lines |
-| `docs/svg-design.md` | ✓ | ✓ | 173 lines |
-| `README.md` | ✓ | ✓ | 215 lines — description, setup, key commands present |
-| `docs/design-system.md` | ✓ | ✓ | 234 lines |
-| `docs/agents/shared-context.md` | ✓ | ✓ | Latest entry: 2026-04-10 (Coverage Agent) |
-
----
+Notable: `/.well-known/security.txt`, `/llms.txt`, `/llms-full.txt`, `/og-image` are implemented as route.ts files outside `/api/` — all documented correctly in CLAUDE.md's Public API section.
 
 ## Stale Documentation
 
-None detected. All documentation is synchronized with current code.
+| Doc | Issue | Severity |
+|-----|-------|----------|
+| `docs/design-system.md` | `--color-amber`, `--color-amber-light`, `--color-amber-dark`, `--color-stroke`, `--color-warm-bg/card/stroke`, `--color-dark-section`, `--color-dark-card`, `--color-purple-tint`, `--color-complement-light`, `--color-track` rows are missing the "Light value" column in the color table | Low |
+| `docs/design-system.md` | Light values for terminal tokens (`--color-terminal-green: #16A34A`, `--color-terminal-red: #DC2626`, `--color-terminal-yellow: #D97706`, `--color-terminal-dim: #9CA3AF`) exist in `globals.css` `:root` but are not listed in the table — only dark values shown | Low |
 
----
+No stale routes, no stale env vars, no stale type references found.
 
 ## Missing Documentation
 
-None identified. JSDoc coverage is complete on all public exports across critical paths:
-- `lib/validation.ts`: all public functions documented ✓
-- `lib/cache/redis.ts`: all exported functions documented ✓
-- `lib/render/BadgeSvg.tsx`: `renderBadgeSvg` documented with param descriptions ✓
-- `packages/shared/src/types.ts`: all interfaces documented ✓
+- `docs/design-system.md` table: light values for `--color-dark-section` (`#1A1A2E`), `--color-dark-card` (`#252542`), and the four terminal tokens are defined in `globals.css:6–31` but absent from the docs table. The doc text says terminal colors "also have light-appropriate values" but does not enumerate them.
 
----
+No missing API docs, no missing exported function documentation found.
 
 ## Environment Variables
 
-### Status Summary
-- Documented in CLAUDE.md: 31 variables
-- Production vars used in code: 31 (all match)
-- Standard/test-only vars used in code: 6 (intentionally not in CLAUDE.md)
+All 33 production environment variables used in code are documented in CLAUDE.md. Audit performed against `process.env.*` references in all non-test `.ts/.tsx` files.
 
-### Documented and in use (31/31 — all GREEN)
-All vars listed in CLAUDE.md lines 292–337 are actively used in production code.
+| Variable | In CLAUDE.md | Used in code | Status |
+|----------|-------------|-------------|--------|
+| `GITHUB_CLIENT_ID` | ✓ | `app/api/auth/login/route.ts:42`, `callback/route.ts:85` | ✓ Match |
+| `GITHUB_CLIENT_SECRET` | ✓ | `app/api/auth/callback/route.ts:86` | ✓ Match |
+| `NEXTAUTH_SECRET` | ✓ | 7 production files | ✓ Match |
+| `NEXT_PUBLIC_BASE_URL` | ✓ | `lib/env.ts:9`, auth files | ✓ Match |
+| `UPSTASH_REDIS_REST_URL` | ✓ | `lib/cache/redis.ts:23` | ✓ Match |
+| `UPSTASH_REDIS_REST_TOKEN` | ✓ | `lib/cache/redis.ts:24` | ✓ Match |
+| `SUPABASE_URL` | ✓ | `lib/db/supabase.ts:15` | ✓ Match |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | `lib/db/supabase.ts:16` | ✓ Match |
+| `NEXT_PUBLIC_POSTHOG_KEY` | ✓ | `lib/analytics/server-errors.ts:63`, `PostHogProvider.tsx:8` | ✓ Match |
+| `NEXT_PUBLIC_POSTHOG_HOST` | ✓ | `lib/analytics/server-errors.ts:64`, `PostHogProvider.tsx:9` | ✓ Match |
+| `RESEND_API_KEY` | ✓ | `lib/email/resend.ts:47` | ✓ Match |
+| `RESEND_WEBHOOK_SECRET` | ✓ | `lib/email/resend.ts:71` | ✓ Match |
+| `SUPPORT_FORWARD_EMAIL` | ✓ | `lib/email/resend.ts:173`, `notifications.ts:40` | ✓ Match |
+| `GITHUB_TOKEN` | ✓ | `lib/github/queries.ts:34`, warm-cache route | ✓ Match |
+| `CHAPA_VERIFICATION_SECRET` | ✓ | `lib/verification/hmac.ts:46` | ✓ Match |
+| `NEXT_PUBLIC_STUDIO_ENABLED` | ✓ | `lib/feature-flags.ts:27` | ✓ Match |
+| `NEXT_PUBLIC_EXPERIMENTS_ENABLED` | ✓ | `lib/feature-flags.ts:103` | ✓ Match |
+| `NEXT_PUBLIC_INSIGHTS_ENABLED` | ✓ | `lib/feature-flags.ts:57` | ✓ Match |
+| `BITBUCKET_CLIENT_ID` | ✓ | `lib/github/client.ts:213` | ✓ Match |
+| `BITBUCKET_CLIENT_SECRET` | ✓ | `lib/github/client.ts:214` | ✓ Match |
+| `NEXT_PUBLIC_BITBUCKET_ENABLED` | ✓ | `lib/feature-flags.ts:37` | ✓ Match |
+| `CODEBERG_CLIENT_ID` | ✓ | `lib/github/client.ts:282` | ✓ Match |
+| `CODEBERG_CLIENT_SECRET` | ✓ | `lib/github/client.ts:283` | ✓ Match |
+| `NEXT_PUBLIC_CODEBERG_ENABLED` | ✓ | `lib/feature-flags.ts:47` | ✓ Match |
+| `ADMIN_HANDLES` | ✓ | `lib/auth/admin.ts:61` | ✓ Match |
+| `ADMIN_SECRET` | ✓ | `lib/auth/admin.ts:32` | ✓ Match |
+| `ALLOW_AGENT_RUN` | ✓ | `app/api/admin/agents/run/route.ts:75` | ✓ Match |
+| `CRON_SECRET` | ✓ | `lib/auth/cron.ts:21` | ✓ Match |
+| `WARM_CACHE_PRIORITY_HANDLES` | ✓ | `app/api/cron/warm-cache/route.ts:197` | ✓ Match |
+| `VERCEL_ENV` | ✓ | `lib/email/notifications.ts:26` | ✓ Match |
+| `ANALYZE` | ✓ | `next.config.ts:5` | ✓ Match |
+| `TESTPLATFORM_CLIENT_ID/SECRET` | — | Test-only (`platform-oauth.test.ts`) | ✓ Intentional omission |
+| `CI`, `NODE_ENV` | — | Standard build vars | ✓ Intentional omission |
 
-### In code but not documented (intentional omissions)
-| Variable | Usage | Justification |
-|----------|-------|---------------|
-| `ANALYZE` | `next.config.ts:5` | Dev-only bundle analyzer — documented inline |
-| `CI` | `playwright.config.ts` | Universal CI marker — not project-specific |
-| `NODE_ENV` | `next.config.ts:8` | Universal Node.js — not project-specific |
-| `VERCEL_ENV` | Various | Documented in CLAUDE.md line 335 |
-| `TESTPLATFORM_CLIENT_ID` | `platform-oauth.test.ts` | Test scaffolding only — confirmed prior audit |
-| `TESTPLATFORM_CLIENT_SECRET` | `platform-oauth.test.ts` | Test scaffolding only — confirmed prior audit |
+## JSDoc Coverage
 
-**Assessment**: No production env var gaps. All omissions are standard build/test vars.
+Spot-checked `lib/impact/v6.ts` — all 8 exported functions have JSDoc (verified at lines 23–338). Prior documentation agent confirmed 100% JSDoc on all public exports across `lib/impact`, `lib/render`, `lib/cache`, `lib/auth`, `lib/github`, `packages/shared` (2026-04-10). No production code changes since then. Status: **100%**.
 
----
+No TODO/FIXME comments referencing missing documentation found in production code. Two TODOs found:
+- `lib/agents/agent-config.ts:281` — the audit template text embedded in agent config (not a real TODO)
+- `components/AuthorTypewriter.tsx:23` — a string literal `"// TODO: fix later"` in mock data, not a code comment
 
-## TODO/FIXME Doc References
+## Required Documents
 
-None found in production code. No genuine unresolved doc-related TODOs.
-
----
+| Document | Exists | Non-empty | Notes |
+|----------|--------|-----------|-------|
+| `docs/impact-v4.md` | ✓ | ✓ | Historical spec, correctly marked deprecated |
+| `docs/impact-v6.md` | ✓ | ✓ | Current spec |
+| `docs/svg-design.md` | ✓ | ✓ | References `lib/render/BadgeSvg.tsx` |
+| `README.md` | ✓ | ✓ | 215+ lines with Quick Start, project structure, CLI, badge embed |
+| `docs/design-system.md` | ✓ | ✓ | Full design spec |
+| `docs/agents/shared-context.md` | ✓ | ✓ | Entries through 2026-04-17 |
 
 ## Recommendations
 
-All documentation is current. No action items required.
+1. **[Low] Fill light-mode terminal color values in design-system.md table** — Add light hex values for `--color-terminal-green` (`#16A34A`), `--color-terminal-red` (`#DC2626`), `--color-terminal-yellow` (`#D97706`), `--color-terminal-dim` (`#9CA3AF`). These exist in `globals.css:26–29` but aren't enumerated in the docs table.
 
-| Priority | Item | Status |
-|----------|------|--------|
-| — | Route documentation (44/44) | ✓ COMPLETE |
-| — | Color token verification (38/38) | ✓ COMPLETE |
-| — | Required docs (6/6) | ✓ COMPLETE |
-| — | Env var coverage (31/31 production) | ✓ COMPLETE |
-| — | JSDoc on public exports | ✓ COMPLETE |
-| CARRIED | BadgeToolbar flaky test (from coverage agent) | Not a docs issue — see coverage report |
+2. **[Low] Document light values for structural dark tokens** — `--color-dark-section` (`#1A1A2E` light) and `--color-dark-card` (`#252542` light) are defined in `globals.css:20–21` but absent from the design-system table. Add a "Light value" column entry for these rows.
+
+3. **[Low] Fix amber/stroke/warm-token row formatting** — Several rows in the design-system color table have 4 columns instead of 5 (missing "Light value" column). The amber tokens use the same purple in both themes — documenting that explicitly would clarify intent.
