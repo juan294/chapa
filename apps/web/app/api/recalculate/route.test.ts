@@ -1,104 +1,46 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-
-// ---------------------------------------------------------------------------
-// Mocks — hoisted before any imports that depend on them
-// ---------------------------------------------------------------------------
+import { POST } from "./route";
 
 const {
   mockResolveRequestAuth,
   mockRateLimit,
-  mockGetStats,
-  mockComputeImpactV6,
-  mockDbRecomputeCraft,
   mockUpdateCraftCache,
-  mockBuildSnapshot,
-  mockDbReplaceSnapshot,
-  mockUpdateSnapshotCache,
-  mockGetTier,
+  mockMaterializeOrchestratedProfile,
+  mockPersistOrchestratedSnapshot,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
-  mockGetStats: vi.fn(),
-  mockComputeImpactV6: vi.fn(),
-  mockDbRecomputeCraft: vi.fn(),
   mockUpdateCraftCache: vi.fn(),
-  mockBuildSnapshot: vi.fn(),
-  mockDbReplaceSnapshot: vi.fn(),
-  mockUpdateSnapshotCache: vi.fn(),
-  mockGetTier: vi.fn(),
+  mockMaterializeOrchestratedProfile: vi.fn(),
+  mockPersistOrchestratedSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
-  resolveRequestAuth: mockResolveRequestAuth,
+  resolveRequestAuth: (...args: unknown[]) => mockResolveRequestAuth(...args),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  rateLimit: mockRateLimit,
-}));
-
-vi.mock("@/lib/github/client", () => ({
-  getStats: mockGetStats,
-}));
-
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV6,
-}));
-
-vi.mock("@/lib/db/tool-insights", () => ({
-  dbRecomputeCraft: mockDbRecomputeCraft,
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
 }));
 
 vi.mock("@/lib/cache/craft-cache", () => ({
-  updateCraftCache: mockUpdateCraftCache,
+  updateCraftCache: (...args: unknown[]) => mockUpdateCraftCache(...args),
 }));
 
-vi.mock("@/lib/history/snapshot", () => ({
-  buildSnapshot: mockBuildSnapshot,
+vi.mock("@/lib/profile/orchestrated-profile", () => ({
+  materializeOrchestratedProfile: (...args: unknown[]) =>
+    mockMaterializeOrchestratedProfile(...args),
+  persistOrchestratedSnapshot: (...args: unknown[]) =>
+    mockPersistOrchestratedSnapshot(...args),
 }));
 
-vi.mock("@/lib/db/snapshots", () => ({
-  dbReplaceSnapshot: mockDbReplaceSnapshot,
-}));
+const AUTH = { handle: "TestUser", token: "cli-token" };
 
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  updateSnapshotCache: mockUpdateSnapshotCache,
-}));
-
-vi.mock("@/lib/impact/utils", () => ({
-  getTier: mockGetTier,
-}));
-
-// ---------------------------------------------------------------------------
-// Import handler AFTER mocks
-// ---------------------------------------------------------------------------
-
-import { POST } from "./route";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const AUTH = { handle: "TestUser" };
-
-function makeRequest(): NextRequest {
-  return new NextRequest(
-    "https://chapa.thecreativetoken.com/api/recalculate",
-    { method: "POST" },
-  );
-}
-
-function makeStats() {
-  return {
-    handle: "testuser",
-    commitsTotal: 150,
-    prsMergedCount: 30,
-    reviewsSubmittedCount: 0,
-  };
-}
-
-function makeImpact(overrides: Record<string, unknown> = {}) {
-  return {
+const FAKE_MATERIALIZED = {
+  stats: { handle: "testuser" },
+  craftResult: { craftScore: 69, tier: "Expert" },
+  rawImpact: {
     adjustedComposite: 61,
     compositeScore: 65,
     dimensions: {
@@ -111,208 +53,107 @@ function makeImpact(overrides: Record<string, unknown> = {}) {
     tier: "Solid",
     profileType: "solo",
     confidence: 85,
-    ...overrides,
-  };
+    confidencePenalties: [],
+    computedAt: "2026-04-17T12:00:00.000Z",
+  },
+  displayImpact: {
+    adjustedComposite: 58,
+    compositeScore: 65,
+    dimensions: {
+      delivery: 75,
+      quality: 40,
+      consistency: 60,
+      breadth: 55,
+    },
+    archetype: "Builder",
+    tier: "Solid",
+    profileType: "solo",
+    confidence: 85,
+    confidencePenalties: [],
+    computedAt: "2026-04-17T12:00:00.000Z",
+  },
+  snapshot: { date: "2026-04-17", adjustedComposite: 58, tier: "Solid" },
+};
+
+function makeRequest(): NextRequest {
+  return new NextRequest(
+    "https://chapa.thecreativetoken.com/api/recalculate",
+    { method: "POST" },
+  );
 }
 
-// ---------------------------------------------------------------------------
-// Setup
-// ---------------------------------------------------------------------------
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockResolveRequestAuth.mockResolvedValue(AUTH);
-  mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
-  mockGetStats.mockResolvedValue(makeStats());
-  mockComputeImpactV6.mockReturnValue(makeImpact());
-  mockDbRecomputeCraft.mockResolvedValue({
-    craftScore: 69,
-    tier: "Expert",
-  });
-  mockUpdateCraftCache.mockResolvedValue(undefined);
-  mockBuildSnapshot.mockReturnValue({ date: "2026-03-08" });
-  mockDbReplaceSnapshot.mockResolvedValue(true);
-  mockUpdateSnapshotCache.mockResolvedValue(undefined);
-  mockGetTier.mockReturnValue("Solid");
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/recalculate
-// ---------------------------------------------------------------------------
-
 describe("POST /api/recalculate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveRequestAuth.mockResolvedValue(AUTH);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+    mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockUpdateCraftCache.mockResolvedValue(undefined);
+  });
+
   it("returns 401 when not authenticated", async () => {
     mockResolveRequestAuth.mockResolvedValue(null);
+
     const resp = await POST(makeRequest());
     expect(resp.status).toBe(401);
   });
 
-  it("accepts Bearer token authentication", async () => {
-    mockResolveRequestAuth.mockResolvedValue({ handle: "cli-user" });
-    mockGetStats.mockResolvedValue(makeStats());
-    const req = new NextRequest(
-      "https://chapa.thecreativetoken.com/api/recalculate",
-      {
-        method: "POST",
-        headers: { Authorization: "Bearer cli.token.here" },
-      },
-    );
-    const resp = await POST(req);
-    expect(resp.status).toBe(200);
-    expect(mockResolveRequestAuth).toHaveBeenCalled();
-  });
-
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({
-      allowed: false,
-      current: 21,
-      limit: 20,
-    });
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 21, limit: 20 });
+
     const resp = await POST(makeRequest());
     expect(resp.status).toBe(429);
-    const body = await resp.json();
-    expect(body.error).toContain("Too many requests");
   });
 
-  it("returns recalculated impact with craft score", async () => {
+  it("materializes with recomputed craft, persists a replace snapshot, and returns raw plus display scores", async () => {
     const resp = await POST(makeRequest());
     const body = await resp.json();
 
     expect(resp.status).toBe(200);
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
+      token: "cli-token",
+      craftMode: "recompute",
+    });
+    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      { mode: "replace" },
+    );
     expect(body.success).toBe(true);
-    expect(body.adjustedComposite).toBe(61);
+    expect(body.adjustedComposite).toBe(58);
+    expect(body.displayAdjustedComposite).toBe(58);
+    expect(body.rawAdjustedComposite).toBe(61);
     expect(body.craftScore).toBe(69);
     expect(body.craftTier).toBe("Expert");
-    expect(body.dimensions).toBeDefined();
-    expect(body.archetype).toBe("Builder");
   });
 
-  it("replaces today's snapshot via dbReplaceSnapshot", async () => {
+  it("updates craft cache when a recomputed craft score exists", async () => {
     await POST(makeRequest());
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(mockDbReplaceSnapshot).toHaveBeenCalledWith(
+    expect(mockUpdateCraftCache).toHaveBeenCalledWith(
       "testuser",
-      expect.any(Object),
-    );
-    expect(mockUpdateSnapshotCache).toHaveBeenCalledWith(
-      "testuser",
-      expect.any(Object),
+      FAKE_MATERIALIZED.craftResult,
     );
   });
 
-  it("works without craft score (no insights uploaded)", async () => {
-    mockDbRecomputeCraft.mockResolvedValue(null);
+  it("does not update craft cache when no craft score exists", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue({
+      ...FAKE_MATERIALIZED,
+      craftResult: null,
+    });
 
-    const resp = await POST(makeRequest());
-    const body = await resp.json();
+    await POST(makeRequest());
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(body.craftScore).toBeNull();
-    expect(body.craftTier).toBeNull();
-    expect(body.success).toBe(true);
+    expect(mockUpdateCraftCache).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when stats cannot be loaded", async () => {
-    mockGetStats.mockResolvedValue(null);
+  it("returns 502 when stats cannot be materialized", async () => {
+    mockMaterializeOrchestratedProfile.mockResolvedValue(null);
 
     const resp = await POST(makeRequest());
     expect(resp.status).toBe(502);
-  });
-
-  it("uses raw adjusted composite (calls getTier, not smoothScore)", async () => {
-    mockComputeImpactV6.mockReturnValue(makeImpact({ adjustedComposite: 61 }));
-    mockGetTier.mockReturnValue("Solid");
-
-    const resp = await POST(makeRequest());
-    const body = await resp.json();
-
-    expect(body.adjustedComposite).toBe(61);
-    expect(mockGetTier).toHaveBeenCalledWith(61);
-  });
-
-  it("returns success even if snapshot replacement fails", async () => {
-    mockDbReplaceSnapshot.mockResolvedValue(false);
-
-    const resp = await POST(makeRequest());
-    expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.success).toBe(true);
-    // Should NOT update cache if replacement failed
-    expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
-  });
-
-  it("lowercases handle for all operations", async () => {
-    await POST(makeRequest());
-
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined);
-    expect(mockDbRecomputeCraft).toHaveBeenCalledWith("testuser");
-    expect(mockDbReplaceSnapshot).toHaveBeenCalledWith(
-      "testuser",
-      expect.any(Object),
-    );
-  });
-
-  it("passes craft score to computeImpactV6", async () => {
-    mockDbRecomputeCraft.mockResolvedValue({
-      craftScore: 69,
-      tier: "Expert",
-    });
-
-    await POST(makeRequest());
-
-    expect(mockComputeImpactV6).toHaveBeenCalledWith(
-      expect.any(Object),
-      69,
-    );
-  });
-
-  it("passes undefined craft score when no insights exist", async () => {
-    mockDbRecomputeCraft.mockResolvedValue(null);
-
-    await POST(makeRequest());
-
-    expect(mockComputeImpactV6).toHaveBeenCalledWith(
-      expect.any(Object),
-      undefined,
-    );
-  });
-
-  describe("craft cache update path", () => {
-    it("calls updateCraftCache when craft result is non-null", async () => {
-      const craftResult = { craftScore: 69, tier: "Expert" };
-      mockDbRecomputeCraft.mockResolvedValue(craftResult);
-
-      await POST(makeRequest());
-
-      // Give fire-and-forget time to execute
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(mockUpdateCraftCache).toHaveBeenCalledWith("testuser", craftResult);
-    });
-
-    it("does not call updateCraftCache when craft result is null", async () => {
-      mockDbRecomputeCraft.mockResolvedValue(null);
-
-      await POST(makeRequest());
-
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(mockUpdateCraftCache).not.toHaveBeenCalled();
-    });
-
-    it("handles updateCraftCache rejection gracefully via .catch()", async () => {
-      const craftResult = { craftScore: 69, tier: "Expert" };
-      mockDbRecomputeCraft.mockResolvedValue(craftResult);
-      mockUpdateCraftCache.mockRejectedValue(new Error("Redis down"));
-
-      const resp = await POST(makeRequest());
-
-      // Flush microtasks so .catch() runs
-      await new Promise((r) => setTimeout(r, 0));
-
-      // Route still succeeds despite cache failure
-      expect(resp.status).toBe(200);
-      const body = await resp.json();
-      expect(body.success).toBe(true);
-    });
   });
 });

@@ -1,10 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { readSessionCookie } from "@/lib/auth/github";
-import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
-import { getClientIp } from "@/lib/http/client-ip";
+import { adminAuth } from "@/lib/auth/admin-route";
 import { AGENTS } from "@/lib/agents/agent-config";
 
 // ---------------------------------------------------------------------------
@@ -45,31 +42,6 @@ export function _resetRunState(): void {
   currentRun = null;
 }
 
-// ---------------------------------------------------------------------------
-// Auth + guards shared by all handlers
-// ---------------------------------------------------------------------------
-
-function authorize(
-  request: NextRequest,
-): { login: string } | NextResponse {
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!isAdminHandle(session.login)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  return { login: session.login };
-}
-
 function devOnlyGuard(): NextResponse | null {
   const isDev = process.env.NODE_ENV === "development";
   const allowRun = process.env.ALLOW_AGENT_RUN?.trim() === "true";
@@ -87,18 +59,8 @@ function devOnlyGuard(): NextResponse | null {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
-  // Rate limit
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-agent-run:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const auth = authorize(request);
-  if (auth instanceof NextResponse) return auth;
+  const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
+  if (authError) return authError;
 
   const devGuard = devOnlyGuard();
   if (devGuard) return devGuard;
@@ -250,18 +212,8 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  // Rate limit
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-agent-run:${ip}`, 30, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const auth = authorize(request);
-  if (auth instanceof NextResponse) return auth;
+  const authError = await adminAuth(request, "ratelimit:admin-agent-run", 30, 60);
+  if (authError) return authError;
 
   const agentKey = request.nextUrl.searchParams.get("agentKey");
   if (!currentRun || currentRun.agentKey !== agentKey) {
@@ -296,18 +248,8 @@ export async function GET(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function DELETE(request: NextRequest) {
-  // Rate limit
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-agent-run:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const auth = authorize(request);
-  if (auth instanceof NextResponse) return auth;
+  const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
+  if (authError) return authError;
 
   const agentKey = request.nextUrl.searchParams.get("agentKey");
   if (!currentRun || currentRun.agentKey !== agentKey) {

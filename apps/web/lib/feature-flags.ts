@@ -78,6 +78,15 @@ async function checkFlag(
   return value;
 }
 
+export function invalidateFeatureFlagCache(key?: string): void {
+  if (key) {
+    flagCache.delete(key);
+    return;
+  }
+
+  flagCache.clear();
+}
+
 /**
  * Check whether Creator Studio is enabled (DB-backed, env-var fallback).
  * Use in server components and API routes.
@@ -158,5 +167,5 @@ export async function isAgentEnabled(agentKey: string): Promise<boolean> {
 
 /** Reset internal cache — for tests only. */
 export function _resetFlagCache(): void {
-  flagCache.clear();
+  invalidateFeatureFlagCache();
 }

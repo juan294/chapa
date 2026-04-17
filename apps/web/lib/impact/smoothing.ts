@@ -1,18 +1,22 @@
 /**
  * Exponential Moving Average (EMA) for score smoothing.
  *
- * Applied as the LAST step in the badge/share page pipeline,
- * after computeImpactV6. Uses the previous day's smoothed score
- * from MetricsSnapshot to dampen daily fluctuations.
+ * Applied after computeImpactV6 using the previous day's persisted
+ * public score from MetricsSnapshot to dampen daily fluctuations.
  *
  * Alpha = 0.15 → half-life ~4.3 days.
  * A 10-point raw drop manifests as ~1.5/day.
  */
 
+import type { ImpactV6Result } from "@chapa/shared";
+import type { MetricsSnapshot } from "@/lib/history/types";
 import { toDateString } from "@/lib/utils/date";
-import { clampScore } from "./utils";
+import { clampScore, getTier } from "./utils";
 
 const EMA_ALPHA = 0.15;
+
+export type ScorePolicy = "public-display" | "explicit-recalculate";
+export type SnapshotScoreInput = Pick<MetricsSnapshot, "date" | "adjustedComposite">;
 
 /**
  * Apply EMA smoothing to a score.
@@ -50,7 +54,7 @@ export function applyEMA(
  */
 export function smoothScore(
   currentAdjusted: number,
-  latestSnapshot: { date: string; adjustedComposite: number } | null | undefined,
+  latestSnapshot: SnapshotScoreInput | null | undefined,
   today?: string,
 ): number {
   if (!latestSnapshot) {
@@ -67,4 +71,39 @@ export function smoothScore(
 
   // Snapshot is from a previous day — apply EMA normally.
   return applyEMA(currentAdjusted, latestSnapshot.adjustedComposite);
+}
+
+/**
+ * Apply Chapa's public score policy to a raw impact result.
+ *
+ * Both current policies expose the EMA-adjusted public score. The distinction is
+ * semantic: `explicit-recalculate` callers may still choose to return `rawImpact`
+ * separately for diagnostics, but persisted snapshots must stay aligned with the
+ * public display score.
+ */
+export function applyImpactScorePolicy(
+  rawImpact: ImpactV6Result,
+  latestSnapshot: SnapshotScoreInput | null | undefined,
+  options: { policy?: ScorePolicy; today?: string } = {},
+): ImpactV6Result {
+  switch (options.policy ?? "public-display") {
+    case "public-display":
+    case "explicit-recalculate": {
+      const adjustedComposite = smoothScore(
+        rawImpact.adjustedComposite,
+        latestSnapshot,
+        options.today,
+      );
+
+      if (adjustedComposite === rawImpact.adjustedComposite) {
+        return rawImpact;
+      }
+
+      return {
+        ...rawImpact,
+        adjustedComposite,
+        tier: getTier(adjustedComposite),
+      };
+    }
+  }
 }

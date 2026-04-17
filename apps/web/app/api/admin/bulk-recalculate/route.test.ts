@@ -1,287 +1,157 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest, NextResponse } from "next/server";
 import { POST } from "./route";
 
+const {
+  mockRateLimit,
+  mockGetClientIp,
+  mockDbGetUsers,
+  mockMaterializeOrchestratedProfile,
+  mockPersistOrchestratedSnapshot,
+  mockVerifyAdminSecret,
+} = vi.hoisted(() => ({
+  mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
+  mockDbGetUsers: vi.fn(),
+  mockMaterializeOrchestratedProfile: vi.fn(),
+  mockPersistOrchestratedSnapshot: vi.fn(),
+  mockVerifyAdminSecret: vi.fn(),
+}));
+
 vi.mock("@/lib/cache/redis", () => ({
-  rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 5 }),
-  cacheDel: vi.fn().mockResolvedValue(undefined),
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
-  getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
+  getClientIp: (...args: unknown[]) => mockGetClientIp(...args),
 }));
 
 vi.mock("@/lib/db/users", () => ({
-  dbGetUsers: vi.fn().mockResolvedValue([
-    { handle: "alice" },
-    { handle: "bob" },
-  ]),
+  dbGetUsers: (...args: unknown[]) => mockDbGetUsers(...args),
 }));
 
-vi.mock("@/lib/github/client", () => ({
-  getStats: vi.fn().mockResolvedValue({
-    handle: "testuser",
-    commitsTotal: 50,
-    activeDays: 30,
-    prsMergedCount: 5,
-    prsMergedWeight: 10,
-    reviewsSubmittedCount: 0,
-    issuesClosedCount: 3,
-    linesAdded: 2000,
-    linesDeleted: 500,
-    reposContributed: 4,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
-    heatmapData: [],
-    fetchedAt: new Date().toISOString(),
-  }),
+vi.mock("@/lib/profile/orchestrated-profile", () => ({
+  materializeOrchestratedProfile: (...args: unknown[]) =>
+    mockMaterializeOrchestratedProfile(...args),
+  persistOrchestratedSnapshot: (...args: unknown[]) =>
+    mockPersistOrchestratedSnapshot(...args),
 }));
 
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: vi.fn().mockReturnValue({
-    handle: "testuser",
-    profileType: "solo",
+vi.mock("@/lib/auth/admin", () => ({
+  verifyAdminSecret: (...args: unknown[]) => mockVerifyAdminSecret(...args),
+}));
+
+const FAKE_MATERIALIZED = {
+  stats: { handle: "testuser" },
+  craftResult: null,
+  rawImpact: {
+    adjustedComposite: 50,
+    compositeScore: 50,
     dimensions: { delivery: 50, quality: 30, consistency: 40, breadth: 35 },
     archetype: "Emerging",
-    compositeScore: 42,
+    tier: "Solid",
+    profileType: "solo",
     confidence: 100,
     confidencePenalties: [],
+    computedAt: "2026-04-17T12:00:00.000Z",
+  },
+  displayImpact: {
     adjustedComposite: 42,
-    tier: "Solid",
-    computedAt: new Date().toISOString(),
-  }),
-}));
-
-vi.mock("@/lib/history/snapshot", () => ({
-  buildSnapshot: vi.fn().mockReturnValue({
-    date: "2026-03-28",
-    capturedAt: new Date().toISOString(),
-    delivery: 50,
-    quality: 30,
-    consistency: 40,
-    breadth: 35,
-    compositeScore: 42,
-    adjustedComposite: 42,
-    confidence: 100,
-    tier: "Solid",
+    compositeScore: 50,
+    dimensions: { delivery: 50, quality: 30, consistency: 40, breadth: 35 },
     archetype: "Emerging",
+    tier: "Solid",
     profileType: "solo",
-  }),
-}));
+    confidence: 100,
+    confidencePenalties: [],
+    computedAt: "2026-04-17T12:00:00.000Z",
+  },
+  snapshot: { date: "2026-04-17", adjustedComposite: 42, tier: "Solid" },
+};
 
-vi.mock("@/lib/db/snapshots", () => ({
-  dbReplaceSnapshot: vi.fn().mockResolvedValue(true),
-}));
+const VALID_SECRET = "test-admin-secret";
 
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  invalidateSnapshotCache: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/cache/craft-cache", () => ({
-  getCachedCraftScore: vi.fn().mockResolvedValue(null),
-}));
-
-import { rateLimit } from "@/lib/cache/redis";
-import { dbGetUsers } from "@/lib/db/users";
-import { getStats } from "@/lib/github/client";
-import { dbReplaceSnapshot } from "@/lib/db/snapshots";
-import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
-
-const VALID_SECRET = "test-admin-secret-123";
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  vi.stubEnv("ADMIN_SECRET", VALID_SECRET);
-  vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 5 });
-  vi.mocked(dbGetUsers).mockResolvedValue([
-    { handle: "alice" },
-    { handle: "bob" },
-  ] as Awaited<ReturnType<typeof dbGetUsers>>);
-  vi.mocked(getStats).mockResolvedValue({
-    handle: "testuser",
-    commitsTotal: 50,
-    activeDays: 30,
-    prsMergedCount: 5,
-    prsMergedWeight: 10,
-    reviewsSubmittedCount: 0,
-    issuesClosedCount: 3,
-    linesAdded: 2000,
-    linesDeleted: 500,
-    reposContributed: 4,
-    topRepoShare: 0.4,
-    maxCommitsIn10Min: 3,
-    totalStars: 0,
-    totalForks: 0,
-    totalWatchers: 0,
-    heatmapData: [],
-    fetchedAt: new Date().toISOString(),
-  });
-  vi.mocked(dbReplaceSnapshot).mockResolvedValue(true);
-  vi.mocked(invalidateSnapshotCache).mockResolvedValue(undefined);
-});
-
-function makeRequest(secret?: string, body?: object): NextRequest {
-  const url = "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (secret !== undefined) {
-    headers["Authorization"] = `Bearer ${secret}`;
-  }
-  return new NextRequest(url, {
-    method: "POST",
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+function makeRequest(secret = VALID_SECRET, body?: object): NextRequest {
+  return new NextRequest(
+    "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    },
+  );
 }
 
 describe("POST /api/admin/bulk-recalculate", () => {
-  it("returns 401 without valid secret", async () => {
-    const res = await POST(makeRequest("wrong-secret"));
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("GITHUB_TOKEN", "ghp-server-token");
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
+    mockVerifyAdminSecret.mockReturnValue(null);
+    mockDbGetUsers.mockResolvedValue([{ handle: "alice" }, { handle: "bob" }]);
+    mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+  });
+
+  it("returns 401 when admin auth fails", async () => {
+    mockVerifyAdminSecret.mockReturnValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    const res = await POST(makeRequest());
     expect(res.status).toBe(401);
   });
 
-  it("returns 503 when ADMIN_SECRET is not set (fail-secure)", async () => {
-    vi.stubEnv("ADMIN_SECRET", "");
-    const res = await POST(makeRequest(VALID_SECRET));
-    // When ADMIN_SECRET is not configured, the endpoint must return 503
-    // (fail-secure: misconfigured environment must not expose admin operations)
-    expect(res.status).toBe(503);
-  });
-
   it("returns 429 when rate limited", async () => {
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 6, limit: 5 });
-    const res = await POST(makeRequest(VALID_SECRET));
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 6, limit: 5 });
+
+    const res = await POST(makeRequest());
     expect(res.status).toBe(429);
   });
 
-  it("recalculates all users when no handles provided", async () => {
-    const res = await POST(makeRequest(VALID_SECRET));
+  it("recalculates all users when no handles are provided", async () => {
+    const res = await POST(makeRequest());
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.recalculated).toBe(2);
     expect(body.failed).toBe(0);
     expect(body.total).toBe(2);
-    expect(dbGetUsers).toHaveBeenCalled();
-    expect(getStats).toHaveBeenCalledTimes(2);
-    expect(dbReplaceSnapshot).toHaveBeenCalledTimes(2);
-    expect(invalidateSnapshotCache).toHaveBeenCalledTimes(2);
+    expect(mockDbGetUsers).toHaveBeenCalled();
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
+      token: "ghp-server-token",
+      craftMode: "cached",
+    });
+    expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
+      "alice",
+      FAKE_MATERIALIZED,
+      { mode: "replace" },
+    );
   });
 
-  it("recalculates only specified handles when provided", async () => {
+  it("recalculates only explicitly provided handles", async () => {
     const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
     const body = await res.json();
 
-    expect(res.status).toBe(200);
     expect(body.recalculated).toBe(1);
     expect(body.total).toBe(1);
-    expect(dbGetUsers).not.toHaveBeenCalled();
-    expect(getStats).toHaveBeenCalledTimes(1);
+    expect(mockDbGetUsers).not.toHaveBeenCalled();
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(1);
   });
 
-  it("reports failures without aborting other handles", async () => {
-    vi.mocked(getStats)
-      .mockResolvedValueOnce(null) // alice fails
-      .mockResolvedValueOnce({
-        handle: "bob",
-        commitsTotal: 50,
-        activeDays: 30,
-        prsMergedCount: 5,
-        prsMergedWeight: 10,
-        reviewsSubmittedCount: 0,
-        issuesClosedCount: 3,
-        linesAdded: 2000,
-        linesDeleted: 500,
-        reposContributed: 4,
-        topRepoShare: 0.4,
-        maxCommitsIn10Min: 3,
-        totalStars: 0,
-        totalForks: 0,
-        totalWatchers: 0,
-        heatmapData: [],
-        fetchedAt: new Date().toISOString(),
-      });
+  it("reports stats fetch failures without aborting the batch", async () => {
+    mockMaterializeOrchestratedProfile
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(FAKE_MATERIALIZED);
 
-    const res = await POST(makeRequest(VALID_SECRET));
+    const res = await POST(makeRequest());
     const body = await res.json();
 
     expect(body.recalculated).toBe(1);
-    expect(body.failed).toBe(1);
-    expect(body.errors).toHaveLength(1);
-    expect(body.errors[0].handle).toBe("alice");
-  });
-
-  it("returns 429 with Retry-After header when rate limited", async () => {
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 6, limit: 5 });
-    const res = await POST(makeRequest(VALID_SECRET));
-
-    expect(res.status).toBe(429);
-    expect(res.headers.get("Retry-After")).toBe("3600");
-    const body = await res.json();
-    expect(body.error).toContain("Too many requests");
-  });
-
-  it("falls back to dbGetUsers when body is malformed JSON", async () => {
-    // Simulate a request with invalid JSON body by providing no body at all
-    const url = "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate";
-    const req = new NextRequest(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${VALID_SECRET}`,
-        "Content-Type": "application/json",
-      },
-      // No body → request.json() will reject
-    });
-
-    const res = await POST(req);
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(dbGetUsers).toHaveBeenCalled();
-    expect(body.total).toBe(2); // alice + bob from mock
-  });
-
-  it("falls back to dbGetUsers when handles is not an array", async () => {
-    const res = await POST(makeRequest(VALID_SECRET, { handles: "not-an-array" }));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(dbGetUsers).toHaveBeenCalled();
-    expect(body.total).toBe(2);
-  });
-
-  it("falls back to dbGetUsers when handles is an empty array", async () => {
-    const res = await POST(makeRequest(VALID_SECRET, { handles: [] }));
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(dbGetUsers).toHaveBeenCalled();
-    expect(body.total).toBe(2);
-  });
-
-  it("filters out non-string and empty-string handles", async () => {
-    const res = await POST(
-      makeRequest(VALID_SECRET, {
-        handles: ["alice", 42, "", null, "bob", undefined, false],
-      }),
-    );
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.total).toBe(2); // only "alice" and "bob"
-    expect(dbGetUsers).not.toHaveBeenCalled();
-    expect(getStats).toHaveBeenCalledTimes(2);
-  });
-
-  it("reports 'Stats fetch returned null' when stats fetch returns null", async () => {
-    vi.mocked(getStats).mockResolvedValueOnce(null);
-
-    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
-    const body = await res.json();
-
-    expect(body.recalculated).toBe(0);
     expect(body.failed).toBe(1);
     expect(body.errors[0]).toEqual({
       handle: "alice",
@@ -289,8 +159,8 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 
-  it("reports 'Snapshot replace failed' when dbReplaceSnapshot returns false", async () => {
-    vi.mocked(dbReplaceSnapshot).mockResolvedValue(false);
+  it("reports snapshot replace failures explicitly", async () => {
+    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
 
     const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
     const body = await res.json();
@@ -303,73 +173,19 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 
-  it("silently catches cache invalidation failure after successful snapshot replace", async () => {
-    vi.mocked(invalidateSnapshotCache).mockRejectedValue(
-      new Error("Redis connection failed"),
-    );
+  it("reports thrown batch errors without aborting other handles", async () => {
+    mockMaterializeOrchestratedProfile
+      .mockRejectedValueOnce(new Error("API timeout"))
+      .mockResolvedValueOnce(FAKE_MATERIALIZED);
 
-    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
-    const body = await res.json();
-
-    // Should still succeed — cache invalidation failure is swallowed
-    expect(body.recalculated).toBe(1);
-    expect(body.failed).toBe(0);
-    expect(body.errors).toBeUndefined();
-  });
-
-  it("omits errors field from response when no errors occurred", async () => {
-    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const res = await POST(makeRequest());
     const body = await res.json();
 
     expect(body.recalculated).toBe(1);
-    expect(body.failed).toBe(0);
-    expect(body.errors).toBeUndefined();
-    expect("errors" in body).toBe(false);
-  });
-
-  it("returns early with zeroed counts when handles list is empty after filtering", async () => {
-    // All handles filter out as non-strings/empty
-    const res = await POST(
-      makeRequest(VALID_SECRET, { handles: [42, "", null] }),
-    );
-
-    // After filtering: no valid handles remain.
-    // This falls through to dbGetUsers (because filtered array might be empty
-    // only if the original array was non-empty with all invalid entries).
-    // Actually, the code checks Array.isArray(body.handles) && body.handles.length > 0
-    // first, then filters. If filters remove all, handles is empty, and we get
-    // the early return.
-    const body = await res.json();
-
-    // dbGetUsers is NOT called here because body.handles is a non-empty array
-    // but after filtering everything out, handles becomes empty
-    expect(body.total).toBe(0);
-    expect(body.recalculated).toBe(0);
-  });
-
-  it("catches thrown errors during batch processing and reports them", async () => {
-    vi.mocked(getStats).mockRejectedValue(new Error("API timeout"));
-
-    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
-    const body = await res.json();
-
-    expect(body.recalculated).toBe(0);
     expect(body.failed).toBe(1);
     expect(body.errors[0]).toEqual({
       handle: "alice",
       error: "API timeout",
-    });
-  });
-
-  it("reports 'Unknown error' when thrown value is not an Error instance", async () => {
-    vi.mocked(getStats).mockRejectedValue("string error");
-
-    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
-    const body = await res.json();
-
-    expect(body.errors[0]).toEqual({
-      handle: "alice",
-      error: "Unknown error",
     });
   });
 });

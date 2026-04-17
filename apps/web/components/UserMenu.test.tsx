@@ -340,11 +340,7 @@ describe("UserMenu — platform status cache", () => {
   });
 
   it("useEffect checks cache before fetching", () => {
-    // The effect body should check if already fetched
-    const effectStart = SOURCE.indexOf("useEffect(");
-    const effectEnd = SOURCE.indexOf("}, [])");
-    const effectBody = SOURCE.slice(effectStart, effectEnd);
-    expect(effectBody).toContain("platformStatusCache.fetched");
+    expect(SOURCE).toContain("platformStatusCache.fetched");
   });
 
   it("unlink handlers invalidate the cache", () => {

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import { readSessionCookie } from "@/lib/auth/github";
+import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { cacheGet } from "@/lib/cache/redis";
@@ -58,18 +58,7 @@ export default async function StudioPage() {
     redirect("/");
   }
 
-  // Auth gate — redirect unauthenticated users to login
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    redirect("/api/auth/login");
-  }
-
-  const headerStore = await headers();
-  const session = readSessionCookie(
-    headerStore.get("cookie"),
-    sessionSecret,
-  );
-
+  const session = getOptionalServerSessionFromHeaders(await headers());
   if (!session) {
     redirect("/api/auth/login");
   }

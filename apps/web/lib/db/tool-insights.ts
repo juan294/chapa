@@ -69,6 +69,7 @@ export async function dbUpsertToolInsights(
   handle: string,
   data: InsightsUpload,
   scores: CraftResult,
+  uploadedAt: string = scores.computedAt,
 ): Promise<CraftResult | null> {
   const db = getSupabase();
   if (!db) return null;
@@ -88,6 +89,7 @@ export async function dbUpsertToolInsights(
           sophistication: scores.dimensions.sophistication,
           craft_score: scores.craftScore,
           craft_tier: scores.tier,
+          uploaded_at: uploadedAt,
         },
         { onConflict: "handle,tool" },
       )
@@ -105,7 +107,11 @@ export async function dbUpsertToolInsights(
 }
 
 /**
- * Get the active craft score for a handle (first tool found).
+ * Get the active craft score for a handle.
+ *
+ * Authoritative selection rule until per-tool selection exists:
+ * latest uploaded report wins.
+ *
  * Returns null if no insights uploaded or Supabase unavailable.
  */
 export async function dbGetToolInsights(
@@ -119,6 +125,7 @@ export async function dbGetToolInsights(
       .from("tool_insights")
       .select(SELECT_COLUMNS)
       .eq("handle", handle.toLowerCase())
+      .order("uploaded_at", { ascending: false })
       .limit(1)
       .single();
 
@@ -142,7 +149,9 @@ export async function dbGetToolInsights(
  * Reads the raw InsightsUpload from the DB, runs `computeCraftScore()`
  * with the current formula, and upserts the updated scores back. This
  * ensures formula changes (e.g. removing friction/error penalties) are
- * retroactively applied without requiring the user to re-upload.
+ * retroactively applied without requiring the user to re-upload. When
+ * multiple tool rows exist, the latest uploaded report remains the
+ * authoritative source.
  *
  * Returns the fresh CraftResult, or null if no raw data exists or DB is unavailable.
  */
@@ -155,8 +164,9 @@ export async function dbRecomputeCraft(
   try {
     const { data, error } = await db
       .from("tool_insights")
-      .select("raw_data")
+      .select("raw_data, uploaded_at")
       .eq("handle", handle.toLowerCase())
+      .order("uploaded_at", { ascending: false })
       .limit(1)
       .single();
 
@@ -166,13 +176,15 @@ export async function dbRecomputeCraft(
     }
 
     const rawData = data?.raw_data as InsightsUpload | undefined;
-    if (!rawData) return null;
+    const uploadedAt =
+      typeof data?.uploaded_at === "string" ? data.uploaded_at : null;
+    if (!rawData || !uploadedAt) return null;
 
     // Recompute with current formula
     const scores = computeCraftScore(rawData);
 
     // Upsert updated scores back to DB
-    return dbUpsertToolInsights(handle, rawData, scores);
+    return dbUpsertToolInsights(handle, rawData, scores, uploadedAt);
   } catch (error) {
     console.error("[db] dbRecomputeCraft failed:", (error as Error).message);
     return null;

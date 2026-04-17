@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { readSessionCookie } from "@/lib/auth/github";
+import {
+  getOptionalServerSessionFromHeaders,
+  getSessionSecret,
+} from "@/lib/auth/session";
 import { AuthorizeClient } from "./AuthorizeClient";
 
 interface Props {
@@ -27,13 +30,11 @@ export default async function CliAuthorizePage({ searchParams }: Props) {
   }
 
   // Check if user is logged in
-  const secret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!secret) {
+  if (!getSessionSecret()) {
     redirect("/");
   }
 
-  const headerStore = await headers();
-  const session = readSessionCookie(headerStore.get("cookie"), secret);
+  const session = getOptionalServerSessionFromHeaders(await headers());
 
   if (!session) {
     // Redirect to login, then back here

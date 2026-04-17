@@ -10,6 +10,12 @@ vi.mock("@/lib/db/feature-flags", () => ({
   dbUpdateFeatureFlag: (...args: unknown[]) => mockDbUpdateFeatureFlag(...args),
 }));
 
+const mockInvalidateFeatureFlagCache = vi.fn();
+vi.mock("@/lib/feature-flags", () => ({
+  invalidateFeatureFlagCache: (...args: unknown[]) =>
+    mockInvalidateFeatureFlagCache(...args),
+}));
+
 const mockRateLimit = vi.fn();
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
@@ -72,6 +78,7 @@ describe("PATCH /api/admin/feature-flags", () => {
     expect(mockDbUpdateFeatureFlag).toHaveBeenCalledWith("coverage_agent", {
       enabled: true,
     });
+    expect(mockInvalidateFeatureFlagCache).toHaveBeenCalledWith("coverage_agent");
   });
 
   it("updates config when provided", async () => {
@@ -128,6 +135,7 @@ describe("PATCH /api/admin/feature-flags", () => {
 
     const res = await PATCH(makeRequest({ key: "test", enabled: true }));
     expect(res.status).toBe(500);
+    expect(mockInvalidateFeatureFlagCache).not.toHaveBeenCalled();
   });
 
   it("returns 504 when Supabase call times out", async () => {
@@ -144,6 +152,7 @@ describe("PATCH /api/admin/feature-flags", () => {
     expect(res.status).toBe(504);
     const body = await res.json();
     expect(body.error).toMatch(/timeout/i);
+    expect(mockInvalidateFeatureFlagCache).not.toHaveBeenCalled();
 
     vi.useRealTimers();
   });

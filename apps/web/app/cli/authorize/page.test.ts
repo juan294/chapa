@@ -33,20 +33,16 @@ describe("CliAuthorizePage", () => {
   });
 
   describe("authentication check", () => {
-    it("reads NEXTAUTH_SECRET from environment", () => {
-      expect(SOURCE).toContain("process.env.NEXTAUTH_SECRET");
-    });
-
-    it("trims the secret (env var safety)", () => {
-      expect(SOURCE).toContain("NEXTAUTH_SECRET?.trim()");
+    it("reads the shared session secret helper", () => {
+      expect(SOURCE).toContain("getSessionSecret");
     });
 
     it("redirects to home when secret is missing", () => {
       expect(SOURCE).toContain('redirect("/")');
     });
 
-    it("reads session cookie via readSessionCookie", () => {
-      expect(SOURCE).toContain("readSessionCookie");
+    it("reads server session via the shared helper", () => {
+      expect(SOURCE).toContain("getOptionalServerSessionFromHeaders");
     });
 
     it("redirects unauthenticated users to login", () => {
@@ -116,9 +112,10 @@ describe("CliAuthorizePage", () => {
       expect(SOURCE).toContain("next/headers");
     });
 
-    it("imports readSessionCookie from auth module", () => {
-      expect(SOURCE).toContain("readSessionCookie");
-      expect(SOURCE).toContain("@/lib/auth/github");
+    it("imports shared session helpers", () => {
+      expect(SOURCE).toContain("getOptionalServerSessionFromHeaders");
+      expect(SOURCE).toContain("getSessionSecret");
+      expect(SOURCE).toContain("@/lib/auth/session");
     });
 
     it("imports AuthorizeClient", () => {

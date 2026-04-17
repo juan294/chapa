@@ -58,6 +58,14 @@ const STORED_CRAFT = {
   computedAt: "2026-03-07T12:00:00.000Z",
 };
 
+const LATEST_UPLOADED_CRAFT = {
+  ...STORED_CRAFT,
+  tool: "cursor" as const,
+  craftScore: 67,
+  tier: "Master" as const,
+  computedAt: "2026-03-08T12:00:00.000Z",
+};
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -85,6 +93,16 @@ describe("GET /api/insights/:handle", () => {
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.craftScore).toEqual(STORED_CRAFT);
+  });
+
+  it("returns the latest uploaded craft result selected by the DB layer", async () => {
+    mockDbGet.mockResolvedValue(LATEST_UPLOADED_CRAFT);
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body.craftScore).toEqual(LATEST_UPLOADED_CRAFT);
   });
 
   it("returns 200 with null craftScore when no data exists", async () => {

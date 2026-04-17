@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { readSessionCookie } from "@/lib/auth/github";
+import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
@@ -17,21 +17,7 @@ interface NavbarProps {
 }
 
 export async function Navbar({ navLinks }: NavbarProps) {
-  // Read session from cookie
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  let session: { login: string; name: string | null; avatar_url: string } | null = null;
-
-  if (sessionSecret) {
-    const headerStore = await headers();
-    const parsed = readSessionCookie(headerStore.get("cookie"), sessionSecret);
-    if (parsed) {
-      session = {
-        login: parsed.login,
-        name: parsed.name,
-        avatar_url: parsed.avatar_url,
-      };
-    }
-  }
+  const session = getOptionalServerSessionFromHeaders(await headers());
 
   return (
     <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">

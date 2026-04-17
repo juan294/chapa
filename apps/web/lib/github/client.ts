@@ -18,7 +18,9 @@ const CACHE_TTL = 21600; // 6 hours
 const STALE_TTL = 604800; // 7 days
 
 // In-flight request deduplication map.
-// Prevents concurrent calls for the same handle from making duplicate API calls.
+// Prevents concurrent calls for the same handle/auth context from making
+// duplicate API calls. Public callers may reuse an authenticated in-flight
+// fetch because it produces a safe superset of the public result.
 const _inflight = new Map<string, Promise<StatsData | null>>();
 
 /** @internal — exported for tests only. Resets the inflight map. */
@@ -43,22 +45,28 @@ export async function getStats(
 ): Promise<StatsData | null> {
   const lowerHandle = handle.toLowerCase();
   const cacheKey = `stats:v2:merged:${lowerHandle}`;
+  const publicInflightKey = `${lowerHandle}:public`;
+  const authenticatedInflightKey = `${lowerHandle}:authenticated`;
+  const inflightKey = token ? authenticatedInflightKey : publicInflightKey;
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
   if (cached) return _enrichWithLogins(cached, handle);
 
-  // Check if there's already an in-flight request for this handle
-  const existing = _inflight.get(lowerHandle);
+  // Public callers can share an authenticated fetch. Authenticated callers
+  // must not reuse a weaker public fetch.
+  const existing = token
+    ? _inflight.get(authenticatedInflightKey)
+    : _inflight.get(authenticatedInflightKey) ?? _inflight.get(publicInflightKey);
   if (existing) return existing;
 
   // Create the fetch promise and store it for deduplication
   const promise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
-  _inflight.set(lowerHandle, promise);
+  _inflight.set(inflightKey, promise);
 
   // Clean up the inflight entry when done (success or failure)
   promise.finally(() => {
-    _inflight.delete(lowerHandle);
+    _inflight.delete(inflightKey);
   });
 
   return promise;

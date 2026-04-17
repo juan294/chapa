@@ -16,6 +16,7 @@ import {
   isCodebergEnabledSync,
   isInsightsEnabled,
   isInsightsEnabledSync,
+  invalidateFeatureFlagCache,
   _resetFlagCache,
 } from "./feature-flags";
 
@@ -430,6 +431,20 @@ describe("feature flag TTL cache", () => {
 
     expect(dbGetFeatureFlag).toHaveBeenCalledTimes(1);
     delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+  });
+
+  it("serves updated values immediately after invalidating the in-process cache", async () => {
+    vi.mocked(dbGetFeatureFlag)
+      .mockResolvedValueOnce(makeFlag("studio_enabled", false))
+      .mockResolvedValueOnce(makeFlag("studio_enabled", true));
+
+    const before = await isStudioEnabled();
+    invalidateFeatureFlagCache("studio_enabled");
+    const after = await isStudioEnabled();
+
+    expect(before).toBe(false);
+    expect(after).toBe(true);
+    expect(dbGetFeatureFlag).toHaveBeenCalledTimes(2);
   });
 });
 

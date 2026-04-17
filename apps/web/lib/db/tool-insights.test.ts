@@ -10,6 +10,7 @@ const mockSelect = vi.fn();
 const mockSingle = vi.fn();
 const mockEq = vi.fn();
 const mockLimit = vi.fn();
+const mockOrder = vi.fn();
 
 const { mockGetSupabase } = vi.hoisted(() => ({
   mockGetSupabase: vi.fn(),
@@ -36,6 +37,10 @@ const mockFrom = vi.fn((): any => {
   };
   chain.limit = (...args: unknown[]) => {
     mockLimit(...args);
+    return chain;
+  };
+  chain.order = (...args: unknown[]) => {
+    mockOrder(...args);
     return chain;
   };
   // Terminal .then to resolve the chain as a promise
@@ -151,6 +156,7 @@ describe("dbUpsertToolInsights", () => {
         sophistication: 58,
         craft_score: 65,
         craft_tier: "Practitioner",
+        uploaded_at: "2025-03-01T12:00:00Z",
       },
       { onConflict: "handle,tool" },
     );
@@ -176,6 +182,23 @@ describe("dbUpsertToolInsights", () => {
 
     expect(mockSelect).toHaveBeenCalled();
     expect(mockSingle).toHaveBeenCalled();
+  });
+
+  it("uses the provided uploaded timestamp override when supplied", async () => {
+    terminalResolve = { data: validRow, error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbUpsertToolInsights(
+      "testuser",
+      validUpload,
+      { ...validScores, computedAt: "2025-04-01T09:00:00Z" },
+      "2025-02-15T08:30:00Z",
+    );
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ uploaded_at: "2025-02-15T08:30:00Z" }),
+      expect.anything(),
+    );
   });
 
   it("returns CraftResult mapped from the returned row", async () => {
@@ -310,6 +333,57 @@ describe("dbGetToolInsights", () => {
 
     expect(mockLimit).toHaveBeenCalledWith(1);
     expect(mockSingle).toHaveBeenCalled();
+  });
+
+  it("selects the latest uploaded report when multiple tool rows exist for one handle", async () => {
+    const olderRow = {
+      ...validRow,
+      tool: "cursor",
+      craft_score: 42,
+      craft_tier: "Novice",
+      uploaded_at: "2025-02-01T12:00:00Z",
+    };
+    const latestRow = {
+      ...validRow,
+      tool: "claude-code",
+      craft_score: 65,
+      craft_tier: "Practitioner",
+      uploaded_at: "2025-03-01T12:00:00Z",
+    };
+
+    // The authoritative rule is "latest uploaded report wins".
+    let rows = [olderRow, latestRow];
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.eq = (...args: unknown[]) => {
+      mockEq(...args);
+      return chain;
+    };
+    chain.order = (...args: unknown[]) => {
+      mockOrder(...args);
+      rows = [...rows].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+      return chain;
+    };
+    chain.limit = (...args: unknown[]) => {
+      mockLimit(...args);
+      rows = rows.slice(0, 1);
+      return chain;
+    };
+    chain.single = () => {
+      mockSingle();
+      return chain;
+    };
+    chain.then = (resolve: (value: unknown) => void) =>
+      resolve({ data: rows[0], error: null });
+
+    mockGetSupabase.mockReturnValue({ from: vi.fn(() => chain) });
+
+    const result = await dbGetToolInsights("testuser");
+
+    expect(mockOrder).toHaveBeenCalledWith("uploaded_at", { ascending: false });
+    expect(result?.tool).toBe("claude-code");
+    expect(result?.craftScore).toBe(65);
+    expect(result?.computedAt).toBe("2025-03-01T12:00:00Z");
   });
 
   it("returns CraftResult from a valid row", async () => {
@@ -449,11 +523,30 @@ describe("dbGetToolInsights", () => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeChain(result: { data: unknown; error: unknown }): any {
   const chain: Record<string, unknown> = {};
-  chain.select = () => chain;
-  chain.upsert = () => chain;
-  chain.eq = () => chain;
-  chain.limit = () => chain;
-  chain.single = () => chain;
+  chain.select = (...args: unknown[]) => {
+    mockSelect(...args);
+    return chain;
+  };
+  chain.upsert = (...args: unknown[]) => {
+    mockUpsert(...args);
+    return chain;
+  };
+  chain.eq = (...args: unknown[]) => {
+    mockEq(...args);
+    return chain;
+  };
+  chain.order = (...args: unknown[]) => {
+    mockOrder(...args);
+    return chain;
+  };
+  chain.limit = (...args: unknown[]) => {
+    mockLimit(...args);
+    return chain;
+  };
+  chain.single = () => {
+    mockSingle();
+    return chain;
+  };
   chain.then = (resolve: (v: unknown) => void) => resolve(result);
   return chain;
 }
@@ -503,13 +596,22 @@ describe("dbRecomputeCraft", () => {
 
   it("recomputes craft from stored raw data and delegates to dbUpsertToolInsights", async () => {
     // Two sequential DB calls: select raw_data, then upsert updated scores
-    const selectChain = makeChain({ data: { raw_data: validUpload }, error: null });
+    const selectChain = makeChain({
+      data: {
+        raw_data: validUpload,
+        uploaded_at: "2025-03-01T12:00:00Z",
+      },
+      error: null,
+    });
     const upsertChain = makeChain({ data: validRow, error: null });
     const mockFromFn = vi.fn()
       .mockImplementationOnce(() => selectChain)
       .mockImplementationOnce(() => upsertChain);
     mockGetSupabase.mockReturnValue({ from: mockFromFn });
-    vi.mocked(computeCraftScore).mockReturnValue(validScores);
+    vi.mocked(computeCraftScore).mockReturnValue({
+      ...validScores,
+      computedAt: "2025-04-01T00:00:00Z",
+    });
 
     const result = await dbRecomputeCraft("testuser");
 
@@ -522,6 +624,63 @@ describe("dbRecomputeCraft", () => {
       reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
       computedAt: "2025-03-01T12:00:00Z",
     });
+    expect(mockUpsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ uploaded_at: "2025-03-01T12:00:00Z" }),
+      expect.anything(),
+    );
+  });
+
+  it("recomputes from the latest uploaded raw report when multiple tool rows exist", async () => {
+    const olderUpload = {
+      ...validUpload,
+      tool: "cursor" as const,
+      reportPeriod: { start: "2025-01-01", end: "2025-02-01" },
+    };
+    const latestUpload = {
+      ...validUpload,
+      tool: "claude-code" as const,
+      reportPeriod: { start: "2025-02-01", end: "2025-03-01" },
+    };
+    let rows = [
+      { raw_data: olderUpload, uploaded_at: "2025-02-01T12:00:00Z" },
+      { raw_data: latestUpload, uploaded_at: "2025-03-01T12:00:00Z" },
+    ];
+
+    const selectChain: Record<string, unknown> = {};
+    selectChain.select = () => selectChain;
+    selectChain.eq = (...args: unknown[]) => {
+      mockEq(...args);
+      return selectChain;
+    };
+    selectChain.order = (...args: unknown[]) => {
+      mockOrder(...args);
+      rows = [...rows].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+      return selectChain;
+    };
+    selectChain.limit = (...args: unknown[]) => {
+      mockLimit(...args);
+      rows = rows.slice(0, 1);
+      return selectChain;
+    };
+    selectChain.single = () => {
+      mockSingle();
+      return selectChain;
+    };
+    selectChain.then = (resolve: (value: unknown) => void) =>
+      resolve({ data: rows[0], error: null });
+
+    const upsertChain = makeChain({ data: validRow, error: null });
+    const mockFromFn = vi
+      .fn()
+      .mockImplementationOnce(() => selectChain)
+      .mockImplementationOnce(() => upsertChain);
+    mockGetSupabase.mockReturnValue({ from: mockFromFn });
+    vi.mocked(computeCraftScore).mockReturnValue(validScores);
+
+    await dbRecomputeCraft("testuser");
+
+    expect(mockOrder).toHaveBeenCalledWith("uploaded_at", { ascending: false });
+    expect(computeCraftScore).toHaveBeenCalledWith(latestUpload);
   });
 
   it("lowercases handle when querying DB", async () => {

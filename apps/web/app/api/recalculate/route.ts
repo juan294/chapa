@@ -1,16 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import { dbRecomputeCraft } from "@/lib/db/tool-insights";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
-import { buildSnapshot } from "@/lib/history/snapshot";
-import { dbReplaceSnapshot } from "@/lib/db/snapshots";
 import {
-  updateSnapshotCache,
-} from "@/lib/cache/snapshot-cache";
-import { getTier } from "@/lib/impact/utils";
+  materializeOrchestratedProfile,
+  persistOrchestratedSnapshot,
+} from "@/lib/profile/orchestrated-profile";
 
 /**
  * POST /api/recalculate — Force-recalculate impact score.
@@ -42,15 +37,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Fetch stats and recompute craft from stored raw data in parallel.
-  // dbRecomputeCraft reads raw_data from DB, runs computeCraftScore()
-  // with the current formula, and upserts the updated scores back.
-  const [stats, craftResult] = await Promise.all([
-    getStats(handle, auth.token),
-    dbRecomputeCraft(handle),
-  ]);
+  const materialized = await materializeOrchestratedProfile(handle, {
+    token: auth.token,
+    craftMode: "recompute",
+  });
 
-  if (!stats) {
+  if (!materialized) {
     return NextResponse.json(
       { error: "Could not load stats. Try again later." },
       { status: 502 },
@@ -58,34 +50,25 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Update craft cache so subsequent badge views use the recomputed score
-  if (craftResult) {
-    updateCraftCache(handle, craftResult).catch(() => {});
+  if (materialized.craftResult) {
+    updateCraftCache(handle, materialized.craftResult).catch(() => {});
   }
 
-  // Compute fresh impact with recomputed craft
-  const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
-
-  // For recalculate: use the RAW adjusted composite, NOT EMA-smoothed.
-  // This is a deliberate action — the user wants to see the actual score.
-  impact.tier = getTier(impact.adjustedComposite);
-
-  // Build snapshot and REPLACE today's (not insert-ignore)
-  const snapshot = buildSnapshot(stats, impact);
-  const replaced = await dbReplaceSnapshot(handle, snapshot);
-
-  if (replaced) {
-    await updateSnapshotCache(handle, snapshot);
-  }
+  await persistOrchestratedSnapshot(handle, materialized, {
+    mode: "replace",
+  });
 
   return NextResponse.json({
     success: true,
-    adjustedComposite: impact.adjustedComposite,
-    compositeScore: impact.compositeScore,
-    dimensions: impact.dimensions,
-    archetype: impact.archetype,
-    tier: impact.tier,
-    profileType: impact.profileType,
-    craftScore: craftResult?.craftScore ?? null,
-    craftTier: craftResult?.tier ?? null,
+    adjustedComposite: materialized.displayImpact.adjustedComposite,
+    displayAdjustedComposite: materialized.displayImpact.adjustedComposite,
+    rawAdjustedComposite: materialized.rawImpact.adjustedComposite,
+    compositeScore: materialized.displayImpact.compositeScore,
+    dimensions: materialized.displayImpact.dimensions,
+    archetype: materialized.displayImpact.archetype,
+    tier: materialized.displayImpact.tier,
+    profileType: materialized.displayImpact.profileType,
+    craftScore: materialized.craftResult?.craftScore ?? null,
+    craftTier: materialized.craftResult?.tier ?? null,
   });
 }

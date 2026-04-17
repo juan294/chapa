@@ -6,21 +6,27 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 // Mocks — hoisted before any imports that depend on them
 // ---------------------------------------------------------------------------
 
-const { mockReadSessionCookie, mockRequireSession, mockCacheGet, mockCacheSet, mockRateLimit } =
+const {
+  mockGetOptionalRequestSession,
+  mockGetSessionSecret,
+  mockRequireRequestSession,
+  mockCacheGet,
+  mockCacheSet,
+  mockRateLimit,
+} =
   vi.hoisted(() => ({
-    mockReadSessionCookie: vi.fn(),
-    mockRequireSession: vi.fn(),
+    mockGetOptionalRequestSession: vi.fn(),
+    mockGetSessionSecret: vi.fn(),
+    mockRequireRequestSession: vi.fn(),
     mockCacheGet: vi.fn(),
     mockCacheSet: vi.fn(),
     mockRateLimit: vi.fn(),
   }));
 
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: mockReadSessionCookie,
-}));
-
-vi.mock("@/lib/auth/require-session", () => ({
-  requireSession: mockRequireSession,
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalRequestSession: mockGetOptionalRequestSession,
+  getSessionSecret: mockGetSessionSecret,
+  requireRequestSession: mockRequireRequestSession,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -82,17 +88,18 @@ describe("GET /api/studio/config", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    mockGetSessionSecret.mockReturnValue("test-secret");
   });
 
   it("returns 401 when no session", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(401);
   });
 
   it("returns { config: null } when no NEXTAUTH_SECRET", async () => {
-    vi.stubEnv("NEXTAUTH_SECRET", "");
+    mockGetSessionSecret.mockReturnValue(null);
 
     const res = await GET(makeGetRequest("session=abc"));
     expect(res.status).toBe(200);
@@ -100,7 +107,7 @@ describe("GET /api/studio/config", () => {
   });
 
   it("returns saved config from Redis", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
+    mockGetOptionalRequestSession.mockReturnValue(SESSION);
     const savedConfig = { ...DEFAULT_BADGE_CONFIG, background: "aurora" };
     mockCacheGet.mockResolvedValue(savedConfig);
 
@@ -112,7 +119,7 @@ describe("GET /api/studio/config", () => {
   });
 
   it("returns { config: null } when Redis has no config", async () => {
-    mockReadSessionCookie.mockReturnValue(SESSION);
+    mockGetOptionalRequestSession.mockReturnValue(SESSION);
     mockCacheGet.mockResolvedValue(null);
 
     const res = await GET(makeGetRequest("session=abc"));
@@ -124,12 +131,12 @@ describe("GET /api/studio/config", () => {
 describe("PUT /api/studio/config", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockRequireRequestSession.mockReturnValue({ session: SESSION });
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
   });
 
   it("returns 401 when no session", async () => {
-    mockRequireSession.mockReturnValue({
+    mockRequireRequestSession.mockReturnValue({
       error: NextResponse.json(
         { error: "Authentication required" },
         { status: 401 },

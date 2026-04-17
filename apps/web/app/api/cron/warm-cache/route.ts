@@ -2,14 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { dbGetUsers } from "@/lib/db/users";
 import {
-  dbInsertSnapshot,
   dbGetLatestSnapshotBatch,
   dbCleanOldSnapshots,
 } from "@/lib/db/snapshots";
-import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import { buildSnapshot } from "@/lib/history/snapshot";
 import { compareSnapshots } from "@/lib/history/diff";
 import { isSignificantChange } from "@/lib/history/significant-change";
 import { notifyScoreBump } from "@/lib/email/score-bump";
@@ -18,8 +13,11 @@ import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import { captureServerError } from "@/lib/analytics/server-errors";
-import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getAvatarBase64 } from "@/lib/render/avatar";
+import {
+  materializeOrchestratedProfile,
+  persistOrchestratedSnapshot,
+} from "@/lib/profile/orchestrated-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -214,8 +212,11 @@ async function warmHandle(
   previousSnapshots: Map<string, unknown>,
 ): Promise<HandleResult> {
   try {
-    const stats = await getStats(handle, githubToken);
-    if (!stats) {
+    const materialized = await materializeOrchestratedProfile(handle, {
+      token: githubToken,
+      craftMode: "cached",
+    });
+    if (!materialized) {
       void captureServerError({
         route: "/api/cron/warm-cache",
         statusCode: 502,
@@ -227,32 +228,27 @@ async function warmHandle(
     let snapshotRecorded = false;
     let notified = false;
 
-    // Pre-warm avatar + craft caches in parallel (both are non-critical)
-    const [craftSettled] = await Promise.allSettled([
-      getCachedCraftScore(handle),
-      stats.avatarUrl ? getAvatarBase64(handle, stats.avatarUrl) : Promise.resolve(undefined),
-    ]);
-    const craftResult = craftSettled.status === "fulfilled" ? craftSettled.value : null;
+    // Pre-warm avatar cache opportunistically for later public renders.
+    if (materialized.stats.avatarUrl) {
+      void getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => {});
+    }
 
     // Record daily metrics snapshot (fire-and-forget, deduplicates by date)
     try {
-      const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
-      const snapshot = buildSnapshot(stats, impact);
-
       const previousSnapshot = previousSnapshots.get(handle.toLowerCase());
 
-      const recorded = await dbInsertSnapshot(handle, snapshot);
+      const recorded = await persistOrchestratedSnapshot(handle, materialized, {
+        mode: "insert",
+      });
       if (recorded) {
         snapshotRecorded = true;
-        // Update snapshot cache so subsequent reads hit Redis
-        await updateSnapshotCache(handle, snapshot).catch(() => {});
 
         // Score bump notification: compare new vs previous snapshot
         if (previousSnapshot) {
           try {
             const diff = compareSnapshots(
               previousSnapshot as Parameters<typeof compareSnapshots>[0],
-              snapshot,
+              materialized.snapshot,
             );
             const result = isSignificantChange(diff);
             if (result.significant) {
@@ -278,4 +274,3 @@ async function warmHandle(
     return { warmed: false, snapshotRecorded: false, notified: false };
   }
 }
-

@@ -8,12 +8,14 @@ const {
   mockIsCliToken,
   mockVerifyCliToken,
   mockFetchGitHubUser,
-  mockReadSessionCookie,
+  mockGetOptionalRequestSession,
+  mockGetSessionSecret,
 } = vi.hoisted(() => ({
   mockIsCliToken: vi.fn(),
   mockVerifyCliToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
-  mockReadSessionCookie: vi.fn(),
+  mockGetOptionalRequestSession: vi.fn(),
+  mockGetSessionSecret: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cli-token", () => ({
@@ -23,7 +25,11 @@ vi.mock("@/lib/auth/cli-token", () => ({
 
 vi.mock("@/lib/auth/github", () => ({
   fetchGitHubUser: mockFetchGitHubUser,
-  readSessionCookie: mockReadSessionCookie,
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalRequestSession: mockGetOptionalRequestSession,
+  getSessionSecret: mockGetSessionSecret,
 }));
 
 // ---------------------------------------------------------------------------
@@ -49,7 +55,7 @@ function makeRequest(headers: Record<string, string> = {}): Request {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret-key");
+  mockGetSessionSecret.mockReturnValue("test-secret-key");
 });
 
 // ---------------------------------------------------------------------------
@@ -110,7 +116,7 @@ describe("resolveRequestAuth", () => {
 
   describe("session cookie fallback", () => {
     it("resolves handle from session cookie when no Bearer header", async () => {
-      mockReadSessionCookie.mockReturnValue({
+      mockGetOptionalRequestSession.mockReturnValue({
         login: "juan294",
         token: "ghp_test",
         name: "Juan",
@@ -122,16 +128,13 @@ describe("resolveRequestAuth", () => {
       );
 
       expect(result).toEqual({ handle: "juan294", token: "ghp_test" });
-      expect(mockReadSessionCookie).toHaveBeenCalledWith(
-        "chapa_session=encrypted_value",
-        "test-secret-key",
-      );
+      expect(mockGetOptionalRequestSession).toHaveBeenCalled();
     });
   });
 
   describe("no auth", () => {
     it("returns null when no Bearer header and no session cookie", async () => {
-      mockReadSessionCookie.mockReturnValue(null);
+      mockGetOptionalRequestSession.mockReturnValue(null);
 
       const result = await resolveRequestAuth(makeRequest());
 
@@ -141,7 +144,7 @@ describe("resolveRequestAuth", () => {
 
   describe("edge cases", () => {
     it("returns null when NEXTAUTH_SECRET is not set", async () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "");
+      mockGetSessionSecret.mockReturnValue(null);
 
       const result = await resolveRequestAuth(
         makeRequest({ Authorization: "Bearer cli.token" }),
@@ -162,7 +165,7 @@ describe("resolveRequestAuth", () => {
       );
 
       expect(result).toEqual({ handle: "bearer-user" });
-      expect(mockReadSessionCookie).not.toHaveBeenCalled();
+      expect(mockGetOptionalRequestSession).not.toHaveBeenCalled();
     });
   });
 });

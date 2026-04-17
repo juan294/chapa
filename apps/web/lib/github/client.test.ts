@@ -553,6 +553,74 @@ describe("getStats", () => {
       expect(r3).toEqual(fresh);
       expect(mockFetchStatsData).toHaveBeenCalledTimes(1);
     });
+
+    it("does not let an authenticated request reuse a public inflight fetch", async () => {
+      const publicStats = makeStats({ commitsTotal: 11 });
+      const authedStats = makeStats({ commitsTotal: 22 });
+
+      let resolvePublicFetch!: (value: StatsData) => void;
+      let resolveAuthedFetch!: (value: StatsData) => void;
+      mockFetchStatsData
+        .mockReturnValueOnce(
+          new Promise<StatsData>((resolve) => {
+            resolvePublicFetch = resolve;
+          }),
+        )
+        .mockReturnValueOnce(
+          new Promise<StatsData>((resolve) => {
+            resolveAuthedFetch = resolve;
+          }),
+        );
+      mockCacheGet.mockResolvedValue(null);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      const publicPromise = getStats("test-user");
+      const authedPromise = getStats("test-user", "auth-token");
+
+      resolvePublicFetch(publicStats);
+      resolveAuthedFetch(authedStats);
+
+      const [publicResult, authedResult] = await Promise.all([
+        publicPromise,
+        authedPromise,
+      ]);
+
+      expect(publicResult).toEqual(publicStats);
+      expect(authedResult).toEqual(authedStats);
+      expect(mockFetchStatsData).toHaveBeenCalledTimes(2);
+      expect(mockFetchStatsData).toHaveBeenNthCalledWith(1, "test-user", undefined);
+      expect(mockFetchStatsData).toHaveBeenNthCalledWith(2, "test-user", "auth-token");
+    });
+
+    it("lets public callers reuse an authenticated inflight fetch", async () => {
+      const authedStats = makeStats({ commitsTotal: 22 });
+
+      let resolveAuthedFetch!: (value: StatsData) => void;
+      mockFetchStatsData.mockReturnValueOnce(
+        new Promise<StatsData>((resolve) => {
+          resolveAuthedFetch = resolve;
+        }),
+      );
+      mockCacheGet.mockResolvedValue(null);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      const authedPromise = getStats("test-user", "auth-token");
+      const publicPromise = getStats("test-user");
+
+      resolveAuthedFetch(authedStats);
+
+      const [authedResult, publicResult] = await Promise.all([
+        authedPromise,
+        publicPromise,
+      ]);
+
+      expect(authedResult).toEqual(authedStats);
+      expect(publicResult).toEqual(authedStats);
+      expect(mockFetchStatsData).toHaveBeenCalledTimes(1);
+      expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", "auth-token");
+    });
   });
 
   // -----------------------------------------------------------------------

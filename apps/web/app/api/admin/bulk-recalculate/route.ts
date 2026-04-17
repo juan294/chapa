@@ -3,13 +3,11 @@ import { verifyAdminSecret } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUsers } from "@/lib/db/users";
-import { dbReplaceSnapshot } from "@/lib/db/snapshots";
-import { invalidateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import { buildSnapshot } from "@/lib/history/snapshot";
 import { processInBatches } from "@/lib/async/process-in-batches";
-import { getCachedCraftScore } from "@/lib/cache/craft-cache";
+import {
+  materializeOrchestratedProfile,
+  persistOrchestratedSnapshot,
+} from "@/lib/profile/orchestrated-profile";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -72,22 +70,20 @@ export async function POST(request: NextRequest) {
 
   await processInBatches(handles, BATCH_SIZE, async (handle) => {
     try {
-      const [stats, craftResult] = await Promise.all([
-        getStats(handle, githubToken),
-        getCachedCraftScore(handle),
-      ]);
+      const materialized = await materializeOrchestratedProfile(handle, {
+        token: githubToken,
+        craftMode: "cached",
+      });
 
-      if (!stats) {
+      if (!materialized) {
         errors.push({ handle, error: "Stats fetch returned null" });
         return;
       }
 
-      const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
-      const snapshot = buildSnapshot(stats, impact);
-
-      const replaced = await dbReplaceSnapshot(handle, snapshot);
+      const replaced = await persistOrchestratedSnapshot(handle, materialized, {
+        mode: "replace",
+      });
       if (replaced) {
-        await invalidateSnapshotCache(handle).catch(() => {});
         recalculated++;
       } else {
         errors.push({ handle, error: "Snapshot replace failed" });

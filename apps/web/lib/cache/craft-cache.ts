@@ -26,6 +26,7 @@ function craftCacheKey(handle: string): string {
  * - Cache hit: return from Redis (no DB call).
  * - Cache miss: fetch from Supabase, cache in Redis, return.
  * - Redis failure: fall back to Supabase directly.
+ * - DB read rule: latest uploaded tool-insights row wins.
  *
  * Returns null if no insights uploaded or Supabase unavailable.
  */

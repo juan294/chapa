@@ -59,6 +59,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
   // Insights import — file picker triggered directly from menu
   const insightsFileRef = useRef<HTMLInputElement>(null);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleToastDismiss = useCallback(() => setToast(null), []);
   const [toast, setToast] = useState<{
     message: string;
@@ -146,11 +147,22 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         });
       }
 
-      setTimeout(() => window.location.reload(), 2500);
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }, 2500);
     } catch {
       setToast({ message: "Import failed", detail: "Please try again", type: "error" });
     }
   }
+
+  useEffect(() => () => {
+    if (reloadTimerRef.current) {
+      clearTimeout(reloadTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (platformStatusCache.fetched) {

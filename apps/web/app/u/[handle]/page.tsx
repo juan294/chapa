@@ -2,14 +2,9 @@ export const revalidate = 3600;
 
 import { Suspense } from "react";
 import { after } from "next/server";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import { smoothScore } from "@/lib/impact/smoothing";
-import { getTier } from "@/lib/impact/utils";
-import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { isValidHandle } from "@/lib/validation";
-import { cacheGet, trackBadgeGenerated } from "@/lib/cache/redis";
+import { cacheGet } from "@/lib/cache/redis";
 import { NavbarClient } from "@/components/NavbarClient";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -18,19 +13,17 @@ import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
-import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getBaseUrl } from "@/lib/env";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
-import { generateVerificationCode } from "@/lib/verification/hmac";
-import { storeVerificationRecord } from "@/lib/verification/store";
-import type { VerificationRecord } from "@/lib/verification/types";
-import { notifyFirstBadge } from "@/lib/email/notifications";
-import { buildSnapshot } from "@/lib/history/snapshot";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
+import {
+  getPublicProfileVerification,
+  materializePublicProfile,
+  runPublicProfileSideEffects,
+} from "@/lib/profile/public-profile";
 
 const BASE_URL = getBaseUrl();
 
@@ -112,35 +105,25 @@ export async function SharePageContent({ handle }: { handle: string }) {
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
-  // Fetch stats, config, snapshot, craft score, and feature flags in parallel
-  const [stats, savedConfig, latestSnapshot, craftResult] = await Promise.all([
-    getStats(handle),
+  const [materialized, savedConfig] = await Promise.all([
+    materializePublicProfile(handle),
     cacheGet<BadgeConfig>(`config:${handle}`),
-    getCachedLatestSnapshot(handle),
-    getCachedCraftScore(handle),
   ]);
-
-  const impact = stats ? computeImpactV6(stats, craftResult?.craftScore ?? undefined) : null;
+  const stats = materialized?.stats ?? null;
+  const impact = materialized?.displayImpact ?? null;
 
   // Start avatar fetch immediately (runs concurrently with EMA computation)
   const avatarPromise = stats?.avatarUrl
-    ? getAvatarBase64(handle, stats.avatarUrl)
+    ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
     : Promise.resolve(undefined);
-
-  // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
-  // on same-day repeated requests (smoothScore returns cached value for today).
-  if (impact) {
-    impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
-    impact.tier = getTier(impact.adjustedComposite);
-  }
 
   const useInteractivePreview =
     hasCustomConfig(savedConfig) && stats && impact;
 
   // Render badge SVG inline during SSR to eliminate second round-trip
   const avatarDataUri = await avatarPromise;
-  const verification = stats && impact
-    ? generateVerificationCode(stats, impact)
+  const verification = materialized
+    ? getPublicProfileVerification(materialized)
     : null;
   const inlineSvg = stats && impact && !useInteractivePreview
     ? renderBadgeSvg(stats, impact, {
@@ -151,38 +134,9 @@ export async function SharePageContent({ handle }: { handle: string }) {
     : null;
 
   // Deferred work: verification storage, tracking, snapshots (runs after response)
-  if (stats && impact && inlineSvg) {
+  if (materialized && inlineSvg) {
     after(() => {
-      const ops: Promise<void>[] = [];
-
-      if (verification) {
-        const record: VerificationRecord = {
-          handle: stats.handle.toLowerCase(),
-          displayName: stats.displayName,
-          adjustedComposite: impact.adjustedComposite,
-          confidence: impact.confidence,
-          tier: impact.tier,
-          archetype: impact.archetype,
-          dimensions: impact.dimensions,
-          commitsTotal: stats.commitsTotal,
-          prsMergedCount: stats.prsMergedCount,
-          reviewsSubmittedCount: stats.reviewsSubmittedCount,
-          generatedAt: verification.date,
-          profileType: impact.profileType,
-        };
-        ops.push(storeVerificationRecord(verification.hash, record));
-      }
-
-      ops.push(trackBadgeGenerated(handle));
-      ops.push(notifyFirstBadge(handle, impact));
-      const snapshot = buildSnapshot(stats, impact);
-      ops.push(
-        dbInsertSnapshot(handle, snapshot).then((inserted) => {
-          if (inserted) updateSnapshotCache(handle, snapshot);
-        }),
-      );
-
-      return Promise.allSettled(ops);
+      return runPublicProfileSideEffects(handle, materialized, { verification });
     });
   }
 

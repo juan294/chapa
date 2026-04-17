@@ -1,14 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
-import { generateVerificationCode } from "@/lib/verification/hmac";
 import { svgToPng } from "@/lib/render/svg-to-png";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { toDateString } from "@/lib/utils/date";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
+import {
+  getPublicProfileVerification,
+  materializePublicProfile,
+} from "@/lib/profile/public-profile";
 
 const OG_CACHE_TTL = 172800; // 48 hours
 const SVG_TO_PNG_TIMEOUT_MS = 10_000;
@@ -33,7 +34,7 @@ export async function GET(
   }
 
   const today = toDateString(new Date());
-  const ogCacheKey = `og-image:v1:${handle}:${today}`;
+  const ogCacheKey = `og-image:v2:${handle}:${today}`;
 
   // Try cached PNG first
   try {
@@ -53,20 +54,18 @@ export async function GET(
   }
 
   try {
-    const stats = await getStats(handle);
-    if (!stats) {
+    const materialized = await materializePublicProfile(handle);
+    if (!materialized) {
       return new NextResponse("Could not load data", { status: 404 });
     }
 
-    const impact = computeImpactV6(stats);
-
-    const avatarDataUri = stats.avatarUrl
-      ? await getAvatarBase64(handle, stats.avatarUrl)
+    const avatarDataUri = materialized.stats.avatarUrl
+      ? await getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : undefined;
 
-    const verification = generateVerificationCode(stats, impact);
+    const verification = getPublicProfileVerification(materialized);
 
-    const svg = renderBadgeSvg(stats, impact, {
+    const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,

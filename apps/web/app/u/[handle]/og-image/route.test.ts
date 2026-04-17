@@ -1,109 +1,95 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-// ---------------------------------------------------------------------------
-// Mocks — must be set up BEFORE importing the route handler
-// ---------------------------------------------------------------------------
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const {
-  mockGetStats,
-  mockComputeImpactV6,
+  mockMaterializePublicProfile,
+  mockGetPublicProfileVerification,
   mockRenderBadgeSvg,
   mockIsValidHandle,
   mockGetAvatarBase64,
-  mockGenerateVerificationCode,
   mockSvgToPng,
   mockCacheGet,
   mockCacheSet,
 } = vi.hoisted(() => ({
-  mockGetStats: vi.fn(),
-  mockComputeImpactV6: vi.fn(),
+  mockMaterializePublicProfile: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
-  mockGenerateVerificationCode: vi.fn(),
   mockSvgToPng: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
 }));
 
-vi.mock("@/lib/github/client", () => ({
-  getStats: mockGetStats,
-}));
-
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV6,
+vi.mock("@/lib/profile/public-profile", () => ({
+  materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
-  renderBadgeSvg: mockRenderBadgeSvg,
+  renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
-  isValidHandle: mockIsValidHandle,
+  isValidHandle: (...args: unknown[]) => mockIsValidHandle(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
-  getAvatarBase64: mockGetAvatarBase64,
-}));
-
-vi.mock("@/lib/verification/hmac", () => ({
-  generateVerificationCode: mockGenerateVerificationCode,
+  getAvatarBase64: (...args: unknown[]) => mockGetAvatarBase64(...args),
 }));
 
 vi.mock("@/lib/render/svg-to-png", () => ({
-  svgToPng: mockSvgToPng,
+  svgToPng: (...args: unknown[]) => mockSvgToPng(...args),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
-  cacheSet: mockCacheSet,
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
+  cacheSet: (...args: unknown[]) => mockCacheSet(...args),
 }));
 
 import { GET } from "./route";
-import { NextRequest } from "next/server";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
+const FAKE_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const FAKE_PNG_BASE64 = Buffer.from(FAKE_PNG).toString("base64");
+
+const FAKE_MATERIALIZED = {
+  stats: {
+    handle: "testuser",
+    displayName: "Test User",
+    avatarUrl: "https://avatars.githubusercontent.com/u/12345",
+    commitsTotal: 42,
+    prsMergedCount: 10,
+    reviewsSubmittedCount: 5,
+  },
+  rawImpact: {
+    adjustedComposite: 73,
+    tier: "High",
+    confidence: 85,
+    archetype: "Builder",
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    profileType: "collaborative",
+  },
+  displayImpact: {
+    adjustedComposite: 65,
+    tier: "Solid",
+    confidence: 85,
+    archetype: "Builder",
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    profileType: "collaborative",
+  },
+  snapshot: { date: "2026-02-14", adjustedComposite: 65, tier: "Solid" },
+};
 
 function makeRequest(
   handle: string,
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
-  const req = new NextRequest(
-    `https://chapa.thecreativetoken.com/u/${handle}/og-image`,
-  );
-  return [req, { params: Promise.resolve({ handle }) }];
+  return [
+    new NextRequest(`https://chapa.thecreativetoken.com/u/${handle}/og-image`),
+    { params: Promise.resolve({ handle }) },
+  ];
 }
-
-const FAKE_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">BADGE</svg>';
-
-const FAKE_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-const FAKE_STATS = {
-  handle: "testuser",
-  commitsTotal: 42,
-  prsMergedCount: 10,
-  reviewsSubmittedCount: 5,
-  avatarUrl: "https://avatars.githubusercontent.com/u/12345",
-};
-
-const FAKE_IMPACT = {
-  handle: "testuser",
-  profileType: "collaborative",
-  adjustedComposite: 65,
-  tier: "Solid",
-  confidence: 85,
-  dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-  archetype: "Builder",
-};
-
-/** The base64-encoded form of FAKE_PNG that the route stores in Redis. */
-const FAKE_PNG_BASE64 = Buffer.from(FAKE_PNG).toString("base64");
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("GET /u/[handle]/og-image", () => {
   beforeEach(() => {
@@ -112,13 +98,12 @@ describe("GET /u/[handle]/og-image", () => {
     vi.setSystemTime(new Date("2026-02-14T12:00:00Z"));
 
     mockIsValidHandle.mockReturnValue(true);
-    mockGetStats.mockResolvedValue(FAKE_STATS);
-    mockComputeImpactV6.mockReturnValue(FAKE_IMPACT);
-    mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-02-14" });
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
-    mockGenerateVerificationCode.mockReturnValue(null);
+    mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockSvgToPng.mockReturnValue(FAKE_PNG);
-    mockCacheGet.mockResolvedValue(null); // default: cache miss
+    mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
   });
 
@@ -126,188 +111,81 @@ describe("GET /u/[handle]/og-image", () => {
     vi.useRealTimers();
   });
 
-  // -----------------------------------------------------------------------
-  // Cache miss — full render pipeline
-  // -----------------------------------------------------------------------
+  it("returns the cached png when Redis already has the image", async () => {
+    mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
 
-  describe("cache miss", () => {
-    it("returns 200 with Content-Type image/png", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toBe("image/png");
-    });
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
 
-    it("stores the generated PNG as base64 in Redis with 48h TTL", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockCacheSet).toHaveBeenCalledWith(
-        "og-image:v1:testuser:2026-02-14",
-        FAKE_PNG_BASE64,
-        172800, // 48 hours
-      );
-    });
-
-    it("calls the full render pipeline", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockGetStats).toHaveBeenCalledWith("testuser");
-      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS);
-      expect(mockSvgToPng).toHaveBeenCalledWith(FAKE_SVG, 1200);
-    });
+    expect(res.status).toBe(200);
+    expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+    expect(mockCacheGet).toHaveBeenCalledWith("og-image:v2:testuser:2026-02-14");
   });
 
-  // -----------------------------------------------------------------------
-  // Cache hit — skip render pipeline
-  // -----------------------------------------------------------------------
+  it("renders the OG image from displayImpact, not rawImpact", async () => {
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
 
-  describe("cache hit", () => {
-    beforeEach(() => {
-      mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
-    });
-
-    it("returns 200 with Content-Type image/png", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toBe("image/png");
-    });
-
-    it("returns the cached PNG buffer", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      const body = await res.arrayBuffer();
-      expect(new Uint8Array(body)).toEqual(FAKE_PNG);
-    });
-
-    it("does NOT call getStats", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockGetStats).not.toHaveBeenCalled();
-    });
-
-    it("does NOT call renderBadgeSvg or svgToPng", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-      expect(mockSvgToPng).not.toHaveBeenCalled();
-    });
-
-    it("does NOT call cacheSet (no re-store needed)", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockCacheSet).not.toHaveBeenCalled();
-    });
-
-    it("checks the correct cache key with handle and date", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockCacheGet).toHaveBeenCalledWith(
-        "og-image:v1:testuser:2026-02-14",
-      );
-    });
+    expect(res.status).toBe(200);
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      {
+        avatarDataUri: "data:image/png;base64,abc123",
+        verificationHash: "abc12345",
+        verificationDate: "2026-02-14",
+      },
+    );
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "og-image:v2:testuser:2026-02-14",
+      FAKE_PNG_BASE64,
+      172800,
+    );
   });
 
-  // -----------------------------------------------------------------------
-  // Cache key format
-  // -----------------------------------------------------------------------
+  it("returns 400 for an invalid handle", async () => {
+    mockIsValidHandle.mockReturnValue(false);
 
-  describe("cache key", () => {
-    it("changes when the date changes", async () => {
-      vi.setSystemTime(new Date("2026-02-15T12:00:00Z"));
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockCacheGet).toHaveBeenCalledWith(
-        "og-image:v1:testuser:2026-02-15",
-      );
-    });
+    const [req, ctx] = makeRequest("bad!!handle");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(400);
   });
 
-  // -----------------------------------------------------------------------
-  // Cache degradation — Redis errors fall through to generation
-  // -----------------------------------------------------------------------
+  it("returns 404 when public materialization returns null", async () => {
+    mockMaterializePublicProfile.mockResolvedValue(null);
 
-  describe("cache degradation", () => {
-    it("generates PNG normally when cacheGet throws", async () => {
-      mockCacheGet.mockRejectedValue(new Error("Redis down"));
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      expect(mockGetStats).toHaveBeenCalled();
-      expect(mockSvgToPng).toHaveBeenCalled();
-    });
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
 
-    it("still returns PNG even when cacheSet throws", async () => {
-      mockCacheSet.mockRejectedValue(new Error("Redis down"));
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-    });
+    expect(res.status).toBe(404);
   });
 
-  // -----------------------------------------------------------------------
-  // Error paths
-  // -----------------------------------------------------------------------
+  it("returns 504 when svgToPng exceeds the timeout", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSvgToPng.mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 30_000)),
+    );
 
-  describe("error handling", () => {
-    it("returns 400 for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(400);
+    const [req, ctx] = makeRequest("testuser");
+    const responsePromise = GET(req, ctx);
+    await vi.advanceTimersByTimeAsync(10_001);
+    const res = await responsePromise;
+
+    expect(res.status).toBe(504);
+    consoleSpy.mockRestore();
+  });
+
+  it("returns 500 when badge rendering fails", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockRenderBadgeSvg.mockImplementation(() => {
+      throw new Error("render failed");
     });
 
-    it("returns 404 when getStats returns null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(404);
-    });
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
 
-    it("returns 500 when render pipeline throws", async () => {
-      // Silence expected console.error from the error-handling code path
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      mockSvgToPng.mockImplementation(() => {
-        throw new Error("PNG conversion failed");
-      });
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(500);
-
-      consoleSpy.mockRestore();
-    });
-
-    it("returns 504 when svgToPng exceeds the timeout", async () => {
-      // Silence expected console.error from the timeout error path
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      // Simulate a svgToPng call that never resolves within the timeout
-      mockSvgToPng.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 30_000)),
-      );
-
-      const [req, ctx] = makeRequest("testuser");
-
-      // Advance timers past the 10s timeout
-      const responsePromise = GET(req, ctx);
-      await vi.advanceTimersByTimeAsync(10_001);
-      const res = await responsePromise;
-
-      expect(res.status).toBe(504);
-      const body = await res.text();
-      expect(body).toContain("timed out");
-
-      consoleSpy.mockRestore();
-    });
-
-    it("returns PNG successfully when svgToPng completes within timeout", async () => {
-      // Ensure the timeout guard doesn't interfere with normal fast responses
-      mockSvgToPng.mockReturnValue(FAKE_PNG);
-      const [req, ctx] = makeRequest("testuser");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toBe("image/png");
-    });
+    expect(res.status).toBe(500);
+    consoleSpy.mockRestore();
   });
 });

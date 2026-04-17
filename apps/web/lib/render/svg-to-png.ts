@@ -6,8 +6,8 @@
  */
 
 import { Resvg } from "@resvg/resvg-js";
-import { existsSync } from "fs";
-import { join } from "path";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 /**
  * Font files co-located with the render module for server-side SVG rendering.
@@ -26,16 +26,12 @@ const FONT_FILES = [
 /**
  * Resolve absolute paths to the bundled TTF font files.
  *
- * Turbopack rewrites `__dirname` to the compiled chunk directory
- * (`.next/server/chunks/`), where the font files don't exist. We use
- * `process.cwd()` instead, which resolves to the app root (`apps/web`)
- * in Next.js dev/production. For test runners invoked from the monorepo
- * root, we fall back to `apps/web/` prefixed paths.
+ * Keep this module-relative so Next/NFT can statically trace only the
+ * `fonts/` directory instead of the entire workspace.
  */
 export function getFontPaths(): string[] {
-  const appRelative = join(/* turbopackIgnore: true */ process.cwd(), "lib", "render", "fonts");
-  const monoRelative = join(/* turbopackIgnore: true */ process.cwd(), "apps", "web", "lib", "render", "fonts");
-  const fontsDir = existsSync(appRelative) ? appRelative : monoRelative;
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const fontsDir = join(moduleDir, "fonts");
   return FONT_FILES.map((f) => join(fontsDir, f));
 }
 

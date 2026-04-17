@@ -40,7 +40,7 @@ describe("getFontPaths", () => {
     expect(paths).toHaveLength(4);
     for (const p of paths) {
       expect(p).toMatch(/\.ttf$/);
-      expect(p).toContain("lib/render/fonts/");
+      expect(p).toContain("/lib/render/fonts/");
     }
   });
 
@@ -54,7 +54,7 @@ describe("getFontPaths", () => {
   });
 
   it("resolves to font files that exist on disk", async () => {
-    const { existsSync } = await import("fs");
+    const { existsSync } = await import("node:fs");
     const paths = getFontPaths();
     for (const p of paths) {
       expect(existsSync(p), `font file should exist: ${p}`).toBe(true);
