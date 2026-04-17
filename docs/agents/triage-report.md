@@ -1,44 +1,43 @@
 # Triage Report
-> Generated on 2026-04-11 | 3 reports processed | 0 action items
+> Generated on 2026-04-17 | 4 reports processed | 10 action items
 
 ## Agent Failures
-| Agent | Error | Log File |
-|-------|-------|----------|
-| cost-analyst | 0-byte report + 0-byte log (API limit — 2nd consecutive day) | `logs/cost-analyst-2026-04-11.log` |
-| coverage | 0-byte report + 0-byte log (API limit — 2nd consecutive day) | `logs/coverage-agent-2026-04-11.log` |
-
-Both failures are API quota — no code action needed. Agents will rerun on next scheduled cycle.
+None — all agents ran successfully.
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi-update | GREEN | 0 — blueprint at v1.14.5, no changes |
-| 2 | `cost-analyst-report.md` | cost-analyst | FAILED | 0 — empty report (agent failure) |
-| 3 | `coverage-report.md` | coverage | FAILED | 0 — empty report (agent failure) |
+| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 (sync current) |
+| 2 | cost-analyst-report.md | cost-analyst | GREEN | 6 (P3-1–P3-6; P3-7/P3-8 false positives) |
+| 3 | coverage-report.md | coverage | YELLOW | 1 (BadgeToolbar vitest 4.1.4 regression) |
+| 4 | documentation-report.md | documentation | GREEN | 3 (design-system.md light values) |
 
 ## Overall Status: GREEN
 
-All actionable items from prior cycles remain resolved. No new findings from any agent.
-
 ## Action Items Completed
-None — no code changes required this cycle.
+| # | Item | Source Report | Tests Added | Status |
+|---|------|--------------|-------------|--------|
+| 1 | Merge codex/triage-audit-fixes (vitest 4.1.4, jsdom 29.0.2, vite ≥8.0.8, campaign test refactors) | cost-analyst P3-4/P3-5 | — | ✅ Done |
+| 2 | Replace og-image `Promise.race` timer with `withTimeout()` | cost-analyst P3-2 | — | ✅ Done |
+| 3 | Replace supabase `pingSupabase` `Promise.race` timer with `withTimeout()` | cost-analyst P3-3 | — | ✅ Done |
+| 4 | Add Redis caching to `listAllContacts()` in sync-audience cron (1h TTL) | cost-analyst P3-1 | 3 (cache hit, miss, error) | ✅ Done |
+| 5 | Add partial index migration for `dbGetUsersWithEmail()` | cost-analyst P3-6 | — | ✅ Done |
+| 6 | Fix BadgeToolbar `vi.spyOn(globalThis, "fetch")` regression from vitest 4.1.4 | coverage P2 | — | ✅ Done |
+| 7 | Fill 14 missing light-value cells in design-system.md | documentation | — | ✅ Done |
+| 8 | P3-7 (Bitbucket/Codeberg token refresh timeout) — FALSE POSITIVE | cost-analyst P3-7 | — | ✅ Confirmed no-op |
+| 9 | P3-8 (cacheDel uncaught throw) — FALSE POSITIVE | cost-analyst P3-8 | — | ✅ Confirmed no-op |
+| 10 | Remove `SvgToPngTimeoutError` class, unify to `TimeoutError` | code quality | — | ✅ Done |
 
 ## Verification
-- [x] No code changes made — verification not required
-- [x] `.last-triage` marker updated
-- [x] `shared-context.md` updated (oldest triage entry pruned, new entry appended)
+- [x] All tests passing (7004/7004)
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] CI in progress (run #24561505823)
 
 ## Carried Items
-
-| Item | Source | Cycles Carried | Note |
-|------|--------|---------------|------|
-| cost-analyst + coverage API failures | — | 2 | Monitor for 3rd consecutive day — may need scheduling fix |
-| `UserMenu.tsx` funcs 79.31% | coverage | 4 | `handleInsightsFile` complex; low priority |
-| `AuthorTypewriter.tsx` branches 67.5% | coverage | 5+ | JSDOM animation timing — accepted limitation |
-| `ParticleBackground.tsx` branches/funcs | coverage | 4+ | Canvas/WebGL absent in JSDOM — accepted |
-| `svg-to-png.ts` branches 66.7% | coverage | 4+ | Fallback error path — accepted |
-| `demoData/archetypeDemoData` branches 50% | coverage | 4+ | Null arms unreachable — accepted |
-| `refresh/route.ts` funcs 75% | coverage | 3 | Fire-and-forget catch — accepted |
-| `dbGetCampaignStats()` client-side aggregation | cost-analyst | 5+ | Act when campaign exceeds 5K sends |
-| OG image Redis memory | cost-analyst | 5+ | CDN s-maxage bounds generation |
-| Turbopack NFT warning | performance | 4+ | existsSync cannot be suppressed — cosmetic only |
+- **P2-1**: `dbGetCampaignStats()` client-side aggregation — move to RPC at >5K sends/campaign (future scale)
+- **Monitor M1**: Avatar cache Redis memory (~300 MB max @10K users)
+- **Monitor M2**: OG image Redis memory (~150 MB max @1K active/day)
+- **Monitor M3**: HyperLogLog ~12 KB (track quarterly)
+- **Monitor M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users)
+- **P2 coverage**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile, low priority)
