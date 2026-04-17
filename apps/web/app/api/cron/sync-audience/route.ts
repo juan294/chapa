@@ -8,10 +8,14 @@ import {
   markUnsubscribed,
 } from "@/lib/email/audience";
 import { processInBatches } from "@/lib/async/process-in-batches";
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { withTimeout } from "@/lib/async/with-timeout";
 
 export const maxDuration = 300;
 
 const BATCH_SIZE = 5;
+const CONTACTS_CACHE_KEY = "sync-audience:contacts";
+const CONTACTS_CACHE_TTL = 3600; // 1h — avoids repeated Resend API calls across same-day cron retries
 
 interface Contact {
   id: string;
@@ -22,27 +26,23 @@ interface Contact {
 const LIST_CONTACTS_TIMEOUT_MS = 30_000;
 
 async function listAllContacts(): Promise<Contact[]> {
+  const cached = await cacheGet<Contact[]>(CONTACTS_CACHE_KEY).catch(() => null);
+  if (cached) return cached;
+
   const resend = getResend();
   if (!resend) return [];
 
-  let timer: ReturnType<typeof setTimeout>;
-  return Promise.race([
+  const contacts = await withTimeout(
     listAllContactsInner(resend),
-    new Promise<Contact[]>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error("listAllContacts timed out")),
-        LIST_CONTACTS_TIMEOUT_MS,
-      );
-    }),
-  ])
-  .finally(() => clearTimeout(timer))
-  .catch((error) => {
-    console.error(
-      "[sync-audience] listAllContacts error:",
-      (error as Error).message,
-    );
+    LIST_CONTACTS_TIMEOUT_MS,
+    "listAllContacts",
+  ).catch((error) => {
+    console.error("[sync-audience] listAllContacts error:", (error as Error).message);
     return [];
   });
+
+  cacheSet(CONTACTS_CACHE_KEY, contacts, CONTACTS_CACHE_TTL).catch(() => {});
+  return contacts;
 }
 
 async function listAllContactsInner(

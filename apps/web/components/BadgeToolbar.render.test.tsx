@@ -955,10 +955,10 @@ describe("BadgeToolbar render", () => {
       </svg>`;
 
       let capturedSrc = "";
-      vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
         ok: true,
         text: () => Promise.resolve(svgWithAnimations),
-      } as Response);
+      } as Response));
 
       // Use class-based Image mock to avoid vitest warning.
       // Use queueMicrotask (not setTimeout) so the onerror fires within the
@@ -1003,6 +1003,7 @@ describe("BadgeToolbar render", () => {
       expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
 
       vi.stubGlobal("Image", origImage);
+      vi.unstubAllGlobals();
     });
   });
 

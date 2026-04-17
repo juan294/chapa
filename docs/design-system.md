@@ -23,20 +23,20 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 | `--color-card` | `#111118` | `#F9FAFB` | `bg-card` | Card/panel surfaces |
 | `--color-text-primary` | `#E2E4E9` | `#1A1A2E` | `text-text-primary` | Headings, body text |
 | `--color-text-secondary` | `#8B8FA0` | `#6B7280` | `text-text-secondary` | Muted text, labels |
-| `--color-amber` | `#8B5CF6` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
-| `--color-amber-light` | `#A78BFA` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
-| `--color-amber-dark` | `#7C3AED` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
-| `--color-stroke` | `rgba(139,92,246,0.10)` | `border-stroke` | Borders, dividers (purple-tinted) |
-| `--color-warm-bg` | `#0A0A0F` | `bg-warm-bg` | Alias for page background |
-| `--color-warm-card` | `#111118` | `bg-warm-card` | Alias for card background |
-| `--color-warm-stroke` | `rgba(139,92,246,0.10)` | `border-warm-stroke` | Alias for borders |
-| `--color-dark-section` | `#06060A` | `bg-dark-section` | Deeper emphasis band backgrounds |
-| `--color-dark-card` | `#0E0E16` | `bg-dark-card` | Cards inside dark sections |
-| `--color-purple-tint` | `rgba(139,92,246,0.06)` | `bg-purple-tint` | Subtle purple section tint |
-| `--color-terminal-green` | `#4ADE80` | `text-terminal-green` | Success messages, checkmarks |
-| `--color-terminal-red` | `#F87171` | `text-terminal-red` | Error messages |
-| `--color-terminal-yellow` | `#FBBF24` | `text-terminal-yellow` | Warning messages |
-| `--color-terminal-dim` | `#4A4A5E` | `text-terminal-dim` | Dim text, prefixes, decorative |
+| `--color-amber` | `#8B5CF6` | `#8B5CF6` | `text-amber`, `bg-amber` | Primary accent — CTAs, highlights, data |
+| `--color-amber-light` | `#A78BFA` | `#A78BFA` | `text-amber-light`, `bg-amber-light` | Hover states, lighter accent |
+| `--color-amber-dark` | `#7C3AED` | `#7C3AED` | `text-amber-dark`, `bg-amber-dark` | Darker accent variant |
+| `--color-stroke` | `rgba(139,92,246,0.10)` | `rgba(0,0,0,0.08)` | `border-stroke` | Borders, dividers (purple-tinted) |
+| `--color-warm-bg` | `#0A0A0F` | `#FFFFFF` | `bg-warm-bg` | Alias for page background |
+| `--color-warm-card` | `#111118` | `#F9FAFB` | `bg-warm-card` | Alias for card background |
+| `--color-warm-stroke` | `rgba(139,92,246,0.10)` | `rgba(0,0,0,0.08)` | `border-warm-stroke` | Alias for borders |
+| `--color-dark-section` | `#06060A` | `#1A1A2E` | `bg-dark-section` | Deeper emphasis band backgrounds |
+| `--color-dark-card` | `#0E0E16` | `#252542` | `bg-dark-card` | Cards inside dark sections |
+| `--color-purple-tint` | `rgba(139,92,246,0.06)` | `#F5F3FF` | `bg-purple-tint` | Subtle purple section tint |
+| `--color-terminal-green` | `#4ADE80` | `#16A34A` | `text-terminal-green` | Success messages, checkmarks |
+| `--color-terminal-red` | `#F87171` | `#DC2626` | `text-terminal-red` | Error messages |
+| `--color-terminal-yellow` | `#FBBF24` | `#D97706` | `text-terminal-yellow` | Warning messages |
+| `--color-terminal-dim` | `#4A4A5E` | `#9CA3AF` | `text-terminal-dim` | Dim text, prefixes, decorative |
 | `--color-complement` | `#10B981` | `#10B981` | `text-complement`, `bg-complement` | Soft teal accent (sparingly) — verification, secondary CTAs |
 | `--color-complement-light` | `rgba(16,185,129,0.15)` | `#D1FAE5` | `bg-complement-light` | Teal tint |
 | `--color-track` | `rgba(255,255,255,0.06)` | `rgba(0,0,0,0.06)` | `bg-track` | Progress bar/gauge track background |
