@@ -32,7 +32,10 @@ vi.mock("@/lib/email/templates/announcement", () => ({
   buildAnnouncementText: vi.fn().mockReturnValue("test"),
 }));
 
-import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+import { adminAuthBeforeEach } from "@/lib/test-helpers/admin-auth";
+import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
+import { rateLimit } from "@/lib/cache/redis";
 import { requireSession } from "@/lib/auth/require-session";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { getResend } from "@/lib/email/resend";

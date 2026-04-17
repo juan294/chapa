@@ -19,7 +19,10 @@ vi.mock("@/lib/db/campaigns", () => ({
   dbCreateCampaign: vi.fn(),
 }));
 
-import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+import { adminAuthBeforeEach } from "@/lib/test-helpers/admin-auth";
+import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
+import { rateLimit } from "@/lib/cache/redis";
 import { dbGetCampaigns, dbCreateCampaign } from "@/lib/db/campaigns";
 import { GET, POST } from "./route";
 

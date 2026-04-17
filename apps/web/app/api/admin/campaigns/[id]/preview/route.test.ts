@@ -21,7 +21,10 @@ vi.mock("@/lib/email/templates/announcement", () => ({
   buildAnnouncementHtml: vi.fn(() => "<html><body>Preview</body></html>"),
 }));
 
-import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+import { adminAuthBeforeEach } from "@/lib/test-helpers/admin-auth";
+import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
+import { rateLimit } from "@/lib/cache/redis";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { buildAnnouncementHtml } from "@/lib/email/templates/announcement";
 import { GET } from "./route";
