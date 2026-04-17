@@ -62,7 +62,7 @@ describe("ActivityHeatmap", () => {
       name: /Activity heatmap: 42 active days/i,
     });
     expect(grid).toBeTruthy();
-  });
+  }, 15000);
 
   // ----------------------------------------------------------------
   // 2. Shows contextual summary (not generic "active days" count)

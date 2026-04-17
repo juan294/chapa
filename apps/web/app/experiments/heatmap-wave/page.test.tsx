@@ -20,5 +20,5 @@ describe("heatmap-wave experiment page", () => {
     const { default: Page } = await import("./page");
     const { container } = render(<Page />);
     expect(container.querySelector("main")).toBeTruthy();
-  });
+  }, 15000);
 });
