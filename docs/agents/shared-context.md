@@ -40,35 +40,28 @@
 - [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — stable. P3-8 (`dbUpdateFeatureFlag` Redis error path) may lack test coverage for the Redis-down branch.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-15T03:00:00Z -->
-## Cost Analyst — 2026-04-15
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-18T03:00:00Z -->
+## Cost Analyst — 2026-04-18
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
-- No production code changes since 2026-04-12 — only agent report updates.
-- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). Full 18-key-pattern audit confirmed.
-- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
-- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 11 indexes. 0 resource leaks.
-- Fetch timeouts: **100%**. No middleware.ts (zero per-request overhead).
-- Production vulns: **0**. Dev-only: 3 vite vulns (2 HIGH + 1 MODERATE via vitest). CARRIED.
-- Tests: **7001/7001 passed**, 0 type errors, 0 lint issues. Build: 3.0s compile, 68 chunks, no chunk >500 KB.
-- **P1s: NONE. P2s: NONE (active).**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
-- **P3-1 CARRIED**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL).
-- **P3-2 CARRIED**: OG image `Promise.race()` timer not cleared (`og-image/route.ts:81-86`). Cosmetic.
-- **P3-3 NEW**: `pingSupabase()` `Promise.race()` timer not cleared (`supabase.ts:43-48`). Same pattern as P3-2.
-- **P3-4 CARRIED**: vite 7.3.1 dev-only vulns. Bump to >=7.3.2.
-- **P3-5 NEW**: Outdated dev deps — vitest 4.1.2→4.1.4, @vitest/coverage-v8 4.1.2→4.1.4, jsdom 29.0.1→29.0.2.
-- **P3-6 NEW**: Consider partial index for `dbGetUsersWithEmail()` (email_notifications WHERE email IS NOT NULL).
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 2 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). 14-cache + 23-rate-limit pattern audit confirmed. **NEW**: `craft:{handle}` key added (1h TTL, ~200 B/user — negligible).
+- GitHub API: cache-first (6h + 7d stale + in-flight dedup). All P3 timer leaks resolved. Unchanged.
+- Supabase: **10 tables + 2 views** (admin_users now counted separately). Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
+- Fetch timeouts: **100%**. P3-7 (Bitbucket/Codeberg token refresh) confirmed false positive — AbortSignal.timeout already present.
+- No middleware.ts (zero per-request overhead). 3 cron jobs/day (maxDuration=300s each, well-spaced).
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to RPC at >5K sends/campaign.
+- **P3-1 NEW**: Add `revalidate = 86400` to static pages (`/about`, `/archetypes/*`) — minor serverless reduction.
+- **P3-2 NEW**: Confirm CLI device session key TTL in `api/cli/auth/approve/route.ts`.
 - **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
 - **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
 - **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
 - **MONITOR M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users). CARRIED.
 
 **Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. Bundle stable at ~1.8 MB (68 chunks). ISR on `/u/[handle]` could increase from 1h to 6h (minor optimization).
-- [Security]: Fail-open rate limiting intact. Fetch timeouts at 100%. vite vulns remain dev-only, zero cost impact. New `pingSupabase()` timer leak is cosmetic — no security concern.
-- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — unchanged and stable. No new cost-critical paths need test coverage.
-- [QA]: No open P1s or P2s. Stable since 2026-04-12. 3 new P3 items (all minor).
+- [Performance]: `/studio` still `force-dynamic` — consider `revalidate = 3600` if page content allows. ISR on `/about` and `/archetypes/*` would reduce invocations (P3-1).
+- [Security]: Fetch timeouts 100% confirmed. P3-7 fully closed. No cost-security conflicts.
+- [Coverage]: warm-cache route coverage at 63% funcs after `7563e3f` refactor — untested error paths reduce confidence in daily snapshot reliability. Coverage agent has this as P2.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
