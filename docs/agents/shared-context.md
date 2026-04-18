@@ -203,21 +203,24 @@
 - [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-15T02:00:00Z -->
-## Coverage Agent — 2026-04-15
+<!-- ENTRY:START agent=coverage timestamp=2026-04-18T02:00:00Z -->
+## Coverage Agent — 2026-04-18
 - **Status**: YELLOW
-- Overall coverage: **93.14% stmts** (7585/8143), 89.88% branch, 90.01% funcs, 94.31% lines
-- Test suite: 390 files, 7001 tests — plateau-stable (+0.02pp branch vs 2026-04-13, within rounding noise)
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 96.0%
-- **Flaky tests: NONE** — 3/3 runs passed 7001/7001. BadgeToolbar fix stable for 5th consecutive cycle.
-- **P2 carried**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile). Low priority.
-- **P3 carried (all accepted)**: AuthorTypewriter 67.5% branches (JSDOM), HolographicOverlay 47% stmts (Canvas), experiments 56.1% aggregate (Canvas/WebGL), svg-to-png 66.7% branches (fallback), refresh/route.ts 75% funcs (fire-and-forget)
+- Overall coverage: **93% stmts** (7647/8222), 89.47% branch, 89.64% funcs, 94.06% lines
+- Test suite: 394 files, 6894 tests. Count dropped from ~7004: `7563e3f refactor(profile)` trimmed warm-cache + bulk-recalculate test suites (-110 tests).
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 98%, lib/auth 98%, lib/cache 99%, lib/history 97%, lib/github 97%, components 96%, app/api aggregate 97%
+- **Bug fixed**: `buildSnapshot` (`lib/history/snapshot.ts:12`) now accepts `today?` param; `materializeImpactState` passes it through. Root cause: real clock date diverged from `today` param, causing same-day EMA short-circuit to miss and re-smooth on every refresh.
+- **Also fixed**: `vitest.config.ts` `testTimeout: 15000` added — JSDOM renders hit 5s default after typecheck+ESLint in pre-commit hook.
+- **Flaky tests: NONE** — 3/3 runs passed 6894/6894.
+- **P2 NEW**: `app/api/cron/warm-cache/route.ts` — 83% stmts, 75% branches, 63% funcs (3/8 functions uncovered after `7563e3f` test trimming)
+- **P2 carried**: `components/UserMenu.tsx` — 80% funcs (handleInsightsFile). Now exactly at threshold.
+- **P3 carried (all accepted)**: HolographicOverlay 50% (Canvas), experiments 56% (Canvas/WebGL), refresh/recalculate fire-and-forget arrows, svg-to-png 67% branches (Resvg binary), lazy wrappers 50-60%
 
 **Cross-agent recommendations:**
-- [Security]: No new security-relevant test gaps. All critical-path coverage unchanged and GREEN.
-- [QA]: Suite stable at 7001 tests, 0 failures, 0 flaky. No regressions.
-- [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable. No new cost-critical paths need coverage.
-- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
+- [Security]: No new security-relevant test gaps. All critical paths unchanged and GREEN. warm-cache error paths now partially untested — consider reviewing for silent failure modes.
+- [QA]: 3/3 clean runs, 0 flaky. Test count drop (-110) is architectural, not a regression. warm-cache P2 is the only new actionable item.
+- [Cost Analyst]: app/api 97%, lib/db 98% — stable. warm-cache coverage drop doesn't affect cost model but does reduce confidence in daily snapshot reliability path.
+- [Performance]: No coverage-performance gaps. testTimeout increase has no performance impact.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->
