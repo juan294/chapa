@@ -56,7 +56,7 @@ export function materializeImpactState(
     latestSnapshot,
     rawImpact,
     displayImpact,
-    snapshot: buildSnapshot(stats, displayImpact),
+    snapshot: buildSnapshot(stats, displayImpact, options.today),
   };
 }
 
