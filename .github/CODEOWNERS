@@ -1,0 +1,6 @@
+# CODEOWNERS
+# All files are owned by the project maintainer.
+# GitHub will request a review from this user on every PR.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @juan294
