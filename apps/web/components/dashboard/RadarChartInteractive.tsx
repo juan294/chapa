@@ -101,9 +101,10 @@ export function RadarChartInteractive({
   const [progress, setProgress] = useState(animated ? 0 : 1);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  const hasAnimated = useRef(false);
 
   useEffect(() => {
-    if (!animated || !inView) return;
+    if (!animated || !inView || hasAnimated.current) return;
 
     // Check prefers-reduced-motion — use rAF to avoid synchronous setState
     const prefersReduced =
@@ -123,6 +124,8 @@ export function RadarChartInteractive({
 
       if (t < 1) {
         animationRef.current = requestAnimationFrame(animate);
+      } else {
+        hasAnimated.current = true;
       }
     };
 

@@ -20,3 +20,16 @@ describe("ShareBadgePreviewLazy (#579)", () => {
     expect(SOURCE).toContain("export function ShareBadgePreviewLazy");
   });
 });
+
+describe("ShareBadgePreviewLazy skeleton (#734)", () => {
+  it("skeleton uses aspect-[1200/630] class to avoid CLS (not a fixed height)", () => {
+    // The skeleton must use an aspect ratio class so it matches the badge's
+    // 1200x630 dimensions and does not cause Cumulative Layout Shift on load.
+    expect(SOURCE).toContain("aspect-[1200/630]");
+  });
+
+  it("skeleton does not use fixed h-[400px] height that mismatches badge ratio", () => {
+    // h-[400px] doesn't match 1200x630 and causes layout shift when badge loads.
+    expect(SOURCE).not.toContain("h-[400px]");
+  });
+});

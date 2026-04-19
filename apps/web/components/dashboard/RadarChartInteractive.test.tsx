@@ -333,6 +333,52 @@ describe("RadarChartInteractive", () => {
   // Animation with animated=true and inView=true
   // -----------------------------------------------------------------------
   describe("animation", () => {
+    it("#733: animation does not replay when component scrolls back into view (hasAnimated guard)", () => {
+      // useInView mock starts returning true.
+      // We collect rAF callbacks to control animation timing.
+      const rafCallbacks: Array<(ts: number) => void> = [];
+      const origRAF = globalThis.requestAnimationFrame;
+      const origCAF = globalThis.cancelAnimationFrame;
+      let rafCallCount = 0;
+      globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
+        rafCallbacks.push(cb);
+        rafCallCount++;
+        return rafCallCount;
+      };
+      globalThis.cancelAnimationFrame = vi.fn();
+
+      const { rerender } = render(
+        <RadarChartInteractive dimensions={mockDimensions} animated={true} />,
+      );
+
+      // Drive animation to completion
+      act(() => {
+        const firstCb = rafCallbacks[0];
+        if (firstCb) firstCb(0);
+      });
+      act(() => {
+        const lastCb = rafCallbacks[rafCallbacks.length - 1];
+        if (lastCb) lastCb(2000); // well past 1s duration → animation completes
+      });
+
+      const rafCountAfterFirstPlay = rafCallCount;
+
+      // Re-render (simulates scroll away and back — useInView toggles false then true).
+      // Since useInView mock always returns true here, we trigger a re-render to
+      // simulate the effect re-running. The hasAnimated guard should block new rAF calls.
+      act(() => {
+        rerender(
+          <RadarChartInteractive dimensions={mockDimensions} animated={true} />,
+        );
+      });
+
+      // No additional rAF should have been requested after the first animation completed.
+      expect(rafCallCount).toBe(rafCountAfterFirstPlay);
+
+      globalThis.requestAnimationFrame = origRAF;
+      globalThis.cancelAnimationFrame = origCAF;
+    });
+
     it("starts with progress=0 when animated=true and advances via rAF", () => {
       // useInView mock already returns true.
       // When animated=true, progress starts at 0 so initial display values are 0.
