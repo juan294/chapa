@@ -1,56 +1,86 @@
 # Coverage Report
-> Generated: 2026-04-18 | Health status: yellow
+> Generated: 2026-04-19 | Health status: yellow
 
 ## Executive Summary
-Overall coverage holds at 93% statements and 89.5% branches — stable vs last cycle — with all critical paths (impact, render, db, auth) remaining GREEN. One date-sensitive regression was found and fixed (`buildSnapshot` ignored `today` param, causing EMA double-application on date rollover); the fix also adds a global `testTimeout: 15000` to prevent JSDOM timeouts under pre-commit hook CPU pressure. Test count dropped from ~7004 to 6894 due to `refactor(profile): harden architecture reliability flows` (commit `7563e3f`) trimming warm-cache and bulk-recalculate test suites, which left `warm-cache/route.ts` at 62.5% functions — new P2.
+Suite stable at 394 files / 6894 tests with 93% statement coverage and zero flaky tests across 3 runs. Overall health is YELLOW due to the experiments module (Canvas/WebGL, accepted) and a carried P2 gap in `warm-cache/route.ts` (62.5% funcs); all critical scoring, rendering, and API paths remain GREEN.
 
 ## Coverage by Module
-| Module | Stmts | Branches | Funcs | Status |
-|--------|-------|----------|-------|--------|
-| `lib/impact` | 100% | 99% | 100% | GREEN |
-| `lib/render` | 100% | 94% | 100% | GREEN |
-| `lib/db` | 98% | 95% | 100% | GREEN |
-| `lib/auth` | 98% | 97% | 100% | GREEN |
-| `lib/email` | 98% | 97% | 100% | GREEN |
-| `lib/cache` | 99% | 98% | 96% | GREEN |
-| `lib/history` | 97% | 95% | 100% | GREEN |
-| `lib/github` | 97% | 92% | 96% | GREEN |
-| `lib/profile` | 100% | 88% | 92% | GREEN |
-| `lib/analytics` | 100% | 91% | 100% | GREEN |
-| `app/api` (aggregate) | 97% | — | — | GREEN |
-| `components` | 96% | 90% | 94% | GREEN |
-| `app/api/cron/warm-cache` | 83% | 75% | 63% | YELLOW |
-| `lib/effects` | 95% | 91% | 95% | YELLOW (HolographicOverlay Canvas gap accepted) |
-| `experiments/*` | 56% | — | — | RED (Canvas/WebGL — accepted) |
+| Module | Stmts | Branches | Funcs | Lines | Status |
+|--------|-------|----------|-------|-------|--------|
+| lib/impact | 100% | 97.2% | 100% | 100% | GREEN |
+| lib/render | 100% | 89.8% | 100% | 100% | GREEN |
+| lib/db | 97.5% | 94.2% | 100% | 99.8% | GREEN |
+| lib/cache | 99.6% | 99.2% | 97.6% | 100% | GREEN |
+| lib/auth | 98.8% | 97.6% | 100% | 99.4% | GREEN |
+| lib/github | 97.6% | 95.8% | 97.9% | 99.1% | GREEN |
+| lib/history | 99.1% | 97.5% | 100% | 99.6% | GREEN |
+| lib/email | 97.9% | 97.4% | 100% | 98.2% | GREEN |
+| app/api | 98.9% | 98.7% | 96.2% | 98.9% | GREEN |
+| app/api/admin | 97.7% | 95.2% | 98.1% | 97.8% | GREEN |
+| app/api/cron | 93.9% | 89.1% | 85.1% | 94.1% | YELLOW |
+| components | 94.2% | 93.8% | 93.3% | 95.7% | GREEN |
+| packages/shared | 81.8% | 100% | 100% | 81.8% | GREEN* |
+| experiments | 58.6% | 64.3% | 51.5% | 61.6% | RED (accepted) |
+| **TOTAL** | **93%** | **89.47%** | **89.64%** | **94.06%** | **YELLOW** |
 
-## Bugs Fixed This Cycle
-
-### P1 Fixed: Date-sensitive EMA regression (`orchestrated-profile.test.ts`)
-- **Root cause**: `buildSnapshot` (`lib/history/snapshot.ts:17`) always used `new Date()` for the snapshot `date` field, ignoring the `today` parameter passed to `materializeImpactState`. When the wall-clock date advanced past the hardcoded test date "2026-04-17", the snapshot's date diverged from `smoothScore`'s view of "today", causing the same-day EMA short-circuit to miss on second reads — the score re-smoothed on every page refresh instead of returning the cached value.
-- **Fix**: `buildSnapshot` now accepts an optional `today?: string` parameter (`snapshot.ts:12`). `materializeImpactState` passes `options.today` through (`materialize-profile.ts:59`).
-- **Also fixed**: Added `testTimeout: 15000` globally to `vitest.config.ts` (was default 5000ms). JSDOM render tests take 6–13s under pre-commit hook CPU pressure (after typecheck + ESLint); the 5s default caused spurious failures.
+*`packages/shared` low stmts from `package.json`/`tsconfig.json` included in v8 scan — all functional code is 100%.
 
 ## Gaps & Recommendations
 
-### P2 (New): `app/api/cron/warm-cache/route.ts` — 63% funcs, 75% branches
-The `7563e3f` refactor trimmed the warm-cache test suite from ~1100 to ~14 lines across both warm-cache and bulk-recalculate, leaving 3 of 8 functions uncovered. This is a cron route that runs daily and drives lifetime snapshot recording — branch coverage at 75% means some error/edge paths are untested.
-- **Recommendation**: Add tests for the uncovered functions (snapshot persistence fallback, priority handle processing, error recovery path).
+### P2 — Actionable
 
-### P2 (Carried): `components/UserMenu.tsx` — 80% funcs
-`handleInsightsFile` and related upload handlers are complex async flows. Now exactly at threshold (up from 79.3%).
+- **`app/api/cron/warm-cache/route.ts`** — 62.5% funcs, 75% branches (CARRIED from 2026-04-18)
+  - 3 uncovered arrow functions: `.map((h) => h.trim())` and `.filter(...)` inside `parsePriorityHandles`, and the `.catch(() => {})` on `getAvatarBase64`
+  - Missing branch: wrap-around rotation path (when `offset + MAX_HANDLES > allHandles.length`)
+  - Fix: add test with `WARM_CACHE_PRIORITY_HANDLES` env var set + rotation offset near the end of the user list + `getAvatarBase64` rejection
 
-### P3 (Accepted — all unchanged):
-- `lib/effects/interactions/HolographicOverlay.tsx` — 50% stmts (Canvas/WebGL, untestable in JSDOM)
-- `app/experiments/*` — 56% aggregate (Canvas/WebGL pages, accepted)
-- `app/api/refresh/route.ts` / `app/api/recalculate/route.ts` — 33–50% funcs (inline fire-and-forget arrow functions, not meaningful to test)
-- `lib/history/svg-to-png.ts` — 67% branches (OG image fallback path requires real Resvg binary)
-- `components/GlobalCommandBarLazy.tsx` / `ShareBadgePreviewLazy.tsx` — 50–60% (next/dynamic wrappers, not meaningfully testable)
-- `components/ClientAnalytics.tsx` — 0% (thin PostHog wrapper, correct to leave untested)
+- **`lib/profile/public-profile.ts`** — 68.75% branches, 83.33% funcs (NEW)
+  - `runPublicProfileSideEffects` missing branches: no-displayName/avatarUrl case (skips `dbUpsertUser`), `inserted = false` path (skips `updateSnapshotCache`)
+  - 1 function uncovered (likely the `.catch(() => {})` handler on `dbUpsertUser`)
+  - Fix: add tests for the falsy-displayName/avatarUrl variant and the `dbInsertSnapshot` returning false path
 
-## Untested Files
-All files in `lib/` and `app/api/` without a `.test.ts` counterpart are type-only files (`types.ts`), OAuth config objects (`config.ts`), or test helpers. No actionable gaps in critical paths.
+- **`components/UserMenu.tsx`** — 80% funcs (CARRIED, now exactly at threshold)
+  - `handleInsightsFile` complex file-upload branch still not exercised
+  - Risk: low — UI-only handler, not a critical path
+
+### P3 — Accepted
+
+- **experiments/\*** — 58.6% aggregate (Canvas/WebGL, JSDOM limitation — accepted)
+- **`HolographicOverlay.tsx`** — 50% stmts (Canvas API, JSDOM limitation — accepted)
+- **`ParticleBackground.tsx`** — 72.2% branches (Canvas/RAF, JSDOM limitation — accepted)
+- **`AuthorTypewriter.tsx`** — 67.5% branches (JSDOM timing, accepted)
+- **`lib/render/archetypeDemoData.ts`, `demoData.ts`** — 50% branches (lookup-only data tables, no logic — accepted)
+- **`app/api/refresh/route.ts`, `app/api/recalculate/route.ts`** — 33–50% funcs (fire-and-forget `after()` callbacks registered but not called in test context — accepted)
+- **`app/u/[handle]/og-image/route.ts`** — 50% funcs (OG image error path — low risk)
+- **`ShareBadgePreviewLazy.tsx`, `GlobalCommandBarLazy.tsx`** — 25–33% funcs (lazy wrappers — accepted)
+
+### Untested Files (no `.test.*` counterpart)
+
+- `app/api/auth/codeberg/config.ts` — pure config object wiring, no logic; covered implicitly through route tests
+- `app/api/auth/bitbucket/config.ts` — same; no action needed
 
 ## Flaky Tests
-None detected. 3/3 runs passed 6894/6894 tests.
+None detected — 3/3 runs passed 6894/6894 tests identically.
 
-> **Note on test count**: Dropped from ~7004 (2026-04-17 triage) to 6894 (-110) due to `7563e3f` refactoring the warm-cache and bulk-recalculate test suites. This is not a regression — tests were intentionally reorganized as part of the architecture reliability refactor. The warm-cache coverage gap (P2 above) is the direct consequence to address.
+---
+
+## Shared Context Entry
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-19T02:00:00Z -->
+## Coverage Agent — 2026-04-19
+- **Status**: YELLOW
+- Overall coverage: **93% stmts** (7647/8222), 89.47% branch, 89.64% funcs, 94.06% lines
+- Test suite: 394 files, 6894 tests — stable (0 change vs 2026-04-18, no regressions)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 97.5%, lib/cache 99.6%, lib/auth 98.8%, lib/github 97.6%, lib/history 99.1%, lib/email 97.9%, app/api 98.9%, app/api/admin 97.7%, components 94.2%
+- **Flaky tests: NONE** — 3/3 runs passed 6894/6894.
+- **P2 carried**: `app/api/cron/warm-cache/route.ts` — 62.5% funcs, 75% branches. Missing: `parsePriorityHandles` arrow callbacks (env var never set in tests), wrap-around rotation branch, `getAvatarBase64` catch handler.
+- **P2 NEW**: `lib/profile/public-profile.ts` — 68.75% branches, 83.33% funcs. `runPublicProfileSideEffects` missing no-displayName/avatarUrl branch and false-insert path. Uncovered catch handler.
+- **P2 carried**: `components/UserMenu.tsx` — 80% funcs (handleInsightsFile, at threshold).
+- **P3 carried (all accepted)**: experiments 58.6% (Canvas/WebGL), HolographicOverlay 50% (Canvas), AuthorTypewriter 67.5% branches (JSDOM), demoData files 50% branches (data tables), refresh/recalculate fire-and-forget arrows, lazy wrappers 25–33% funcs
+
+**Cross-agent recommendations:**
+- [Security]: No new security-relevant test gaps. All critical-path coverage stable and GREEN. `public-profile.ts` side-effects (dbUpsertUser, storeVerificationRecord) have partial branch coverage — the uncovered paths are non-throwing fire-and-forget, low blast radius.
+- [QA]: Suite stable at 6894 tests, 0 failures, 0 flaky for 4th consecutive cycle.
+- [Cost Analyst]: app/api 98.9%, lib/db 97.5% — stable. warm-cache P2 unchanged — 3 uncovered arrow functions are in non-critical `parsePriorityHandles` and avatar-cache warming, not the snapshot/notification pipeline.
+- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
+<!-- ENTRY:END -->

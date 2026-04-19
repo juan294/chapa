@@ -9,35 +9,28 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-17T03:00:00Z -->
-## Cost Analyst — 2026-04-17
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-19T03:00:00Z -->
+## Cost Analyst — 2026-04-19
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$60–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). 18-key-pattern audit confirmed.
-- GitHub API: cache-first (6h + 7d stale + in-flight dedup), ~97%+ headroom. Unchanged.
-- Supabase: **9 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 11 indexes. 0 resource leaks.
-- Fetch timeouts: **97%** — 2 gaps found (Bitbucket/Codeberg token refresh, see P3-7). All production paths have timeouts.
-- No middleware.ts (zero per-request overhead). 3 cron jobs/day (maxDuration=300s each).
-- Production vulns: **0**. Dev-only: 3 vite vulns (2 HIGH + 1 MODERATE via vitest). CARRIED.
-- **P1s: NONE. P2s: NONE (active).**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation. Move to RPC at >5K sends/campaign.
-- **P3-1 CARRIED**: Cache `listAllContacts()` in sync-audience cron (1–2h TTL).
-- **P3-2 CARRIED**: OG image `Promise.race()` timer not cleared (`og-image/route.ts:81-86`). Cosmetic.
-- **P3-3 CARRIED**: `pingSupabase()` timer not cleared (`supabase.ts:43-48`). Cosmetic.
-- **P3-4 CARRIED**: vite 7.3.1 dev-only vulns. Bump to >=7.3.2.
-- **P3-5 CARRIED**: Outdated dev deps — vitest 4.1.2→4.1.4, jsdom 29.0.1→29.0.2.
-- **P3-6 CARRIED**: Partial index for `dbGetUsersWithEmail()`.
-- **P3-7 NEW**: Bitbucket/Codeberg token refresh missing `AbortSignal.timeout()` (`lib/github/client.ts:215, 284`). Could hang to Vercel function timeout.
-- **P3-8 NEW**: `dbUpdateFeatureFlag()` `cacheDel()` not wrapped in `.catch()` (`lib/db/feature-flags.ts:177–180`). Redis failure throws and breaks flag updates.
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). 16-key-pattern audit confirmed. No new patterns since 2026-04-18.
+- GitHub API: cache-first (6h + 7d stale + in-flight dedup). Fetch timeouts 100%. Unchanged.
+- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
+- ISR audit: all static pages correctly configured (`/about`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600). **P3-1 from 2026-04-18 was a false positive — closed.**
+- No new commits since 2026-04-18 in cache/db/api areas.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to RPC at >5K sends/campaign.
+- **P3-1 NEW**: `pingRedis()` raw `setTimeout` not cleared in `Promise.race()` (`lib/cache/redis.ts:262–266`). Same pattern fixed elsewhere in 2026-04-17 triage. Cosmetic — health check path only.
+- **P3-2 CARRIED**: CLI device session key TTL unconfirmed (`api/cli/auth/approve/route.ts`). Pending verification.
 - **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
 - **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
 - **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
 - **MONITOR M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users). CARRIED.
 
 **Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. Bundle stable at ~1,682 KB. `/studio` uses `force-dynamic` — every request hits serverless. Consider `revalidate = 3600` if page content allows.
-- [Security]: P3-7 (missing token refresh timeout) could allow slow OAuth servers to hold Vercel functions open — low blast radius, no auth bypass risk.
-- [Coverage]: `app/api` 97.6%, `lib/db` 97.6% — stable. P3-8 (`dbUpdateFeatureFlag` Redis error path) may lack test coverage for the Redis-down branch.
+- [Performance]: No new cost-performance tradeoffs. ISR confirmed correct on all static pages — no serverless reduction opportunity remains. `/studio` force-dynamic is intentional.
+- [Security]: No cost-security conflicts. Fetch timeouts 100% confirmed. P3-1 timer leak is health-check only — zero auth or data exposure risk.
+- [Coverage]: app/api 98.9%, lib/db 97.5% — stable. P3-1 (`pingRedis` timer) is in the health-check path — low value to test.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-18T03:00:00Z -->
@@ -179,23 +172,6 @@
 <!-- ENTRY:END -->
 
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-17T02:00:00Z -->
-## Coverage Agent — 2026-04-17
-- **Status**: YELLOW
-- Overall coverage: **93.14% stmts** (7585/8143), 89.86% branch, 90.01% funcs, 94.31% lines
-- Test suite: 390 files, 7001 tests — plateau-stable (±0 vs 2026-04-15, no regressions)
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, packages/shared 100%, lib/cache 99.2%, lib/history 98.2%, lib/auth 98.1%, lib/email 97.9%, app/api 97.6%, lib/db 97.6%, lib/github 96.8%, components 96.0%
-- **Flaky tests: NONE** — 3/3 runs passed 7001/7001. BadgeToolbar fix stable for 6th consecutive cycle.
-- **P2 carried**: `components/UserMenu.tsx` — 79.3% funcs (handleInsightsFile). Low priority.
-- **P3 carried (all accepted)**: AuthorTypewriter 67.5% branches (JSDOM), HolographicOverlay 47% stmts (Canvas), experiments 56.1% aggregate (Canvas/WebGL), svg-to-png 66.7% branches (fallback), refresh/route.ts 75% funcs (fire-and-forget)
-
-**Cross-agent recommendations:**
-- [Security]: No new security-relevant test gaps. All critical-path coverage unchanged and GREEN.
-- [QA]: Suite stable at 7001 tests, 0 failures, 0 flaky. No regressions.
-- [Cost Analyst]: app/api 97.6%, lib/db 97.6% — unchanged and stable. No new cost-critical paths need coverage.
-- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage timestamp=2026-04-18T02:00:00Z -->
 ## Coverage Agent — 2026-04-18
 - **Status**: YELLOW
@@ -214,6 +190,25 @@
 - [QA]: 3/3 clean runs, 0 flaky. Test count drop (-110) is architectural, not a regression. warm-cache P2 is the only new actionable item.
 - [Cost Analyst]: app/api 97%, lib/db 98% — stable. warm-cache coverage drop doesn't affect cost model but does reduce confidence in daily snapshot reliability path.
 - [Performance]: No coverage-performance gaps. testTimeout increase has no performance impact.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-19T02:00:00Z -->
+## Coverage Agent — 2026-04-19
+- **Status**: YELLOW
+- Overall coverage: **93% stmts** (7647/8222), 89.47% branch, 89.64% funcs, 94.06% lines
+- Test suite: 394 files, 6894 tests — stable (0 change vs 2026-04-18, no regressions)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 97.5%, lib/cache 99.6%, lib/auth 98.8%, lib/github 97.6%, lib/history 99.1%, lib/email 97.9%, app/api 98.9%, app/api/admin 97.7%, components 94.2%
+- **Flaky tests: NONE** — 3/3 runs passed 6894/6894.
+- **P2 carried**: `app/api/cron/warm-cache/route.ts` — 62.5% funcs, 75% branches. Missing: `parsePriorityHandles` arrow callbacks (env var never set in tests), wrap-around rotation branch, `getAvatarBase64` catch handler.
+- **P2 NEW**: `lib/profile/public-profile.ts` — 68.75% branches, 83.33% funcs. `runPublicProfileSideEffects` missing no-displayName/avatarUrl branch and false-insert path. Uncovered catch handler.
+- **P2 carried**: `components/UserMenu.tsx` — 80% funcs (handleInsightsFile, at threshold).
+- **P3 carried (all accepted)**: experiments 58.6% (Canvas/WebGL), HolographicOverlay 50% (Canvas), AuthorTypewriter 67.5% branches (JSDOM), demoData files 50% branches (data tables), refresh/recalculate fire-and-forget arrows, lazy wrappers 25–33% funcs
+
+**Cross-agent recommendations:**
+- [Security]: No new security-relevant test gaps. All critical-path coverage stable and GREEN. `public-profile.ts` side-effects (dbUpsertUser, storeVerificationRecord) have partial branch coverage — the uncovered paths are non-throwing fire-and-forget, low blast radius.
+- [QA]: Suite stable at 6894 tests, 0 failures, 0 flaky for 4th consecutive cycle.
+- [Cost Analyst]: app/api 98.9%, lib/db 97.5% — stable. warm-cache P2 unchanged — 3 uncovered arrow functions are in non-critical `parsePriorityHandles` and avatar-cache warming, not the snapshot/notification pipeline.
+- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->
@@ -271,6 +266,19 @@
 - [Coverage]: No new findings. Last known state YELLOW (93.14%) with BadgeToolbar fixed. Expect GREEN next successful run.
 - [Cost Analyst]: No new findings. Last known state GREEN. All P1/P2s resolved. Carries: P2-1 campaigns RPC (future scale), OG image Redis monitor.
 - [QA]: Recurring API limit failures on cost-analyst + coverage agents — if pattern persists a 3rd day, may warrant investigating agent scheduling/throttling.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-04-19T10:00:00Z -->
+## Triage — 2026-04-19
+- **Reports processed**: 3 (cc-rpi-update, cost-analyst, coverage)
+- **Action items resolved**: 8 of 8 — all implemented
+- **Summary**: Replaced last raw `Promise.race/setTimeout` timer pattern in `pingRedis()` with `withTimeout()` (P3-1 from cost-analyst); confirmed CLI device session TTL=300 in `api/cli/auth/approve/route.ts` (P3-2 resolved, no code change); added 3 tests for warm-cache route (parsePriorityHandles env var path, wrap-around rotation branch, getAvatarBase64 rejection); added 3 tests for public-profile (verification=null, no displayName/avatarUrl, dbUpsertUser rejection); added 1 test for UserMenu (craftScore absent → "Insights uploaded" toast). Tests: 6901 (+7 vs 6894), 0 type errors, 0 lint issues.
+- **Coverage delta**: +7 tests. warm-cache and public-profile P2 branch/func gaps addressed.
+
+**Cross-agent recommendations:**
+- [Coverage]: warm-cache/route.ts and lib/profile/public-profile.ts P2 branch gaps now addressed — expect coverage improvement next cycle. UserMenu.tsx P2 (handleInsightsFile craftScore branch) covered. Remaining P2 carried: warm-cache getAvatarBase64 catch, UserMenu 80% funcs (now should be resolved).
+- [Cost Analyst]: P3-1 (pingRedis timer leak) resolved. P3-2 (CLI device session TTL) confirmed resolved. Remaining: P2-1 campaigns RPC (future scale), monitors M1–M4.
+- [Security]: No new security-relevant changes. All timer patterns now use withTimeout() — fetch timeout coverage remains 100%.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-17T14:00:00Z -->
