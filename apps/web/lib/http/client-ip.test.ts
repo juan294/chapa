@@ -10,18 +10,28 @@ function makeRequest(headers: Record<string, string> = {}): Request {
 }
 
 describe("getClientIp", () => {
-  it("returns x-real-ip when present", () => {
-    const req = makeRequest({ "x-real-ip": "1.2.3.4" });
+  it("returns x-vercel-forwarded-for when present (trusted Vercel header)", () => {
+    const req = makeRequest({ "x-vercel-forwarded-for": "1.2.3.4" });
     expect(getClientIp(req)).toBe("1.2.3.4");
   });
 
-  it("returns first entry from x-forwarded-for when x-real-ip is absent", () => {
-    const req = makeRequest({ "x-forwarded-for": "10.0.0.1, 10.0.0.2, 10.0.0.3" });
+  it("trims whitespace from x-vercel-forwarded-for", () => {
+    const req = makeRequest({ "x-vercel-forwarded-for": "  1.2.3.4  " });
+    expect(getClientIp(req)).toBe("1.2.3.4");
+  });
+
+  it("returns rightmost hop from x-forwarded-for when x-vercel-forwarded-for is absent", () => {
+    const req = makeRequest({ "x-forwarded-for": "10.0.0.1, 10.0.0.2, 1.2.3.4" });
+    expect(getClientIp(req)).toBe("1.2.3.4");
+  });
+
+  it("returns single entry from x-forwarded-for", () => {
+    const req = makeRequest({ "x-forwarded-for": "10.0.0.1" });
     expect(getClientIp(req)).toBe("10.0.0.1");
   });
 
-  it("trims whitespace from x-forwarded-for entries", () => {
-    const req = makeRequest({ "x-forwarded-for": "  192.168.1.1  , 10.0.0.2" });
+  it("trims whitespace from x-forwarded-for rightmost hop", () => {
+    const req = makeRequest({ "x-forwarded-for": "10.0.0.1, 10.0.0.2,  192.168.1.1  " });
     expect(getClientIp(req)).toBe("192.168.1.1");
   });
 
@@ -30,10 +40,10 @@ describe("getClientIp", () => {
     expect(getClientIp(req)).toBe("unknown");
   });
 
-  it("prefers x-real-ip over x-forwarded-for when both present", () => {
+  it("prefers x-vercel-forwarded-for over x-forwarded-for when both present", () => {
     const req = makeRequest({
-      "x-real-ip": "5.6.7.8",
-      "x-forwarded-for": "9.10.11.12",
+      "x-vercel-forwarded-for": "5.6.7.8",
+      "x-forwarded-for": "9.10.11.12, 3.3.3.3",
     });
     expect(getClientIp(req)).toBe("5.6.7.8");
   });
@@ -43,8 +53,17 @@ describe("getClientIp", () => {
     expect(getClientIp(req)).toBe("unknown");
   });
 
-  it("trims whitespace from x-real-ip", () => {
-    const req = makeRequest({ "x-real-ip": "  3.4.5.6  " });
-    expect(getClientIp(req)).toBe("3.4.5.6");
+  it("ignores x-real-ip (client-controlled, not trusted)", () => {
+    const req = makeRequest({
+      "x-real-ip": "9.9.9.9",
+      "x-vercel-forwarded-for": "5.6.7.8",
+    });
+    expect(getClientIp(req)).toBe("5.6.7.8");
+  });
+
+  it("falls back to unknown when x-real-ip is present but x-vercel-forwarded-for is not", () => {
+    const req = makeRequest({ "x-real-ip": "9.9.9.9" });
+    // x-real-ip alone is not trusted — "unknown" is returned
+    expect(getClientIp(req)).toBe("unknown");
   });
 });

@@ -52,14 +52,12 @@ function makeRequest(bearer?: string): NextRequest {
 // ---------------------------------------------------------------------------
 
 describe("sync-audience auth", () => {
-  it("passes through when CRON_SECRET env var is not set", async () => {
+  it("returns 503 when CRON_SECRET env var is not set (fail-secure)", async () => {
     delete process.env.CRON_SECRET;
-    // No CRON_SECRET configured = auth skipped (pass-through)
-    vi.mocked(ensureSegment).mockResolvedValue(null);
     const res = await GET(makeRequest("anything"));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     const body = await res.json();
-    expect(body.status).toBe("skipped");
+    expect(body.error).toBe("Cron secret not configured");
   });
 
   it("returns 401 with wrong Bearer token", async () => {

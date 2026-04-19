@@ -10,22 +10,25 @@ describe("verifyCronSecret", () => {
     delete process.env.CRON_SECRET;
   });
 
-  it("returns null when CRON_SECRET is not set", async () => {
+  it("returns 503 when CRON_SECRET is not set (fail-secure)", async () => {
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test");
     const result = verifyCronSecret(req);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(503);
+    const body = await result!.json();
+    expect(body.error).toBe("Cron secret not configured");
   });
 
-  it("logs a warning when CRON_SECRET is not set", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("logs an error when CRON_SECRET is not set", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test");
     verifyCronSecret(req);
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[cron] CRON_SECRET not configured — cron endpoints are unprotected"
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[cron] CRON_SECRET not configured — rejecting request (fail-secure)"
     );
-    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it("returns 401 when Authorization header is missing", async () => {

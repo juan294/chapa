@@ -28,14 +28,12 @@ function makeRequest(bearer?: string): NextRequest {
 }
 
 describe("process-campaigns cron", () => {
-  it("passes through when CRON_SECRET is not set", async () => {
+  it("returns 503 when CRON_SECRET is not set (fail-secure)", async () => {
     delete process.env.CRON_SECRET;
-    vi.mocked(dbGetCampaigns).mockResolvedValue([]);
     const res = await GET(makeRequest("anything"));
-    // No CRON_SECRET configured = auth skipped (pass-through)
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     const body = await res.json();
-    expect(body.status).toBe("idle");
+    expect(body.error).toBe("Cron secret not configured");
   });
 
   it("returns 401 with wrong token", async () => {

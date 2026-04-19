@@ -8,7 +8,11 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
  * invocations. This helper centralises that check for all cron routes.
  *
  * @returns `null` on success (caller should continue), or a ready-to-return
- *          `NextResponse` with 401 status on failure.
+ *          `NextResponse` with an error status on failure.
+ *
+ * When `CRON_SECRET` is not configured the function returns a 503 response
+ * (fail-secure) — endpoints must not be publicly accessible due to a missing
+ * environment variable.
  *
  * Usage:
  * ```ts
@@ -20,10 +24,13 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
 export function verifyCronSecret(request: Request): NextResponse | null {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) {
-    console.warn(
-      "[cron] CRON_SECRET not configured — cron endpoints are unprotected"
+    console.error(
+      "[cron] CRON_SECRET not configured — rejecting request (fail-secure)",
     );
-    return null;
+    return NextResponse.json(
+      { error: "Cron secret not configured" },
+      { status: 503 },
+    );
   }
 
   const authHeader = request.headers.get("Authorization") ?? "";
