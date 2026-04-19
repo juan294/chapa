@@ -4,9 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockRateLimit, mockDbInsertTelemetry } = vi.hoisted(() => ({
+const { mockRateLimit, mockDbInsertTelemetry, mockGetClientIp } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockDbInsertTelemetry: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -15,6 +16,10 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/db/telemetry", () => ({
   dbInsertTelemetry: mockDbInsertTelemetry,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: mockGetClientIp,
 }));
 
 // Re-export real validation functions through the mock
@@ -74,6 +79,7 @@ describe("POST /api/telemetry", () => {
     vi.clearAllMocks();
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockDbInsertTelemetry.mockResolvedValue(true);
+    mockGetClientIp.mockReturnValue("127.0.0.1");
   });
 
   // -------------------------------------------------------------------------
@@ -98,6 +104,29 @@ describe("POST /api/telemetry", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ ok: true });
+  });
+
+  it("does not await DB insert — response resolves before insert completes (fire-and-forget)", async () => {
+    // The insert should NOT be awaited — response must return even if insert hangs
+    let insertResolve!: () => void;
+    const neverResolvingInsert = new Promise<boolean>((resolve) => {
+      insertResolve = () => resolve(true);
+    });
+    mockDbInsertTelemetry.mockReturnValue(neverResolvingInsert);
+
+    // Race: route should resolve quickly without waiting for the insert
+    const result = await Promise.race([
+      POST(makeRequest(validPayload)),
+      new Promise<null>((res) => setTimeout(() => res(null), 50)),
+    ]);
+
+    // If fire-and-forget: route won the race and result is a Response
+    // If await: route hung waiting, and timeout won (result is null)
+    expect(result).not.toBeNull();
+    expect((result as Response).status).toBe(200);
+
+    // Clean up the dangling promise
+    insertResolve();
   });
 
   // -------------------------------------------------------------------------
@@ -152,6 +181,30 @@ describe("POST /api/telemetry", () => {
       10,
       60,
     );
+  });
+
+  it("applies IP-based floor rate limit (60 req/min) in addition to handle rate limit", async () => {
+    mockGetClientIp.mockReturnValue("1.2.3.4");
+    await POST(makeRequest(validPayload));
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      "ratelimit:telemetry-ip:1.2.3.4",
+      60,
+      60,
+    );
+    // Both rate limits must be checked
+    expect(mockRateLimit).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 429 when IP rate limit is exceeded (before handle check)", async () => {
+    mockGetClientIp.mockReturnValue("1.2.3.4");
+    // First call (IP) hits limit; second call (handle) is allowed — but route returns 429
+    mockRateLimit
+      .mockResolvedValueOnce({ allowed: false, current: 61, limit: 60 }) // IP
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 10 }); // handle (not reached)
+    const res = await POST(makeRequest(validPayload));
+    expect(res.status).toBe(429);
+    // Only the IP rate limit should have been checked (short-circuit)
+    expect(mockRateLimit).toHaveBeenCalledTimes(1);
   });
 
   it("includes Retry-After header when rate limited", async () => {

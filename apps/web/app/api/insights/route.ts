@@ -36,10 +36,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Validate InsightsUpload shape
     const validation = isValidInsightsUpload(body);
     if (!validation.valid) {
-      return NextResponse.json(
-        { error: "Invalid insights data", reason: validation.reason },
-        { status: 400 },
-      );
+      console.warn("[insights] Validation failed:", validation.reason);
+      return NextResponse.json({ error: "Invalid insights data" }, { status: 400 });
     }
 
     // Rate limit: 10 uploads per handle per 24h

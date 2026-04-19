@@ -173,8 +173,16 @@ describe("POST /api/insights", () => {
     const resp = await POST(makePostRequest({ tool: "claude-code" }));
     expect(resp.status).toBe(400);
     const body = await resp.json();
-    expect(body.error).toContain("Invalid insights data");
-    expect(body.reason).toBeDefined();
+    expect(body.error).toBe("Invalid insights data");
+  });
+
+  it("does not expose Zod/validation schema details to caller on invalid data", async () => {
+    const resp = await POST(makePostRequest({ tool: "claude-code" }));
+    expect(resp.status).toBe(400);
+    const body = await resp.json();
+    // Must only contain the generic error message — no internal reason/details
+    expect(body.reason).toBeUndefined();
+    expect(Object.keys(body)).toEqual(["error"]);
   });
 
   it("returns 403 when feature is disabled", async () => {
