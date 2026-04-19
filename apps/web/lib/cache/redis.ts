@@ -10,6 +10,7 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { withTimeout } from "@/lib/async/with-timeout";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton
@@ -259,12 +260,7 @@ export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
   if (!redis) return "skipped";
 
   try {
-    await Promise.race([
-      redis.dbsize(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("ping timeout")), 5000),
-      ),
-    ]);
+    await withTimeout(redis.dbsize(), 5000, "pingRedis");
     return "ok";
   } catch {
     return "error";

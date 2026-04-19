@@ -277,4 +277,52 @@ describe("GET /api/cron/warm-cache", () => {
     expect(body.expiredMergeOpsDeleted).toBe(3);
     expect(body.expiredSnapshotsDeleted).toBe(7);
   });
+
+  it("includes WARM_CACHE_PRIORITY_HANDLES in the warm list even when outside the rotation slice", async () => {
+    process.env.WARM_CACHE_PRIORITY_HANDLES = "user0,user1,unknown-user";
+    // 80 users, offset=60 → rotation slice is user60..user79 (20 handles, < MAX_HANDLES)
+    mockCacheGet.mockResolvedValue(60);
+    mockDbGetUsers.mockResolvedValue(
+      Array.from({ length: 80 }, (_, index) => user(`user${index}`)),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    // user0 and user1 are priority and outside the slice — they must be appended
+    expect(body.handles).toContain("user0");
+    expect(body.handles).toContain("user1");
+    // unknown-user is not in the user list — must be excluded
+    expect(body.handles).not.toContain("unknown-user");
+  });
+
+  it("wraps around to the start of the handle list when offset + MAX_HANDLES exceeds total users", async () => {
+    // 60 users, offset=40 → offset+MAX_HANDLES=90 > 60 → wrap-around
+    mockCacheGet.mockResolvedValue(40);
+    mockDbGetUsers.mockResolvedValue(
+      Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    // Remaining from offset: user40..user59 (20), from start: user0..user29 (30) = 50 total
+    expect(body.handles).toHaveLength(50);
+    expect(body.handles[0]).toBe("user40");
+    expect(body.handles[19]).toBe("user59");
+    expect(body.handles[20]).toBe("user0");
+    expect(body.handles[49]).toBe("user29");
+    expect(body.rotation.nextOffset).toBe(30);
+  });
+
+  it("swallows getAvatarBase64 rejection without failing the warm", async () => {
+    mockGetAvatarBase64.mockRejectedValue(new Error("avatar fetch timeout"));
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    // Warm still succeeds — avatar failure is fire-and-forget
+    expect(body.warmed).toBe(2);
+    expect(body.failed).toBe(0);
+  });
 });

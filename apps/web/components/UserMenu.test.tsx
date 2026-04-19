@@ -1451,6 +1451,40 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
       expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
     });
   });
+
+  it("shows generic 'Insights uploaded' toast when recalculate fails and upload has no craftScore", async () => {
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        // Upload succeeds but returns no craftScore field
+        return Promise.resolve(
+          new Response(JSON.stringify({}), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(new Response("{}", { status: 500 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("success");
+      expect(toast.textContent).toContain("Insights uploaded");
+      expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════

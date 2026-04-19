@@ -190,4 +190,36 @@ describe("runPublicProfileSideEffects", () => {
       expect.objectContaining({ generatedAt: "2026-04-18" }),
     );
   });
+
+  it("skips storeVerificationRecord when verification is null", async () => {
+    const materialized = makeMaterializedProfile();
+    mockGenerateVerificationCode.mockReturnValue(null);
+
+    await runPublicProfileSideEffects("testuser", materialized);
+
+    expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
+  });
+
+  it("skips dbUpsertUser when displayName and avatarUrl are both absent", async () => {
+    const materialized = makeMaterializedProfile();
+    materialized.stats = makeFullStats({
+      handle: "testuser",
+      displayName: undefined,
+      avatarUrl: undefined,
+    });
+
+    await runPublicProfileSideEffects("testuser", materialized);
+
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+    expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
+  });
+
+  it("silently ignores dbUpsertUser rejection via catch handler", async () => {
+    const materialized = makeMaterializedProfile();
+    mockDbUpsertUser.mockRejectedValue(new Error("DB write failed"));
+
+    await expect(runPublicProfileSideEffects("testuser", materialized)).resolves.toBeUndefined();
+    expect(mockDbUpsertUser).toHaveBeenCalled();
+  });
 });
