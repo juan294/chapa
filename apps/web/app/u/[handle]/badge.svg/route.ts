@@ -4,7 +4,7 @@ import { getAvatarBase64 } from "@/lib/render/avatar";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
-import { rateLimit } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import {
@@ -41,9 +41,9 @@ export async function GET(
 ) {
   const { handle } = await params;
 
-  // Rate limit: 100 requests per IP per 60 seconds
+  // Rate limit: 100 requests per IP+handle per 60 seconds
   const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:badge:${ip}`, 100, 60);
+  const rl = await rateLimit(`ratelimit:badge:${ip}:${handle}`, 100, 60);
   if (!rl.allowed) {
     return new NextResponse("Too many requests. Please try again later.", {
       status: 429,
@@ -61,6 +61,13 @@ export async function GET(
       status: 400,
       headers: { "Content-Type": "image/svg+xml" },
     });
+  }
+
+  // SVG full-response cache: serve stale badge without hitting GitHub API
+  const svgCacheKey = `svg:badge:${handle}:v1`;
+  const cachedSvg = await cacheGet<string>(svgCacheKey);
+  if (cachedSvg) {
+    return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
   }
 
   // Try to get an auth token from session (better rate limits)
@@ -97,6 +104,7 @@ export async function GET(
       verificationDate: verification?.date,
     });
 
+    void cacheSet(svgCacheKey, svg, 86400);
     return new NextResponse(svg, { headers: CACHE_HEADERS });
   } catch (err) {
     void captureServerError({

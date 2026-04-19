@@ -1,4 +1,4 @@
-import { trackBadgeGenerated } from "@/lib/cache/redis";
+import { cacheSetNx, trackBadgeGenerated } from "@/lib/cache/redis";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
 import { dbInsertSnapshot } from "@/lib/db/snapshots";
 import { dbUpsertUser } from "@/lib/db/users";
@@ -63,6 +63,18 @@ export async function runPublicProfileSideEffects(
   materialized: MaterializedProfile,
   options: { verification?: PublicVerificationCode | null } = {},
 ): Promise<void> {
+  // Deduplication guard: once-per-day SETNX key prevents duplicate Supabase
+  // writes when the CDN misses and multiple edge nodes hit the origin in parallel.
+  // Fail-open: if Redis throws (unavailable), proceed so no data is silently lost.
+  const today = new Date().toISOString().slice(0, 10);
+  let shouldRun = true;
+  try {
+    shouldRun = await cacheSetNx(`sideeffects:done:${handle}:${today}`, 86400);
+  } catch {
+    shouldRun = true;
+  }
+  if (!shouldRun) return;
+
   const verification = options.verification ??
     getPublicProfileVerification(materialized);
   const ops: Promise<unknown>[] = [];

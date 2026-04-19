@@ -268,6 +268,34 @@ export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
 }
 
 // ---------------------------------------------------------------------------
+// Atomic set-if-not-exists (SETNX) — used for once-per-day guards
+// ---------------------------------------------------------------------------
+
+/**
+ * Set a key with a TTL only if it does not already exist (Redis SET NX EX).
+ *
+ * Returns `true` when the key was newly written (first call for this key).
+ * Returns `false` when the key already existed (guard already set).
+ * Returns `false` when Redis is unavailable or throws (fail-open — callers
+ * should treat this as "allowed to proceed" so no data is silently lost).
+ *
+ * Typical use: once-per-day side-effect guards keyed on `<prefix>:<handle>:<YYYY-MM-DD>`.
+ */
+export async function cacheSetNx(key: string, ttlSeconds: number): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+
+  try {
+    const result = await redis.set(key, 1, { ex: ttlSeconds, nx: true });
+    // Upstash returns "OK" when the key is newly set, null when it already existed.
+    return result === "OK";
+  } catch (error) {
+    console.error("[cache] cacheSetNx failed:", (error as Error).message);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Atomic increment (used for daily campaign send quota)
 // ---------------------------------------------------------------------------
 

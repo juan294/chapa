@@ -528,3 +528,53 @@ describe("cacheSet with TTL=0", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// cacheSetNx
+// ---------------------------------------------------------------------------
+
+describe("cacheSetNx", () => {
+  it("returns true when the key is newly set (first write)", async () => {
+    mockSet.mockResolvedValueOnce("OK");
+
+    const { cacheSetNx } = await import("./redis");
+    const result = await cacheSetNx("sideeffects:done:testuser:2026-04-19", 86400);
+
+    expect(result).toBe(true);
+    expect(mockSet).toHaveBeenCalledWith(
+      "sideeffects:done:testuser:2026-04-19",
+      1,
+      { ex: 86400, nx: true },
+    );
+  });
+
+  it("returns false when the key already exists", async () => {
+    mockSet.mockResolvedValueOnce(null);
+
+    const { cacheSetNx } = await import("./redis");
+    const result = await cacheSetNx("sideeffects:done:testuser:2026-04-19", 86400);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when Redis is unavailable (no env vars)", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const { cacheSetNx } = await import("./redis");
+    const result = await cacheSetNx("anything", 3600);
+
+    expect(result).toBe(false);
+    expect(mockSet).not.toHaveBeenCalled();
+  });
+
+  it("returns false when Redis throws (graceful degradation)", async () => {
+    mockSet.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const { cacheSetNx } = await import("./redis");
+    const result = await cacheSetNx("sideeffects:done:testuser:2026-04-19", 86400);
+
+    expect(result).toBe(false);
+  });
+});
+

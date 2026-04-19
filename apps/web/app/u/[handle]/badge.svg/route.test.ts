@@ -11,6 +11,8 @@ const {
   mockIsValidHandle,
   mockRateLimit,
   mockCaptureServerError,
+  mockCacheGet,
+  mockCacheSet,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -21,6 +23,8 @@ const {
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -50,6 +54,8 @@ vi.mock("@/lib/validation", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
+  cacheSet: (...args: unknown[]) => mockCacheSet(...args),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -133,6 +139,9 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockCaptureServerError.mockResolvedValue(undefined);
+    // SVG cache: miss by default
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
   });
 
   it("returns 429 when the badge route is rate limited", async () => {
@@ -230,5 +239,79 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(res.status).toBe(500);
     expect(mockCaptureServerError).toHaveBeenCalled();
+  });
+
+  describe("SVG full-response cache (#717)", () => {
+    it("returns cached SVG on cache hit without calling materialize or render", async () => {
+      const CACHED_SVG = '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>';
+      mockCacheGet.mockResolvedValue(CACHED_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(CACHED_SVG);
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("writes the rendered SVG to cache on cache miss", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(/^svg:badge:testuser:/),
+        FAKE_SVG,
+        86400,
+      );
+    });
+
+    it("checks the cache with the correct key prefix and handle", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        expect.stringMatching(/^svg:badge:testuser:/),
+      );
+    });
+
+    it("skips rendering on cache hit but still returns correct Content-Type header", async () => {
+      mockCacheGet.mockResolvedValue(FAKE_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+    });
+  });
+
+  describe("rate limit key uses (ip, handle) not just ip (#693)", () => {
+    it("rate-limits on combined ip+handle key", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockRateLimit).toHaveBeenCalledWith(
+        expect.stringContaining("testuser"),
+        expect.any(Number),
+        expect.any(Number),
+      );
+    });
+
+    it("uses different rate limit buckets for different handles from same IP", async () => {
+      const [req1, ctx1] = makeRequest("alice", { "x-forwarded-for": "1.2.3.4" });
+      const [req2, ctx2] = makeRequest("bob", { "x-forwarded-for": "1.2.3.4" });
+
+      await GET(req1, ctx1);
+      await GET(req2, ctx2);
+
+      const keys = mockRateLimit.mock.calls.map((call: unknown[]) => call[0] as string);
+      expect(keys[0]).not.toBe(keys[1]);
+      expect(keys[0]).toContain("alice");
+      expect(keys[1]).toContain("bob");
+    });
   });
 });
