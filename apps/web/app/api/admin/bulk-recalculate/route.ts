@@ -29,6 +29,12 @@ const BATCH_SIZE = 5;
  *   recalculates all users from Supabase.
  */
 export async function POST(request: NextRequest) {
+  // Auth first: Bearer token must match ADMIN_SECRET.
+  // Checking auth before rate limiting prevents unauthenticated callers from
+  // exhausting the per-IP bucket and locking out legitimate admins (BE-H9).
+  const denied = verifyAdminSecret(request);
+  if (denied) return denied;
+
   // Rate limit: 5 requests per IP per hour (this is a heavy operation)
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:admin-bulk-recalc:${ip}`, 5, 3600);
@@ -39,9 +45,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Auth: Bearer token must match ADMIN_SECRET
-  const denied = verifyAdminSecret(request);
-  if (denied) return denied;
+  // Optional cursor: ?after=<handle> to resume a partial run (BE-H7).
+  // Only handles that sort alphabetically after the cursor are processed,
+  // allowing re-invocation to pick up where a previous 504 left off.
+  const afterCursor = request.nextUrl.searchParams.get("after") ?? undefined;
 
   // Parse optional body for specific handles
   let handles: string[];
@@ -60,8 +67,19 @@ export async function POST(request: NextRequest) {
     handles = users.map((u) => u.handle);
   }
 
+  // Apply cursor filter: skip handles up to and including the cursor value.
+  if (afterCursor) {
+    handles = handles.filter((h) => h > afterCursor);
+  }
+
   if (handles.length === 0) {
-    return NextResponse.json({ recalculated: 0, failed: 0, total: 0, errors: [] });
+    return NextResponse.json({
+      recalculated: 0,
+      failed: 0,
+      total: 0,
+      errors: [],
+      ...(afterCursor ? { cursor: afterCursor } : {}),
+    });
   }
 
   const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
@@ -101,5 +119,6 @@ export async function POST(request: NextRequest) {
     failed: errors.length,
     total: handles.length,
     errors: errors.length > 0 ? errors : undefined,
+    ...(afterCursor ? { cursor: afterCursor } : {}),
   });
 }

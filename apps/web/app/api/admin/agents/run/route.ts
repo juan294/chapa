@@ -42,7 +42,26 @@ export function _resetRunState(): void {
   currentRun = null;
 }
 
+/**
+ * Returns a 403 response when the route should not be available.
+ *
+ * Two conditions block execution:
+ * 1. NODE_ENV is not "development" AND ALLOW_AGENT_RUN is not "true" — prevents
+ *    accidental exposure in staging/CI environments.
+ * 2. VERCEL_ENV === "production" — hard blocks the route on Vercel production
+ *    regardless of ALLOW_AGENT_RUN, because module-level `currentRun` state is
+ *    not shared across Vercel instances (BE-H10/DO-M6). In production, a DELETE
+ *    may land on a different instance than the POST, seeing null and leaving
+ *    orphaned processes with no way to stop them.
+ */
 function devOnlyGuard(): NextResponse | null {
+  // Hard block in Vercel production — in-memory state breaks across instances.
+  if (process.env.VERCEL_ENV === "production") {
+    return NextResponse.json(
+      { error: "Not available in production" },
+      { status: 403 },
+    );
+  }
   const isDev = process.env.NODE_ENV === "development";
   const allowRun = process.env.ALLOW_AGENT_RUN?.trim() === "true";
   if (!isDev && !allowRun) {
@@ -215,6 +234,9 @@ export async function GET(request: NextRequest) {
   const authError = await adminAuth(request, "ratelimit:admin-agent-run", 30, 60);
   if (authError) return authError;
 
+  const devGuard = devOnlyGuard();
+  if (devGuard) return devGuard;
+
   const agentKey = request.nextUrl.searchParams.get("agentKey");
   if (!currentRun || currentRun.agentKey !== agentKey) {
     return NextResponse.json(
@@ -250,6 +272,9 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
   if (authError) return authError;
+
+  const devGuard = devOnlyGuard();
+  if (devGuard) return devGuard;
 
   const agentKey = request.nextUrl.searchParams.get("agentKey");
   if (!currentRun || currentRun.agentKey !== agentKey) {

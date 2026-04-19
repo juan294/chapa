@@ -199,6 +199,54 @@ describe("POST /api/admin/agents/run", () => {
     expect(res.status).toBe(200);
   });
 
+  describe("BE-H10/DO-M6: VERCEL_ENV production guard", () => {
+    it("POST returns 403 when VERCEL_ENV is production", async () => {
+      vi.stubEnv("ALLOW_AGENT_RUN", "true");
+      vi.stubEnv("VERCEL_ENV", "production");
+      const res = await POST(makePostRequest({ agentKey: "coverage_agent" }));
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toContain("production");
+    });
+
+    it("GET returns 403 when VERCEL_ENV is production", async () => {
+      vi.stubEnv("ALLOW_AGENT_RUN", "true");
+      vi.stubEnv("VERCEL_ENV", "production");
+      const res = await GET(makeRequest("GET", { agentKey: "coverage_agent" }));
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toContain("production");
+    });
+
+    it("DELETE returns 403 when VERCEL_ENV is production", async () => {
+      vi.stubEnv("ALLOW_AGENT_RUN", "true");
+      vi.stubEnv("VERCEL_ENV", "production");
+      const res = await DELETE_HANDLER(makeRequest("DELETE", { agentKey: "coverage_agent" }));
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toContain("production");
+    });
+
+    it("POST is allowed when VERCEL_ENV is preview", async () => {
+      vi.stubEnv("ALLOW_AGENT_RUN", "true");
+      vi.stubEnv("VERCEL_ENV", "preview");
+      const res = await POST(makePostRequest({ agentKey: "coverage_agent" }));
+      expect(res.status).toBe(200);
+    });
+
+    it("POST is allowed when VERCEL_ENV is not set", async () => {
+      vi.stubEnv("ALLOW_AGENT_RUN", "true");
+      vi.unstubAllEnvs();
+      // Re-stub the ones needed for auth
+      vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+      vi.stubEnv("ADMIN_HANDLES", "admin1");
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("ALLOW_AGENT_RUN", "true");
+      const res = await POST(makePostRequest({ agentKey: "coverage_agent" }));
+      expect(res.status).toBe(200);
+    });
+  });
+
   it("returns 400 for invalid agent key", async () => {
     const res = await POST(makePostRequest({ agentKey: "invalid_agent" }));
     expect(res.status).toBe(400);

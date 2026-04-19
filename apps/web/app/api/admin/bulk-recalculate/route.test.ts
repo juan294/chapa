@@ -188,4 +188,106 @@ describe("POST /api/admin/bulk-recalculate", () => {
       error: "API timeout",
     });
   });
+
+  describe("BE-H9: auth ordering — auth must run before rate limit", () => {
+    it("checks auth before rate limit (unauthenticated request never touches rate limiter)", async () => {
+      mockVerifyAdminSecret.mockReturnValue(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      );
+      // Rate limit is allowed — if auth runs first, the rate limit bucket
+      // should NOT be consumed for an unauthed caller.
+      mockRateLimit.mockResolvedValue({ allowed: true, current: 0, limit: 5 });
+
+      const res = await POST(makeRequest("wrong-secret"));
+      expect(res.status).toBe(401);
+      // rateLimit must NOT have been called — auth rejected before we got there
+      expect(mockRateLimit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("BE-H7: ?after= cursor — resumes from alphabetic position", () => {
+    beforeEach(() => {
+      mockDbGetUsers.mockResolvedValue([
+        { handle: "alice" },
+        { handle: "bob" },
+        { handle: "carol" },
+        { handle: "dave" },
+      ]);
+    });
+
+    it("processes all handles when no after cursor is provided", async () => {
+      const res = await POST(makeRequest());
+      const body = await res.json();
+      expect(body.total).toBe(4);
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(4);
+    });
+
+    it("skips handles up to and including the cursor value", async () => {
+      const url = new URL(
+        "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=bob",
+      );
+      const req = new NextRequest(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const res = await POST(req);
+      const body = await res.json();
+      // Only "carol" and "dave" are after "bob" alphabetically
+      expect(body.total).toBe(2);
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith(
+        "carol",
+        expect.any(Object),
+      );
+      expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith(
+        "dave",
+        expect.any(Object),
+      );
+      expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalledWith(
+        "alice",
+        expect.any(Object),
+      );
+      expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalledWith(
+        "bob",
+        expect.any(Object),
+      );
+    });
+
+    it("returns cursor info in the response when after param is used", async () => {
+      const url = new URL(
+        "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=alice",
+      );
+      const req = new NextRequest(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const res = await POST(req);
+      const body = await res.json();
+      expect(body.cursor).toBe("alice");
+      // "bob", "carol", "dave" are after "alice"
+      expect(body.total).toBe(3);
+    });
+
+    it("returns zero results when cursor is past all handles", async () => {
+      const url = new URL(
+        "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=zzz",
+      );
+      const req = new NextRequest(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const res = await POST(req);
+      const body = await res.json();
+      expect(body.total).toBe(0);
+      expect(body.recalculated).toBe(0);
+    });
+  });
 });
