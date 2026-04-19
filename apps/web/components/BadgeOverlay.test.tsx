@@ -206,3 +206,47 @@ describe("BadgeOverlay — rendering", () => {
     expect(panel!.style.transform).toBe("translate(-50%, 0%)");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression: archetype tooltip lists all 7 archetypes (#735)
+// ---------------------------------------------------------------------------
+
+describe("BadgeOverlay — archetype tooltip completeness (#735)", () => {
+  const EXPECTED_ARCHETYPES = [
+    "Builder",
+    "Quality Champion",
+    "Marathoner",
+    "Polymath",
+    "Artificer",
+    "Balanced",
+    "Emerging",
+  ];
+
+  it('archetype tooltip says "Seven types" (not Six)', () => {
+    expect(SOURCE).toContain("Seven types");
+    expect(SOURCE).not.toContain("Six types");
+  });
+
+  it("archetype tooltip includes all 7 archetype names", () => {
+    for (const name of EXPECTED_ARCHETYPES) {
+      expect(SOURCE).toContain(name);
+    }
+  });
+
+  it("archetype hotspot tooltip text contains Artificer", () => {
+    render(<BadgeOverlay />);
+    // The sr-only span for badge-archetype holds the tooltip text
+    const descSpan = document.getElementById("badge-archetype-desc");
+    expect(descSpan).not.toBeNull();
+    expect(descSpan!.textContent).toContain("Artificer");
+  });
+
+  it("archetype hotspot tooltip text lists all 7 archetypes", () => {
+    render(<BadgeOverlay />);
+    const descSpan = document.getElementById("badge-archetype-desc");
+    expect(descSpan).not.toBeNull();
+    for (const name of EXPECTED_ARCHETYPES) {
+      expect(descSpan!.textContent).toContain(name);
+    }
+  });
+});
