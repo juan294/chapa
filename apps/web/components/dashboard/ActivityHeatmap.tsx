@@ -485,6 +485,40 @@ function DotTimeline({
     []
   );
 
+  const handleDotFocus = useCallback(
+    (day: EnrichedDay, e: React.FocusEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltip({
+        title: formatIsoDate(day.date),
+        count: day.count,
+        dimensionWeights: day.dimensionWeights,
+        dominant: day.dominant,
+        screenX: rect.left + rect.width / 2,
+        screenY: rect.top,
+        cellBottom: rect.bottom,
+      });
+    },
+    []
+  );
+
+  const handleDotKeyDown = useCallback(
+    (day: EnrichedDay, e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltip({
+          title: formatIsoDate(day.date),
+          count: day.count,
+          dimensionWeights: day.dimensionWeights,
+          dominant: day.dominant,
+          screenX: rect.left + rect.width / 2,
+          screenY: rect.top,
+          cellBottom: rect.bottom,
+        });
+      }
+    },
+    []
+  );
+
   const handleLeave = useCallback(() => setTooltip(null), []);
 
   const dayWord = activeDays === 1 ? "day" : "days";
@@ -523,6 +557,9 @@ function DotTimeline({
                 return (
                   <div key={di} className="flex flex-col items-center gap-0.5 flex-1">
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${day.count} contribution${day.count !== 1 ? "s" : ""} on ${formatIsoDate(day.date)}`}
                       className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
                       style={{
                         width: size,
@@ -542,6 +579,9 @@ function DotTimeline({
                       }}
                       onMouseEnter={(e) => handleDotEnter(day, e)}
                       onMouseLeave={handleLeave}
+                      onFocus={(e) => handleDotFocus(day, e)}
+                      onBlur={handleLeave}
+                      onKeyDown={(e) => handleDotKeyDown(day, e)}
                     />
                   </div>
                 );

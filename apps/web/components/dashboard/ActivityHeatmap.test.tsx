@@ -496,6 +496,149 @@ describe("ActivityHeatmap", () => {
   });
 
   // ----------------------------------------------------------------
+  // H4. Keyboard accessibility — day dots are keyboard navigable
+  // ----------------------------------------------------------------
+  describe("H4 – keyboard accessibility for day dots", () => {
+    function makeDotData(): HeatmapDay[] {
+      return makeDays("2025-03-01", [3, 10, 5, 0, 7, 2, 1]);
+    }
+
+    function getActivityDots(container: HTMLElement): HTMLElement[] {
+      const timeline = container.querySelector(
+        "[role='img'][aria-label*='Activity heatmap']",
+      );
+      if (!timeline) return [];
+      return Array.from(
+        timeline.querySelectorAll<HTMLElement>("div.rounded-full.cursor-pointer"),
+      );
+    }
+
+    it("every day dot has tabIndex={0}", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      expect(dots.length).toBeGreaterThan(0);
+      for (const dot of dots) {
+        expect(dot.getAttribute("tabindex")).toBe("0");
+      }
+    });
+
+    it("every day dot has role=\"button\"", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      expect(dots.length).toBeGreaterThan(0);
+      for (const dot of dots) {
+        expect(dot.getAttribute("role")).toBe("button");
+      }
+    });
+
+    it("every day dot has an aria-label describing the date and count", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      expect(dots.length).toBeGreaterThan(0);
+      for (const dot of dots) {
+        const label = dot.getAttribute("aria-label");
+        expect(label).toBeTruthy();
+        // Should contain either a date pattern and/or contribution count
+        expect(label).toMatch(/contribution/i);
+      }
+    });
+
+    it("focus on a dot shows the tooltip (onFocus)", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      expect(dots.length).toBeGreaterThan(0);
+
+      fireEvent.focus(dots[0]!);
+
+      const tooltip = document.querySelector("[role='tooltip']");
+      expect(tooltip).not.toBeNull();
+    });
+
+    it("blur on a dot hides the tooltip (onBlur)", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      // Show tooltip first
+      fireEvent.focus(dots[0]!);
+      expect(document.querySelector("[role='tooltip']")).not.toBeNull();
+
+      // Blur — tooltip should disappear
+      fireEvent.blur(dots[0]!);
+      expect(document.querySelector("[role='tooltip']")).toBeNull();
+    });
+
+    it("Enter key on a dot shows the tooltip (onKeyDown Enter)", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      expect(dots.length).toBeGreaterThan(0);
+
+      fireEvent.keyDown(dots[0]!, { key: "Enter" });
+
+      const tooltip = document.querySelector("[role='tooltip']");
+      expect(tooltip).not.toBeNull();
+    });
+
+    it("Space key on a dot shows the tooltip (onKeyDown Space)", () => {
+      const { container } = render(
+        <ActivityHeatmap
+          heatmapData={makeDotData()}
+          activeDays={6}
+          dimensions={mockDimensions}
+        />,
+      );
+
+      const dots = getActivityDots(container);
+      expect(dots.length).toBeGreaterThan(0);
+
+      fireEvent.keyDown(dots[0]!, { key: " " });
+
+      const tooltip = document.querySelector("[role='tooltip']");
+      expect(tooltip).not.toBeNull();
+    });
+  });
+
+  // ----------------------------------------------------------------
   // 16. enrichDays dimension weighting
   // ----------------------------------------------------------------
   describe("enrichDays dimension weighting", () => {
