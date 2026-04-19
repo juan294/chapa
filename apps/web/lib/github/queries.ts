@@ -68,6 +68,19 @@ export async function fetchContributionData(
 
     if (json.errors) {
       console.error(`[github] GraphQL errors for ${login}:`, json.errors);
+
+      // Treat RATE_LIMITED or FORBIDDEN errors as a complete fetch failure.
+      // GitHub returns partial data alongside these errors, but that partial data
+      // has zero stars/forks/watchers which would get cached for 6h and cause
+      // score drops. Returning null lets the caller serve stale cache instead.
+      const isBlocking = (json.errors as { extensions?: { type?: string }; code?: string }[]).some(
+        (e) =>
+          e.extensions?.type === "RATE_LIMITED" ||
+          e.extensions?.type === "FORBIDDEN" ||
+          e.code === "RATE_LIMITED" ||
+          e.code === "FORBIDDEN",
+      );
+      if (isBlocking) return null;
     }
 
     if (!json.data?.user) return null;

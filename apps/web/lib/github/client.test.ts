@@ -593,6 +593,79 @@ describe("getStats", () => {
       expect(mockFetchStatsData).toHaveBeenNthCalledWith(2, "test-user", "auth-token");
     });
 
+    // -----------------------------------------------------------------------
+    // BE-M14: inflight timeout + cleanup (#701)
+    // -----------------------------------------------------------------------
+
+    it("cleans up the inflight map after a timeout so subsequent requests can proceed", async () => {
+      // Simulate a hanging fetch that never resolves — the withTimeout wrapper
+      // should reject it after 30s, remove it from _inflight, and allow future
+      // calls to retry.  In tests we use vi.useFakeTimers to advance time.
+      vi.useFakeTimers();
+
+      // Hanging promise — never resolves
+      const hangingPromise = new Promise<never>(() => { /* intentionally hangs */ });
+      mockFetchStatsData.mockReturnValueOnce(hangingPromise);
+      mockCacheGet.mockResolvedValue(null);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      const p1 = getStats("test-user");
+
+      // Advance timers past the 30s inflight timeout
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      // p1 should have resolved to null (timeout → stale fallback → null)
+      const result1 = await p1;
+      expect(result1).toBeNull();
+
+      // The inflight entry should now be gone — a second call must attempt a fresh fetch
+      vi.useRealTimers();
+
+      const fresh = makeStats({ commitsTotal: 77 });
+      mockCacheGet.mockResolvedValue(null);
+      mockFetchStatsData.mockResolvedValue(fresh);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      const result2 = await getStats("test-user");
+      // fetchStats was called twice — once for hanging, once for fresh
+      expect(mockFetchStatsData).toHaveBeenCalledTimes(2);
+      expect(result2).not.toBeNull();
+      expect(result2!.commitsTotal).toBe(77);
+    });
+
+    it("a hanging inflight promise does not block subsequent fresh requests after timeout", async () => {
+      vi.useFakeTimers();
+
+      const hangingPromise = new Promise<never>(() => { /* hangs */ });
+      mockFetchStatsData.mockReturnValueOnce(hangingPromise);
+      mockCacheGet.mockResolvedValue(null);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      // Start first call — it will hang
+      const p1 = getStats("hanging-user");
+
+      // Advance past timeout
+      await vi.advanceTimersByTimeAsync(31_000);
+      const result1 = await p1;
+      expect(result1).toBeNull();
+
+      vi.useRealTimers();
+
+      // Now the second call for a different user should work independently
+      const fresh = makeStats({ handle: "other-user", commitsTotal: 55 });
+      mockCacheGet.mockResolvedValue(null);
+      mockFetchStatsData.mockResolvedValue(fresh);
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      const result2 = await getStats("other-user");
+      expect(result2).not.toBeNull();
+      expect(result2!.commitsTotal).toBe(55);
+    });
+
     it("lets public callers reuse an authenticated inflight fetch", async () => {
       const authedStats = makeStats({ commitsTotal: 22 });
 

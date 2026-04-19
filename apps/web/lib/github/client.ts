@@ -12,10 +12,17 @@ import { isTokenExpired, refreshBitbucketToken } from "@/lib/auth/bitbucket";
 import { refreshCodebergToken } from "@/lib/auth/codeberg";
 import { fetchBitbucketStats } from "@/lib/bitbucket/stats";
 import { fetchCodebergStats } from "@/lib/codeberg/stats";
+import { withTimeout } from "@/lib/async/with-timeout";
 import type { StatsData, SupplementalStats, Platform } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
 const STALE_TTL = 604800; // 7 days
+// Maximum time an in-flight fetch is allowed to hang before it is abandoned.
+// Without this limit, a fetch that hangs (e.g. GitHub API never responds) would
+// occupy the _inflight slot forever, blocking all subsequent requests for that
+// handle from ever retrying. The timeout causes the promise to reject, the
+// finally() cleanup fires, and future callers get a fresh attempt.
+const INFLIGHT_TIMEOUT_MS = 30_000;
 
 // In-flight request deduplication map.
 // Prevents concurrent calls for the same handle/auth context from making
@@ -60,11 +67,21 @@ export async function getStats(
     : _inflight.get(authenticatedInflightKey) ?? _inflight.get(publicInflightKey);
   if (existing) return existing;
 
-  // Create the fetch promise and store it for deduplication
-  const promise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
+  // Create the fetch promise, wrap it with a timeout, and store it for
+  // deduplication. The timeout ensures the _inflight slot is always cleaned up
+  // even if the underlying fetch hangs indefinitely (e.g. GitHub never responds).
+  // A timed-out promise resolves to null via the catch below, which causes the
+  // caller to fall back to stale cache exactly as a failed API call would.
+  const rawPromise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
+  const promise = withTimeout(rawPromise, INFLIGHT_TIMEOUT_MS, `getStats(${handle})`).catch(
+    (err) => {
+      console.error(`[github] inflight fetch timed out for ${handle}:`, err);
+      return null;
+    },
+  );
   _inflight.set(inflightKey, promise);
 
-  // Clean up the inflight entry when done (success or failure)
+  // Clean up the inflight entry when done (success, failure, or timeout)
   promise.finally(() => {
     _inflight.delete(inflightKey);
   });
