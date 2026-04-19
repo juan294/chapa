@@ -105,3 +105,21 @@ describe("ThemeToggle — mobile responsiveness (#240)", () => {
     expect(placeholderMatch).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// FE-H4: ThemeToggle must use the shared useIsClient hook (#730)
+// ---------------------------------------------------------------------------
+describe("ThemeToggle — shared useIsClient hook (#730)", () => {
+  it("imports useIsClient from the shared hooks directory", () => {
+    expect(THEME_TOGGLE_SOURCE).toContain("useIsClient");
+    expect(THEME_TOGGLE_SOURCE).toContain("@/hooks/useIsClient");
+  });
+
+  it("does not define its own local useHydrated function", () => {
+    expect(THEME_TOGGLE_SOURCE).not.toContain("useHydrated");
+  });
+
+  it("does not use useSyncExternalStore directly (delegated to useIsClient)", () => {
+    expect(THEME_TOGGLE_SOURCE).not.toContain("useSyncExternalStore");
+  });
+});

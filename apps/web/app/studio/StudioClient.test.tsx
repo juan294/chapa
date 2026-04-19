@@ -123,8 +123,8 @@ describe("StudioClient", () => {
       expect(SOURCE).toContain("prefers-reduced-motion");
     });
 
-    it("passes interactive flag based on reduced motion", () => {
-      expect(SOURCE).toContain("interactive={!reducedMotion}");
+    it("passes interactive flag based on reduced motion and client hydration", () => {
+      expect(SOURCE).toContain("interactive={isClient && !reducedMotion}");
     });
 
     it("shows reduced motion notice when detected", () => {
@@ -157,6 +157,13 @@ describe("StudioClient", () => {
   describe("aria-busy on saving state", () => {
     it("applies aria-busy to the preview area when saving", () => {
       expect(SOURCE).toContain("aria-busy");
+    });
+  });
+
+  describe("shared useIsClient hook (#730)", () => {
+    it("imports useIsClient from the shared hooks directory", () => {
+      expect(SOURCE).toContain("useIsClient");
+      expect(SOURCE).toContain("@/hooks/useIsClient");
     });
   });
 

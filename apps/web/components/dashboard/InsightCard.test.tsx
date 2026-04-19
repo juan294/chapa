@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { InsightCard } from "./InsightCard";
+
+const INSIGHT_CARD_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "InsightCard.tsx"),
+  "utf-8",
+);
 
 afterEach(cleanup);
 
@@ -245,5 +252,14 @@ describe("InsightCard", () => {
 
     const article = container.querySelector("[role='article']") as HTMLElement;
     expect(article.style.animationDelay).toBe("0ms");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FE-H2: InsightCard must NOT have "use client" (no hooks or browser APIs)
+// ---------------------------------------------------------------------------
+describe("InsightCard — client boundary (#728)", () => {
+  it("does not have 'use client' directive (pure presentational component)", () => {
+    expect(INSIGHT_CARD_SOURCE).not.toMatch(/^["']use client["']/m);
   });
 });

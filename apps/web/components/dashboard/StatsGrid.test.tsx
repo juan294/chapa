@@ -2,7 +2,14 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import type { StatsData } from "@chapa/shared";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { StatsGrid } from "./StatsGrid";
+
+const STATS_GRID_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "StatsGrid.tsx"),
+  "utf-8",
+);
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -172,5 +179,14 @@ describe("StatsGrid", () => {
     render(<StatsGrid stats={mockStats} diff={null} />);
 
     expect(screen.getByText("Key Numbers")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FE-H2: StatsGrid must NOT have "use client" (no hooks or browser APIs)
+// ---------------------------------------------------------------------------
+describe("StatsGrid — client boundary (#728)", () => {
+  it("does not have 'use client' directive (pure presentational component)", () => {
+    expect(STATS_GRID_SOURCE).not.toMatch(/^["']use client["']/m);
   });
 });

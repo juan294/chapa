@@ -1,5 +1,3 @@
-"use client";
-
 import type { Insight } from "@/lib/dashboard/generate-insights";
 
 // ---------------------------------------------------------------------------
