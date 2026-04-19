@@ -10,6 +10,7 @@ vi.mock("@/lib/auth/admin", () => ({
 }));
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 10 }),
+  cacheDel: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: () => "127.0.0.1",
@@ -23,7 +24,7 @@ vi.mock("@/lib/db/campaigns", () => ({
 import { adminAuthBeforeEach } from "@/lib/test-helpers/admin-auth";
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimit, cacheDel } from "@/lib/cache/redis";
 import { dbGetCampaign, dbUpdateCampaign, dbDeleteCampaign } from "@/lib/db/campaigns";
 import { GET, PATCH, DELETE } from "./route";
 
@@ -175,6 +176,104 @@ describe("PATCH /api/admin/campaigns/[id]", () => {
     vi.mocked(dbGetCampaign).mockResolvedValue({ ...draftCampaign, status: "failed" } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     const res = await PATCH(makeRequest("PATCH", { name: "Updated" }), { params: mockParams });
     expect(res.status).toBe(400);
+  });
+
+  // BE-H4: field whitelist — status must not reach dbUpdateCampaign
+  it("ignores status field in PATCH body (whitelist enforced)", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+    const res = await PATCH(
+      makeRequest("PATCH", { name: "Updated", status: "sending" }),
+      { params: mockParams },
+    );
+    expect(res.status).toBe(200);
+    expect(dbUpdateCampaign).toHaveBeenCalledWith(
+      "c-1",
+      expect.not.objectContaining({ status: "sending" }),
+    );
+  });
+
+  it("passes only whitelisted fields to dbUpdateCampaign", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+    await PATCH(
+      makeRequest("PATCH", {
+        name: "N",
+        subject: "S",
+        previewText: "P",
+        headline: "H",
+        bodyText: "B",
+        features: [],
+        ctaText: "C",
+        ctaUrl: "https://example.com",
+        status: "sending",          // must be stripped
+        totalRecipients: 999,       // must be stripped
+        sentCount: 999,             // must be stripped
+      }),
+      { params: mockParams },
+    );
+    const callArg = vi.mocked(dbUpdateCampaign).mock.calls[0]![1];
+    expect(callArg).not.toHaveProperty("status");
+    expect(callArg).not.toHaveProperty("totalRecipients");
+    expect(callArg).not.toHaveProperty("sentCount");
+  });
+
+  // BE-M17: cache invalidation after successful PATCH
+  it("invalidates engagement cache after successful update", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+    await PATCH(makeRequest("PATCH", { name: "Updated" }), { params: mockParams });
+    expect(cacheDel).toHaveBeenCalledWith("campaign:active-engagement");
+  });
+
+  it("does not invalidate cache when dbUpdateCampaign fails", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(false);
+    await PATCH(makeRequest("PATCH", { name: "Updated" }), { params: mockParams });
+    expect(cacheDel).not.toHaveBeenCalled();
+  });
+
+  // SE-L1: ctaUrl validation
+  it("rejects javascript: ctaUrl with 400", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const res = await PATCH(
+      makeRequest("PATCH", { ctaUrl: "javascript:evil()" }),
+      { params: mockParams },
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ctaUrl/i);
+  });
+
+  it("rejects invalid URL as ctaUrl with 400", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const res = await PATCH(
+      makeRequest("PATCH", { ctaUrl: "not-a-url" }),
+      { params: mockParams },
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ctaUrl/i);
+  });
+
+  it("accepts https: ctaUrl", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+    const res = await PATCH(
+      makeRequest("PATCH", { ctaUrl: "https://example.com/path" }),
+      { params: mockParams },
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts http: ctaUrl", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+    const res = await PATCH(
+      makeRequest("PATCH", { ctaUrl: "http://localhost:3000" }),
+      { params: mockParams },
+    );
+    expect(res.status).toBe(200);
   });
 });
 
