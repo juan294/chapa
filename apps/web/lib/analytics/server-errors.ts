@@ -12,6 +12,8 @@
  * - Fails silently when PostHog is unavailable or unconfigured
  */
 
+import type { NextRequest, NextResponse } from "next/server";
+
 /** Patterns that match sensitive values in error messages and stack traces. */
 const SENSITIVE_PATTERNS = [
   // GitHub tokens (classic and fine-grained)
@@ -149,4 +151,33 @@ export async function captureServerError(
   } catch {
     // Never let monitoring crash the app — silently swallow all errors
   }
+}
+
+/** Route handler type compatible with Next.js App Router. */
+type RouteHandler = (
+  req: NextRequest,
+  ctx: unknown,
+) => Promise<NextResponse | Response>;
+
+/**
+ * Wrap a Next.js route handler to capture unhandled errors in PostHog.
+ *
+ * Re-throws the original error so the framework generates a 500 response.
+ * Never swallows errors.
+ *
+ * Usage:
+ *   export const GET = withErrorCapture("/api/my-route", async (req) => { ... });
+ */
+export function withErrorCapture(
+  route: string,
+  handler: RouteHandler,
+): RouteHandler {
+  return async (req: NextRequest, ctx: unknown) => {
+    try {
+      return await handler(req, ctx);
+    } catch (err) {
+      void captureServerError({ route, statusCode: 500, error: err });
+      throw err;
+    }
+  };
 }

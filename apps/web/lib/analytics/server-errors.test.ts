@@ -263,3 +263,91 @@ describe("captureServerError", () => {
     expect(opts.signal).toBeInstanceOf(AbortSignal);
   });
 });
+
+describe("withErrorCapture", () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    process.env = {
+      ...ORIGINAL_ENV,
+      NEXT_PUBLIC_POSTHOG_KEY: "phc_test_key_123",
+      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+    };
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("passes through successful handler responses unchanged", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const { withErrorCapture } = await import("./server-errors");
+    const { NextRequest, NextResponse } = await import("next/server");
+
+    const handler = vi.fn().mockResolvedValue(NextResponse.json({ ok: true }));
+    const wrapped = withErrorCapture("/api/test", handler);
+
+    const req = new NextRequest("http://localhost/api/test");
+    const res = await wrapped(req, {});
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(res.status).toBe(200);
+    // captureServerError should NOT be called on success
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("calls captureServerError and re-throws when handler throws", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const { withErrorCapture } = await import("./server-errors");
+    const { NextRequest } = await import("next/server");
+
+    const boom = new Error("DB exploded");
+    const handler = vi.fn().mockRejectedValue(boom);
+    const wrapped = withErrorCapture("/api/explode", handler);
+
+    const req = new NextRequest("http://localhost/api/explode");
+
+    await expect(wrapped(req, {})).rejects.toThrow("DB exploded");
+
+    // captureServerError fires a fetch call to PostHog
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [url, opts] = mockFetch.mock.calls[0] as [string, { body: string }];
+    expect(url).toContain("posthog.com");
+    const body = JSON.parse(opts.body) as { properties: { route: string } };
+    expect(body.properties.route).toBe("/api/explode");
+  });
+
+  it("re-throws the original error instance", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const { withErrorCapture } = await import("./server-errors");
+    const { NextRequest } = await import("next/server");
+
+    const original = new TypeError("type mismatch");
+    const handler = vi.fn().mockRejectedValue(original);
+    const wrapped = withErrorCapture("/api/types", handler);
+
+    const req = new NextRequest("http://localhost/api/types");
+
+    await expect(wrapped(req, {})).rejects.toBe(original);
+  });
+
+  it("does not swallow the error even when captureServerError is unavailable", async () => {
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+
+    const { withErrorCapture } = await import("./server-errors");
+    const { NextRequest } = await import("next/server");
+
+    const boom = new Error("still thrown");
+    const handler = vi.fn().mockRejectedValue(boom);
+    const wrapped = withErrorCapture("/api/noop", handler);
+
+    const req = new NextRequest("http://localhost/api/noop");
+    await expect(wrapped(req, {})).rejects.toThrow("still thrown");
+  });
+});
