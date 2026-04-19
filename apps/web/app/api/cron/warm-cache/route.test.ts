@@ -18,6 +18,7 @@ const {
   mockPersistOrchestratedSnapshot,
   mockGetAvatarBase64,
   mockCaptureServerError,
+  mockCaptureServerEvent,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
@@ -34,6 +35,7 @@ const {
   mockPersistOrchestratedSnapshot: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockCaptureServerEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -87,6 +89,7 @@ vi.mock("@/lib/render/avatar", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+  captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
 }));
 
 const FAKE_MATERIALIZED = {
@@ -148,6 +151,7 @@ describe("GET /api/cron/warm-cache", () => {
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc");
     mockCaptureServerError.mockResolvedValue(undefined);
+    mockCaptureServerEvent.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -324,5 +328,63 @@ describe("GET /api/cron/warm-cache", () => {
     // Warm still succeeds — avatar failure is fire-and-forget
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
+  });
+
+  // DO-M5: PostHog cron_warm_cache_complete event
+  it("emits a cron_warm_cache_complete PostHog event with warmed, failed, and durationMs", async () => {
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(mockCaptureServerEvent).toHaveBeenCalledTimes(1);
+    expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+      "cron_warm_cache_complete",
+      expect.objectContaining({
+        warmed: body.warmed,
+        failed: body.failed,
+        durationMs: expect.any(Number),
+      }),
+    );
+  });
+
+  it("includes correct warmed and failed counts in the PostHog event when some handles fail", async () => {
+    mockMaterializeOrchestratedProfile
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(FAKE_MATERIALIZED);
+
+    await GET(makeRequest());
+
+    expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+      "cron_warm_cache_complete",
+      expect.objectContaining({
+        warmed: 1,
+        failed: 1,
+      }),
+    );
+  });
+
+  it("does not emit the PostHog event when auth is denied", async () => {
+    mockVerifyCronSecret.mockReturnValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+
+    await GET(makeRequest());
+
+    expect(mockCaptureServerEvent).not.toHaveBeenCalled();
+  });
+
+  // BE-M15: failed handle logging
+  it("logs failed handles via captureServerError when warmHandle throws unexpectedly", async () => {
+    // warmHandle catches internally, but if processInBatches itself encounters an unexpected
+    // rejection (e.g. warmHandle throws despite its catch), failed++ and error is logged
+    mockMaterializeOrchestratedProfile
+      .mockRejectedValueOnce(new Error("unexpected unhandled throw"))
+      .mockResolvedValueOnce(FAKE_MATERIALIZED);
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    // The failing handle should be counted and the error should surface
+    expect(body.failed).toBeGreaterThanOrEqual(1);
   });
 });

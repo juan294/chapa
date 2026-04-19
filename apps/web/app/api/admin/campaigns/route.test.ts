@@ -209,4 +209,39 @@ describe("POST /api/admin/campaigns", () => {
       }),
     );
   });
+
+  // SE-L1: ctaUrl validation
+  it("rejects javascript: ctaUrl with 400", async () => {
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "javascript:evil()" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ctaUrl/i);
+  });
+
+  it("rejects invalid URL as ctaUrl with 400", async () => {
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "not-a-url" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ctaUrl/i);
+  });
+
+  it("accepts https: ctaUrl", async () => {
+    vi.mocked(dbCreateCampaign).mockResolvedValue("new-id");
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "https://example.com/path" }),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts http: ctaUrl", async () => {
+    vi.mocked(dbCreateCampaign).mockResolvedValue("new-id");
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "http://example.com" }),
+    );
+    expect(res.status).toBe(201);
+  });
 });

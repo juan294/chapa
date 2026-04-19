@@ -124,10 +124,8 @@ export async function GET(request: NextRequest) {
     (contact) => markUnsubscribed(contact.email),
   );
 
-  const added = addResults.filter((r) => r.status === "fulfilled").length;
-  const unsubscribed = unsubResults.filter(
-    (r) => r.status === "fulfilled",
-  ).length;
+  const added = addResults.succeeded.length;
+  const unsubscribed = unsubResults.succeeded.length;
 
   return NextResponse.json({
     status: "ok",

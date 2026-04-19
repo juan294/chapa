@@ -51,6 +51,43 @@ export interface CaptureServerErrorOptions {
 }
 
 /**
+ * Send an arbitrary server-side event to PostHog.
+ *
+ * This is a fire-and-forget function: it never throws, never blocks the response,
+ * and fails silently if PostHog is unavailable or unconfigured.
+ *
+ * @param event  - Event name (e.g. "cron_warm_cache_complete")
+ * @param properties - Arbitrary key-value properties attached to the event
+ */
+export async function captureServerEvent(
+  event: string,
+  properties?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
+    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
+
+    if (!apiKey || !host) return;
+
+    const payload = {
+      api_key: apiKey,
+      event,
+      distinct_id: "chapa-server",
+      properties: properties ?? {},
+    };
+
+    await fetch(`${host}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // Never let monitoring crash the app — silently swallow all errors
+  }
+}
+
+/**
  * Capture a server-side error and send it to PostHog as a `server_error` event.
  *
  * This is a fire-and-forget function: it never throws, never blocks the response,

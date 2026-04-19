@@ -12,7 +12,10 @@ import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { processInBatches } from "@/lib/async/process-in-batches";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import {
+  captureServerError,
+  captureServerEvent,
+} from "@/lib/analytics/server-errors";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import {
   materializeOrchestratedProfile,
@@ -114,28 +117,38 @@ export async function GET(request: NextRequest) {
   let snapshots = 0;
   let notifications = 0;
 
-  // Process handles in parallel batches for throughput
-  const results = await processInBatches(toWarm, BATCH_SIZE, async (handle) => {
-    const result = await warmHandle(handle, githubToken, previousSnapshots);
-    return { handle, ...result };
-  });
+  // Process handles in parallel batches for throughput.
+  // processInBatches returns { succeeded, failed } so we can identify which handles failed.
+  const { succeeded: warmResults, failed: warmFailures } = await processInBatches(
+    toWarm,
+    BATCH_SIZE,
+    async (handle) => {
+      const result = await warmHandle(handle, githubToken, previousSnapshots);
+      return { handle, ...result };
+    },
+  );
 
-  // Aggregate results from all settled promises
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      const { warmed: w, snapshotRecorded, notified } =
-        r.value as HandleResult & { handle: string };
-      if (w) {
-        warmed++;
-        if (snapshotRecorded) snapshots++;
-        if (notified) notifications++;
-      } else {
-        failed++;
-      }
+  // Aggregate succeeded results
+  for (const { warmed: w, snapshotRecorded, notified } of warmResults) {
+    if (w) {
+      warmed++;
+      if (snapshotRecorded) snapshots++;
+      if (notified) notifications++;
     } else {
-      // Promise rejected — should not happen since warmHandle catches internally,
-      // but guard against unexpected throws
       failed++;
+    }
+  }
+
+  // Aggregate unexpected failures (warmHandle catches internally, but guard against
+  // any unhandled throws that bypass the internal catch)
+  if (warmFailures.length > 0) {
+    failed += warmFailures.length;
+    for (const { item: handle, error } of warmFailures) {
+      void captureServerError({
+        route: "/api/cron/warm-cache",
+        statusCode: 500,
+        error: new Error(`Unexpected failure for handle "${handle}": ${error.message}`),
+      });
     }
   }
 
@@ -163,6 +176,15 @@ export async function GET(request: NextRequest) {
     // Non-critical — don't fail the cron response
   }
 
+  const durationMs = Date.now() - start;
+
+  // Emit observability event to PostHog (fire-and-forget)
+  void captureServerEvent("cron_warm_cache_complete", {
+    warmed,
+    failed,
+    durationMs,
+  });
+
   return NextResponse.json(
     {
       warmed,
@@ -180,7 +202,7 @@ export async function GET(request: NextRequest) {
         totalUsers: allHandles.length,
         coversAll: allHandles.length <= MAX_HANDLES,
       },
-      durationMs: Date.now() - start,
+      durationMs,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

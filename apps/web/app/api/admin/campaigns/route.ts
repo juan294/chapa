@@ -3,6 +3,15 @@ import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetCampaigns, dbCreateCampaign } from "@/lib/db/campaigns";
 import type { CampaignType } from "@/lib/db/campaigns";
 
+function isValidCtaUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 const VALID_TYPES: CampaignType[] = ["announcement", "engagement"];
 
 export async function GET(request: NextRequest) {
@@ -36,6 +45,14 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+  }
+
+  // SE-L1: validate ctaUrl scheme
+  if (!isValidCtaUrl(body.ctaUrl as string)) {
+    return NextResponse.json(
+      { error: "Invalid ctaUrl: must be an http or https URL" },
+      { status: 400 },
+    );
   }
 
   const type = (body.type as string) ?? "announcement";
