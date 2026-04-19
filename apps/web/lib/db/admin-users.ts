@@ -150,6 +150,30 @@ function rowToAdminUser(row: AdminUserRow): AdminUserEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Search term sanitization
+// ---------------------------------------------------------------------------
+
+/**
+ * Escapes SQL ILIKE wildcard characters and the escape character itself so
+ * user-supplied search terms cannot act as wildcards or bypass escaping.
+ *
+ * Escaped characters:
+ *   \ → \\ (escape char must be doubled first to avoid double-escaping)
+ *   % → \% (SQL wildcard: matches any sequence of characters)
+ *   _ → \_ (SQL wildcard: matches any single character)
+ *
+ * Also strips PostgREST filter-string delimiter characters (,  .  (  )) to
+ * prevent predicate injection when the term is later interpolated into a
+ * PostgREST filter expression. GitHub handles and display names do not use
+ * these characters in practice, so stripping is safe.
+ */
+function escapeIlike(term: string): string {
+  return term
+    .replace(/[\\%_]/g, "\\$&")
+    .replace(/[,.()\s]/g, "");
+}
+
+// ---------------------------------------------------------------------------
 // Main query function
 // ---------------------------------------------------------------------------
 
@@ -181,10 +205,13 @@ export async function dbGetAdminUsers(
   try {
     let q = db.from("admin_users").select("*", { count: "exact" });
 
-    // Search filter: ILIKE on handle or display_name
+    // Search filter: ILIKE on handle and display_name.
+    // Uses chained .ilike() builder calls (parameterized) instead of raw
+    // .or() string interpolation to prevent SQL wildcard abuse (_ and %)
+    // and PostgREST delimiter injection (, . ( )).
     if (query.search?.trim()) {
-      const term = query.search.trim().replace(/%/g, "\\%");
-      q = q.or(`handle.ilike.%${term}%,display_name.ilike.%${term}%`);
+      const term = escapeIlike(query.search.trim());
+      q = q.ilike("handle", `%${term}%`).ilike("display_name", `%${term}%`);
     }
 
     // Tier filter
