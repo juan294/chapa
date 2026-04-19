@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { isStudioEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
+import { clearSessionCache } from "@/hooks/useSession";
+import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -224,6 +226,18 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     } finally {
       setCbUnlinkLoading(false);
     }
+  }
+
+  async function handleSignOut() {
+    // Clear all module-level per-user caches before navigating away.
+    // This prevents the previous user's session, platform links, or
+    // cache warm state from appearing when a different user logs in
+    // in the same tab. (#732)
+    clearSessionCache();
+    clearPlatformStatusCache();
+    clearCacheWarmState();
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/";
   }
 
   const fallbackLetter = login.charAt(0).toUpperCase();
@@ -541,7 +555,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
           {/* Sign out */}
           <div className="px-2 py-1.5">
-            <form method="POST" action="/api/auth/logout">
+            <form method="POST" action="/api/auth/logout" onSubmit={(e) => { e.preventDefault(); void handleSignOut(); }}>
               <button
                 type="submit"
                 role="menuitem"

@@ -43,6 +43,17 @@ function fetchSession(): Promise<SessionUser | null> {
 }
 
 /**
+ * Clear the module-level session cache.
+ *
+ * Call this on logout so that a subsequent login as a different user
+ * does not see the previous user's session data.
+ */
+export function clearSessionCache(): void {
+  cachedPromise = null;
+  cachedResult = undefined;
+}
+
+/**
  * Shared session hook that deduplicates `/api/auth/session` fetches.
  *
  * All components calling `useSession()` share a single network request

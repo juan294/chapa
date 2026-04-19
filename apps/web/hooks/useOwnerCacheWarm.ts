@@ -6,6 +6,26 @@ import { useRouter } from "next/navigation";
 const STORAGE_PREFIX = "chapa:refreshed:";
 
 /**
+ * Clear all owner cache warm sessionStorage entries.
+ *
+ * Call this on logout so that a subsequent login as a different user
+ * does not see warm-cache debounce state from the previous session.
+ */
+export function clearCacheWarmState(): void {
+  if (typeof sessionStorage === "undefined") return;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key?.startsWith(STORAGE_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) {
+    sessionStorage.removeItem(key);
+  }
+}
+
+/**
  * Silently warm the stats cache with OAuth data when the badge owner
  * visits their share page.
  *

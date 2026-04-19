@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 
 // Reset the module-level cache between tests by re-importing
 let useSession: typeof import("./useSession").useSession;
+let clearSessionCache: typeof import("./useSession").clearSessionCache;
 
 beforeEach(async () => {
   vi.restoreAllMocks();
@@ -11,6 +12,7 @@ beforeEach(async () => {
   vi.resetModules();
   const mod = await import("./useSession");
   useSession = mod.useSession;
+  clearSessionCache = mod.clearSessionCache;
 });
 
 afterEach(() => {
@@ -153,5 +155,48 @@ describe("useSession", () => {
 
       expect(callCount).toBe(2);
     });
+  });
+});
+
+describe("clearSessionCache", () => {
+  it("is exported from useSession module", () => {
+    expect(typeof clearSessionCache).toBe("function");
+  });
+
+  it("clears the module-level cache so the next hook render re-fetches", async () => {
+    const user1 = { login: "userA", name: "User A", avatar_url: "https://example.com/a.png" };
+    const user2 = { login: "userB", name: "User B", avatar_url: "https://example.com/b.png" };
+
+    let callCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() => {
+        callCount++;
+        const user = callCount === 1 ? user1 : user2;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ user }),
+        });
+      }),
+    );
+
+    // First render — populates the cache with user1
+    const { result: result1 } = renderHook(() => useSession());
+    await waitFor(() => {
+      expect(result1.current.loading).toBe(false);
+    });
+    expect(result1.current.session?.login).toBe("userA");
+    expect(callCount).toBe(1);
+
+    // clearSessionCache — wipes both cachedPromise and cachedResult
+    clearSessionCache();
+
+    // Second render — cache is gone, must re-fetch and get user2
+    const { result: result2 } = renderHook(() => useSession());
+    await waitFor(() => {
+      expect(result2.current.loading).toBe(false);
+    });
+    expect(result2.current.session?.login).toBe("userB");
+    expect(callCount).toBe(2);
   });
 });
