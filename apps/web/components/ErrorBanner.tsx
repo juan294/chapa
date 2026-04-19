@@ -7,7 +7,7 @@ interface ErrorBannerProps {
 }
 
 /**
- * Dismissible amber-themed error banner for OAuth failures.
+ * Dismissible terminal-red error banner for OAuth failures.
  *
  * Rendered by the server component (page.tsx) only when an error
  * query parameter is present. Dismiss state is client-side only.
@@ -20,7 +20,7 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <div
       role="alert"
-      className="fixed top-[73px] left-0 right-0 z-40 flex items-center justify-center gap-2 sm:gap-3 border-b border-amber/30 bg-amber/10 px-4 sm:px-6 py-3 text-xs sm:text-sm text-amber backdrop-blur-sm"
+      className="fixed top-[73px] left-0 right-0 z-40 flex items-center justify-center gap-2 sm:gap-3 border-b border-terminal-red/30 bg-terminal-red/10 px-4 sm:px-6 py-3 text-xs sm:text-sm text-terminal-red backdrop-blur-sm"
     >
       {/* Warning icon */}
       <svg
@@ -43,7 +43,7 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
       <button
         type="button"
         onClick={() => setDismissed(true)}
-        className="ml-2 flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full p-1 text-amber/70 transition-colors hover:bg-amber/10 hover:text-amber"
+        className="ml-2 flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full p-1 text-terminal-red/70 transition-colors hover:bg-terminal-red/10 hover:text-terminal-red"
         aria-label="Dismiss error"
       >
         <svg

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
@@ -19,6 +20,59 @@ import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
  * - Owner: DataSources, ImpactDashboard, Embed Snippets
  * - Visitor: "Discover your impact" CTA
  */
+
+function EmptyImpactState({ handle }: { handle: string }) {
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  async function handleRegenerate() {
+    setStatus("loading");
+    try {
+      const res = await fetch(`/api/refresh?handle=${encodeURIComponent(handle)}`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setStatus("success");
+        setTimeout(() => window.location.reload(), 800);
+      } else {
+        setStatus("error");
+      }
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  return (
+    <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
+      <div className="rounded-2xl border border-stroke bg-card p-8 space-y-4">
+        <p className="text-text-secondary text-sm">
+          Could not load impact data. Try again later.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            disabled={status === "loading" || status === "success"}
+            aria-busy={status === "loading"}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-light disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {status === "loading" ? "Regenerating\u2026" : status === "success" ? "Done!" : "Regenerate"}
+          </button>
+          {status === "error" && (
+            <p className="text-terminal-red text-xs">
+              Regeneration failed.{" "}
+              <a
+                href={`mailto:support@thecreativetoken.com?subject=Badge%20data%20issue%20for%20%40${encodeURIComponent(handle)}`}
+                className="underline hover:text-terminal-red/80 transition-colors"
+              >
+                Contact support
+              </a>
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 interface SharePageOwnerContentProps {
   handle: string;
@@ -88,13 +142,7 @@ export function SharePageOwnerContent({
           <ImpactDashboard impact={impact} stats={stats} handle={handle} />
         </section>
       ) : (
-        <section className="mb-12 animate-fade-in-up [animation-delay:350ms]">
-          <div className="rounded-2xl border border-stroke bg-card p-8">
-            <p className="text-text-secondary">
-              Could not load impact data for this user. Try again later.
-            </p>
-          </div>
-        </section>
+        <EmptyImpactState handle={handle} />
       )}
 
       {/* Embed Snippets */}

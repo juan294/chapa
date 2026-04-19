@@ -91,6 +91,17 @@ describe("Landing page (server component)", () => {
     });
   });
 
+  // #740 — UX-M3: verification CTA uses complement (teal) tokens
+  describe("verification CTA uses complement tokens (#740)", () => {
+    it("Verify a Badge button uses bg-complement", () => {
+      expect(SOURCE).toContain("bg-complement");
+    });
+
+    it("Verify a Badge button links to /verify", () => {
+      expect(SOURCE).toContain('href="/verify"');
+    });
+  });
+
   describe("archetype links", () => {
     it("links to all seven archetype pages", () => {
       expect(SOURCE).toContain("/archetypes/builder");
@@ -108,6 +119,27 @@ describe("Landing page (server component)", () => {
     it("CTA buttons use asymmetric padding for optical icon alignment", () => {
       // Hero buttons should have pl-6 pr-5 (not symmetric px-6)
       expect(SOURCE).toContain("pl-6 pr-5");
+    });
+  });
+
+  // #741 — visible section labels for landmark sections
+  describe("visible section labels (#741)", () => {
+    it("Features section has a visible label element (not only sr-only)", () => {
+      // There should be a visible label with font-heading + tracking-widest or similar
+      expect(SOURCE).toContain("tracking-widest");
+    });
+
+    it("section labels use text-text-secondary and font-heading", () => {
+      expect(SOURCE).toContain("text-text-secondary");
+      expect(SOURCE).toContain("font-heading");
+    });
+
+    it("section headings are still present for accessibility", () => {
+      expect(SOURCE).toContain("Features");
+      expect(SOURCE).toContain("How It Works");
+      expect(SOURCE).toContain("Enterprise");
+      expect(SOURCE).toContain("Stats");
+      expect(SOURCE).toContain("Get Started");
     });
   });
 });

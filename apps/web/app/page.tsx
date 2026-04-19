@@ -247,8 +247,8 @@ export default async function Home({
           </section>
 
           {/* ── Features: $ chapa features ────────────────── */}
-          <h2 className="sr-only">Features</h2>
           <section id="features" className="animate-fade-in-up [animation-delay:600ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">Features</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa features</span>
@@ -268,8 +268,8 @@ export default async function Home({
           </section>
 
           {/* ── How It Works: $ chapa explain ─────────────── */}
-          <h2 className="sr-only">How It Works</h2>
           <section id="how-it-works" className="animate-fade-in-up [animation-delay:800ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">How It Works</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa explain</span>
@@ -327,8 +327,8 @@ export default async function Home({
           </section>
 
           {/* ── Enterprise: $ chapa enterprise ────────────── */}
-          <h2 className="sr-only">Enterprise</h2>
           <section id="enterprise" className="animate-fade-in-up [animation-delay:900ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">Enterprise</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa enterprise</span>
@@ -408,8 +408,8 @@ export default async function Home({
           </section>
 
           {/* ── Stats: $ chapa stats ──────────────────────── */}
-          <h2 className="sr-only">Stats</h2>
           <section id="stats" className="animate-fade-in-up [animation-delay:1100ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">Stats</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa stats</span>
@@ -432,8 +432,8 @@ export default async function Home({
           </section>
 
           {/* ── CTA: $ chapa login ────────────────────────── */}
-          <h2 className="sr-only">Get Started</h2>
           <section className="animate-fade-in-up [animation-delay:1300ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">Get Started</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa login</span>

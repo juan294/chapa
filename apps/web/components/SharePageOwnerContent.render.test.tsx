@@ -221,10 +221,26 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText(
-        "Could not load impact data for this user. Try again later.",
-      ),
+      screen.getByText("Could not load impact data. Try again later."),
     ).toBeTruthy();
+  });
+
+  it("shows Regenerate button in empty state (#743)", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    expect(screen.getByText("Regenerate")).toBeTruthy();
   });
 
   it("hides DataSources when stats is null", () => {

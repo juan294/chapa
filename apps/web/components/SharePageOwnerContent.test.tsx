@@ -76,4 +76,23 @@ describe("SharePageOwnerContent", () => {
       expect(SOURCE).toContain("Curious what your developer impact looks like");
     });
   });
+
+  // #743 — empty state retry mechanism
+  describe("empty state retry mechanism (#743)", () => {
+    it("has a Regenerate button in the empty state", () => {
+      expect(SOURCE).toContain("Regenerate");
+    });
+
+    it("empty state calls /api/refresh endpoint", () => {
+      expect(SOURCE).toContain("/api/refresh");
+    });
+
+    it("empty state includes support mailto link", () => {
+      expect(SOURCE).toContain("mailto:");
+    });
+
+    it("Regenerate button uses POST method", () => {
+      expect(SOURCE).toContain('method: "POST"');
+    });
+  });
 });

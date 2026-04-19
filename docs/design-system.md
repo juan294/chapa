@@ -69,6 +69,8 @@ Defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`. Values shown 
 - Never hardcode hex colors in components; always use the CSS variable tokens so theme switching works.
 - Purple-tinted borders (`border-stroke`) are the default for all dividers.
 - Terminal colors used in terminal output only: green for success, red for errors, yellow for warnings. These also have light-appropriate values.
+- **Error banners and alerts** must use terminal-red tokens (`border-terminal-red/30`, `bg-terminal-red/10`, `text-terminal-red`) — never amber/purple for error states.
+- **Verification-related UI** (verify page headings, verify CTAs, verification badges) must use the complement (teal) tokens: `text-complement`, `bg-complement`, `bg-complement-light`. This semantically distinguishes cryptographic trust from primary brand actions.
 - Use Tailwind opacity modifiers: `bg-amber/10`, `text-amber/70`, `border-amber/20`.
 - Cards use `bg-card` with `border-stroke`.
 - Button text on purple background: always `text-white`.

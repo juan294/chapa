@@ -75,13 +75,18 @@ describe("ErrorBanner", () => {
   });
 
   describe("design system compliance", () => {
-    it("uses amber color scheme for the banner", () => {
-      expect(SOURCE).toContain("bg-amber/10");
-      expect(SOURCE).toContain("text-amber");
+    it("uses terminal-red color scheme for the banner (#739)", () => {
+      expect(SOURCE).toContain("bg-terminal-red/10");
+      expect(SOURCE).toContain("text-terminal-red");
     });
 
-    it("uses amber-tinted border", () => {
-      expect(SOURCE).toContain("border-amber/30");
+    it("uses terminal-red-tinted border (#739)", () => {
+      expect(SOURCE).toContain("border-terminal-red/30");
+    });
+
+    it("does NOT use amber colors for error banner (#739)", () => {
+      expect(SOURCE).not.toContain("bg-amber/10");
+      expect(SOURCE).not.toContain("border-amber/30");
     });
 
     it("uses fixed positioning below navbar", () => {
