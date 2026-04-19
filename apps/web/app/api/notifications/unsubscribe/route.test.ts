@@ -39,10 +39,19 @@ vi.mock("@/lib/http/client-ip", () => ({
 }));
 
 import { GET } from "./route";
+import {
+  generateUnsubscribeToken,
+  verifyUnsubscribeToken,
+} from "@/lib/auth/unsubscribe-token";
 
-function makeRequest(handle?: string): NextRequest {
-  const url = new URL("https://chapa.thecreativetoken.com/api/notifications/unsubscribe");
+const TEST_SECRET = "test-nextauth-secret-32chars-abcdef";
+
+function makeRequest(handle?: string, token?: string): NextRequest {
+  const url = new URL(
+    "https://chapa.thecreativetoken.com/api/notifications/unsubscribe",
+  );
   if (handle) url.searchParams.set("handle", handle);
+  if (token) url.searchParams.set("token", token);
   return new NextRequest(url);
 }
 
@@ -52,10 +61,100 @@ beforeEach(() => {
   mockDbGetUserEmail.mockResolvedValue(null);
   mockMarkUnsubscribed.mockResolvedValue(null);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+  vi.stubEnv("NEXTAUTH_SECRET", TEST_SECRET);
 });
 
 // ---------------------------------------------------------------------------
-// Tests
+// HMAC token unit tests
+// ---------------------------------------------------------------------------
+
+describe("unsubscribe token utilities", () => {
+  it("generateUnsubscribeToken returns a non-empty string", () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    expect(typeof token).toBe("string");
+    expect(token.length).toBeGreaterThan(0);
+  });
+
+  it("verifyUnsubscribeToken returns true for a freshly generated token", () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    expect(verifyUnsubscribeToken("testuser", token, TEST_SECRET)).toBe(true);
+  });
+
+  it("verifyUnsubscribeToken returns false for wrong handle", () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    expect(verifyUnsubscribeToken("otheruser", token, TEST_SECRET)).toBe(false);
+  });
+
+  it("verifyUnsubscribeToken returns false for wrong secret", () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    expect(verifyUnsubscribeToken("testuser", token, "wrong-secret")).toBe(
+      false,
+    );
+  });
+
+  it("verifyUnsubscribeToken returns false for tampered token", () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const tampered = token.slice(0, -4) + "XXXX";
+    expect(verifyUnsubscribeToken("testuser", tampered, TEST_SECRET)).toBe(
+      false,
+    );
+  });
+
+  it("verifyUnsubscribeToken returns false for empty string", () => {
+    expect(verifyUnsubscribeToken("testuser", "", TEST_SECRET)).toBe(false);
+  });
+
+  it("verifyUnsubscribeToken returns false for garbage input", () => {
+    expect(
+      verifyUnsubscribeToken("testuser", "notavalidtoken", TEST_SECRET),
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Route: token enforcement
+// ---------------------------------------------------------------------------
+
+describe("GET /api/notifications/unsubscribe — token enforcement", () => {
+  it("returns 401 when token is missing", async () => {
+    const res = await GET(makeRequest("testuser"));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when token is invalid", async () => {
+    const res = await GET(makeRequest("testuser", "invalid-token-value"));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when token is for a different handle", async () => {
+    const token = generateUnsubscribeToken("otheruser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 200 when valid token is provided", async () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
+    expect(res.status).toBe(200);
+  });
+
+  it("does NOT call dbUpdateEmailNotifications without a valid token", async () => {
+    await GET(makeRequest("testuser"));
+    expect(mockDbUpdateEmailNotifications).not.toHaveBeenCalled();
+  });
+
+  it("calls dbUpdateEmailNotifications with valid token", async () => {
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
+    expect(mockDbUpdateEmailNotifications).toHaveBeenCalledWith(
+      "testuser",
+      false,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Route: existing behaviour preserved when token is valid
 // ---------------------------------------------------------------------------
 
 describe("GET /api/notifications/unsubscribe", () => {
@@ -64,18 +163,9 @@ describe("GET /api/notifications/unsubscribe", () => {
     expect(res.status).toBe(400);
   });
 
-  it("calls dbUpdateEmailNotifications with handle and false", async () => {
-    const res = await GET(makeRequest("testuser"));
-
-    expect(mockDbUpdateEmailNotifications).toHaveBeenCalledWith(
-      "testuser",
-      false,
-    );
-    expect(res.status).toBe(200);
-  });
-
   it("returns HTML confirmation page", async () => {
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
 
     expect(res.headers.get("Content-Type")).toContain("text/html");
     const body = await res.text();
@@ -84,7 +174,8 @@ describe("GET /api/notifications/unsubscribe", () => {
   });
 
   it("lowercases handle", async () => {
-    await GET(makeRequest("TestUser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("TestUser", token));
 
     expect(mockDbUpdateEmailNotifications).toHaveBeenCalledWith(
       "testuser",
@@ -93,24 +184,26 @@ describe("GET /api/notifications/unsubscribe", () => {
   });
 
   it("escapes HTML in handle to prevent XSS", async () => {
-    const res = await GET(makeRequest('<script>alert("xss")</script>'));
+    const xssHandle = '<script>alert("xss")</script>';
+    const token = generateUnsubscribeToken(
+      xssHandle.toLowerCase(),
+      TEST_SECRET,
+    );
+    const res = await GET(makeRequest(xssHandle, token));
     const body = await res.text();
 
-    // Must NOT contain raw script tag
     expect(body).not.toContain("<script>");
-    // Must contain the escaped version
     expect(body).toContain("&lt;script&gt;");
   });
 
   it("does not throw when DB update fails", async () => {
-    // Silence expected console.error from the fail-open error-handling path
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     mockDbUpdateEmailNotifications.mockRejectedValue(new Error("DB down"));
 
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
 
-    // Still shows confirmation — fail-open for UX
     expect(res.status).toBe(200);
 
     consoleSpy.mockRestore();
@@ -119,7 +212,8 @@ describe("GET /api/notifications/unsubscribe", () => {
   it("returns 429 when rate limited", async () => {
     mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
 
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
 
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("60");
@@ -133,9 +227,9 @@ describe("GET /api/notifications/unsubscribe", () => {
       emailNotifications: true,
     });
 
-    await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
 
-    // Wait for fire-and-forget to flush
     await new Promise((r) => setTimeout(r, 10));
     expect(mockMarkUnsubscribed).toHaveBeenCalledWith("dev@example.com");
   });
@@ -143,7 +237,8 @@ describe("GET /api/notifications/unsubscribe", () => {
   it("does not call Resend sync when user has no email", async () => {
     mockDbGetUserEmail.mockResolvedValue(null);
 
-    await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
 
     await new Promise((r) => setTimeout(r, 10));
     expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
@@ -152,9 +247,9 @@ describe("GET /api/notifications/unsubscribe", () => {
   it("does not call Resend sync when dbGetUserEmail rejects (catch returns null)", async () => {
     mockDbGetUserEmail.mockRejectedValue(new Error("DB unreachable"));
 
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
 
-    // Should still succeed (fail-open)
     expect(res.status).toBe(200);
     await new Promise((r) => setTimeout(r, 10));
     expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
@@ -167,10 +262,10 @@ describe("GET /api/notifications/unsubscribe", () => {
     });
     mockMarkUnsubscribed.mockRejectedValue(new Error("Resend down"));
 
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
 
     expect(res.status).toBe(200);
-    // Wait for the fire-and-forget promise to settle
     await new Promise((r) => setTimeout(r, 10));
     expect(mockMarkUnsubscribed).toHaveBeenCalledWith("dev@example.com");
   });
@@ -178,17 +273,18 @@ describe("GET /api/notifications/unsubscribe", () => {
   it("does not call Resend sync when email field is empty string", async () => {
     mockDbGetUserEmail.mockResolvedValue({ email: "", emailNotifications: true });
 
-    await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
 
     await new Promise((r) => setTimeout(r, 10));
-    // Empty string is falsy, so markUnsubscribed should not be called
     expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
   });
 
   it("does not call Resend sync when email field is undefined", async () => {
     mockDbGetUserEmail.mockResolvedValue({ emailNotifications: true });
 
-    await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
 
     await new Promise((r) => setTimeout(r, 10));
     expect(mockMarkUnsubscribed).not.toHaveBeenCalled();
@@ -197,14 +293,18 @@ describe("GET /api/notifications/unsubscribe", () => {
   it("still updates DB even when dbGetUserEmail fails", async () => {
     mockDbGetUserEmail.mockRejectedValue(new Error("query fail"));
 
-    await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
 
-    // dbUpdate should still have been called (Promise.all runs both)
-    expect(mockDbUpdateEmailNotifications).toHaveBeenCalledWith("testuser", false);
+    expect(mockDbUpdateEmailNotifications).toHaveBeenCalledWith(
+      "testuser",
+      false,
+    );
   });
 
   it("passes the rate limit key with the client IP", async () => {
-    await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    await GET(makeRequest("testuser", token));
 
     expect(mockRateLimit).toHaveBeenCalledWith(
       "ratelimit:unsubscribe:127.0.0.1",
@@ -214,14 +314,16 @@ describe("GET /api/notifications/unsubscribe", () => {
   });
 
   it("includes lang attribute on html tag", async () => {
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
     const body = await res.text();
 
     expect(body).toContain('<html lang="en">');
   });
 
   it("includes viewport meta tag", async () => {
-    const res = await GET(makeRequest("testuser"));
+    const token = generateUnsubscribeToken("testuser", TEST_SECRET);
+    const res = await GET(makeRequest("testuser", token));
     const body = await res.text();
 
     expect(body).toContain(
