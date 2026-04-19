@@ -793,7 +793,7 @@ describe("GET /api/auth/callback — audience sync", () => {
     });
   });
 
-  it("swallows dbUpsertUser rejection via .catch() (fire-and-forget)", async () => {
+  it("swallows dbUpsertUser rejection and calls captureServerError (fire-and-forget)", async () => {
     mockValidateState.mockReturnValue(true);
     mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
     mockFetchGitHubUser.mockResolvedValue({
@@ -804,7 +804,7 @@ describe("GET /api/auth/callback — audience sync", () => {
     mockFetchGitHubUserEmail.mockResolvedValue(null);
     mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
     mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
-    // dbUpsertUser rejects — the .catch(() => {}) should swallow it
+    // dbUpsertUser rejects — should be captured, not silently discarded
     mockDbUpsertUser.mockRejectedValue(new Error("DB down"));
 
     const res = await GET(
@@ -815,9 +815,17 @@ describe("GET /api/auth/callback — audience sync", () => {
     expect(res.status).toBe(307);
     // Flush microtasks so .catch() runs
     await new Promise((r) => setTimeout(r, 0));
+    // Error must be tracked — not silently swallowed
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: expect.any(Error),
+      }),
+    );
   });
 
-  it("swallows addContact rejection via .catch() (fire-and-forget)", async () => {
+  it("swallows addContact rejection and calls captureServerError (fire-and-forget)", async () => {
     mockValidateState.mockReturnValue(true);
     mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
     mockFetchGitHubUser.mockResolvedValue({
@@ -828,7 +836,7 @@ describe("GET /api/auth/callback — audience sync", () => {
     mockFetchGitHubUserEmail.mockResolvedValue("octocat@github.com");
     mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
     mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
-    // addContact rejects — the .catch(() => {}) should swallow it
+    // addContact rejects — should be captured, not silently discarded
     mockAddContact.mockRejectedValue(new Error("Email service down"));
 
     const res = await GET(
@@ -839,5 +847,173 @@ describe("GET /api/auth/callback — audience sync", () => {
     expect(res.status).toBe(307);
     // Flush microtasks so .catch() runs
     await new Promise((r) => setTimeout(r, 0));
+    // Error must be tracked — not silently swallowed
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: expect.any(Error),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #705: Redirect allow-list enforcement
+// ---------------------------------------------------------------------------
+
+describe("GET /api/auth/callback — redirect allow-list (#705)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    allowRateLimit();
+    setEnvVars();
+    mockAddContact.mockResolvedValue(undefined);
+    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+  });
+
+  afterEach(() => {
+    clearEnvVars();
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+  });
+
+  function setupHappyPath() {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+  }
+
+  it("allows redirect to /u/ prefix", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/u/someuser")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/u/someuser");
+  });
+
+  it("allows redirect to /studio", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/studio")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/studio");
+  });
+
+  it("allows redirect to /about", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/about")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/about");
+  });
+
+  it("allows redirect to exactly /", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/");
+  });
+
+  it("blocks redirect to /evil-path (not on allow-list)", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/evil-path")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    // Falls back to generating page — /evil-path is not on allow-list
+    expect(location.pathname).toBe("/generating/octocat");
+  });
+
+  it("blocks redirect to /admin (not on allow-list)", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/admin")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/generating/octocat");
+  });
+
+  it("blocks redirect to /verify (not on allow-list)", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/verify/abc123")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/generating/octocat");
+  });
+
+  it("blocks cross-origin redirect to https://evil.com", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("https://evil.com/steal")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/generating/octocat");
   });
 });

@@ -24,22 +24,22 @@ function cookieFlags(): string {
 }
 
 /**
- * Validate that a redirect URL is safe (same-origin only).
- * Prevents open-redirect attacks via the postLoginRedirect cookie.
+ * Validate that a redirect URL is on the explicit allow-list.
+ * Restricts post-login redirects to a known set of safe prefixes to prevent
+ * open-redirect attacks via the chapa_redirect cookie.
+ *
+ * Allow-list: exactly "/", or paths starting with "/u/", "/studio", "/about".
  */
 function isSafeRedirect(url: string): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  if (base) {
-    try {
-      const parsed = new URL(url, base);
-      const origin = new URL(base);
-      return parsed.origin === origin.origin;
-    } catch {
-      // URL parsing failed — fall through to path check
-    }
+  if (url === "/") return true;
+  if (
+    url.startsWith("/u/") ||
+    url.startsWith("/studio") ||
+    url.startsWith("/about")
+  ) {
+    return true;
   }
-  // Fallback: only allow paths starting with "/"
-  return url.startsWith("/") && !url.startsWith("//");
+  return false;
 }
 
 /**
@@ -121,14 +121,26 @@ export async function GET(request: NextRequest) {
     email: email ?? undefined,
     displayName: user.name ?? null,
     avatarUrl: user.avatar_url ?? null,
-  }).catch(() => {});
+  }).catch((err: unknown) => {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 500,
+      error: err,
+    });
+  });
 
   // Sync to Resend audience (fire-and-forget, non-blocking)
   if (email) {
     void addContact(email, {
       firstName: user.name ?? undefined,
       handle: user.login,
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      void captureServerError({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: err,
+      });
+    });
   }
 
   const cookie = createSessionCookie(
