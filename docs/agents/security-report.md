@@ -1,110 +1,70 @@
 # Security Report
-> Generated: 2026-04-13 | Health status: GREEN
+> Generated: 2026-04-20 | Health status: green
 
 ## Executive Summary
 
-The Chapa codebase maintains a strong security posture. No hardcoded secrets, no XSS vectors, and no RLS gaps were found. The only vulnerabilities are 3 dev-only vite issues (via vitest) with no production exposure. One new LGPL-3.0 transitive dependency (`@img/sharp-libvips-darwin-arm64`) surfaced — binary-only, no compliance action needed.
+Zero vulnerabilities in production dependencies (vite was bumped to ≥8.0.8 in triage 2026-04-17, resolving prior dev-only CVEs). All security controls remain intact — XSS escaping, RLS, CORS posture, secret isolation, and license compliance are unchanged from the 2026-04-13 baseline. One carried item: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS scrubbing branches (63.63%) lack test coverage, flagged by coverage agent — adding tests is the only open recommendation.
 
 ## Dependency Vulnerabilities
 
 | Severity | Package | Issue | Fix |
 |----------|---------|-------|-----|
-| HIGH | vite 7.3.1 (via vitest) | `server.fs.deny` bypassed with queries ([GHSA-v2wj-q39q-566r](https://github.com/advisories/GHSA-v2wj-q39q-566r)) | Bump vite ≥7.3.2 via `pnpm.overrides` or wait for vitest peer bump |
-| HIGH | vite 7.3.1 (via vitest) | Arbitrary file read via dev server WebSocket ([GHSA-p9ff-h696-f583](https://github.com/advisories/GHSA-p9ff-h696-f583)) | Bump vite ≥7.3.2 |
-| MODERATE | vite 7.3.1 (via vitest) | Path traversal in optimized deps `.map` handling ([GHSA-4w7w-66w2-5vf9](https://github.com/advisories/GHSA-4w7w-66w2-5vf9)) | Bump vite ≥7.3.2 |
+| — | — | No known vulnerabilities found (`pnpm audit` clean) | — |
 
-**Risk assessment:** All 3 vulnerabilities are in `vite`, a dev-only dependency pulled in by `vitest`. Vite's dev server is never deployed to production. **No production exposure.**
+**Notes:**
+- Previous high/moderate findings in `vite <7.3.2` (GHSA-xxx, dev-only via vitest) were resolved in triage 2026-04-17 by bumping vite ≥8.0.8, jsdom ≥29.0.2, vitest 4.1.4.
+- All production dependencies are clean.
 
-## Unused Dependencies (Knip --production)
+## Knip Analysis (Attack Surface)
 
-Knip flagged 8 packages + 1 file as unused in production entry graph. **All are false positives** — confirmed in use via non-entry paths:
+`npx knip --production` reports **8 packages** as "unused" — all are confirmed false positives (same 8 as 2026-04-13):
 
-| Package | Reason it's used |
-|---------|-----------------|
-| `@resvg/resvg-js` | SVG-to-PNG conversion (`lib/render/svg-to-png.ts`) |
-| `@vercel/analytics` | Loaded via Next.js plugin in `next.config.ts` |
-| `@vercel/speed-insights` | Loaded via Next.js plugin in `next.config.ts` |
-| `canvas-confetti` | Dynamic import in experiment pages |
-| `next-themes` | ThemeProvider in `layout.tsx` |
-| `posthog-js` | Dynamic PostHog client initialization |
-| `resend` | Server-side email sending (`lib/email/`) |
-| `svix` | Webhook signature verification (`lib/email/webhook.ts`) |
-| `vitest.setup.ts` | Referenced in `vitest.config.ts:12 setupFiles` |
+| Package | False Positive Reason |
+|---------|----------------------|
+| `@resvg/resvg-js` | Used in `svg-to-png.ts` (OG image route) |
+| `@vercel/analytics` | Used in `layout.tsx` Analytics component |
+| `@vercel/speed-insights` | Used in `layout.tsx` SpeedInsights component |
+| `canvas-confetti` | Used in experiments page |
+| `next-themes` | Used in ThemeProvider/ThemeToggle |
+| `posthog-js` | Used in PostHog client provider |
+| `resend` | Used in email campaign routes |
+| `svix` | Used in webhooks/resend verification |
 
-**Do not remove any of these packages.**
+`vitest.setup.ts` flagged as unused file — it is registered in `vitest.config.ts:12 setupFiles`. All 8 packages are in active use. **Do not remove any of these.**
 
 ## Code Findings
 
-### Secrets & Credential Handling
-- **PASS** — No hardcoded secrets in source code. All sensitive values loaded via `process.env.*`.
-- **PASS** — `NEXT_PUBLIC_*` variables contain only feature flags and public URLs. No server secrets exposed.
-- **PASS** — Error logging sanitizes 9 sensitive patterns (GitHub tokens, API keys, Bearer tokens) via `SENSITIVE_PATTERNS` regex in `lib/analytics/server-errors.ts:16-30`.
-- **PASS** — `.env.example` contains only empty template keys.
-- **PASS** — `.env`, `.env.local`, `.env.*.local` are in `.gitignore`.
+- **[INFO] XSS — SAFE**: 9 user-input entry points in SVG pipeline (`stats.handle`, `stats.displayName`, `impact.tier`, `impact.archetype`, `verificationHash`, `verificationDate`, `avatarDataUri`, etc.) all escaped via `escapeXml()` in `apps/web/lib/render/escape.ts`. Explicit XSS tests at `BadgeSvg.test.tsx:59–65`. 18 `dangerouslySetInnerHTML` uses — all safe (server-rendered SVG with escaped inputs; JSON-LD via `JSON.stringify()`).
 
-### SVG XSS Protection
-- **PASS** — All user-controlled input (handle, displayName, avatar URI, archetype text, tier label) escaped via `escapeXml()` in `lib/render/escape.ts:18-25`.
-- **PASS** — SVG error fallback in `badge.svg/route.ts:36,42` escapes both handle and message.
-- **PASS** — Explicit XSS test suite at `BadgeSvg.test.tsx:59-65`.
-- **PASS** — 18 `dangerouslySetInnerHTML` uses audited — all hardcoded demo SVG or pre-escaped `renderBadgeSvg()` output.
-- **PASS** — JSON-LD injection prevented via `JSON.stringify().replace(/</g, "\\u003c")` in share page.
+- **[INFO] Avatar URL — SAFE**: `fetchAvatarBase64()` (`lib/render/avatar.ts:8–43`) enforces hostname whitelist (`avatars.githubusercontent.com` only), MIME type whitelist (`image/png|jpeg|gif|webp`), and 5s abort timeout. Returns `undefined` on any validation failure.
 
-### CORS Configuration
-- **PASS** — Wildcard `Access-Control-Allow-Origin: *` on exactly 2 read-only public endpoints:
-  - `/api/verify/[hash]` — rate-limited 30 req/60s
-  - `/api/profile/[handle]` — rate-limited 60 req/60s
-- **PASS** — All authenticated, admin, and write endpoints have no CORS headers (same-origin only).
+- **[INFO] Secret leaks — NONE**: No hardcoded tokens, API keys, or passwords found in source. `SENSITIVE_PATTERNS` regex (9 patterns) in `lib/analytics/server-errors.ts` scrubs tokens before PostHog logging. All `NEXT_PUBLIC_*` vars are non-sensitive.
 
-### Row Level Security (Supabase)
-- **PASS** — RLS enabled on all tables via `002_enable_rls.sql`.
-- **PASS** — Explicit `deny_anon_all` policies on all tables via `008_add_rls_deny_policies.sql`.
-- **PASS** — 2 views use `security_invoker = true`.
-- **PASS** — Server uses `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS server-side, never exposed to client).
-- **PASS** — No raw SQL, no `.sql()` calls — all queries use Supabase client with parameterized `.from()`.
+- **[INFO] CORS — INTENTIONAL**: 2 routes with wildcard `Access-Control-Allow-Origin: *` — `/api/verify/[hash]` (30 req/60s rate limit) and `/api/profile/[handle]` (60 req/60s rate limit). Both are read-only public endpoints by design. All 17 mutation endpoints (POST/PUT/PATCH/DELETE) have no CORS headers, relying on browser same-origin enforcement + server-side auth.
 
-### Authentication & Session Security
-- **PASS** — OAuth CSRF protection via `timingSafeEqual()` state verification.
-- **PASS** — Token encryption: AES-256-GCM with fresh IV per call.
-- **PASS** — CLI tokens: HMAC-SHA256 signed, 90-day expiry.
-- **PASS** — Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`.
+- **[INFO] RLS — COMPREHENSIVE**: All 9 Supabase tables have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + explicit deny-all policies for the anon role (migrations 002, 008, 018). Both views (`latest_snapshots`, `admin_users`) use `security_invoker = true` (migration 014). Application exclusively uses `SUPABASE_SERVICE_ROLE_KEY` server-side — no anon key exposed.
 
-### Rate Limiting & Timeouts
-- **PASS** — Rate limiting on 67 route files. Remaining routes use admin/bearer auth or are internal.
-- **PASS** — Fetch timeout coverage: 100% — all external calls have `AbortSignal.timeout()`.
-- **PASS** — Rate limiter fails open (availability-first design, documented in `redis.ts`).
+- **[INFO] OAuth — STRONG**: CSRF state validated via `timingSafeEqual()`. OAuth tokens encrypted AES-256-GCM (fresh IV per call). CLI tokens HMAC-SHA256 signed with 90-day expiry. Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`.
+
+- **[INFO] Fetch timeouts — 100%**: All external calls use `AbortSignal.timeout()` or `withTimeout()` wrapper. Confirmed across GitHub, Supabase, Bitbucket, Codeberg, PostHog, OG image, sync-audience routes.
+
+- **[P2] SENSITIVE_PATTERNS test gap**: `lib/analytics/server-errors.ts` branches at 63.63% (carried from coverage agent 2026-04-20). The 9 SENSITIVE_PATTERNS regex branches (token scrubbing before error logs) lack test coverage. These are the guards that prevent accidental secret leakage in PostHog events. Tests should cover all 9 pattern types (Bearer tokens, ghp_ prefixes, sk_live_, etc.) to confirm scrubbing fires correctly.
 
 ## License Compliance
 
-| License | Package(s) | Risk |
-|---------|-----------|------|
-| MPL-2.0 | `@resvg/resvg-js`, `@resvg/resvg-js-darwin-arm64` | File-level weak copyleft. No source modifications made. No compliance action needed. |
-| MPL-2.0 / Apache-2.0 | `dompurify` | Dual-licensed with Apache-2.0. Use under Apache-2.0. No issue. |
-| LGPL-3.0-or-later | `@img/sharp-libvips-darwin-arm64` | **NEW** — Transitive binary dependency via `sharp`. Pre-compiled native binary, no source modifications. LGPL requires offering source for the library itself (not your code). Binary distribution via npm satisfies this. No compliance action needed. |
+| Package | License | Status |
+|---------|---------|--------|
+| `@resvg/resvg-js` | MPL-2.0 | Acceptable — file-level copyleft, binary usage only, no source modifications |
+| `lightningcss` | MPL-2.0 | Acceptable — file-level copyleft, binary usage only, no source modifications |
+| `dompurify` | Apache-2.0 OR MPL-2.0 | Acceptable — dual-license, Apache-2.0 applies |
+| All others | MIT / ISC / Apache-2.0 / BSD | All clear |
 
-**No GPL or AGPL dependencies found.** All clear for production use.
+No GPL, AGPL, or LGPL licenses detected. MPL-2.0 is file-level copyleft and requires sharing modifications to the MPL-licensed files themselves — since we use these as unmodified binary dependencies, there is no compliance obligation. **No action required.**
 
 ## Recommendations
 
-### P3 — Low Priority (dev-only)
-1. **Bump vite to ≥7.3.2** — Add `pnpm.overrides` for `vite: ">=7.3.2"` or wait for vitest to bump its peer dependency. No production risk, but cleans up `pnpm audit` output.
+1. **[P2] Add SENSITIVE_PATTERNS branch tests** (`lib/analytics/server-errors.ts`): Write tests covering all 9 token-scrubbing regex patterns to confirm they fire before PostHog event submission. This closes the 63.63% branch coverage gap flagged by the coverage agent and validates a security-critical code path. Priority: medium — no known leakage, but the guard is untested.
 
-### Carried Items (unchanged from 2026-04-06)
-2. **INFO** — `dbRecomputeCraft()` error paths now have test coverage (resolved by triage 2026-04-07). No remaining security-adjacent test gaps.
+2. **[INFO] Knip false positives**: The 8 flagged packages are all in active use. Do not remove them. Knip's production entry-point graph misses dynamic imports and JSX component references in this configuration.
 
-### Monitoring
-- Rate limiter fail-open behavior — acceptable given CDN + GitHub API secondary limits.
-- `@img/sharp-libvips-darwin-arm64` LGPL-3.0 — monitor for any source modification requirements if sharp usage changes.
-
-## Delta from Last Report (2026-04-06)
-
-| Item | 2026-04-06 | 2026-04-13 | Change |
-|------|-----------|-----------|--------|
-| `pnpm audit` vulns | 0 | 3 (dev-only) | vite 7.3.1 introduced via vitest upgrade |
-| Secret leaks | 0 | 0 | Unchanged |
-| XSS vectors | 0 | 0 | Unchanged |
-| CORS wildcards | 2 (intentional) | 2 (intentional) | Unchanged |
-| RLS coverage | 100% | 100% | Unchanged |
-| License flags | 1 (MPL-2.0) | 2 (MPL-2.0 + LGPL-3.0) | sharp-libvips binary added |
-| Fetch timeouts | 100% | 100% | Unchanged |
-| Rate-limited routes | 31/44 | 67 files | Measurement improved (file count vs route count) |
-| `dbRecomputeCraft` P2 | Open | Resolved | Triage 2026-04-07 added tests |
+3. **[MONITOR] Dependency audit cadence**: `pnpm audit` is now clean. Continue running weekly — the previous vite vulnerability was dev-only and resolved promptly.

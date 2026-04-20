@@ -9,6 +9,29 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-20T03:00:00Z -->
+## Cost Analyst — 2026-04-20
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 3 no-TTL keys (rotation offset + 2 HyperLogLogs — all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). 12-pattern full audit confirmed. `withTimeout()` timer cleanup verified — no leaks anywhere in cache layer.
+- GitHub API: cache-first (6h + 7d stale). Fetch timeouts 100%. No unconditional GitHub calls in any route. Only uncached call is `/api/health` GitHub probe (intentional, 3s timeout).
+- Supabase: **9 tables + 1 view** (`admin_users`). Singleton lazy client. 0 N+1 patterns. Batch queries throughout.
+- ISR: all static pages confirmed (`/about`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600). `/studio` + `/experiments` force-dynamic (intentional).
+- Cron: **4 handlers** at maxDuration=300s — warm-cache, process-campaigns, sync-audience (all scheduled daily), bulk-recalculate (admin on-demand only).
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to RPC at >5K sends/campaign.
+- All prior P3s resolved: P3-1 (pingRedis timer) fixed 2026-04-19 triage; P3-2 (CLI device session TTL=300) confirmed 2026-04-19 triage.
+- **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
+- **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
+- **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
+- **MONITOR M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users). CARRIED.
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. All ISR confirmed correct. `/studio` force-dynamic is intentional (user auth). No serverless reduction opportunities remain.
+- [Security]: Fetch timeouts 100%. `withTimeout()` timer cleanup confirmed across all external calls. No cost-security conflicts.
+- [Coverage]: app/api 97.5%, lib/db 97.6% — stable. No new cost-critical path coverage gaps.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-19T03:00:00Z -->
 ## Cost Analyst — 2026-04-19
 - **Status**: GREEN
@@ -31,30 +54,6 @@
 - [Performance]: No new cost-performance tradeoffs. ISR confirmed correct on all static pages — no serverless reduction opportunity remains. `/studio` force-dynamic is intentional.
 - [Security]: No cost-security conflicts. Fetch timeouts 100% confirmed. P3-1 timer leak is health-check only — zero auth or data exposure risk.
 - [Coverage]: app/api 98.9%, lib/db 97.5% — stable. P3-1 (`pingRedis` timer) is in the health-check path — low value to test.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-18T03:00:00Z -->
-## Cost Analyst — 2026-04-18
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 2 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). 14-cache + 23-rate-limit pattern audit confirmed. **NEW**: `craft:{handle}` key added (1h TTL, ~200 B/user — negligible).
-- GitHub API: cache-first (6h + 7d stale + in-flight dedup). All P3 timer leaks resolved. Unchanged.
-- Supabase: **10 tables + 2 views** (admin_users now counted separately). Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
-- Fetch timeouts: **100%**. P3-7 (Bitbucket/Codeberg token refresh) confirmed false positive — AbortSignal.timeout already present.
-- No middleware.ts (zero per-request overhead). 3 cron jobs/day (maxDuration=300s each, well-spaced).
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to RPC at >5K sends/campaign.
-- **P3-1 NEW**: Add `revalidate = 86400` to static pages (`/about`, `/archetypes/*`) — minor serverless reduction.
-- **P3-2 NEW**: Confirm CLI device session key TTL in `api/cli/auth/approve/route.ts`.
-- **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
-- **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
-- **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
-- **MONITOR M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users). CARRIED.
-
-**Cross-agent recommendations:**
-- [Performance]: `/studio` still `force-dynamic` — consider `revalidate = 3600` if page content allows. ISR on `/about` and `/archetypes/*` would reduce invocations (P3-1).
-- [Security]: Fetch timeouts 100% confirmed. P3-7 fully closed. No cost-security conflicts.
-- [Coverage]: warm-cache route coverage at 63% funcs after `7563e3f` refactor — untested error paths reduce confidence in daily snapshot reliability. Coverage agent has this as P2.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
@@ -131,27 +130,25 @@
 - [Cost Analyst]: No doc gaps affecting cost model. All routes and env vars fully documented.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-04-13T09:00:00Z -->
-## Security Scanner — 2026-04-13
+<!-- ENTRY:START agent=security timestamp=2026-04-20T09:00:00Z -->
+## Security Scanner — 2026-04-20
 - **Status**: GREEN
-- Vulnerabilities: 0 critical, 2 high, 1 moderate — all in vite 7.3.1 (dev-only via vitest). No production exposure. Fix: bump vite ≥7.3.2.
-- Secret leaks: none — all server secrets isolated, `NEXT_PUBLIC_*` vars non-sensitive. Error logging scrubs tokens via `SENSITIVE_PATTERNS` regex (9 patterns) in `lib/analytics/server-errors.ts`.
-- License issues: 2 MPL-2.0 (`@resvg/resvg-js`) + 1 LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`, binary-only via sharp). No source modifications. No GPL/AGPL. No compliance action needed.
-- Knip `--production`: **8 false positives** — all flagged packages confirmed in use (grep verified). `vitest.setup.ts` is in `vitest.config.ts:12 setupFiles`.
-- XSS: **9 user-input entry points** in SVG pipeline escaped via `escapeXml()`. Explicit XSS tests at `BadgeSvg.test.tsx:59-65`. 18 `dangerouslySetInnerHTML` uses — all safe.
-- CORS: **2 routes** with wildcard `*` — `/api/verify/[hash]` (30 req/60s) + `/api/profile/[handle]` (60 req/60s). Both read-only, public data, rate-limited. Intentional design.
-- RLS: **all Supabase tables** RLS-enabled + FORCE ROW LEVEL SECURITY + explicit deny policies. 2 views with `security_invoker = true`.
-- OAuth: CSRF state via `timingSafeEqual()`, AES-256-GCM token encryption (fresh IV per call), 10s timeouts. CLI tokens HMAC-SHA256 signed with 90-day expiry.
-- Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`.
-- Rate limiting: **67 route files** with rate limiting. Remaining use admin/bearer auth or are internal. All fail-open.
-- Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`.
-- `dbRecomputeCraft` P2 from 2026-04-06: **RESOLVED** (triage 2026-04-07 added full test coverage).
+- Vulnerabilities: **0 critical, 0 high, 0 moderate, 0 low** — `pnpm audit` fully clean. Prior vite CVEs resolved by vite ≥8.0.8 bump (triage 2026-04-17).
+- Secret leaks: none — all server secrets isolated. `NEXT_PUBLIC_*` vars non-sensitive. `SENSITIVE_PATTERNS` regex (9 patterns) in `lib/analytics/server-errors.ts` scrubs tokens before PostHog logging.
+- License issues: 2 MPL-2.0 (`@resvg/resvg-js`, `lightningcss`) + 1 dual Apache-2.0/MPL-2.0 (`dompurify`). No GPL/AGPL/LGPL. No source modifications. No compliance action needed.
+- Knip `--production`: **8 false positives** — all confirmed in use. Same 8 as prior cycle. Do not remove any.
+- XSS: **9 user-input entry points** in SVG pipeline, all escaped via `escapeXml()`. Avatar URL enforces hostname + MIME whitelist + 5s timeout. 18 `dangerouslySetInnerHTML` uses — all safe.
+- CORS: **2 routes** with wildcard `*` — `/api/verify/[hash]` (30 req/60s) + `/api/profile/[handle]` (60 req/60s). Read-only, rate-limited. Intentional design. All 17 mutation routes: no CORS headers.
+- RLS: **9 tables** with ENABLE + FORCE ROW LEVEL SECURITY + explicit deny-all for anon. 2 views with `security_invoker = true`.
+- OAuth: CSRF via `timingSafeEqual()`, AES-256-GCM (fresh IV), CLI tokens HMAC-SHA256 90-day expiry. Sessions: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-min `Max-Age`.
+- Fetch timeouts: **100%** — all external calls use `AbortSignal.timeout()` or `withTimeout()`.
+- **P2 OPEN**: `lib/analytics/server-errors.ts` — 63.63% branch coverage. The 9 SENSITIVE_PATTERNS scrubbing branches are untested. Token-redaction guards before PostHog logging need test coverage.
 
 **Cross-agent recommendations:**
-- [Coverage]: No new security-relevant test gaps. All critical-path coverage stable and GREEN. `dbRecomputeCraft` P2 resolved.
-- [QA]: No security UX issues. All XSS vectors covered. Knip `--production` false positives should not trigger package removals.
-- [Cost Analyst]: Fail-open rate limiting intact. Fetch timeouts at 100%. No new cost-security conflicts. vite vulns are dev-only, zero cost impact.
-- [Performance]: Knip `--production` false positives — do not remove flagged packages; they are all actively used. vite bump has no bundle impact (dev-only).
+- [Coverage]: Priority item — add tests for all 9 SENSITIVE_PATTERNS types in `lib/analytics/server-errors.ts`. These are security-critical token-scrubbing guards with no branch coverage.
+- [QA]: No new security UX issues. All XSS vectors covered. Knip false positives confirmed stable — no removals.
+- [Cost Analyst]: No new cost-security conflicts. Fetch timeouts at 100%. Fail-open rate limiting intact.
+- [Performance]: Knip `--production` false positives unchanged — confirmed in active use via grep. No bundle changes.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-04-01T09:00:00Z -->
@@ -172,24 +169,22 @@
 <!-- ENTRY:END -->
 
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-18T02:00:00Z -->
-## Coverage Agent — 2026-04-18
+<!-- ENTRY:START agent=coverage timestamp=2026-04-20T02:00:00Z -->
+## Coverage Agent — 2026-04-20
 - **Status**: YELLOW
-- Overall coverage: **93% stmts** (7647/8222), 89.47% branch, 89.64% funcs, 94.06% lines
-- Test suite: 394 files, 6894 tests. Count dropped from ~7004: `7563e3f refactor(profile)` trimmed warm-cache + bulk-recalculate test suites (-110 tests).
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 98%, lib/auth 98%, lib/cache 99%, lib/history 97%, lib/github 97%, components 96%, app/api aggregate 97%
-- **Bug fixed**: `buildSnapshot` (`lib/history/snapshot.ts:12`) now accepts `today?` param; `materializeImpactState` passes it through. Root cause: real clock date diverged from `today` param, causing same-day EMA short-circuit to miss and re-smooth on every refresh.
-- **Also fixed**: `vitest.config.ts` `testTimeout: 15000` added — JSDOM renders hit 5s default after typecheck+ESLint in pre-commit hook.
-- **Flaky tests: NONE** — 3/3 runs passed 6894/6894.
-- **P2 NEW**: `app/api/cron/warm-cache/route.ts` — 83% stmts, 75% branches, 63% funcs (3/8 functions uncovered after `7563e3f` test trimming)
-- **P2 carried**: `components/UserMenu.tsx` — 80% funcs (handleInsightsFile). Now exactly at threshold.
-- **P3 carried (all accepted)**: HolographicOverlay 50% (Canvas), experiments 56% (Canvas/WebGL), refresh/recalculate fire-and-forget arrows, svg-to-png 67% branches (Resvg binary), lazy wrappers 50-60%
+- Overall coverage: **93.07% stmts** (7800/8380), 89.56% branches, 89.83% funcs, 94.14% lines
+- Test suite: 396 files, 7048 tests (+147 vs 2026-04-19 — remediation work added tests)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 97.6%, lib/cache 99.2%, lib/auth 97.7%, lib/github 97%, lib/history 98.2%, lib/email 97.9%, app/api 97.5%, lib/profile 100%
+- **Flaky tests: NONE** — 3/3 runs passed 7048/7048.
+- **P2 resolved from 2026-04-19**: warm-cache/route.ts funcs 100% (was 62.5%), public-profile.ts branches 88.88% (was 68.75%), UserMenu.tsx funcs 81.25% (above threshold)
+- **P2 NEW**: `components/SharePageOwnerContent.tsx` — 59.09% stmts, 77.27% branches, 50% funcs. Owner-only interactive section (embed copy, refresh CTA) completely untested.
+- **P2 carried**: `lib/analytics/server-errors.ts` — 63.63% branches. SENSITIVE_PATTERNS token-scrubbing branches uncovered — security-relevant.
+- **P3 carried (all accepted)**: experiments 56.7% (Canvas/WebGL), HolographicOverlay 50% (Canvas), AuthorTypewriter 67.5% branches (JSDOM), demoData 50% branches (data tables), refresh/recalculate fire-and-forget arrows 33–50% funcs, lazy wrappers 25–50% funcs
 
 **Cross-agent recommendations:**
-- [Security]: No new security-relevant test gaps. All critical paths unchanged and GREEN. warm-cache error paths now partially untested — consider reviewing for silent failure modes.
-- [QA]: 3/3 clean runs, 0 flaky. Test count drop (-110) is architectural, not a regression. warm-cache P2 is the only new actionable item.
-- [Cost Analyst]: app/api 97%, lib/db 98% — stable. warm-cache coverage drop doesn't affect cost model but does reduce confidence in daily snapshot reliability path.
-- [Performance]: No coverage-performance gaps. testTimeout increase has no performance impact.
+- [Security]: `lib/analytics/server-errors.ts` branches at 63.63% — the uncovered paths include SENSITIVE_PATTERNS regex scrubbing branches. These are the token-redaction guards before error logs. Consider adding tests for all 9 pattern types to confirm scrubbing fires correctly.
+- [QA]: Suite grew +147 tests (remediation cycle). All 3 runs clean, 0 flaky. SharePageOwnerContent P2 is the only new actionable item — owner UI interactive handlers have zero test coverage.
+- [Cost Analyst]: app/api 97.5%, lib/db 97.6% — stable. No changes to caching path coverage.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage timestamp=2026-04-19T02:00:00Z -->
@@ -307,4 +302,22 @@
 - [Coverage]: `debug-quality/route.ts` confirmed deleted — 0% coverage gap resolved. `AdminDashboardClient.tsx` funcs at 68.4% remains the top actionable gap.
 - [Security]: No new security-related quality issues. All XSS vectors covered, all interactive elements properly accessible.
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — should be reverted before next production release.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-04-20T00:15:54Z -->
+## Coverage Agent — 2026-04-20
+- **Status**: YELLOW
+- Overall coverage: **93.07% stmts** (7800/8380), 89.56% branches, 89.83% funcs, 94.14% lines
+- Test suite: 396 files, 7048 tests (+147 vs 2026-04-19 — remediation work added tests)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 97.6%, lib/cache 99.2%, lib/auth 97.7%, lib/github 97%, lib/history 98.2%, lib/email 97.9%, app/api 97.5%, lib/profile 100%
+- **Flaky tests: NONE** — 3/3 runs passed 7048/7048.
+- **P2 resolved from 2026-04-19**: warm-cache/route.ts funcs 100% (was 62.5%), public-profile.ts branches 88.88% (was 68.75%), UserMenu.tsx funcs 81.25% (above threshold)
+- **P2 NEW**: `components/SharePageOwnerContent.tsx` — 59.09% stmts, 77.27% branches, 50% funcs. Owner-only interactive section (embed copy, refresh CTA) completely untested.
+- **P2 carried**: `lib/analytics/server-errors.ts` — 63.63% branches. SENSITIVE_PATTERNS token-scrubbing branches uncovered — security-relevant.
+- **P3 carried (all accepted)**: experiments 56.7% (Canvas/WebGL), HolographicOverlay 50% (Canvas), AuthorTypewriter 67.5% branches (JSDOM), demoData 50% branches (data tables), refresh/recalculate fire-and-forget arrows 33–50% funcs, lazy wrappers 25–50% funcs
+
+**Cross-agent recommendations:**
+- [Security]: `lib/analytics/server-errors.ts` branches at 63.63% — the uncovered paths include SENSITIVE_PATTERNS regex scrubbing branches. These are the token-redaction guards before error logs. Consider security agent adding specific tests for all 9 pattern types to confirm scrubbing fires correctly.
+- [QA]: Suite grew +147 tests (remediation cycle added tests). All 3 runs clean, no flaky tests. SharePageOwnerContent P2 is the only new actionable item — owner UI interactive handlers have zero test coverage.
+- [Cost Analyst]: app/api 97.5%, lib/db 97.6% — stable. No changes to caching path coverage.
 <!-- ENTRY:END -->
