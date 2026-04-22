@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SharePageOwnerContent } from "./SharePageOwnerContent";
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import type { SessionUser } from "@/hooks/useSession";
@@ -89,7 +89,12 @@ beforeEach(() => {
   mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("SharePageOwnerContent — render", () => {
   it("shows nothing while loading session", () => {
@@ -241,6 +246,61 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(screen.getByText("Regenerate")).toBeTruthy();
+  });
+
+  it("posts to refresh and shows success after a successful regenerate", async () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Regenerate"));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/refresh?handle=testuser", {
+        method: "POST",
+      });
+    });
+
+    expect(screen.getByText("Done!")).toBeTruthy();
+  });
+
+  it("shows support fallback when regenerate fails", async () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Regenerate"));
+
+    expect(
+      await screen.findByText("Regeneration failed.", { exact: false }),
+    ).toBeTruthy();
+    const supportLink = screen.getByText("Contact support");
+    expect(supportLink.getAttribute("href")).toContain(
+      "mailto:support@thecreativetoken.com",
+    );
   });
 
   it("hides DataSources when stats is null", () => {

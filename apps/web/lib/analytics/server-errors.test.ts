@@ -105,6 +105,38 @@ describe("captureServerError", () => {
     expect(payload).not.toContain("mysecret");
   });
 
+  it.each([
+    ["ghp token", "token=ghp_abcdefghijklmnopqrstuvwxyz1234567890"],
+    [
+      "github fine-grained token",
+      `github_pat_${"a".repeat(82)}`,
+    ],
+    ["gho token", "gho_abcdefghijklmnopqrstuvwxyz1234567890"],
+    ["ghs token", "ghs_abcdefghijklmnopqrstuvwxyz1234567890"],
+    ["ghu token", "ghu_abcdefghijklmnopqrstuvwxyz1234567890"],
+    ["generic secret assignment", "authorization=super-secret-value"],
+    ["secret key prefix", "sk-abcdefghijklmnopqrstuvwx123456"],
+    ["public key prefix", "pk_abcdefghijklmnopqrstuvwx123456"],
+    ["bearer token", "Bearer abc.def-ghi_jkl"],
+  ])("redacts %s patterns", async (_label, sensitiveValue) => {
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerError } = await import("./server-errors");
+
+    await captureServerError({
+      route: "/api/test",
+      statusCode: 500,
+      error: new Error(`failed: ${sensitiveValue}`),
+    });
+
+    const body = getCallBody();
+    const props = body.properties as Record<string, unknown>;
+    const message = String(props.message);
+
+    expect(message).toContain("[REDACTED]");
+    expect(message).not.toContain(sensitiveValue);
+  });
+
   it("fails silently when PostHog env vars are not configured", async () => {
     delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
     delete process.env.NEXT_PUBLIC_POSTHOG_HOST;

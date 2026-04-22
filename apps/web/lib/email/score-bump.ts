@@ -28,6 +28,7 @@ import { dbGetUserEmail } from "@/lib/db/users";
 import { dbGetFeatureFlag } from "@/lib/db/feature-flags";
 import { dbGetActiveEngagementCampaign } from "@/lib/db/campaigns";
 import { getBaseUrl } from "@/lib/env";
+import { buildUnsubscribeUrl } from "./unsubscribe-url";
 
 const DEDUP_TTL = 604_800; // 7 days in seconds
 
@@ -84,7 +85,7 @@ export async function notifyScoreBump(
     // 5. Build email
     const baseUrl = getBaseUrl();
     const shareUrl = `${baseUrl}/u/${lowerHandle}`;
-    const unsubscribeUrl = `${baseUrl}/api/notifications/unsubscribe?handle=${lowerHandle}`;
+    const unsubscribeUrl = buildUnsubscribeUrl(lowerHandle);
 
     let subject: string;
     let html: string;

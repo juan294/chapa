@@ -62,7 +62,7 @@ describe("buildAnnouncementHtml", () => {
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain("Unsubscribe");
-    expect(html).toContain("/api/notifications/unsubscribe?handle=testuser");
+    expect(html).toContain("/api/notifications/unsubscribe?handle=testuser&amp;token=");
   });
 
   it("escapes XSS in user-controlled fields", () => {
@@ -167,7 +167,7 @@ describe("buildAnnouncementHtml", () => {
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain(
-      "/api/notifications/unsubscribe?handle=testuser",
+      "/api/notifications/unsubscribe?handle=testuser&amp;token=",
     );
     expect(html).toContain("https://custom.example.com");
   });
@@ -177,7 +177,7 @@ describe("buildAnnouncementHtml", () => {
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain(
-      "https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser",
+      "https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser&amp;token=",
     );
   });
 
@@ -186,7 +186,7 @@ describe("buildAnnouncementHtml", () => {
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain(
-      "https://chapa.thecreativetoken.com/api/notifications/unsubscribe",
+      "https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser&amp;token=",
     );
   });
 
@@ -232,7 +232,7 @@ describe("buildAnnouncementText", () => {
     const text = buildAnnouncementText(sampleData);
 
     expect(text).toContain(
-      "Unsubscribe: https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser",
+      "Unsubscribe: https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser&token=",
     );
   });
 
@@ -269,7 +269,7 @@ describe("buildAnnouncementText", () => {
     const text = buildAnnouncementText(sampleData);
 
     expect(text).toContain(
-      "Unsubscribe: https://custom.example.com/api/notifications/unsubscribe?handle=testuser",
+      "Unsubscribe: https://custom.example.com/api/notifications/unsubscribe?handle=testuser&token=",
     );
   });
 
@@ -278,7 +278,7 @@ describe("buildAnnouncementText", () => {
     const text = buildAnnouncementText(sampleData);
 
     expect(text).toContain(
-      "Unsubscribe: https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser",
+      "Unsubscribe: https://chapa.thecreativetoken.com/api/notifications/unsubscribe?handle=testuser&token=",
     );
   });
 });
