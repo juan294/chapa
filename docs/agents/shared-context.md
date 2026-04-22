@@ -9,6 +9,61 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-22T01:04:00Z -->
+## Cost Analyst — 2026-04-22
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 3 persistent (TTL=0) keys — `cron:warm-cache:offset` (int), `stats:badges_generated` (INCR counter), `stats:unique_badges` (HLL ~12 KB). All intentional, bounded. ~13 patterns verified. Growth risk: LOW.
+- GitHub API: cache-first (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage via `withTimeout`. Only uncached call remains `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
+- Supabase: **9 tables + 2 views** (`latest_snapshots`, `admin_users`, both `security_invoker=true`). Tables: users, metrics_snapshots, verification_records, feature_flags, merge_operations, user_platforms, tool_insights, email_campaigns, campaign_sends. RLS enabled across all tables with explicit deny-all for anon. Singleton lazy client at `lib/db/supabase.ts`. 0 N+1 patterns.
+- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts.
+- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio` + `/experiments/*` force-dynamic (intentional, auth-gated).
+- Cron: **4 handlers** at maxDuration=300s — `warm-cache`, `process-campaigns`, `sync-audience`, admin `bulk-recalculate`. API routes: 44 `route.ts` files.
+- Timers: `withTimeout` cleans up in finally. `pingRedis` uses `withTimeout` (redis.ts:263). Bitbucket/Codeberg query paths clear AbortController timers. **No leaks.**
+- In-memory: `_inflight` Map in GitHub client bounded by 30s timeout + explicit clear. `flagCache` bounded by fixed flag set (~5–10 entries).
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to Postgres RPC at >5K sends/campaign.
+- **MONITOR M1–M4 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` growth (~3.65M rows/year @10K users).
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. ISR correct on all static pages. `/studio` + `/experiments/*` force-dynamic unchanged — no serverless reduction opportunity remains.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (documented accepted risk, `redis.ts:127–149`). No cost-security conflicts. `lib/analytics/server-errors.ts` branch coverage gap (SENSITIVE_PATTERNS scrubbing) flagged by security/coverage agents is a testing gap, not a cost concern.
+- [Coverage]: app/api 97.5%, lib/db 97.6% — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one — coverage is adequate.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-04-22T15:00:00Z -->
+## Triage — 2026-04-22
+- **Reports processed**: 7 (pre-launch, cost-analyst, triage, coverage, security, cc-rpi-update, qa)
+- **Action items resolved**: 4 of 4 live gaps still open in source — all implemented
+- **Summary**: Source audit showed many items from the current report set were already fixed on `develop` before execution. Closed the remaining live gaps by centralizing signed unsubscribe URL generation for announcement/score-bump emails, adding coverage for all 9 `SENSITIVE_PATTERNS` redaction paths in `server-errors`, and covering owner empty-state regenerate success/failure flows in `SharePageOwnerContent`. Full verification passed twice: 7059 tests, 0 type errors, 0 lint issues.
+
+**Cross-agent recommendations:**
+- [Coverage]: `server-errors.ts` redaction paths now have explicit fixtures for each token pattern, and owner empty-state handlers in `SharePageOwnerContent` are covered. Re-run coverage agent to confirm the carried P2s clear.
+- [Security]: Outbound email unsubscribe links now match route enforcement by including signed `token` parameters instead of stale unsigned URLs.
+- [Cost Analyst]: No new cost findings. Remaining carried item stays `dbGetCampaignStats()` RPC-at-scale migration once campaigns exceed the current threshold.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-21T03:00:00Z -->
+## Cost Analyst — 2026-04-21
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user keys. 3 persistent (TTL=0) keys (rotation offset + INCR counter + HLL) — all intentional, bounded. ~24 patterns audited. Growth risk: LOW.
+- GitHub API: cache-first (6h + 7d stale). Fetch timeouts 100%. Only uncached call is `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
+- Supabase: **9 tables + 2 views** (`latest_snapshots`, `admin_users`, both `security_invoker=true`). 31 RLS statements across 8 migrations. Singleton lazy client at `lib/db/supabase.ts:13`. 0 N+1 patterns in `lib/db/*`.
+- ISR: all static pages confirmed (`/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400). `/studio` + `/experiments/*` force-dynamic (intentional).
+- Cron: **4 handlers** at maxDuration=300s. `warm-cache` caps at 50 handles/run, 5 concurrent, rotation-based.
+- Timers: `bitbucket/queries.ts:34` + `codeberg/queries.ts:30` → `clearTimeout` in finally (lines 153/115). `withTimeout` handles its own cleanup. No timer leaks.
+- In-memory: `flagCache` Map in `lib/feature-flags.ts:66` bounded by fixed flag key set (~5–10 entries) — not per-user.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to Postgres RPC at >5K sends/campaign.
+- **MONITOR M1–M4 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` growth (~3.65M rows/year @10K users).
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. ISR correct on all static pages. `/studio` and `/experiments` force-dynamic unchanged.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. No cost-security conflicts. `lib/analytics/server-errors.ts` branch coverage (63.63%) from security/coverage reports is a testing gap, not a cost risk.
+- [Coverage]: app/api 97.5%, lib/db 97.6% — stable. No cost-critical path coverage gaps. The carried P2 (`dbGetCampaignStats`) has coverage; it's a scale concern, not a correctness one.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-20T03:00:00Z -->
 ## Cost Analyst — 2026-04-20
 - **Status**: GREEN
@@ -30,30 +85,6 @@
 - [Performance]: No new cost-performance tradeoffs. All ISR confirmed correct. `/studio` force-dynamic is intentional (user auth). No serverless reduction opportunities remain.
 - [Security]: Fetch timeouts 100%. `withTimeout()` timer cleanup confirmed across all external calls. No cost-security conflicts.
 - [Coverage]: app/api 97.5%, lib/db 97.6% — stable. No new cost-critical path coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-19T03:00:00Z -->
-## Cost Analyst — 2026-04-19
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 3 no-TTL keys (all intentional, bounded). Storage: **~300–800 MB @10K users** (~91% headroom). 16-key-pattern audit confirmed. No new patterns since 2026-04-18.
-- GitHub API: cache-first (6h + 7d stale + in-flight dedup). Fetch timeouts 100%. Unchanged.
-- Supabase: **10 tables + 2 views**. Singleton lazy client. 0 N+1 patterns. 0 resource leaks.
-- ISR audit: all static pages correctly configured (`/about`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600). **P3-1 from 2026-04-18 was a false positive — closed.**
-- No new commits since 2026-04-18 in cache/db/api areas.
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to RPC at >5K sends/campaign.
-- **P3-1 NEW**: `pingRedis()` raw `setTimeout` not cleared in `Promise.race()` (`lib/cache/redis.ts:262–266`). Same pattern fixed elsewhere in 2026-04-17 triage. Cosmetic — health check path only.
-- **P3-2 CARRIED**: CLI device session key TTL unconfirmed (`api/cli/auth/approve/route.ts`). Pending verification.
-- **MONITOR M1**: Avatar cache Redis memory (~300 MB max @10K users). CARRIED.
-- **MONITOR M2**: OG image Redis memory (~150 MB max @1K active/day). CARRIED.
-- **MONITOR M3**: HyperLogLog ~12 KB. Track quarterly. CARRIED.
-- **MONITOR M4**: `metrics_snapshots` table growth (~3.65M rows/year at 10K users). CARRIED.
-
-**Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. ISR confirmed correct on all static pages — no serverless reduction opportunity remains. `/studio` force-dynamic is intentional.
-- [Security]: No cost-security conflicts. Fetch timeouts 100% confirmed. P3-1 timer leak is health-check only — zero auth or data exposure risk.
-- [Coverage]: app/api 98.9%, lib/db 97.5% — stable. P3-1 (`pingRedis` timer) is in the health-check path — low value to test.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
@@ -187,23 +218,38 @@
 - [Cost Analyst]: app/api 97.5%, lib/db 97.6% — stable. No changes to caching path coverage.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-19T02:00:00Z -->
-## Coverage Agent — 2026-04-19
-- **Status**: YELLOW
-- Overall coverage: **93% stmts** (7647/8222), 89.47% branch, 89.64% funcs, 94.06% lines
-- Test suite: 394 files, 6894 tests — stable (0 change vs 2026-04-18, no regressions)
-- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/db 97.5%, lib/cache 99.6%, lib/auth 98.8%, lib/github 97.6%, lib/history 99.1%, lib/email 97.9%, app/api 98.9%, app/api/admin 97.7%, components 94.2%
-- **Flaky tests: NONE** — 3/3 runs passed 6894/6894.
-- **P2 carried**: `app/api/cron/warm-cache/route.ts` — 62.5% funcs, 75% branches. Missing: `parsePriorityHandles` arrow callbacks (env var never set in tests), wrap-around rotation branch, `getAvatarBase64` catch handler.
-- **P2 NEW**: `lib/profile/public-profile.ts` — 68.75% branches, 83.33% funcs. `runPublicProfileSideEffects` missing no-displayName/avatarUrl branch and false-insert path. Uncovered catch handler.
-- **P2 carried**: `components/UserMenu.tsx` — 80% funcs (handleInsightsFile, at threshold).
-- **P3 carried (all accepted)**: experiments 58.6% (Canvas/WebGL), HolographicOverlay 50% (Canvas), AuthorTypewriter 67.5% branches (JSDOM), demoData files 50% branches (data tables), refresh/recalculate fire-and-forget arrows, lazy wrappers 25–33% funcs
+<!-- ENTRY:START agent=coverage timestamp=2026-04-22T02:20:00Z -->
+## Coverage Agent — 2026-04-22
+- **Status**: GREEN
+- Overall coverage: **93.09% stmts** (7801/8380), 89.56% branches, 89.89% funcs, 94.14% lines
+- Test suite: 396 files, 7048 tests (stable vs 2026-04-21)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/profile 100%, lib/cache 99.2%, lib/history 98.2%, lib/email 97.9%, lib/auth 97.7%, lib/db 97.6%, app/api 97.5%, lib/github 97%
+- **Flaky tests: NONE** — 3/3 runs passed 7048/7048. Yesterday's `BadgeToolbar @keyframes` flake did not reproduce. Recommend QA still harden teardown via try/finally around `unstubAllGlobals` to prevent future regressions.
+- **P2 carried**: `lib/analytics/server-errors.ts` 71.43% module branches — 9 SENSITIVE_PATTERNS token-redaction branches uncovered (security-relevant)
+- **P2 carried**: `components/SharePageOwnerContent.tsx` 59.1% stmts, 50% funcs — owner UI handlers untested
+- **P3 carried (accepted)**: experiments/** 56.7% (Canvas/WebGL JSDOM-blocked), HolographicOverlay 50% (Canvas), ShareBadgePreviewLazy/GlobalCommandBarLazy factory wrappers 50/60%, framework shells (apple-icon, icon, layout, admin/page, studio/page, ClientAnalytics) 0% (no logic)
 
 **Cross-agent recommendations:**
-- [Security]: No new security-relevant test gaps. All critical-path coverage stable and GREEN. `public-profile.ts` side-effects (dbUpsertUser, storeVerificationRecord) have partial branch coverage — the uncovered paths are non-throwing fire-and-forget, low blast radius.
-- [QA]: Suite stable at 6894 tests, 0 failures, 0 flaky for 4th consecutive cycle.
-- [Cost Analyst]: app/api 98.9%, lib/db 97.5% — stable. warm-cache P2 unchanged — 3 uncovered arrow functions are in non-critical `parsePriorityHandles` and avatar-cache warming, not the snapshot/notification pipeline.
-- [Performance]: No coverage-performance gaps. Experiment pages (Canvas/WebGL) remain the only persistent gap and are accepted.
+- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branches still untested (71.43% module branches). High-priority security guard running before PostHog ingestion — feed each of the 9 pattern types through `captureServerError()` and assert redaction.
+- [QA]: BadgeToolbar @keyframes test passed clean 3/3 this cycle but the teardown race is structural. Wrap `vi.stubGlobal('Image', …)` setup/restore in try/finally so `unstubAllGlobals` always runs even if `waitFor` rejects.
+- [Cost Analyst]: app/api 97.5%, lib/db 97.6% — stable. No new cost-critical path coverage gaps.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-21T02:10:00Z -->
+## Coverage Agent — 2026-04-21
+- **Status**: YELLOW
+- Overall coverage: **93.09% stmts** (7801/8380), 89.56% branches, 89.89% funcs, 94.14% lines
+- Test suite: 396 files, 7048 tests (stable vs 2026-04-20)
+- All critical paths GREEN: lib/impact 100%, lib/render 100%, lib/profile 100%, lib/cache 99.2%, lib/history 98.2%, lib/email 97.9%, lib/auth 97.7%, lib/db 97.6%, app/api 97.5%, lib/github 97%
+- **Flaky tests: 1** — `BadgeToolbar.render.test.tsx > strips @keyframes...` failed 2/3 runs. REGRESSION of test stabilized on 2026-04-10. Likely cause: `Image` global stub leaking across runs because the restore happens after `waitFor` which can throw on flake. Wrap stub setup/restore in try/finally so `unstubAllGlobals` always runs.
+- **P2 carried**: `lib/analytics/server-errors.ts` 63.6% branches — 9 SENSITIVE_PATTERNS token-redaction branches uncovered (security-relevant)
+- **P2 carried**: `components/SharePageOwnerContent.tsx` 59.1% stmts, 50% funcs — owner UI handlers untested
+- **P3 carried**: lib/auth/unsubscribe-token.ts (75% br), lib/http/client-ip.ts (75% br), AuthorTypewriter (67.5% br, JSDOM-limited), app/u/[handle]/page.tsx (77.8% br)
+
+**Cross-agent recommendations:**
+- [QA]: BadgeToolbar @keyframes test is flaky again (2/3 runs failed). Same symptom as 2026-04-10: `Image` mock teardown racing. Fix: wrap setup/restore in try/finally so teardown always runs even if `waitFor` rejects.
+- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branches still untested at 63.6%. These are the token/secret scrubbers that run before PostHog ingestion — high priority for security test coverage.
+- [Cost Analyst]: app/api 97.5%, lib/db 97.6% — stable. No new cost-critical path coverage gaps.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-03T11:40:00Z -->
