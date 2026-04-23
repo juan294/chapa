@@ -21,7 +21,7 @@ NNN_description.sql
 Validate the sequence before applying:
 
 ```bash
-pnpm tsx scripts/validate-migrations.ts
+pnpm run validate:migrations
 ```
 
 The script checks that all files follow the naming convention and that the sequence has no gaps or duplicates.
@@ -35,7 +35,7 @@ The script checks that all files follow the naming convention and that the seque
    ```
 2. Create the file: `supabase/migrations/021_your_description.sql`
 3. Write idempotent SQL where possible (use `IF NOT EXISTS`, `IF EXISTS`, `ON CONFLICT DO NOTHING`).
-4. Run the validator: `pnpm tsx scripts/validate-migrations.ts`
+4. Run the validator: `pnpm run validate:migrations`
 
 ## Applying Migrations
 
@@ -67,7 +67,7 @@ supabase db execute --file supabase/migrations/021_your_description.sql
    ```bash
    git diff main..develop -- supabase/migrations/
    ```
-2. Run the validator: `pnpm tsx scripts/validate-migrations.ts`
+2. Run the validator: `pnpm run validate:migrations`
 3. Apply new migrations to the production Supabase project **before** the code deploy goes live (or simultaneously — the application is designed to degrade gracefully if new columns don't exist yet).
 4. Verify with a quick health check: `curl https://chapa.thecreativetoken.com/api/health`
 
