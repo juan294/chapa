@@ -3,6 +3,8 @@ import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { revalidatePath } from "next/cache";
+import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -50,15 +52,25 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Update craft cache so subsequent badge views use the recomputed score
+  const persisted = await persistOrchestratedSnapshot(handle, materialized, {
+    mode: "replace",
+  });
+  if (!persisted) {
+    return NextResponse.json(
+      { error: "Could not save recalculated profile. Try again later." },
+      { status: 500 },
+    );
+  }
+
+  await invalidateProfileReadModels(handle, { history: true });
+
+  // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;
   if (craftResult) {
     fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
   }
 
-  await persistOrchestratedSnapshot(handle, materialized, {
-    mode: "replace",
-  });
+  revalidatePath(`/u/${handle}`);
 
   return NextResponse.json({
     success: true,

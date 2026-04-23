@@ -3,10 +3,10 @@ import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
-import { invalidateHistoryCache } from "@/lib/history/history";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
+import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -57,9 +57,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>" (lowercase)
     await cacheDel(`stats:v2:merged:${normalizedHandle}`);
 
-    // Invalidate history cache so next /api/history/:handle request fetches fresh data
-    await invalidateHistoryCache(handle);
-
     const materialized = await materializeOrchestratedProfile(handle, {
       token: session.token,
       craftMode: "recompute",
@@ -76,16 +73,28 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    // Update craft cache so badge views use the recomputed score
+    const persisted = await persistOrchestratedSnapshot(handle, materialized, {
+      mode: "replace",
+    });
+    if (!persisted) {
+      void captureServerError({
+        route: "/api/refresh",
+        statusCode: 500,
+        error: new Error(`Failed to persist refreshed snapshot for handle: ${handle}`),
+      });
+      return NextResponse.json(
+        { error: "Failed to save refreshed profile. Try again later." },
+        { status: 500 },
+      );
+    }
+
+    await invalidateProfileReadModels(handle, { history: true });
+
+    // Update craft cache after the durable snapshot write succeeds.
     const craftResult = materialized.craftResult;
     if (craftResult) {
       fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
     }
-
-    fireAndForget(
-      () => persistOrchestratedSnapshot(handle, materialized, { mode: "replace" }),
-      () => undefined,
-    );
 
     // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
     revalidatePath(`/u/${handle}`);

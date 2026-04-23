@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse, after } from "next/server";
+import { revalidatePath } from "next/cache";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
-import { rateLimit, cacheDel } from "@/lib/cache/redis";
-import { buildSnapshotKey } from "@/lib/cache/snapshot-cache";
-import { buildCraftKey } from "@/lib/cache/craft-cache";
+import { rateLimit } from "@/lib/cache/redis";
 import { isInsightsEnabled } from "@/lib/feature-flags";
 import {
   isValidInsightsUpload,
@@ -10,6 +9,7 @@ import {
 } from "@/lib/insights/validation";
 import { computeCraftScore } from "@/lib/insights/scoring";
 import { dbUpsertToolInsights } from "@/lib/db/tool-insights";
+import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import type { InsightsUpload } from "@chapa/shared";
 
 /**
@@ -67,14 +67,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Store in database (synchronous — response needs the stored result)
     const stored = await dbUpsertToolInsights(auth.handle, data, scores);
 
-    // Defer cache updates to post-response (non-blocking)
+    // Defer cache invalidation until after the durable write completes.
     after(async () => {
       const handle = auth.handle.toLowerCase();
-      await Promise.allSettled([
-        cacheDel(`stats:v2:merged:${handle}`),
-        cacheDel(buildCraftKey(handle)),
-        cacheDel(buildSnapshotKey(handle)),
-      ]);
+      await invalidateProfileReadModels(handle, {
+        stats: true,
+        craft: true,
+        snapshot: true,
+        history: true,
+      });
+      revalidatePath(`/u/${handle}`);
     });
 
     return NextResponse.json({
