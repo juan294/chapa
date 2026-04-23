@@ -12,6 +12,8 @@
  *
  * Used by POST /api/insights.
  */
+export const MAX_INSIGHTS_BYTES = 256 * 1024;
+
 export function isValidInsightsUpload(
   data: unknown,
 ): { valid: true } | { valid: false; reason: string } {

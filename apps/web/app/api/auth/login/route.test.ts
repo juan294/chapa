@@ -4,10 +4,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockBuildAuthUrl, mockCreateStateCookie, mockRateLimit } = vi.hoisted(
+const { mockBuildAuthUrl, mockCreateStateCookie, mockIssueOauthState, mockRateLimit } = vi.hoisted(
   () => ({
     mockBuildAuthUrl: vi.fn(),
     mockCreateStateCookie: vi.fn(),
+    mockIssueOauthState: vi.fn(),
     mockRateLimit: vi.fn(),
   }),
 );
@@ -15,6 +16,10 @@ const { mockBuildAuthUrl, mockCreateStateCookie, mockRateLimit } = vi.hoisted(
 vi.mock("@/lib/auth/github", () => ({
   buildAuthUrl: mockBuildAuthUrl,
   createStateCookie: mockCreateStateCookie,
+}));
+
+vi.mock("@/lib/auth/oauth-state", () => ({
+  issueOauthState: mockIssueOauthState,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -57,6 +62,7 @@ function findRedirectCookie(res: Response): string | undefined {
 
 function setupDefaultMocks(): void {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+  mockIssueOauthState.mockResolvedValue(undefined);
   mockCreateStateCookie.mockReturnValue({
     state: "abc",
     cookie: "gh_oauth_state=abc; Path=/",
@@ -199,6 +205,13 @@ describe("GET /api/auth/login — OAuth redirect", () => {
     await GET(makeRequest("1.2.3.4"));
 
     expect(mockCreateStateCookie).toHaveBeenCalledOnce();
+  });
+
+  it("issues the OAuth state server-side before redirecting", async () => {
+    await GET(makeRequest("1.2.3.4"));
+
+    expect(mockIssueOauthState).toHaveBeenCalledWith("abc");
+    expect(mockIssueOauthState).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,4 +1,5 @@
 import { dbGetSnapshots } from "@/lib/db/snapshots";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheGet, cacheSet, cacheDel } from "@/lib/cache/redis";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import type { MetricsSnapshot } from "./types";
@@ -57,7 +58,7 @@ export async function getSnapshots(
   // Cache the result (only if we got data — don't cache empty arrays)
   if (snapshots.length > 0) {
     // Fire-and-forget: don't block on cache write
-    cacheSet(key, snapshots, HISTORY_CACHE_TTL).catch(() => {});
+    fireAndForget(() => cacheSet(key, snapshots, HISTORY_CACHE_TTL), () => undefined);
   }
 
   return snapshots;

@@ -95,7 +95,10 @@ describe("POST /api/telemetry", () => {
 
   it("calls dbInsertTelemetry with the payload", async () => {
     await POST(makeRequest(validPayload));
-    expect(mockDbInsertTelemetry).toHaveBeenCalledWith(validPayload);
+    expect(mockDbInsertTelemetry).toHaveBeenCalledWith({
+      ...validPayload,
+      verified: false,
+    });
   });
 
   it("returns 200 even when Supabase insert fails (graceful degradation)", async () => {
@@ -104,6 +107,20 @@ describe("POST /api/telemetry", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ ok: true });
+  });
+
+  it("logs DB insert failure but still returns 200", async () => {
+    mockDbInsertTelemetry.mockResolvedValue(false);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(makeRequest(validPayload));
+    await Promise.resolve();
+
+    expect(res.status).toBe(200);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[telemetry] insert failed",
+      { handle: validPayload.targetHandle },
+    );
   });
 
   it("does not await DB insert — response resolves before insert completes (fire-and-forget)", async () => {
@@ -192,7 +209,12 @@ describe("POST /api/telemetry", () => {
       60,
     );
     // Both rate limits must be checked
-    expect(mockRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      "ratelimit:telemetry-ip-day:1.2.3.4",
+      600,
+      86400,
+    );
+    expect(mockRateLimit).toHaveBeenCalledTimes(3);
   });
 
   it("returns 429 when IP rate limit is exceeded (before handle check)", async () => {
@@ -200,11 +222,28 @@ describe("POST /api/telemetry", () => {
     // First call (IP) hits limit; second call (handle) is allowed — but route returns 429
     mockRateLimit
       .mockResolvedValueOnce({ allowed: false, current: 61, limit: 60 }) // IP
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 600 }) // IP/day (not reached)
       .mockResolvedValueOnce({ allowed: true, current: 1, limit: 10 }); // handle (not reached)
     const res = await POST(makeRequest(validPayload));
     expect(res.status).toBe(429);
     // Only the IP rate limit should have been checked (short-circuit)
     expect(mockRateLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 429 when daily IP rate limit is exceeded", async () => {
+    mockGetClientIp.mockReturnValue("1.2.3.4");
+    mockRateLimit.mockReset();
+    mockRateLimit.mockImplementation(async (key: string) => {
+      if (key === "ratelimit:telemetry-ip-day:1.2.3.4") {
+        return { allowed: false, current: 601, limit: 600 };
+      }
+      return { allowed: true, current: 1, limit: 60 };
+    });
+
+    const res = await POST(makeRequest(validPayload));
+    expect(res.status).toBe(429);
+    expect(mockRateLimit).toHaveBeenCalledTimes(2);
+    expect(res.headers.get("Retry-After")).toBe("3600");
   });
 
   it("includes Retry-After header when rate limited", async () => {

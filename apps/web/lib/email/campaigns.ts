@@ -23,7 +23,7 @@ import {
   dbMarkSendsFailed,
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
-import { cacheGet, cacheIncr } from "@/lib/cache/redis";
+import { cacheGet, cacheIncr, cacheReserveQuota } from "@/lib/cache/redis";
 import { toDateString } from "@/lib/utils/date";
 
 // ---------------------------------------------------------------------------
@@ -75,9 +75,16 @@ export async function getDailyQuota(): Promise<number> {
   return count ?? 0;
 }
 
-async function incrementDailyQuota(count: number): Promise<void> {
+async function refundDailyQuota(count: number): Promise<void> {
+  if (count <= 0) return;
+
   const key = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
-  await cacheIncr(key, count, 86400);
+  await cacheIncr(key, -count, 86400);
+}
+
+interface ResendBatchResult {
+  id?: string | null;
+  error?: { message?: string | null } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +135,7 @@ export async function processCampaignBatch(
   }
 
   // Check daily quota
+  const quotaKey = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
   const todaySent = await getDailyQuota();
   const available = DAILY_SEND_LIMIT - todaySent;
   if (available <= 0) {
@@ -158,7 +166,12 @@ export async function processCampaignBatch(
       pending.map((s) => s.id),
       "Resend unavailable",
     );
-    return { sent: 0, failed: pending.length, remaining: 0 };
+    const stats = await dbGetCampaignStats(campaignId);
+    await dbUpdateCampaign(campaignId, {
+      sentCount: stats.sent,
+      failedCount: stats.failed,
+    });
+    return { sent: 0, failed: pending.length, remaining: stats.pending };
   }
 
   // Build emails using shared content helper
@@ -173,12 +186,22 @@ export async function processCampaignBatch(
     };
   });
 
+  const reservation = await cacheReserveQuota(
+    quotaKey,
+    pending.length,
+    DAILY_SEND_LIMIT,
+    86400,
+  );
+  if (!reservation.allowed) {
+    return { sent: 0, failed: 0, remaining: -1 };
+  }
+
   let batchSent = 0;
   let batchFailed = 0;
   const sendIds = pending.map((s) => s.id);
 
   try {
-    const { error } = await withTimeout(
+    const { data, error } = await withTimeout(
       resend.batch.send(emails),
       EMAIL_SEND_TIMEOUT_MS,
       "processCampaignBatch",
@@ -188,9 +211,32 @@ export async function processCampaignBatch(
       await dbMarkSendsFailed(sendIds, error.message);
       batchFailed = pending.length;
     } else {
-      await dbMarkSendsSent(sendIds);
-      await incrementDailyQuota(pending.length);
-      batchSent = pending.length;
+      const results = Array.isArray(data) ? (data as ResendBatchResult[]) : [];
+      const successfulIds: string[] = [];
+      const failedByMessage = new Map<string, string[]>();
+
+      for (const [index, send] of pending.entries()) {
+        const result = results[index];
+        if (result?.id && !result.error) {
+          successfulIds.push(send.id);
+          continue;
+        }
+
+        const message = result?.error?.message ?? "Unknown Resend batch failure";
+        const ids = failedByMessage.get(message) ?? [];
+        ids.push(send.id);
+        failedByMessage.set(message, ids);
+      }
+
+      if (successfulIds.length > 0) {
+        await dbMarkSendsSent(successfulIds);
+      }
+      for (const [message, failedIds] of failedByMessage) {
+        await dbMarkSendsFailed(failedIds, message);
+      }
+
+      batchSent = successfulIds.length;
+      batchFailed = pending.length - successfulIds.length;
     }
   } catch (error) {
     console.error(
@@ -199,6 +245,10 @@ export async function processCampaignBatch(
     );
     await dbMarkSendsFailed(sendIds, (error as Error).message);
     batchFailed = pending.length;
+  }
+
+  if (batchFailed > 0) {
+    await refundDailyQuota(batchFailed);
   }
 
   // Single stats query at the end

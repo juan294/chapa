@@ -109,3 +109,13 @@ fireAndForget(
 
 - The palette tripling is harder to fully eliminate — `globals.css` CSS vars must exist for runtime theme switching, and `lib/render/theme.ts` must expose TS constants because badge SVG is server-rendered pre-CSS. Minimum viable fix: document the invariant in `theme.ts` with a `// source of truth: globals.css` comment and add a unit test asserting hex values match. Full single-source migration is out of scope.
 - If P11 discovers that some constants are used in `packages/shared` but with different values than the web-app literal, take the web-app literal as canonical (it's what's shipped) and flag in the phase PR description.
+
+## Status
+
+- [x] Implemented on 2026-04-23
+- [x] Verified with `pnpm exec vitest run packages/shared/src/constants.test.ts apps/web/lib/impact/utils.test.ts apps/web/lib/impact/v6.test.ts apps/web/lib/async/fire-and-forget.test.ts apps/web/lib/render/theme.test.ts apps/web/app/api/telemetry/route.test.ts apps/web/app/api/notifications/unsubscribe/route.test.ts apps/web/lib/cache/snapshot-cache.test.ts apps/web/lib/cache/craft-cache.test.ts`, `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`
+- [x] Centralized the shipped scoring thresholds in `packages/shared/src/constants.ts` and replaced the inline scoring literals in `impact/utils.ts` and `impact/v6.ts`
+- [x] Added `lib/async/fire-and-forget.ts` and replaced ad hoc fire-and-forget patterns across `apps/web` so the phase grep gate is actually clean
+- [x] Documented the badge/CSS palette invariant in `lib/render/theme.ts` and pinned the shared brand/archetype tokens against `styles/globals.css` in unit tests
+- [x] Added `@chapa/shared` path mapping in `apps/web/tsconfig.json` so this worktree resolves the local shared package source instead of the original repo's shared-package symlinked `node_modules`
+- [x] Confirmed there was no remaining phase-11 fire-and-forget call site to change in `apps/web/lib/email/campaigns.ts` after the phase-7 refactor

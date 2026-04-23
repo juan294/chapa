@@ -9,6 +9,7 @@ import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
 
@@ -178,16 +179,19 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       platform: "bitbucket" | "codeberg",
       setter: typeof setBbStatus,
     ) {
-      fetch(`/api/auth/${platform}/status`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.enabled) {
-            const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-            platformStatusCache[platform] = status;
-            setter(status);
-          }
-        })
-        .catch(() => {}); // Graceful — menu works without status
+      fireAndForget(
+        () =>
+          fetch(`/api/auth/${platform}/status`)
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.enabled) {
+                const status = { linked: data.linked, remoteLogin: data.remoteLogin };
+                platformStatusCache[platform] = status;
+                setter(status);
+              }
+            }),
+        () => undefined,
+      ); // Graceful — menu works without status
     }
     fetchPlatformStatus("bitbucket", setBbStatus);
     fetchPlatformStatus("codeberg", setCbStatus);

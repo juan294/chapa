@@ -40,6 +40,12 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   });
 }
 
+function heatmapDateAt(offset: number, startDate = "2025-01-05"): string {
+  const date = new Date(`${startDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
 /** Build a uniform 13-week heatmap with a given weekly total. */
 function makeUniformHeatmap(weeklyTotal: number) {
   const days = [];
@@ -48,7 +54,7 @@ function makeUniformHeatmap(weeklyTotal: number) {
       const perDay = Math.floor(weeklyTotal / 7);
       const extra = d < weeklyTotal % 7 ? 1 : 0;
       days.push({
-        date: `2025-01-${String(w * 7 + d + 1).padStart(2, "0")}`,
+        date: heatmapDateAt(w * 7 + d),
         count: perDay + extra,
       });
     }
@@ -63,7 +69,7 @@ function makeBurstHeatmap(total: number) {
     for (let d = 0; d < 7; d++) {
       const count = w === 0 ? Math.floor(total / 7) + (d < total % 7 ? 1 : 0) : 0;
       days.push({
-        date: `2025-01-${String(w * 7 + d + 1).padStart(2, "0")}`,
+        date: heatmapDateAt(w * 7 + d),
         count,
       });
     }
@@ -409,7 +415,7 @@ describe("computeConsistency(stats)", () => {
     // Build a 52-week heatmap (364 days) with uniform activity
     const days: { date: string; count: number }[] = [];
     for (let i = 0; i < 364; i++) {
-      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count: 3 });
+      days.push({ date: heatmapDateAt(i), count: 3 });
     }
     const stats = makeStats({
       activeDays: 364,
@@ -424,7 +430,7 @@ describe("computeConsistency(stats)", () => {
     const days: { date: string; count: number }[] = [];
     for (let i = 0; i < 365; i++) {
       const count = i < 134 ? (i % 7 === 0 ? 50 : 5) : 0;
-      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count });
+      days.push({ date: heatmapDateAt(i), count });
     }
     const stats = makeStats({
       activeDays: 134,

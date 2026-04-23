@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeRecencyRatio, applyRecencyWeight } from "./recency";
+import { applyRecencyWeight, computeRecencyRatio, recencyCutoff } from "./recency";
 import type { HeatmapDay } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
@@ -92,6 +92,20 @@ describe("computeRecencyRatio(heatmapData)", () => {
       expect(ratio).toBeGreaterThanOrEqual(0);
       expect(ratio).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("recencyCutoff", () => {
+  it("normalizes to UTC midnight for a west-of-UTC timestamp", () => {
+    const cutoff = recencyCutoff(new Date("2025-01-15T23:30:00-08:00"));
+    expect(cutoff.toISOString()).toBe("2024-10-18T00:00:00.000Z");
+    expect(cutoff.getUTCHours()).toBe(0);
+  });
+
+  it("normalizes to UTC midnight for an east-of-UTC timestamp", () => {
+    const cutoff = recencyCutoff(new Date("2025-01-15T00:30:00+09:00"));
+    expect(cutoff.toISOString()).toBe("2024-10-16T00:00:00.000Z");
+    expect(cutoff.getUTCHours()).toBe(0);
   });
 });
 

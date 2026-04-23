@@ -157,3 +157,11 @@ if (!rl.allowed) return new Response("Too many requests", { status: 429, headers
 
 - `mapSendRow` gets the same Zod treatment as `mapCampaignRow` — included in this phase.
 - The Resend partial-failure shape is SDK-version-dependent. If the installed version returns `data: ResendResult[]`, the pseudocode above holds. If it returns a single `{data, error}`, the test adapts to the actual mock shape in implementation.
+
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`
+- [x] Adjusted the campaign status whitelist to match live code reality by allowing `failed` alongside `draft`, `scheduled`, `sending`, `sent`, and `cancelled`
+- [x] Used the existing `parseRow` runtime-validation pattern instead of adding a new `zod` dependency in this phase
+- [x] Added an idempotent migration to reaffirm the existing `metrics_snapshots.captured_at DEFAULT now()` contract while removing app-side `captured_at` on inserts

@@ -114,3 +114,11 @@ describe("HMAC v2 golden vectors", () => {
 
 - Golden vectors are generated once, committed, and then act as regression gate. If a future scoring change intentionally changes outputs, regenerate and note in the commit body.
 - The pipeline test must NOT mock the verification layer — it exercises it. Use an in-memory Supabase mock via the existing `lib/db/supabase.ts` test pattern.
+
+## Status
+
+- [x] Implemented on 2026-04-23
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, `pnpm exec vitest run apps/web/lib/impact/pipeline.test.ts apps/web/lib/verification/hmac.test.ts apps/web/app/u/[handle]/badge.svg/concurrent.test.ts apps/web/lib/email/campaigns.test.ts`, and `pnpm run test`
+- [x] Added committed HMAC v2 golden vectors and round-trip coverage
+- [x] Extended the pipeline and campaign tests for the remaining deterministic verification and multi-row failure shapes
+- [x] Added `badge.svg/concurrent.test.ts` as a `todo` because the render lock is intentionally deferred to phase 12 in this plan

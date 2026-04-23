@@ -168,3 +168,9 @@ return NextResponse.json(body);
 
 - We do not switch `bulk-recalculate` to a queue in this plan (per research §9 Q5). Capping at 100 + timeout-guard is the minimum viable hardening; a queue-backed mode is tracked as a follow-up.
 - The `agents/run` invariant is a belt-and-braces check; the actual exploit requires `ALLOW_AGENT_RUN=true` (already off by default).
+
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`
+- [x] Applied with the agreed option-1 interpretation: `agents/run` validates the existing underscore-based `AGENTS` allowlist shape rather than introducing a broader agent-key migration

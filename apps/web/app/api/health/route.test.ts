@@ -14,6 +14,14 @@ vi.mock("@/lib/db/supabase", () => ({
   pingSupabase: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalRequestSession: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/admin", () => ({
+  isAdminHandle: vi.fn(),
+}));
+
 // GitHub API is probed via global fetch — mock at module level
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -21,6 +29,8 @@ vi.stubGlobal("fetch", mockFetch);
 import { GET } from "./route";
 import { pingRedis, rateLimit } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
+import { getOptionalRequestSession } from "@/lib/auth/session";
+import { isAdminHandle } from "@/lib/auth/admin";
 
 function makeRequest(): NextRequest {
   return new NextRequest("http://localhost:3001/api/health");
@@ -39,6 +49,8 @@ function makeGitHubRateLimitResponse(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+  vi.mocked(getOptionalRequestSession).mockReturnValue(null);
+  vi.mocked(isAdminHandle).mockReturnValue(false);
   // Default: GITHUB_TOKEN not set — skipped
   delete process.env.GITHUB_TOKEN;
 });
@@ -171,7 +183,7 @@ describe("GET /api/health", () => {
       expect(response.status).toBe(200);
       expect(body.status).toBe("ok");
       expect(body.dependencies.github).toBe("ok");
-      expect(body.dependencies.githubRateLimit).toEqual({ remaining: 4999, limit: 5000 });
+      expect(body.dependencies.githubRateLimit).toBeUndefined();
     });
 
     it("calls the GitHub rate_limit endpoint with Authorization header", async () => {
@@ -230,6 +242,44 @@ describe("GET /api/health", () => {
 
       expect(response.status).toBe(200);
       expect(body.status).toBe("ok");
+    });
+
+    it("redacts githubRateLimit details for unauthenticated callers", async () => {
+      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+      vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+      mockFetch.mockResolvedValueOnce(makeGitHubRateLimitResponse(4999, 5000));
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.github).toBe("ok");
+      expect(body.dependencies.githubRateLimit).toBeUndefined();
+    });
+
+    it("includes githubRateLimit details for admin sessions", async () => {
+      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+      vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+      vi.mocked(getOptionalRequestSession).mockReturnValue({
+        token: "t",
+        login: "admin",
+        name: "Admin",
+        avatar_url: "",
+      });
+      vi.mocked(isAdminHandle).mockReturnValue(true);
+      mockFetch.mockResolvedValueOnce(makeGitHubRateLimitResponse(4999, 5000));
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.github).toBe("ok");
+      expect(body.dependencies.githubRateLimit).toEqual({
+        remaining: 4999,
+        limit: 5000,
+      });
     });
   });
 });

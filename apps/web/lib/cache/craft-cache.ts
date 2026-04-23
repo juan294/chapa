@@ -10,14 +10,16 @@
  */
 
 import type { CraftResult } from "@chapa/shared";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheGet, cacheSet, cacheDel } from "./redis";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
+import { CACHE_VERSION } from "./version";
 
 /** 1 hour — craft scores change rarely (only on insights upload). */
 const CRAFT_CACHE_TTL = 3600;
 
-function craftCacheKey(handle: string): string {
-  return `craft:${handle.toLowerCase()}`;
+export function buildCraftKey(handle: string): string {
+  return `craft:${CACHE_VERSION}:${handle.toLowerCase()}`;
 }
 
 /**
@@ -33,7 +35,7 @@ function craftCacheKey(handle: string): string {
 export async function getCachedCraftScore(
   handle: string,
 ): Promise<CraftResult | null> {
-  const key = craftCacheKey(handle);
+  const key = buildCraftKey(handle);
 
   // Try Redis first
   try {
@@ -49,7 +51,7 @@ export async function getCachedCraftScore(
   // Cache the result (only if we got data — don't cache nulls)
   if (result) {
     // Fire-and-forget: don't block on cache write
-    cacheSet(key, result, CRAFT_CACHE_TTL).catch(() => {});
+    fireAndForget(() => cacheSet(key, result, CRAFT_CACHE_TTL), () => undefined);
   }
 
   return result;
@@ -65,7 +67,7 @@ export async function updateCraftCache(
   handle: string,
   result: CraftResult,
 ): Promise<void> {
-  const key = craftCacheKey(handle);
+  const key = buildCraftKey(handle);
   try {
     await cacheSet(key, result, CRAFT_CACHE_TTL);
   } catch {
@@ -85,7 +87,7 @@ export async function updateCraftCache(
 export async function invalidateCraftCache(
   handle: string,
 ): Promise<void> {
-  const key = craftCacheKey(handle);
+  const key = buildCraftKey(handle);
   try {
     await cacheDel(key);
   } catch {

@@ -12,6 +12,7 @@ import { isTokenExpired, refreshBitbucketToken } from "@/lib/auth/bitbucket";
 import { refreshCodebergToken } from "@/lib/auth/codeberg";
 import { fetchBitbucketStats } from "@/lib/bitbucket/stats";
 import { fetchCodebergStats } from "@/lib/codeberg/stats";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withTimeout } from "@/lib/async/with-timeout";
 import type { StatsData, SupplementalStats, Platform } from "@chapa/shared";
 
@@ -201,7 +202,7 @@ async function _fetchAndCache(
   await cacheSet(staleKey, stats, STALE_TTL);
 
   // Record in permanent user registry (fire-and-forget)
-  void dbUpsertUser(handle).catch(() => {});
+  fireAndForget(() => dbUpsertUser(handle), () => undefined);
 
   return stats;
 }

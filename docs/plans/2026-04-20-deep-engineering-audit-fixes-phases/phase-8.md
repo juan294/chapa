@@ -66,3 +66,10 @@ if (allZero) {
 
 - Copy is deliberately soft ("no data yet") — matches the non-accusatory-messaging rule already in effect for confidence penalties.
 - Works for both 4-dim (diamond fallback) and 5-dim (pentagon) variants — the zero-check wraps both rendering branches.
+
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, `pnpm exec vitest run apps/web/lib/render/RadarChart.test.ts`, and `pnpm run test`
+- [x] Added the all-zero empty-state marker for both the 4-axis and 5-axis radar variants
+- [x] Updated the existing RadarChart tests for the new marker behavior; there were no separate RadarChart snapshot fixtures in this repo to refresh

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import type { InsightsUpload } from "@chapa/shared";
+import { MAX_INSIGHTS_BYTES } from "@/lib/insights/validation";
 
 // ---------------------------------------------------------------------------
 // Mocks — hoisted before any imports that depend on them
@@ -14,7 +15,8 @@ const {
   mockDbUpsert,
   mockDbGet,
   mockGetClientIp,
-  mockInvalidateSnapshotCache,
+  mockBuildSnapshotKey,
+  mockBuildCraftKey,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
@@ -23,7 +25,8 @@ const {
   mockDbUpsert: vi.fn(),
   mockDbGet: vi.fn(),
   mockGetClientIp: vi.fn(),
-  mockInvalidateSnapshotCache: vi.fn(),
+  mockBuildSnapshotKey: vi.fn(),
+  mockBuildCraftKey: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -36,7 +39,11 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
-  invalidateSnapshotCache: mockInvalidateSnapshotCache,
+  buildSnapshotKey: mockBuildSnapshotKey,
+}));
+
+vi.mock("@/lib/cache/craft-cache", () => ({
+  buildCraftKey: mockBuildCraftKey,
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -125,10 +132,11 @@ beforeEach(() => {
   mockResolveRequestAuth.mockResolvedValue(AUTH);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   mockCacheDel.mockResolvedValue(undefined);
-  mockInvalidateSnapshotCache.mockResolvedValue(undefined);
   mockDbUpsert.mockResolvedValue(null); // null = fallback to computed scores
   mockDbGet.mockResolvedValue(null);
   mockGetClientIp.mockReturnValue("127.0.0.1");
+  mockBuildSnapshotKey.mockImplementation((handle: string) => `snapshot:v2:latest:${handle}`);
+  mockBuildCraftKey.mockImplementation((handle: string) => `craft:v2:${handle}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -176,6 +184,22 @@ describe("POST /api/insights", () => {
     expect(body.error).toBe("Invalid insights data");
   });
 
+  it("returns 413 for bodies larger than 256 KB before DB insert", async () => {
+    const tooLargeRequest = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/insights",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw_data: "x".repeat(MAX_INSIGHTS_BYTES + 1) }),
+      },
+    );
+
+    const resp = await POST(tooLargeRequest);
+
+    expect(resp.status).toBe(413);
+    expect(mockDbUpsert).not.toHaveBeenCalled();
+  });
+
   it("does not expose Zod/validation schema details to caller on invalid data", async () => {
     const resp = await POST(makePostRequest({ tool: "claude-code" }));
     expect(resp.status).toBe(400);
@@ -204,7 +228,12 @@ describe("POST /api/insights", () => {
 
   it("invalidates snapshot cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
-    expect(mockInvalidateSnapshotCache).toHaveBeenCalledWith("juan294");
+    expect(mockCacheDel).toHaveBeenCalledWith("snapshot:v2:latest:juan294");
+  });
+
+  it("invalidates craft cache after successful upload", async () => {
+    await POST(makePostRequest(makeValidUpload()));
+    expect(mockCacheDel).toHaveBeenCalledWith("craft:v2:juan294");
   });
 
   it("calls dbUpsert with correct arguments", async () => {

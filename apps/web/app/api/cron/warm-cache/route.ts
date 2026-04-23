@@ -11,6 +11,7 @@ import { notifyScoreBump } from "@/lib/email/score-bump";
 import { dbCleanExpiredVerifications } from "@/lib/db/verification";
 import { dbCleanExpiredMergeOperations } from "@/lib/db/telemetry";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
@@ -194,8 +195,8 @@ export async function GET(request: NextRequest) {
       expiredVerificationsDeleted,
       expiredMergeOpsDeleted,
       expiredSnapshotsDeleted,
-      total: toWarm.length,
-      handles: toWarm,
+      processedCount: toWarm.length,
+      processedSample: toWarm.slice(0, 10),
       rotation: {
         offset,
         nextOffset,
@@ -251,8 +252,12 @@ async function warmHandle(
     let notified = false;
 
     // Pre-warm avatar cache opportunistically for later public renders.
-    if (materialized.stats.avatarUrl) {
-      void getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => {});
+    const avatarUrl = materialized.stats.avatarUrl;
+    if (avatarUrl) {
+      fireAndForget(
+        () => getAvatarBase64(handle, avatarUrl),
+        () => undefined,
+      );
     }
 
     // Record daily metrics snapshot (fire-and-forget, deduplicates by date)

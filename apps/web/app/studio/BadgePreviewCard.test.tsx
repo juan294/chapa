@@ -33,7 +33,7 @@ vi.mock("next/dynamic", () => ({
     // our mocked modules (see vi.mock calls below for the effect modules).
     // We catch rejections so tests aren't affected if an import fails.
     try {
-      loader().catch(() => {});
+      loader().catch(() => undefined);
     } catch {
       // swallow synchronous errors
     }

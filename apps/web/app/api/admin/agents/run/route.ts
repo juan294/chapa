@@ -29,6 +29,14 @@ const MAX_LOG_LINES = 500;
 const PROCESS_TIMEOUT_MS = 300_000;
 /** Grace period after SIGTERM before escalating to SIGKILL. */
 const SIGKILL_GRACE_MS = 5_000;
+/** Closed-format guard for configured and requested agent keys. */
+const AGENT_KEY_RE = /^[a-z0-9_]+$/;
+
+for (const [agentKey, config] of Object.entries(AGENTS)) {
+  if (!AGENT_KEY_RE.test(agentKey) || !AGENT_KEY_RE.test(config.key)) {
+    throw new Error(`Invalid AGENTS key at module load: ${agentKey}`);
+  }
+}
 
 let currentRun: RunState | null = null;
 
@@ -95,10 +103,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { agentKey } = body;
+  const agentKey = typeof body.agentKey === "string" ? body.agentKey.trim() : "";
   if (!agentKey) {
     return NextResponse.json(
       { error: "Missing agentKey in request body" },
+      { status: 400 },
+    );
+  }
+
+  if (!AGENT_KEY_RE.test(agentKey)) {
+    return NextResponse.json(
+      { error: `Invalid agent key: ${agentKey}` },
       { status: 400 },
     );
   }

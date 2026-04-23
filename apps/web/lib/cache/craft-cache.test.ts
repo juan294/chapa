@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { CACHE_VERSION } from "./version";
 
 // ---------------------------------------------------------------------------
 // Mocks — set up before importing the module under test
@@ -17,6 +18,7 @@ vi.mock("@/lib/db/tool-insights", () => ({
 import { cacheGet, cacheSet, cacheDel } from "./redis";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import {
+  buildCraftKey,
   getCachedCraftScore,
   updateCraftCache,
   invalidateCraftCache,
@@ -51,6 +53,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("buildCraftKey", () => {
+  it("includes the CACHE_VERSION axis", () => {
+    expect(buildCraftKey("juan")).toBe(`craft:${CACHE_VERSION}:juan`);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // getCachedCraftScore
 // ---------------------------------------------------------------------------
@@ -63,7 +71,7 @@ describe("getCachedCraftScore", () => {
     const result = await getCachedCraftScore("TestUser");
 
     expect(result).toEqual(craft);
-    expect(cacheGet).toHaveBeenCalledWith("craft:testuser");
+    expect(cacheGet).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`);
     expect(dbGetToolInsights).not.toHaveBeenCalled();
   });
 
@@ -77,7 +85,7 @@ describe("getCachedCraftScore", () => {
 
     expect(result).toEqual(craft);
     expect(dbGetToolInsights).toHaveBeenCalledWith("testuser");
-    expect(cacheSet).toHaveBeenCalledWith("craft:testuser", craft, 3600);
+    expect(cacheSet).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`, craft, 3600);
   });
 
   it("returns null when both cache and DB have no data", async () => {
@@ -97,7 +105,7 @@ describe("getCachedCraftScore", () => {
 
     await getCachedCraftScore("UPPERCASE");
 
-    expect(cacheGet).toHaveBeenCalledWith("craft:uppercase");
+    expect(cacheGet).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:uppercase`);
     expect(dbGetToolInsights).toHaveBeenCalledWith("UPPERCASE");
   });
 
@@ -155,7 +163,7 @@ describe("updateCraftCache", () => {
 
     await updateCraftCache("TestUser", craft);
 
-    expect(cacheSet).toHaveBeenCalledWith("craft:testuser", craft, 3600);
+    expect(cacheSet).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`, craft, 3600);
   });
 
   it("lowercases the handle for the cache key", async () => {
@@ -164,7 +172,7 @@ describe("updateCraftCache", () => {
 
     await updateCraftCache("UPPERCASE", craft);
 
-    expect(cacheSet).toHaveBeenCalledWith("craft:uppercase", craft, 3600);
+    expect(cacheSet).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:uppercase`, craft, 3600);
   });
 
   it("does not throw when Redis fails (fire-and-forget safe)", async () => {
@@ -186,13 +194,13 @@ describe("invalidateCraftCache", () => {
   it("deletes the craft cache key", async () => {
     vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
     await invalidateCraftCache("testuser");
-    expect(cacheDel).toHaveBeenCalledWith("craft:testuser");
+    expect(cacheDel).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`);
   });
 
   it("lowercases handle", async () => {
     vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
     await invalidateCraftCache("TestUser");
-    expect(cacheDel).toHaveBeenCalledWith("craft:testuser");
+    expect(cacheDel).toHaveBeenCalledWith(`craft:${CACHE_VERSION}:testuser`);
   });
 
   it("does not throw on Redis failure", async () => {

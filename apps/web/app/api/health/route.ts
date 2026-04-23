@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pingRedis, rateLimit } from "@/lib/cache/redis";
+import { isAdminHandle } from "@/lib/auth/admin";
+import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
 import { pingSupabase } from "@/lib/db/supabase";
 
@@ -70,6 +72,8 @@ export async function GET(request: NextRequest) {
     pingSupabase(),
     pingGitHub(),
   ]);
+  const session = getOptionalRequestSession(request);
+  const isAdmin = session ? isAdminHandle(session.login) : false;
 
   // "skipped" = env vars not configured (preview deploys) — not degraded.
   // Only "error" = configured but failing — triggers 503.
@@ -90,7 +94,7 @@ export async function GET(request: NextRequest) {
         redis: redisStatus,
         supabase: supabaseStatus,
         github: githubResult.status,
-        ...(githubResult.rateLimit && {
+        ...(isAdmin && githubResult.rateLimit && {
           githubRateLimit: githubResult.rateLimit,
         }),
       },

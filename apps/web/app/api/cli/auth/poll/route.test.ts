@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheDel: vi.fn(),
-  rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 30 }),
+  rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 120 }),
 }));
 
 vi.mock("@/lib/auth/cli-token", () => ({
@@ -232,38 +232,75 @@ describe("GET /api/cli/auth/poll — rate limiting", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
     vi.mocked(cacheGet).mockResolvedValue(null);
   });
 
-  it("returns 429 when rate limited", async () => {
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 31, limit: 30 });
+  it("returns 429 when rate limited by sessionId", async () => {
+    vi.mocked(rateLimit)
+      .mockResolvedValueOnce({ allowed: false, current: 121, limit: 120 });
 
     const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
 
     expect(res.status).toBe(429);
     const json = await res.json();
-    expect(json.error).toMatch(/too many/i);
+    expect(json.error).toBe("poll_rate_exceeded");
+    expect(res.headers.get("Retry-After")).toBe("30");
   });
 
-  it("rate limits by IP with correct key and window (30 req / 60s)", async () => {
+  it("returns 429 when rate limited by IP blanket cap", async () => {
+    vi.mocked(rateLimit)
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 120 })
+      .mockResolvedValueOnce({ allowed: false, current: 601, limit: 600 });
+
+    const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toBe("poll_rate_exceeded");
+    expect(res.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("rate limits by sessionId with correct key and window (120 req / 300s)", async () => {
     await GET(makeRequest(VALID_UUID, "1.2.3.4"));
 
-    expect(rateLimit).toHaveBeenCalledWith("ratelimit:cli-poll:1.2.3.4", 30, 60);
+    expect(rateLimit).toHaveBeenNthCalledWith(
+      1,
+      `ratelimit:cli-poll-session:${VALID_UUID}`,
+      120,
+      300,
+    );
+  });
+
+  it("rate limits by IP with correct key and window (600 req / 300s)", async () => {
+    await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(rateLimit).toHaveBeenNthCalledWith(
+      2,
+      "ratelimit:cli-poll-ip:1.2.3.4",
+      600,
+      300,
+    );
   });
 
   it("uses 'unknown' when x-forwarded-for is absent", async () => {
     await GET(makeRequest(VALID_UUID));
 
-    expect(rateLimit).toHaveBeenCalledWith("ratelimit:cli-poll:unknown", 30, 60);
+    expect(rateLimit).toHaveBeenNthCalledWith(
+      2,
+      "ratelimit:cli-poll-ip:unknown",
+      600,
+      300,
+    );
   });
 
-  it("includes Retry-After header when rate limited", async () => {
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 31, limit: 30 });
+  it("does not evaluate the IP limiter when sessionId is already rate limited", async () => {
+    vi.mocked(rateLimit)
+      .mockResolvedValueOnce({ allowed: false, current: 121, limit: 120 });
 
-    const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+    await GET(makeRequest(VALID_UUID, "1.2.3.4"));
 
-    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(rateLimit).toHaveBeenCalledTimes(1);
   });
 
   it("proceeds normally when not rate limited", async () => {
@@ -272,5 +309,54 @@ describe("GET /api/cli/auth/poll — rate limiting", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.status).toBe("pending");
+  });
+
+  it("supports repeated polls up to the 120/session cap within 5 minutes", async () => {
+    let sessionPolls = 0;
+    let ipPolls = 0;
+    vi.mocked(rateLimit).mockImplementation(async (key: string, limit: number) => {
+      if (key.startsWith("ratelimit:cli-poll-session:")) {
+        sessionPolls += 1;
+        return { allowed: sessionPolls <= limit, current: sessionPolls, limit };
+      }
+
+      ipPolls += 1;
+      return { allowed: ipPolls <= limit, current: ipPolls, limit };
+    });
+
+    for (let i = 0; i < 120; i++) {
+      const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+      expect(res.status).toBe(200);
+    }
+
+    const res = await GET(makeRequest(VALID_UUID, "1.2.3.4"));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("30");
+  });
+
+  it("supports up to 600 polls per IP within 5 minutes across distinct sessions", async () => {
+    let ipPolls = 0;
+    vi.mocked(rateLimit).mockImplementation(async (key: string, limit: number) => {
+      if (key.startsWith("ratelimit:cli-poll-session:")) {
+        return { allowed: true, current: 1, limit };
+      }
+
+      ipPolls += 1;
+      return { allowed: ipPolls <= limit, current: ipPolls, limit };
+    });
+
+    for (let i = 0; i < 600; i++) {
+      const session = `00000000-0000-4000-8000-${i.toString(16).padStart(12, "0")}`;
+      const res = await GET(makeRequest(session, "1.2.3.4"));
+      expect(res.status).toBe(200);
+    }
+
+    const res = await GET(
+      makeRequest("00000000-0000-4000-8000-ffffffffffff", "1.2.3.4"),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
   });
 });

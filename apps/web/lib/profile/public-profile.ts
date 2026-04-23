@@ -104,7 +104,7 @@ export async function runPublicProfileSideEffects(
       dbUpsertUser(handle, {
         displayName: materialized.stats.displayName ?? undefined,
         avatarUrl: materialized.stats.avatarUrl ?? undefined,
-      }).catch(() => {}),
+      }).catch(() => undefined),
     );
   }
 

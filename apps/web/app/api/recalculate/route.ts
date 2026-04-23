@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -50,8 +51,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   // Update craft cache so subsequent badge views use the recomputed score
-  if (materialized.craftResult) {
-    updateCraftCache(handle, materialized.craftResult).catch(() => {});
+  const craftResult = materialized.craftResult;
+  if (craftResult) {
+    fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
   }
 
   await persistOrchestratedSnapshot(handle, materialized, {

@@ -142,6 +142,15 @@ function snapshotToRow(
   };
 }
 
+function snapshotToInsertRow(
+  handle: string,
+  s: MetricsSnapshot,
+): Record<string, unknown> {
+  const { captured_at, ...row } = snapshotToRow(handle, s);
+  void captured_at;
+  return row;
+}
+
 /** Keys required on every SnapshotRow — used by parseRow for runtime validation. */
 const SNAPSHOT_REQUIRED_KEYS: readonly (keyof SnapshotRow)[] = [
   "date",
@@ -223,7 +232,7 @@ export async function dbInsertSnapshot(
   try {
     const { error, status } = await db
       .from("metrics_snapshots")
-      .upsert(snapshotToRow(handle, snapshot), {
+      .upsert(snapshotToInsertRow(handle, snapshot), {
         onConflict: "handle,date",
         ignoreDuplicates: true,
       });

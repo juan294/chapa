@@ -58,17 +58,12 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
     expect(polygonCount).toBeGreaterThanOrEqual(2); // data shape + at least 1 ring
   });
 
-  it("all-zero dimensions produce a point at center", () => {
+  it("renders a visible center marker for all-zero dimensions instead of a collapsed polygon", () => {
     const svg = renderRadarChart(makeDimensions({ delivery: 0, quality: 0, consistency: 0, breadth: 0 }), 200, 200, 100);
-    // Match the data polygon (fill-opacity, not fill="none")
-    const pointsMatch = svg.match(/points="([^"]+)"[^>]*fill-opacity/);
-    expect(pointsMatch).not.toBeNull();
-    const points = pointsMatch![1]!.split(" ").map(p => p.split(",").map(Number));
-    // All points should be at or very near center
-    for (const pt of points) {
-      expect(Math.abs(pt![0]! - 200)).toBeLessThan(2);
-      expect(Math.abs(pt![1]! - 200)).toBeLessThan(2);
-    }
+    expect(svg).not.toMatch(/fill-opacity="0\.15"/);
+    expect(svg).toContain('data-role="radar-empty-marker"');
+    expect(svg).toContain('cx="200" cy="200" r="3"');
+    expect(svg).toContain(">no data yet<");
   });
 
   it("uniform scores produce a symmetric shape", () => {
@@ -178,6 +173,25 @@ describe("renderRadarChart(dimensions, cx, cy, radius)", () => {
       // Data point dots: <circle cx="..." cy="..." r="4"
       const dotCount = (svg.match(/<circle[^>]*r="4"/g) || []).length;
       expect(dotCount).toBe(5);
+    });
+
+    it("renders the empty-state marker for an all-zero pentagon", () => {
+      const svg = renderRadarChart(
+        makePentagonDimensions({
+          delivery: 0,
+          quality: 0,
+          consistency: 0,
+          breadth: 0,
+          craft: 0,
+        }),
+        200,
+        200,
+        100,
+      );
+
+      expect(svg).toContain('data-role="radar-empty-marker"');
+      expect(svg).toContain(">no data yet<");
+      expect(svg).not.toMatch(/fill-opacity="0\.15"/);
     });
 
     it("uniform pentagon scores produce equidistant points", () => {

@@ -5,6 +5,7 @@ import { markUnsubscribed } from "@/lib/email/audience";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { verifyUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 
 /**
  * GET /api/notifications/unsubscribe?handle=:handle&token=:token
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
   // Sync unsubscribe to Resend (fire-and-forget)
   if (emailInfo?.email) {
-    void markUnsubscribed(emailInfo.email).catch(() => {});
+    fireAndForget(() => markUnsubscribed(emailInfo.email), () => undefined);
   }
 
   // Return a simple confirmation page

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 
 const STORAGE_PREFIX = "chapa:refreshed:";
 
@@ -47,15 +48,17 @@ export function useOwnerCacheWarm(handle: string, isOwner: boolean): void {
       return;
     }
 
-    fetch(`/api/refresh?handle=${encodeURIComponent(handle)}`, {
-      method: "POST",
-    })
-      .then((res) => {
-        if (res.ok) {
-          try { sessionStorage.setItem(key, "1"); } catch {}
-          router.refresh();
-        }
-      })
-      .catch(() => {});
+    fireAndForget(
+      () =>
+        fetch(`/api/refresh?handle=${encodeURIComponent(handle)}`, {
+          method: "POST",
+        }).then((res) => {
+          if (res.ok) {
+            try { sessionStorage.setItem(key, "1"); } catch {}
+            router.refresh();
+          }
+        }),
+      () => undefined,
+    );
   }, [handle, isOwner, router]);
 }

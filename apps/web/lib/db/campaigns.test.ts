@@ -12,6 +12,20 @@ const mockDelete = vi.fn();
 const mockUpsert = vi.fn();
 
 let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
+let queryResults: Array<{ data?: unknown; error?: unknown; count?: number | null }> = [];
+
+function nextQueryResult(): { data: unknown; error: unknown; count?: number | null } {
+  if (queryResults.length > 0) {
+    const next = queryResults.shift()!;
+    return {
+      data: next.data ?? null,
+      error: next.error ?? null,
+      count: next.count,
+    };
+  }
+
+  return queryResult;
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockFrom = vi.fn((): any => ({
@@ -20,10 +34,10 @@ const mockFrom = vi.fn((): any => ({
     const chainable: any = {
       order: () => chainable,
       eq: () => chainable,
-      in: () => Promise.resolve(queryResult),
-      maybeSingle: () => Promise.resolve(queryResult),
+      in: () => Promise.resolve(nextQueryResult()),
+      maybeSingle: () => Promise.resolve(nextQueryResult()),
       limit: () => chainable,
-      then: (resolve: (v: unknown) => void) => resolve(queryResult),
+      then: (resolve: (v: unknown) => void) => resolve(nextQueryResult()),
     };
     return chainable;
   },
@@ -70,6 +84,8 @@ vi.mock("../cache/redis", () => ({
 
 import { getSupabase } from "./supabase";
 import {
+  CampaignRowSchema,
+  CampaignSendRowSchema,
   dbGetCampaigns,
   dbGetCampaign,
   dbCreateCampaign,
@@ -81,11 +97,14 @@ import {
   dbMarkSendsFailed,
   dbGetCampaignStats,
   dbGetActiveEngagementCampaign,
+  mapCampaignRow,
+  mapSendRow,
 } from "./campaigns";
 
 beforeEach(() => {
   vi.clearAllMocks();
   queryResult = { data: null, error: null };
+  queryResults = [];
 });
 
 // ---------------------------------------------------------------------------
@@ -247,6 +266,26 @@ describe("dbGetCampaign", () => {
   });
 });
 
+describe("mapCampaignRow runtime validation", () => {
+  it("rejects rows with missing required fields", () => {
+    expect(() => mapCampaignRow({})).toThrow(/validation/i);
+  });
+
+  it("exposes a schema-like parse function for campaign rows", () => {
+    expect(typeof CampaignRowSchema.parse).toBe("function");
+  });
+});
+
+describe("mapSendRow runtime validation", () => {
+  it("rejects rows with missing required fields", () => {
+    expect(() => mapSendRow({})).toThrow(/validation/i);
+  });
+
+  it("exposes a schema-like parse function for send rows", () => {
+    expect(typeof CampaignSendRowSchema.parse).toBe("function");
+  });
+});
+
 describe("dbCreateCampaign", () => {
   const validInput = {
     type: "announcement" as const,
@@ -376,6 +415,13 @@ describe("dbUpdateCampaign", () => {
     await dbUpdateCampaign("c-1", { name: "Only Name" });
 
     expect(mockUpdate).toHaveBeenCalledWith({ name: "Only Name" });
+  });
+
+  it("rejects invalid campaign statuses before writing", async () => {
+    await expect(
+      dbUpdateCampaign("c-1", { status: "bogus" as unknown as "draft" }),
+    ).rejects.toThrow(/invalid campaign status/i);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -544,18 +590,31 @@ describe("dbMarkSendsFailed", () => {
 
 describe("dbGetCampaignStats", () => {
   it("returns aggregate counts", async () => {
-    queryResult = {
-      data: [
-        { status: "sent" },
-        { status: "sent" },
-        { status: "pending" },
-        { status: "failed" },
-      ],
-      error: null,
-    };
+    queryResults = [
+      { count: 2, error: null },
+      { count: 1, error: null },
+      { count: 1, error: null },
+    ];
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 2, pending: 1, failed: 1 });
+  });
+
+  it("uses count-only queries instead of loading campaign send rows", async () => {
+    queryResults = [
+      { count: 2, error: null },
+      { count: 1, error: null },
+      { count: 1, error: null },
+    ];
+
+    await dbGetCampaignStats("c-1");
+
+    expect(mockSelect).toHaveBeenCalledTimes(3);
+    for (const call of mockSelect.mock.calls) {
+      expect(call[0]).not.toContain("*");
+      expect(call[0]).toBe("id");
+      expect(call[1]).toEqual({ count: "exact", head: true });
+    }
   });
 
   it("returns zeros when DB unavailable", async () => {
@@ -565,47 +624,49 @@ describe("dbGetCampaignStats", () => {
   });
 
   it("returns zeros when data is null", async () => {
-    queryResult = { data: null, error: null };
+    queryResults = [
+      { count: null, error: null },
+      { count: null, error: null },
+      { count: null, error: null },
+    ];
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
   });
 
   it("returns zeros on query error", async () => {
-    queryResult = { data: null, error: new Error("query failed") };
+    queryResults = [{ error: new Error("query failed") }];
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
   });
 
   it("counts all-sent data correctly", async () => {
-    queryResult = {
-      data: [
-        { status: "sent" },
-        { status: "sent" },
-        { status: "sent" },
-      ],
-      error: null,
-    };
+    queryResults = [
+      { count: 3, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    ];
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 3, pending: 0, failed: 0 });
   });
 
-  it("ignores unknown status values in count", async () => {
-    queryResult = {
-      data: [
-        { status: "sent" },
-        { status: "unknown" },
-        { status: "pending" },
-      ],
-      error: null,
-    };
+  it("returns the server-side counts exactly", async () => {
+    queryResults = [
+      { count: 1, error: null },
+      { count: 1, error: null },
+      { count: 0, error: null },
+    ];
 
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 1, pending: 1, failed: 0 });
   });
 
   it("returns zeros for empty data array", async () => {
-    queryResult = { data: [], error: null };
+    queryResults = [
+      { count: 0, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    ];
     const stats = await dbGetCampaignStats("c-1");
     expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
   });

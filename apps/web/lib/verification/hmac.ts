@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
 
+const PAYLOAD_VERSION = "v2";
+
 /**
  * Build a deterministic pipe-delimited payload string from badge data.
  * Same inputs on the same date always produce the same string.
@@ -12,6 +14,7 @@ export function buildPayload(
   date: string,
 ): string {
   return [
+    PAYLOAD_VERSION,
     stats.handle.toLowerCase(),
     impact.adjustedComposite,
     impact.confidence,
@@ -21,9 +24,12 @@ export function buildPayload(
     Math.round(impact.dimensions.quality),
     Math.round(impact.dimensions.consistency),
     Math.round(impact.dimensions.breadth),
+    Math.round(impact.dimensions.craft ?? 0),
     stats.commitsTotal,
     stats.prsMergedCount,
     stats.reviewsSubmittedCount,
+    stats.activeDays,
+    stats.reposContributed,
     date,
   ].join("|");
 }
@@ -44,7 +50,15 @@ export function generateVerificationCode(
   impact: ImpactV6Result,
 ): { hash: string; date: string } | null {
   const secret = process.env.CHAPA_VERIFICATION_SECRET?.trim();
-  if (!secret) return null;
+  if (!secret) {
+    if (process.env.VERCEL_ENV === "production") {
+      throw new Error("CHAPA_VERIFICATION_SECRET is required in production");
+    }
+    console.warn(
+      "[verify] CHAPA_VERIFICATION_SECRET unset - verification disabled (non-production)",
+    );
+    return null;
+  }
 
   const date = toDateString(new Date());
   const payload = buildPayload(stats, impact, date);

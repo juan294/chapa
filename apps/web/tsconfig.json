@@ -26,6 +26,12 @@
       }
     ],
     "paths": {
+      "@chapa/shared": [
+        "../../packages/shared/src/index.ts"
+      ],
+      "@chapa/shared/*": [
+        "../../packages/shared/src/*"
+      ],
       "@/*": [
         "./*"
       ]

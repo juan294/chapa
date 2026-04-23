@@ -91,3 +91,10 @@ if (!ipRl.allowed) return NextResponse.json({error:"poll_rate_exceeded"}, {statu
 - The per-sessionId rate of 120/5min = 1 poll every 2.5 s average, well above the CLI's typical 2-s polling cadence.
 - The per-IP blanket protects against an attacker issuing fresh `sessionId`s to evade the per-session limit.
 - If runtime telemetry later shows the IP tier being hit by legitimate shared-network users (office, CI), bump the cap — this is a reversible decision.
+
+## Status
+
+- [x] Implemented on 2026-04-23
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, `pnpm exec vitest run apps/web/app/api/webhooks/resend/route.test.ts apps/web/app/api/cli/auth/poll/route.test.ts`, and `pnpm run test`
+- [x] Added an explicit `email_id` format guard before the Resend fetch-by-id step
+- [x] Replaced the single CLI poll limiter with a two-tier per-session and per-IP rate limit

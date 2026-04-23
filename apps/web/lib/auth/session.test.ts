@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  getSessionKey,
   getOptionalRequestSession,
   getOptionalServerSessionFromHeaders,
   requireRequestSession,
@@ -52,6 +53,22 @@ describe("session helpers", () => {
       expect(mockReadSessionCookie).toHaveBeenCalledWith(
         "chapa_session=some-value",
         "test-secret-value",
+      );
+    });
+  });
+
+  describe("getSessionKey", () => {
+    it("throws when NEXTAUTH_SECRET is shorter than 32 chars", () => {
+      vi.stubEnv("NEXTAUTH_SECRET", "short");
+
+      expect(() => getSessionKey()).toThrow(/at least 32 chars/i);
+    });
+
+    it("returns a buffer when NEXTAUTH_SECRET is long enough", () => {
+      vi.stubEnv("NEXTAUTH_SECRET", "12345678901234567890123456789012");
+
+      expect(getSessionKey()).toEqual(
+        Buffer.from("12345678901234567890123456789012", "utf8"),
       );
     });
   });

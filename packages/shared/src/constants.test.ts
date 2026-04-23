@@ -6,6 +6,12 @@ import {
   REPO_DEPTH_THRESHOLD,
   DIMENSION_KEYS,
   SOLO_DIMENSION_KEYS,
+  BURST_ACTIVITY_THRESHOLD,
+  MICRO_COMMIT_THRESHOLD,
+  SINGLE_REPO_CONCENTRATION,
+  LEAD_TIME_CAPS,
+  BATCH_SIZE_DEFAULT,
+  TIER_THRESHOLDS,
 } from "./constants";
 
 describe("shared/constants", () => {
@@ -129,6 +135,32 @@ describe("shared/constants", () => {
 
     it("is less than commits cap (sanity)", () => {
       expect(REPO_DEPTH_THRESHOLD).toBeLessThan(SCORING_CAPS.commits);
+    });
+  });
+
+  describe("scoring thresholds", () => {
+    it("keeps BURST_ACTIVITY_THRESHOLD at 100", () => {
+      expect(BURST_ACTIVITY_THRESHOLD).toBe(100);
+    });
+
+    it("keeps MICRO_COMMIT_THRESHOLD at 0.6", () => {
+      expect(MICRO_COMMIT_THRESHOLD).toBe(0.6);
+    });
+
+    it("keeps SINGLE_REPO_CONCENTRATION at 0.95", () => {
+      expect(SINGLE_REPO_CONCENTRATION).toBe(0.95);
+    });
+
+    it("keeps LEAD_TIME_CAPS aligned with the v6 delivery modifier", () => {
+      expect(LEAD_TIME_CAPS).toEqual({ fast: 4, mid: 48, slow: 168 });
+    });
+
+    it("keeps BATCH_SIZE_DEFAULT at 0.3", () => {
+      expect(BATCH_SIZE_DEFAULT).toBe(0.3);
+    });
+
+    it("keeps TIER_THRESHOLDS aligned with tier mapping", () => {
+      expect(TIER_THRESHOLDS).toEqual({ S: 85, A: 70, C: 30 });
     });
   });
 

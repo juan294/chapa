@@ -105,3 +105,8 @@ await cacheDel(buildSnapshotKey(handle));  // NEW
 
 - Old cache entries (`snapshot:latest:…` etc.) will age out naturally via the 24 h TTL. We do not scan-and-delete; Redis memory overhead for 24 h of orphaned keys is negligible for this scale.
 - `CACHE_VERSION` belongs in `apps/web/lib/cache/` (not `packages/shared`) because it's a web-app concern. P11 consolidates *scoring* constants, not cache ones.
+
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { buildAuthUrl, createStateCookie } from "@/lib/auth/github";
+import { issueOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${baseUrl}/api/auth/callback`;
 
   const { state, cookie: stateCookie } = createStateCookie();
+  await issueOauthState(state);
   const authUrl = buildAuthUrl(clientId, redirectUri, state);
 
   const response = NextResponse.redirect(authUrl);

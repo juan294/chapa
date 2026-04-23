@@ -131,3 +131,9 @@ export function getSessionKey(): Buffer {
 
 - `cacheGetDel` is a single Upstash Redis round-trip (`GETDEL`). If the project uses an older Upstash SDK without `GETDEL`, fall back to a MULTI `GET` + `DEL` pipeline — note in the implementation PR which path was taken.
 - The `NEXTAUTH_SECRET` length choice (32) matches industry norm for HS256/HMAC keys.
+
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`
+- [x] Added `login/route.ts` to the implementation surface to issue the server-side OAuth nonce before callback consumption

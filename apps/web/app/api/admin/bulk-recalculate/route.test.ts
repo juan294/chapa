@@ -138,9 +138,63 @@ describe("POST /api/admin/bulk-recalculate", () => {
     const body = await res.json();
 
     expect(body.recalculated).toBe(1);
+    expect(body.partial).toBe(false);
+    expect(body.completed).toEqual(["alice"]);
     expect(body.total).toBe(1);
     expect(mockDbGetUsers).not.toHaveBeenCalled();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects payloads with more than 100 handles", async () => {
+    const handles = Array.from({ length: 101 }, (_, index) => `user${index}`);
+
+    const res = await POST(makeRequest(VALID_SECRET, { handles }));
+    const body = await res.json();
+
+    expect(res.status).toBe(413);
+    expect(body.error).toMatch(/max 100 handles/i);
+    expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalled();
+  });
+
+  it("returns completed handles for successful inline runs", async () => {
+    const res = await POST(
+      makeRequest(VALID_SECRET, { handles: ["alice", "bob"] }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.partial).toBe(false);
+    expect(body.completed).toEqual(["alice", "bob"]);
+    expect(body.pending).toBeUndefined();
+  });
+
+  it("aborts cleanly with partial progress when the inline deadline is exceeded", async () => {
+    vi.useFakeTimers();
+    const handles = Array.from({ length: 100 }, (_, index) => `user${index}`);
+    mockMaterializeOrchestratedProfile.mockImplementation(async (handle: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 251_000));
+      return {
+        ...FAKE_MATERIALIZED,
+        stats: { ...FAKE_MATERIALIZED.stats, handle },
+      };
+    });
+
+    try {
+      const promise = POST(makeRequest(VALID_SECRET, { handles }));
+      await vi.advanceTimersByTimeAsync(251_000);
+
+      const res = await promise;
+      const body = await res.json();
+
+      expect(res.status).toBe(202);
+      expect(body.partial).toBe(true);
+      expect(body.completed).toEqual(handles.slice(0, 5));
+      expect(body.pending).toEqual(handles.slice(5));
+      expect(body.total).toBe(100);
+      expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reports stats fetch failures without aborting the batch", async () => {

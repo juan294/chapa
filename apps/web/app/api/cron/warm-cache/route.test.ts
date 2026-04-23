@@ -177,7 +177,9 @@ describe("GET /api/cron/warm-cache", () => {
     expect(res.status).toBe(200);
     expect(body.warmed).toBe(2);
     expect(body.failed).toBe(0);
-    expect(body.handles).toEqual(["alice", "bob"]);
+    expect(body.processedCount).toBe(2);
+    expect(body.processedSample).toEqual(["alice", "bob"]);
+    expect(body.handles).toBeUndefined();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       token: "ghp-server-token",
       craftMode: "cached",
@@ -265,7 +267,8 @@ describe("GET /api/cron/warm-cache", () => {
 
     expect(body.rotation.offset).toBe(10);
     expect(body.rotation.nextOffset).toBe(60);
-    expect(body.handles).toHaveLength(50);
+    expect(body.processedCount).toBe(50);
+    expect(body.processedSample).toHaveLength(10);
     expect(mockCacheSet).toHaveBeenCalledWith("cron:warm-cache:offset", 60, 0);
   });
 
@@ -291,13 +294,14 @@ describe("GET /api/cron/warm-cache", () => {
     );
 
     const res = await GET(makeRequest());
-    const body = await res.json();
+    expect(res.status).toBe(200);
 
-    // user0 and user1 are priority and outside the slice — they must be appended
-    expect(body.handles).toContain("user0");
-    expect(body.handles).toContain("user1");
-    // unknown-user is not in the user list — must be excluded
-    expect(body.handles).not.toContain("unknown-user");
+    const warmedHandles = mockMaterializeOrchestratedProfile.mock.calls.map(
+      ([handle]) => handle,
+    );
+    expect(warmedHandles).toContain("user0");
+    expect(warmedHandles).toContain("user1");
+    expect(warmedHandles).not.toContain("unknown-user");
   });
 
   it("wraps around to the start of the handle list when offset + MAX_HANDLES exceeds total users", async () => {
@@ -311,12 +315,52 @@ describe("GET /api/cron/warm-cache", () => {
     const body = await res.json();
 
     // Remaining from offset: user40..user59 (20), from start: user0..user29 (30) = 50 total
-    expect(body.handles).toHaveLength(50);
-    expect(body.handles[0]).toBe("user40");
-    expect(body.handles[19]).toBe("user59");
-    expect(body.handles[20]).toBe("user0");
-    expect(body.handles[49]).toBe("user29");
+    expect(body.processedCount).toBe(50);
+    expect(body.processedSample).toEqual([
+      "user40",
+      "user41",
+      "user42",
+      "user43",
+      "user44",
+      "user45",
+      "user46",
+      "user47",
+      "user48",
+      "user49",
+    ]);
     expect(body.rotation.nextOffset).toBe(30);
+
+    const warmedHandles = mockMaterializeOrchestratedProfile.mock.calls.map(
+      ([handle]) => handle,
+    );
+    expect(warmedHandles[0]).toBe("user40");
+    expect(warmedHandles[19]).toBe("user59");
+    expect(warmedHandles[20]).toBe("user0");
+    expect(warmedHandles[49]).toBe("user29");
+  });
+
+  it("returns a trimmed processed sample instead of the full handle list", async () => {
+    mockDbGetUsers.mockResolvedValue(
+      Array.from({ length: 25 }, (_, index) => user(`user${index}`)),
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.processedCount).toBe(25);
+    expect(body.processedSample).toEqual([
+      "user0",
+      "user1",
+      "user2",
+      "user3",
+      "user4",
+      "user5",
+      "user6",
+      "user7",
+      "user8",
+      "user9",
+    ]);
+    expect(body.handles).toBeUndefined();
   });
 
   it("swallows getAvatarBase64 rejection without failing the warm", async () => {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { CACHE_VERSION } from "@/lib/cache/version";
 
 const {
   mockMaterializePublicProfile,
@@ -13,6 +14,8 @@ const {
   mockCaptureServerError,
   mockCacheGet,
   mockCacheSet,
+  mockCacheSetNx,
+  mockCacheDel,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -25,6 +28,8 @@ const {
   mockCaptureServerError: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockCacheSetNx: vi.fn(),
+  mockCacheDel: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -56,6 +61,8 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
   cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheSetNx: (...args: unknown[]) => mockCacheSetNx(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -142,6 +149,8 @@ describe("GET /u/[handle]/badge.svg", () => {
     // SVG cache: miss by default
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockCacheSetNx.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(undefined);
   });
 
   it("returns 429 when the badge route is rate limited", async () => {
@@ -262,9 +271,22 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
 
       expect(mockCacheSet).toHaveBeenCalledWith(
-        expect.stringMatching(/^svg:badge:testuser:/),
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
         FAKE_SVG,
         86400,
+      );
+    });
+
+    it("acquires and releases a versioned render lock on cold-cache renders", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSetNx).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:warm-amber:`)),
+        30,
+      );
+      expect(mockCacheDel).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:warm-amber:`)),
       );
     });
 
@@ -275,8 +297,22 @@ describe("GET /u/[handle]/badge.svg", () => {
       await GET(req, ctx);
 
       expect(mockCacheGet).toHaveBeenCalledWith(
-        expect.stringMatching(/^svg:badge:testuser:/),
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
       );
+    });
+
+    it("reuses cached SVG after another request already holds the render lock", async () => {
+      mockCacheSetNx.mockResolvedValue(false);
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(FAKE_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(await res.text()).toBe(FAKE_SVG);
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
     it("skips rendering on cache hit but still returns correct Content-Type header", async () => {

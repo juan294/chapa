@@ -90,8 +90,8 @@ describe("golden profiles", () => {
       {
         "archetype": "Builder",
         "breadth": 36,
-        "compositeScore": 61,
-        "consistency": 73,
+        "compositeScore": 60,
+        "consistency": 72,
         "delivery": 82,
         "profileType": "collaborative",
         "quality": 51,

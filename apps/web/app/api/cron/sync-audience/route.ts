@@ -7,6 +7,7 @@ import {
   addContact,
   markUnsubscribed,
 } from "@/lib/email/audience";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { withTimeout } from "@/lib/async/with-timeout";
@@ -41,7 +42,10 @@ async function listAllContacts(): Promise<Contact[]> {
     return [];
   });
 
-  cacheSet(CONTACTS_CACHE_KEY, contacts, CONTACTS_CACHE_TTL).catch(() => {});
+  fireAndForget(
+    () => cacheSet(CONTACTS_CACHE_KEY, contacts, CONTACTS_CACHE_TTL),
+    () => undefined,
+  );
   return contacts;
 }
 

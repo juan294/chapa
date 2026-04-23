@@ -15,6 +15,16 @@ const mockPfcount = vi.fn();
 const mockMget = vi.fn();
 const mockIncrby = vi.fn();
 const mockDbsize = vi.fn();
+const mockPipelineGet = vi.fn();
+const mockPipelineIncrby = vi.fn();
+const mockPipelineExpire = vi.fn();
+const mockPipelineExec = vi.fn();
+const mockPipelineFactory = vi.fn(() => ({
+  get: mockPipelineGet,
+  incrby: mockPipelineIncrby,
+  expire: mockPipelineExpire,
+  exec: mockPipelineExec,
+}));
 
 vi.mock("@upstash/redis", () => ({
   Redis: class MockRedis {
@@ -28,6 +38,7 @@ vi.mock("@upstash/redis", () => ({
     mget = mockMget;
     incrby = mockIncrby;
     dbsize = mockDbsize;
+    pipeline = mockPipelineFactory;
   },
 }));
 
@@ -42,6 +53,7 @@ import {
   cacheMGet,
   pingRedis,
   cacheIncr,
+  cacheReserveQuota,
   _resetClient,
 } from "./redis";
 
@@ -268,6 +280,45 @@ describe("rateLimit", () => {
 
     expect(result.allowed).toBe(true);
     expect(mockIncr).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cacheReserveQuota
+// ---------------------------------------------------------------------------
+
+describe("cacheReserveQuota", () => {
+  it("uses a single pipeline to read and reserve quota", async () => {
+    mockPipelineExec.mockResolvedValueOnce([4, 7, 1]);
+
+    const result = await cacheReserveQuota("quota:test", 3, 10, 86400);
+
+    expect(result).toEqual({ allowed: true, current: 7, limit: 10 });
+    expect(mockPipelineFactory).toHaveBeenCalled();
+    expect(mockPipelineGet).toHaveBeenCalledWith("quota:test");
+    expect(mockPipelineIncrby).toHaveBeenCalledWith("quota:test", 3);
+    expect(mockPipelineExpire).toHaveBeenCalledWith("quota:test", 86400);
+  });
+
+  it("compensates and denies when the reservation would exceed the limit", async () => {
+    mockPipelineExec.mockResolvedValueOnce([9, 12, 1]);
+    mockIncrby.mockResolvedValueOnce(9);
+
+    const result = await cacheReserveQuota("quota:test", 3, 10, 86400);
+
+    expect(result).toEqual({ allowed: false, current: 9, limit: 10 });
+    expect(mockIncrby).toHaveBeenCalledWith("quota:test", -3);
+  });
+
+  it("fails open when Redis is unavailable", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await cacheReserveQuota("quota:test", 2, 10, 86400);
+
+    expect(result).toEqual({ allowed: true, current: 0, limit: 10 });
+    expect(mockPipelineFactory).not.toHaveBeenCalled();
   });
 });
 
@@ -577,4 +628,3 @@ describe("cacheSetNx", () => {
     expect(result).toBe(false);
   });
 });
-

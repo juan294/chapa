@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Campaign } from "@/lib/db/campaigns";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,10 +57,13 @@ export function EngagementDashboard() {
   }, [fetchFlags]);
 
   useEffect(() => {
-    fetch("/api/admin/campaigns?type=engagement")
-      .then(res => res.ok ? res.json() : null)
-      .then(data => setEngagementCampaign(data?.campaigns?.[0] ?? null))
-      .catch(() => {});
+    fireAndForget(
+      () =>
+        fetch("/api/admin/campaigns?type=engagement")
+          .then(res => res.ok ? res.json() : null)
+          .then(data => setEngagementCampaign(data?.campaigns?.[0] ?? null)),
+      () => undefined,
+    );
   }, []);
 
   const handleToggle = useCallback(

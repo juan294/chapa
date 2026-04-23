@@ -5,6 +5,11 @@
 **Batch:** [batch-eligible]
 **Policy:** Q3a — add missing fields, bump `v` byte, accept legacy 32-char hashes for 90-day window.
 
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, targeted `eslint` on changed phase-2 files, and `pnpm run test`
+
 ## Goal
 
 Extend the verification payload so two profiles with different real-world stats no longer collide, make the missing-secret failure mode loud (in production only), and compare stored hashes via `crypto.timingSafeEqual`.

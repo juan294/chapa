@@ -3,7 +3,6 @@ import { verifyAdminSecret } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUsers } from "@/lib/db/users";
-import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -14,6 +13,10 @@ export const maxDuration = 300;
 
 /** Number of handles to process concurrently per batch. */
 const BATCH_SIZE = 5;
+/** Maximum handles processed inline per request. */
+const MAX_INLINE_HANDLES = 100;
+/** Abort inline work before the platform max duration is exhausted. */
+const INLINE_DEADLINE_MS = 250_000;
 
 /**
  * POST /api/admin/bulk-recalculate
@@ -74,6 +77,8 @@ export async function POST(request: NextRequest) {
 
   if (handles.length === 0) {
     return NextResponse.json({
+      partial: false,
+      completed: [],
       recalculated: 0,
       failed: 0,
       total: 0,
@@ -82,39 +87,74 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  if (handles.length > MAX_INLINE_HANDLES) {
+    return NextResponse.json(
+      {
+        error: `Payload too large. Max ${MAX_INLINE_HANDLES} handles per call.`,
+      },
+      { status: 413 },
+    );
+  }
+
   const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
   const errors: { handle: string; error: string }[] = [];
   let recalculated = 0;
+  const completed: string[] = [];
+  const deadline = Date.now() + INLINE_DEADLINE_MS;
 
-  await processInBatches(handles, BATCH_SIZE, async (handle) => {
-    try {
-      const materialized = await materializeOrchestratedProfile(handle, {
-        token: githubToken,
-        craftMode: "cached",
-      });
-
-      if (!materialized) {
-        errors.push({ handle, error: "Stats fetch returned null" });
-        return;
-      }
-
-      const replaced = await persistOrchestratedSnapshot(handle, materialized, {
-        mode: "replace",
-      });
-      if (replaced) {
-        recalculated++;
-      } else {
-        errors.push({ handle, error: "Snapshot replace failed" });
-      }
-    } catch (err) {
-      errors.push({
-        handle,
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+  for (let i = 0; i < handles.length; i += BATCH_SIZE) {
+    if (Date.now() >= deadline) {
+      return NextResponse.json(
+        {
+          partial: true,
+          completed,
+          pending: handles.slice(completed.length),
+          recalculated,
+          failed: errors.length,
+          total: handles.length,
+          errors: errors.length > 0 ? errors : undefined,
+          ...(afterCursor ? { cursor: afterCursor } : {}),
+        },
+        { status: 202 },
+      );
     }
-  });
+
+    const batch = handles.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (handle) => {
+        try {
+          const materialized = await materializeOrchestratedProfile(handle, {
+            token: githubToken,
+            craftMode: "cached",
+          });
+
+          if (!materialized) {
+            errors.push({ handle, error: "Stats fetch returned null" });
+            return;
+          }
+
+          const replaced = await persistOrchestratedSnapshot(handle, materialized, {
+            mode: "replace",
+          });
+          if (replaced) {
+            recalculated++;
+          } else {
+            errors.push({ handle, error: "Snapshot replace failed" });
+          }
+        } catch (err) {
+          errors.push({
+            handle,
+            error: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      }),
+    );
+    completed.push(...batch);
+  }
 
   return NextResponse.json({
+    partial: false,
+    completed,
     recalculated,
     failed: errors.length,
     total: handles.length,

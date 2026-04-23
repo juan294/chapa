@@ -5,6 +5,11 @@
 **Batch:** [batch-eligible]
 **Policy:** Q2a — `/api/telemetry` stays unauthenticated because `chapa-cli/src/telemetry.ts` depends on it.
 
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`
+
 ## Goal
 
 Keep the endpoint open so the CLI keeps working, but make the trust story explicit: every row is flagged `verified=false` until the CLI presents a token, rate-limits are tightened, and the route logs the DB outcome instead of silently dropping it.

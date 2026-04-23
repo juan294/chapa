@@ -76,6 +76,13 @@ const sampleEmail = {
   attachments: [],
 };
 
+function makeEmailReceivedPayload(emailId: string): string {
+  return JSON.stringify({
+    type: "email.received",
+    data: { email_id: emailId },
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
@@ -157,6 +164,22 @@ describe("POST /api/webhooks/resend", () => {
     expect(body.error).toContain("fetch");
   });
 
+  it("returns 400 when email_id fails the format guard", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+
+    const req = makeRequest(
+      makeEmailReceivedPayload("../../etc/passwd"),
+      validHeaders,
+    );
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("email_id");
+    expect(mockFetchReceivedEmail).not.toHaveBeenCalled();
+  });
+
   it("returns 502 when forwardEmail fails", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
     mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
@@ -200,6 +223,23 @@ describe("POST /api/webhooks/resend", () => {
       html: "<p>Need help</p>",
       text: "Need help",
     });
+  });
+
+  it("passes a valid email_id through to fetchReceivedEmail", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_456" });
+
+    const req = makeRequest(
+      makeEmailReceivedPayload("12345678-abcd-4ef0-1234-567890abcdef"),
+      validHeaders,
+    );
+
+    await POST(req);
+
+    expect(mockFetchReceivedEmail).toHaveBeenCalledWith(
+      "12345678-abcd-4ef0-1234-567890abcdef",
+    );
   });
 
   it("passes svix headers to verifyWebhookSignature", async () => {

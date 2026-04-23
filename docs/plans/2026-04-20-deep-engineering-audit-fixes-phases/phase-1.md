@@ -4,6 +4,11 @@
 **Depends on:** none
 **Blocks:** P4 (cache version bump), P11 (constants consolidation)
 
+## Status
+
+- [x] Implemented on 2026-04-22
+- [x] Verified with `pnpm run typecheck`, `pnpm run lint`, `pnpm exec vitest run apps/web/lib/impact/pipeline.test.ts`, and `pnpm run test`
+
 ## Goal
 
 Fix four scoring-math defects that bias outputs today, and align the `burst_activity` JSDoc with its implementation (code stays, doc changes).

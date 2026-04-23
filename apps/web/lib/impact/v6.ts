@@ -5,7 +5,15 @@ import type {
   ImpactV6Result,
   ProfileType,
 } from "@chapa/shared";
-import { SCORING_CAPS, SCORING_WINDOW_DAYS, DIMENSION_KEYS, SOLO_DIMENSION_KEYS, SOLO_REVIEW_RATIO_THRESHOLD } from "@chapa/shared";
+import {
+  BATCH_SIZE_DEFAULT,
+  DIMENSION_KEYS,
+  LEAD_TIME_CAPS,
+  SCORING_CAPS,
+  SCORING_WINDOW_DAYS,
+  SOLO_DIMENSION_KEYS,
+  SOLO_REVIEW_RATIO_THRESHOLD,
+} from "@chapa/shared";
 import { normalize, clampScore, computeConfidence, computeAdjustedScore, getTier } from "./utils";
 import { computeHeatmapEvenness, computeWeekCoverage } from "./heatmap-evenness";
 import { computeRecencyRatio, applyRecencyWeight } from "./recency";
@@ -31,12 +39,18 @@ const CAPS = SCORING_CAPS;
  */
 export function computeLeadTimeModifier(medianHours?: number): number {
   if (medianHours == null) return 1.0;
-  if (medianHours <= 4) return 1.05;
-  if (medianHours <= 48) {
-    return 1.05 - 0.05 * ((medianHours - 4) / (48 - 4));
+  if (medianHours <= LEAD_TIME_CAPS.fast) return 1.05;
+  if (medianHours <= LEAD_TIME_CAPS.mid) {
+    return 1.05 - 0.05 * (
+      (medianHours - LEAD_TIME_CAPS.fast) /
+      (LEAD_TIME_CAPS.mid - LEAD_TIME_CAPS.fast)
+    );
   }
-  if (medianHours <= 168) {
-    return 1.0 - 0.05 * ((medianHours - 48) / (168 - 48));
+  if (medianHours <= LEAD_TIME_CAPS.slow) {
+    return 1.0 - 0.05 * (
+      (medianHours - LEAD_TIME_CAPS.mid) /
+      (LEAD_TIME_CAPS.slow - LEAD_TIME_CAPS.mid)
+    );
   }
   return 0.95;
 }
@@ -105,7 +119,7 @@ export function computeQuality(stats: StatsData, profileType?: ProfileType): num
 
   // Batch size score: fraction of PRs in the reviewable sweet spot (20-500 lines)
   // Default 0.3 when unknown (no free points)
-  const batchSize = stats.batchSizeScore ?? 0.3;
+  const batchSize = stats.batchSizeScore ?? BATCH_SIZE_DEFAULT;
 
   const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * batchSize);
   return clampScore(raw);
@@ -133,7 +147,7 @@ function computeSoloQuality(stats: StatsData): number {
   const descRate = stats.prDescriptionRate ?? 0;
   const branchRate = stats.featureBranchRate ?? 0;
   const linkageRate = stats.issueLinkageRate ?? 0;
-  const batchSize = stats.batchSizeScore ?? 0.3;
+  const batchSize = stats.batchSizeScore ?? BATCH_SIZE_DEFAULT;
 
   const raw = 100 * (0.40 * descRate + 0.25 * branchRate + 0.20 * linkageRate + 0.15 * batchSize);
   return clampScore(raw);

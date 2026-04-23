@@ -5,6 +5,7 @@ import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { invalidateHistoryCache } from "@/lib/history/history";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import {
   materializeOrchestratedProfile,
@@ -76,13 +77,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     // Update craft cache so badge views use the recomputed score
-    if (materialized.craftResult) {
-      updateCraftCache(handle, materialized.craftResult).catch(() => {});
+    const craftResult = materialized.craftResult;
+    if (craftResult) {
+      fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
     }
 
-    void persistOrchestratedSnapshot(handle, materialized, {
-      mode: "replace",
-    }).catch(() => {});
+    fireAndForget(
+      () => persistOrchestratedSnapshot(handle, materialized, { mode: "replace" }),
+      () => undefined,
+    );
 
     // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
     revalidatePath(`/u/${handle}`);

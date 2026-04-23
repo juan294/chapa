@@ -1,0 +1,6 @@
+{
+  "date": "2025-06-15",
+  "payload": "v2|testuser|52|85|Solid|Builder|70|50|60|40|0|200|30|50|120|5|2025-06-15",
+  "secret": "test-secret-with-enough-length-32chars!",
+  "hash": "824bb07bd969b492eba8eb4e9f57b2d0"
+}

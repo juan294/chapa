@@ -18,6 +18,7 @@ export interface TelemetryPayload {
   targetHandle: string;
   sourceHandle: string;
   success: boolean;
+  verified: boolean;
   errorCategory?: string;
   stats: {
     commitsTotal: number;
@@ -49,6 +50,7 @@ export async function dbInsertTelemetry(payload: TelemetryPayload): Promise<bool
       target_handle: payload.targetHandle.toLowerCase(),
       source_handle: payload.sourceHandle,
       success: payload.success,
+      verified: payload.verified,
       error_category: payload.errorCategory ?? null,
       commits_total: payload.stats.commitsTotal,
       repos_contributed: payload.stats.reposContributed,

@@ -155,6 +155,12 @@ export interface RateLimitResult {
   limit: number;
 }
 
+export interface QuotaReservationResult {
+  allowed: boolean;
+  current: number;
+  limit: number;
+}
+
 /**
  * Check and increment a rate limit counter.
  * Uses Redis INCR + EXPIRE for a fixed-window counter.
@@ -184,6 +190,47 @@ export async function rateLimit(
     return { allowed: current <= limit, current, limit };
   } catch {
     // Fail open — don't block requests if Redis is down
+    return { allowed: true, current: 0, limit };
+  }
+}
+
+/**
+ * Atomically reserve quota in Redis using a single pipeline for
+ * read + increment + TTL refresh.
+ *
+ * Returns the post-reservation counter when allowed. If the reservation would
+ * exceed the limit, the increment is immediately compensated and the previous
+ * counter is returned. Redis failures are fail-open.
+ */
+export async function cacheReserveQuota(
+  key: string,
+  amount: number,
+  limit: number,
+  ttlSeconds: number,
+): Promise<QuotaReservationResult> {
+  const redis = getRedis();
+  if (!redis || amount <= 0) {
+    return { allowed: true, current: 0, limit };
+  }
+
+  try {
+    const pipeline = redis.pipeline();
+    pipeline.get<number>(key);
+    pipeline.incrby(key, amount);
+    pipeline.expire(key, ttlSeconds);
+
+    const [beforeRaw, afterRaw] = await pipeline.exec<[number | null, number, number]>();
+    const before = beforeRaw ?? 0;
+    const after = typeof afterRaw === "number" ? afterRaw : before + amount;
+
+    if (after > limit) {
+      await redis.incrby(key, -amount);
+      return { allowed: false, current: before, limit };
+    }
+
+    return { allowed: true, current: after, limit };
+  } catch (error) {
+    console.error("[cache] cacheReserveQuota failed:", (error as Error).message);
     return { allowed: true, current: 0, limit };
   }
 }

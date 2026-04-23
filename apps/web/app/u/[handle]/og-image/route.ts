@@ -3,8 +3,10 @@ import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
 import { svgToPng } from "@/lib/render/svg-to-png";
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
 import {
   getPublicProfileVerification,
@@ -24,10 +26,22 @@ const SVG_TO_PNG_TIMEOUT_MS = 10_000;
  * redundant stats fetch + SVG render + PNG conversion on repeated requests.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   const { handle } = await params;
+
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:og:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return new NextResponse("Too many requests. Please try again later.", {
+      status: 429,
+      headers: {
+        "Content-Type": "text/plain",
+        "Retry-After": "60",
+      },
+    });
+  }
 
   if (!isValidHandle(handle)) {
     return new NextResponse("Invalid handle", { status: 400 });
@@ -78,7 +92,10 @@ export async function GET(
     );
 
     // Cache the PNG as base64 for 48h (fire-and-forget — don't block response)
-    cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL).catch(() => {});
+    fireAndForget(
+      () => cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL),
+      () => undefined,
+    );
 
     return new NextResponse(Buffer.from(png), {
       headers: {

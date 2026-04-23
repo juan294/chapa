@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 
 export type SessionPayload = NonNullable<ReturnType<typeof readSessionCookie>>;
+const MIN_SESSION_SECRET_LENGTH = 32;
 
 export type RequireSessionResult =
   | { session: SessionPayload; error?: never }
@@ -11,9 +12,29 @@ type CookieHeaderSource = {
   get(name: string): string | null;
 };
 
+function assertSessionSecretLength(secret: string): string {
+  if (secret.length < MIN_SESSION_SECRET_LENGTH) {
+    throw new Error("NEXTAUTH_SECRET must be set and at least 32 chars");
+  }
+  return secret;
+}
+
+const bootSessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+if (bootSessionSecret && process.env.NODE_ENV !== "test") {
+  assertSessionSecretLength(bootSessionSecret);
+}
+
 export function getSessionSecret(): string | null {
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
   return sessionSecret || null;
+}
+
+export function getSessionKey(): Buffer {
+  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  if (!sessionSecret) {
+    throw new Error("NEXTAUTH_SECRET must be set and at least 32 chars");
+  }
+  return Buffer.from(assertSessionSecretLength(sessionSecret), "utf8");
 }
 
 function parseSessionCookie(

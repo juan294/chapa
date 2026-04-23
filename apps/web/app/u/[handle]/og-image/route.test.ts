@@ -10,6 +10,8 @@ const {
   mockSvgToPng,
   mockCacheGet,
   mockCacheSet,
+  mockRateLimit,
+  mockGetClientIp,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -19,6 +21,8 @@ const {
   mockSvgToPng: vi.fn(),
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
+  mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -46,6 +50,11 @@ vi.mock("@/lib/render/svg-to-png", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: (...args: unknown[]) => mockCacheGet(...args),
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  getClientIp: (...args: unknown[]) => mockGetClientIp(...args),
 }));
 
 import { GET } from "./route";
@@ -105,6 +114,8 @@ describe("GET /u/[handle]/og-image", () => {
     mockSvgToPng.mockReturnValue(FAKE_PNG);
     mockCacheGet.mockResolvedValue(null);
     mockCacheSet.mockResolvedValue(true);
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+    mockGetClientIp.mockReturnValue("127.0.0.1");
   });
 
   afterEach(() => {
@@ -187,5 +198,26 @@ describe("GET /u/[handle]/og-image", () => {
 
     expect(res.status).toBe(500);
     consoleSpy.mockRestore();
+  });
+
+  it("rate-limits to 30 requests per IP per 60 seconds", async () => {
+    const counts = new Map<string, number>();
+    mockRateLimit.mockImplementation(async (key: string) => {
+      const next = (counts.get(key) ?? 0) + 1;
+      counts.set(key, next);
+      return { allowed: next <= 30, current: next, limit: 30 };
+    });
+
+    for (let i = 0; i < 30; i++) {
+      const [req, ctx] = makeRequest("testuser");
+      const res = await GET(req, ctx);
+      expect(res.status).toBe(200);
+    }
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
   });
 });

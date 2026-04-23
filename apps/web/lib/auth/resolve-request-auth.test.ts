@@ -87,6 +87,22 @@ describe("resolveRequestAuth", () => {
 
       expect(result).toBeNull();
     });
+
+    it("trims whitespace and newlines from the Authorization bearer token", async () => {
+      mockIsCliToken.mockReturnValue(true);
+      mockVerifyCliToken.mockReturnValue({ handle: "juan294" });
+
+      const result = await resolveRequestAuth(
+        makeRequest({ Authorization: "Bearer \tcli.token.here\n " }),
+      );
+
+      expect(result).toEqual({ handle: "juan294" });
+      expect(mockIsCliToken).toHaveBeenCalledWith("cli.token.here");
+      expect(mockVerifyCliToken).toHaveBeenCalledWith(
+        "cli.token.here",
+        "test-secret-key",
+      );
+    });
   });
 
   describe("Bearer GitHub PAT", () => {

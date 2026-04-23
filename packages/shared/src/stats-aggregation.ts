@@ -5,6 +5,21 @@ import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD, BATCH
 /** Branch names that indicate a direct push (not a feature branch). */
 const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
 
+export function median(values: number[]): number | undefined {
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1]! + sorted[middle]!) / 2;
+  }
+
+  return sorted[middle]!;
+}
+
 /**
  * Transform raw GitHub GraphQL contribution data into a StatsData object.
  *
@@ -90,11 +105,8 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
       const created = new Date(pr.createdAt!).getTime();
       const merged = new Date(pr.mergedAt!).getTime();
       return Math.max(0, (merged - created) / (1000 * 60 * 60));
-    })
-    .sort((a, b) => a - b);
-  const medianPrLeadTimeHours = leadTimes.length > 0
-    ? leadTimes[Math.floor(leadTimes.length / 2)]
-    : undefined;
+    });
+  const medianPrLeadTimeHours = median(leadTimes);
 
   // 6. Reviews and issues
   const reviewsSubmittedCount = raw.reviews.totalCount;

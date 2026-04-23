@@ -1,17 +1,51 @@
 import type { HeatmapDay } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
-// Internal helper
+// Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Aggregate daily heatmap into weekly totals. */
-function aggregateWeeklyTotals(heatmapData: HeatmapDay[], numWeeks: number): number[] {
-  const weeklyTotals: number[] = new Array(numWeeks).fill(0);
-  for (let i = 0; i < heatmapData.length; i++) {
-    const week = Math.floor(i / 7);
-    weeklyTotals[week]! += heatmapData[i]!.count;
+const MIN_WEEKS_FOR_COVERAGE = 4;
+
+export interface WeeklyBucket {
+  startOfWeek: string;
+  total: number;
+}
+
+function startOfSundayUTC(date: Date): Date {
+  const start = new Date(date);
+  start.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  start.setUTCHours(0, 0, 0, 0);
+  return start;
+}
+
+export function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+
+  if (sorted.length === 0) {
+    return 0;
   }
-  return weeklyTotals;
+
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1]! + sorted[middle]!) / 2;
+  }
+
+  return sorted[middle]!;
+}
+
+/** Aggregate daily heatmap into calendar-week totals keyed by UTC Sunday. */
+export function aggregateWeeklyTotals(heatmapData: HeatmapDay[]): WeeklyBucket[] {
+  const totalsByWeek = new Map<string, number>();
+
+  for (const entry of heatmapData) {
+    const day = new Date(`${entry.date}T00:00:00Z`);
+    const startOfWeek = startOfSundayUTC(day).toISOString().slice(0, 10);
+    totalsByWeek.set(startOfWeek, (totalsByWeek.get(startOfWeek) ?? 0) + entry.count);
+  }
+
+  return [...totalsByWeek.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([startOfWeek, total]) => ({ startOfWeek, total }));
 }
 
 // ---------------------------------------------------------------------------
@@ -33,8 +67,7 @@ function aggregateWeeklyTotals(heatmapData: HeatmapDay[], numWeeks: number): num
 export function computeHeatmapEvenness(heatmapData: HeatmapDay[]): number {
   if (heatmapData.length === 0) return 0;
 
-  const numWeeks = Math.ceil(heatmapData.length / 7);
-  const weeklyTotals = aggregateWeeklyTotals(heatmapData, numWeeks);
+  const weeklyTotals = aggregateWeeklyTotals(heatmapData).map((bucket) => bucket.total);
 
   // If total activity is zero, evenness is 0
   const total = weeklyTotals.reduce((sum, w) => sum + w, 0);
@@ -42,9 +75,8 @@ export function computeHeatmapEvenness(heatmapData: HeatmapDay[]): number {
 
   // Clip outlier weeks at 3× median to prevent extreme weeks from
   // dominating the coefficient of variation.
-  const sorted = [...weeklyTotals].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
-  const clipCap = Math.max(median * 3, 1);
+  const medianTotal = median(weeklyTotals);
+  const clipCap = Math.max(medianTotal * 3, 1);
   const clipped = weeklyTotals.map((w) => Math.min(w, clipCap));
 
   const clippedTotal = clipped.reduce((sum, w) => sum + w, 0);
@@ -76,8 +108,8 @@ export function computeHeatmapEvenness(heatmapData: HeatmapDay[]): number {
 export function computeWeekCoverage(heatmapData: HeatmapDay[]): number {
   if (heatmapData.length === 0) return 0;
 
-  const numWeeks = Math.ceil(heatmapData.length / 7);
-  const weeklyTotals = aggregateWeeklyTotals(heatmapData, numWeeks);
+  const weeklyTotals = aggregateWeeklyTotals(heatmapData).map((bucket) => bucket.total);
   const activeWeeks = weeklyTotals.filter((w) => w > 0).length;
-  return activeWeeks / numWeeks;
+  const totalWeeks = Math.max(weeklyTotals.length, MIN_WEEKS_FOR_COVERAGE);
+  return activeWeeks / totalWeeks;
 }

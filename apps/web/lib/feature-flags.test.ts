@@ -92,6 +92,18 @@ describe("isStudioEnabled", () => {
     const result = await isStudioEnabled();
     expect(result).toBe(false);
   });
+
+  it("falls back after 500ms when the DB lookup hangs", async () => {
+    vi.useFakeTimers();
+    vi.mocked(dbGetFeatureFlag).mockReturnValue(new Promise(() => {}));
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+
+    const resultPromise = isStudioEnabled();
+    await vi.advanceTimersByTimeAsync(501);
+
+    await expect(resultPromise).resolves.toBe(true);
+    vi.useRealTimers();
+  });
 });
 
 // ---------------------------------------------------------------------------

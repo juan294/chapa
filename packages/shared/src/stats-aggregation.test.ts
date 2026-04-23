@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { RawContributionData } from "./types";
-import { buildStatsFromRaw } from "./stats-aggregation";
+import { buildStatsFromRaw, median } from "./stats-aggregation";
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -690,6 +690,16 @@ describe("buildStatsFromRaw", () => {
   });
 });
 
+describe("median", () => {
+  it("returns the arithmetic mean of the middle pair for even-length arrays", () => {
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+  });
+
+  it("returns the middle value for odd-length arrays", () => {
+    expect(median([1, 2, 3])).toBe(2);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // batchSizeScore
 // ---------------------------------------------------------------------------
@@ -868,6 +878,22 @@ describe("medianPrLeadTimeHours", () => {
     });
     const result = buildStatsFromRaw(raw);
     expect(result.medianPrLeadTimeHours).toBe(8);
+  });
+
+  it("averages the two middle lead times for an even number of merged PRs", () => {
+    const raw = makeRaw({
+      pullRequests: {
+        totalCount: 4,
+        nodes: [
+          { additions: 50, deletions: 10, changedFiles: 3, merged: true, body: "x", headRefName: "feat/a", closingIssuesCount: 0, createdAt: "2026-01-01T10:00:00Z", mergedAt: "2026-01-01T14:00:00Z" }, // 4h
+          { additions: 30, deletions: 5, changedFiles: 2, merged: true, body: "x", headRefName: "feat/b", closingIssuesCount: 0, createdAt: "2026-01-02T10:00:00Z", mergedAt: "2026-01-02T18:00:00Z" }, // 8h
+          { additions: 80, deletions: 20, changedFiles: 5, merged: true, body: "x", headRefName: "feat/c", closingIssuesCount: 0, createdAt: "2026-01-03T10:00:00Z", mergedAt: "2026-01-03T22:00:00Z" }, // 12h
+          { additions: 20, deletions: 10, changedFiles: 1, merged: true, body: "x", headRefName: "feat/d", closingIssuesCount: 0, createdAt: "2026-01-04T10:00:00Z", mergedAt: "2026-01-05T10:00:00Z" }, // 24h
+        ],
+      },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.medianPrLeadTimeHours).toBe(10);
   });
 
   it("ignores unmerged PRs", () => {

@@ -71,6 +71,7 @@ vi.mock("node:child_process", () => ({
 import { readSessionCookie } from "@/lib/auth/github";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
+import { AGENTS } from "@/lib/agents/agent-config";
 import { spawn } from "node:child_process";
 
 // Import route handlers — they're module-level so we import after mocks
@@ -252,6 +253,19 @@ describe("POST /api/admin/agents/run", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain("Unknown agent");
+  });
+
+  it("rejects agent keys outside the closed allowlist format", async () => {
+    const res = await POST(makePostRequest({ agentKey: "../../etc/passwd" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("Invalid agent key");
+  });
+
+  it("uses underscore-safe agent keys in the allowlist", () => {
+    for (const key of Object.keys(AGENTS)) {
+      expect(key).toMatch(/^[a-z0-9_]+$/);
+    }
   });
 
   it("returns 400 when agentKey is missing", async () => {

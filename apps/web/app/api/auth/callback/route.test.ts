@@ -10,6 +10,7 @@ const {
   mockFetchGitHubUserEmail,
   mockCreateSessionCookie,
   mockValidateState,
+  mockConsumeOauthState,
   mockClearStateCookie,
   mockRateLimit,
   mockDbUpsertUser,
@@ -21,6 +22,7 @@ const {
   mockFetchGitHubUserEmail: vi.fn(),
   mockCreateSessionCookie: vi.fn(),
   mockValidateState: vi.fn(),
+  mockConsumeOauthState: vi.fn(),
   mockClearStateCookie: vi.fn(),
   mockRateLimit: vi.fn(),
   mockDbUpsertUser: vi.fn(),
@@ -35,6 +37,10 @@ vi.mock("@/lib/auth/github", () => ({
   createSessionCookie: mockCreateSessionCookie,
   validateState: mockValidateState,
   clearStateCookie: mockClearStateCookie,
+}));
+
+vi.mock("@/lib/auth/oauth-state", () => ({
+  consumeOauthState: mockConsumeOauthState,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -92,6 +98,7 @@ function makeRequest(params?: {
 
 function allowRateLimit() {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+  mockConsumeOauthState.mockResolvedValue(true);
   mockFetchGitHubUserEmail.mockResolvedValue(null);
   mockDbUpsertUser.mockResolvedValue(undefined);
   mockAddContact.mockResolvedValue(undefined);
@@ -205,6 +212,32 @@ describe("GET /api/auth/callback — OAuth flow", () => {
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("Location")!);
     expect(location.searchParams.get("error")).toBe("invalid_state");
+  });
+
+  it("consumes the state value server-side and rejects replay", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockConsumeOauthState
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const first = await GET(
+      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc" }),
+    );
+    expect(first.status).toBe(307);
+
+    const second = await GET(
+      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc" }),
+    );
+    expect(second.status).toBe(400);
+    await expect(second.json()).resolves.toEqual({ error: "state_already_used" });
   });
 
   it("redirects to /?error=config when GITHUB_CLIENT_ID is missing", async () => {

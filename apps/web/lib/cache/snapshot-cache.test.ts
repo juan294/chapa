@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { makeSnapshot } from "../test-helpers/fixtures";
+import { CACHE_VERSION } from "./version";
 
 // ---------------------------------------------------------------------------
 // Mocks — set up before importing the module under test
@@ -18,6 +19,7 @@ vi.mock("@/lib/db/snapshots", () => ({
 import { cacheGet, cacheSet, cacheDel } from "./redis";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
 import {
+  buildSnapshotKey,
   getCachedLatestSnapshot,
   updateSnapshotCache,
   invalidateSnapshotCache,
@@ -29,6 +31,12 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("buildSnapshotKey", () => {
+  it("includes the CACHE_VERSION axis", () => {
+    expect(buildSnapshotKey("juan")).toBe(`snapshot:${CACHE_VERSION}:latest:juan`);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -43,7 +51,7 @@ describe("getCachedLatestSnapshot", () => {
     const result = await getCachedLatestSnapshot("TestUser");
 
     expect(result).toEqual(snapshot);
-    expect(cacheGet).toHaveBeenCalledWith("snapshot:latest:testuser");
+    expect(cacheGet).toHaveBeenCalledWith(`snapshot:${CACHE_VERSION}:latest:testuser`);
     expect(dbGetLatestSnapshot).not.toHaveBeenCalled();
   });
 
@@ -58,7 +66,7 @@ describe("getCachedLatestSnapshot", () => {
     expect(result).toEqual(snapshot);
     expect(dbGetLatestSnapshot).toHaveBeenCalledWith("testuser");
     expect(cacheSet).toHaveBeenCalledWith(
-      "snapshot:latest:testuser",
+      `snapshot:${CACHE_VERSION}:latest:testuser`,
       snapshot,
       86400,
     );
@@ -81,7 +89,7 @@ describe("getCachedLatestSnapshot", () => {
 
     await getCachedLatestSnapshot("UPPERCASE");
 
-    expect(cacheGet).toHaveBeenCalledWith("snapshot:latest:uppercase");
+    expect(cacheGet).toHaveBeenCalledWith(`snapshot:${CACHE_VERSION}:latest:uppercase`);
     expect(dbGetLatestSnapshot).toHaveBeenCalledWith("UPPERCASE");
   });
 
@@ -101,7 +109,7 @@ describe("getCachedLatestSnapshot", () => {
     const snapshot = makeSnapshot();
     vi.mocked(cacheGet).mockResolvedValueOnce(null);
     vi.mocked(dbGetLatestSnapshot).mockResolvedValueOnce(snapshot);
-    // cacheSet rejects — the .catch(() => {}) on the fire-and-forget should swallow it
+    // cacheSet rejects — the helper-backed fire-and-forget path should swallow it
     vi.mocked(cacheSet).mockRejectedValueOnce(new Error("Redis write failed"));
 
     const result = await getCachedLatestSnapshot("testuser");
@@ -133,7 +141,7 @@ describe("updateSnapshotCache", () => {
     await updateSnapshotCache("TestUser", snapshot);
 
     expect(cacheSet).toHaveBeenCalledWith(
-      "snapshot:latest:testuser",
+      `snapshot:${CACHE_VERSION}:latest:testuser`,
       snapshot,
       86400,
     );
@@ -146,7 +154,7 @@ describe("updateSnapshotCache", () => {
     await updateSnapshotCache("UPPERCASE", snapshot);
 
     expect(cacheSet).toHaveBeenCalledWith(
-      "snapshot:latest:uppercase",
+      `snapshot:${CACHE_VERSION}:latest:uppercase`,
       snapshot,
       86400,
     );
@@ -171,13 +179,13 @@ describe("invalidateSnapshotCache", () => {
   it("deletes the snapshot cache key", async () => {
     vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
     await invalidateSnapshotCache("testuser");
-    expect(cacheDel).toHaveBeenCalledWith("snapshot:latest:testuser");
+    expect(cacheDel).toHaveBeenCalledWith(`snapshot:${CACHE_VERSION}:latest:testuser`);
   });
 
   it("lowercases handle", async () => {
     vi.mocked(cacheDel).mockResolvedValueOnce(undefined);
     await invalidateSnapshotCache("TestUser");
-    expect(cacheDel).toHaveBeenCalledWith("snapshot:latest:testuser");
+    expect(cacheDel).toHaveBeenCalledWith(`snapshot:${CACHE_VERSION}:latest:testuser`);
   });
 
   it("does not throw on Redis failure", async () => {

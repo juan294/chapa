@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+const SOURCE = readFileSync(new URL("./route.ts", import.meta.url), "utf8");
 
 const { mockGetVerificationRecord, mockRateLimit } = vi.hoisted(() => ({
   mockGetVerificationRecord: vi.fn(),
@@ -99,6 +102,11 @@ describe("GET /api/verify/[hash]", () => {
       const [req, ctx] = makeRequest("abc12345abc12345abc12345abc12345", "1.2.3.4");
       const res = await GET(req, ctx);
       expect(res.status).toBe(200);
+    });
+
+    it("documents the legacy 32-char acceptance window through 2026-07-19", () => {
+      expect(SOURCE).toContain("LEGACY_PRE_V2_DEADLINE");
+      expect(SOURCE).toContain("2026-07-19");
     });
 
     it("returns 400 for hash shorter than 8 characters", async () => {

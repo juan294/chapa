@@ -4,14 +4,34 @@ import { getAvatarBase64 } from "@/lib/render/avatar";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
-import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
+import {
+  cacheDel,
+  cacheGet,
+  cacheSet,
+  cacheSetNx,
+  rateLimit,
+} from "@/lib/cache/redis";
+import { CACHE_VERSION } from "@/lib/cache/version";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { toDateString } from "@/lib/utils/date";
 import {
   getPublicProfileVerification,
   materializePublicProfile,
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
+
+const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
+const BADGE_RENDER_WAIT_MS = 50;
+const BADGE_RENDER_WAIT_ATTEMPTS = 6;
+type BadgeRenderResult = {
+  svg: string;
+  headers: HeadersInit;
+  status?: number;
+};
+
+const inflightBadgeRenders = new Map<string, Promise<BadgeRenderResult>>();
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -33,6 +53,40 @@ function fallbackSvg(handle: string, message: string): string {
   <text x="60" y="340" font-family="'JetBrains Mono', monospace" font-size="28" fill="#E6EDF3">@${safe}</text>
   <text x="60" y="400" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" fill="#9AA4B2">${escapeXml(message)}</text>
 </svg>`;
+}
+
+function buildBadgeSvgCacheKey(handle: string, date: string): string {
+  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
+}
+
+function buildBadgeRenderLockKey(handle: string, date: string): string {
+  return `badge-lock:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForBadgeSvgCache(key: string): Promise<string | null> {
+  for (let attempt = 0; attempt < BADGE_RENDER_WAIT_ATTEMPTS; attempt++) {
+    await sleep(BADGE_RENDER_WAIT_MS);
+    const cached = await cacheGet<string>(key);
+    if (cached) return cached;
+  }
+
+  return null;
+}
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+
+  return { promise, resolve };
 }
 
 export async function GET(
@@ -64,29 +118,60 @@ export async function GET(
   }
 
   // SVG full-response cache: serve stale badge without hitting GitHub API
-  const svgCacheKey = `svg:badge:${handle}:v1`;
+  const today = toDateString(new Date());
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
   const cachedSvg = await cacheGet<string>(svgCacheKey);
   if (cachedSvg) {
     return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
   }
+
+  const inflightSvg = inflightBadgeRenders.get(svgCacheKey);
+  if (inflightSvg) {
+    const shared = await inflightSvg;
+    return new NextResponse(shared.svg, {
+      status: shared.status,
+      headers: shared.headers,
+    });
+  }
+
+  const deferred = createDeferred<BadgeRenderResult>();
+  inflightBadgeRenders.set(svgCacheKey, deferred.promise);
+
+  const renderLockKey = buildBadgeRenderLockKey(handle, today);
+  let gotRenderLock = false;
 
   // Try to get an auth token from session (better rate limits)
   const session = getOptionalRequestSession(request);
   const token = session?.token;
 
   try {
+    gotRenderLock = await cacheSetNx(
+      renderLockKey,
+      BADGE_RENDER_LOCK_TTL_SECONDS,
+    );
+    if (!gotRenderLock) {
+      const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
+      if (lockedSvg) {
+        const sharedResult = {
+          svg: lockedSvg,
+          headers: CACHE_HEADERS,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(sharedResult);
+        return new NextResponse(sharedResult.svg, { headers: sharedResult.headers });
+      }
+    }
+
     const materialized = await materializePublicProfile(handle, { token });
     if (!materialized) {
-      const svg = fallbackSvg(
-        handle,
-        "Could not load data — try again later.",
-      );
-      return new NextResponse(svg, {
+      const fallbackResult = {
+        svg: fallbackSvg(handle, "Could not load data — try again later."),
         headers: {
           "Content-Type": "image/svg+xml",
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
         },
-      });
+      } satisfies BadgeRenderResult;
+      deferred.resolve(fallbackResult);
+      return new NextResponse(fallbackResult.svg, { headers: fallbackResult.headers });
     }
 
     const avatarDataUri = materialized.stats.avatarUrl
@@ -103,20 +188,32 @@ export async function GET(
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
     });
-
-    void cacheSet(svgCacheKey, svg, 86400);
-    return new NextResponse(svg, { headers: CACHE_HEADERS });
+    await cacheSet(svgCacheKey, svg, 86400);
+    const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
+    deferred.resolve(successResult);
+    return new NextResponse(successResult.svg, { headers: successResult.headers });
   } catch (err) {
-    void captureServerError({
+    const fallbackResult = {
+      svg: fallbackSvg(handle, "Something went wrong — try again later."),
+      status: 500,
+      headers: { "Content-Type": "image/svg+xml" },
+    } satisfies BadgeRenderResult;
+    deferred.resolve(fallbackResult);
+
+    fireAndForget(() => captureServerError({
       route: `/u/${handle}/badge.svg`,
       statusCode: 500,
       error: err,
-    });
+    }));
 
-    const svg = fallbackSvg(handle, "Something went wrong — try again later.");
-    return new NextResponse(svg, {
-      status: 500,
-      headers: { "Content-Type": "image/svg+xml" },
+    return new NextResponse(fallbackResult.svg, {
+      status: fallbackResult.status,
+      headers: fallbackResult.headers,
     });
+  } finally {
+    inflightBadgeRenders.delete(svgCacheKey);
+    if (gotRenderLock) {
+      await cacheDel(renderLockKey);
+    }
   }
 }

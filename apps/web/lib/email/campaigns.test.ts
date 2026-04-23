@@ -33,6 +33,7 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
   cacheSet: vi.fn(),
   cacheIncr: vi.fn().mockResolvedValue(1),
+  cacheReserveQuota: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 95 }),
 }));
 
 import { getResend } from "./resend";
@@ -46,7 +47,7 @@ import {
   dbMarkSendsFailed,
   dbGetCampaignStats,
 } from "@/lib/db/campaigns";
-import { cacheGet, cacheIncr } from "@/lib/cache/redis";
+import { cacheGet, cacheIncr, cacheReserveQuota } from "@/lib/cache/redis";
 import { initiateCampaign, processCampaignBatch, DAILY_SEND_LIMIT } from "./campaigns";
 
 const mockBatchSend = vi.fn();
@@ -57,6 +58,7 @@ beforeEach(() => {
     batch: { send: mockBatchSend },
   } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
   vi.mocked(cacheGet).mockResolvedValue(null);
+  vi.mocked(cacheReserveQuota).mockResolvedValue({ allowed: true, current: 1, limit: DAILY_SEND_LIMIT });
 });
 
 const draftCampaign = {
@@ -187,6 +189,11 @@ describe("processCampaignBatch", () => {
 
     expect(result.failed).toBe(1);
     expect(dbMarkSendsFailed).toHaveBeenCalledWith(["s-1"], "Rate limited");
+    expect(cacheIncr).toHaveBeenCalledWith(
+      expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
+      -1,
+      86400,
+    );
   });
 
   it("returns zeros for non-sending campaign", async () => {
@@ -196,7 +203,7 @@ describe("processCampaignBatch", () => {
     expect(result).toEqual({ sent: 0, failed: 0, remaining: 0 });
   });
 
-  it("calls cacheIncr with correct key pattern and 86400 TTL after successful send", async () => {
+  it("does not increment quota again after a successful send because the reservation already counted it", async () => {
     vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
     vi.mocked(dbGetPendingSends).mockResolvedValue([
       { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "pending", sentAt: null, error: null },
@@ -207,9 +214,117 @@ describe("processCampaignBatch", () => {
 
     await processCampaignBatch("campaign-1");
 
-    expect(cacheIncr).toHaveBeenCalledWith(
+    expect(cacheIncr).not.toHaveBeenCalled();
+  });
+
+  it("uses an atomic quota reservation helper before sending the batch", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbGetPendingSends).mockResolvedValue([
+      { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "pending", sentAt: null, error: null },
+    ]);
+    mockBatchSend.mockResolvedValue({ data: [{ id: "msg-1" }], error: null });
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 1, pending: 0, failed: 0 });
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+
+    await processCampaignBatch("campaign-1");
+
+    expect(cacheReserveQuota).toHaveBeenCalledWith(
       expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
       1,
+      DAILY_SEND_LIMIT,
+      86400,
+    );
+  });
+
+  it("handles Resend partial batch failures as mixed sent/failed results", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbGetPendingSends).mockResolvedValue([
+      { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "pending", sentAt: null, error: null },
+      { id: "s-2", campaignId: "campaign-1", handle: "bob", email: "bob@example.com", status: "pending", sentAt: null, error: null },
+    ]);
+    mockBatchSend.mockResolvedValue({
+      data: [
+        { id: "ok-1" },
+        { id: null, error: { message: "rejected" } },
+      ],
+      error: null,
+    });
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 1, pending: 0, failed: 1 });
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+
+    const result = await processCampaignBatch("campaign-1");
+
+    expect(result).toEqual({ sent: 1, failed: 1, remaining: 0 });
+    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"]);
+    expect(dbMarkSendsFailed).toHaveBeenCalledWith(["s-2"], "rejected");
+    expect(cacheIncr).toHaveBeenCalledWith(
+      expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
+      -1,
+      86400,
+    );
+  });
+
+  it("groups multiple failed sends with the same message into one failure write", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbGetPendingSends).mockResolvedValue([
+      { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "pending", sentAt: null, error: null },
+      { id: "s-2", campaignId: "campaign-1", handle: "bob", email: "bob@example.com", status: "pending", sentAt: null, error: null },
+      { id: "s-3", campaignId: "campaign-1", handle: "carol", email: "carol@example.com", status: "pending", sentAt: null, error: null },
+    ]);
+    mockBatchSend.mockResolvedValue({
+      data: [
+        { id: "ok-1" },
+        { id: null, error: { message: "mailbox unavailable" } },
+        { id: null, error: { message: "mailbox unavailable" } },
+      ],
+      error: null,
+    });
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 1, pending: 0, failed: 2 });
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+
+    const result = await processCampaignBatch("campaign-1");
+
+    expect(result).toEqual({ sent: 1, failed: 2, remaining: 0 });
+    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"]);
+    expect(dbMarkSendsFailed).toHaveBeenCalledTimes(1);
+    expect(dbMarkSendsFailed).toHaveBeenCalledWith(
+      ["s-2", "s-3"],
+      "mailbox unavailable",
+    );
+    expect(cacheIncr).toHaveBeenCalledWith(
+      expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
+      -2,
+      86400,
+    );
+  });
+
+  it("treats missing batch result rows as unknown failures", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(sendingCampaign);
+    vi.mocked(dbGetPendingSends).mockResolvedValue([
+      { id: "s-1", campaignId: "campaign-1", handle: "alice", email: "alice@example.com", status: "pending", sentAt: null, error: null },
+      { id: "s-2", campaignId: "campaign-1", handle: "bob", email: "bob@example.com", status: "pending", sentAt: null, error: null },
+      { id: "s-3", campaignId: "campaign-1", handle: "carol", email: "carol@example.com", status: "pending", sentAt: null, error: null },
+    ]);
+    mockBatchSend.mockResolvedValue({
+      data: [
+        { id: "ok-1" },
+      ],
+      error: null,
+    });
+    vi.mocked(dbGetCampaignStats).mockResolvedValue({ sent: 1, pending: 0, failed: 2 });
+    vi.mocked(dbUpdateCampaign).mockResolvedValue(true);
+
+    const result = await processCampaignBatch("campaign-1");
+
+    expect(result).toEqual({ sent: 1, failed: 2, remaining: 0 });
+    expect(dbMarkSendsSent).toHaveBeenCalledWith(["s-1"]);
+    expect(dbMarkSendsFailed).toHaveBeenCalledWith(
+      ["s-2", "s-3"],
+      "Unknown Resend batch failure",
+    );
+    expect(cacheIncr).toHaveBeenCalledWith(
+      expect.stringMatching(/^campaign:daily-sends:\d{4}-\d{2}-\d{2}$/),
+      -2,
       86400,
     );
   });

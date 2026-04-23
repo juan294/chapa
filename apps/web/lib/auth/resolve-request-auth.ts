@@ -25,7 +25,7 @@ export async function resolveRequestAuth(
   // 1. Check Authorization header (Bearer token)
   const authHeader = request.headers.get("Authorization");
   if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
+    const token = authHeader.slice(7).trim();
     return resolveHandle(token, secret);
   }
 

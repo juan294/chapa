@@ -155,3 +155,13 @@ try {
 
 - The RPC approach for campaign stats requires a Supabase function definition. If introducing an RPC is heavier than desired, fall back to `count:"exact", head:true` per-status queries (6 round-trips for 6 statuses, still O(1) in row count).
 - The badge-render lock uses 30 s TTL as a safety valve: if a render crashes and doesn't release the lock, the worst case is one user waits 30 s on the next request. Tune if render p99 approaches 30 s.
+
+## Status
+
+- [x] Implemented on 2026-04-23
+- [x] Verified with `pnpm exec vitest run apps/web/lib/db/campaigns.test.ts apps/web/lib/feature-flags.test.ts apps/web/lib/insights/validation.test.ts apps/web/app/api/insights/route.test.ts apps/web/app/u/[handle]/badge.svg/route.test.ts apps/web/app/u/[handle]/badge.svg/concurrent.test.ts apps/web/lib/db/supabase.test.ts`, `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`
+- [x] Replaced `dbGetCampaignStats()` row-loading with bounded per-status count queries
+- [x] Added a 500ms timeout around DB-backed feature-flag lookups while preserving env-var fallback semantics
+- [x] Added a shared `MAX_INSIGHTS_BYTES` source-of-truth and rejected oversize insights uploads with `413 payload_too_large` before JSON parsing and DB writes
+- [x] Added a cold-cache badge render lock keyed by the versioned badge cache key and converted the phase-10 concurrency `todo` into a real passing test
+- [x] Confirmed `apps/web/lib/db/supabase.ts` was already using a memoized singleton and retained the existing singleton coverage rather than changing that module again

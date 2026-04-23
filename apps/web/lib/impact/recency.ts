@@ -6,6 +6,13 @@ const NEUTRAL_RATIO = 0.25; // 90/365 ≈ proportional share
 const MAX_BOOST = 1.06;
 const MIN_PENALTY = 0.98;
 
+export function recencyCutoff(now = new Date()): Date {
+  const cutoff = new Date(now);
+  cutoff.setUTCHours(0, 0, 0, 0);
+  cutoff.setUTCDate(cutoff.getUTCDate() - RECENCY_WINDOW_DAYS);
+  return cutoff;
+}
+
 /**
  * Compute what fraction of total heatmap activity occurred in the last 90 days.
  * Returns 0.0–1.0. Returns NEUTRAL_RATIO (0.25) for empty heatmaps.
@@ -13,17 +20,14 @@ const MIN_PENALTY = 0.98;
 export function computeRecencyRatio(heatmapData: HeatmapDay[]): number {
   if (heatmapData.length === 0) return NEUTRAL_RATIO;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() - RECENCY_WINDOW_DAYS);
+  const cutoff = recencyCutoff();
 
   let totalActivity = 0;
   let recentActivity = 0;
 
   for (const day of heatmapData) {
     totalActivity += day.count;
-    const d = new Date(day.date);
+    const d = new Date(`${day.date}T00:00:00Z`);
     if (d >= cutoff) {
       recentActivity += day.count;
     }

@@ -7,6 +7,7 @@ import {
   validateState,
   clearStateCookie,
 } from "@/lib/auth/github";
+import { consumeOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
@@ -80,6 +81,10 @@ export async function GET(request: NextRequest) {
   const cookieHeader = request.headers.get("cookie");
   if (!validateState(cookieHeader, queryState)) {
     return NextResponse.redirect(new URL("/?error=invalid_state", request.url));
+  }
+  const consumed = queryState ? await consumeOauthState(queryState) : false;
+  if (!consumed) {
+    return NextResponse.json({ error: "state_already_used" }, { status: 400 });
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();

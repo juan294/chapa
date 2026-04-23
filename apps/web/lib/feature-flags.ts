@@ -12,6 +12,7 @@
  */
 
 import { dbGetFeatureFlag } from "./db/feature-flags";
+import { withTimeout } from "./async/with-timeout";
 
 // ---------------------------------------------------------------------------
 // Sync (env-var only) — for client components
@@ -63,6 +64,7 @@ export function isInsightsEnabledSync(): boolean {
 
 /** In-process TTL cache for feature flag DB lookups — 5 minutes. */
 const FLAG_CACHE_TTL_MS = 5 * 60 * 1000;
+const FLAG_DB_TIMEOUT_MS = 500;
 const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
 
 async function checkFlag(
@@ -72,7 +74,11 @@ async function checkFlag(
   const cached = flagCache.get(dbKey);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
-  const flag = await dbGetFeatureFlag(dbKey);
+  const flag = await withTimeout(
+    dbGetFeatureFlag(dbKey),
+    FLAG_DB_TIMEOUT_MS,
+    `featureFlag:${dbKey}`,
+  ).catch(() => null);
   const value = flag !== null ? flag.enabled : envVar?.trim() === "true";
   flagCache.set(dbKey, { value, expiresAt: Date.now() + FLAG_CACHE_TTL_MS });
   return value;
@@ -158,10 +164,18 @@ export async function isInsightsEnabled(): Promise<boolean> {
  * agent flag to be enabled. Returns false if either is missing or disabled.
  */
 export async function isAgentEnabled(agentKey: string): Promise<boolean> {
-  const master = await dbGetFeatureFlag("automated_agents");
+  const master = await withTimeout(
+    dbGetFeatureFlag("automated_agents"),
+    FLAG_DB_TIMEOUT_MS,
+    "featureFlag:automated_agents",
+  ).catch(() => null);
   if (!master?.enabled) return false;
 
-  const agent = await dbGetFeatureFlag(agentKey);
+  const agent = await withTimeout(
+    dbGetFeatureFlag(agentKey),
+    FLAG_DB_TIMEOUT_MS,
+    `featureFlag:${agentKey}`,
+  ).catch(() => null);
   return agent?.enabled ?? false;
 }
 

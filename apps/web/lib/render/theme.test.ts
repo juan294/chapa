@@ -1,5 +1,16 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { WARM_AMBER, getHeatmapColor, getTierColor } from "./theme";
+import {
+  WARM_AMBER,
+  getArchetypeColor,
+  getHeatmapColor,
+  getTierColor,
+} from "./theme";
+
+const globalsCss = readFileSync(
+  new URL("../../styles/globals.css", import.meta.url),
+  "utf8",
+);
 
 describe("WARM_AMBER theme", () => {
   it("has all required color tokens", () => {
@@ -40,5 +51,32 @@ describe("getTierColor", () => {
     for (const tier of ["Emerging", "Solid", "High", "Elite"] as const) {
       expect(getTierColor(tier)).toBeTruthy();
     }
+  });
+
+  it("keeps tier colors aligned with the CSS brand tokens", () => {
+    expect(globalsCss).toContain("--color-amber: #8B5CF6;");
+    expect(globalsCss).toContain("--color-amber-light: #A78BFA;");
+    expect(getTierColor("Elite")).toBe("#8B5CF6");
+    expect(getTierColor("High")).toBe("#A78BFA");
+  });
+});
+
+describe("getArchetypeColor", () => {
+  it("keeps archetype colors aligned with globals.css tokens", () => {
+    expect(globalsCss).toContain("--color-archetype-builder: #8B5CF6;");
+    expect(globalsCss).toContain("--color-archetype-guardian: #EC4899;");
+    expect(globalsCss).toContain("--color-archetype-marathoner: #22C55E;");
+    expect(globalsCss).toContain("--color-archetype-polymath: #EAB308;");
+    expect(globalsCss).toContain("--color-archetype-balanced: #0EA5E9;");
+    expect(globalsCss).toContain("--color-archetype-emerging: #F97316;");
+    expect(globalsCss).toContain("--color-archetype-artificer: #F59E0B;");
+
+    expect(getArchetypeColor("Builder")).toBe("#8B5CF6");
+    expect(getArchetypeColor("Quality Champion")).toBe("#EC4899");
+    expect(getArchetypeColor("Marathoner")).toBe("#22C55E");
+    expect(getArchetypeColor("Polymath")).toBe("#EAB308");
+    expect(getArchetypeColor("Balanced")).toBe("#0EA5E9");
+    expect(getArchetypeColor("Emerging")).toBe("#F97316");
+    expect(getArchetypeColor("Artificer")).toBe("#F59E0B");
   });
 });
