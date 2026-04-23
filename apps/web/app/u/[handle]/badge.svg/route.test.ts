@@ -315,6 +315,50 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
+    it("keeps polling long enough to reuse SVG produced by another renderer", async () => {
+      vi.useFakeTimers();
+      let cacheReads = 0;
+      mockCacheSetNx.mockResolvedValue(false);
+      mockCacheGet.mockImplementation(async () => {
+        cacheReads += 1;
+        return cacheReads >= 8 ? FAKE_SVG : null;
+      });
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(1200);
+        const res = await responsePromise;
+
+        expect(await res.text()).toBe(FAKE_SVG);
+        expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("fails open when the initial cache read stalls", async () => {
+      vi.useFakeTimers();
+      mockCacheGet.mockImplementationOnce(
+        () => new Promise<string | null>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(400);
+        const res = await responsePromise;
+
+        expect(res.status).toBe(200);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("skips rendering on cache hit but still returns correct Content-Type header", async () => {
       mockCacheGet.mockResolvedValue(FAKE_SVG);
 
@@ -348,6 +392,26 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(keys[0]).not.toBe(keys[1]);
       expect(keys[0]).toContain("alice");
       expect(keys[1]).toContain("bob");
+    });
+
+    it("fails open when the rate limiter stalls", async () => {
+      vi.useFakeTimers();
+      mockRateLimit.mockImplementation(
+        () => new Promise(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(300);
+        const res = await responsePromise;
+
+        expect(res.status).toBe(200);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

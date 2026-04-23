@@ -16,6 +16,7 @@ import { CACHE_VERSION } from "@/lib/cache/version";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 import { toDateString } from "@/lib/utils/date";
+import { withTimeout } from "@/lib/async/with-timeout";
 import {
   getPublicProfileVerification,
   materializePublicProfile,
@@ -23,8 +24,9 @@ import {
 } from "@/lib/profile/public-profile";
 
 const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
-const BADGE_RENDER_WAIT_MS = 50;
-const BADGE_RENDER_WAIT_ATTEMPTS = 6;
+const BADGE_CACHE_DEADLINE_MS = 250;
+const BADGE_RATE_LIMIT_DEADLINE_MS = 150;
+const BADGE_RENDER_WAIT_SCHEDULE_MS = [50, 75, 100, 125, 150, 200, 250, 300, 350, 400];
 type BadgeRenderResult = {
   svg: string;
   headers: HeadersInit;
@@ -67,10 +69,63 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withBadgeFallback<T>(
+  promise: Promise<T>,
+  fallback: T,
+  ms: number,
+  label: string,
+): Promise<T> {
+  try {
+    return await withTimeout(promise, ms, label);
+  } catch {
+    return fallback;
+  }
+}
+
+async function readBadgeSvgCache(key: string): Promise<string | null> {
+  return withBadgeFallback(
+    cacheGet<string>(key),
+    null,
+    BADGE_CACHE_DEADLINE_MS,
+    "badge cache read",
+  );
+}
+
+async function acquireBadgeRenderLock(key: string): Promise<boolean> {
+  return withBadgeFallback(
+    cacheSetNx(key, BADGE_RENDER_LOCK_TTL_SECONDS),
+    false,
+    BADGE_CACHE_DEADLINE_MS,
+    "badge render lock",
+  );
+}
+
+async function writeBadgeSvgCache(key: string, svg: string): Promise<boolean> {
+  return withBadgeFallback(
+    cacheSet(key, svg, 86400),
+    false,
+    BADGE_CACHE_DEADLINE_MS,
+    "badge cache write",
+  );
+}
+
+async function checkBadgeRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+) {
+  return withBadgeFallback(
+    rateLimit(key, limit, windowSeconds),
+    { allowed: true, current: 0, limit },
+    BADGE_RATE_LIMIT_DEADLINE_MS,
+    "badge rate limit",
+  );
+}
+
 async function waitForBadgeSvgCache(key: string): Promise<string | null> {
-  for (let attempt = 0; attempt < BADGE_RENDER_WAIT_ATTEMPTS; attempt++) {
-    await sleep(BADGE_RENDER_WAIT_MS);
-    const cached = await cacheGet<string>(key);
+  for (const waitMs of BADGE_RENDER_WAIT_SCHEDULE_MS) {
+    await sleep(waitMs);
+    const cached = await readBadgeSvgCache(key);
     if (cached) return cached;
   }
 
@@ -97,7 +152,7 @@ export async function GET(
 
   // Rate limit: 100 requests per IP+handle per 60 seconds
   const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:badge:${ip}:${handle}`, 100, 60);
+  const rl = await checkBadgeRateLimit(`ratelimit:badge:${ip}:${handle}`, 100, 60);
   if (!rl.allowed) {
     return new NextResponse("Too many requests. Please try again later.", {
       status: 429,
@@ -120,7 +175,7 @@ export async function GET(
   // SVG full-response cache: serve stale badge without hitting GitHub API
   const today = toDateString(new Date());
   const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
-  const cachedSvg = await cacheGet<string>(svgCacheKey);
+  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
   if (cachedSvg) {
     return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
   }
@@ -145,10 +200,7 @@ export async function GET(
   const token = session?.token;
 
   try {
-    gotRenderLock = await cacheSetNx(
-      renderLockKey,
-      BADGE_RENDER_LOCK_TTL_SECONDS,
-    );
+    gotRenderLock = await acquireBadgeRenderLock(renderLockKey);
     if (!gotRenderLock) {
       const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
       if (lockedSvg) {
@@ -188,7 +240,7 @@ export async function GET(
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
     });
-    await cacheSet(svgCacheKey, svg, 86400);
+    await writeBadgeSvgCache(svgCacheKey, svg);
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return new NextResponse(successResult.svg, { headers: successResult.headers });
@@ -213,7 +265,7 @@ export async function GET(
   } finally {
     inflightBadgeRenders.delete(svgCacheKey);
     if (gotRenderLock) {
-      await cacheDel(renderLockKey);
+      fireAndForget(() => cacheDel(renderLockKey), () => undefined);
     }
   }
 }
