@@ -36,6 +36,44 @@ log_warn()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]  $*" >&2; }
 log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2; }
 
 # ---------------------------------------------------------------------------
+# Report validation
+# ---------------------------------------------------------------------------
+
+# validate_report_file <report_file> <agent_label> [valid_pattern]
+# Rejects empty files and known error stub output before agents treat stdout
+# as a successful markdown report.
+validate_report_file() {
+  local report_file="$1"
+  local agent_label="$2"
+  local valid_pattern="${3:-^(# |\`\`\`markdown)}"
+
+  if [ ! -s "${report_file}" ]; then
+    log_error "${agent_label} report file is empty: ${report_file}"
+    return 1
+  fi
+
+  if grep -Eq "You've hit your limit|FAILED after [0-9]+ attempts|Claude execution failed" "${report_file}"; then
+    log_error "${agent_label} produced invalid report output: ${report_file}"
+    return 1
+  fi
+
+  local first_content_line
+  first_content_line=$(grep -m1 -E '[^[:space:]]' "${report_file}" || true)
+
+  if [ -z "${first_content_line}" ]; then
+    log_error "${agent_label} report file has no content: ${report_file}"
+    return 1
+  fi
+
+  if ! printf '%s\n' "${first_content_line}" | grep -Eq "${valid_pattern}"; then
+    log_error "${agent_label} produced invalid report output: ${first_content_line}"
+    return 1
+  fi
+
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # Feature flag check
 # ---------------------------------------------------------------------------
 

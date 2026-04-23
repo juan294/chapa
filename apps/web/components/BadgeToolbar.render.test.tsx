@@ -580,28 +580,30 @@ describe("BadgeToolbar render", () => {
 
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
-      render(
-        <BadgeToolbar handle="testuser" />,
-      );
-
-      await act(async () => {
-        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
-      });
-
-      // Should fall back to SVG download
-      await waitFor(() => {
-        const anchorCall = appendChildSpy.mock.calls.find(
-          (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+      try {
+        render(
+          <BadgeToolbar handle="testuser" />,
         );
-        if (anchorCall) {
-          const anchor = anchorCall[0] as HTMLAnchorElement;
-          expect(anchor.download).toBe("chapa-testuser.svg");
-        }
-      });
 
-      appendChildSpy.mockRestore();
-      vi.stubGlobal("Image", origImage);
-      vi.unstubAllGlobals();
+        await act(async () => {
+          fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+        });
+
+        // Should fall back to SVG download
+        await waitFor(() => {
+          const anchorCall = appendChildSpy.mock.calls.find(
+            (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+          );
+          if (anchorCall) {
+            const anchor = anchorCall[0] as HTMLAnchorElement;
+            expect(anchor.download).toBe("chapa-testuser.svg");
+          }
+        });
+      } finally {
+        appendChildSpy.mockRestore();
+        vi.stubGlobal("Image", origImage);
+        vi.unstubAllGlobals();
+      }
     });
 
     it("falls back to SVG when toBlob returns null", async () => {
@@ -638,27 +640,29 @@ describe("BadgeToolbar render", () => {
 
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
-      render(
-        <BadgeToolbar handle="testuser" />,
-      );
-
-      await act(async () => {
-        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
-      });
-
-      await waitFor(() => {
-        const anchorCall = appendChildSpy.mock.calls.find(
-          (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+      try {
+        render(
+          <BadgeToolbar handle="testuser" />,
         );
-        if (anchorCall) {
-          const anchor = anchorCall[0] as HTMLAnchorElement;
-          expect(anchor.download).toBe("chapa-testuser.svg");
-        }
-      });
 
-      appendChildSpy.mockRestore();
-      vi.stubGlobal("Image", origImage);
-      vi.unstubAllGlobals();
+        await act(async () => {
+          fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+        });
+
+        await waitFor(() => {
+          const anchorCall = appendChildSpy.mock.calls.find(
+            (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+          );
+          if (anchorCall) {
+            const anchor = anchorCall[0] as HTMLAnchorElement;
+            expect(anchor.download).toBe("chapa-testuser.svg");
+          }
+        });
+      } finally {
+        appendChildSpy.mockRestore();
+        vi.stubGlobal("Image", origImage);
+        vi.unstubAllGlobals();
+      }
     });
 
     it("falls back to SVG when Image onerror fires", async () => {
@@ -680,27 +684,29 @@ describe("BadgeToolbar render", () => {
 
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
 
-      render(
-        <BadgeToolbar handle="testuser" />,
-      );
-
-      await act(async () => {
-        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
-      });
-
-      await waitFor(() => {
-        const anchorCall = appendChildSpy.mock.calls.find(
-          (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+      try {
+        render(
+          <BadgeToolbar handle="testuser" />,
         );
-        if (anchorCall) {
-          const anchor = anchorCall[0] as HTMLAnchorElement;
-          expect(anchor.download).toBe("chapa-testuser.svg");
-        }
-      });
 
-      appendChildSpy.mockRestore();
-      vi.stubGlobal("Image", origImage);
-      vi.unstubAllGlobals();
+        await act(async () => {
+          fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+        });
+
+        await waitFor(() => {
+          const anchorCall = appendChildSpy.mock.calls.find(
+            (call) => (call[0] as HTMLElement).tagName?.toUpperCase() === "A",
+          );
+          if (anchorCall) {
+            const anchor = anchorCall[0] as HTMLAnchorElement;
+            expect(anchor.download).toBe("chapa-testuser.svg");
+          }
+        });
+      } finally {
+        appendChildSpy.mockRestore();
+        vi.stubGlobal("Image", origImage);
+        vi.unstubAllGlobals();
+      }
     });
   });
 
@@ -984,27 +990,29 @@ describe("BadgeToolbar render", () => {
       const origImage = globalThis.Image;
       vi.stubGlobal("Image", MockImage);
 
-      render(
-        <BadgeToolbar handle="testuser" />,
-      );
+      try {
+        render(
+          <BadgeToolbar handle="testuser" />,
+        );
 
-      fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
 
-      // waitFor polls until capturedSrc is populated — more reliable than a
-      // fixed-tick setTimeout which can miss the queueMicrotask→promise chain
-      // (fetch → text() → Image → queueMicrotask(onerror) → reject → finally)
-      await waitFor(() => {
-        expect(capturedSrc).not.toBe("");
-      }, { timeout: 2000 });
+        // waitFor polls until capturedSrc is populated — more reliable than a
+        // fixed-tick setTimeout which can miss the queueMicrotask→promise chain
+        // (fetch → text() → Image → queueMicrotask(onerror) → reject → finally)
+        await waitFor(() => {
+          expect(capturedSrc).not.toBe("");
+        }, { timeout: 2000 });
 
-      // The data URI src should have animations stripped
-      const decodedSvg = decodeURIComponent(capturedSrc.replace("data:image/svg+xml;charset=utf-8,", ""));
-      expect(decodedSvg).not.toContain("@keyframes");
-      expect(decodedSvg).not.toContain("<animate ");
-      expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
-
-      vi.stubGlobal("Image", origImage);
-      vi.unstubAllGlobals();
+        // The data URI src should have animations stripped
+        const decodedSvg = decodeURIComponent(capturedSrc.replace("data:image/svg+xml;charset=utf-8,", ""));
+        expect(decodedSvg).not.toContain("@keyframes");
+        expect(decodedSvg).not.toContain("<animate ");
+        expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
+      } finally {
+        vi.stubGlobal("Image", origImage);
+        vi.unstubAllGlobals();
+      }
     });
   });
 
@@ -1061,36 +1069,38 @@ describe("BadgeToolbar render", () => {
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
       const removeChildSpy = vi.spyOn(document.body, "removeChild");
 
-      render(
-        <BadgeToolbar handle="testuser" />,
-      );
+      try {
+        render(
+          <BadgeToolbar handle="testuser" />,
+        );
 
-      await act(async () => {
-        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
-        // Let the microtask (onload) run within act
-        await new Promise((r) => setTimeout(r, 0));
-      });
+        await act(async () => {
+          fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+          // Let the microtask (onload) run within act
+          await new Promise((r) => setTimeout(r, 0));
+        });
 
-      // Verify canvas was created with 2x scale
-      expect(mockCanvas.width).toBe(2400);
-      expect(mockCanvas.height).toBe(1260);
-      expect(mockCtx.scale).toHaveBeenCalledWith(2, 2);
+        // Verify canvas was created with 2x scale
+        expect(mockCanvas.width).toBe(2400);
+        expect(mockCanvas.height).toBe(1260);
+        expect(mockCtx.scale).toHaveBeenCalledWith(2, 2);
 
-      // Verify the anchor was created, clicked, and cleaned up
-      const anchorCall = appendChildSpy.mock.calls.find(
-        (call) => (call[0] as HTMLElement).tagName === "A",
-      );
-      expect(anchorCall).toBeDefined();
-      const anchor = anchorCall![0] as HTMLAnchorElement;
-      expect(anchor.download).toBe("chapa-testuser.png");
+        // Verify the anchor was created, clicked, and cleaned up
+        const anchorCall = appendChildSpy.mock.calls.find(
+          (call) => (call[0] as HTMLElement).tagName === "A",
+        );
+        expect(anchorCall).toBeDefined();
+        const anchor = anchorCall![0] as HTMLAnchorElement;
+        expect(anchor.download).toBe("chapa-testuser.png");
 
-      // Verify cleanup
-      expect(removeChildSpy).toHaveBeenCalled();
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
-
-      appendChildSpy.mockRestore();
-      removeChildSpy.mockRestore();
-      vi.stubGlobal("Image", origImage);
+        // Verify cleanup
+        expect(removeChildSpy).toHaveBeenCalled();
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+      } finally {
+        appendChildSpy.mockRestore();
+        removeChildSpy.mockRestore();
+        vi.stubGlobal("Image", origImage);
+      }
     });
   });
 });

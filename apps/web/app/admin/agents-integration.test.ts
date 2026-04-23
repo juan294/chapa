@@ -295,6 +295,27 @@ describe("agents integration: shell scripts and launchd plists", () => {
     }
   });
 
+  it("shell scripts validate report output before treating runs as successful", () => {
+    const scripts = [
+      "scripts/coverage-agent.sh",
+      "scripts/security-agent.sh",
+      "scripts/qa-agent.sh",
+      "scripts/performance-agent.sh",
+      "scripts/documentation-agent.sh",
+      "scripts/cost-analyst.sh",
+    ];
+    for (const scriptPath of scripts) {
+      const fullPath = path.join(projectRoot, scriptPath);
+      const content = fs.readFileSync(fullPath, "utf-8");
+      expect(content).toContain('validate_report_file "${OUTPUT_FILE}"');
+    }
+
+    const ccRpiPath = path.join(projectRoot, "scripts/cc-rpi-update.sh");
+    const ccRpiContent = fs.readFileSync(ccRpiPath, "utf-8");
+    expect(ccRpiContent).toContain("validate_report_file");
+    expect(ccRpiContent).toContain('"${REPORT_FILE}"');
+  });
+
   it("launchd plists have valid XML structure", () => {
     const plists = [
       "scripts/launchd/com.chapa.coverage-agent.plist",

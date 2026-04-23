@@ -296,6 +296,85 @@ describe("captureServerError", () => {
   });
 });
 
+describe("captureServerEvent", () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    process.env = {
+      ...ORIGINAL_ENV,
+      NEXT_PUBLIC_POSTHOG_KEY: "phc_test_key_123",
+      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+    };
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("sends arbitrary server events with provided properties", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerEvent } = await import("./server-errors");
+
+    await captureServerEvent("cron_warm_cache_complete", {
+      handlesProcessed: 12,
+      cacheHitRate: 0.9,
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    const body = getCallBody();
+    expect(body.api_key).toBe("phc_test_key_123");
+    expect(body.event).toBe("cron_warm_cache_complete");
+    expect(body.distinct_id).toBe("chapa-server");
+    expect(body.properties).toEqual({
+      handlesProcessed: 12,
+      cacheHitRate: 0.9,
+    });
+  });
+
+  it("defaults properties to an empty object when omitted", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerEvent } = await import("./server-errors");
+
+    await captureServerEvent("cron_warm_cache_complete");
+
+    const body = getCallBody();
+    expect(body.properties).toEqual({});
+  });
+
+  it("fails silently when PostHog is unconfigured", async () => {
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+
+    const { captureServerEvent } = await import("./server-errors");
+
+    await captureServerEvent("cron_warm_cache_complete", {
+      handlesProcessed: 12,
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("fails silently when fetch throws", async () => {
+    mockFetch.mockRejectedValue(new Error("Network unreachable"));
+
+    const { captureServerEvent } = await import("./server-errors");
+
+    await captureServerEvent("cron_warm_cache_complete", {
+      handlesProcessed: 12,
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("withErrorCapture", () => {
   const ORIGINAL_ENV = process.env;
 
