@@ -2,9 +2,10 @@
  * Campaign orchestration — initiate and process email campaign batches.
  *
  * Respects Resend Free plan daily limit (100 emails/day) by tracking
- * sends via a Redis counter and processing in batches of 50.
+ * sends via a Redis counter and processing in claimed batches of 50.
  */
 
+import { randomUUID } from "node:crypto";
 import { getResend } from "./resend";
 import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import {
@@ -13,12 +14,12 @@ import {
   type AnnouncementData,
 } from "./templates/announcement";
 import { dbGetUsersWithEmail } from "@/lib/db/users";
-import type { Campaign } from "@/lib/db/campaigns";
+import type { Campaign, CampaignSendStats } from "@/lib/db/campaigns";
 import {
   dbGetCampaign,
   dbUpdateCampaign,
   dbCreateCampaignSends,
-  dbGetPendingSends,
+  dbClaimPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
   dbGetCampaignStats,
@@ -41,6 +42,9 @@ export const BATCH_SIZE = 50;
 
 /** Redis key prefix for daily send counter. */
 const DAILY_QUOTA_KEY = "campaign:daily-sends";
+
+/** Claimed campaign send rows are eligible for recovery after this lease window. */
+const CLAIM_LEASE_MS = 10 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,6 +84,10 @@ async function refundDailyQuota(count: number): Promise<void> {
 
   const key = `${DAILY_QUOTA_KEY}:${toDateString(new Date())}`;
   await cacheIncr(key, -count, 86400);
+}
+
+function getRemainingSends(stats: CampaignSendStats): number {
+  return stats.pending + stats.processing;
 }
 
 interface ResendBatchResult {
@@ -142,13 +150,23 @@ export async function processCampaignBatch(
     return { sent: 0, failed: 0, remaining: -1 }; // quota exhausted
   }
 
-  // Get next batch
   const batchLimit = Math.min(available, BATCH_SIZE);
-  const pending = await dbGetPendingSends(campaignId, batchLimit);
+  const leaseToken = randomUUID();
+  const leaseExpiresAt = new Date(Date.now() + CLAIM_LEASE_MS).toISOString();
+  const claimed = await dbClaimPendingSends(
+    campaignId,
+    batchLimit,
+    leaseToken,
+    leaseExpiresAt,
+  );
 
-  if (pending.length === 0) {
-    // All sends processed — finalize campaign
+  if (claimed.length === 0) {
     const stats = await dbGetCampaignStats(campaignId);
+    const remaining = getRemainingSends(stats);
+    if (remaining > 0) {
+      return { sent: 0, failed: 0, remaining };
+    }
+
     const finalStatus =
       stats.failed > 0 && stats.sent === 0 ? "failed" : "sent";
     await dbUpdateCampaign(campaignId, {
@@ -163,19 +181,24 @@ export async function processCampaignBatch(
   const resend = getResend();
   if (!resend) {
     await dbMarkSendsFailed(
-      pending.map((s) => s.id),
+      claimed.map((s) => s.id),
       "Resend unavailable",
+      leaseToken,
     );
     const stats = await dbGetCampaignStats(campaignId);
     await dbUpdateCampaign(campaignId, {
       sentCount: stats.sent,
       failedCount: stats.failed,
     });
-    return { sent: 0, failed: pending.length, remaining: stats.pending };
+    return {
+      sent: 0,
+      failed: claimed.length,
+      remaining: getRemainingSends(stats),
+    };
   }
 
   // Build emails using shared content helper
-  const emails = pending.map((send) => {
+  const emails = claimed.map((send) => {
     const content = buildEmailContent(campaign, send.handle);
     return {
       from: EMAIL_FROM,
@@ -188,17 +211,19 @@ export async function processCampaignBatch(
 
   const reservation = await cacheReserveQuota(
     quotaKey,
-    pending.length,
+    claimed.length,
     DAILY_SEND_LIMIT,
     86400,
   );
   if (!reservation.allowed) {
+    // Leave the claimed rows in processing until the lease expires to prevent
+    // another worker from re-sending the same recipients inside this quota window.
     return { sent: 0, failed: 0, remaining: -1 };
   }
 
   let batchSent = 0;
   let batchFailed = 0;
-  const sendIds = pending.map((s) => s.id);
+  const sendIds = claimed.map((s) => s.id);
 
   try {
     const { data, error } = await withTimeout(
@@ -208,14 +233,14 @@ export async function processCampaignBatch(
     );
 
     if (error) {
-      await dbMarkSendsFailed(sendIds, error.message);
-      batchFailed = pending.length;
+      await dbMarkSendsFailed(sendIds, error.message, leaseToken);
+      batchFailed = claimed.length;
     } else {
       const results = Array.isArray(data) ? (data as ResendBatchResult[]) : [];
       const successfulIds: string[] = [];
       const failedByMessage = new Map<string, string[]>();
 
-      for (const [index, send] of pending.entries()) {
+      for (const [index, send] of claimed.entries()) {
         const result = results[index];
         if (result?.id && !result.error) {
           successfulIds.push(send.id);
@@ -229,22 +254,22 @@ export async function processCampaignBatch(
       }
 
       if (successfulIds.length > 0) {
-        await dbMarkSendsSent(successfulIds);
+        await dbMarkSendsSent(successfulIds, leaseToken);
       }
       for (const [message, failedIds] of failedByMessage) {
-        await dbMarkSendsFailed(failedIds, message);
+        await dbMarkSendsFailed(failedIds, message, leaseToken);
       }
 
       batchSent = successfulIds.length;
-      batchFailed = pending.length - successfulIds.length;
+      batchFailed = claimed.length - successfulIds.length;
     }
   } catch (error) {
     console.error(
       "[campaigns] processCampaignBatch error:",
       (error as Error).message,
     );
-    await dbMarkSendsFailed(sendIds, (error as Error).message);
-    batchFailed = pending.length;
+    await dbMarkSendsFailed(sendIds, (error as Error).message, leaseToken);
+    batchFailed = claimed.length;
   }
 
   if (batchFailed > 0) {
@@ -258,5 +283,9 @@ export async function processCampaignBatch(
     failedCount: stats.failed,
   });
 
-  return { sent: batchSent, failed: batchFailed, remaining: stats.pending };
+  return {
+    sent: batchSent,
+    failed: batchFailed,
+    remaining: getRemainingSends(stats),
+  };
 }
