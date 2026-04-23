@@ -15,7 +15,7 @@ const mockNotifyFirstBadge = vi.fn();
 const mockDbInsertSnapshot = vi.fn();
 const mockUpdateSnapshotCache = vi.fn();
 const mockDbUpsertUser = vi.fn();
-const mockCacheSetNx = vi.fn();
+const mockCacheSetNxStatus = vi.fn();
 
 vi.mock("./materialize-profile", () => ({
   materializeProfile: (...args: unknown[]) => mockMaterializeProfile(...args),
@@ -31,7 +31,7 @@ vi.mock("@/lib/verification/store", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   trackBadgeGenerated: (...args: unknown[]) => mockTrackBadgeGenerated(...args),
-  cacheSetNx: (...args: unknown[]) => mockCacheSetNx(...args),
+  cacheSetNxStatus: (...args: unknown[]) => mockCacheSetNxStatus(...args),
 }));
 
 vi.mock("@/lib/email/notifications", () => ({
@@ -145,7 +145,7 @@ describe("runPublicProfileSideEffects", () => {
     mockStoreVerificationRecord.mockResolvedValue(undefined);
     mockGenerateVerificationCode.mockReturnValue({ hash: "abc123", date: "2026-04-17" });
     // SETNX guard: first call succeeds (key was unset) by default
-    mockCacheSetNx.mockResolvedValue(true);
+    mockCacheSetNxStatus.mockResolvedValue("acquired");
   });
 
   it("stores verification, snapshot, tracking, and user metadata from the display profile", async () => {
@@ -229,7 +229,7 @@ describe("runPublicProfileSideEffects", () => {
 
   describe("sideeffect guard (#718 / #695)", () => {
     it("skips all heavy Supabase writes when the SETNX guard key already exists", async () => {
-      mockCacheSetNx.mockResolvedValue(false);
+      mockCacheSetNxStatus.mockResolvedValue("exists");
       const materialized = makeMaterializedProfile();
 
       await runPublicProfileSideEffects("testuser", materialized);
@@ -242,7 +242,7 @@ describe("runPublicProfileSideEffects", () => {
     });
 
     it("fires all writes when SETNX succeeds (first CDN miss of the day)", async () => {
-      mockCacheSetNx.mockResolvedValue(true);
+      mockCacheSetNxStatus.mockResolvedValue("acquired");
       const materialized = makeMaterializedProfile();
 
       await runPublicProfileSideEffects("testuser", materialized);
@@ -259,17 +259,14 @@ describe("runPublicProfileSideEffects", () => {
 
       await runPublicProfileSideEffects("testuser", materialized);
 
-      expect(mockCacheSetNx).toHaveBeenCalledWith(
+      expect(mockCacheSetNxStatus).toHaveBeenCalledWith(
         expect.stringMatching(/^sideeffects:done:testuser:/),
         86400,
       );
     });
 
-    it("still fires when Redis is unavailable (SETNX returns false-ish via graceful degradation)", async () => {
-      // cacheSetNx gracefully returns false when Redis is down.
-      // But we want sideeffects to still run in that case to avoid silent data loss.
-      // The guard must treat a Redis error as "allowed to run" (fail-open).
-      mockCacheSetNx.mockRejectedValue(new Error("Redis down"));
+    it("still fires when Redis is unavailable", async () => {
+      mockCacheSetNxStatus.mockResolvedValue("unavailable");
       const materialized = makeMaterializedProfile();
 
       await runPublicProfileSideEffects("testuser", materialized);
