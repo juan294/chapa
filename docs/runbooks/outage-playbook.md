@@ -6,13 +6,13 @@ Quick reference for the three most likely external service outages.
 
 ## Redis Down (Upstash Unavailable)
 
-**Symptoms:** `/api/health` returns `{"redis":"error"}`. Badge SVG loads slowly (no cache hits). Rate limiting stops working.
+**Symptoms:** `/api/health` returns `{"status":"degraded","dependencies":{"redis":"error",...}}`. Badge SVG loads slowly (no cache hits). Rate limiting stops working.
 
 **Design behavior:** The rate limiter in `lib/cache/redis.ts` is intentionally fail-open — all requests are allowed through when Redis is unavailable. See `docs/accepted-risks.md`. GitHub's own API limits and CDN `s-maxage=21600` caching provide secondary protection.
 
 **Diagnosis:**
 ```bash
-curl https://chapa.thecreativetoken.com/api/health
+curl https://chapa.thecreativetoken.com/api/health | jq '{status, dependencies}'
 # Check Upstash status: https://status.upstash.com/
 ```
 
@@ -28,13 +28,13 @@ curl https://chapa.thecreativetoken.com/api/health
 
 ## Supabase Down
 
-**Symptoms:** `/api/health` returns `{"supabase":"error"}`. Admin dashboard fails to load user list. Feature flags fall back to environment variable defaults. Lifetime metric snapshots are not recorded.
+**Symptoms:** `/api/health` returns `{"status":"degraded","dependencies":{"supabase":"error",...}}`. Admin dashboard fails to load user list. Feature flags fall back to environment variable defaults. Lifetime metric snapshots are not recorded.
 
 **Design behavior:** All Supabase calls have graceful degradation — no Supabase call throws an unhandled error to the user. The badge SVG endpoint (`/u/:handle/badge.svg`) does not depend on Supabase for its primary path.
 
 **Diagnosis:**
 ```bash
-curl https://chapa.thecreativetoken.com/api/health
+curl https://chapa.thecreativetoken.com/api/health | jq '{status, dependencies}'
 # Check Supabase status: https://status.supabase.com/
 ```
 
