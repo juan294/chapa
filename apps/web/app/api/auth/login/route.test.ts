@@ -56,13 +56,17 @@ function findRedirectCookie(res: Response): string | undefined {
   return res.headers.getSetCookie().find((c) => c.startsWith("chapa_redirect="));
 }
 
+function findStateStoreCookie(res: Response): string | undefined {
+  return res.headers.getSetCookie().find((c) => c.startsWith("chapa_oauth_state_store="));
+}
+
 // ---------------------------------------------------------------------------
 // Shared mock defaults
 // ---------------------------------------------------------------------------
 
 function setupDefaultMocks(): void {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
-  mockIssueOauthState.mockResolvedValue(undefined);
+  mockIssueOauthState.mockResolvedValue("shared");
   mockCreateStateCookie.mockReturnValue({
     state: "abc",
     cookie: "gh_oauth_state=abc; Path=/",
@@ -212,6 +216,20 @@ describe("GET /api/auth/login — OAuth redirect", () => {
 
     expect(mockIssueOauthState).toHaveBeenCalledWith("abc");
     expect(mockIssueOauthState).toHaveBeenCalledOnce();
+  });
+
+  it("sets a shared-store marker cookie when the nonce is persisted centrally", async () => {
+    const res = await GET(makeRequest("1.2.3.4"));
+
+    expect(findStateStoreCookie(res)).toContain("chapa_oauth_state_store=shared");
+  });
+
+  it("sets a fallback-store marker cookie when login falls back to local memory", async () => {
+    mockIssueOauthState.mockResolvedValueOnce("fallback");
+
+    const res = await GET(makeRequest("1.2.3.4"));
+
+    expect(findStateStoreCookie(res)).toContain("chapa_oauth_state_store=fallback");
   });
 });
 

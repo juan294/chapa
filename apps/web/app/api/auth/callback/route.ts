@@ -14,6 +14,8 @@ import { dbUpsertUser } from "@/lib/db/users";
 import { addContact } from "@/lib/email/audience";
 import { captureServerError } from "@/lib/analytics/server-errors";
 
+const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
+
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
   return base.startsWith("https://");
@@ -22,6 +24,11 @@ function isSecureOrigin(): boolean {
 function cookieFlags(): string {
   const secure = isSecureOrigin() ? " Secure;" : "";
   return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+}
+
+function isLocalDevRequest(request: NextRequest): boolean {
+  const hostname = request.nextUrl.hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
 /**
@@ -61,6 +68,19 @@ function readRedirectCookie(cookieHeader: string | null): string | null {
   }
 }
 
+function readOauthStateStoreCookie(
+  cookieHeader: string | null,
+): "shared" | "fallback" | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${OAUTH_STATE_STORE_COOKIE}=`));
+  if (!match) return null;
+  const value = match.slice(`${OAUTH_STATE_STORE_COOKIE}=`.length);
+  return value === "shared" || value === "fallback" ? value : null;
+}
+
 export async function GET(request: NextRequest) {
   // Rate limit: 10 requests per IP per 15 minutes
   const ip = getClientIp(request);
@@ -82,8 +102,13 @@ export async function GET(request: NextRequest) {
   if (!validateState(cookieHeader, queryState)) {
     return NextResponse.redirect(new URL("/?error=invalid_state", request.url));
   }
-  const consumed = queryState ? await consumeOauthState(queryState) : false;
-  if (!consumed) {
+  const stateStoreMode = readOauthStateStoreCookie(cookieHeader);
+  const mustConsumeSharedState =
+    !isLocalDevRequest(request) && stateStoreMode === "shared";
+  const consumed = mustConsumeSharedState && queryState
+    ? await consumeOauthState(queryState)
+    : true;
+  if (mustConsumeSharedState && !consumed) {
     return NextResponse.json({ error: "state_already_used" }, { status: 400 });
   }
 
@@ -172,6 +197,10 @@ export async function GET(request: NextRequest) {
   );
   response.headers.append("Set-Cookie", cookie);
   response.headers.append("Set-Cookie", clearStateCookie());
+  response.headers.append(
+    "Set-Cookie",
+    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags()}; Max-Age=0`,
+  );
   // Clear the redirect cookie
   response.headers.append(
     "Set-Cookie",

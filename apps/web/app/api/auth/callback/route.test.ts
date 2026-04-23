@@ -76,9 +76,10 @@ function makeRequest(params?: {
   state?: string;
   ip?: string;
   cookie?: string;
+  baseUrl?: string;
 }): NextRequest {
   const url = new URL(
-    "https://chapa.thecreativetoken.com/api/auth/callback",
+    params?.baseUrl ?? "https://chapa.thecreativetoken.com/api/auth/callback",
   );
   if (params?.code) url.searchParams.set("code", params.code);
   if (params?.state) url.searchParams.set("state", params.state);
@@ -229,15 +230,63 @@ describe("GET /api/auth/callback — OAuth flow", () => {
     mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
 
     const first = await GET(
-      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc" }),
+      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc; chapa_oauth_state_store=shared" }),
     );
     expect(first.status).toBe(307);
 
     const second = await GET(
-      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc" }),
+      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc; chapa_oauth_state_store=shared" }),
     );
     expect(second.status).toBe(400);
     await expect(second.json()).resolves.toEqual({ error: "state_already_used" });
+  });
+
+  it("skips shared-store replay enforcement when login marked the nonce as fallback-only", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "chapa_oauth_state=valid-state; chapa_oauth_state_store=fallback",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
+  });
+
+  it("skips shared-store replay enforcement on localhost during local dev", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockConsumeOauthState.mockResolvedValue(false);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const res = await GET(
+      makeRequest({
+        baseUrl: "http://localhost:3001/api/auth/callback",
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "chapa_oauth_state=valid-state; chapa_oauth_state_store=shared",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
   });
 
   it("redirects to /?error=config when GITHUB_CLIENT_ID is missing", async () => {
@@ -327,10 +376,11 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     // Verify Set-Cookie headers are present
     const setCookies = res.headers.getSetCookie();
-    expect(setCookies).toHaveLength(3);
+    expect(setCookies).toHaveLength(4);
     expect(setCookies[0]).toContain("chapa_session=");
     expect(setCookies[1]).toContain("chapa_oauth_state=");
-    expect(setCookies[2]).toContain("chapa_redirect=");
+    expect(setCookies[2]).toContain("chapa_oauth_state_store=");
+    expect(setCookies[3]).toContain("chapa_redirect=");
   });
 
   it("passes correct arguments to exchangeCodeForToken", async () => {

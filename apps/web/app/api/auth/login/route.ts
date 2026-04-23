@@ -5,6 +5,8 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 
+const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
+
 function isSecureOrigin(): boolean {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
   return base.startsWith("https://");
@@ -57,11 +59,15 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${baseUrl}/api/auth/callback`;
 
   const { state, cookie: stateCookie } = createStateCookie();
-  await issueOauthState(state);
+  const stateStoreMode = await issueOauthState(state);
   const authUrl = buildAuthUrl(clientId, redirectUri, state);
 
   const response = NextResponse.redirect(authUrl);
   response.headers.append("Set-Cookie", stateCookie);
+  response.headers.append(
+    "Set-Cookie",
+    `${OAUTH_STATE_STORE_COOKIE}=${stateStoreMode}; ${cookieFlags()}; Max-Age=600`,
+  );
 
   // Store post-login redirect URL if provided (same-origin only)
   const postLoginRedirect = request.nextUrl.searchParams.get("redirect");
