@@ -275,6 +275,32 @@ describe("PATCH /api/admin/campaigns/[id]", () => {
     );
     expect(res.status).toBe(200);
   });
+
+  it("rejects malformed features on patch", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const res = await PATCH(
+      makeRequest("PATCH", { features: [{ text: 42 }] }),
+      { params: mockParams },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/features\[0\]\.text/i);
+    expect(dbUpdateCampaign).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string previewText on patch", async () => {
+    vi.mocked(dbGetCampaign).mockResolvedValue(draftCampaign as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const res = await PATCH(
+      makeRequest("PATCH", { previewText: 42 }),
+      { params: mockParams },
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/previewText/i);
+    expect(dbUpdateCampaign).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

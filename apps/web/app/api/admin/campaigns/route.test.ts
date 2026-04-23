@@ -198,6 +198,34 @@ describe("POST /api/admin/campaigns", () => {
     );
   });
 
+  it("rejects malformed features on create", async () => {
+    const res = await POST(
+      makeRequest("POST", {
+        ...validBody,
+        features: [{ text: 42 }],
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/features\[0\]\.text/i);
+    expect(dbCreateCampaign).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string previewText on create", async () => {
+    const res = await POST(
+      makeRequest("POST", {
+        ...validBody,
+        previewText: 42,
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/previewText/i);
+    expect(dbCreateCampaign).not.toHaveBeenCalled();
+  });
+
   it("defaults previewText to null and features to [] when not provided", async () => {
     vi.mocked(dbCreateCampaign).mockResolvedValue("new-id");
     await POST(makeRequest("POST", validBody));
