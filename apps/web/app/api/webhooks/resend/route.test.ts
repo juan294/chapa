@@ -10,11 +10,15 @@ const {
   mockFetchReceivedEmail,
   mockForwardEmail,
   mockRateLimit,
+  mockCacheSetNx,
+  mockCacheGet,
 } = vi.hoisted(() => ({
   mockVerifyWebhookSignature: vi.fn(),
   mockFetchReceivedEmail: vi.fn(),
   mockForwardEmail: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockCacheSetNx: vi.fn(),
+  mockCacheGet: vi.fn(),
 }));
 
 vi.mock("@/lib/email/resend", () => ({
@@ -25,6 +29,8 @@ vi.mock("@/lib/email/resend", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  cacheSetNx: mockCacheSetNx,
+  cacheGet: mockCacheGet,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -86,6 +92,8 @@ function makeEmailReceivedPayload(emailId: string): string {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+  mockCacheSetNx.mockResolvedValue(true);
+  mockCacheGet.mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -207,6 +215,41 @@ describe("POST /api/webhooks/resend", () => {
     const body = await res.json();
     expect(body.status).toBe("forwarded");
     expect(body.id).toBe("fwd_123");
+  });
+
+  it("returns 200 and skips forwarding when the svix event was already processed", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockCacheSetNx.mockResolvedValueOnce(false);
+    mockCacheGet.mockResolvedValueOnce(1);
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("already_processed");
+    expect(body.id).toBe("msg_123");
+    expect(mockFetchReceivedEmail).not.toHaveBeenCalled();
+    expect(mockForwardEmail).not.toHaveBeenCalled();
+  });
+
+  it("fails open when dedupe storage is unavailable", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockCacheSetNx.mockResolvedValueOnce(false);
+    mockCacheGet.mockResolvedValueOnce(null);
+    mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
+    mockForwardEmail.mockResolvedValueOnce({ id: "fwd_123" });
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("forwarded");
+    expect(mockFetchReceivedEmail).toHaveBeenCalledOnce();
+    expect(mockForwardEmail).toHaveBeenCalledOnce();
   });
 
   it("passes correct params to forwardEmail", async () => {
