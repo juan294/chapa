@@ -189,3 +189,54 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+  deployment-smoke:
+    name: Deployment Smoke
+    needs: [build]
+    if: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: deployment-playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        if: steps.deployment-playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+
+      - name: Install Playwright system deps (cached)
+        if: steps.deployment-playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: apps/web
+
+      - name: Run deployment-shaped smoke tests
+        working-directory: apps/web
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
+          DEPLOYMENT_SMOKE_STRICT: "true"
+        run: npx playwright test e2e/smoke.spec.ts
+
+      - name: Upload deployment smoke report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-smoke-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
