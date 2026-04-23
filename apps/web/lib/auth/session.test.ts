@@ -45,14 +45,14 @@ describe("session helpers", () => {
     });
 
     it("passes the cookie header and trimmed secret to readSessionCookie", () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "  test-secret-value  ");
+      vi.stubEnv("NEXTAUTH_SECRET", "  12345678901234567890123456789012  ");
       mockReadSessionCookie.mockReturnValue(null);
 
       getOptionalRequestSession(makeRequest("chapa_session=some-value"));
 
       expect(mockReadSessionCookie).toHaveBeenCalledWith(
         "chapa_session=some-value",
-        "test-secret-value",
+        "12345678901234567890123456789012",
       );
     });
   });
@@ -75,7 +75,7 @@ describe("session helpers", () => {
 
   describe("getOptionalServerSessionFromHeaders", () => {
     it("reads the cookie header from the header store", () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value");
+      vi.stubEnv("NEXTAUTH_SECRET", "12345678901234567890123456789012");
       mockReadSessionCookie.mockReturnValue({
         token: "ghp_test123",
         login: "juan294",
@@ -90,7 +90,7 @@ describe("session helpers", () => {
       expect(result?.login).toBe("juan294");
       expect(mockReadSessionCookie).toHaveBeenCalledWith(
         "chapa_session=server-cookie",
-        "test-secret-value",
+        "12345678901234567890123456789012",
       );
     });
   });
@@ -108,9 +108,8 @@ describe("session helpers", () => {
         error: "Server misconfigured",
       });
     });
-
     it("returns 401 when the session is invalid", async () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value");
+      vi.stubEnv("NEXTAUTH_SECRET", "12345678901234567890123456789012");
       mockReadSessionCookie.mockReturnValue(null);
 
       const result = requireRequestSession(makeRequest("chapa_session=bad"));
@@ -124,7 +123,7 @@ describe("session helpers", () => {
     });
 
     it("returns the session payload when the session is valid", () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value");
+      vi.stubEnv("NEXTAUTH_SECRET", "12345678901234567890123456789012");
       mockReadSessionCookie.mockReturnValue({
         token: "ghp_test123",
         login: "juan294",

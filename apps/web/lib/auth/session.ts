@@ -19,18 +19,17 @@ function assertSessionSecretLength(secret: string): string {
   return secret;
 }
 
-const bootSessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-if (bootSessionSecret && process.env.NODE_ENV !== "test") {
-  assertSessionSecretLength(bootSessionSecret);
-}
-
-export function getSessionSecret(): string | null {
+function getRawSessionSecret(): string | null {
   const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
   return sessionSecret || null;
 }
 
+export function getSessionSecret(): string | null {
+  return getRawSessionSecret();
+}
+
 export function getSessionKey(): Buffer {
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  const sessionSecret = getRawSessionSecret();
   if (!sessionSecret) {
     throw new Error("NEXTAUTH_SECRET must be set and at least 32 chars");
   }
