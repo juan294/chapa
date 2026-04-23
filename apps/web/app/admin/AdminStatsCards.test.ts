@@ -52,23 +52,26 @@ describe("AdminStatsCards", () => {
   });
 
   describe("percentage detail", () => {
-    it("computes percentage when totalUsers > 0", () => {
-      expect(SOURCE).toContain("totalUsers > 0");
+    it("computes page-scoped detail when pageUsers > 0", () => {
+      expect(SOURCE).toContain("pageUsers > 0");
     });
 
-    it("uses toFixed(0) for percentage display", () => {
-      expect(SOURCE).toContain(".toFixed(0)");
+    it("renders page-scoped detail text", () => {
+      expect(SOURCE).toContain("on this page");
     });
 
-    it("shows undefined detail when totalUsers is 0", () => {
-      // The ternary returns undefined when totalUsers is 0, hiding the detail
-      expect(SOURCE).toMatch(/totalUsers > 0 \?.*: undefined/);
+    it("shows undefined detail when pageUsers is 0", () => {
+      expect(SOURCE).toMatch(/pageUsers > 0 \?.*: undefined/);
     });
   });
 
   describe("props interface", () => {
     it("accepts totalUsers as a number", () => {
       expect(SOURCE).toContain("totalUsers: number");
+    });
+
+    it("accepts pageUsers as a number", () => {
+      expect(SOURCE).toContain("pageUsers: number");
     });
 
     it("accepts tierCounts as a Record", () => {

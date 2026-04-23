@@ -217,7 +217,11 @@ export function AdminDashboardClient() {
           </div>
 
           {/* Summary cards */}
-          <AdminStatsCards totalUsers={total} tierCounts={tierCounts} />
+          <AdminStatsCards
+            totalUsers={total}
+            pageUsers={users.length}
+            tierCounts={tierCounts}
+          />
 
           {/* Search + Table */}
           <div

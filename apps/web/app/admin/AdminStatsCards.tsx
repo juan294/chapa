@@ -33,35 +33,40 @@ function StatCard({
 
 interface AdminStatsCardsProps {
   totalUsers: number;
+  pageUsers: number;
   tierCounts: Record<string, number>;
 }
 
-export function AdminStatsCards({ totalUsers, tierCounts }: AdminStatsCardsProps) {
+export function AdminStatsCards({
+  totalUsers,
+  pageUsers,
+  tierCounts,
+}: AdminStatsCardsProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <StatCard label="Total Users" value={totalUsers} delay={0} />
       <StatCard
         label="Elite"
         value={tierCounts.Elite ?? 0}
-        detail={totalUsers > 0 ? `${((tierCounts.Elite ?? 0) / totalUsers * 100).toFixed(0)}%` : undefined}
+        detail={pageUsers > 0 ? `${tierCounts.Elite ?? 0} of ${pageUsers} on this page` : undefined}
         delay={50}
       />
       <StatCard
         label="High"
         value={tierCounts.High ?? 0}
-        detail={totalUsers > 0 ? `${((tierCounts.High ?? 0) / totalUsers * 100).toFixed(0)}%` : undefined}
+        detail={pageUsers > 0 ? `${tierCounts.High ?? 0} of ${pageUsers} on this page` : undefined}
         delay={100}
       />
       <StatCard
         label="Solid"
         value={tierCounts.Solid ?? 0}
-        detail={totalUsers > 0 ? `${((tierCounts.Solid ?? 0) / totalUsers * 100).toFixed(0)}%` : undefined}
+        detail={pageUsers > 0 ? `${tierCounts.Solid ?? 0} of ${pageUsers} on this page` : undefined}
         delay={150}
       />
       <StatCard
         label="Emerging"
         value={tierCounts.Emerging ?? 0}
-        detail={totalUsers > 0 ? `${((tierCounts.Emerging ?? 0) / totalUsers * 100).toFixed(0)}%` : undefined}
+        detail={pageUsers > 0 ? `${tierCounts.Emerging ?? 0} of ${pageUsers} on this page` : undefined}
         delay={200}
       />
     </div>
