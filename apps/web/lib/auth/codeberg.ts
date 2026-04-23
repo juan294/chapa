@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from "crypto";
 import { classifyOAuthError, type TokenRefreshResult } from "./bitbucket";
+import { buildAuthCookieFlags } from "./cookie-policy";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,14 +58,8 @@ export function buildCodebergAuthUrl(
 
 const CB_STATE_COOKIE_NAME = "chapa_cb_oauth_state";
 
-function isSecureOrigin(): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
-  return base.startsWith("https://");
-}
-
 function cookieFlags(): string {
-  const secure = isSecureOrigin() ? " Secure;" : "";
-  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+  return buildAuthCookieFlags(process.env.NEXT_PUBLIC_BASE_URL?.trim());
 }
 
 /**

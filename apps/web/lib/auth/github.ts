@@ -1,4 +1,5 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
+import { buildAuthCookieFlags } from "./cookie-policy";
 
 /** 10-second timeout for all external OAuth fetches */
 const FETCH_TIMEOUT_MS = 10_000;
@@ -41,14 +42,8 @@ export function buildAuthUrl(clientId: string, redirectUri: string, state: strin
 
 const STATE_COOKIE_NAME = "chapa_oauth_state";
 
-function isSecureOrigin(): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
-  return base.startsWith("https://");
-}
-
 function cookieFlags(): string {
-  const secure = isSecureOrigin() ? " Secure;" : "";
-  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+  return buildAuthCookieFlags(process.env.NEXT_PUBLIC_BASE_URL?.trim());
 }
 
 /**

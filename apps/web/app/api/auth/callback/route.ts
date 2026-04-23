@@ -7,6 +7,7 @@ import {
   validateState,
   clearStateCookie,
 } from "@/lib/auth/github";
+import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
 import { consumeOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -16,14 +17,10 @@ import { captureServerError } from "@/lib/analytics/server-errors";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
-function isSecureOrigin(): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
-  return base.startsWith("https://");
-}
-
-function cookieFlags(): string {
-  const secure = isSecureOrigin() ? " Secure;" : "";
-  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+function cookieFlags(request: NextRequest): string {
+  return buildAuthCookieFlags(
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() || request.nextUrl.origin,
+  );
 }
 
 function isLocalDevRequest(request: NextRequest): boolean {
@@ -199,12 +196,12 @@ export async function GET(request: NextRequest) {
   response.headers.append("Set-Cookie", clearStateCookie());
   response.headers.append(
     "Set-Cookie",
-    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags()}; Max-Age=0`,
+    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags(request)}; Max-Age=0`,
   );
   // Clear the redirect cookie
   response.headers.append(
     "Set-Cookie",
-    `chapa_redirect=; ${cookieFlags()}; Max-Age=0`,
+    `chapa_redirect=; ${cookieFlags(request)}; Max-Age=0`,
   );
   return response;
 }
