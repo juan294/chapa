@@ -13,6 +13,7 @@ const {
   mockInvalidateProfileReadModels,
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
+  mockGetSessionGitHubToken,
 } = vi.hoisted(() => ({
   mockRequireSession: vi.fn(),
   mockCacheDel: vi.fn(),
@@ -24,6 +25,7 @@ const {
   mockInvalidateProfileReadModels: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
+  mockGetSessionGitHubToken: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -63,8 +65,11 @@ vi.mock("@/lib/profile/orchestrated-profile", () => ({
     mockPersistOrchestratedSnapshot(...args),
 }));
 
+vi.mock("@/lib/auth/github-session-token", () => ({
+  getSessionGitHubToken: (...args: unknown[]) => mockGetSessionGitHubToken(...args),
+}));
+
 const SESSION = {
-  token: "oauth-token",
   login: "testuser",
   name: "Test User",
   avatar_url: "https://example.com/avatar.png",
@@ -124,6 +129,7 @@ describe("POST /api/refresh", () => {
     mockUpdateCraftCache.mockResolvedValue(undefined);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockGetSessionGitHubToken.mockResolvedValue("oauth-token");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -227,6 +233,16 @@ describe("POST /api/refresh", () => {
       }),
     );
     expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when no GitHub token is stored for the session", async () => {
+    mockGetSessionGitHubToken.mockResolvedValue(null);
+
+    const res = await POST(makeRequest("testuser"));
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: "Reauthentication required" });
+    expect(mockMaterializeOrchestratedProfile).not.toHaveBeenCalled();
   });
 
   it("revalidates the share page after a successful refresh", async () => {

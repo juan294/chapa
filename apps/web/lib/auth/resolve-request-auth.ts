@@ -4,6 +4,7 @@ import {
   getOptionalRequestSession,
   getSessionSecret,
 } from "@/lib/auth/session";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 
 /**
  * Resolve the authenticated handle from a request.
@@ -32,7 +33,10 @@ export async function resolveRequestAuth(
   // 2. Fall back to session cookie
   const session = getOptionalRequestSession(request);
   if (session) {
-    return { handle: session.login, token: session.token };
+    const token = await getSessionGitHubToken(session);
+    return token
+      ? { handle: session.login, token }
+      : { handle: session.login };
   }
 
   return null;

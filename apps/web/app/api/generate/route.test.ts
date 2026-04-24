@@ -18,17 +18,23 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/github-session-token", () => ({
+  getSessionGitHubToken: vi.fn(),
+}));
+
 import { POST } from "./route";
 import { requireSession } from "@/lib/auth/require-session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { rateLimit } from "@/lib/cache/redis";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 
 const mockRequireSession = vi.mocked(requireSession);
 const mockGetStats = vi.mocked(getStats);
 const mockComputeImpact = vi.mocked(computeImpactV6);
 const mockRateLimit = vi.mocked(rateLimit);
+const mockGetSessionGitHubToken = vi.mocked(getSessionGitHubToken);
 
 function makeRequest(cookie?: string): NextRequest {
   const req = new NextRequest("http://localhost:3001/api/generate", {
@@ -39,7 +45,6 @@ function makeRequest(cookie?: string): NextRequest {
 }
 
 const SESSION = {
-  token: "ghp_test",
   login: "juan294",
   name: "Juan",
   avatar_url: "https://example.com/avatar.png",
@@ -49,6 +54,7 @@ describe("POST /api/generate", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockGetSessionGitHubToken.mockResolvedValue("ghp_test");
   });
 
   it("returns 401 when no session cookie is present", async () => {
@@ -99,7 +105,7 @@ describe("POST /api/generate", () => {
     expect(body.handle).toBe("juan294");
   });
 
-  it("calls getStats with the session handle and token", async () => {
+  it("calls getStats with the stored GitHub token", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockResolvedValue({ handle: "juan294" } as unknown as StatsData);
     mockComputeImpact.mockReturnValue({ archetype: "Builder" } as unknown as ImpactV6Result);
@@ -107,6 +113,17 @@ describe("POST /api/generate", () => {
     await POST(makeRequest("chapa_session=abc"));
 
     expect(mockGetStats).toHaveBeenCalledWith("juan294", "ghp_test");
+  });
+
+  it("returns 401 when no GitHub token is stored for the session", async () => {
+    mockRequireSession.mockReturnValue({ session: SESSION });
+    mockGetSessionGitHubToken.mockResolvedValue(null);
+
+    const res = await POST(makeRequest("chapa_session=abc"));
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: "Reauthentication required" });
+    expect(mockGetStats).not.toHaveBeenCalled();
   });
 
   it("returns 502 when GitHub API fails", async () => {

@@ -14,6 +14,7 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
 import { addContact } from "@/lib/email/audience";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { storeGitHubToken } from "@/lib/auth/github-session-token";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
@@ -142,6 +143,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/?error=user_fetch", request.url));
   }
 
+  const storedToken = await storeGitHubToken(user.login, token);
+  if (!storedToken) {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 500,
+      error: new Error("GitHub token storage failed"),
+    });
+    return NextResponse.redirect(new URL("/?error=session_storage", request.url));
+  }
+
   // Capture email and profile, register user (fire-and-forget, non-blocking)
   const email = await fetchGitHubUserEmail(token).catch(() => null);
   void dbUpsertUser(user.login, {
@@ -172,7 +183,6 @@ export async function GET(request: NextRequest) {
 
   const cookie = createSessionCookie(
     {
-      token,
       login: user.login,
       name: user.name,
       avatar_url: user.avatar_url,
