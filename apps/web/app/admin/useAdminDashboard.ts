@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminUser, SortField, SortDir, PaginatedResponse } from "./admin-types";
 
 // ---------------------------------------------------------------------------
@@ -57,8 +57,10 @@ export function useAdminDashboard(): AdminDashboardState {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const limit = 25;
+  const latestRequestRef = useRef(0);
 
   const fetchUsers = useCallback(async (isRefresh = false) => {
+    const requestId = ++latestRequestRef.current;
     if (isRefresh) setRefreshing(true);
     try {
       const params = new URLSearchParams({
@@ -77,14 +79,17 @@ export function useAdminDashboard(): AdminDashboardState {
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
       const data: PaginatedResponse = await res.json();
+      if (requestId !== latestRequestRef.current) return;
       setUsers(data.users ?? []);
       setTotal(data.total ?? 0);
       setTotalPages(data.totalPages ?? 0);
       setError(null);
       setLastRefreshed(new Date());
     } catch (err) {
+      if (requestId !== latestRequestRef.current) return;
       setError((err as Error).message);
     } finally {
+      if (requestId !== latestRequestRef.current) return;
       setLoading(false);
       setRefreshing(false);
     }

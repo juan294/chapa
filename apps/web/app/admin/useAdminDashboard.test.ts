@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor, cleanup } from "@testing-library/react";
 import { useAdminDashboard } from "./useAdminDashboard";
-import type { PaginatedResponse } from "./admin-types";
+import type { AdminUser, PaginatedResponse } from "./admin-types";
 
 afterEach(cleanup);
 
@@ -61,6 +61,20 @@ function mockFetchError(status = 500) {
     status,
     json: () => Promise.resolve({ error: `HTTP ${status}` }),
   } as Response);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function withHandle(user: AdminUser, handle: string): AdminUser {
+  return { ...user, handle };
 }
 
 beforeEach(() => {
@@ -609,6 +623,57 @@ describe("useAdminDashboard", () => {
       expect(result.current.error).toBeNull();
       expect(result.current.users).toEqual(mockUsers);
       expect(result.current.total).toBe(10);
+    });
+  });
+
+  describe("stale response handling", () => {
+    it("ignores an older response that resolves after a newer request", async () => {
+      const first = deferred<Response>();
+      const second = deferred<Response>();
+
+      vi.spyOn(globalThis, "fetch")
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise);
+
+      const { result } = renderHook(() => useAdminDashboard());
+
+      act(() => {
+        result.current.handleSort("handle");
+      });
+
+      second.resolve({
+        ok: true,
+        json: async () =>
+          makePaginatedResponse({
+            users: [
+              withHandle(mockUsers[1] as AdminUser, "newer"),
+            ],
+            total: 1,
+            totalPages: 1,
+          }),
+      } as Response);
+
+      await waitFor(() => {
+        expect(result.current.users[0]?.handle).toBe("newer");
+      });
+
+      first.resolve({
+        ok: true,
+        json: async () =>
+          makePaginatedResponse({
+            users: [
+              withHandle(mockUsers[0] as AdminUser, "older"),
+            ],
+            total: 1,
+            totalPages: 1,
+          }),
+      } as Response);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(result.current.users[0]?.handle).toBe("newer");
     });
   });
 });
