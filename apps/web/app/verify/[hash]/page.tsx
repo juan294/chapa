@@ -1,5 +1,6 @@
 import { getVerificationRecord } from "@/lib/verification/store";
 import { Navbar } from "@/components/Navbar";
+import { StatusCallout } from "@/components/StatusCallout";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -78,37 +79,16 @@ function VerifiedCard({
   };
 }) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-terminal-green/15">
-          <svg
-            className="h-5 w-5 text-terminal-green"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold text-terminal-green">
-            Verified Badge
-          </h1>
-          <p className="text-sm text-text-secondary">
-            This badge was generated from authentic platform data.
-          </p>
-        </div>
-      </div>
-
+    <StatusCallout
+      variant="verification"
+      title="Verified Badge"
+      titleAs="h1"
+      description="This badge was generated from authentic platform data."
+    >
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">Verification Code</p>
-        <p className="font-heading text-lg tracking-widest text-terminal-red">
+        <p className="font-heading text-lg tracking-widest text-complement">
           {hash}
         </p>
       </div>
@@ -119,7 +99,7 @@ function VerifiedCard({
           <span className="text-sm text-text-secondary">Developer</span>
           <Link
             href={`/u/${record.handle}`}
-            className="font-heading text-sm text-amber hover:text-amber-light"
+            className="font-heading text-sm text-complement hover:text-complement-light"
           >
             @{record.handle}
           </Link>
@@ -210,42 +190,23 @@ function VerifiedCard({
         </p>
         <Link
           href={`/u/${record.handle}/badge.svg`}
-          className="text-xs text-amber hover:text-amber-light"
+          className="text-xs text-complement hover:text-complement-light"
         >
           View Badge
         </Link>
       </div>
-    </div>
+    </StatusCallout>
   );
 }
 
 function NotFoundCard({ hash }: { hash: string }) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-8">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-terminal-yellow/15">
-          <svg
-            className="h-5 w-5 text-terminal-yellow"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 9v4m0 4h.01M12 2L2 20h20L12 2z" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold text-terminal-yellow">
-            Not Found
-          </h1>
-          <p className="text-sm text-text-secondary">
-            No verification record found for this hash.
-          </p>
-        </div>
-      </div>
+    <StatusCallout
+      variant="warning"
+      title="Not Found"
+      titleAs="h1"
+      description="No verification record found for this hash."
+    >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">Hash</p>
         <p className="font-heading text-lg tracking-widest text-text-secondary">
@@ -256,42 +217,22 @@ function NotFoundCard({ hash }: { hash: string }) {
         This could mean the badge has expired (records are kept for 30 days) or
         the hash is incorrect.
       </p>
-    </div>
+    </StatusCallout>
   );
 }
 
 function InvalidHashCard({ hash }: { hash: string }) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-8">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-terminal-red/15">
-          <svg
-            className="h-5 w-5 text-terminal-red"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M15 9l-6 6m0-6l6 6" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold text-terminal-red">
-            Invalid Hash
-          </h1>
-          <p className="text-sm text-text-secondary">
-            The verification hash must be 8, 16, or 32 hex characters.
-          </p>
-        </div>
-      </div>
+    <StatusCallout
+      variant="error"
+      title="Invalid Hash"
+      titleAs="h1"
+      description="The verification hash must be 8, 16, or 32 hex characters."
+    >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">Provided</p>
         <p className="font-heading text-sm text-terminal-red">{hash}</p>
       </div>
-    </div>
+    </StatusCallout>
   );
 }

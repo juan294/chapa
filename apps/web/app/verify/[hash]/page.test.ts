@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
+const STATUS_CALLOUT_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../../../components/StatusCallout.tsx"),
+  "utf-8",
+);
 
 describe("VerifyPage", () => {
   describe("hash validation", () => {
@@ -167,13 +171,28 @@ describe("VerifyPage", () => {
   describe("design system compliance", () => {
     it("uses semantic background tokens", () => {
       expect(SOURCE).toContain("bg-bg");
-      expect(SOURCE).toContain("bg-card");
+      expect(STATUS_CALLOUT_SOURCE).toContain("bg-complement/10");
+      expect(STATUS_CALLOUT_SOURCE).toContain("bg-terminal-red/10");
+      expect(STATUS_CALLOUT_SOURCE).toContain("bg-terminal-yellow/10");
     });
 
-    it("uses terminal color tokens for status indicators", () => {
-      expect(SOURCE).toContain("text-terminal-green");
-      expect(SOURCE).toContain("text-terminal-yellow");
-      expect(SOURCE).toContain("text-terminal-red");
+    it("uses shared semantic status primitives", () => {
+      expect(SOURCE).toContain("StatusCallout");
+      expect(SOURCE).toContain('variant="verification"');
+      expect(SOURCE).toContain('variant="warning"');
+      expect(SOURCE).toContain('variant="error"');
+    });
+
+    it("uses complement tokens for the verified trust state", () => {
+      expect(SOURCE).toContain("text-complement");
+      expect(SOURCE).not.toContain("text-terminal-green");
+      expect(SOURCE).not.toContain("bg-terminal-green");
+    });
+
+    it("uses terminal tokens only for warning and error states", () => {
+      expect(STATUS_CALLOUT_SOURCE).toContain("text-terminal-yellow");
+      expect(STATUS_CALLOUT_SOURCE).toContain("text-terminal-red");
+      expect(SOURCE).not.toContain("text-terminal-yellow");
     });
 
     it("uses stroke border token", () => {
@@ -185,7 +204,7 @@ describe("VerifyPage", () => {
     });
 
     it("all three cards have h1 headings", () => {
-      const h1Matches = SOURCE.match(/<h1\b/g) ?? [];
+      const h1Matches = SOURCE.match(/titleAs="h1"/g) ?? [];
       expect(h1Matches.length).toBe(3);
     });
   });
