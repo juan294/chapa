@@ -292,7 +292,7 @@ describe("cookie Secure flag", () => {
   it("session cookie includes Secure when base URL is HTTPS", () => {
     process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
     const cookie = createSessionCookie(
-      { token: "t", login: "u", name: null, avatar_url: "" },
+      { login: "u", name: null, avatar_url: "" },
       "secret-key-for-test-32-chars!!!!",
     );
     expect(cookie).toContain("Secure");
@@ -301,7 +301,7 @@ describe("cookie Secure flag", () => {
   it("session cookie omits Secure when base URL is HTTP", () => {
     process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
     const cookie = createSessionCookie(
-      { token: "t", login: "u", name: null, avatar_url: "" },
+      { login: "u", name: null, avatar_url: "" },
       "secret-key-for-test-32-chars!!!!",
     );
     expect(cookie).not.toContain("Secure");
@@ -322,7 +322,7 @@ describe("cookie Secure flag", () => {
   it("session cookie roundtrips correctly (encrypt+decrypt)", () => {
     process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
     const secret = "secret-key-for-test-32-chars!!!!";
-    const payload = { token: "gho_abc", login: "juan294", name: "Juan", avatar_url: "https://img" };
+    const payload = { login: "juan294", name: "Juan", avatar_url: "https://img" };
     const cookie = createSessionCookie(payload, secret);
     const cookieHeader = cookie.split(";")[0]!; // just the name=value part
     const result = readSessionCookie(cookieHeader, secret);
@@ -508,7 +508,7 @@ describe("readSessionCookie — additional edge cases", () => {
   });
 
   it("returns null when session has missing avatar_url field", () => {
-    const badPayload = JSON.stringify({ token: "t", login: "user", name: "Test" });
+    const badPayload = JSON.stringify({ login: "user", name: "Test" });
     const encrypted = encryptToken(badPayload, secret);
     const cookieHeader = `chapa_session=${encrypted}`;
     const result = readSessionCookie(cookieHeader, secret);
@@ -516,7 +516,7 @@ describe("readSessionCookie — additional edge cases", () => {
   });
 
   it("returns null when name is not string or null (boolean)", () => {
-    const badPayload = JSON.stringify({ token: "t", login: "user", name: true, avatar_url: "url" });
+    const badPayload = JSON.stringify({ login: "user", name: true, avatar_url: "url" });
     const encrypted = encryptToken(badPayload, secret);
     const cookieHeader = `chapa_session=${encrypted}`;
     const result = readSessionCookie(cookieHeader, secret);
@@ -654,15 +654,23 @@ describe("readSessionCookie — shape validation", () => {
 
   it("returns null for session with missing login field", () => {
     // Encrypt an object that lacks the `login` field
-    const badPayload = JSON.stringify({ token: "t", name: null, avatar_url: "https://img" });
+    const badPayload = JSON.stringify({ name: null, avatar_url: "https://img" });
     const encrypted = encryptToken(badPayload, secret);
     const cookieHeader = `chapa_session=${encrypted}`;
     const result = readSessionCookie(cookieHeader, secret);
     expect(result).toBeNull();
   });
 
-  it("returns null for session with missing token field", () => {
-    const badPayload = JSON.stringify({ login: "user", name: null, avatar_url: "https://img" });
+  it("accepts a session payload without a token", () => {
+    const payload = { login: "user", name: null, avatar_url: "https://img" };
+    const encrypted = encryptToken(JSON.stringify(payload), secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toEqual(payload);
+  });
+
+  it("returns null for session when token is not a string", () => {
+    const badPayload = JSON.stringify({ login: "user", token: 42, name: null, avatar_url: "https://img" });
     const encrypted = encryptToken(badPayload, secret);
     const cookieHeader = `chapa_session=${encrypted}`;
     const result = readSessionCookie(cookieHeader, secret);
@@ -670,7 +678,7 @@ describe("readSessionCookie — shape validation", () => {
   });
 
   it("returns null for session where name is a number instead of string|null", () => {
-    const badPayload = JSON.stringify({ token: "t", login: "user", name: 42, avatar_url: "https://img" });
+    const badPayload = JSON.stringify({ login: "user", name: 42, avatar_url: "https://img" });
     const encrypted = encryptToken(badPayload, secret);
     const cookieHeader = `chapa_session=${encrypted}`;
     const result = readSessionCookie(cookieHeader, secret);
@@ -678,7 +686,7 @@ describe("readSessionCookie — shape validation", () => {
   });
 
   it("returns a valid payload when shape is correct", () => {
-    const goodPayload = { token: "gho_abc", login: "juan294", name: "Juan", avatar_url: "https://img" };
+    const goodPayload = { login: "juan294", name: "Juan", avatar_url: "https://img" };
     const cookie = createSessionCookie(goodPayload, secret);
     const cookieHeader = cookie.split(";")[0]!;
     const result = readSessionCookie(cookieHeader, secret);

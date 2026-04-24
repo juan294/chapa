@@ -10,12 +10,14 @@ const {
   mockFetchGitHubUser,
   mockGetOptionalRequestSession,
   mockGetSessionSecret,
+  mockGetSessionGitHubToken,
 } = vi.hoisted(() => ({
   mockIsCliToken: vi.fn(),
   mockVerifyCliToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
   mockGetOptionalRequestSession: vi.fn(),
   mockGetSessionSecret: vi.fn(),
+  mockGetSessionGitHubToken: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cli-token", () => ({
@@ -30,6 +32,10 @@ vi.mock("@/lib/auth/github", () => ({
 vi.mock("@/lib/auth/session", () => ({
   getOptionalRequestSession: mockGetOptionalRequestSession,
   getSessionSecret: mockGetSessionSecret,
+}));
+
+vi.mock("@/lib/auth/github-session-token", () => ({
+  getSessionGitHubToken: mockGetSessionGitHubToken,
 }));
 
 // ---------------------------------------------------------------------------
@@ -56,6 +62,7 @@ function makeRequest(headers: Record<string, string> = {}): Request {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetSessionSecret.mockReturnValue("test-secret-key");
+  mockGetSessionGitHubToken.mockResolvedValue("ghp_test");
 });
 
 // ---------------------------------------------------------------------------
@@ -134,7 +141,6 @@ describe("resolveRequestAuth", () => {
     it("resolves handle from session cookie when no Bearer header", async () => {
       mockGetOptionalRequestSession.mockReturnValue({
         login: "juan294",
-        token: "ghp_test",
         name: "Juan",
         avatar_url: "https://example.com/avatar.png",
       });
@@ -145,6 +151,11 @@ describe("resolveRequestAuth", () => {
 
       expect(result).toEqual({ handle: "juan294", token: "ghp_test" });
       expect(mockGetOptionalRequestSession).toHaveBeenCalled();
+      expect(mockGetSessionGitHubToken).toHaveBeenCalledWith({
+        login: "juan294",
+        name: "Juan",
+        avatar_url: "https://example.com/avatar.png",
+      });
     });
   });
 
@@ -182,6 +193,21 @@ describe("resolveRequestAuth", () => {
 
       expect(result).toEqual({ handle: "bearer-user" });
       expect(mockGetOptionalRequestSession).not.toHaveBeenCalled();
+    });
+
+    it("returns the handle without a token when the stored GitHub token is unavailable", async () => {
+      mockGetOptionalRequestSession.mockReturnValue({
+        login: "juan294",
+        name: "Juan",
+        avatar_url: "https://example.com/avatar.png",
+      });
+      mockGetSessionGitHubToken.mockResolvedValue(null);
+
+      const result = await resolveRequestAuth(
+        makeRequest({ cookie: "chapa_session=encrypted_value" }),
+      );
+
+      expect(result).toEqual({ handle: "juan294" });
     });
   });
 });

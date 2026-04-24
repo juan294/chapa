@@ -11,6 +11,7 @@ import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -60,8 +61,16 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Invalidate history cache so next /api/history/:handle request fetches fresh data
     await invalidateHistoryCache(handle);
 
+    const token = await getSessionGitHubToken(session);
+    if (!token) {
+      return NextResponse.json(
+        { error: "Reauthentication required" },
+        { status: 401 },
+      );
+    }
+
     const materialized = await materializeOrchestratedProfile(handle, {
-      token: session.token,
+      token,
       craftMode: "recompute",
     });
     if (!materialized) {

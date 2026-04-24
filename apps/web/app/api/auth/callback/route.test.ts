@@ -16,6 +16,7 @@ const {
   mockDbUpsertUser,
   mockAddContact,
   mockCaptureServerError,
+  mockStoreGitHubToken,
 } = vi.hoisted(() => ({
   mockExchangeCodeForToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
@@ -28,6 +29,7 @@ const {
   mockDbUpsertUser: vi.fn(),
   mockAddContact: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockStoreGitHubToken: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/github", () => ({
@@ -62,6 +64,10 @@ vi.mock("@/lib/email/audience", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: mockCaptureServerError,
+}));
+
+vi.mock("@/lib/auth/github-session-token", () => ({
+  storeGitHubToken: mockStoreGitHubToken,
 }));
 
 import { GET } from "./route";
@@ -104,6 +110,7 @@ function allowRateLimit() {
   mockDbUpsertUser.mockResolvedValue(undefined);
   mockAddContact.mockResolvedValue(undefined);
   mockCaptureServerError.mockResolvedValue(undefined);
+  mockStoreGitHubToken.mockResolvedValue(true);
 }
 
 function setEnvVars() {
@@ -422,13 +429,51 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     expect(mockCreateSessionCookie).toHaveBeenCalledWith(
       {
-        token: "gho_valid_token",
         login: "octocat",
         name: "The Octocat",
         avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
       },
       "test-session-secret",
     );
+  });
+
+  it("stores the GitHub token server-side before creating the session cookie", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockStoreGitHubToken).toHaveBeenCalledWith("octocat", "gho_valid_token");
+  });
+
+  it("redirects when GitHub token storage fails", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockStoreGitHubToken.mockResolvedValue(false);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("Location")!).searchParams.get("error")).toBe(
+      "session_storage",
+    );
+    expect(mockCreateSessionCookie).not.toHaveBeenCalled();
   });
 
   it("captures email and upserts user on successful login", async () => {

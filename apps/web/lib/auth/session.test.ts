@@ -77,7 +77,6 @@ describe("session helpers", () => {
     it("reads the cookie header from the header store", () => {
       vi.stubEnv("NEXTAUTH_SECRET", "12345678901234567890123456789012");
       mockReadSessionCookie.mockReturnValue({
-        token: "ghp_test123",
         login: "juan294",
         name: "Juan",
         avatar_url: "https://avatars.githubusercontent.com/u/123",
@@ -125,7 +124,6 @@ describe("session helpers", () => {
     it("returns the session payload when the session is valid", () => {
       vi.stubEnv("NEXTAUTH_SECRET", "12345678901234567890123456789012");
       mockReadSessionCookie.mockReturnValue({
-        token: "ghp_test123",
         login: "juan294",
         name: "Juan",
         avatar_url: "https://avatars.githubusercontent.com/u/123",
@@ -135,7 +133,6 @@ describe("session helpers", () => {
 
       expect(result.error).toBeUndefined();
       expect(result.session).toEqual({
-        token: "ghp_test123",
         login: "juan294",
         name: "Juan",
         avatar_url: "https://avatars.githubusercontent.com/u/123",

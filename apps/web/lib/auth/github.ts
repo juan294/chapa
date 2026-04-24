@@ -321,10 +321,10 @@ export function decryptToken(
 const COOKIE_NAME = "chapa_session";
 
 interface SessionPayload {
-  token: string;
   login: string;
   name: string | null;
   avatar_url: string;
+  token?: string;
 }
 
 /**
@@ -334,7 +334,8 @@ interface SessionPayload {
  * (AES-256-GCM), and wraps it in cookie flags: HttpOnly, Secure (when HTTPS),
  * SameSite=Lax, Path=/, Max-Age=86400 (24 hours).
  *
- * @param payload - Session data containing token, login, name, and avatar_url
+ * @param payload - Session data containing login, name, avatar_url, and an
+ *   optional legacy OAuth token during cookie-shape migration
  * @param secret - The secret used to derive the AES-256 encryption key
  * @returns A `Set-Cookie` header string with the encrypted session
  */
@@ -351,7 +352,7 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
   if (typeof value !== "object" || value === null) return false;
   const obj = value as Record<string, unknown>;
   if (typeof obj.login !== "string") return false;
-  if (typeof obj.token !== "string") return false;
+  if (obj.token !== undefined && typeof obj.token !== "string") return false;
   if (obj.name !== null && typeof obj.name !== "string") return false;
   if (typeof obj.avatar_url !== "string") return false;
   return true;
@@ -365,8 +366,8 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
  * before returning. Any failure at any stage (missing cookie, decryption error,
  * malformed JSON, invalid payload shape) returns `null` — never throws.
  *
- * The session payload contains the user's encrypted GitHub OAuth token,
- * login handle, display name, and avatar URL.
+ * The session payload contains the user's login handle, display name,
+ * avatar URL, and may contain a legacy GitHub token from older cookies.
  *
  * **Cookie flags:** `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (when
  * served over HTTPS). Max-Age is 86400 (24 hours), set at creation time by
@@ -376,9 +377,8 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
  *   or `null` if no cookies are present.
  * @param secret - The secret used to decrypt the session (same secret passed
  *   to {@link createSessionCookie} / {@link encryptToken}).
- * @returns The decrypted {@link SessionPayload} containing `token`, `login`,
- *   `name`, and `avatar_url`; or `null` if the cookie is absent, cannot be
- *   decrypted, or fails shape validation.
+ * @returns The decrypted {@link SessionPayload}; or `null` if the cookie is
+ *   absent, cannot be decrypted, or fails shape validation.
  *
  * @example
  * ```ts
