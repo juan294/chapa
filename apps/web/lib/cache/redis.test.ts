@@ -628,3 +628,53 @@ describe("cacheSetNx", () => {
     expect(result).toBe(false);
   });
 });
+
+describe("cacheSetNxStatus", () => {
+  it("returns acquired when the key is newly set", async () => {
+    mockSet.mockResolvedValueOnce("OK");
+
+    const { cacheSetNxStatus } = await import("./redis");
+    const result = await cacheSetNxStatus(
+      "sideeffects:done:testuser:2026-04-19",
+      86400,
+    );
+
+    expect(result).toBe("acquired");
+  });
+
+  it("returns exists when the key already exists", async () => {
+    mockSet.mockResolvedValueOnce(null);
+
+    const { cacheSetNxStatus } = await import("./redis");
+    const result = await cacheSetNxStatus(
+      "sideeffects:done:testuser:2026-04-19",
+      86400,
+    );
+
+    expect(result).toBe("exists");
+  });
+
+  it("returns unavailable when Redis is unavailable", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const { cacheSetNxStatus } = await import("./redis");
+    const result = await cacheSetNxStatus("anything", 3600);
+
+    expect(result).toBe("unavailable");
+    expect(mockSet).not.toHaveBeenCalled();
+  });
+
+  it("returns unavailable when Redis throws", async () => {
+    mockSet.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const { cacheSetNxStatus } = await import("./redis");
+    const result = await cacheSetNxStatus(
+      "sideeffects:done:testuser:2026-04-19",
+      86400,
+    );
+
+    expect(result).toBe("unavailable");
+  });
+});

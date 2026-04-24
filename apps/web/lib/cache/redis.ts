@@ -318,28 +318,38 @@ export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
 // Atomic set-if-not-exists (SETNX) — used for once-per-day guards
 // ---------------------------------------------------------------------------
 
+export type CacheSetNxStatus = "acquired" | "exists" | "unavailable";
+
 /**
  * Set a key with a TTL only if it does not already exist (Redis SET NX EX).
  *
- * Returns `true` when the key was newly written (first call for this key).
- * Returns `false` when the key already existed (guard already set).
- * Returns `false` when Redis is unavailable or throws (fail-open — callers
- * should treat this as "allowed to proceed" so no data is silently lost).
- *
- * Typical use: once-per-day side-effect guards keyed on `<prefix>:<handle>:<YYYY-MM-DD>`.
+ * Returns:
+ * - `"acquired"` when the key was newly written
+ * - `"exists"` when the key already existed
+ * - `"unavailable"` when Redis is unavailable or throws
  */
-export async function cacheSetNx(key: string, ttlSeconds: number): Promise<boolean> {
+export async function cacheSetNxStatus(
+  key: string,
+  ttlSeconds: number,
+): Promise<CacheSetNxStatus> {
   const redis = getRedis();
-  if (!redis) return false;
+  if (!redis) return "unavailable";
 
   try {
     const result = await redis.set(key, 1, { ex: ttlSeconds, nx: true });
     // Upstash returns "OK" when the key is newly set, null when it already existed.
-    return result === "OK";
+    return result === "OK" ? "acquired" : "exists";
   } catch (error) {
     console.error("[cache] cacheSetNx failed:", (error as Error).message);
-    return false;
+    return "unavailable";
   }
+}
+
+/**
+ * Boolean wrapper for callers that only care whether the key was newly acquired.
+ */
+export async function cacheSetNx(key: string, ttlSeconds: number): Promise<boolean> {
+  return (await cacheSetNxStatus(key, ttlSeconds)) === "acquired";
 }
 
 // ---------------------------------------------------------------------------
