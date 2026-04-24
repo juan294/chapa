@@ -4,6 +4,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
 import { pingSupabase } from "@/lib/db/supabase";
+import { captureOperationalAlert } from "@/lib/analytics/server-errors";
 
 /** Shape returned for a successful GitHub probe. */
 interface GitHubRateLimit {
@@ -85,19 +86,30 @@ export async function GET(request: NextRequest) {
       ? "ok"
       : "degraded";
   const httpStatus = status === "ok" ? 200 : 503;
+  const dependencies = {
+    redis: redisStatus,
+    supabase: supabaseStatus,
+    github: githubResult.status,
+    ...(isAdmin && githubResult.rateLimit && {
+      githubRateLimit: githubResult.rateLimit,
+    }),
+  };
+
+  if (status === "degraded") {
+    void captureOperationalAlert({
+      signal: "health_degraded",
+      severity: "P1",
+      summary: "Health check is degraded",
+      route: "/api/health",
+      properties: { dependencies },
+    });
+  }
 
   return NextResponse.json(
     {
       status,
       timestamp: new Date().toISOString(),
-      dependencies: {
-        redis: redisStatus,
-        supabase: supabaseStatus,
-        github: githubResult.status,
-        ...(isAdmin && githubResult.rateLimit && {
-          githubRateLimit: githubResult.rateLimit,
-        }),
-      },
+      dependencies,
     },
     { status: httpStatus },
   );
