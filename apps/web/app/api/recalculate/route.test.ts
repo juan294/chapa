@@ -6,12 +6,16 @@ const {
   mockResolveRequestAuth,
   mockRateLimit,
   mockUpdateCraftCache,
+  mockInvalidateProfileReadModels,
+  mockRevalidatePath,
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
   mockUpdateCraftCache: vi.fn(),
+  mockInvalidateProfileReadModels: vi.fn(),
+  mockRevalidatePath: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
 }));
@@ -26,6 +30,15 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/cache/craft-cache", () => ({
   updateCraftCache: (...args: unknown[]) => mockUpdateCraftCache(...args),
+}));
+
+vi.mock("@/lib/profile/post-write-invalidation", () => ({
+  invalidateProfileReadModels: (...args: unknown[]) =>
+    mockInvalidateProfileReadModels(...args),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
 vi.mock("@/lib/profile/orchestrated-profile", () => ({
@@ -88,6 +101,8 @@ describe("POST /api/recalculate", () => {
     mockResolveRequestAuth.mockResolvedValue(AUTH);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
+    mockRevalidatePath.mockImplementation(() => undefined);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
     mockUpdateCraftCache.mockResolvedValue(undefined);
   });
@@ -120,12 +135,27 @@ describe("POST /api/recalculate", () => {
       FAKE_MATERIALIZED,
       { mode: "replace" },
     );
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
+      history: true,
+    });
     expect(body.success).toBe(true);
     expect(body.adjustedComposite).toBe(58);
     expect(body.displayAdjustedComposite).toBe(58);
     expect(body.rawAdjustedComposite).toBe(61);
     expect(body.craftScore).toBe(69);
     expect(body.craftTier).toBe("Expert");
+  });
+
+  it("persists before invalidating history-backed read models", async () => {
+    await POST(makeRequest());
+
+    const persistOrder = mockPersistOrchestratedSnapshot.mock.invocationCallOrder[0];
+    const invalidateOrder =
+      mockInvalidateProfileReadModels.mock.invocationCallOrder[0];
+
+    expect(persistOrder).toBeDefined();
+    expect(invalidateOrder).toBeDefined();
+    expect(persistOrder!).toBeLessThan(invalidateOrder!);
   });
 
   it("updates craft cache when a recomputed craft score exists", async () => {
@@ -155,5 +185,22 @@ describe("POST /api/recalculate", () => {
 
     const resp = await POST(makeRequest());
     expect(resp.status).toBe(502);
+  });
+
+  it("revalidates the share page after a successful recalculation", async () => {
+    const resp = await POST(makeRequest());
+
+    expect(resp.status).toBe(200);
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/u/testuser");
+  });
+
+  it("returns 500 when the recalculated snapshot cannot be persisted", async () => {
+    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
+
+    const resp = await POST(makeRequest());
+
+    expect(resp.status).toBe(500);
+    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 });

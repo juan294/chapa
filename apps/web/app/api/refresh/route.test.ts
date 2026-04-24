@@ -7,10 +7,10 @@ const {
   mockCacheDel,
   mockRateLimit,
   mockIsValidHandle,
-  mockInvalidateHistoryCache,
   mockCaptureServerError,
   mockRevalidatePath,
   mockUpdateCraftCache,
+  mockInvalidateProfileReadModels,
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
 } = vi.hoisted(() => ({
@@ -18,10 +18,10 @@ const {
   mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
   mockIsValidHandle: vi.fn(),
-  mockInvalidateHistoryCache: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockUpdateCraftCache: vi.fn(),
+  mockInvalidateProfileReadModels: vi.fn(),
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
 }));
@@ -39,8 +39,9 @@ vi.mock("@/lib/validation", () => ({
   isValidHandle: (...args: unknown[]) => mockIsValidHandle(...args),
 }));
 
-vi.mock("@/lib/history/history", () => ({
-  invalidateHistoryCache: (...args: unknown[]) => mockInvalidateHistoryCache(...args),
+vi.mock("@/lib/profile/post-write-invalidation", () => ({
+  invalidateProfileReadModels: (...args: unknown[]) =>
+    mockInvalidateProfileReadModels(...args),
 }));
 
 vi.mock("@/lib/analytics/server-errors", () => ({
@@ -119,7 +120,7 @@ describe("POST /api/refresh", () => {
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 5 });
     mockCacheDel.mockResolvedValue(undefined);
-    mockInvalidateHistoryCache.mockResolvedValue(undefined);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockUpdateCraftCache.mockResolvedValue(undefined);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
@@ -163,7 +164,6 @@ describe("POST /api/refresh", () => {
 
     expect(res.status).toBe(200);
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
-    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("testuser");
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       craftMode: "recompute",
@@ -173,8 +173,23 @@ describe("POST /api/refresh", () => {
       FAKE_MATERIALIZED,
       { mode: "replace" },
     );
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
+      history: true,
+    });
     expect(body.stats).toEqual(FAKE_MATERIALIZED.stats);
     expect(body.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
+  });
+
+  it("persists before invalidating history-backed read models", async () => {
+    await POST(makeRequest("testuser"));
+
+    const persistOrder = mockPersistOrchestratedSnapshot.mock.invocationCallOrder[0];
+    const invalidateOrder =
+      mockInvalidateProfileReadModels.mock.invocationCallOrder[0];
+
+    expect(persistOrder).toBeDefined();
+    expect(invalidateOrder).toBeDefined();
+    expect(persistOrder!).toBeLessThan(invalidateOrder!);
   });
 
   it("updates craft cache when recompute returns craft data", async () => {
@@ -219,6 +234,16 @@ describe("POST /api/refresh", () => {
 
     expect(res.status).toBe(200);
     expect(mockRevalidatePath).toHaveBeenCalledWith("/u/testuser");
+  });
+
+  it("returns 500 when the refreshed snapshot cannot be persisted", async () => {
+    mockPersistOrchestratedSnapshot.mockResolvedValue(false);
+
+    const res = await POST(makeRequest("testuser"));
+
+    expect(res.status).toBe(500);
+    expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
   it("returns 500 and captures the exception on unexpected failure", async () => {

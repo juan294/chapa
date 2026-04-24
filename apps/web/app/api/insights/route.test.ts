@@ -17,6 +17,8 @@ const {
   mockGetClientIp,
   mockBuildSnapshotKey,
   mockBuildCraftKey,
+  mockInvalidateHistoryCache,
+  mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
@@ -27,6 +29,8 @@ const {
   mockGetClientIp: vi.fn(),
   mockBuildSnapshotKey: vi.fn(),
   mockBuildCraftKey: vi.fn(),
+  mockInvalidateHistoryCache: vi.fn(),
+  mockRevalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -46,6 +50,10 @@ vi.mock("@/lib/cache/craft-cache", () => ({
   buildCraftKey: mockBuildCraftKey,
 }));
 
+vi.mock("@/lib/history/history", () => ({
+  invalidateHistoryCache: mockInvalidateHistoryCache,
+}));
+
 vi.mock("@/lib/feature-flags", () => ({
   isInsightsEnabled: mockIsInsightsEnabled,
 }));
@@ -57,6 +65,10 @@ vi.mock("@/lib/db/tool-insights", () => ({
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: mockRevalidatePath,
 }));
 
 // Mock next/server's after() to execute callbacks synchronously in tests
@@ -122,6 +134,10 @@ function makePostRequest(body: unknown): NextRequest {
   });
 }
 
+async function flushAfterCallbacks(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -137,6 +153,8 @@ beforeEach(() => {
   mockGetClientIp.mockReturnValue("127.0.0.1");
   mockBuildSnapshotKey.mockImplementation((handle: string) => `snapshot:v2:latest:${handle}`);
   mockBuildCraftKey.mockImplementation((handle: string) => `craft:v2:${handle}`);
+  mockInvalidateHistoryCache.mockResolvedValue(undefined);
+  mockRevalidatePath.mockImplementation(() => undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -223,17 +241,34 @@ describe("POST /api/insights", () => {
 
   it("invalidates badge cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
   });
 
   it("invalidates snapshot cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
     expect(mockCacheDel).toHaveBeenCalledWith("snapshot:v2:latest:juan294");
   });
 
   it("invalidates craft cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
     expect(mockCacheDel).toHaveBeenCalledWith("craft:v2:juan294");
+  });
+
+  it("invalidates history cache after successful upload", async () => {
+    await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
+    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("juan294");
+  });
+
+  it("revalidates the share page after successful upload", async () => {
+    const resp = await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
+
+    expect(resp.status).toBe(200);
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/u/juan294");
   });
 
   it("calls dbUpsert with correct arguments", async () => {
