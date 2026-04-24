@@ -53,4 +53,16 @@ describe("RootLayout", () => {
       expect(interactiveBeforeSkip?.length ?? 0).toBeLessThanOrEqual(1);
     });
   });
+
+  describe("feature flags", () => {
+    it("resolves the Studio flag through the DB-backed server helper", () => {
+      expect(SOURCE).toContain("isStudioEnabled");
+      expect(SOURCE).toContain("const studioEnabled = await isStudioEnabled()");
+    });
+
+    it("hydrates client navigation with the server-resolved Studio flag", () => {
+      expect(SOURCE).toContain("ClientFeatureFlagsProvider");
+      expect(SOURCE).toContain("studioEnabled={studioEnabled}");
+    });
+  });
 });

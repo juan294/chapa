@@ -5,7 +5,9 @@ import PostHogProvider from "@/components/PostHogProvider";
 import { ClientAnalytics } from "@/components/ClientAnalytics";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
+import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvider";
 import { getBaseUrl } from "@/lib/env";
+import { isStudioEnabled } from "@/lib/feature-flags";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -63,11 +65,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const studioEnabled = await isStudioEnabled();
+
   return (
     <html
       lang="en"
@@ -124,8 +128,10 @@ export default function RootLayout({
         </a>
         <ThemeProvider>
           <PostHogProvider>
-            <KeyboardShortcutsListener />
-            {children}
+            <ClientFeatureFlagsProvider studioEnabled={studioEnabled}>
+              <KeyboardShortcutsListener />
+              {children}
+            </ClientFeatureFlagsProvider>
           </PostHogProvider>
         </ThemeProvider>
         <ClientAnalytics />

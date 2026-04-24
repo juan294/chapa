@@ -132,6 +132,13 @@ describe("createNavigationCommands (studio disabled)", () => {
     expect(names).not.toContain("/studio");
   });
 
+  it("uses explicit server-resolved studioEnabled=false over env fallback", () => {
+    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    const commands = createNavigationCommands({ studioEnabled: false });
+    const names = commands.map((c) => c.name);
+    expect(names).not.toContain("/studio");
+  });
+
   it("returns 14 commands when studio is disabled", () => {
     delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
     const commands = createNavigationCommands();
@@ -177,6 +184,13 @@ describe("createNavigationCommands (studio enabled)", () => {
   it("includes /studio when flag is set to true", () => {
     process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
     const commands = createNavigationCommands();
+    const names = commands.map((c) => c.name);
+    expect(names).toContain("/studio");
+  });
+
+  it("uses explicit server-resolved studioEnabled=true over env fallback", () => {
+    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    const commands = createNavigationCommands({ studioEnabled: true });
     const names = commands.map((c) => c.name);
     expect(names).toContain("/studio");
   });

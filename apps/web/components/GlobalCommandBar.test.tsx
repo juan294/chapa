@@ -34,9 +34,9 @@ describe("GlobalCommandBar", () => {
       expect(SOURCE).toMatch(/isAdmin\??:\s*boolean/);
     });
 
-    it("passes isAdmin to createNavigationCommands", () => {
-      // Must call createNavigationCommands with { isAdmin }
-      expect(SOURCE).toMatch(/createNavigationCommands\(\s*\{\s*isAdmin\s*\}\s*\)/);
+    it("passes isAdmin and studioEnabled to createNavigationCommands", () => {
+      // Must call createNavigationCommands with both page role and hydrated feature flag.
+      expect(SOURCE).toMatch(/createNavigationCommands\(\s*\{\s*isAdmin,\s*studioEnabled\s*\}\s*\)/);
     });
 
     it("handles custom event action type", () => {

@@ -2,13 +2,13 @@
  * Feature flags — DB-backed with env-var fallback.
  *
  * Two API styles:
- * - **Sync** (`isStudioEnabledSync`): env-var only — for client components
- *   and synchronous code that can't await.
+ * - **Sync** (`isStudioEnabledSync`): env-var fallback for tests and code
+ *   running outside the hydrated client feature-flag provider.
  * - **Async** (`isStudioEnabled`): checks Supabase first, falls back to
  *   env var — for server components and API routes.
  *
- * Client components should use the sync variants or receive the flag value
- * as a prop from a server component.
+ * Client navigation surfaces should use `ClientFeatureFlagsProvider`, which
+ * receives the DB-backed server value from the root layout.
  */
 
 import { dbGetFeatureFlag } from "./db/feature-flags";
@@ -19,8 +19,8 @@ import { withTimeout } from "./async/with-timeout";
 // ---------------------------------------------------------------------------
 
 /**
- * Synchronously check whether Creator Studio is enabled (env-var only).
- * Use in client components where `await` is not available.
+ * Synchronously check whether Creator Studio is enabled (env-var fallback).
+ * Client navigation should prefer `useClientFeatureFlags()`.
  *
  * @returns `true` if `NEXT_PUBLIC_STUDIO_ENABLED` is `"true"`
  */
