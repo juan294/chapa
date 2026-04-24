@@ -97,7 +97,7 @@ afterEach(() => {
 });
 
 describe("SharePageOwnerContent — render", () => {
-  it("shows nothing while loading session", () => {
+  it("shows public content while loading session", () => {
     mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
 
     const { container } = render(
@@ -108,10 +108,13 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(container.innerHTML).toBe("");
+    expect(container.innerHTML).not.toBe("");
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
+    expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
   });
 
-  it("shows visitor CTA when user is not the profile owner", () => {
+  it("shows public insight content and CTA when user is not the profile owner", () => {
     mockUseSession.mockReturnValue({
       session: { login: "otheruser", name: null, avatar_url: "" },
       loading: false,
@@ -127,9 +130,12 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Curious what your developer impact looks like?"),
+      screen.getByText("Quieres ver tu propio impacto?"),
     ).toBeTruthy();
-    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
+    expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    expect(screen.getByText("Descubrir mi impacto")).toBeTruthy();
   });
 
   it("shows visitor CTA when session fetch fails", () => {
@@ -144,8 +150,9 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Curious what your developer impact looks like?"),
+      screen.getByText("Quieres ver tu propio impacto?"),
     ).toBeTruthy();
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
   });
 
   it("shows visitor CTA when user is null", () => {
@@ -159,7 +166,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    expect(screen.getByText("Descubrir mi impacto")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
   });
 
   it("shows owner content when user matches the handle", () => {
@@ -179,8 +187,8 @@ describe("SharePageOwnerContent — render", () => {
 
     expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
-    expect(screen.getByText("Embed This Badge")).toBeTruthy();
-    expect(screen.getByText("Impact Breakdown")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    expect(screen.getByText("Desglose de impacto")).toBeTruthy();
   });
 
   it("renders embed snippets with correct handle", () => {
@@ -198,7 +206,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Embed This Badge")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
 
     const copyButtons = screen.getAllByTestId("copy-button");
     expect(copyButtons.length).toBe(2);
@@ -226,7 +234,7 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Could not load impact data. Try again later."),
+      screen.getByText("No se pudieron cargar los datos de impacto. Intentalo de nuevo mas tarde."),
     ).toBeTruthy();
   });
 
@@ -245,7 +253,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Regenerate")).toBeTruthy();
+    expect(screen.getByText("Regenerar")).toBeTruthy();
   });
 
   it("posts to refresh and shows success after a successful regenerate", async () => {
@@ -265,7 +273,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Regenerate"));
+    fireEvent.click(screen.getByText("Regenerar"));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith("/api/refresh?handle=testuser", {
@@ -273,7 +281,7 @@ describe("SharePageOwnerContent — render", () => {
       });
     });
 
-    expect(screen.getByText("Done!")).toBeTruthy();
+    expect(screen.getByText("Listo")).toBeTruthy();
   });
 
   it("shows support fallback when regenerate fails", async () => {
@@ -292,12 +300,12 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Regenerate"));
+    fireEvent.click(screen.getByText("Regenerar"));
 
     expect(
-      await screen.findByText("Regeneration failed.", { exact: false }),
+      await screen.findByText("La regeneracion fallo.", { exact: false }),
     ).toBeTruthy();
-    const supportLink = screen.getByText("Contact support");
+    const supportLink = screen.getByText("Contactar soporte");
     expect(supportLink.getAttribute("href")).toContain(
       "mailto:support@thecreativetoken.com",
     );
@@ -318,7 +326,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Embed This Badge")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
     expect(screen.queryByTestId("data-sources")).toBeNull();
   });
 });

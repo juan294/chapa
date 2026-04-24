@@ -4,7 +4,6 @@ const {
   mockMaterializePublicProfile,
   mockGetPublicProfileVerification,
   mockRunPublicProfileSideEffects,
-  mockCacheGet,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -13,7 +12,6 @@ const {
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
-  mockCacheGet: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -26,10 +24,6 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
-}));
-
-vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -76,9 +70,6 @@ vi.mock("@/components/NavbarClient", () => ({
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
-}));
-vi.mock("@/components/ShareBadgePreviewLazy", () => ({
-  ShareBadgePreviewLazy: () => "<div>interactive-preview</div>",
 }));
 vi.mock("@/components/BadgeToolbar", () => ({
   BadgeToolbar: () => "<div>toolbar</div>",
@@ -135,7 +126,6 @@ describe("SharePage /u/[handle]", () => {
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
-    mockCacheGet.mockResolvedValue(null);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
   });
@@ -200,25 +190,6 @@ describe("SharePage /u/[handle]", () => {
 
     expect(mockAfter).not.toHaveBeenCalled();
     expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-  });
-
-  it("does not register side effects for the interactive preview path", async () => {
-    mockCacheGet.mockResolvedValue({
-      background: "aurora",
-      cardStyle: "flat",
-      border: "solid-amber",
-      scoreEffect: "standard",
-      heatmapAnimation: "fade-in",
-      interaction: "static",
-      statsDisplay: "static",
-      tierTreatment: "standard",
-      celebration: "none",
-    });
-
-    await renderPage();
-
-    expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-    expect(mockAfter).not.toHaveBeenCalled();
   });
 
   it("tolerates avatar fetch failure for inline rendering", async () => {
