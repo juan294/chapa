@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { SHORTCUTS, groupByScope } from "@/lib/keyboard/shortcuts";
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 
 const SCOPE_LABELS: Record<string, string> = {
   navigation: "Navigation",
@@ -17,6 +17,7 @@ interface ShortcutCheatSheetProps {
 
 export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { studioEnabled } = useClientFeatureFlags();
 
   // Close on Escape (capture phase to avoid conflicts with other handlers)
   useEffect(() => {
@@ -72,7 +73,6 @@ export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
 
   if (!open) return null;
 
-  const studioEnabled = isStudioEnabledSync();
   const filtered = studioEnabled
     ? SHORTCUTS
     : SHORTCUTS.filter((s) => s.scope !== "studio" && s.id !== "go-studio");

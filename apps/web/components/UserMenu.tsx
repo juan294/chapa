@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
+import { isInsightsEnabledSync } from "@/lib/feature-flags";
+import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
@@ -40,6 +41,7 @@ interface UserMenuProps {
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
+  const { studioEnabled } = useClientFeatureFlags();
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -341,7 +343,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </svg>
               My Badge
             </Link>
-            {isStudioEnabledSync() && (
+            {studioEnabled && (
               <Link
                 href="/studio"
                 role="menuitem"
