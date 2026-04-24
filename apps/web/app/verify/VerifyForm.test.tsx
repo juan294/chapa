@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "VerifyForm.tsx"),
   "utf-8",
 );
+const COPY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../../lib/copy/public-flow.ts"),
+  "utf-8",
+);
 
 describe("VerifyForm", () => {
   describe("client component", () => {
@@ -24,7 +28,7 @@ describe("VerifyForm", () => {
     });
 
     it("shows error for invalid hash format", () => {
-      expect(SOURCE).toContain("Enter a valid 8, 16, or 32 character hex hash");
+      expect(COPY_SOURCE).toContain("Introduce un hash hexadecimal válido de 8, 16 o 32 caracteres");
     });
   });
 
@@ -38,8 +42,8 @@ describe("VerifyForm", () => {
       expect(SOURCE).toContain('id="hash-input"');
     });
 
-    it("label text says Verification Hash", () => {
-      expect(SOURCE).toContain("Verification Hash");
+    it("label text is Spanish", () => {
+      expect(COPY_SOURCE).toContain("Hash de verificación");
     });
 
     it("input has maxLength of 32", () => {
@@ -55,9 +59,13 @@ describe("VerifyForm", () => {
       expect(SOURCE).toContain("spellCheck={false}");
     });
 
-    it("has a submit button with text 'Verify'", () => {
+    it("has a submit button with Spanish text", () => {
       expect(SOURCE).toContain('type="submit"');
-      expect(SOURCE).toContain("Verify");
+      expect(COPY_SOURCE).toContain("Verificar");
+    });
+
+    it("uses centralized public-flow copy", () => {
+      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
     });
   });
 

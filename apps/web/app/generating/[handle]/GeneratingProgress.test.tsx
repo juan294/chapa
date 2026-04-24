@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "GeneratingProgress.tsx"),
   "utf-8",
 );
+const COPY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../../../lib/copy/public-flow.ts"),
+  "utf-8",
+);
 
 describe("GeneratingProgress", () => {
   it("has 'use client' directive", () => {
@@ -13,20 +17,20 @@ describe("GeneratingProgress", () => {
   });
 
   describe("progress steps", () => {
-    it("shows 'Authenticated with GitHub' step", () => {
-      expect(SOURCE).toContain("Authenticated with GitHub");
+    it("shows Spanish GitHub authentication step", () => {
+      expect(COPY_SOURCE).toContain("Autenticado con GitHub");
     });
 
-    it("shows 'Fetching contribution data' step", () => {
-      expect(SOURCE).toContain("Fetching contribution data");
+    it("shows Spanish contribution fetch step", () => {
+      expect(COPY_SOURCE).toContain("Recopilando datos de contribución");
     });
 
-    it("shows 'Computing Impact profile' step", () => {
-      expect(SOURCE).toContain("Computing Impact profile");
+    it("shows Spanish impact profile step", () => {
+      expect(COPY_SOURCE).toContain("Calculando perfil de impacto");
     });
 
-    it("shows 'Rendering badge' step", () => {
-      expect(SOURCE).toContain("Rendering badge");
+    it("shows Spanish badge render step", () => {
+      expect(COPY_SOURCE).toContain("Renderizando insignia");
     });
   });
 
@@ -57,7 +61,11 @@ describe("GeneratingProgress", () => {
     });
 
     it("provides a retry mechanism", () => {
-      expect(SOURCE).toMatch(/try again/i);
+      expect(COPY_SOURCE).toContain("Intentar de nuevo");
+    });
+
+    it("uses centralized public-flow copy", () => {
+      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
     });
   });
 

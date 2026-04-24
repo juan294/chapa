@@ -8,6 +8,7 @@ import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 
 /**
  * Client-side component that renders public share-page sections plus owner-only
@@ -20,8 +21,10 @@ import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
  * Sections rendered:
  * - Public: DataSources, ImpactDashboard, Embed Snippets
  * - Owner-only: OAuth-backed cache warm
- * - Visitor: "Descubrir mi impacto" CTA
+ * - Visitor: Spanish public acquisition CTA
  */
+
+const SHARE_VISITOR_COPY = SPANISH_PUBLIC_COPY.shareVisitor;
 
 function EmptyImpactState({ handle }: { handle: string }) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -186,16 +189,16 @@ export function SharePageOwnerContent({
         <section className="mt-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:560ms]">
           <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
             <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
-              Quieres ver tu propio impacto?
+              {SHARE_VISITOR_COPY.title}
             </h2>
             <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto text-pretty">
-              Decodifica tu ADN de codigo en segundos. Mira tu arquetipo, tu puntuacion de impacto y como comparas.
+              {SHARE_VISITOR_COPY.description}
             </p>
             <Link
               href="/"
               className="inline-flex items-center gap-2 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all motion-reduce:transition-none"
             >
-              Descubrir mi impacto
+              {SHARE_VISITOR_COPY.cta}
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>

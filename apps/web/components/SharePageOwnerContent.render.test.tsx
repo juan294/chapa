@@ -130,12 +130,12 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Quieres ver tu propio impacto?"),
+      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
     ).toBeTruthy();
     expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
     expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
-    expect(screen.getByText("Descubrir mi impacto")).toBeTruthy();
+    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
   });
 
   it("shows visitor CTA when session fetch fails", () => {
@@ -150,7 +150,7 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Quieres ver tu propio impacto?"),
+      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
     ).toBeTruthy();
     expect(screen.getByTestId("data-sources")).toBeTruthy();
   });
@@ -166,7 +166,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Descubrir mi impacto")).toBeTruthy();
+    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
     expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
   });
 

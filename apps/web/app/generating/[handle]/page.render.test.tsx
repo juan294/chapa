@@ -44,7 +44,7 @@ describe("GeneratingPage render", () => {
 describe("generateMetadata", () => {
   it("returns metadata with handle in title", async () => {
     const metadata = await generateMetadata({ params: Promise.resolve({ handle: "testuser" }) });
-    expect(metadata.title).toBe("Generating badge — @testuser");
+    expect(metadata.title).toBe("Generando insignia — @testuser");
   });
 
   it("sets robots noindex", async () => {

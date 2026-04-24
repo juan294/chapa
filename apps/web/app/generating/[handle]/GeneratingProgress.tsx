@@ -2,18 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 
 interface Step {
   label: string;
   status: "pending" | "active" | "done" | "error";
 }
 
-const INITIAL_STEPS: Step[] = [
-  { label: "Authenticated with GitHub", status: "done" },
-  { label: "Fetching contribution data", status: "active" },
-  { label: "Computing Impact profile", status: "pending" },
-  { label: "Rendering badge", status: "pending" },
-];
+const INITIAL_STEPS: Step[] = SPANISH_PUBLIC_COPY.generation.steps.map(
+  (step) => ({ ...step }),
+);
 
 const STEP_DELAY_MS = 300;
 const REDIRECT_DELAY_MS = 800;
@@ -52,7 +50,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         if (cancelled) return;
 
         if (!res.ok) {
-          setError("Something went wrong generating your badge.");
+          setError(SPANISH_PUBLIC_COPY.generation.error);
           setSteps((prev) =>
             prev.map((s) =>
               s.status === "active" ? { ...s, status: "error" } : s,
@@ -64,7 +62,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         completeRemainingSteps();
       } catch {
         if (cancelled) return;
-        setError("Something went wrong generating your badge.");
+        setError(SPANISH_PUBLIC_COPY.generation.error);
         setSteps((prev) =>
           prev.map((s) =>
             s.status === "active" ? { ...s, status: "error" } : s,
@@ -99,7 +97,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
             chapa generate
           </p>
           <h1 className="mt-2 font-heading text-lg font-bold tracking-tight text-text-primary">
-            Generating badge for{" "}
+            {SPANISH_PUBLIC_COPY.generation.heading}{" "}
             <span className="text-amber">@{handle}</span>
           </h1>
         </div>
@@ -193,7 +191,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
               href={`/generating/${encodeURIComponent(handle)}`}
               className="mt-2 inline-block font-heading text-sm text-text-secondary underline underline-offset-4 hover:text-text-primary"
             >
-              Try again
+              {SPANISH_PUBLIC_COPY.generation.retry}
             </a>
           </div>
         )}
@@ -201,7 +199,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         {/* Redirect notice */}
         {done && (
           <p className="mt-6 animate-terminal-fade-in font-heading text-xs text-text-secondary">
-            Redirecting to your badge...
+            {SPANISH_PUBLIC_COPY.generation.redirect}
           </p>
         )}
       </div>

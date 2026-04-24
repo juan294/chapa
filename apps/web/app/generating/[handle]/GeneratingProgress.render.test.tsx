@@ -38,10 +38,10 @@ describe("GeneratingProgress", () => {
   it("renders initial steps", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     render(<GeneratingProgress handle="testuser" />);
-    expect(screen.getByText("Authenticated with GitHub")).toBeDefined();
-    expect(screen.getByText("Fetching contribution data")).toBeDefined();
-    expect(screen.getByText("Computing Impact profile")).toBeDefined();
-    expect(screen.getByText("Rendering badge")).toBeDefined();
+    expect(screen.getByText("Autenticado con GitHub")).toBeDefined();
+    expect(screen.getByText("Recopilando datos de contribución")).toBeDefined();
+    expect(screen.getByText("Calculando perfil de impacto")).toBeDefined();
+    expect(screen.getByText("Renderizando insignia")).toBeDefined();
     vi.unstubAllGlobals();
   });
 
@@ -66,7 +66,7 @@ describe("GeneratingProgress", () => {
 
     expect(screen.getByRole("alert")).toBeDefined();
     expect(
-      screen.getByText("Something went wrong generating your badge."),
+      screen.getByText("Algo salió mal al generar tu insignia."),
     ).toBeDefined();
     vi.unstubAllGlobals();
   });
@@ -97,7 +97,7 @@ describe("GeneratingProgress", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(screen.getByText("Try again")).toBeDefined();
+    expect(screen.getByText("Intentar de nuevo")).toBeDefined();
     vi.unstubAllGlobals();
   });
 
@@ -119,7 +119,7 @@ describe("GeneratingProgress", () => {
     });
 
     // Should show redirect notice
-    expect(screen.getByText("Redirecting to your badge...")).toBeDefined();
+    expect(screen.getByText("Redirigiendo a tu insignia...")).toBeDefined();
 
     // Advance through redirect delay (800ms)
     await act(async () => {
