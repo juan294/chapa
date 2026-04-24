@@ -55,7 +55,7 @@ test.describe("Navigation — navbar and footer", () => {
   test("footer shows copyright and platform branding", async ({ page }) => {
     const footer = page.locator("footer");
     await expect(footer).toContainText("Chapa");
-    await expect(footer).toContainText("Powered by");
+    await expect(footer).toContainText("Compatible con");
     // Platform logos are icon-only SVGs — check via accessible link name
     await expect(footer.getByRole("link", { name: "GitHub" })).toBeVisible();
   });

@@ -8,14 +8,14 @@ test.describe("Landing page — sections and content", () => {
   test("hero section renders with h1 heading", async ({ page }) => {
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Developer Impact");
+    await expect(h1).toContainText("Impacto de desarrollador");
   });
 
   test("hero has CTA linking to GitHub login", async ({ page }) => {
-    // The main/hero area has the "Get Your Badge" button (not the nav login)
+    // The main/hero area has the primary badge CTA (not the nav login).
     const cta = page.locator('main a[href="/api/auth/login"]').first();
     await expect(cta).toBeVisible();
-    await expect(cta).toContainText("Get Your Badge");
+    await expect(cta).toContainText("Consigue tu insignia");
   });
 
   test("feature cards render (all 5 features)", async ({ page }) => {
@@ -24,16 +24,16 @@ test.describe("Landing page — sections and content", () => {
 
     // Check for known feature titles (exact match to avoid ambiguity)
     await expect(
-      page.getByText("MULTI-DIMENSIONAL", { exact: true })
+      page.getByText("MULTIDIMENSIONAL", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByText("DEVELOPER ARCHETYPE", { exact: true })
+      page.getByText("ARQUETIPO DE DESARROLLADOR", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByText("VERIFIED METRICS", { exact: true })
+      page.getByText("MÉTRICAS VERIFICADAS", { exact: true })
     ).toBeVisible();
     await expect(
-      page.getByText("ONE-CLICK EMBED", { exact: true })
+      page.getByText("EMBEBIDO EN UN CLIC", { exact: true })
     ).toBeVisible();
   });
 
@@ -53,9 +53,9 @@ test.describe("Landing page — sections and content", () => {
 
     // Scope to #stats to avoid matching unrelated content
     await expect(section.getByText("7", { exact: true })).toBeVisible();
-    await expect(section.getByText("archetypes")).toBeVisible();
+    await expect(section.getByText("arquetipos")).toBeVisible();
     await expect(section.getByText("5", { exact: true })).toBeVisible();
-    await expect(section.getByText("dimensions")).toBeVisible();
+    await expect(section.getByText("dimensiones")).toBeVisible();
     await expect(section.getByText("365", { exact: true })).toBeVisible();
   });
 
@@ -70,6 +70,6 @@ test.describe("Landing page — sections and content", () => {
   test("Verify a Badge link points to /verify", async ({ page }) => {
     const verifyLink = page.locator('a[href="/verify"]').first();
     await expect(verifyLink).toBeVisible();
-    await expect(verifyLink).toContainText("Verify a Badge");
+    await expect(verifyLink).toContainText("Verificar una insignia");
   });
 });
