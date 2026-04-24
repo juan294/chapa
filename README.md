@@ -163,9 +163,9 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | `BITBUCKET_CLIENT_SECRET` | No | Bitbucket OAuth consumer secret |
 | `CODEBERG_CLIENT_ID` | No | Codeberg OAuth app client ID |
 | `CODEBERG_CLIENT_SECRET` | No | Codeberg OAuth app secret |
-| `CHAPA_VERIFICATION_SECRET` | No | HMAC secret for badge verification |
+| `CHAPA_VERIFICATION_SECRET` | No | Required in production for `/api/verify`; when unset outside production, verification is disabled |
 | `ADMIN_HANDLES` | No | Comma-separated admin GitHub handles |
-| `CRON_SECRET` | No | Vercel Cron auth token |
+| `CRON_SECRET` | No | Required anywhere `/api/cron/*` should run; cron routes return 503 when it is unset |
 
 See `.env.example` for the full list with descriptions.
 
@@ -191,7 +191,7 @@ See `.env.example` for the full list with descriptions.
 | `GET /studio` | Creator Studio (auth required) |
 | `GET /admin` | Admin dashboard (admin handles only) |
 | `GET /about` | About page (scoring explainer, archetype showcase) |
-| `GET /api/health` | Health check (Redis + Supabase) |
+| `GET /api/health` | Health check (`status`, timestamp, and Redis/Supabase/GitHub dependency probes) |
 | `GET /api/verify/:hash` | Badge verification |
 | `POST /api/refresh?handle=` | Force refresh (rate-limited) |
 | `GET /api/history/:handle` | Score history, trend, and diff |

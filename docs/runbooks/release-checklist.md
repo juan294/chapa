@@ -37,7 +37,7 @@ Every push to `develop` creates a Vercel preview deployment automatically.
 | **Badge generation** | Log in → `/generate` or visit `/u/<handle>` → confirm badge renders |
 | **Badge SVG public** | Open `/u/<handle>/badge.svg` in incognito → must load without auth |
 | **Share page** | Visit `/u/<handle>` → badge preview, breakdown, and embed snippet visible |
-| **Health endpoint** | `curl <preview-url>/api/health` → `{"redis":"ok","supabase":"ok"}` |
+| **Health endpoint** | `curl <preview-url>/api/health` → `{"status":"ok","dependencies":{"redis":"ok","supabase":"ok","github":"ok|skipped"}}` |
 | **Verification** | Click verify link on share page → `/verify/:hash` renders correctly |
 
 3. Leave the preview running for at least 24 hours if the change touches caching, scoring, or OAuth. For documentation-only changes, 1 hour is sufficient.
@@ -76,7 +76,7 @@ Within 15 minutes of merge to `main`:
 
 ```bash
 # Verify production health
-curl https://chapa.thecreativetoken.com/api/health
+curl https://chapa.thecreativetoken.com/api/health | jq '{status, dependencies}'
 
 # Verify a badge loads
 curl -I https://chapa.thecreativetoken.com/u/<known-handle>/badge.svg

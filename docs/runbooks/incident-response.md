@@ -12,14 +12,14 @@
 ## Detection
 
 Incidents are typically discovered via:
-- Manual monitoring of `/api/health` — returns JSON with `redis` and `supabase` status
+- Manual monitoring of `/api/health` — returns `status` plus `dependencies.redis`, `dependencies.supabase`, and `dependencies.github`
 - Vercel deployment failure notifications
 - GitHub CI failure on `develop`
 - User report via support email
 
 ```bash
 # Quick health check
-curl https://chapa.thecreativetoken.com/api/health
+curl https://chapa.thecreativetoken.com/api/health | jq '{status, dependencies}'
 ```
 
 ## Escalation
@@ -38,7 +38,7 @@ This is a solo project. Escalation means:
 3. **Roll back if needed:** See `docs/runbooks/rollback.md`.
 4. **Communicate:** If the project has public users, add a status note.
 5. **Fix forward if rollback isn't sufficient:** Patch on `develop`, merge to `main` via PR.
-6. **Verify:** Confirm health endpoint green and core flows working.
+6. **Verify:** Confirm `/api/health` returns `status: "ok"` and core flows are working.
 
 ### P2-P4 — Non-critical
 
