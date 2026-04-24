@@ -28,22 +28,22 @@ describe("SharePageOwnerContent", () => {
     });
   });
 
-  describe("owner-only sections", () => {
-    it("renders DataSources component for owners", () => {
+  describe("public insight sections", () => {
+    it("renders DataSources component for public viewers", () => {
       expect(SOURCE).toContain("DataSources");
     });
 
-    it("renders ImpactDashboard component for owners", () => {
+    it("renders ImpactDashboard component for public viewers", () => {
       expect(SOURCE).toContain("ImpactDashboard");
     });
 
-    it("renders embed snippets for owners", () => {
-      expect(SOURCE).toContain("Embed This Badge");
+    it("renders embed snippets for public viewers", () => {
+      expect(SOURCE).toContain("Incrustar esta insignia");
     });
 
     it("renders DataSources before Impact Breakdown heading", () => {
       const dsIndex = SOURCE.indexOf("DataSources");
-      const breakdownIndex = SOURCE.indexOf("Impact Breakdown");
+      const breakdownIndex = SOURCE.indexOf("Desglose de impacto");
       expect(dsIndex).toBeGreaterThan(-1);
       expect(breakdownIndex).toBeGreaterThan(-1);
       expect(dsIndex).toBeLessThan(breakdownIndex);
@@ -64,8 +64,8 @@ describe("SharePageOwnerContent", () => {
   });
 
   describe("visitor CTA", () => {
-    it("shows 'Discover your impact' CTA for non-owners", () => {
-      expect(SOURCE).toContain("Discover your impact");
+    it("shows Spanish CTA copy for non-owners", () => {
+      expect(SOURCE).toContain("Descubrir mi impacto");
     });
 
     it("CTA links to the homepage", () => {
@@ -73,14 +73,14 @@ describe("SharePageOwnerContent", () => {
     });
 
     it("uses curiosity-driven copy that focuses on the reader", () => {
-      expect(SOURCE).toContain("Curious what your developer impact looks like");
+      expect(SOURCE).toContain("Quieres ver tu propio impacto");
     });
   });
 
   // #743 — empty state retry mechanism
   describe("empty state retry mechanism (#743)", () => {
     it("has a Regenerate button in the empty state", () => {
-      expect(SOURCE).toContain("Regenerate");
+      expect(SOURCE).toContain("Regenerar");
     });
 
     it("empty state calls /api/refresh endpoint", () => {

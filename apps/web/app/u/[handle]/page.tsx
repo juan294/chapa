@@ -4,13 +4,9 @@ import { Suspense } from "react";
 import { after } from "next/server";
 import { BadgeToolbar } from "@/components/BadgeToolbar";
 import { isValidHandle } from "@/lib/validation";
-import { cacheGet } from "@/lib/cache/redis";
 import { NavbarClient } from "@/components/NavbarClient";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { BadgeConfig } from "@chapa/shared";
-import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
-import { ShareBadgePreviewLazy } from "@/components/ShareBadgePreviewLazy";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
 import { getBaseUrl } from "@/lib/env";
@@ -66,21 +62,6 @@ export async function generateMetadata({
   };
 }
 
-function hasCustomConfig(config: BadgeConfig | null): config is BadgeConfig {
-  if (!config) return false;
-  return (
-    config.background !== DEFAULT_BADGE_CONFIG.background ||
-    config.cardStyle !== DEFAULT_BADGE_CONFIG.cardStyle ||
-    config.border !== DEFAULT_BADGE_CONFIG.border ||
-    config.scoreEffect !== DEFAULT_BADGE_CONFIG.scoreEffect ||
-    config.heatmapAnimation !== DEFAULT_BADGE_CONFIG.heatmapAnimation ||
-    config.interaction !== DEFAULT_BADGE_CONFIG.interaction ||
-    config.statsDisplay !== DEFAULT_BADGE_CONFIG.statsDisplay ||
-    config.tierTreatment !== DEFAULT_BADGE_CONFIG.tierTreatment ||
-    config.celebration !== DEFAULT_BADGE_CONFIG.celebration
-  );
-}
-
 export default async function SharePage({ params }: SharePageProps) {
   const { handle } = await params;
 
@@ -105,10 +86,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
-  const [materialized, savedConfig] = await Promise.all([
-    materializePublicProfile(handle),
-    cacheGet<BadgeConfig>(`config:${handle}`),
-  ]);
+  const materialized = await materializePublicProfile(handle);
   const stats = materialized?.stats ?? null;
   const impact = materialized?.displayImpact ?? null;
 
@@ -117,15 +95,12 @@ export async function SharePageContent({ handle }: { handle: string }) {
     ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
     : Promise.resolve(undefined);
 
-  const useInteractivePreview =
-    hasCustomConfig(savedConfig) && stats && impact;
-
   // Render badge SVG inline during SSR to eliminate second round-trip
   const avatarDataUri = await avatarPromise;
   const verification = materialized
     ? getPublicProfileVerification(materialized)
     : null;
-  const inlineSvg = stats && impact && !useInteractivePreview
+  const inlineSvg = stats && impact
     ? renderBadgeSvg(stats, impact, {
         avatarDataUri,
         verificationHash: verification?.hash,
@@ -182,48 +157,40 @@ export async function SharePageContent({ handle }: { handle: string }) {
         </h1>
 
         {/* ── Badge Section Title ──────────────────────────────── */}
-        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:150ms] text-balance">
+        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up motion-reduce:animate-none [animation-delay:150ms] text-balance">
           Your Impact, Decoded
         </h2>
 
         {/* ── Badge Preview ──────────────────────────────────── */}
-        <div className="mb-4 animate-scale-in [animation-delay:200ms]">
-          {useInteractivePreview ? (
-            <ShareBadgePreviewLazy
-              config={savedConfig}
-              stats={stats}
-              impact={impact}
-            />
-          ) : (
-            <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
-              {inlineSvg ? (
-                <div
-                  role="img"
-                  aria-label={`Chapa badge for ${handle}`}
-                  className="w-full rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
-                  dangerouslySetInnerHTML={{ __html: inlineSvg }}
+        <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">
+          <div className="rounded-2xl border border-stroke bg-card p-4 shadow-lg shadow-amber/5">
+            {inlineSvg ? (
+              <div
+                role="img"
+                aria-label={`Chapa badge for ${handle}`}
+                className="w-full rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
+                dangerouslySetInnerHTML={{ __html: inlineSvg }}
+              />
+            ) : (
+              /* Fallback: if SVG render failed, load via <img> with skeleton */
+              <div className="relative">
+                <BadgeSkeleton />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
+                  alt={`Chapa badge for ${handle}`}
+                  width={1200}
+                  height={630}
+                  fetchPriority="high"
+                  className="w-full rounded-xl relative"
                 />
-              ) : (
-                /* Fallback: if SVG render failed, load via <img> with skeleton */
-                <div className="relative">
-                  <BadgeSkeleton />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
-                    alt={`Chapa badge for ${handle}`}
-                    width={1200}
-                    height={630}
-                    fetchPriority="high"
-                    className="w-full rounded-xl relative"
-                  />
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Toolbar ──────────────────────────────────────────── */}
-        <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up [animation-delay:250ms]">
+        <div className="relative z-30 flex justify-end mb-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:250ms]">
           <BadgeToolbar
             handle={handle}
           />

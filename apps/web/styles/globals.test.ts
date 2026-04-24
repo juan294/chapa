@@ -17,6 +17,14 @@ describe("globals.css", () => {
       expect(SOURCE).toContain("animation-duration: 0.01ms !important");
     });
 
+    it("turns named animation utilities off in reduced motion", () => {
+      const reducedMotionBlock =
+        SOURCE.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/g)?.join("\n") ?? "";
+      expect(reducedMotionBlock).toContain(".animate-fade-in-up");
+      expect(reducedMotionBlock).toContain(".animate-scale-in");
+      expect(reducedMotionBlock).toContain("animation: none !important");
+    });
+
     it("disables transition-duration in reduced motion", () => {
       expect(SOURCE).toContain("transition-duration: 0.01ms !important");
     });
