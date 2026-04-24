@@ -20,7 +20,7 @@ export type CampaignStatus =
   | "sent"
   | "failed"
   | "cancelled";
-export type CampaignSendStatus = "pending" | "sent" | "failed";
+export type CampaignSendStatus = "pending" | "processing" | "sent" | "failed";
 
 export interface Campaign {
   id: string;
@@ -50,6 +50,13 @@ export interface CampaignSend {
   status: CampaignSendStatus;
   sentAt: string | null;
   error: string | null;
+}
+
+export interface CampaignSendStats {
+  sent: number;
+  pending: number;
+  processing: number;
+  failed: number;
 }
 
 interface CampaignRow {
@@ -101,6 +108,7 @@ const CAMPAIGN_STATUSES = [
 ] as const satisfies readonly CampaignStatus[];
 const CAMPAIGN_SEND_STATUSES = [
   "pending",
+  "processing",
   "sent",
   "failed",
 ] as const satisfies readonly CampaignSendStatus[];
@@ -255,6 +263,12 @@ export const CampaignRowSchema = {
 export const CampaignSendRowSchema = {
   parse: parseCampaignSendRow,
 };
+
+const CLAIM_CLEAR_FIELDS = {
+  claimed_at: null,
+  lease_expires_at: null,
+  lease_token: null,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Row mapping
@@ -609,15 +623,64 @@ export async function dbGetPendingSends(
   }
 }
 
-export async function dbMarkSendsSent(ids: string[]): Promise<void> {
+export async function dbClaimPendingSends(
+  campaignId: string,
+  limit: number,
+  leaseToken: string,
+  leaseExpiresAt: string,
+): Promise<CampaignSend[]> {
+  const db = getSupabase();
+  if (!db) return [];
+
+  try {
+    const { data, error } = await db.rpc("claim_campaign_sends", {
+      p_campaign_id: campaignId,
+      p_limit: limit,
+      p_lease_token: leaseToken,
+      p_lease_expires_at: leaseExpiresAt,
+    });
+
+    if (error) throw error;
+    if (!data) return [];
+
+    const rows = parseRows<CampaignSendRow>(
+      data,
+      CAMPAIGN_SEND_ROW_REQUIRED_KEYS,
+      "campaign_sends",
+    );
+    return rows.map(mapSendRow);
+  } catch (error) {
+    console.error(
+      "[db] dbClaimPendingSends failed:",
+      (error as Error).message,
+    );
+    return [];
+  }
+}
+
+export async function dbMarkSendsSent(
+  ids: string[],
+  leaseToken?: string,
+): Promise<void> {
   const db = getSupabase();
   if (!db) return;
 
   try {
-    const { error } = await db
+    let query = db
       .from("campaign_sends")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .in("id", ids);
+      .update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        error: null,
+        ...CLAIM_CLEAR_FIELDS,
+      })
+      .eq("status", "processing");
+
+    if (leaseToken) {
+      query = query.eq("lease_token", leaseToken);
+    }
+
+    const { error } = await query.in("id", ids);
 
     if (error) throw error;
   } catch (error) {
@@ -628,15 +691,26 @@ export async function dbMarkSendsSent(ids: string[]): Promise<void> {
 export async function dbMarkSendsFailed(
   ids: string[],
   errorMsg: string,
+  leaseToken?: string,
 ): Promise<void> {
   const db = getSupabase();
   if (!db) return;
 
   try {
-    const { error } = await db
+    let query = db
       .from("campaign_sends")
-      .update({ status: "failed", error: errorMsg })
-      .in("id", ids);
+      .update({
+        status: "failed",
+        error: errorMsg,
+        ...CLAIM_CLEAR_FIELDS,
+      })
+      .eq("status", "processing");
+
+    if (leaseToken) {
+      query = query.eq("lease_token", leaseToken);
+    }
+
+    const { error } = await query.in("id", ids);
 
     if (error) throw error;
   } catch (error) {
@@ -652,9 +726,9 @@ export async function dbMarkSendsFailed(
  */
 export async function dbGetCampaignStats(
   id: string,
-): Promise<{ sent: number; pending: number; failed: number }> {
+): Promise<CampaignSendStats> {
   const db = getSupabase();
-  if (!db) return { sent: 0, pending: 0, failed: 0 };
+  if (!db) return { sent: 0, pending: 0, processing: 0, failed: 0 };
 
   try {
     const countByStatus = async (status: CampaignSendStatus): Promise<number> => {
@@ -668,15 +742,17 @@ export async function dbGetCampaignStats(
       return count ?? 0;
     };
 
-    const [sent, pending, failed] = await Promise.all([
+    const [sent, pending, processing, failed] = await Promise.all([
       countByStatus("sent"),
       countByStatus("pending"),
+      countByStatus("processing"),
       countByStatus("failed"),
     ]);
 
     return {
       sent,
       pending,
+      processing,
       failed,
     };
   } catch (error) {
@@ -684,6 +760,6 @@ export async function dbGetCampaignStats(
       "[db] dbGetCampaignStats failed:",
       (error as Error).message,
     );
-    return { sent: 0, pending: 0, failed: 0 };
+    return { sent: 0, pending: 0, processing: 0, failed: 0 };
   }
 }
