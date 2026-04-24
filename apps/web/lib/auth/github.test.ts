@@ -622,22 +622,22 @@ describe("cookie Secure flag — env var edge cases", () => {
     }
   });
 
-  it("omits Secure when NEXT_PUBLIC_BASE_URL is undefined", () => {
+  it("includes Secure when NEXT_PUBLIC_BASE_URL is undefined", () => {
     delete process.env.NEXT_PUBLIC_BASE_URL;
     const { cookie } = createStateCookie();
-    expect(cookie).not.toContain("Secure");
+    expect(cookie).toContain("Secure");
   });
 
-  it("omits Secure when NEXT_PUBLIC_BASE_URL is empty string", () => {
+  it("includes Secure when NEXT_PUBLIC_BASE_URL is empty string", () => {
     process.env.NEXT_PUBLIC_BASE_URL = "";
     const { cookie } = createStateCookie();
-    expect(cookie).not.toContain("Secure");
+    expect(cookie).toContain("Secure");
   });
 
-  it("omits Secure when NEXT_PUBLIC_BASE_URL has trailing whitespace", () => {
+  it("includes Secure when NEXT_PUBLIC_BASE_URL has trailing whitespace", () => {
     process.env.NEXT_PUBLIC_BASE_URL = "  ";
     const { cookie } = createStateCookie();
-    expect(cookie).not.toContain("Secure");
+    expect(cookie).toContain("Secure");
   });
 });
 

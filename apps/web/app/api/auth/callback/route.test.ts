@@ -753,7 +753,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
     expect(redirectClear).not.toContain("Secure");
   });
 
-  it("omits Secure flag when NEXT_PUBLIC_BASE_URL is unset", async () => {
+  it("includes Secure flag when NEXT_PUBLIC_BASE_URL is unset", async () => {
     delete process.env.NEXT_PUBLIC_BASE_URL;
     setupHappyPath();
 
@@ -768,7 +768,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
     const setCookies = res.headers.getSetCookie();
     const redirectClear = setCookies.find((c) => c.startsWith("chapa_redirect="));
     expect(redirectClear).toBeDefined();
-    expect(redirectClear).not.toContain("Secure");
+    expect(redirectClear).toContain("Secure");
   });
 });
 
