@@ -11,8 +11,17 @@
 
 ## Detection
 
-Incidents are typically discovered via:
-- Manual monitoring of `/api/health` — returns JSON with `redis` and `supabase` status
+Production should have `CHAPA_ALERT_WEBHOOK_URL` configured to an operator-owned webhook endpoint. The app sends active alerts for these launch-critical signals:
+
+| Signal | Threshold | Severity | Recipient |
+|--------|-----------|----------|-----------|
+| `health_degraded` | Every `/api/health` response with status `degraded` / HTTP 503 | P1 | `CHAPA_ALERT_WEBHOOK_URL` |
+| `badge_5xx` | Every captured 5xx from `/u/:handle/badge.svg` | P1 | `CHAPA_ALERT_WEBHOOK_URL` |
+| `oauth_callback_failure` | Every captured 5xx from `/api/auth/callback` | P1 | `CHAPA_ALERT_WEBHOOK_URL` |
+| `cron_failure` | Every captured 5xx from `/api/cron/*` | P2 | `CHAPA_ALERT_WEBHOOK_URL` |
+
+If `CHAPA_ALERT_WEBHOOK_URL` is unset, detection falls back to:
+- Manual monitoring of `/api/health` — returns JSON with `redis`, `supabase`, and `github` status
 - Vercel deployment failure notifications
 - GitHub CI failure on `develop`
 - User report via support email
@@ -21,6 +30,8 @@ Incidents are typically discovered via:
 # Quick health check
 curl https://chapa.thecreativetoken.com/api/health
 ```
+
+Alert payloads are JSON and include `source`, `timestamp`, `signal`, `severity`, `summary`, optional `route`, and redacted `properties`. Tokens, secrets, API keys, and bearer headers are scrubbed before delivery.
 
 ## Escalation
 

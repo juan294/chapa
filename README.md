@@ -158,6 +158,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | `SUPABASE_SERVICE_ROLE_KEY` | No | Supabase service role key (server-side only) |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog project API key |
 | `NEXT_PUBLIC_POSTHOG_HOST` | No | PostHog ingestion host |
+| `CHAPA_ALERT_WEBHOOK_URL` | No | Active operational alert webhook for health, badge, OAuth, and cron failures |
 | `RESEND_API_KEY` | No | Resend email service |
 | `BITBUCKET_CLIENT_ID` | No | Bitbucket OAuth consumer key |
 | `BITBUCKET_CLIENT_SECRET` | No | Bitbucket OAuth consumer secret |

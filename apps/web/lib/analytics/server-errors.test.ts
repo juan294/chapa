@@ -294,6 +294,153 @@ describe("captureServerError", () => {
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(opts.signal).toBeInstanceOf(AbortSignal);
   });
+
+  it("sends an active alert for launch-critical badge 5xx errors", async () => {
+    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerError } = await import("./server-errors");
+
+    await captureServerError({
+      route: "/u/octocat/badge.svg",
+      statusCode: 500,
+      error: new Error("render failed token=ghp_abcdefghijklmnopqrstuvwxyz1234567890"),
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [url, opts] = mockFetch.mock.calls[1] as [string, { body: string }];
+    expect(url).toBe("https://alerts.example.com/chapa");
+
+    const body = JSON.parse(opts.body) as Record<string, unknown>;
+    expect(body.signal).toBe("badge_5xx");
+    expect(body.severity).toBe("P1");
+    expect(body.route).toBe("/u/octocat/badge.svg");
+    expect(JSON.stringify(body)).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz1234567890");
+  });
+
+  it("does not alert for non-critical server errors", async () => {
+    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerError } = await import("./server-errors");
+
+    await captureServerError({
+      route: "/api/test",
+      statusCode: 500,
+      error: new Error("test"),
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["/api/auth/callback", "oauth_callback_failure", "P1"],
+    ["/api/cron/warm-cache", "cron_failure", "P2"],
+  ])("alerts for %s failures", async (route, signal, severity) => {
+    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureServerError } = await import("./server-errors");
+
+    await captureServerError({
+      route,
+      statusCode: 502,
+      error: new Error("test"),
+    });
+
+    const [, opts] = mockFetch.mock.calls[1] as [string, { body: string }];
+    const body = JSON.parse(opts.body) as Record<string, unknown>;
+    expect(body.signal).toBe(signal);
+    expect(body.severity).toBe(severity);
+  });
+
+  it("still sends active alerts when PostHog delivery fails", async () => {
+    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    mockFetch
+      .mockRejectedValueOnce(new Error("PostHog down"))
+      .mockResolvedValueOnce({ ok: true });
+
+    const { captureServerError } = await import("./server-errors");
+
+    await captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 500,
+      error: new Error("oauth failed"),
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const [url, opts] = mockFetch.mock.calls[1] as [string, { body: string }];
+    expect(url).toBe("https://alerts.example.com/chapa");
+    const body = JSON.parse(opts.body) as Record<string, unknown>;
+    expect(body.signal).toBe("oauth_callback_failure");
+  });
+});
+
+describe("captureOperationalAlert", () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    process.env = {
+      ...ORIGINAL_ENV,
+      CHAPA_ALERT_WEBHOOK_URL: "https://alerts.example.com/chapa",
+    };
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it("posts a structured alert payload to the configured webhook", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await captureOperationalAlert({
+      signal: "health_degraded",
+      severity: "P1",
+      summary: "Health check is degraded",
+      route: "/api/health",
+      properties: {
+        token: "ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+        dependencies: { redis: "error" },
+      },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://alerts.example.com/chapa",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: expect.any(AbortSignal),
+      }),
+    );
+
+    const body = getCallBody();
+    expect(body.source).toBe("chapa");
+    expect(body.signal).toBe("health_degraded");
+    expect(body.severity).toBe("P1");
+    expect(body.route).toBe("/api/health");
+    expect(JSON.stringify(body)).not.toContain("ghp_abcdefghijklmnopqrstuvwxyz1234567890");
+  });
+
+  it("does not send when the alert webhook is not configured", async () => {
+    delete process.env.CHAPA_ALERT_WEBHOOK_URL;
+
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await captureOperationalAlert({
+      signal: "health_degraded",
+      severity: "P1",
+      summary: "Health check is degraded",
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
 });
 
 describe("captureServerEvent", () => {

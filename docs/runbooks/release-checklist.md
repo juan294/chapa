@@ -40,6 +40,8 @@ Every push to `develop` creates a Vercel preview deployment automatically.
 | **Health endpoint** | `curl <preview-url>/api/health` → `{"redis":"ok","supabase":"ok"}` |
 | **Verification** | Click verify link on share page → `/verify/:hash` renders correctly |
 
+For production, confirm `CHAPA_ALERT_WEBHOOK_URL` is configured before release. It receives `health_degraded`, `badge_5xx`, `oauth_callback_failure`, and `cron_failure` alerts as documented in `docs/runbooks/incident-response.md`.
+
 3. Leave the preview running for at least 24 hours if the change touches caching, scoring, or OAuth. For documentation-only changes, 1 hour is sufficient.
 
 ### 4. Rollback Decision Criteria

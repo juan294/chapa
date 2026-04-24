@@ -22,6 +22,10 @@ vi.mock("@/lib/auth/admin", () => ({
   isAdminHandle: vi.fn(),
 }));
 
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureOperationalAlert: vi.fn(),
+}));
+
 // GitHub API is probed via global fetch — mock at module level
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -31,6 +35,7 @@ import { pingRedis, rateLimit } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
+import { captureOperationalAlert } from "@/lib/analytics/server-errors";
 
 function makeRequest(): NextRequest {
   return new NextRequest("http://localhost:3001/api/health");
@@ -82,6 +87,19 @@ describe("GET /api/health", () => {
     expect(body.status).toBe("degraded");
     expect(body.dependencies.redis).toBe("error");
     expect(body.dependencies.supabase).toBe("ok");
+    expect(captureOperationalAlert).toHaveBeenCalledWith({
+      signal: "health_degraded",
+      severity: "P1",
+      summary: "Health check is degraded",
+      route: "/api/health",
+      properties: {
+        dependencies: {
+          redis: "error",
+          supabase: "ok",
+          github: "skipped",
+        },
+      },
+    });
   });
 
   it("returns 200 with 'skipped' when Redis env vars are not configured (#634)", async () => {
@@ -94,6 +112,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
     expect(body.dependencies.redis).toBe("skipped");
+    expect(captureOperationalAlert).not.toHaveBeenCalled();
   });
 
   it("returns 200 with 'skipped' when Supabase env vars are not configured (#634)", async () => {

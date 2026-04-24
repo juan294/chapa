@@ -1,5 +1,5 @@
 /**
- * Server-side error monitoring via PostHog.
+ * Server-side error monitoring via PostHog and optional active alerts.
  *
  * Sends `server_error` events to PostHog's capture API using plain fetch.
  * No new dependencies required — uses the same NEXT_PUBLIC_POSTHOG_KEY
@@ -9,7 +9,7 @@
  * - Fire-and-forget: never throws, never blocks the response
  * - Strips sensitive data (tokens, secrets, API keys) from messages and stacks
  * - Truncates stack traces to 1024 chars to avoid oversized payloads
- * - Fails silently when PostHog is unavailable or unconfigured
+ * - Fails silently when monitoring is unavailable or unconfigured
  */
 
 import type { NextRequest, NextResponse } from "next/server";
@@ -50,6 +50,95 @@ export interface CaptureServerErrorOptions {
   statusCode: number;
   /** The error object, string, or unknown value. */
   error: unknown;
+}
+
+export interface OperationalAlertOptions {
+  /** Machine-readable signal name, e.g. "health_degraded". */
+  signal: string;
+  /** Incident severity used by the runbook. */
+  severity: "P1" | "P2" | "P3" | "P4";
+  /** Short human-readable alert summary. */
+  summary: string;
+  /** Route or subsystem that emitted the alert. */
+  route?: string;
+  /** Extra structured context. Sensitive strings are redacted recursively. */
+  properties?: Record<string, unknown>;
+}
+
+function sanitizeUnknown(value: unknown): unknown {
+  if (typeof value === "string") return sanitize(value);
+  if (value == null || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(sanitizeUnknown);
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+        key,
+        sanitizeUnknown(child),
+      ]),
+    );
+  }
+  return sanitize(String(value));
+}
+
+function classifyLaunchCriticalError(
+  route: string,
+  statusCode: number,
+): Pick<OperationalAlertOptions, "signal" | "severity" | "summary"> | null {
+  if (statusCode < 500) return null;
+
+  if (route.includes("/badge.svg")) {
+    return {
+      signal: "badge_5xx",
+      severity: "P1",
+      summary: "Badge SVG route returned a 5xx error",
+    };
+  }
+  if (route === "/api/auth/callback") {
+    return {
+      signal: "oauth_callback_failure",
+      severity: "P1",
+      summary: "OAuth callback returned a 5xx error",
+    };
+  }
+  if (route.startsWith("/api/cron/")) {
+    return {
+      signal: "cron_failure",
+      severity: "P2",
+      summary: "Cron route returned a 5xx error",
+    };
+  }
+
+  return null;
+}
+
+export async function captureOperationalAlert(
+  options: OperationalAlertOptions,
+): Promise<void> {
+  try {
+    const webhookUrl = process.env.CHAPA_ALERT_WEBHOOK_URL?.trim();
+    if (!webhookUrl) return;
+
+    const payload = {
+      source: "chapa",
+      timestamp: new Date().toISOString(),
+      signal: options.signal,
+      severity: options.severity,
+      summary: sanitize(options.summary),
+      ...(options.route && { route: options.route }),
+      properties: sanitizeUnknown(options.properties ?? {}),
+    };
+
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // Never let alert delivery affect the request path.
+  }
 }
 
 /**
@@ -102,8 +191,6 @@ export async function captureServerError(
     const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
 
-    if (!apiKey || !host) return;
-
     const { route, statusCode, error } = options;
 
     // Extract error details based on type
@@ -129,25 +216,42 @@ export async function captureServerError(
       );
     }
 
-    const payload = {
-      api_key: apiKey,
-      event: "server_error",
-      distinct_id: "chapa-server",
-      properties: {
-        route,
-        statusCode,
-        errorType,
-        message,
-        ...(stack !== undefined && { stack }),
-      },
+    const properties = {
+      route,
+      statusCode,
+      errorType,
+      message,
+      ...(stack !== undefined && { stack }),
     };
 
-    await fetch(`${host}/capture/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000),
-    });
+    try {
+      if (apiKey && host) {
+        const payload = {
+          api_key: apiKey,
+          event: "server_error",
+          distinct_id: "chapa-server",
+          properties,
+        };
+
+        await fetch(`${host}/capture/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(5000),
+        });
+      }
+    } catch {
+      // PostHog delivery failure must not suppress active alerts below.
+    }
+
+    const alert = classifyLaunchCriticalError(route, statusCode);
+    if (alert) {
+      await captureOperationalAlert({
+        ...alert,
+        route,
+        properties,
+      });
+    }
   } catch {
     // Never let monitoring crash the app — silently swallow all errors
   }
