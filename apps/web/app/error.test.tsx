@@ -31,4 +31,11 @@ describe("error.tsx — error boundary", () => {
   it("links to the root path", () => {
     expect(SOURCE).toContain('href="/"');
   });
+
+  it("uses terminal-red semantics for error state", () => {
+    expect(SOURCE).toContain("StatusCallout");
+    expect(SOURCE).toContain('variant="error"');
+    expect(SOURCE).toContain("text-terminal-red");
+    expect(SOURCE).not.toContain("amber");
+  });
 });

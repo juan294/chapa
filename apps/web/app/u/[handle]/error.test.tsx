@@ -40,7 +40,10 @@ describe("SharePage error.tsx — error boundary", () => {
     expect(SOURCE).toContain("bg-bg");
   });
 
-  it("uses the amber accent color for the heading", () => {
-    expect(SOURCE).toContain("text-amber");
+  it("uses terminal-red semantics for the error state", () => {
+    expect(SOURCE).toContain("StatusCallout");
+    expect(SOURCE).toContain('variant="error"');
+    expect(SOURCE).toContain("text-terminal-red");
+    expect(SOURCE).not.toContain("amber");
   });
 });
