@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "SharePageOwnerContent.tsx"),
   "utf-8",
 );
+const COPY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../lib/copy/public-flow.ts"),
+  "utf-8",
+);
 
 describe("SharePageOwnerContent", () => {
   describe("client component", () => {
@@ -64,8 +68,8 @@ describe("SharePageOwnerContent", () => {
   });
 
   describe("visitor CTA", () => {
-    it("shows 'Discover your impact' CTA for non-owners", () => {
-      expect(SOURCE).toContain("Discover your impact");
+    it("shows a Spanish impact CTA for non-owners", () => {
+      expect(COPY_SOURCE).toContain("Descubre tu impacto");
     });
 
     it("CTA links to the homepage", () => {
@@ -73,7 +77,11 @@ describe("SharePageOwnerContent", () => {
     });
 
     it("uses curiosity-driven copy that focuses on the reader", () => {
-      expect(SOURCE).toContain("Curious what your developer impact looks like");
+      expect(COPY_SOURCE).toContain("¿Quieres ver cómo se ve tu impacto como desarrollador?");
+    });
+
+    it("uses centralized public-flow copy", () => {
+      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
     });
   });
 

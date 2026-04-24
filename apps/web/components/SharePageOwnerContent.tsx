@@ -8,6 +8,7 @@ import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 
 /**
  * Client-side component that handles owner-specific sections on the share page.
@@ -18,8 +19,10 @@ import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
  *
  * Sections rendered:
  * - Owner: DataSources, ImpactDashboard, Embed Snippets
- * - Visitor: "Discover your impact" CTA
+ * - Visitor: Spanish public acquisition CTA
  */
+
+const SHARE_VISITOR_COPY = SPANISH_PUBLIC_COPY.shareVisitor;
 
 function EmptyImpactState({ handle }: { handle: string }) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -102,16 +105,16 @@ export function SharePageOwnerContent({
       <section className="mb-10 animate-fade-in-up [animation-delay:300ms]">
         <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
           <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
-            Curious what your developer impact looks like?
+            {SHARE_VISITOR_COPY.title}
           </h2>
           <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto text-pretty">
-            Decode your coding DNA in seconds. See your archetype, impact score, and how you compare.
+            {SHARE_VISITOR_COPY.description}
           </p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
           >
-            Discover your impact
+            {SHARE_VISITOR_COPY.cta}
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>

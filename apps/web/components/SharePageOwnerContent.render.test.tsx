@@ -127,9 +127,9 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Curious what your developer impact looks like?"),
+      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
     ).toBeTruthy();
-    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
   });
 
   it("shows visitor CTA when session fetch fails", () => {
@@ -144,7 +144,7 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Curious what your developer impact looks like?"),
+      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
     ).toBeTruthy();
   });
 
@@ -159,7 +159,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
   });
 
   it("shows owner content when user matches the handle", () => {

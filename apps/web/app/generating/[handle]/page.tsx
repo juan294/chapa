@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { isValidHandle } from "@/lib/validation";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 import { GeneratingProgress } from "./GeneratingProgress";
 import type { Metadata } from "next";
 
@@ -12,7 +13,7 @@ export async function generateMetadata({
 }: GeneratingPageProps): Promise<Metadata> {
   const { handle } = await params;
   return {
-    title: `Generating badge — @${handle}`,
+    title: `${SPANISH_PUBLIC_COPY.generation.metadataTitle} — @${handle}`,
     robots: { index: false },
   };
 }

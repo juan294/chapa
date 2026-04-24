@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 
 const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
@@ -14,7 +15,7 @@ export function VerifyForm() {
     e.preventDefault();
     const trimmed = hash.trim().toLowerCase();
     if (!HASH_PATTERN.test(trimmed)) {
-      setError("Enter a valid 8, 16, or 32 character hex hash (e.g. a1b2c3d4e5f6a7b8).");
+      setError(SPANISH_PUBLIC_COPY.verifyForm.invalidHash);
       return;
     }
     router.push(`/verify/${trimmed}`);
@@ -27,7 +28,7 @@ export function VerifyForm() {
           htmlFor="hash-input"
           className="block text-xs font-medium uppercase tracking-wider text-text-secondary mb-2"
         >
-          Verification Hash
+          {SPANISH_PUBLIC_COPY.verifyForm.label}
         </label>
         <input
           id="hash-input"
@@ -52,7 +53,7 @@ export function VerifyForm() {
         type="submit"
         className="group inline-flex items-center gap-2.5 rounded-lg bg-complement px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
       >
-        Verify
+        {SPANISH_PUBLIC_COPY.verifyForm.submit}
         <svg
           className="w-4 h-4 transition-transform group-hover:translate-x-1"
           viewBox="0 0 24 24"
