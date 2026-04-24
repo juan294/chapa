@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 /**
  * validate-migrations.ts
  *
@@ -6,15 +6,18 @@
  * 1. All files follow the naming convention: NNN_<description>.sql (3-digit zero-padded prefix)
  * 2. The sequence is contiguous starting from 001 (no gaps, no duplicates)
  *
- * Run: pnpm tsx scripts/validate-migrations.ts
- * Or:  npx tsx scripts/validate-migrations.ts
+ * Run: pnpm run validate:migrations
+ * Or:  node scripts/validate-migrations.ts
  *
  * Exits 0 on success, 1 on any validation failure.
  */
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "node:url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const MIGRATIONS_DIR = path.join(__dirname, "..", "supabase", "migrations");
 
 const EXPECTED_PATTERN = /^(\d{3})_[a-z0-9][a-z0-9_]*\.sql$/;
