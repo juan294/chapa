@@ -1,7 +1,7 @@
 export const revalidate = 86400;
 
 import { Navbar } from "@/components/Navbar";
-import { GlobalCommandBar } from "@/components/GlobalCommandBar";
+import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
         </div>
       </main>
 
-      <GlobalCommandBar />
+      <GlobalCommandBarLazy />
     </div>
   );
 }

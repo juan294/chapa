@@ -29,8 +29,9 @@ describe("Verification explainer page (server component)", () => {
       expect(SOURCE).toContain("Navbar");
     });
 
-    it("renders GlobalCommandBar", () => {
-      expect(SOURCE).toContain("GlobalCommandBar");
+    it("renders the lazy command bar", () => {
+      expect(SOURCE).toContain("GlobalCommandBarLazy");
+      expect(SOURCE).not.toContain("<GlobalCommandBar ");
     });
 
     it("renders main content area", () => {

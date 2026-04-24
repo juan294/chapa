@@ -86,6 +86,11 @@ describe("Studio page (server component)", () => {
       expect(SOURCE).toContain("handle=");
     });
 
+    it("mounts keyboard shortcuts only on the studio route", () => {
+      expect(SOURCE).toContain("KeyboardShortcutsListener");
+      expect(SOURCE).toContain("<KeyboardShortcutsListener />");
+    });
+
     it("has a main element", () => {
       expect(SOURCE).toContain('id="main-content"');
     });

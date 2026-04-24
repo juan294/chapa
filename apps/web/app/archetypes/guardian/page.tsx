@@ -1,7 +1,7 @@
 export const revalidate = 604800;
 
 import { Navbar } from "@/components/Navbar";
-import { GlobalCommandBar } from "@/components/GlobalCommandBar";
+import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { GUARDIAN_STATS, GUARDIAN_IMPACT } from "@/lib/render/archetypeDemoData";
 import Link from "next/link";
@@ -184,7 +184,7 @@ export default function GuardianPage() {
           </div>
         </article>
       </main>
-      <GlobalCommandBar />
+      <GlobalCommandBarLazy />
     </div>
   );
 }

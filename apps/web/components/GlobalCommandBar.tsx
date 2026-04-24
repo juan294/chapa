@@ -3,6 +3,7 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AuthorTypewriter } from "@/components/AuthorTypewriter";
+import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 import { TerminalInput } from "@/components/terminal/TerminalInput";
 import type { TerminalInputHandle } from "@/components/terminal/TerminalInput";
 import { TerminalOutput } from "@/components/terminal/TerminalOutput";
@@ -117,32 +118,35 @@ export function GlobalCommandBar({
   }, []);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
-      <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
-        <AuthorTypewriter />
+    <>
+      <KeyboardShortcutsListener />
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-stroke bg-bg/90 backdrop-blur-xl">
+        <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 z-50">
+          <AuthorTypewriter />
+        </div>
+        <div className="relative mx-auto max-w-4xl">
+          {outputLines.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl">
+              <TerminalOutput lines={outputLines} />
+            </div>
+          )}
+          <AutocompleteDropdown
+            commands={commands}
+            partial={partial}
+            onSelect={handleAutocompleteSelect}
+            onFill={handleAutocompleteFill}
+            onDismiss={handleAutocompleteDismiss}
+            visible={showAutocomplete}
+          />
+          <TerminalInput
+            ref={terminalRef}
+            onSubmit={handleSubmit}
+            onPartialChange={handlePartialChange}
+            prompt="chapa"
+            autoFocus={!!isAdmin}
+          />
+        </div>
       </div>
-      <div className="relative mx-auto max-w-4xl">
-        {outputLines.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 mb-1 max-h-48 sm:max-h-64 overflow-y-auto rounded-lg border border-stroke bg-card shadow-xl">
-            <TerminalOutput lines={outputLines} />
-          </div>
-        )}
-        <AutocompleteDropdown
-          commands={commands}
-          partial={partial}
-          onSelect={handleAutocompleteSelect}
-          onFill={handleAutocompleteFill}
-          onDismiss={handleAutocompleteDismiss}
-          visible={showAutocomplete}
-        />
-        <TerminalInput
-          ref={terminalRef}
-          onSubmit={handleSubmit}
-          onPartialChange={handlePartialChange}
-          prompt="chapa"
-          autoFocus={!!isAdmin}
-        />
-      </div>
-    </div>
+    </>
   );
 }
