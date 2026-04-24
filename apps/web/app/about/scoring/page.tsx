@@ -1,5 +1,5 @@
 import { Navbar } from "@/components/Navbar";
-import { GlobalCommandBar } from "@/components/GlobalCommandBar";
+import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
 import type { Metadata } from "next";
 
@@ -753,7 +753,7 @@ export default function ScoringMethodologyPage() {
         </div>
       </main>
 
-      <GlobalCommandBar />
+      <GlobalCommandBarLazy />
     </div>
   );
 }

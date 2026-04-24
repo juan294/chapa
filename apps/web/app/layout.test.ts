@@ -8,6 +8,25 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("RootLayout", () => {
+  describe("client shell baseline", () => {
+    it("does not mount analytics providers around every route", () => {
+      expect(SOURCE).not.toContain("<PostHogProvider>");
+      expect(SOURCE).not.toContain("<ClientAnalytics />");
+    });
+
+    it("does not mount keyboard shortcuts globally", () => {
+      expect(SOURCE).not.toContain("<KeyboardShortcutsListener />");
+    });
+
+    it("uses a deferred instrumentation island instead of global providers", () => {
+      expect(SOURCE).toContain("ClientInstrumentation");
+    });
+
+    it("does not preconnect to analytics hosts from the root document", () => {
+      expect(SOURCE).not.toContain("eu.i.posthog.com");
+    });
+  });
+
   describe("skip-to-main-content link (WCAG 2.4.1, #506)", () => {
     it("has a skip link targeting #main-content", () => {
       expect(SOURCE).toMatch(/href="#main-content"/);

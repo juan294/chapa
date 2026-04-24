@@ -14,8 +14,8 @@ const GLOBAL_SOURCE = fs.readFileSync(
 
 describe("LandingTerminal", () => {
   describe("re-export", () => {
-    it("re-exports GlobalCommandBar", () => {
-      expect(REEXPORT_SOURCE).toContain("GlobalCommandBar");
+    it("re-exports the lazy command bar", () => {
+      expect(REEXPORT_SOURCE).toContain("GlobalCommandBarLazy");
       expect(REEXPORT_SOURCE).toContain("LandingTerminal");
     });
   });

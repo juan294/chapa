@@ -14,6 +14,13 @@ describe("GlobalCommandBar", () => {
     });
   });
 
+  describe("route-scoped shortcuts", () => {
+    it("mounts KeyboardShortcutsListener with command-bar routes", () => {
+      expect(SOURCE).toContain("KeyboardShortcutsListener");
+      expect(SOURCE).toContain("<KeyboardShortcutsListener />");
+    });
+  });
+
   describe("autoFocus on admin page (#283)", () => {
     it("passes autoFocus based on isAdmin prop so admin page gets focus", () => {
       // Admin page should auto-focus the command input; other pages should not.

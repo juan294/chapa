@@ -12,6 +12,7 @@ import { StudioClient } from "./StudioClient";
 import type { BadgeConfig, StatsData } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
+import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 
 function buildEmptyStats(session: {
   login: string;
@@ -91,6 +92,7 @@ export default async function StudioPage() {
       />
 
       <div className="pt-[57px]">
+        <KeyboardShortcutsListener />
         <StudioClient
           initialConfig={initialConfig}
           stats={effectiveStats}

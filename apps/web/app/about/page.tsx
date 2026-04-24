@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
-import { GlobalCommandBar } from "@/components/GlobalCommandBar";
+import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import type { Metadata } from "next";
 
 export const revalidate = 86400;
@@ -120,7 +120,7 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <GlobalCommandBar />
+      <GlobalCommandBarLazy />
     </div>
   );
 }
