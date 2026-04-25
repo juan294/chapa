@@ -8,9 +8,9 @@
  * so without this backfill, old uploads keep serving stale scores until the
  * user re-uploads.
  *
- * Usage:
- *   tsx scripts/backfill-craft-scores.ts             # apply changes
- *   tsx scripts/backfill-craft-scores.ts --dry-run   # preview only
+ * Usage (from repo root or apps/web):
+ *   pnpm --filter @chapa/web exec tsx scripts/backfill-craft-scores.ts             # apply
+ *   pnpm --filter @chapa/web exec tsx scripts/backfill-craft-scores.ts --dry-run   # preview
  *
  * Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  *
@@ -21,8 +21,8 @@
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { InsightsUpload } from "../packages/shared/src/types";
-import { computeCraftScore } from "../apps/web/lib/insights/scoring";
+import type { InsightsUpload } from "@chapa/shared";
+import { computeCraftScore } from "@/lib/insights/scoring";
 
 interface ToolInsightsRow {
   handle: string;
