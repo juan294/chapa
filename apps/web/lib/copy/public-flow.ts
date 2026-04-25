@@ -188,4 +188,41 @@ export const SPANISH_PUBLIC_COPY = {
     retry: "Intentar de nuevo",
     redirect: "Redirigiendo a tu insignia...",
   },
+  errors: {
+    general: {
+      title: "Algo salió mal",
+      description: "Se produjo un error inesperado. Por favor, inténtalo de nuevo.",
+    },
+    sharePage: {
+      title: "Algo salió mal",
+      description: "No pudimos cargar este perfil. Por favor, inténtalo de nuevo.",
+    },
+    tryAgain: "Intentar de nuevo",
+    goHome: "Volver al inicio",
+  },
+  verifyDetail: {
+    verifiedTitle: "Insignia verificada",
+    verifiedDescription: "Esta insignia fue generada con datos auténticos de la plataforma.",
+    verificationCode: "Código de verificación",
+    developer: "Desarrollador",
+    name: "Nombre",
+    impactScore: "Puntuación de impacto",
+    tier: "Nivel",
+    archetype: "Arquetipo",
+    profile: "Perfil",
+    dimensions: "Dimensiones",
+    keyMetrics: "Métricas clave",
+    prsMerged: "PRs fusionadas",
+    reviews: "Reviews",
+    generatedOn: "Generado el",
+    viewBadge: "Ver insignia",
+    notFoundTitle: "No encontrado",
+    notFoundDescription: "No se encontró ningún registro de verificación para este hash.",
+    notFoundExplanation:
+      "Es posible que la insignia haya caducado (los registros se guardan 30 días) o que el hash sea incorrecto.",
+    provided: "Proporcionado",
+    invalidHashTitle: "Hash inválido",
+    invalidHashDescription:
+      "El hash de verificación debe tener 8, 16 o 32 caracteres hexadecimales.",
+  },
 } as const;

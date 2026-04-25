@@ -63,15 +63,15 @@ describe("generateMetadata", () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ hash: "a1b2c3d4" }),
     });
-    expect(meta.title).toContain("Verify Badge");
+    expect(meta.title).toContain("Verificar");
     expect(meta.title).toContain("a1b2c3d4");
   });
 
-  it("returns 'Invalid Hash' title for a non-hex hash", async () => {
+  it("returns invalid hash title for a non-hex hash", async () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ hash: "not-valid!" }),
     });
-    expect(meta.title).toContain("Invalid Hash");
+    expect(meta.title).toContain("Hash inválido");
   });
 
   it("disables robots indexing for all verify pages", async () => {
@@ -90,10 +90,10 @@ describe("VerifyPage", () => {
       });
       render(jsx);
 
-      expect(screen.getByText("Invalid Hash")).toBeDefined();
+      expect(screen.getByText("Hash inválido")).toBeDefined();
       expect(
         screen.getByText(
-          "The verification hash must be 8, 16, or 32 hex characters.",
+          "El hash de verificación debe tener 8, 16 o 32 caracteres hexadecimales.",
         ),
       ).toBeDefined();
       expect(screen.getByText("zzzzzzzz")).toBeDefined();
@@ -105,7 +105,7 @@ describe("VerifyPage", () => {
       });
       render(jsx);
 
-      expect(screen.getByText("Invalid Hash")).toBeDefined();
+      expect(screen.getByText("Hash inválido")).toBeDefined();
     });
   });
 
@@ -118,9 +118,9 @@ describe("VerifyPage", () => {
       });
       render(jsx);
 
-      expect(screen.getByText("Not Found")).toBeDefined();
+      expect(screen.getByText("No encontrado")).toBeDefined();
       expect(
-        screen.getByText("No verification record found for this hash."),
+        screen.getByText("No se encontró ningún registro de verificación para este hash."),
       ).toBeDefined();
       expect(screen.getByText("a1b2c3d4")).toBeDefined();
     });
@@ -135,7 +135,7 @@ describe("VerifyPage", () => {
       });
       render(jsx);
 
-      expect(screen.getByText("Verified Badge")).toBeDefined();
+      expect(screen.getByText("Insignia verificada")).toBeDefined();
       expect(screen.getByText("@testuser")).toBeDefined();
       expect(screen.getByText("Test User")).toBeDefined();
     });
@@ -182,7 +182,7 @@ describe("VerifyPage", () => {
       expect(screen.getByText("420")).toBeDefined();
       expect(screen.getByText("Commits")).toBeDefined();
       expect(screen.getByText("38")).toBeDefined();
-      expect(screen.getByText("PRs Merged")).toBeDefined();
+      expect(screen.getByText("PRs fusionadas")).toBeDefined();
       expect(screen.getByText("15")).toBeDefined();
       expect(screen.getByText("Reviews")).toBeDefined();
     });
@@ -195,8 +195,8 @@ describe("VerifyPage", () => {
       });
       render(jsx);
 
-      expect(screen.getByText("Generated on 2026-03-22")).toBeDefined();
-      const viewBadge = screen.getByText("View Badge");
+      expect(screen.getByText("Generado el 2026-03-22")).toBeDefined();
+      const viewBadge = screen.getByText("Ver insignia");
       expect(viewBadge.closest("a")?.getAttribute("href")).toBe(
         "/u/testuser/badge.svg",
       );

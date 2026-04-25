@@ -9,13 +9,13 @@ describe("ErrorPage render", () => {
   it("renders the error heading", () => {
     const reset = vi.fn();
     render(<ErrorPage error={new Error("test") as Error & { digest?: string }} reset={reset} />);
-    expect(screen.getByText("Something went wrong")).toBeDefined();
+    expect(screen.getByText("Algo salió mal")).toBeDefined();
   });
 
   it("calls reset when try again is clicked", () => {
     const reset = vi.fn();
     render(<ErrorPage error={new Error("test") as Error & { digest?: string }} reset={reset} />);
-    fireEvent.click(screen.getByText("Try again"));
+    fireEvent.click(screen.getByText("Intentar de nuevo"));
     expect(reset).toHaveBeenCalledTimes(1);
   });
 });

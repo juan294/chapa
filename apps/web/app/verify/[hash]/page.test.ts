@@ -38,8 +38,8 @@ describe("VerifyPage", () => {
   });
 
   describe("VerifiedCard content", () => {
-    it("displays 'Verified Badge' heading", () => {
-      expect(SOURCE).toContain("Verified Badge");
+    it("displays verified heading via copy", () => {
+      expect(SOURCE).toContain("COPY.verifiedTitle");
     });
 
     it("shows developer handle as a link to share page", () => {
@@ -77,12 +77,12 @@ describe("VerifyPage", () => {
   });
 
   describe("NotFoundCard content", () => {
-    it("displays 'Not Found' heading", () => {
-      expect(SOURCE).toContain("Not Found");
+    it("displays not-found heading via copy", () => {
+      expect(SOURCE).toContain("COPY.notFoundTitle");
     });
 
-    it("mentions 30-day record retention", () => {
-      expect(SOURCE).toContain("30 days");
+    it("mentions 30-day record retention via copy", () => {
+      expect(SOURCE).toContain("COPY.notFoundExplanation");
     });
 
     it("shows the queried hash", () => {
@@ -92,12 +92,12 @@ describe("VerifyPage", () => {
   });
 
   describe("InvalidHashCard content", () => {
-    it("displays 'Invalid Hash' heading", () => {
-      expect(SOURCE).toContain("Invalid Hash");
+    it("displays invalid-hash heading via copy", () => {
+      expect(SOURCE).toContain("COPY.invalidHashTitle");
     });
 
-    it("explains the expected format", () => {
-      expect(SOURCE).toContain("8, 16, or 32 hex characters");
+    it("explains the expected format via copy", () => {
+      expect(SOURCE).toContain("COPY.invalidHashDescription");
     });
   });
 
@@ -127,11 +127,13 @@ describe("VerifyPage", () => {
 
   describe("heading hierarchy (#288)", () => {
     it("uses <h2> for Dimensions section heading", () => {
-      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?Dimensions[\s\S]*?<\/h2>/);
+      expect(SOURCE).toContain("COPY.dimensions");
+      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?COPY\.dimensions[\s\S]*?<\/h2>/);
     });
 
     it("uses <h2> for Key Metrics section heading", () => {
-      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?Key Metrics[\s\S]*?<\/h2>/);
+      expect(SOURCE).toContain("COPY.keyMetrics");
+      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?COPY\.keyMetrics[\s\S]*?<\/h2>/);
     });
 
     it("section headings use font-heading class", () => {
@@ -149,8 +151,8 @@ describe("VerifyPage", () => {
       expect(SOURCE).toContain("Chapa");
     });
 
-    it("returns 'Invalid Hash' title for invalid hashes", () => {
-      expect(SOURCE).toContain("Invalid Hash");
+    it("returns invalid hash title for invalid hashes", () => {
+      expect(SOURCE).toContain("COPY.invalidHashTitle");
     });
 
     it("disables indexing with robots noindex", () => {

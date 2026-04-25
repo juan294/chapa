@@ -168,7 +168,7 @@ describe("Error page renders", () => {
   it("renders SharePageError", async () => {
     const { default: SharePageError } = await import("./u/[handle]/error");
     render(<SharePageError error={makeError()} reset={noop} />);
-    expect(screen.getByText("Something went wrong")).toBeDefined();
+    expect(screen.getByText("Algo salió mal")).toBeDefined();
   });
 
   it("renders VerifyError", async () => {

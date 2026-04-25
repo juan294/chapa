@@ -106,7 +106,7 @@ export default async function Home({
         <div className="mx-auto max-w-4xl px-6 pt-24 pb-20 md:pt-28 md:pb-32 space-y-16 md:space-y-24">
 
           {/* ── Hero: $ chapa ──────────────────────────────── */}
-          <section className="animate-fade-in-up">
+          <section className="animate-fade-in-up motion-reduce:animate-none">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa</span>
@@ -147,7 +147,7 @@ export default async function Home({
           </section>
 
           {/* ── Badge Preview: $ chapa preview @developer ──── */}
-          <section id="badge-preview" className="relative z-10 animate-fade-in-up [animation-delay:200ms]">
+          <section id="badge-preview" className="relative z-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:200ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa preview @developer</span>
@@ -167,7 +167,7 @@ export default async function Home({
           </section>
 
           {/* ── Embed: $ chapa embed ──────────────────────── */}
-          <section className="animate-fade-in-up [animation-delay:400ms]">
+          <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:400ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa embed</span>
@@ -205,7 +205,7 @@ export default async function Home({
           </section>
 
           {/* ── Features: $ chapa features ────────────────── */}
-          <section id="features" className="animate-fade-in-up [animation-delay:600ms]">
+          <section id="features" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:600ms]">
             <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.features}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
@@ -239,7 +239,7 @@ export default async function Home({
           </section>
 
           {/* ── Cómo funciona: $ chapa explain ─────────────── */}
-          <section id="how-it-works" className="animate-fade-in-up [animation-delay:800ms]">
+          <section id="how-it-works" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:800ms]">
             <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.howItWorks}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
@@ -298,7 +298,7 @@ export default async function Home({
           </section>
 
           {/* ── Enterprise: $ chapa enterprise ────────────── */}
-          <section id="enterprise" className="animate-fade-in-up [animation-delay:900ms]">
+          <section id="enterprise" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:900ms]">
             <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.enterprise}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
@@ -377,7 +377,7 @@ export default async function Home({
           </section>
 
           {/* ── Stats: $ chapa stats ──────────────────────── */}
-          <section id="stats" className="animate-fade-in-up [animation-delay:1100ms]">
+          <section id="stats" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1100ms]">
             <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.stats}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
@@ -401,7 +401,7 @@ export default async function Home({
           </section>
 
           {/* ── CTA: $ chapa login ────────────────────────── */}
-          <section className="animate-fade-in-up [animation-delay:1300ms]">
+          <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1300ms]">
             <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.getStarted}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>

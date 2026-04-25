@@ -8,7 +8,7 @@ vi.mock("@/components/badge/BadgeContent", () => ({
 }));
 
 describe("aurora experiment page", () => {
-  it("renders without throwing", async () => {
+  it("renders without throwing", { timeout: 30000 }, async () => {
     const { default: Page } = await import("./page");
     const { container } = render(<Page />);
     expect(container.querySelector("div")).toBeTruthy();

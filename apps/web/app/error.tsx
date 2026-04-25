@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { StatusCallout } from "@/components/StatusCallout";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+
+const COPY = SPANISH_PUBLIC_COPY.errors;
 
 export default function ErrorPage({
   reset,
@@ -16,9 +19,9 @@ export default function ErrorPage({
     >
       <StatusCallout
         variant="error"
-        title="Something went wrong"
+        title={COPY.general.title}
         titleAs="h1"
-        description="An unexpected error occurred. Please try again."
+        description={COPY.general.description}
         className="w-full max-w-xl text-left"
       />
       <div className="mt-8 flex items-center gap-4">
@@ -26,13 +29,13 @@ export default function ErrorPage({
           onClick={reset}
           className="rounded-lg border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
         >
-          Try again
+          {COPY.tryAgain}
         </button>
         <Link
           href="/"
           className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
         >
-          Go home
+          {COPY.goHome}
         </Link>
       </div>
     </main>
