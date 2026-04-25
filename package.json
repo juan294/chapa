@@ -53,7 +53,8 @@
       "@typescript-eslint/visitor-keys": ">=8.58.0",
       "@typescript-eslint/project-service": ">=8.58.0",
       "@typescript-eslint/tsconfig-utils": ">=8.58.0",
-      "svix": "1.92.2"
+      "svix": "1.92.2",
+      "postcss": ">=8.5.10"
     }
   }
 }
