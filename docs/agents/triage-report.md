@@ -1,36 +1,48 @@
 # Triage Report
-> Generated on 2026-04-22 | 7 reports processed | 4 live action items
+> Generated on 2026-04-25 | 5 reports processed | 12 action items
 
 ## Agent Failures
 None — all agents ran successfully.
 
 ## Reports Reviewed
+
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | pre-launch-report.md | pre-launch | RED | 0 new code actions in this run — source audit showed the referenced high-priority fixes were already present on `develop` |
-| 2 | cost-analyst-report.md | cost-analyst | GREEN | 0 — no immediate code action; carried scale item only |
-| 3 | triage-report.md | triage | GREEN | 0 — historical report only |
-| 4 | coverage-report.md | coverage | GREEN | 2 — redaction-path coverage + owner empty-state handler coverage |
-| 5 | security-report.md | security | GREEN | 1 — same redaction-path coverage item as coverage |
-| 6 | cc-rpi-update-report.md | cc-rpi-update | INFO | 0 — repo already effectively aligned with v1.17.2 |
-| 7 | qa-report.md | qa | GREEN | 1 — same owner empty-state / regenerate-flow coverage item as coverage |
+| 1 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 1 (CC-H1: already at v1.17.2, no action) |
+| 2 | cost-analyst-report.md | cost-analyst | GREEN | 0 open items |
+| 3 | coverage-report.md | coverage | YELLOW | 4 (CO-P1, CO-P2, CO-P3, QA infra) |
+| 4 | documentation-report.md | documentation | GREEN | 0 open items |
+| 5 | pre-launch-report.md | pre-launch | YELLOW | 7 (PL-B1, PL-B2, PL-W1, AR-M1, QA-P1, QA-P2, QA-P3) |
 
 ## Overall Status: GREEN
 
+All blocking items resolved. Test suite healthy at 7179 tests.
+
 ## Action Items Completed
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Centralized signed unsubscribe URL generation for announcement emails | security / pre-launch follow-through | 0 | ✅ |
-| 2 | Updated score-bump email flow to use signed unsubscribe URLs | security / pre-launch follow-through | 1 assertion expansion | ✅ |
-| 3 | Added explicit tests for all 9 `SENSITIVE_PATTERNS` redaction branches in `server-errors` | coverage + security | 9 | ✅ |
-| 4 | Added regenerate success/failure coverage for `SharePageOwnerContent` empty-state owner flow | coverage + qa | 2 | ✅ |
+
+| # | Item | Source | Tests Added | Status |
+|---|------|--------|-------------|--------|
+| 1 | CO-P1: fire-and-forget catch path + onError override | coverage-report | 3 | ✅ Done |
+| 2 | CO-P2: telemetry route untested handler | coverage-report | 1 | ✅ Done |
+| 3 | CO-P3: verification/store.ts error paths | coverage-report | 2 | ✅ Done |
+| 4 | QA-P1: BadgeToolbar double-restore flaky test | coverage-report | 0 (fix) | ✅ Done |
+| 5 | QA-P2: aurora page test 15s timeout | coverage-report | 0 (mock + timeout) | ✅ Done |
+| 6 | QA-P3: vitest fork-pool starvation | coverage-report | 0 (config) | ✅ Done |
+| 7 | PL-B1: Delete HeroScoreZone + RadarChartInteractive | pre-launch-report | 0 (deletion) | ✅ Done |
+| 8 | PL-B2: Extract AgentRunResult shared type | pre-launch-report | 0 (refactor) | ✅ Done |
+| 9 | PL-W1: Update E2E copy expectations to Spanish | pre-launch-report | 0 (fix) | ✅ Done |
+| 10 | AR-M1: Split github/client.ts god module | pre-launch-report | 18 | ✅ Done |
+| 11 | CC-H1: cc-rpi blueprint sync check | cc-rpi-update-report | — | ✅ Already v1.17.2 |
+| 12 | DO-H1/QA-H1: Deployment smoke strictness | pre-launch-report | — | ✅ Already implemented |
 
 ## Verification
-- [x] All tests passing — 7059/7059
-- [x] Typecheck clean
-- [x] Lint clean
-- [ ] CI green
+- [x] All tests passing (7179/7179)
+- [x] Typecheck clean (0 errors)
+- [x] Lint clean (0 issues)
+- [x] Commit: 9c1e6cf on develop
 
 ## Carried Items
-- `dbGetCampaignStats()` client-side aggregation remains a future-scale cost item; no threshold breach in this cycle.
-- The broader pre-launch audit document still contains historical and after-launch backlog items, but the live gaps still present in source at triage time are resolved in this run.
+- Cost Analyst P2-1: `dbGetCampaignStats()` RPC migration (future scale, >5K sends/campaign)
+- Cost Analyst M1–M3: avatar cache, OG image cache, HLL memory monitors
+- Performance: Turbopack NFT warning in svg-to-png.ts (cosmetic, no functional impact)
+- Coverage P3: experiments/** Canvas/WebGL (JSDOM limitation, accepted)
