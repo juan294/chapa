@@ -147,12 +147,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## Fire-and-forget side effects in badge route
+## Post-response side effects in badge route
 
-- **Risk:** After rendering a badge SVG, side effects (metrics snapshot capture, analytics events, cache warm) are executed via `fireAndForget()` — a non-blocking wrapper that swallows errors. If these side effects fail (e.g., Redis or Supabase is temporarily unavailable), they fail silently with no retry and no alert.
-- **Mitigation:** Side effects are non-critical by design: the badge SVG is already returned to the requester before they run. Missing a single daily snapshot is acceptable — the next request or cron job will fill the gap. `fireAndForget` logs errors via `captureServerError` to PostHog before swallowing them, giving observability without blocking the response. This is intentional availability-first design.
+- **Risk:** After rendering a badge SVG, side effects (metrics snapshot capture, analytics events, cache warm, verification record store) are scheduled with Next.js `after()` and run via `Promise.allSettled` in `runPublicProfileSideEffects` (`apps/web/lib/profile/public-profile.ts`). Individual rejections are absorbed by `allSettled` with no retry and no alert, and the side-effect path currently has no `captureServerError`/PostHog instrumentation — failures produce, at most, whatever each callee logs internally.
+- **Mitigation:** Side effects are non-critical by design: the badge SVG is already returned to the requester before they run. Missing a single daily snapshot is acceptable — the next request or cron job (`/api/cron/warm-cache`) will fill the gap. A daily per-handle guard key (`sideeffects:done:{handle}:{date}`) prevents repeat work. This is intentional availability-first design; observability for this path is tracked as a follow-up improvement.
 - **Severity:** Low
-- **Accepted:** 2026-04-10
+- **Accepted:** 2026-04-04
 
 ---
 

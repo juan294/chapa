@@ -12,8 +12,8 @@
 
 ### CHANGELOG.md
 Added two missing version entries that were never written after releases shipped:
-- `[2.7.2] - 2026-04-10` — craft recompute on `/api/refresh` + correct craft passthrough to impact
-- `[2.7.1] - 2026-04-07` — craft recompute from stored raw data on `/api/recalculate`
+- `[2.7.2] - 2026-04-04` — craft recompute on `/api/refresh` + correct craft passthrough to impact
+- `[2.7.1] - 2026-04-04` — craft recompute from stored raw data on `/api/recalculate`
 - Added compare links `[2.7.2]` and `[2.7.1]` at bottom of file
 
 ### CLAUDE.md
@@ -26,7 +26,7 @@ Three targeted updates to reflect auth architecture changes shipped since v2.7.0
 - **Privacy Guarantees #2**: Updated from "OAuth tokens are encrypted in session cookies with a 24-hour expiry" to reflect server-side database storage
 
 ### docs/accepted-risks.md
-- Added new entry: **Fire-and-forget side effects in badge route** — documents the intentional design of non-blocking side effects (snapshot, analytics, cache) after badge render, the `fireAndForget()` wrapper, silent failure behavior, and PostHog error capture as mitigation. Severity: Low. Accepted: 2026-04-10.
+- Added new entry: **Post-response side effects in badge route** — documents the intentional design of non-blocking side effects (snapshot, analytics, cache, verification record) scheduled via Next.js `after()` and run with `Promise.allSettled` in `runPublicProfileSideEffects`, silent failure behavior, the daily `sideeffects:done:{handle}:{date}` guard, and the current absence of PostHog instrumentation on this path. Severity: Low. Accepted: 2026-04-04.
 
 ### docs/chapa-architecture.drawio
 - Fixed stale label on "Public Endpoints" cell: `/api/badge` → `/u/:handle/badge.svg` (the badge has never been served from `/api/badge`; correct route is the page-level SVG endpoint)
