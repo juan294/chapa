@@ -108,7 +108,6 @@ describe("materializePublicProfile", () => {
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       today: undefined,
-      craftMode: "cached",
       policy: "public-display",
     });
     expect(result).toBe(materialized);

@@ -237,7 +237,6 @@ async function warmHandle(
   try {
     const materialized = await materializeOrchestratedProfile(handle, {
       token: githubToken,
-      craftMode: "cached",
     });
     if (!materialized) {
       void captureServerError({

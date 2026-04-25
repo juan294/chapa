@@ -1,7 +1,6 @@
 import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
 import { getCachedCraftScore } from "@/lib/cache/craft-cache";
 import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
-import { dbRecomputeCraft } from "@/lib/db/tool-insights";
 import { buildSnapshot } from "@/lib/history/snapshot";
 import type { MetricsSnapshot } from "@/lib/history/types";
 import {
@@ -11,8 +10,6 @@ import {
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { getStats } from "@/lib/github/client";
-
-export type MaterializationCraftMode = "cached" | "recompute";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -32,7 +29,6 @@ export interface MaterializedImpactState {
 export interface MaterializeProfileOptions
   extends Omit<MaterializeImpactStateOptions, "craftResult" | "latestSnapshot"> {
   token?: string;
-  craftMode?: MaterializationCraftMode;
 }
 
 export interface MaterializedProfile extends MaterializedImpactState {
@@ -64,10 +60,6 @@ export async function materializeProfile(
   handle: string,
   options: MaterializeProfileOptions = {},
 ): Promise<MaterializedProfile | null> {
-  const craftLoader = options.craftMode === "recompute"
-    ? dbRecomputeCraft
-    : getCachedCraftScore;
-
   const stats = await getStats(handle, options.token);
 
   if (!stats) {
@@ -75,7 +67,7 @@ export async function materializeProfile(
   }
 
   const [craftSettled, snapshotSettled] = await Promise.allSettled([
-    craftLoader(handle),
+    getCachedCraftScore(handle),
     getCachedLatestSnapshot(handle),
   ]);
 

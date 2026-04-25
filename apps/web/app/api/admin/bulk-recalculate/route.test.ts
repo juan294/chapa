@@ -124,7 +124,6 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockDbGetUsers).toHaveBeenCalled();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       token: "ghp-server-token",
-      craftMode: "cached",
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",

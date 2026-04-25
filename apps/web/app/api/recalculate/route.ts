@@ -13,12 +13,8 @@ import {
 /**
  * POST /api/recalculate — Force-recalculate impact score.
  *
- * Fetches stats (cached or fresh), recomputes craft score from stored
- * raw insights data (applying the current formula), computes fresh
- * impact, replaces today's snapshot, and returns the new score.
- *
- * Craft recomputation ensures formula changes are retroactively applied
- * without requiring the user to re-upload their insights report.
+ * Fetches stats (cached or fresh), reads the stored craft score, computes
+ * fresh impact, replaces today's snapshot, and returns the new score.
  *
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
  * Rate limited: 20 requests/handle/hour.
@@ -42,7 +38,6 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const materialized = await materializeOrchestratedProfile(handle, {
     token: auth.token,
-    craftMode: "recompute",
   });
 
   if (!materialized) {

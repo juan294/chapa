@@ -9,7 +9,6 @@ import {
 
 const mockGetStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
-const mockDbRecomputeCraft = vi.fn();
 const mockGetCachedLatestSnapshot = vi.fn();
 
 vi.mock("@/lib/github/client", () => ({
@@ -18,10 +17,6 @@ vi.mock("@/lib/github/client", () => ({
 
 vi.mock("@/lib/cache/craft-cache", () => ({
   getCachedCraftScore: (...args: unknown[]) => mockGetCachedCraftScore(...args),
-}));
-
-vi.mock("@/lib/db/tool-insights", () => ({
-  dbRecomputeCraft: (...args: unknown[]) => mockDbRecomputeCraft(...args),
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -171,7 +166,7 @@ describe("materializeProfile", () => {
     expect(result).toBeNull();
   });
 
-  it("uses cached craft by default", async () => {
+  it("always reads craft from the cache (no live recomputation on read paths)", async () => {
     const stats = makeFullStats({ handle: "testuser" });
     const craftResult = makeCraftResult();
     const latestSnapshot = makeSnapshot({
@@ -181,7 +176,6 @@ describe("materializeProfile", () => {
 
     mockGetStats.mockResolvedValue(stats);
     mockGetCachedCraftScore.mockResolvedValue(craftResult);
-    mockDbRecomputeCraft.mockResolvedValue(null);
     mockGetCachedLatestSnapshot.mockResolvedValue(latestSnapshot);
 
     const result = await materializeProfile("testuser", {
@@ -191,27 +185,9 @@ describe("materializeProfile", () => {
 
     expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token");
     expect(mockGetCachedCraftScore).toHaveBeenCalledWith("testuser");
-    expect(mockDbRecomputeCraft).not.toHaveBeenCalled();
     expect(result?.craftResult).toEqual(craftResult);
-  });
-
-  it("uses recomputed craft when requested", async () => {
-    const stats = makeFullStats({ handle: "testuser" });
-    const craftResult = makeCraftResult({ craftScore: 80 });
-
-    mockGetStats.mockResolvedValue(stats);
-    mockGetCachedCraftScore.mockResolvedValue(null);
-    mockDbRecomputeCraft.mockResolvedValue(craftResult);
-    mockGetCachedLatestSnapshot.mockResolvedValue(null);
-
-    const result = await materializeProfile("testuser", {
-      craftMode: "recompute",
-      policy: "explicit-recalculate",
-    });
-
-    expect(mockDbRecomputeCraft).toHaveBeenCalledWith("testuser");
-    expect(mockGetCachedCraftScore).not.toHaveBeenCalled();
-    expect(result?.rawImpact.dimensions.craft).toBe(80);
+    // Regression: stored craft must not be mutated by a refresh/read.
+    // (No dbRecomputeCraft path exists anymore.)
   });
 
   it("tolerates craft and snapshot loader failures for public consumers", async () => {

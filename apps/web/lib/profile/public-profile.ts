@@ -23,7 +23,6 @@ export async function materializePublicProfile(
   return materializeProfile(handle, {
     token: options.token,
     today: options.today,
-    craftMode: "cached",
     policy: "public-display",
   });
 }

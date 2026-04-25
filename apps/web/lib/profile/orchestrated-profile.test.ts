@@ -58,13 +58,11 @@ describe("materializeOrchestratedProfile", () => {
 
     const result = await materializeOrchestratedProfile("testuser", {
       token: "oauth-token",
-      craftMode: "recompute",
       today: "2026-04-17",
     });
 
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      craftMode: "recompute",
       today: "2026-04-17",
       policy: "public-display",
     });

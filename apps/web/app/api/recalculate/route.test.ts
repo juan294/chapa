@@ -121,14 +121,13 @@ describe("POST /api/recalculate", () => {
     expect(resp.status).toBe(429);
   });
 
-  it("materializes with recomputed craft, persists a replace snapshot, and returns raw plus display scores", async () => {
+  it("materializes the public profile, persists a replace snapshot, and returns raw plus display scores", async () => {
     const resp = await POST(makeRequest());
     const body = await resp.json();
 
     expect(resp.status).toBe(200);
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "cli-token",
-      craftMode: "recompute",
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "testuser",
@@ -158,7 +157,7 @@ describe("POST /api/recalculate", () => {
     expect(persistOrder!).toBeLessThan(invalidateOrder!);
   });
 
-  it("updates craft cache when a recomputed craft score exists", async () => {
+  it("updates craft cache when materialized profile carries craft data", async () => {
     await POST(makeRequest());
     await new Promise((resolve) => setTimeout(resolve, 0));
 

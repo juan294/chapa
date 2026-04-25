@@ -68,7 +68,6 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const materialized = await materializeOrchestratedProfile(handle, {
       token,
-      craftMode: "recompute",
     });
     if (!materialized) {
       void captureServerError({

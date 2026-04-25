@@ -125,7 +125,6 @@ export async function POST(request: NextRequest) {
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
             token: githubToken,
-            craftMode: "cached",
           });
 
           if (!materialized) {

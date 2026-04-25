@@ -164,7 +164,7 @@ describe("POST /api/refresh", () => {
     expect(res.status).toBe(429);
   });
 
-  it("materializes with recomputed craft, persists a replace snapshot, and returns display impact", async () => {
+  it("materializes the public profile, persists a replace snapshot, and returns display impact", async () => {
     const res = await POST(makeRequest("testuser"));
     const body = await res.json();
 
@@ -172,7 +172,6 @@ describe("POST /api/refresh", () => {
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
-      craftMode: "recompute",
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "testuser",
@@ -198,7 +197,7 @@ describe("POST /api/refresh", () => {
     expect(persistOrder!).toBeLessThan(invalidateOrder!);
   });
 
-  it("updates craft cache when recompute returns craft data", async () => {
+  it("updates craft cache when materialized profile carries craft data", async () => {
     await POST(makeRequest("testuser"));
 
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -209,7 +208,7 @@ describe("POST /api/refresh", () => {
     );
   });
 
-  it("does not update craft cache when recompute returns no craft data", async () => {
+  it("does not update craft cache when no craft data is loaded", async () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue({
       ...FAKE_MATERIALIZED,
       craftResult: null,

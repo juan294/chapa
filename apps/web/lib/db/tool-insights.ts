@@ -1,6 +1,5 @@
 import { getSupabase } from "./supabase";
 import { parseRow } from "./parse-row";
-import { computeCraftScore } from "@/lib/insights/scoring";
 import type { CraftResult, CraftTier, InsightsUpload, InsightsTool } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
@@ -143,50 +142,3 @@ export async function dbGetToolInsights(
   }
 }
 
-/**
- * Recompute a user's Craft score from their stored raw insights data.
- *
- * Reads the raw InsightsUpload from the DB, runs `computeCraftScore()`
- * with the current formula, and upserts the updated scores back. This
- * ensures formula changes (e.g. removing friction/error penalties) are
- * retroactively applied without requiring the user to re-upload. When
- * multiple tool rows exist, the latest uploaded report remains the
- * authoritative source.
- *
- * Returns the fresh CraftResult, or null if no raw data exists or DB is unavailable.
- */
-export async function dbRecomputeCraft(
-  handle: string,
-): Promise<CraftResult | null> {
-  const db = getSupabase();
-  if (!db) return null;
-
-  try {
-    const { data, error } = await db
-      .from("tool_insights")
-      .select("raw_data, uploaded_at")
-      .eq("handle", handle.toLowerCase())
-      .order("uploaded_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
-    }
-
-    const rawData = data?.raw_data as InsightsUpload | undefined;
-    const uploadedAt =
-      typeof data?.uploaded_at === "string" ? data.uploaded_at : null;
-    if (!rawData || !uploadedAt) return null;
-
-    // Recompute with current formula
-    const scores = computeCraftScore(rawData);
-
-    // Upsert updated scores back to DB
-    return dbUpsertToolInsights(handle, rawData, scores, uploadedAt);
-  } catch (error) {
-    console.error("[db] dbRecomputeCraft failed:", (error as Error).message);
-    return null;
-  }
-}

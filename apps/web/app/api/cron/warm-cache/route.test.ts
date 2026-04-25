@@ -182,7 +182,6 @@ describe("GET /api/cron/warm-cache", () => {
     expect(body.handles).toBeUndefined();
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledWith("alice", {
       token: "ghp-server-token",
-      craftMode: "cached",
     });
     expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledWith(
       "alice",

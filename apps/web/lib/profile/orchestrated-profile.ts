@@ -5,7 +5,6 @@ import {
 } from "@/lib/db/snapshots";
 import {
   materializeProfile,
-  type MaterializationCraftMode,
   type MaterializedProfile,
 } from "./materialize-profile";
 
@@ -16,13 +15,11 @@ export async function materializeOrchestratedProfile(
   options: {
     token?: string;
     today?: string;
-    craftMode: MaterializationCraftMode;
-  },
+  } = {},
 ): Promise<MaterializedProfile | null> {
   return materializeProfile(handle, {
     token: options.token,
     today: options.today,
-    craftMode: options.craftMode,
     policy: "public-display",
   });
 }
