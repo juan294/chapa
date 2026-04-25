@@ -91,7 +91,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
     <main id="main-content" className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-md">
         {/* Terminal header */}
-        <div className="mb-8 animate-fade-in-up">
+        <div className="mb-8 animate-fade-in-up motion-reduce:animate-none">
           <p className="font-heading text-xs tracking-widest uppercase text-text-secondary">
             <span className="text-terminal-dim">$</span>{" "}
             chapa generate
@@ -143,7 +143,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                   </svg>
                 )}
                 {step.status === "active" && (
-                  <span className="h-3 w-3 animate-pulse rounded-full bg-amber" />
+                  <span className="h-3 w-3 animate-pulse motion-reduce:animate-none rounded-full bg-amber" />
                 )}
                 {step.status === "error" && (
                   <svg
@@ -185,7 +185,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
         {/* Error message */}
         {error && (
-          <div role="alert" className="mt-6 animate-terminal-fade-in rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
+          <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
             <p className="font-heading text-sm text-terminal-red">{error}</p>
             <a
               href={`/generating/${encodeURIComponent(handle)}`}
@@ -198,7 +198,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
         {/* Redirect notice */}
         {done && (
-          <p className="mt-6 animate-terminal-fade-in font-heading text-xs text-text-secondary">
+          <p className="mt-6 animate-terminal-fade-in motion-reduce:animate-none font-heading text-xs text-text-secondary">
             {SPANISH_PUBLIC_COPY.generation.redirect}
           </p>
         )}

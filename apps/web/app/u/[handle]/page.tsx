@@ -95,8 +95,15 @@ export async function SharePageContent({ handle }: { handle: string }) {
     ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
     : Promise.resolve(undefined);
 
-  // Render badge SVG inline during SSR to eliminate second round-trip
-  const avatarDataUri = await avatarPromise;
+  // Render badge SVG inline during SSR. Cap avatar wait at 500ms so a slow
+  // external image server can't block TTFB — badge renders with placeholder on miss.
+  const AVATAR_DEADLINE_MS = 500;
+  const avatarDataUri = await Promise.race([
+    avatarPromise,
+    new Promise<undefined>((resolve) =>
+      setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
+    ),
+  ]);
   const verification = materialized
     ? getPublicProfileVerification(materialized)
     : null;
