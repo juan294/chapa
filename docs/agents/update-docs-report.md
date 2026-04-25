@@ -1,68 +1,41 @@
 # Documentation Update Report
-
-> Generated on 2026-04-04 | Branch: `develop` | Changes since v2.6.0
+> Generated on 2026-04-25 | Branch: `develop` | Changes since v2.7.2 (118 commits)
 
 ## Summary
-- 12 documents updated
-- 5 diagrams refreshed (v4→v6 in ASCII pipeline diagrams)
-- 3 version references corrected (TS badge, test count, StatsData field count)
-- 1 inline doc block updated (MetricsSnapshot JSDoc)
-- 1 new user-facing section added (Craft dimension on /about/scoring)
+- 5 documents updated
+- 1 diagram node label corrected
+- 0 version references updated (already current)
+- 0 inline doc blocks updated (none targeted)
 - 0 items flagged [NEEDS REVIEW]
 
 ## Changes by File
 
-### docs/impact-v6.md
-- Effectiveness signals: removed "inverse friction, error recovery" → now "achievement rate (55%), satisfaction rate (45%) — friction/errors excluded"
-- Consistency table: "Inverse burst" → "Week coverage"
-- Pipeline diagram: 6x `computeImpactV4`/`ImpactV4Result`/`impact/v4.ts` → v6
-
-### docs/svg-design.md
-- Heatmap palette: corrected 5 opacity values to match `theme.ts` (0.06→0.12, 0.20→0.30, etc.)
-- Type reference: `ImpactV4Result` → `ImpactV6Result`
-
-### packages/shared/src/types.ts
-- MetricsSnapshot JSDoc: "Redis sorted sets" → "Supabase `metrics_snapshots` table"
+### CHANGELOG.md
+Added two missing version entries that were never written after releases shipped:
+- `[2.7.2] - 2026-04-10` — craft recompute on `/api/refresh` + correct craft passthrough to impact
+- `[2.7.1] - 2026-04-07` — craft recompute from stored raw data on `/api/recalculate`
+- Added compare links `[2.7.2]` and `[2.7.1]` at bottom of file
 
 ### CLAUDE.md
-- StatsData field count: 29 → 30 (added `primaryReviewsSubmittedCount`)
+- Updated `/api/health` route description: added "GitHub API probe" to the parenthetical (was "Redis dbsize + Supabase query"; now "Redis dbsize + Supabase query + GitHub API probe")
 
-### docs/impact-v4.md
-- Deprecation notice: "still named computeImpactV4" → "renamed to computeImpactV6 in v6.ts"
+### docs/how-it-works.md — Security Model section
+Three targeted updates to reflect auth architecture changes shipped since v2.7.0:
+- **Token handling table**: GitHub OAuth token storage updated from "Encrypted in session cookie (AES-256-GCM)" to "Supabase `user_platforms` table (server-side only)"
+- **OAuth security bullets**: CSRF protection bullet updated to describe Redis-backed one-time-consumption state (with in-memory fallback); token storage bullet rewritten to clarify tokens live in Supabase, not cookies; cookie policy bullet updated to mention centralized `cookie-policy.ts` and localhost dev exception
+- **Privacy Guarantees #2**: Updated from "OAuth tokens are encrypted in session cookies with a 24-hour expiry" to reflect server-side database storage
 
-### README.md
-- TypeScript badge: 5.9 → 6.0
-- Test count: 382+ files / 6,650+ tests → 389+ files / 6,950+ tests
+### docs/accepted-risks.md
+- Added new entry: **Fire-and-forget side effects in badge route** — documents the intentional design of non-blocking side effects (snapshot, analytics, cache) after badge render, the `fireAndForget()` wrapper, silent failure behavior, and PostHog error capture as mitigation. Severity: Low. Accepted: 2026-04-10.
 
-### docs/demo.md
-- "Impact v4 measures four independent dimensions" → "Impact v6 measures up to five independent dimensions"
-
-### apps/web/app/about/scoring/page.tsx
-- Added new "Craft — AI tool mastery (optional)" section explaining:
-  - How to unlock Craft (run `/insights` in Claude Code, upload to Chapa)
-  - Two-week re-upload cadence (matches Claude Code's insights generation cycle)
-  - Three sub-dimensions table (Proficiency, Effectiveness, Sophistication)
-  - Explicit note that friction/errors are excluded from scoring
-
-### docs/plans/2026-04-03-metaphor-first-badge-vision.md
-- Architecture diagram: `computeImpactV4`/`ImpactV4Result` → v6
-
-### docs/research/multi-platform.md
-- All "Impact v4" naming → "Impact v6", function/type refs → v6
-
-### docs/research/2026-03-08-score-stasis-solution-space.md
-- Pipeline refs: `computeImpactV4()` → v6, `impact/v4.ts` → v6
-
-### docs/plans/2026-03-07-insights-integration.md
-- "Impact v4" → "Impact v6" (3 occurrences)
-
-## Verified Current (no changes needed)
-- `docs/design-system.md` — updated in v2.6.0 cycle
-- `docs/accepted-risks.md` — just updated with CRON_SECRET entry
-- `docs/chapa-architecture.drawio` — already says "v6 Scoring"
-- `CHANGELOG.md` — will be updated during `/release`
-- Historical specs (v3/v5) — archived, no update needed
-- 39 plan/research docs with v4 refs — historical point-in-time records
+### docs/chapa-architecture.drawio
+- Fixed stale label on "Public Endpoints" cell: `/api/badge` → `/u/:handle/badge.svg` (the badge has never been served from `/api/badge`; correct route is the page-level SVG endpoint)
 
 ## Flagged for Review
-None.
+None. All updates traced directly to code changes.
+
+## Not Updated (checked and current)
+- `README.md` — `/api/health` description already lists "Redis/Supabase/GitHub dependency probes"; no other stale content found
+- `docs/user-manual.md` — Documents Creator Studio terminal interface (English); Spanish localization affects public-flow pages only (landing, generating, error, verify) which the user manual does not cover
+- `docs/impact-v6.md`, `docs/svg-design.md` — No scoring or SVG rendering changes since v2.7.2
+- `docs/accepted-risks.md` (existing entries) — All existing risks current; only addition made

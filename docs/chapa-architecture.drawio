@@ -44,7 +44,7 @@
     <mxCell id="authep" value="Auth Endpoints&#10;/api/auth/*" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="api">
       <mxGeometry x="20" y="35" width="160" height="45" as="geometry"/>
     </mxCell>
-    <mxCell id="pubep" value="Public Endpoints&#10;/api/profile, /api/badge" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
+    <mxCell id="pubep" value="Public Endpoints&#10;/api/profile, /u/:handle/badge.svg" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
       <mxGeometry x="210" y="35" width="180" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="privep" value="Authenticated Endpoints&#10;/api/refresh, /api/generate" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="api">
