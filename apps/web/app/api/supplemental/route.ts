@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
 import type { SupplementalStats } from "@chapa/shared";
 
@@ -60,7 +61,9 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ error: "Token does not match targetHandle" }, { status: 403 });
     }
 
-    // 5. Store in Redis
+    // 5. Store in Redis (hot read path) AND Supabase (durable). Redis has a
+    // 24h TTL and is rebuilt from Supabase by warm-cache + by getStats() on
+    // a Redis miss, so a missed CLI upload day no longer drops EMU data.
     const supplemental: SupplementalStats = {
       targetHandle,
       sourceHandle,
@@ -68,7 +71,10 @@ export async function POST(request: Request): Promise<Response> {
       uploadedAt: new Date().toISOString(),
     };
 
-    await cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL);
+    await Promise.all([
+      cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL),
+      dbUpsertSupplemental(targetHandle, supplemental),
+    ]);
 
     // 6. Invalidate primary stats cache (forces re-merge on next badge request)
     // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>"

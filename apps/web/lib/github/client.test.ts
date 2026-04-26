@@ -10,6 +10,7 @@ const {
   mockCacheGet,
   mockCacheSet,
   mockDbUpsertUser,
+  mockDbGetSupplemental,
   mockIsBitbucketEnabled,
   mockIsCodebergEnabled,
   mockDbGetLinkedPlatform,
@@ -20,6 +21,9 @@ const {
   mockCacheGet: vi.fn(),
   mockCacheSet: vi.fn(),
   mockDbUpsertUser: vi.fn(() => Promise.resolve()),
+  // Untyped here because vi.hoisted runs before imports — SupplementalStats type
+  // isn't available yet. The mock is given a typed implementation per-test.
+  mockDbGetSupplemental: vi.fn(),
   mockIsBitbucketEnabled: vi.fn(),
   mockIsCodebergEnabled: vi.fn(),
   mockDbGetLinkedPlatform: vi.fn(),
@@ -38,6 +42,10 @@ vi.mock("../cache/redis", () => ({
 
 vi.mock("@/lib/db/users", () => ({
   dbUpsertUser: mockDbUpsertUser,
+}));
+
+vi.mock("@/lib/db/supplemental", () => ({
+  dbGetSupplemental: mockDbGetSupplemental,
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -100,6 +108,7 @@ describe("getStats", () => {
     mockIsBitbucketEnabled.mockResolvedValue(false);
     mockIsCodebergEnabled.mockResolvedValue(false);
     mockDbGetLinkedPlatform.mockResolvedValue(null);
+    mockDbGetSupplemental.mockResolvedValue(null);
     _resetInflight();
   });
 
@@ -227,6 +236,88 @@ describe("getStats", () => {
     expect(result).not.toBeNull();
     expect(result!.commitsTotal).toBe(50);
     expect(result!.hasSupplementalData).toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // #825 — Supplemental data persistence: when the Redis key has expired but
+  // Supabase still has the row, getStats must fall back to the DB and merge
+  // the EMU stats. Otherwise a missed CLI upload day silently drops them.
+  // -------------------------------------------------------------------------
+
+  it("falls back to Supabase when Redis supplemental key is missing (#825)", async () => {
+    const primary = makeStats({ commitsTotal: 50, prsMergedCount: 5 });
+    const supplementalStats = makeStats({
+      handle: "corp-user",
+      commitsTotal: 30,
+      prsMergedCount: 3,
+    });
+    const persisted: SupplementalStats = {
+      targetHandle: "test-user",
+      sourceHandle: "corp-user",
+      stats: supplementalStats,
+      uploadedAt: "2026-04-26T08:08:14.276Z",
+    };
+
+    mockCacheGet
+      .mockResolvedValueOnce(null) // stats:v2:merged:test-user
+      .mockResolvedValueOnce(null) // stats:stale:test-user
+      .mockResolvedValueOnce(null); // supplemental:test-user — Redis miss
+    mockFetchStatsData.mockResolvedValue(primary);
+    mockDbGetSupplemental.mockResolvedValue(persisted);
+
+    const result = await getStats("test-user");
+
+    expect(mockDbGetSupplemental).toHaveBeenCalledWith("test-user");
+    expect(result).not.toBeNull();
+    expect(result!.commitsTotal).toBe(80); // 50 + 30 — supplemental was merged
+    expect(result!.hasSupplementalData).toBe(true);
+  });
+
+  it("rehydrates Redis supplemental key on Supabase fallback hit (#825)", async () => {
+    const primary = makeStats({ commitsTotal: 50 });
+    const persisted: SupplementalStats = {
+      targetHandle: "test-user",
+      sourceHandle: "corp-user",
+      stats: makeStats({ commitsTotal: 30 }),
+      uploadedAt: "2026-04-26T08:08:14.276Z",
+    };
+
+    mockCacheGet
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null); // Redis supplemental miss
+    mockFetchStatsData.mockResolvedValue(primary);
+    mockDbGetSupplemental.mockResolvedValue(persisted);
+
+    await getStats("test-user");
+    // Allow fire-and-forget rehydration to flush
+    await new Promise((r) => setImmediate(r));
+
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "supplemental:test-user",
+      persisted,
+      86400, // 24h — must match POST /api/supplemental TTL
+    );
+  });
+
+  it("does not call Supabase when Redis supplemental hit (hot path)", async () => {
+    const primary = makeStats({ commitsTotal: 50 });
+    const supplemental: SupplementalStats = {
+      targetHandle: "test-user",
+      sourceHandle: "corp-user",
+      stats: makeStats({ commitsTotal: 30 }),
+      uploadedAt: new Date().toISOString(),
+    };
+
+    mockCacheGet
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(supplemental); // Redis hit
+    mockFetchStatsData.mockResolvedValue(primary);
+
+    await getStats("test-user");
+
+    expect(mockDbGetSupplemental).not.toHaveBeenCalled();
   });
 
   it("caches the merged result (not just primary)", async () => {

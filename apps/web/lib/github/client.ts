@@ -2,6 +2,7 @@ import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
+import { dbGetSupplemental } from "@/lib/db/supplemental";
 import { isBitbucketEnabled, isCodebergEnabled } from "@/lib/feature-flags";
 import { dbGetLinkedPlatform } from "@/lib/db/user-platforms";
 import { fetchBitbucketIfLinked } from "@/lib/bitbucket/client";
@@ -12,6 +13,7 @@ import type { StatsData, SupplementalStats, Platform } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
 const STALE_TTL = 604800; // 7 days
+const SUPPLEMENTAL_TTL = 86400; // 24h — must match POST /api/supplemental
 // Maximum time an in-flight fetch is allowed to hang before it is abandoned.
 // Without this limit, a fetch that hangs (e.g. GitHub API never responds) would
 // occupy the _inflight slot forever, blocking all subsequent requests for that
@@ -152,8 +154,23 @@ async function _fetchAndCache(
     stats = mergeStats(stats, cbStats, { markAsSupplemental: false });
   }
 
-  // Check for supplemental data (e.g. EMU account)
-  const supplemental = await cacheGet<SupplementalStats>(`supplemental:${lowerHandle}`);
+  // Check for supplemental data (e.g. EMU account). Redis is the hot path
+  // with a 24h TTL; Supabase (#825) is the durable fallback so a missed CLI
+  // upload day no longer silently drops EMU stats from scores. On a Redis
+  // miss + DB hit, we rehydrate Redis so subsequent reads stay fast.
+  const supplementalKey = `supplemental:${lowerHandle}`;
+  const cachedSupplemental = await cacheGet<SupplementalStats>(supplementalKey);
+  let supplemental: SupplementalStats | null = cachedSupplemental;
+  if (!supplemental) {
+    const persisted = await dbGetSupplemental(lowerHandle);
+    if (persisted) {
+      supplemental = persisted;
+      fireAndForget(
+        () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
+        () => undefined,
+      );
+    }
+  }
   if (supplemental) {
     stats = mergeStats(stats, supplemental.stats);
   }
