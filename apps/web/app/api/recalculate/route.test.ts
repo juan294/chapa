@@ -167,6 +167,20 @@ describe("POST /api/recalculate", () => {
     );
   });
 
+  it("swallows errors from updateCraftCache via fire-and-forget without affecting the response", async () => {
+    mockUpdateCraftCache.mockRejectedValue(new Error("redis unavailable"));
+
+    const resp = await POST(makeRequest());
+    expect(resp.status).toBe(200);
+
+    await vi.waitFor(() => {
+      expect(mockUpdateCraftCache).toHaveBeenCalledWith(
+        "testuser",
+        FAKE_MATERIALIZED.craftResult,
+      );
+    });
+  });
+
   it("does not update craft cache when no craft score exists", async () => {
     mockMaterializeOrchestratedProfile.mockResolvedValue({
       ...FAKE_MATERIALIZED,

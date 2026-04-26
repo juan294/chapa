@@ -569,7 +569,6 @@ describe("BadgeToolbar render", () => {
         return el as HTMLElement;
       });
 
-      const origImage = globalThis.Image;
       const mockImage: Partial<HTMLImageElement> = { width: 0, height: 0 };
       vi.stubGlobal("Image", vi.fn(() => {
         setTimeout(() => {
@@ -601,7 +600,6 @@ describe("BadgeToolbar render", () => {
         });
       } finally {
         appendChildSpy.mockRestore();
-        vi.stubGlobal("Image", origImage);
         vi.unstubAllGlobals();
       }
     });
@@ -629,7 +627,6 @@ describe("BadgeToolbar render", () => {
         return el as HTMLElement;
       });
 
-      const origImage = globalThis.Image;
       const mockImage: Partial<HTMLImageElement> = { width: 0, height: 0 };
       vi.stubGlobal("Image", vi.fn(() => {
         setTimeout(() => {
@@ -660,7 +657,6 @@ describe("BadgeToolbar render", () => {
         });
       } finally {
         appendChildSpy.mockRestore();
-        vi.stubGlobal("Image", origImage);
         vi.unstubAllGlobals();
       }
     });
@@ -673,7 +669,6 @@ describe("BadgeToolbar render", () => {
       });
       vi.stubGlobal("fetch", mockFetch);
 
-      const origImage = globalThis.Image;
       const mockImage: Partial<HTMLImageElement> = { width: 0, height: 0 };
       vi.stubGlobal("Image", vi.fn(() => {
         setTimeout(() => {
@@ -704,7 +699,6 @@ describe("BadgeToolbar render", () => {
         });
       } finally {
         appendChildSpy.mockRestore();
-        vi.stubGlobal("Image", origImage);
         vi.unstubAllGlobals();
       }
     });
@@ -987,7 +981,6 @@ describe("BadgeToolbar render", () => {
           });
         }
       }
-      const origImage = globalThis.Image;
       vi.stubGlobal("Image", MockImage);
 
       try {
@@ -1010,7 +1003,6 @@ describe("BadgeToolbar render", () => {
         expect(decodedSvg).not.toContain("<animate ");
         expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
       } finally {
-        vi.stubGlobal("Image", origImage);
         vi.unstubAllGlobals();
       }
     });
@@ -1063,7 +1055,6 @@ describe("BadgeToolbar render", () => {
           });
         }
       }
-      const origImage = globalThis.Image;
       vi.stubGlobal("Image", MockImage);
 
       const appendChildSpy = vi.spyOn(document.body, "appendChild");
@@ -1099,7 +1090,6 @@ describe("BadgeToolbar render", () => {
       } finally {
         appendChildSpy.mockRestore();
         removeChildSpy.mockRestore();
-        vi.stubGlobal("Image", origImage);
       }
     });
   });

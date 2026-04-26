@@ -63,6 +63,44 @@ describe("invalidateProfileReadModels", () => {
     ]);
   });
 
+  it("is a no-op when no read models are enabled", async () => {
+    await invalidateProfileReadModels("anyone", {});
+
+    expect(mockCacheDel).not.toHaveBeenCalled();
+    expect(mockBuildCraftKey).not.toHaveBeenCalled();
+    expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
+    expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
+  });
+
+  it("only invalidates the stats read model when stats=true", async () => {
+    await invalidateProfileReadModels("Solo", { stats: true });
+
+    expect(mockCacheDel).toHaveBeenCalledTimes(1);
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:solo");
+    expect(mockBuildCraftKey).not.toHaveBeenCalled();
+    expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
+    expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
+  });
+
+  it("only invalidates the snapshot read model when snapshot=true", async () => {
+    await invalidateProfileReadModels("Solo", { snapshot: true });
+
+    expect(mockBuildSnapshotKey).toHaveBeenCalledWith("solo");
+    expect(mockCacheDel).toHaveBeenCalledTimes(1);
+    expect(mockCacheDel).toHaveBeenCalledWith("snapshot:solo");
+    expect(mockBuildCraftKey).not.toHaveBeenCalled();
+    expect(mockInvalidateHistoryCache).not.toHaveBeenCalled();
+  });
+
+  it("only invalidates the history read model when history=true", async () => {
+    await invalidateProfileReadModels("Solo", { history: true });
+
+    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("solo");
+    expect(mockCacheDel).not.toHaveBeenCalled();
+    expect(mockBuildCraftKey).not.toHaveBeenCalled();
+    expect(mockBuildSnapshotKey).not.toHaveBeenCalled();
+  });
+
   it("continues invalidating later read models when one step throws", async () => {
     mockCacheDel
       .mockRejectedValueOnce(new Error("stats down"))

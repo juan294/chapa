@@ -20,4 +20,8 @@ describe("buildAuthCookieFlags", () => {
       "Secure",
     );
   });
+
+  it("falls back to Secure when the origin cannot be parsed as a URL", () => {
+    expect(buildAuthCookieFlags("not-a-url")).toContain("Secure");
+  });
 });

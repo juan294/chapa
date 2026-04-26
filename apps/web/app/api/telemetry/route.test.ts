@@ -123,6 +123,24 @@ describe("POST /api/telemetry", () => {
     );
   });
 
+  it("logs via the fire-and-forget onError handler when dbInsertTelemetry rejects", async () => {
+    const dbError = new Error("supabase connection refused");
+    mockDbInsertTelemetry.mockRejectedValue(dbError);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(makeRequest(validPayload));
+    expect(res.status).toBe(200);
+
+    await vi.waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "[telemetry] insert failed",
+        { handle: validPayload.targetHandle, err: dbError },
+      );
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("does not await DB insert — response resolves before insert completes (fire-and-forget)", async () => {
     // The insert should NOT be awaited — response must return even if insert hangs
     let insertResolve!: () => void;
