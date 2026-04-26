@@ -70,7 +70,7 @@ The badge radar chart renders as a 5-point pentagon when craft data exists, or f
 |--------|--------|-----|---------------|
 | Reviews submitted | 60% | 80 | Log |
 | Review-to-PR ratio | 25% | 5:1 | Linear |
-| Inverse micro-commit | 15% | — | Linear |
+| Batch size score | 15% | — | Linear |
 
 **Solo path** (reviewsSubmittedCount = 0):
 | Signal | Weight |
@@ -78,7 +78,14 @@ The badge radar chart renders as a 5-point pentagon when craft data exists, or f
 | PR description rate | 40% |
 | Feature branch rate | 25% |
 | Issue linkage rate | 20% |
-| Inverse micro-commit | 15% |
+| Batch size score | 15% |
+
+**Cliff guard (v6.2, #827):** for collaborative profiles, Quality returns
+`max(collaborativeFormula, soloFormula)`. This prevents a sharp drop when a
+user with strong solo signals (descriptions, feature branches, issue linkage)
+crosses the 0.15 review-to-PR threshold and switches scoring formulas. Without
+the guard, picking up a few reviews could lower Quality by 30–40 points;
+participation in code review must never be punished.
 
 ### Consistency (0–100) — Sustained contributions
 | Signal | Weight | Normalization |

@@ -94,6 +94,13 @@ export function computeDelivery(stats: StatsData): number {
  * inverse microCommitRatio (15%). Delegates to {@link computeSoloQuality} when
  * the profile type is "solo".
  *
+ * Cliff guard (#827): for collaborative profiles we also evaluate the solo
+ * formula and return the higher of the two. Without this, a user with strong
+ * solo signals (descriptions, feature branches, issue linkage) who picks up
+ * a few reviews would see Quality collapse the moment their review-to-PR
+ * ratio crosses the solo threshold. Taking the max preserves monotonicity in
+ * reviews and prevents participation in code review from being penalized.
+ *
  * @param stats - Aggregated GitHub stats for the scoring window
  * @param profileType - Override profile type; auto-detects when omitted
  * @returns Clamped score between 0 and 100
@@ -122,7 +129,9 @@ export function computeQuality(stats: StatsData, profileType?: ProfileType): num
   const batchSize = stats.batchSizeScore ?? BATCH_SIZE_DEFAULT;
 
   const raw = 100 * (0.6 * reviews + 0.25 * reviewRatio + 0.15 * batchSize);
-  return clampScore(raw);
+  const collaborative = clampScore(raw);
+  const solo = computeSoloQuality(stats);
+  return Math.max(collaborative, solo);
 }
 
 // ---------------------------------------------------------------------------
