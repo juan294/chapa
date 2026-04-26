@@ -47,29 +47,40 @@ export function applyEMA(
  * instead of re-smoothing (which would cause the score to spiral toward raw
  * on every page refresh).
  *
+ * Bypass (#826): when the inputs themselves have legitimately changed mid-day
+ * (e.g. a supplemental EMU upload added new PR/review data), pass
+ * `bypassSameDayLock: true` to apply EMA against today's snapshot anyway. The
+ * result is anchored to today's already-smoothed value but absorbs partial
+ * credit for the new score, preventing the user from being stuck on a stale
+ * snapshot until tomorrow's cron run.
+ *
  * @param currentAdjusted - Today's raw adjusted composite (pre-EMA)
  * @param latestSnapshot - Most recent snapshot (may be from today or earlier)
  * @param today - Override for current date (YYYY-MM-DD), for testing
+ * @param options - Bypass flag for legitimate same-day input changes
  * @returns Smoothed score as integer 0-100
  */
 export function smoothScore(
   currentAdjusted: number,
   latestSnapshot: SnapshotScoreInput | null | undefined,
   today?: string,
+  options?: { bypassSameDayLock?: boolean },
 ): number {
   if (!latestSnapshot) {
     return Math.round(currentAdjusted);
   }
 
   const todayStr = today ?? toDateString(new Date());
+  const sameDay = latestSnapshot.date === todayStr;
+  const bypass = options?.bypassSameDayLock === true;
 
-  if (latestSnapshot.date === todayStr) {
+  if (sameDay && !bypass) {
     // Snapshot is from today — EMA was already applied on the first request.
     // Return the already-smoothed value to prevent feedback loop.
     return latestSnapshot.adjustedComposite;
   }
 
-  // Snapshot is from a previous day — apply EMA normally.
+  // Same-day with bypass, or different day: apply EMA normally.
   return applyEMA(currentAdjusted, latestSnapshot.adjustedComposite);
 }
 
@@ -84,7 +95,17 @@ export function smoothScore(
 export function applyImpactScorePolicy(
   rawImpact: ImpactV6Result,
   latestSnapshot: SnapshotScoreInput | null | undefined,
-  options: { policy?: ScorePolicy; today?: string } = {},
+  options: {
+    policy?: ScorePolicy;
+    today?: string;
+    /**
+     * #826 — Set when the inputs to scoring have legitimately changed mid-day
+     * (e.g. a supplemental EMU upload added PR/review data). Bypasses the
+     * same-day lock in {@link smoothScore} so the user sees a fresh score
+     * instead of the snapshot taken before the upload.
+     */
+    inputsChanged?: boolean;
+  } = {},
 ): ImpactV6Result {
   switch (options.policy ?? "public-display") {
     case "public-display":
@@ -93,6 +114,7 @@ export function applyImpactScorePolicy(
         rawImpact.adjustedComposite,
         latestSnapshot,
         options.today,
+        { bypassSameDayLock: options.inputsChanged ?? false },
       );
 
       if (adjustedComposite === rawImpact.adjustedComposite) {

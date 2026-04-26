@@ -13,9 +13,11 @@ const mockStoreVerificationRecord = vi.fn();
 const mockTrackBadgeGenerated = vi.fn();
 const mockNotifyFirstBadge = vi.fn();
 const mockDbInsertSnapshot = vi.fn();
+const mockDbReplaceSnapshot = vi.fn();
 const mockUpdateSnapshotCache = vi.fn();
 const mockDbUpsertUser = vi.fn();
 const mockCacheSetNxStatus = vi.fn();
+const mockClearStatsDirty = vi.fn();
 
 vi.mock("./materialize-profile", () => ({
   materializeProfile: (...args: unknown[]) => mockMaterializeProfile(...args),
@@ -40,6 +42,11 @@ vi.mock("@/lib/email/notifications", () => ({
 
 vi.mock("@/lib/db/snapshots", () => ({
   dbInsertSnapshot: (...args: unknown[]) => mockDbInsertSnapshot(...args),
+  dbReplaceSnapshot: (...args: unknown[]) => mockDbReplaceSnapshot(...args),
+}));
+
+vi.mock("@/lib/cache/dirty-stats", () => ({
+  clearStatsDirty: (...args: unknown[]) => mockClearStatsDirty(...args),
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
@@ -91,6 +98,7 @@ function makeMaterializedProfile(): MaterializedProfile {
       tier: "Solid",
       craft: undefined,
     }),
+    inputsChanged: false,
   };
 }
 
@@ -272,6 +280,65 @@ describe("runPublicProfileSideEffects", () => {
 
       expect(mockTrackBadgeGenerated).toHaveBeenCalled();
       expect(mockDbInsertSnapshot).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #826 — Same-day refresh after a supplemental upload
+  // -------------------------------------------------------------------------
+
+  describe("#826 inputsChanged path", () => {
+    beforeEach(() => {
+      mockDbReplaceSnapshot.mockResolvedValue(true);
+      mockClearStatsDirty.mockResolvedValue(undefined);
+    });
+
+    it("uses dbReplaceSnapshot (not dbInsertSnapshot) when inputsChanged=true", async () => {
+      const materialized = { ...makeMaterializedProfile(), inputsChanged: true };
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockDbReplaceSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
+      expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("clears the stats:dirty marker after a successful replacement", async () => {
+      const materialized = { ...makeMaterializedProfile(), inputsChanged: true };
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockClearStatsDirty).toHaveBeenCalledWith("testuser");
+    });
+
+    it("bypasses the SETNX dedup guard so today's pre-upload guard does not block the refresh", async () => {
+      // The SETNX guard normally prevents a second pass on the same day. After
+      // a supplemental upload, that's exactly the path we want to run.
+      mockCacheSetNxStatus.mockResolvedValue("exists");
+      const materialized = { ...makeMaterializedProfile(), inputsChanged: true };
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockDbReplaceSnapshot).toHaveBeenCalled();
+      expect(mockUpdateSnapshotCache).toHaveBeenCalled();
+    });
+
+    it("does not touch the dirty marker when inputsChanged=false (existing behavior preserved)", async () => {
+      const materialized = makeMaterializedProfile();
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockClearStatsDirty).not.toHaveBeenCalled();
+      expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
+      expect(mockDbInsertSnapshot).toHaveBeenCalled();
+    });
+
+    it("skips clearStatsDirty when the snapshot replacement fails", async () => {
+      mockDbReplaceSnapshot.mockResolvedValue(false);
+      const materialized = { ...makeMaterializedProfile(), inputsChanged: true };
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockClearStatsDirty).not.toHaveBeenCalled();
     });
   });
 });

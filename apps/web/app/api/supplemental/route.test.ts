@@ -190,7 +190,9 @@ describe("POST /api/supplemental", () => {
 
     // Both stores must be written: Redis (hot path, 24h) and Supabase (durable).
     // Without DB persistence, a missed CLI upload day silently drops EMU data.
-    expect(mockCacheSet).toHaveBeenCalledTimes(1);
+    // Match by key — the route also writes the #826 stats:dirty marker.
+    const cacheSetKeys = mockCacheSet.mock.calls.map((c) => c[0]);
+    expect(cacheSetKeys).toContain("supplemental:juan294");
     expect(mockDbUpsertSupplemental).toHaveBeenCalledTimes(1);
     expect(mockDbUpsertSupplemental).toHaveBeenCalledWith(
       "juan294",
@@ -199,6 +201,23 @@ describe("POST /api/supplemental", () => {
         sourceHandle: "juan_corp",
         stats: validStats,
       }),
+    );
+  });
+
+  it("marks stats dirty so today's snapshot lock yields to the new inputs (#826)", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    await POST(req);
+
+    // The dirty marker must be written so materializeProfile picks it up on
+    // the next page render and replaces today's locked snapshot value.
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "stats:dirty:juan294",
+      1,
+      3600, // DIRTY_STATS_TTL — 1h
     );
   });
 

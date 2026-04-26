@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyEMA, smoothScore } from "./smoothing";
+import { applyEMA, smoothScore, applyImpactScorePolicy } from "./smoothing";
 
 // ---------------------------------------------------------------------------
 // applyEMA(currentScore, previousSmoothedScore?)
@@ -124,5 +124,75 @@ describe("smoothScore(currentAdjusted, latestSnapshot, today?)", () => {
     const result = smoothScore(60, snapshot);
     // Should apply EMA: 0.15 * 60 + 0.85 * 70 = 68.5 → 69
     expect(result).toBe(69);
+  });
+
+  // -------------------------------------------------------------------------
+  // #826 — Same-day refresh: when inputs have legitimately changed mid-day
+  // (e.g. supplemental EMU upload), the same-day lock must give way so the
+  // freshly recomputed score reaches the user instead of the stale snapshot.
+  // -------------------------------------------------------------------------
+
+  describe("#826 same-day refresh (bypassSameDayLock)", () => {
+    it("applies EMA against today's snapshot when inputs changed (bypasses same-day lock)", () => {
+      // Today's snapshot was captured before the EMU upload at adjustedComposite=58.
+      // After the upload, raw recomputes to 75. With bypass, EMA against today's
+      // snapshot lifts it: 0.15*75 + 0.85*58 = 11.25 + 49.3 = 60.55 → 61.
+      const snapshot = { date: "2026-03-01", adjustedComposite: 58 };
+      expect(smoothScore(75, snapshot, "2026-03-01", { bypassSameDayLock: true })).toBe(61);
+    });
+
+    it("preserves the same-day lock by default (bypass=false / unset)", () => {
+      // Without the bypass, today's snapshot value wins to prevent the EMA
+      // feedback loop on every page refresh — the existing behavior.
+      const snapshot = { date: "2026-03-01", adjustedComposite: 58 };
+      expect(smoothScore(75, snapshot, "2026-03-01")).toBe(58);
+      expect(smoothScore(75, snapshot, "2026-03-01", { bypassSameDayLock: false })).toBe(58);
+    });
+
+    it("bypass has no effect when no snapshot exists", () => {
+      expect(smoothScore(60, null, "2026-03-01", { bypassSameDayLock: true })).toBe(60);
+    });
+
+    it("bypass has no effect on cross-day path (EMA already applies)", () => {
+      const snapshot = { date: "2026-02-28", adjustedComposite: 70 };
+      // Same as without bypass: 0.15*60 + 0.85*70 = 68.5 → 69
+      expect(smoothScore(60, snapshot, "2026-03-01", { bypassSameDayLock: true })).toBe(69);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyImpactScorePolicy
+// ---------------------------------------------------------------------------
+
+describe("applyImpactScorePolicy — #826 inputsChanged", () => {
+  // Helper: minimal ImpactV6Result shape
+  const baseImpact = {
+    handle: "testuser",
+    profileType: "collaborative" as const,
+    archetype: "Builder" as const,
+    dimensions: { delivery: 100, quality: 50, consistency: 60, breadth: 60 },
+    compositeScore: 67,
+    adjustedComposite: 75,
+    confidence: 90,
+    confidencePenalties: [],
+    tier: "High" as const,
+    computedAt: "2026-03-01T00:00:00.000Z",
+  };
+
+  it("threads inputsChanged into smoothScore (bypasses same-day lock)", () => {
+    const snapshot = { date: "2026-03-01", adjustedComposite: 58 };
+    const result = applyImpactScorePolicy(baseImpact, snapshot, {
+      today: "2026-03-01",
+      inputsChanged: true,
+    });
+    // Bypass → EMA applied: 0.15*75 + 0.85*58 = 60.55 → 61
+    expect(result.adjustedComposite).toBe(61);
+  });
+
+  it("keeps the same-day lock when inputsChanged is unset", () => {
+    const snapshot = { date: "2026-03-01", adjustedComposite: 58 };
+    const result = applyImpactScorePolicy(baseImpact, snapshot, { today: "2026-03-01" });
+    expect(result.adjustedComposite).toBe(58);
   });
 });

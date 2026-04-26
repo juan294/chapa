@@ -1,6 +1,7 @@
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
+import { clearStatsDirty } from "@/lib/cache/dirty-stats";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
+import { dbInsertSnapshot, dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { dbUpsertUser } from "@/lib/db/users";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { generateVerificationCode } from "@/lib/verification/hmac";
@@ -65,12 +66,14 @@ export async function runPublicProfileSideEffects(
   // Deduplication guard: once-per-day SETNX key prevents duplicate Supabase
   // writes when the CDN misses and multiple edge nodes hit the origin in parallel.
   // Only the explicit duplicate case should skip work; Redis outages must fail open.
+  // #826 — When inputs have legitimately changed mid-day (supplemental upload),
+  // bypass the guard so today's snapshot can be replaced with the fresh score.
   const today = new Date().toISOString().slice(0, 10);
   const guardStatus = await cacheSetNxStatus(
     `sideeffects:done:${handle}:${today}`,
     86400,
   );
-  if (guardStatus === "exists") return;
+  if (guardStatus === "exists" && !materialized.inputsChanged) return;
 
   const verification = options.verification ??
     getPublicProfileVerification(materialized);
@@ -89,9 +92,16 @@ export async function runPublicProfileSideEffects(
   ops.push(notifyFirstBadge(handle, materialized.displayImpact));
   ops.push(
     (async () => {
-      const inserted = await dbInsertSnapshot(handle, materialized.snapshot);
-      if (inserted) {
+      // #826 — replace today's row when inputs changed; otherwise insert and
+      // let the UNIQUE(handle, date) constraint dedupe.
+      const persisted = materialized.inputsChanged
+        ? await dbReplaceSnapshot(handle, materialized.snapshot)
+        : await dbInsertSnapshot(handle, materialized.snapshot);
+      if (persisted) {
         await updateSnapshotCache(handle, materialized.snapshot);
+        if (materialized.inputsChanged) {
+          await clearStatsDirty(handle);
+        }
       }
     })(),
   );

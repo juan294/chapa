@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
 import type { SupplementalStats } from "@chapa/shared";
@@ -79,6 +80,10 @@ export async function POST(request: Request): Promise<Response> {
     // 6. Invalidate primary stats cache (forces re-merge on next badge request)
     // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>"
     await cacheDel(`stats:v2:merged:${targetHandle.toLowerCase()}`);
+
+    // 7. Mark stats dirty (#826) so today's snapshot lock yields to the new
+    // inputs and the user sees the updated score without waiting for tomorrow.
+    await markStatsDirty(targetHandle);
 
     return NextResponse.json({ success: true });
   } catch (err) {
