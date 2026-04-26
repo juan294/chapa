@@ -1,41 +1,69 @@
 # Documentation Update Report
-> Generated on 2026-04-25 | Branch: `develop` | Changes since v2.7.2 (118 commits)
+> Generated on 2026-04-26 | Branch: `develop` | Changes since `v2.7.2`
 
 ## Summary
-- 5 documents updated
-- 1 diagram node label corrected
-- 0 version references updated (already current)
-- 0 inline doc blocks updated (none targeted)
+- 3 documents updated
+- 1 diagram refreshed
+- 1 version reference corrected
+- 0 inline doc blocks updated
 - 0 items flagged [NEEDS REVIEW]
+
+## Discovery
+
+4 parallel agents investigated the project:
+
+- **change-analyst**: 125 commits since v2.7.2 across 390 files. Key areas: auth modules, profile modules, craft scoring fix, campaign safety, cron hardening, accessibility, observability, Spanish localization, 6 new runbooks, 237 new tests.
+- **doc-inventory**: ~50 markdown files catalogued. Most docs already updated by recent commits (`c0c35ff`, `4394470`). Stale items identified: CHANGELOG missing [Unreleased], cli-guide Node version mismatch, user-manual missing Artificer command.
+- **diagram-analyzer**: One diagram found (`docs/chapa-architecture.drawio`). Assessed as stale — updated and re-exported to PNG.
+- **version-scanner**: `apps/web/package.json` at `2.7.2` (defer to `/release`). `CACHE_VERSION` and `PAYLOAD_VERSION` intentionally pinned. README badges current.
 
 ## Changes by File
 
-### CHANGELOG.md
-Added two missing version entries that were never written after releases shipped:
-- `[2.7.2] - 2026-04-04` — craft recompute on `/api/refresh` + correct craft passthrough to impact
-- `[2.7.1] - 2026-04-04` — craft recompute from stored raw data on `/api/recalculate`
-- Added compare links `[2.7.2]` and `[2.7.1]` at bottom of file
+### `CHANGELOG.md`
+Added `[Unreleased]` section before `[2.7.2]`. Covers 125 commits since v2.7.2, organized into:
+- **Added** (23 items): Active alerts, structured error logger, auth modules, profile modules, Spanish localization, lease-based campaign sends, deployment smoke gate, migration validator, auto-commit launchd job, 6 runbooks, AGENTS.md, backfill script, new hooks/components, health probe, 237 new tests
+- **Fixed** (28 items): Craft scoring single source of truth, OAuth token storage to Supabase, campaign deduplication, admin stabilization, badge cache hardening, Redis fail-open, cron fail-secure, auth cookie policy, InfoTooltip z-index, heatmap keyboard nav, radar reduced-motion, and more
+- **Security** (2 items): PostCSS XSS CVE pin, Next.js 16.2.4 PPR DoS fix
+- **Changed** (2 items): Removed stale components, license inventory refresh
+- **Dependencies** (10 bumps): Next.js, React, TypeScript, ESLint, vitest, supabase-js, posthog-js, resend, playwright, @types/node
 
-### CLAUDE.md
-- Updated `/api/health` route description: added "GitHub API probe" to the parenthetical (was "Redis dbsize + Supabase query"; now "Redis dbsize + Supabase query + GitHub API probe")
+### `docs/cli-guide.md` — lines 33–34
+Fixed version mismatch. The prerequisites section (line 25) correctly stated "Node.js 20 or later" and "npm 10 or later" but the shell example below it showed `v18.x.x` and `7.x.x`. Corrected to match:
+- `v18.x.x or higher` → `v20.x.x or higher`
+- `7.x.x or higher` → `10.x.x or higher`
 
-### docs/how-it-works.md — Security Model section
-Three targeted updates to reflect auth architecture changes shipped since v2.7.0:
-- **Token handling table**: GitHub OAuth token storage updated from "Encrypted in session cookie (AES-256-GCM)" to "Supabase `user_platforms` table (server-side only)"
-- **OAuth security bullets**: CSRF protection bullet updated to describe Redis-backed one-time-consumption state (with in-memory fallback); token storage bullet rewritten to clarify tokens live in Supabase, not cookies; cookie policy bullet updated to mention centralized `cookie-policy.ts` and localhost dev exception
-- **Privacy Guarantees #2**: Updated from "OAuth tokens are encrypted in session cookies with a 24-hour expiry" to reflect server-side database storage
-
-### docs/accepted-risks.md
-- Added new entry: **Post-response side effects in badge route** — documents the intentional design of non-blocking side effects (snapshot, analytics, cache, verification record) scheduled via Next.js `after()` and run with `Promise.allSettled` in `runPublicProfileSideEffects`, silent failure behavior, the daily `sideeffects:done:{handle}:{date}` guard, and the current absence of PostHog instrumentation on this path. Severity: Low. Accepted: 2026-04-04.
-
-### docs/chapa-architecture.drawio
-- Fixed stale label on "Public Endpoints" cell: `/api/badge` → `/u/:handle/badge.svg` (the badge has never been served from `/api/badge`; correct route is the page-level SVG endpoint)
+### `docs/user-manual.md`
+Two gaps found and patched:
+1. **Missing `/artificer` command**: The Global Command Bar archetype command list had all 7 archetypes except Artificer. Added `/artificer → View the Artificer archetype page` between `/polymath` and `/balanced`.
+2. **Stale radar chart tooltip description**: "What the four dimensions represent" updated to "What the dimensions represent (4 axes for standard profiles; 5 axes when Craft is present)" — reflects pentagon mode added in v2.7.0.
 
 ## Flagged for Review
-None. All updates traced directly to code changes.
+None.
 
-## Not Updated (checked and current)
-- `README.md` — `/api/health` description already lists "Redis/Supabase/GitHub dependency probes"; no other stale content found
-- `docs/user-manual.md` — Documents Creator Studio terminal interface (English); Spanish localization affects public-flow pages only (landing, generating, error, verify) which the user manual does not cover
-- `docs/impact-v6.md`, `docs/svg-design.md` — No scoring or SVG rendering changes since v2.7.2
-- `docs/accepted-risks.md` (existing entries) — All existing risks current; only addition made
+### `docs/chapa-architecture.drawio` + `docs/chapa-architecture.drawio.png`
+Rebuilt the architecture diagram to reflect changes since v2.7.2:
+- **Frontend**: Added 5th box — "About + Archetypes `/about · /archetypes/*`"
+- **Auth Layer**: Added second row with 4 new modules: Session Mgmt, Cookie Policy, OAuth State (Redis-backed CSRF), GitHub Token Store (Supabase-backed)
+- **API Layer**: Added second row — Campaign API, Cron Jobs (moved from separate cell), Verification, Feature Flags + Webhooks + Telemetry
+- **Core Engine**: Added Profile Modules row (lib/profile/ — materialize, orchestrate, public); added third row with Observability (withErrorCapture, structured JSON logger) and Email + Campaigns (lib/email/, lib/campaigns/, lease-based send claiming)
+- **External Services**: Expanded panel height to cover full diagram
+- All edge waypoints updated for new layer positions
+- Re-exported PNG with embedded XML
+
+## Documents Verified — No Update Needed
+
+| Document | Reason |
+|----------|--------|
+| `docs/how-it-works.md` | Updated in `c0c35ff` — OAuth token storage, Redis state |
+| `docs/accepted-risks.md` | Updated in `4394470` — badge route side-effects mechanism |
+| `docs/design-system.md` | Updated recently — light-mode color table values added |
+| `CLAUDE.md` | Updated recently — GitHub API probe added to `/api/health` |
+| `README.md` | Updated recently — test counts and badges current |
+| `LICENSE-THIRD-PARTY.md` | Updated in `67bcb60` |
+| `docs/svg-design.md` | Confirmed current — v3 pentagon mode documented correctly |
+| All runbooks (6) | New files added since v2.7.2, already complete |
+| `AGENTS.md` | New file added since v2.7.2, complete |
+| Legacy specs (impact-v3/v4/v5) | Intentionally historical — no update needed |
+
+## Lint Note
+`markdownlint` reports pre-existing violations throughout `CHANGELOG.md` (MD013 line-length, MD022 heading spacing, MD024 duplicate headings per-version, MD032 list spacing). These violations exist uniformly across all pre-existing entries and reflect the established CHANGELOG format. The new `[Unreleased]` section follows the same format.

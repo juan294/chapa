@@ -30,8 +30,8 @@ If your employer uses GitHub Enterprise Managed Users (EMU), your work contribut
 ### Check your setup
 
 ```bash
-node --version    # Should print v18.x.x or higher
-npm --version     # Should print 7.x.x or higher
+node --version    # Should print v20.x.x or higher
+npm --version     # Should print 10.x.x or higher
 ```
 
 If Node.js is not installed, download it from [nodejs.org](https://nodejs.org/) (LTS recommended). On corporate machines, you may need to request installation through your IT department or use a version manager like `nvm` if allowed.

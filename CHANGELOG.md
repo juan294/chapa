@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Active alerts**: Launch-critical active alert integration for real-time status notifications
+- **Structured error logger**: `withErrorCapture()` wrapper and structured JSON logger (`lib/analytics/server-errors.ts`) for consistent server-side error observability
+- **Auth modules**: Cleanly separated authentication concerns — `oauth-state` (Redis-backed CSRF-safe state), `session` (session management), `cookie-policy`, `github-session-token` (Supabase-backed token store), `unsubscribe-token` (HMAC-signed)
+- **Profile modules**: `materialize-profile`, `orchestrated-profile`, `public-profile`, `post-write-invalidation` — replaces scattered profile assembly logic
+- **Spanish localization**: Public flow copy (`lib/copy/public-flow.ts`) translated to Spanish for all error pages, verify flow, and public-facing messages
+- **Lease-based campaign send claiming**: Atomic SQL lease (`claim_campaign_sends()`) prevents duplicate email sends in multi-worker deployments
+- **Deployment smoke test gate**: CI workflow validates deployment shape before proceeding
+- **Migration validation script**: `scripts/validate-migrations.ts` enforces sequential `NNN_` naming on Supabase migrations
+- **Auto-commit agent reports**: `scripts/commit-reports.sh` + launchd job (`com.chapa.commit-reports`) automatically commits `docs/agents/` updates at 10:30 UTC daily
+- **CODEOWNERS**: `.github/CODEOWNERS` with catch-all `@juan294` ownership
+- **Operational runbooks**: `docs/runbooks/` — incident-response, migrations, outage-playbook, release-checklist, rollback, secret-rotation (6 guides)
+- **AGENTS.md**: Codex compatibility guide for AI agent workflows
+- **Craft score backfill script**: `apps/web/scripts/backfill-craft-scores.ts` for applying formula changes to existing stored scores
+- **`useIsClient` hook**: Extracted SSR-safe hydration check from presentational components into `apps/web/hooks/useIsClient.ts`
+- **`useSession` hook**: Dedicated hook at `apps/web/hooks/useSession.ts`
+- **`StatusCallout` component**: Reusable status/alert callout with semantic variants
+- **`ClientFeatureFlagsProvider`**: Client-side feature flag injection component
+- **Health endpoint GitHub API probe**: `/api/health` now validates GitHub API reachability alongside Redis and Supabase checks
+- **`WARM_CACHE_PRIORITY_HANDLES` env var**: Comma-separated handles always included in warm-cache cron runs
+- 237 new tests; total test count: 7,192 across 438 files
+
+### Fixed
+- **Craft scoring single source of truth**: `/api/refresh` and `/api/recalculate` no longer mutate stored craft scores — all paths read from `getCachedCraftScore()`. Formula changes require explicit backfill via the new backfill script
+- **GitHub OAuth tokens moved to Supabase**: Tokens stored in `user_github_session_token` (encrypted) instead of session cookies, preventing token leak via log capture (#807)
+- **Campaign send deduplication**: Claim sends before delivery with lease-based locking; prevents duplicate emails in multi-worker environments (#793)
+- **Campaign payload validation**: Payloads validated on write, not just on send (#795)
+- **Admin dashboard state**: Stabilized loading and error state transitions (#789, #790)
+- **Admin user search**: Uses `ILIKE` for case-insensitive handle/name filtering
+- **Admin agents/run auth**: Endpoint now requires valid auth; bulk-recalculate uses cursor pagination for large user sets
+- **Badge cache coordination**: Hardened concurrent SVG cache writes and sideeffect deduplication (#799, #801)
+- **Redis fail-open for public side effects**: Badge route side effects (snapshot, PostHog) fail silently on Redis outage rather than blocking the SVG response (#792)
+- **Snapshot invalidation order**: Centralized and consistent cache invalidation sequence on profile writes (#794)
+- **Auth cookie policy**: Hardened `SameSite`, `Secure`, and `HttpOnly` attributes; separate policy per environment (#806, #813)
+- **Verification read path**: Unified verification data access via single read path (#812)
+- **Resend webhook deduplication**: Deduplicated webhook event delivery to prevent double-processing (#796, #809)
+- **Cron fail-secure**: All cron endpoints return `503` when `CRON_SECRET` is unset (previously allowed through); `getClientIp` now trusts `x-vercel-forwarded-for` over spoofable headers
+- **OAuth callback state**: Stabilized local OAuth callback state transitions for dev environment
+- **Module cache on logout**: Module-level promise caches (e.g. `useSession`) cleared on logout
+- **`withTimeout()` helper**: Replaced `Promise.race` with a named helper for better error context
+- **SVG route**: Cache key, sideeffect dedup guard, and rate limit key corrected
+- **Public client shell**: Deferred to avoid SSR/client hydration mismatch (#786, #797)
+- **Studio availability flag**: Unified `NEXT_PUBLIC_STUDIO_ENABLED` check across all entry points (#788)
+- **Share page UX**: Stabilized public share page rendering and loading state (#787, #818, #821)
+- **Status semantics**: Unified status field across admin and API responses (#820)
+- **InfoTooltip z-index**: Increased from `9999` to `99999` to layer above animated ancestors
+- **Heatmap keyboard navigation**: Day cells are keyboard-navigable with `tabindex`, `role`, and `aria-label` (UX-H4)
+- **Radar animation reduced-motion**: Respects `prefers-reduced-motion` media query
+- **Badge preview CLS**: Eliminated layout shift on badge preview mount (FE-M5)
+- **BadgeContent avatar**: Adds `.img-outline` per design system
+- **Profile date alignment**: `buildSnapshot` now uses the `today` param consistently for date binding
+- **`useTrendData` waterfall**: Module-level promise cache eliminates redundant sequential fetches
+
+### Security
+- **PostCSS XSS CVE**: Pinned `postcss >= 8.5.10` to resolve CVE
+- **Next.js 16.2.4**: Resolves PPR-related DoS vulnerability (GHSA-q4gf-8mx6-v5v3)
+
+### Changed
+- **Removed stale components**: `ShareBadgePreview`, `ShareBadgePreviewLazy`, `HeroScoreZone`, `RadarChartInteractive` (superseded by current dashboard design)
+- **Third-party license inventory**: Refreshed to reflect current dependency set
+
+### Dependencies
+- Next.js: 16.2.2 → 16.2.4
+- React / React-DOM: 19.2.4 → 19.2.5
+- TypeScript: 6.0.2 → 6.0.3
+- ESLint: 9.27.0 → 9.39.0
+- vitest / @vitest/coverage-v8: 4.1.2 → 4.1.4
+- @supabase/supabase-js: 2.103.0 → 2.103.3
+- posthog-js: 1.367.0 → 1.369.3
+- resend: 6.10.0 → 6.12.0
+- @playwright/test: 1.58.2 → 1.59.1
+- @types/node: 25.5.0 → 25.6.0
+
 ## [2.7.2] - 2026-04-04
 
 ### Fixed

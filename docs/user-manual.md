@@ -425,6 +425,7 @@ On pages that don't have a dedicated terminal (share pages, about, terms, privac
 | `/guardian` | View the Quality Champion archetype page |
 | `/marathoner` | View the Marathoner archetype page |
 | `/polymath` | View the Polymath archetype page |
+| `/artificer` | View the Artificer archetype page |
 | `/balanced` | View the Balanced archetype page |
 | `/emerging` | View the Emerging archetype page |
 
@@ -485,7 +486,7 @@ The share page and badge preview include **explanatory tooltips** that appear on
 Hovering over elements on the badge preview reveals explanations:
 - **Archetype label** — What this archetype means
 - **Heatmap** — How to read the activity grid
-- **Radar chart** — What the four dimensions represent
+- **Radar chart** — What the dimensions represent (4 axes for standard profiles; 5 axes when Craft is present)
 - **Score** — How the composite score is calculated
 - **Tier** — What the tier means
 - **Stars / Forks / Watchers** — What each community metric represents
