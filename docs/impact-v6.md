@@ -148,6 +148,16 @@ Deliberate user actions (insights upload, platform connect) trigger immediate sc
 
 This ensures that after an insights upload, the badge and share page immediately reflect the new score. EMA smoothing continues to apply for passive badge views where GitHub stats change organically.
 
+### Same-day refresh after a CLI supplemental upload (#826)
+
+A CLI supplemental upload (`POST /api/supplemental`) follows a different path than an insights upload — it does not call `/api/recalculate` directly. Instead, it sets a Redis marker `stats:dirty:<handle>` (1h TTL) so the **next** page render does the recompute:
+
+1. `materializeProfile` reads the marker via `isStatsDirty()` and threads `inputsChanged: true` through the impact pipeline.
+2. `applyImpactScorePolicy` propagates that flag into `smoothScore`, where `bypassSameDayLock` switches behavior: instead of returning today's snapshot value verbatim (the feedback-loop guard), EMA is applied against today's snapshot — anchoring the new score to today's already-smoothed value while absorbing partial credit for the change.
+3. `runPublicProfileSideEffects` routes today's snapshot through `dbReplaceSnapshot` (UPSERT), bypasses the per-day SETNX dedup guard so the legitimate refresh is not blocked, and clears the dirty marker after a successful write.
+
+When the marker is absent (the default), all of the above is no-op and the existing same-day lock applies — the feedback-loop protection is preserved.
+
 ### Upload Flow
 
 ```
