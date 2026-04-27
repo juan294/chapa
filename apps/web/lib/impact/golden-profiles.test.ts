@@ -90,11 +90,11 @@ describe("golden profiles", () => {
       {
         "archetype": "Builder",
         "breadth": 36,
-        "compositeScore": 61,
-        "consistency": 73,
+        "compositeScore": 64,
+        "consistency": 72,
         "delivery": 82,
         "profileType": "collaborative",
-        "quality": 51,
+        "quality": 67,
         "tier": "Solid",
       }
     `);
@@ -193,12 +193,12 @@ describe("golden profiles", () => {
       {
         "archetype": "Builder",
         "breadth": 47,
-        "compositeScore": 69,
+        "compositeScore": 72,
         "consistency": 79,
         "delivery": 98,
         "profileType": "collaborative",
-        "quality": 53,
-        "tier": "Solid",
+        "quality": 64,
+        "tier": "High",
       }
     `);
   });

@@ -48,6 +48,32 @@ export const BATCH_SIZE_MIN = 20;
 /** Maximum lines changed for a PR to be in the "reviewable sweet spot". */
 export const BATCH_SIZE_MAX = 500;
 
+/** Commits in a 10-minute window that trigger the burst-activity confidence penalty. */
+export const BURST_ACTIVITY_THRESHOLD = 100;
+
+/** Micro-commit ratio threshold that triggers the confidence penalty. */
+export const MICRO_COMMIT_THRESHOLD = 0.6;
+
+/** Top-repo concentration threshold that triggers the single-repo confidence penalty. */
+export const SINGLE_REPO_CONCENTRATION = 0.95;
+
+/** Delivery lead-time breakpoints (hours) for the +/-5% modifier. */
+export const LEAD_TIME_CAPS = {
+  fast: 4,
+  mid: 48,
+  slow: 168,
+} as const;
+
+/** Neutral fallback when batch-size score is unavailable. */
+export const BATCH_SIZE_DEFAULT = 0.3;
+
+/** Adjusted-score thresholds for tier mapping. */
+export const TIER_THRESHOLDS = {
+  S: 85,
+  A: 70,
+  C: 30,
+} as const;
+
 /**
  * All four scoring dimension keys in canonical order.
  * Used by v4 scoring, heatmap coloring, and archetype derivation.

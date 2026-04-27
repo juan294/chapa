@@ -1,127 +1,51 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// ---------------------------------------------------------------------------
-// Mock dependencies BEFORE importing the page component.
-// ---------------------------------------------------------------------------
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  mockGetStats,
-  mockComputeImpactV6,
-  mockSmoothScore,
-  mockGetTier,
-  mockGetCachedLatestSnapshot,
-  mockUpdateSnapshotCache,
+  mockMaterializePublicProfile,
+  mockGetPublicProfileVerification,
+  mockRunPublicProfileSideEffects,
   mockIsValidHandle,
-  mockCacheGet,
-  mockTrackBadgeGenerated,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
-  mockGenerateVerificationCode,
-  mockStoreVerificationRecord,
-  mockNotifyFirstBadge,
-  mockBuildSnapshot,
-  mockDbInsertSnapshot,
-  mockIsStudioEnabled,
-  mockDbGetToolInsights,
   mockAfter,
 } = vi.hoisted(() => ({
-  mockGetStats: vi.fn(),
-  mockComputeImpactV6: vi.fn(),
-  mockSmoothScore: vi.fn((score: number) => score),
-  mockGetTier: vi.fn((score: number) => {
-    if (score >= 85) return "Elite";
-    if (score >= 70) return "High";
-    if (score >= 30) return "Solid";
-    return "Emerging";
-  }),
-  mockGetCachedLatestSnapshot: vi.fn(),
-  mockUpdateSnapshotCache: vi.fn(),
+  mockMaterializePublicProfile: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
+  mockRunPublicProfileSideEffects: vi.fn(),
   mockIsValidHandle: vi.fn(),
-  mockCacheGet: vi.fn(),
-  mockTrackBadgeGenerated: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
-  mockGenerateVerificationCode: vi.fn(),
-  mockStoreVerificationRecord: vi.fn(),
-  mockNotifyFirstBadge: vi.fn(),
-  mockBuildSnapshot: vi.fn(),
-  mockDbInsertSnapshot: vi.fn(),
-  mockIsStudioEnabled: vi.fn(),
-  mockDbGetToolInsights: vi.fn(),
   mockAfter: vi.fn(),
 }));
 
-vi.mock("@/lib/github/client", () => ({
-  getStats: mockGetStats,
-}));
-
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV6,
-}));
-
-vi.mock("@/lib/impact/smoothing", () => ({
-  smoothScore: mockSmoothScore,
-}));
-
-vi.mock("@/lib/impact/utils", () => ({
-  getTier: mockGetTier,
-}));
-
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
-  updateSnapshotCache: mockUpdateSnapshotCache,
+vi.mock("@/lib/profile/public-profile", () => ({
+  materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
+  runPublicProfileSideEffects: (...args: unknown[]) =>
+    mockRunPublicProfileSideEffects(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
-  isValidHandle: mockIsValidHandle,
-}));
-
-vi.mock("@/lib/cache/redis", () => ({
-  cacheGet: mockCacheGet,
-  trackBadgeGenerated: mockTrackBadgeGenerated,
+  isValidHandle: (...args: unknown[]) => mockIsValidHandle(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
-  getAvatarBase64: mockGetAvatarBase64,
+  getAvatarBase64: (...args: unknown[]) => mockGetAvatarBase64(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
-  renderBadgeSvg: mockRenderBadgeSvg,
-}));
-
-vi.mock("@/lib/verification/hmac", () => ({
-  generateVerificationCode: mockGenerateVerificationCode,
-}));
-
-vi.mock("@/lib/verification/store", () => ({
-  storeVerificationRecord: mockStoreVerificationRecord,
-}));
-
-vi.mock("@/lib/email/notifications", () => ({
-  notifyFirstBadge: mockNotifyFirstBadge,
-}));
-
-vi.mock("@/lib/history/snapshot", () => ({
-  buildSnapshot: mockBuildSnapshot,
-}));
-
-vi.mock("@/lib/db/snapshots", () => ({
-  dbInsertSnapshot: mockDbInsertSnapshot,
-}));
-
-vi.mock("@/lib/feature-flags", () => ({
-  isStudioEnabled: mockIsStudioEnabled,
-}));
-
-vi.mock("@/lib/cache/craft-cache", () => ({
-  getCachedCraftScore: mockDbGetToolInsights,
+  renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
 }));
 
 vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.thecreativetoken.com",
 }));
 
-// Mock next/server's after() to capture callback
+vi.mock("@/lib/utils/date", () => ({
+  toDateString: () => "2026-04-17",
+}));
+
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
   return {
@@ -130,26 +54,22 @@ vi.mock("next/server", async (importOriginal) => {
   };
 });
 
-// Mock next/navigation
 const mockNotFound = vi.fn();
 vi.mock("next/navigation", () => ({
-  notFound: () => { mockNotFound(); throw new Error("NOT_FOUND"); },
+  notFound: () => {
+    mockNotFound();
+    throw new Error("NOT_FOUND");
+  },
 }));
 
-// Mock the lazy-loaded GlobalCommandBar wrapper
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: () => null,
 }));
-
-// Mock components to return simple elements
 vi.mock("@/components/NavbarClient", () => ({
   NavbarClient: () => "<nav />",
 }));
 vi.mock("@/components/SharePageShortcuts", () => ({
   SharePageShortcuts: () => null,
-}));
-vi.mock("@/components/ShareBadgePreviewLazy", () => ({
-  ShareBadgePreviewLazy: () => "<div>interactive-preview</div>",
 }));
 vi.mock("@/components/BadgeToolbar", () => ({
   BadgeToolbar: () => "<div>toolbar</div>",
@@ -157,451 +77,130 @@ vi.mock("@/components/BadgeToolbar", () => ({
 vi.mock("@/components/SharePageOwnerContent", () => ({
   SharePageOwnerContent: () => "<div>owner-content</div>",
 }));
-vi.mock("@/components/dashboard/HeroScoreZone", () => ({
-  HeroScoreZone: () => "<div>hero</div>",
-}));
-
-// Mock date utility for predictable metadata URLs
-vi.mock("@/lib/utils/date", () => ({
-  toDateString: () => "2026-01-01",
-}));
-
-// Mock BadgeSkeleton (used in fallback path when inline SVG is null)
 vi.mock("@/components/BadgeSkeleton", () => ({
   BadgeSkeleton: () => null,
 }));
 
-// ---------------------------------------------------------------------------
-// Import the page after all mocks
-// ---------------------------------------------------------------------------
+import SharePage, { SharePageContent, generateMetadata } from "./page";
 
-import SharePage, { generateMetadata, SharePageContent } from "./page";
+const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const FAKE_STATS = {
-  handle: "testuser",
-  displayName: "Test User",
-  commitsTotal: 42,
-  prsMergedCount: 10,
-  reviewsSubmittedCount: 5,
-  avatarUrl: "https://avatars.githubusercontent.com/u/12345",
-  fetchedAt: "2026-01-01T00:00:00Z",
-  heatmapData: [],
+const FAKE_MATERIALIZED = {
+  stats: {
+    handle: "testuser",
+    displayName: "Test User",
+    avatarUrl: "https://avatars.githubusercontent.com/u/12345",
+    fetchedAt: "2026-04-17T00:00:00Z",
+    commitsTotal: 42,
+    prsMergedCount: 10,
+    reviewsSubmittedCount: 5,
+    heatmapData: [],
+  },
+  rawImpact: {
+    adjustedComposite: 73,
+    tier: "High",
+    confidence: 85,
+    archetype: "Builder",
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    profileType: "collaborative",
+  },
+  displayImpact: {
+    adjustedComposite: 65,
+    tier: "Solid",
+    confidence: 85,
+    archetype: "Builder",
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    profileType: "collaborative",
+  },
+  snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
 };
-
-const FAKE_IMPACT = {
-  handle: "testuser",
-  profileType: "collaborative",
-  adjustedComposite: 65,
-  tier: "Solid",
-  confidence: 85,
-  dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-  archetype: "Builder",
-};
-
-const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">BADGE</svg>';
-
-const FAKE_SNAPSHOT = { adjustedComposite: 60, date: "2026-01-01" };
 
 async function renderPage(handle = "testuser") {
-  // Test the data-dependent content directly (SharePageContent).
-  // SharePage is a thin Suspense wrapper around SharePageContent.
   return SharePageContent({ handle });
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("SharePage /u/[handle]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsValidHandle.mockReturnValue(true);
-    mockGetStats.mockResolvedValue(FAKE_STATS);
-    mockCacheGet.mockResolvedValue(null); // no saved config
-    mockGetCachedLatestSnapshot.mockResolvedValue(FAKE_SNAPSHOT);
-    mockComputeImpactV6.mockReturnValue({ ...FAKE_IMPACT });
+    mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+    mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
-    mockGenerateVerificationCode.mockReturnValue(null);
-    mockStoreVerificationRecord.mockResolvedValue(undefined);
-    mockTrackBadgeGenerated.mockResolvedValue(undefined);
-    mockNotifyFirstBadge.mockResolvedValue(undefined);
-    mockBuildSnapshot.mockReturnValue({ date: "2026-01-01" });
-    mockDbInsertSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
-    mockIsStudioEnabled.mockResolvedValue(false);
-    mockDbGetToolInsights.mockResolvedValue(null);
   });
 
-  // -------------------------------------------------------------------------
-  // ISR compatibility — no headers() call
-  // -------------------------------------------------------------------------
-
-  describe("ISR compatibility", () => {
-    it("calls getStats without user token (ISR has no request context)", async () => {
-      await renderPage();
-      // With ISR, no per-user OAuth token is available — getStats is called
-      // with handle only, relying on env GITHUB_TOKEN fallback.
-      expect(mockGetStats).toHaveBeenCalledWith("testuser");
+  it("generates metadata with the daily OG cache buster", async () => {
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ handle: "testuser" }),
     });
+
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=2026-04-17",
+        width: 1200,
+        height: 630,
+        alt: "Chapa badge for testuser",
+      },
+    ]);
   });
 
-  // -------------------------------------------------------------------------
-  // Phase 1: Parallel data fetching
-  // -------------------------------------------------------------------------
+  it("calls notFound for an invalid handle", async () => {
+    mockIsValidHandle.mockReturnValue(false);
 
-  describe("parallel data fetching", () => {
-    it("fetches stats, config, and snapshot in a single Promise.all", async () => {
-      await renderPage();
-
-      // All three should be called — the key assertion is that snapshot
-      // is called BEFORE stats resolves (i.e., in parallel, not sequential)
-      expect(mockGetStats).toHaveBeenCalledWith("testuser");
-      expect(mockCacheGet).toHaveBeenCalledWith("config:testuser");
-      expect(mockGetCachedLatestSnapshot).toHaveBeenCalledWith("testuser");
-    });
-
-    it("uses snapshot data for EMA smoothing", async () => {
-      await renderPage();
-      expect(mockSmoothScore).toHaveBeenCalledWith(65, FAKE_SNAPSHOT);
-    });
-
-    it("handles null snapshot gracefully", async () => {
-      mockGetCachedLatestSnapshot.mockResolvedValue(null);
-      await renderPage();
-      expect(mockSmoothScore).toHaveBeenCalledWith(65, null);
-    });
+    await expect(
+      SharePage({ params: Promise.resolve({ handle: "bad!!handle" }) }),
+    ).rejects.toThrow("NOT_FOUND");
+    expect(mockNotFound).toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // Phase 1: Inline SVG rendering
-  // -------------------------------------------------------------------------
+  it("renders the inline badge from displayImpact, not rawImpact", async () => {
+    await renderPage();
 
-  describe("inline SVG rendering", () => {
-    it("calls renderBadgeSvg during SSR with stats, impact, and avatar", async () => {
-      await renderPage();
-
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        FAKE_STATS,
-        expect.objectContaining({ archetype: "Builder" }),
-        {
-          avatarDataUri: "data:image/png;base64,abc123",
-          verificationHash: undefined,
-          verificationDate: undefined,
-        },
-      );
-    });
-
-    it("fetches avatar from stats.avatarUrl", async () => {
-      await renderPage();
-      expect(mockGetAvatarBase64).toHaveBeenCalledWith(
-        "testuser",
-        "https://avatars.githubusercontent.com/u/12345",
-      );
-    });
-
-    it("passes undefined avatar when stats has no avatarUrl", async () => {
-      mockGetStats.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
-      await renderPage();
-      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        expect.objectContaining({ avatarDataUri: undefined }),
-      );
-    });
-
-    it("does not call renderBadgeSvg when stats are null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      await renderPage();
-      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-    });
-
-    it("passes verification hash and date when verification code is generated", async () => {
-      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2026-01-15" });
-      await renderPage();
-
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        FAKE_STATS,
-        expect.anything(),
-        {
-          avatarDataUri: "data:image/png;base64,abc123",
-          verificationHash: "abc12345",
-          verificationDate: "2026-01-15",
-        },
-      );
-    });
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser");
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      {
+        avatarDataUri: "data:image/png;base64,abc123",
+        verificationHash: "abc12345",
+        verificationDate: "2026-04-17",
+      },
+    );
   });
 
-  // -------------------------------------------------------------------------
-  // Phase 1: after() deferred work
-  // -------------------------------------------------------------------------
+  it("registers centralized public side effects when inline svg is rendered", async () => {
+    await renderPage();
 
-  describe("deferred work via after()", () => {
-    it("registers after() callback when inline SVG is rendered", async () => {
-      await renderPage();
-      expect(mockAfter).toHaveBeenCalledTimes(1);
-      expect(mockAfter).toHaveBeenCalledWith(expect.any(Function));
-    });
+    expect(mockAfter).toHaveBeenCalledTimes(1);
+    const callback = mockAfter.mock.calls[0][0];
+    await callback();
 
-    it("after() callback calls trackBadgeGenerated and notifyFirstBadge", async () => {
-      await renderPage();
-
-      // Execute the deferred callback
-      const afterCallback = mockAfter.mock.calls[0][0];
-      await afterCallback();
-
-      expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
-      expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", expect.objectContaining({ archetype: "Builder" }));
-    });
-
-    it("after() callback stores verification record when code is generated", async () => {
-      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2026-01-15" });
-      await renderPage();
-
-      const afterCallback = mockAfter.mock.calls[0][0];
-      await afterCallback();
-
-      expect(mockStoreVerificationRecord).toHaveBeenCalledWith(
-        "abc12345",
-        expect.objectContaining({
-          handle: "testuser",
-          adjustedComposite: 65,
-          generatedAt: "2026-01-15",
-        }),
-      );
-    });
-
-    it("after() callback inserts snapshot and updates cache", async () => {
-      mockBuildSnapshot.mockReturnValue({ date: "2026-01-15" });
-      await renderPage();
-
-      const afterCallback = mockAfter.mock.calls[0][0];
-      await afterCallback();
-
-      expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", { date: "2026-01-15" });
-      expect(mockUpdateSnapshotCache).toHaveBeenCalledWith("testuser", { date: "2026-01-15" });
-    });
-
-    it("does not register after() when stats are null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      await renderPage();
-      expect(mockAfter).not.toHaveBeenCalled();
-    });
-
-    it("does not store verification record when code is null", async () => {
-      mockGenerateVerificationCode.mockReturnValue(null);
-      await renderPage();
-
-      const afterCallback = mockAfter.mock.calls[0][0];
-      await afterCallback();
-
-      expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
-    });
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      { verification: { hash: "abc12345", date: "2026-04-17" } },
+    );
   });
 
-  // -------------------------------------------------------------------------
-  // Phase 4: Craft score integration
-  // -------------------------------------------------------------------------
+  it("does not register side effects when materialization returns null", async () => {
+    mockMaterializePublicProfile.mockResolvedValue(null);
 
-  describe("craft score integration", () => {
-    it("passes craft score to computeImpactV6 when tool insights exist", async () => {
-      mockDbGetToolInsights.mockResolvedValue({
-        tool: "claude-code",
-        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
-        craftScore: 68,
-        tier: "Practitioner",
-        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
-        computedAt: "2025-03-01T00:00:00Z",
-      });
-      await renderPage();
-      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, 68);
-    });
+    await renderPage();
 
-    it("passes undefined craft score when no tool insights exist", async () => {
-      await renderPage();
-      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, undefined);
-    });
-
-    it("does not render CraftBreakdown component", async () => {
-      // CraftBreakdown was removed in Phase 4 — verify it's not imported
-      mockDbGetToolInsights.mockResolvedValue({
-        tool: "claude-code",
-        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
-        craftScore: 68,
-        tier: "Practitioner",
-        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
-        computedAt: "2025-03-01T00:00:00Z",
-      });
-      // Should still render without errors — CraftBreakdown section is gone
-      const result = await renderPage();
-      expect(result).toBeDefined();
-    });
+    expect(mockAfter).not.toHaveBeenCalled();
+    expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // Phase 3: GlobalCommandBar lazy loading
-  // -------------------------------------------------------------------------
+  it("tolerates avatar fetch failure for inline rendering", async () => {
+    mockGetAvatarBase64.mockRejectedValue(new Error("avatar down"));
 
-  describe("lazy-loaded GlobalCommandBar", () => {
-    it("renders without importing GlobalCommandBar eagerly", async () => {
-      // This test verifies the page doesn't crash with the dynamic import
-      const result = await renderPage();
-      expect(result).toBeDefined();
-    });
-  });
+    await renderPage();
 
-  // -------------------------------------------------------------------------
-  // Edge cases
-  // -------------------------------------------------------------------------
-
-  describe("edge cases", () => {
-    it("calls notFound for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      // notFound() validation is in the outer SharePage wrapper, not SharePageContent
-      await expect(
-        SharePage({ params: Promise.resolve({ handle: "bad!!handle" }) }),
-      ).rejects.toThrow("NOT_FOUND");
-      expect(mockNotFound).toHaveBeenCalled();
-    });
-
-    it("does not call renderBadgeSvg for interactive preview (custom config)", async () => {
-      // Return a custom config that differs from defaults
-      mockCacheGet.mockResolvedValue({
-        background: "aurora",
-        cardStyle: "default",
-        border: "default",
-        scoreEffect: "default",
-        heatmapAnimation: "default",
-        interaction: "default",
-        statsDisplay: "default",
-        tierTreatment: "default",
-        celebration: "default",
-      });
-      await renderPage();
-      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
-    });
-
-    it("uses handle as displayLabel when stats has no displayName", async () => {
-      mockGetStats.mockResolvedValue({ ...FAKE_STATS, displayName: undefined });
-      const result = await renderPage();
-      // The JSX tree should contain the handle as fallback label
-      expect(result).toBeDefined();
-    });
-
-    it("uses current ISO string as badgeCacheBuster when stats is null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      const result = await renderPage();
-      // Should render without crashing — falls through to img fallback
-      expect(result).toBeDefined();
-    });
-
-    it("does not call smoothScore or getTier when impact is null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      await renderPage();
-      expect(mockSmoothScore).not.toHaveBeenCalled();
-      expect(mockGetTier).not.toHaveBeenCalled();
-    });
-
-    it("does not register after() when inlineSvg is null (interactive preview)", async () => {
-      // Custom config + stats + impact → interactive preview path → no inlineSvg → no after()
-      mockCacheGet.mockResolvedValue({
-        background: "aurora",
-        cardStyle: "default",
-        border: "default",
-        scoreEffect: "default",
-        heatmapAnimation: "default",
-        interaction: "default",
-        statsDisplay: "default",
-        tierTreatment: "default",
-        celebration: "default",
-      });
-      await renderPage();
-      expect(mockAfter).not.toHaveBeenCalled();
-    });
-
-    it("uses config that matches all defaults as non-custom (no interactive preview)", async () => {
-      // Config exactly matching DEFAULT_BADGE_CONFIG should NOT trigger interactive preview
-      mockCacheGet.mockResolvedValue({
-        background: "solid",
-        cardStyle: "flat",
-        border: "solid-amber",
-        scoreEffect: "standard",
-        heatmapAnimation: "fade-in",
-        interaction: "static",
-        statsDisplay: "static",
-        tierTreatment: "standard",
-        celebration: "none",
-      });
-      await renderPage();
-      // Should use inline SVG, not interactive preview
-      expect(mockRenderBadgeSvg).toHaveBeenCalled();
-    });
-
-    it("treats null config as non-custom (hasCustomConfig returns false)", async () => {
-      mockCacheGet.mockResolvedValue(null);
-      await renderPage();
-      expect(mockRenderBadgeSvg).toHaveBeenCalled();
-    });
-
-    it("personJsonLd omits description when impact is null", async () => {
-      mockGetStats.mockResolvedValue(null);
-      const result = await renderPage();
-      // With null stats, impact is null, so personJsonLd should not have description
-      expect(result).toBeDefined();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // generateMetadata
-  // -------------------------------------------------------------------------
-
-  describe("generateMetadata", () => {
-    it("returns 'Not Found' title for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const meta = await generateMetadata({
-        params: Promise.resolve({ handle: "bad!!handle" }),
-      });
-      expect(meta).toEqual({ title: "Not Found" });
-    });
-
-    it("returns full metadata for valid handle", async () => {
-      mockIsValidHandle.mockReturnValue(true);
-      const meta = await generateMetadata({
-        params: Promise.resolve({ handle: "testuser" }),
-      });
-
-      expect(meta.title).toBe("@testuser — Developer Impact, Decoded");
-      expect(meta.description).toContain("testuser");
-      expect(meta.openGraph).toBeDefined();
-      expect(meta.openGraph!.title).toContain("testuser");
-      expect(meta.openGraph!.url).toBe("https://chapa.thecreativetoken.com/u/testuser");
-      expect(meta.openGraph!.images).toHaveLength(1);
-      expect((meta.openGraph!.images as Array<{ url: string }>)[0].url).toContain("og-image?v=2026-01-01");
-      expect(meta.twitter).toBeDefined();
-      expect(meta.twitter!.card).toBe("summary_large_image");
-      expect(meta.alternates?.canonical).toBe("https://chapa.thecreativetoken.com/u/testuser");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // after() callback — snapshot insert not-inserted branch
-  // -------------------------------------------------------------------------
-
-  describe("after() snapshot cache skip", () => {
-    it("does not update snapshot cache when dbInsertSnapshot returns false", async () => {
-      mockDbInsertSnapshot.mockResolvedValue(false);
-      await renderPage();
-
-      const afterCallback = mockAfter.mock.calls[0][0];
-      await afterCallback();
-
-      expect(mockDbInsertSnapshot).toHaveBeenCalled();
-      expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
-    });
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ avatarDataUri: undefined }),
+    );
   });
 });

@@ -4,13 +4,18 @@ import { escapeHtml } from "@/lib/utils/escape";
 import { markUnsubscribed } from "@/lib/email/audience";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { verifyUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 
 /**
- * GET /api/notifications/unsubscribe?handle=:handle
+ * GET /api/notifications/unsubscribe?handle=:handle&token=:token
  *
- * Simple unsubscribe endpoint linked from score-bump emails.
+ * Unsubscribe endpoint linked from score-bump emails.
  * Sets email_notifications=false for the user. Returns a static
  * HTML confirmation page.
+ *
+ * Security: requires a valid HMAC-signed ownership token to prevent
+ * unauthenticated third parties from unsubscribing arbitrary users.
  *
  * Rate limited: 10 requests per IP per 60 seconds.
  * Fail-open: even if the DB update fails, shows the confirmation
@@ -35,6 +40,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const token = request.nextUrl.searchParams.get("token") ?? "";
+  const secret = process.env.NEXTAUTH_SECRET?.trim() ?? "";
+
+  if (!verifyUnsubscribeToken(handle, token, secret)) {
+    return NextResponse.json(
+      { error: "Invalid or missing unsubscribe token" },
+      { status: 401 },
+    );
+  }
+
   // Best-effort DB update + Resend sync — fail-open for UX
   const [emailInfo] = await Promise.all([
     dbGetUserEmail(handle).catch(() => null),
@@ -48,7 +63,7 @@ export async function GET(request: NextRequest) {
 
   // Sync unsubscribe to Resend (fire-and-forget)
   if (emailInfo?.email) {
-    void markUnsubscribed(emailInfo.email).catch(() => {});
+    fireAndForget(() => markUnsubscribed(emailInfo.email), () => undefined);
   }
 
   // Return a simple confirmation page

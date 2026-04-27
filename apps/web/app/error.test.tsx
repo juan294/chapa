@@ -17,7 +17,7 @@ describe("error.tsx — error boundary", () => {
   });
 
   it("contains a retry/reset button", () => {
-    expect(SOURCE).toContain("Try again");
+    expect(SOURCE).toContain("COPY.tryAgain");
   });
 
   it("calls reset on retry button click", () => {
@@ -25,10 +25,17 @@ describe("error.tsx — error boundary", () => {
   });
 
   it("contains a 'go home' link", () => {
-    expect(SOURCE).toContain("Go home");
+    expect(SOURCE).toContain("COPY.goHome");
   });
 
   it("links to the root path", () => {
     expect(SOURCE).toContain('href="/"');
+  });
+
+  it("uses terminal-red semantics for error state", () => {
+    expect(SOURCE).toContain("StatusCallout");
+    expect(SOURCE).toContain('variant="error"');
+    expect(SOURCE).toContain("text-terminal-red");
+    expect(SOURCE).not.toContain("amber");
   });
 });

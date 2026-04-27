@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useOwnerCacheWarm } from "./useOwnerCacheWarm";
+import { useOwnerCacheWarm, clearCacheWarmState } from "./useOwnerCacheWarm";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -129,5 +129,43 @@ describe("useOwnerCacheWarm", () => {
       "/api/refresh?handle=user%20name",
       { method: "POST" },
     );
+  });
+});
+
+describe("clearCacheWarmState", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("is exported from useOwnerCacheWarm module", () => {
+    expect(typeof clearCacheWarmState).toBe("function");
+  });
+
+  it("removes all chapa:refreshed: keys from sessionStorage", () => {
+    sessionStorage.setItem("chapa:refreshed:userA", "1");
+    sessionStorage.setItem("chapa:refreshed:userB", "1");
+    sessionStorage.setItem("unrelated-key", "keep");
+
+    clearCacheWarmState();
+
+    expect(sessionStorage.getItem("chapa:refreshed:userA")).toBeNull();
+    expect(sessionStorage.getItem("chapa:refreshed:userB")).toBeNull();
+    // Unrelated keys must not be removed
+    expect(sessionStorage.getItem("unrelated-key")).toBe("keep");
+  });
+
+  it("does nothing when sessionStorage has no chapa:refreshed: entries", () => {
+    sessionStorage.setItem("other-app-key", "value");
+
+    expect(() => clearCacheWarmState()).not.toThrow();
+    expect(sessionStorage.getItem("other-app-key")).toBe("value");
+  });
+
+  it("does nothing when sessionStorage is empty", () => {
+    expect(() => clearCacheWarmState()).not.toThrow();
   });
 });

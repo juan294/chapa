@@ -45,7 +45,7 @@ describe("Home page render", () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("Decoded")).toBeDefined();
+    expect(screen.getByText("decodificado")).toBeDefined();
   });
 
   it("renders the navbar", async () => {
@@ -59,25 +59,25 @@ describe("Home page render", () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("MULTI-DIMENSIONAL")).toBeDefined();
-    expect(screen.getByText("VERIFIED METRICS")).toBeDefined();
+    expect(screen.getByText("MULTIDIMENSIONAL")).toBeDefined();
+    expect(screen.getByText("MÉTRICAS VERIFICADAS")).toBeDefined();
   });
 
   it("renders how-it-works steps", async () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("Sign in with GitHub")).toBeDefined();
-    expect(screen.getByText("We build your profile")).toBeDefined();
-    expect(screen.getByText("Share your badge")).toBeDefined();
+    expect(screen.getByText("Inicia sesión con GitHub")).toBeDefined();
+    expect(screen.getByText("Construimos tu perfil")).toBeDefined();
+    expect(screen.getByText("Comparte tu insignia")).toBeDefined();
   });
 
   it("renders stats section", async () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("archetypes")).toBeDefined();
-    expect(screen.getByText("dimensions")).toBeDefined();
+    expect(screen.getByText("arquetipos")).toBeDefined();
+    expect(screen.getByText("dimensiones")).toBeDefined();
   });
 
   it("renders error banner when error param present", async () => {

@@ -2,18 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 
 interface Step {
   label: string;
   status: "pending" | "active" | "done" | "error";
 }
 
-const INITIAL_STEPS: Step[] = [
-  { label: "Authenticated with GitHub", status: "done" },
-  { label: "Fetching contribution data", status: "active" },
-  { label: "Computing Impact profile", status: "pending" },
-  { label: "Rendering badge", status: "pending" },
-];
+const INITIAL_STEPS: Step[] = SPANISH_PUBLIC_COPY.generation.steps.map(
+  (step) => ({ ...step }),
+);
 
 const STEP_DELAY_MS = 300;
 const REDIRECT_DELAY_MS = 800;
@@ -52,7 +50,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         if (cancelled) return;
 
         if (!res.ok) {
-          setError("Something went wrong generating your badge.");
+          setError(SPANISH_PUBLIC_COPY.generation.error);
           setSteps((prev) =>
             prev.map((s) =>
               s.status === "active" ? { ...s, status: "error" } : s,
@@ -64,7 +62,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         completeRemainingSteps();
       } catch {
         if (cancelled) return;
-        setError("Something went wrong generating your badge.");
+        setError(SPANISH_PUBLIC_COPY.generation.error);
         setSteps((prev) =>
           prev.map((s) =>
             s.status === "active" ? { ...s, status: "error" } : s,
@@ -93,13 +91,13 @@ export function GeneratingProgress({ handle }: { handle: string }) {
     <main id="main-content" className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-md">
         {/* Terminal header */}
-        <div className="mb-8 animate-fade-in-up">
+        <div className="mb-8 animate-fade-in-up motion-reduce:animate-none">
           <p className="font-heading text-xs tracking-widest uppercase text-text-secondary">
             <span className="text-terminal-dim">$</span>{" "}
             chapa generate
           </p>
           <h1 className="mt-2 font-heading text-lg font-bold tracking-tight text-text-primary">
-            Generating badge for{" "}
+            {SPANISH_PUBLIC_COPY.generation.heading}{" "}
             <span className="text-amber">@{handle}</span>
           </h1>
         </div>
@@ -145,7 +143,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
                   </svg>
                 )}
                 {step.status === "active" && (
-                  <span className="h-3 w-3 animate-pulse rounded-full bg-amber" />
+                  <span className="h-3 w-3 animate-pulse motion-reduce:animate-none rounded-full bg-amber" />
                 )}
                 {step.status === "error" && (
                   <svg
@@ -187,21 +185,21 @@ export function GeneratingProgress({ handle }: { handle: string }) {
 
         {/* Error message */}
         {error && (
-          <div role="alert" className="mt-6 animate-terminal-fade-in rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
+          <div role="alert" className="mt-6 animate-terminal-fade-in motion-reduce:animate-none rounded-lg border border-terminal-red/20 bg-terminal-red/[0.06] p-4">
             <p className="font-heading text-sm text-terminal-red">{error}</p>
             <a
               href={`/generating/${encodeURIComponent(handle)}`}
               className="mt-2 inline-block font-heading text-sm text-text-secondary underline underline-offset-4 hover:text-text-primary"
             >
-              Try again
+              {SPANISH_PUBLIC_COPY.generation.retry}
             </a>
           </div>
         )}
 
         {/* Redirect notice */}
         {done && (
-          <p className="mt-6 animate-terminal-fade-in font-heading text-xs text-text-secondary">
-            Redirecting to your badge...
+          <p className="mt-6 animate-terminal-fade-in motion-reduce:animate-none font-heading text-xs text-text-secondary">
+            {SPANISH_PUBLIC_COPY.generation.redirect}
           </p>
         )}
       </div>

@@ -32,7 +32,10 @@ vi.mock("@/lib/email/templates/announcement", () => ({
   buildAnnouncementText: vi.fn().mockReturnValue("test"),
 }));
 
-import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+import { adminAuthBeforeEach } from "@/lib/test-helpers/admin-auth";
+import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
+import { rateLimit } from "@/lib/cache/redis";
 import { requireSession } from "@/lib/auth/require-session";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { getResend } from "@/lib/email/resend";
@@ -63,6 +66,7 @@ const CAMPAIGN = {
 
 beforeEach(() => {
   adminAuthBeforeEach();
+  vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   vi.mocked(requireSession).mockReturnValue({
     session: { token: "t", login: "admin", name: "Admin", avatar_url: "" },
   });
@@ -104,6 +108,66 @@ describe("POST /api/admin/campaigns/[id]/test", () => {
     vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, current: 11, limit: 10 });
     const res = await POST(makeRequest({ email: "test@test.com" }), { params: mockParams });
     expect(res.status).toBe(429);
+  });
+
+  it("rate-limits test emails to 5 per admin per 60 seconds", async () => {
+    const mockSend = vi.fn().mockResolvedValue({ data: { id: "email-1" }, error: null });
+    const adminCounts = new Map<string, number>();
+
+    vi.mocked(dbGetCampaign).mockResolvedValue(CAMPAIGN);
+    vi.mocked(getResend).mockReturnValue({ emails: { send: mockSend } } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(rateLimit).mockImplementation(async (key: string) => {
+      if (key.startsWith("ratelimit:admin-campaigns:")) {
+        return { allowed: true, current: 1, limit: 10 };
+      }
+      if (key.startsWith("ratelimit:campaign-test:admin:")) {
+        const next = (adminCounts.get(key) ?? 0) + 1;
+        adminCounts.set(key, next);
+        return { allowed: next <= 5, current: next, limit: 5 };
+      }
+      return { allowed: true, current: 1, limit: 1 };
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const response = await POST(
+        makeRequest({ email: `test${i}@test.com` }),
+        { params: mockParams },
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const res = await POST(makeRequest({ email: "blocked@test.com" }), { params: mockParams });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("rate-limits duplicate recipients to 1 per 300 seconds", async () => {
+    const mockSend = vi.fn().mockResolvedValue({ data: { id: "email-1" }, error: null });
+    const recipientCounts = new Map<string, number>();
+
+    vi.mocked(dbGetCampaign).mockResolvedValue(CAMPAIGN);
+    vi.mocked(getResend).mockReturnValue({ emails: { send: mockSend } } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(rateLimit).mockImplementation(async (key: string) => {
+      if (
+        key.startsWith("ratelimit:admin-campaigns:") ||
+        key.startsWith("ratelimit:campaign-test:admin:")
+      ) {
+        return { allowed: true, current: 1, limit: 10 };
+      }
+      if (key.startsWith("ratelimit:campaign-test:recipient:")) {
+        const next = (recipientCounts.get(key) ?? 0) + 1;
+        recipientCounts.set(key, next);
+        return { allowed: next <= 1, current: next, limit: 1 };
+      }
+      return { allowed: true, current: 1, limit: 1 };
+    });
+
+    const first = await POST(makeRequest({ email: "test@test.com" }), { params: mockParams });
+    expect(first.status).toBe(200);
+
+    const second = await POST(makeRequest({ email: "test@test.com" }), { params: mockParams });
+    expect(second.status).toBe(429);
+    expect(second.headers.get("Retry-After")).toBe("300");
   });
 
   it("returns 400 when email is missing", async () => {

@@ -1,47 +1,56 @@
 # Triage Report
-> Generated on 2026-04-03 | 6 reports processed | 9 action items
+> Generated on 2026-04-26 | 5 reports processed | 8 action items
 
 ## Agent Failures
-None — all agents ran successfully. No error logs in the last 24h.
+None — both recent agent logs (`coverage-agent`, `cost-analyst`) ran cleanly.
 
 ## Reports Reviewed
 
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi | — | 0 (no new commits) |
-| 2 | `cost-analyst-report.md` | cost-analyst | YELLOW | 3 (P1 rate limit, P3 supplemental, LOW turbopack) |
-| 3 | `coverage-report.md` | coverage | GREEN | 3 (P1 AdminDashboard, P2 verify page, P2 ConfirmDialog/AuthorTypewriter) |
-| 4 | `documentation-report.md` | documentation | GREEN | 1 (P3 TESTPLATFORM_* comment) |
-| 5 | `performance-report.md` | performance | GREEN | 1 (LOW turbopack NFT — overlaps cost-analyst) |
-| 6 | `qa-report.md` | qa | GREEN | 1 (P1 rate limit — overlaps cost-analyst) |
+| 1 | cost-analyst-report.md | cost-analyst | GREEN | 0 actionable (P2-1 carried monitor) |
+| 2 | coverage-report.md | coverage | YELLOW | 8 |
+| 3 | cc-rpi-update-report.md | cc-rpi-update | GREEN | 0 (already at v1.17.2) |
+| 4 | update-docs-report.md | update-docs | GREEN | 0 (no flagged items) |
+| 5 | triage-report.md (prior) | triage | — | (self-reference) |
 
 ## Overall Status: GREEN
 
-All action items resolved. Only one YELLOW source report (cost-analyst). All P1s fixed.
+All 8 actionable items resolved. Test suite up from 7171 → 7192 (+21).
 
 ## Action Items Completed
 
-| # | Item | Source | Files Changed | Tests Added | Status |
-|---|------|--------|---------------|-------------|--------|
-| 1 | Revert refresh rate limit 15→5/hr | cost-analyst P1 | `app/api/refresh/route.ts` | ✓ (existing test validates) | DONE |
-| 2 | Clean supplemental key on OAuth disconnect | cost-analyst P3 | `lib/auth/platform-oauth.ts` | +2 tests in platform-oauth.test.ts | DONE |
-| 3 | Add turbopackIgnore to svg-to-png.ts | performance LOW | `lib/render/svg-to-png.ts` | — | DONE |
-| 4 | AdminDashboardClient dynamic import coverage | coverage P1 | `AdminDashboardClient.test.tsx` | +3 sub-module mocks, loader() called | DONE |
-| 5 | verify/[hash]/page.tsx generateMetadata branches | coverage P2 | `page.render.test.tsx` | +3 generateMetadata tests | DONE |
-| 6 | ConfirmDialog.tsx dead branch removal | coverage P2 | `ConfirmDialog.tsx` | — (dead code removed) | DONE |
-| 7 | AuthorTypewriter.tsx null guard removal | coverage P2 | `AuthorTypewriter.tsx` | — (dead code removed) | DONE |
-| 8 | TESTPLATFORM_* clarification comment | docs P3 | `platform-oauth.test.ts` | — | DONE |
-| 9 | shared-context.md triage entry | housekeeping | `docs/agents/shared-context.md` | — | DONE |
+| # | Item | Source | Tests | Status |
+|---|------|--------|-------|--------|
+| 1 | BadgeToolbar flake: remove 5 redundant `vi.stubGlobal("Image", origImage)` + 5 unused `origImage` lines (2026-04-25 fix did not land) | coverage | 0 (fix); 5/5 reruns pass | ✅ Done |
+| 2 | fire-and-forget: cover default `onError` parameter (was 0% branches) | coverage | +2 | ✅ Done |
+| 3 | telemetry route: cover `(err) => ...` onError when `dbInsertTelemetry` rejects | coverage | +1 | ✅ Done |
+| 4 | refresh + recalculate: cover `() => undefined` onError when `updateCraftCache` rejects | coverage | +2 | ✅ Done |
+| 5 | cookie-policy: cover URL parse `catch` fallback | coverage | +1 | ✅ Done |
+| 6 | unsubscribe-token: dedicated test sibling (roundtrip + 8 invalid-input cases) | coverage | +9 | ✅ Done |
+| 7 | unsubscribe-url: focused unit test (handle lowercase, signed token, base URL fallback) | coverage | +2 | ✅ Done |
+| 8 | post-write-invalidation: cover the 4 false-option branches (62.5% → expected 100%) | coverage | +4 | ✅ Done |
+
+## Skipped with Reason
+
+| Item | Reason |
+|------|--------|
+| Cost Analyst P2-1: `dbGetCampaignStats` GROUP BY RPC migration | Threshold-gated (>5K sends/campaign) — not yet reached. Report itself classifies as "Acceptable today". Premature optimization to migrate now. Stays a monitor. |
+| Cost Analyst M1–M4 monitors | Explicitly "no action — track only" in the source report. |
 
 ## Verification
+- [x] All tests passing (7192/7192)
+- [x] Typecheck clean (0 errors)
+- [x] Lint clean (0 issues)
+- [x] BadgeToolbar flake: 5 consecutive reruns, all pass
+- [x] Pre-commit hook ran successfully (typecheck + lint + test)
+- [x] Pushed to `develop` as `a897b0f`
+- [x] CI: monitoring (see push-accountability)
 
-- [x] All tests passing: 6,883/6,883 (+4 vs 6,879)
-- [x] Typecheck clean: 0 errors
-- [x] Lint clean: 0 warnings
-- [x] CI push: develop → pushed, background monitor running
+## Carried Items
+- **Cost Analyst P2-1** — `dbGetCampaignStats()` RPC migration when any campaign exceeds ~5K sends.
+- **Cost Analyst M1–M4** — avatar cache, OG image cache, HLL memory, `metrics_snapshots` row growth (cleanup wired). Track only.
+- **Coverage P3** — `app/experiments/**` 56.7% (Canvas/WebGL JSDOM-blocked, accepted), `demoData.ts`/`archetypeDemoData.ts` 50% branch (overload signatures, accepted).
 
-## Carried Items (none)
-
-All previously carried items from this cycle:
-- MONITOR: OG image Redis memory — still carried (no action until 5K+ users)
-- MONITOR: sync-audience pagination — still carried (future scale only)
+## Notes for Next Triage
+- Verify with `grep` and a targeted rerun that flake fixes / coverage claims actually landed before marking them resolved. The 2026-04-25 cycle overstated completion on both BadgeToolbar and `fire-and-forget.ts` — surfaced again here.

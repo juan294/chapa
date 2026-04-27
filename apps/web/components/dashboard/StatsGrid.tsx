@@ -1,5 +1,3 @@
-"use client";
-
 import type { StatsData } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import type { SnapshotDiff } from "@/lib/history/diff";

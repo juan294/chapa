@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
+const STATUS_CALLOUT_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../../../components/StatusCallout.tsx"),
+  "utf-8",
+);
 
 describe("VerifyPage", () => {
   describe("hash validation", () => {
@@ -34,8 +38,8 @@ describe("VerifyPage", () => {
   });
 
   describe("VerifiedCard content", () => {
-    it("displays 'Verified Badge' heading", () => {
-      expect(SOURCE).toContain("Verified Badge");
+    it("displays verified heading via copy", () => {
+      expect(SOURCE).toContain("COPY.verifiedTitle");
     });
 
     it("shows developer handle as a link to share page", () => {
@@ -73,12 +77,12 @@ describe("VerifyPage", () => {
   });
 
   describe("NotFoundCard content", () => {
-    it("displays 'Not Found' heading", () => {
-      expect(SOURCE).toContain("Not Found");
+    it("displays not-found heading via copy", () => {
+      expect(SOURCE).toContain("COPY.notFoundTitle");
     });
 
-    it("mentions 30-day record retention", () => {
-      expect(SOURCE).toContain("30 days");
+    it("mentions 30-day record retention via copy", () => {
+      expect(SOURCE).toContain("COPY.notFoundExplanation");
     });
 
     it("shows the queried hash", () => {
@@ -88,12 +92,12 @@ describe("VerifyPage", () => {
   });
 
   describe("InvalidHashCard content", () => {
-    it("displays 'Invalid Hash' heading", () => {
-      expect(SOURCE).toContain("Invalid Hash");
+    it("displays invalid-hash heading via copy", () => {
+      expect(SOURCE).toContain("COPY.invalidHashTitle");
     });
 
-    it("explains the expected format", () => {
-      expect(SOURCE).toContain("8, 16, or 32 hex characters");
+    it("explains the expected format via copy", () => {
+      expect(SOURCE).toContain("COPY.invalidHashDescription");
     });
   });
 
@@ -123,11 +127,13 @@ describe("VerifyPage", () => {
 
   describe("heading hierarchy (#288)", () => {
     it("uses <h2> for Dimensions section heading", () => {
-      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?Dimensions[\s\S]*?<\/h2>/);
+      expect(SOURCE).toContain("COPY.dimensions");
+      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?COPY\.dimensions[\s\S]*?<\/h2>/);
     });
 
     it("uses <h2> for Key Metrics section heading", () => {
-      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?Key Metrics[\s\S]*?<\/h2>/);
+      expect(SOURCE).toContain("COPY.keyMetrics");
+      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?COPY\.keyMetrics[\s\S]*?<\/h2>/);
     });
 
     it("section headings use font-heading class", () => {
@@ -145,8 +151,8 @@ describe("VerifyPage", () => {
       expect(SOURCE).toContain("Chapa");
     });
 
-    it("returns 'Invalid Hash' title for invalid hashes", () => {
-      expect(SOURCE).toContain("Invalid Hash");
+    it("returns invalid hash title for invalid hashes", () => {
+      expect(SOURCE).toContain("COPY.invalidHashTitle");
     });
 
     it("disables indexing with robots noindex", () => {
@@ -167,13 +173,28 @@ describe("VerifyPage", () => {
   describe("design system compliance", () => {
     it("uses semantic background tokens", () => {
       expect(SOURCE).toContain("bg-bg");
-      expect(SOURCE).toContain("bg-card");
+      expect(STATUS_CALLOUT_SOURCE).toContain("bg-complement/10");
+      expect(STATUS_CALLOUT_SOURCE).toContain("bg-terminal-red/10");
+      expect(STATUS_CALLOUT_SOURCE).toContain("bg-terminal-yellow/10");
     });
 
-    it("uses terminal color tokens for status indicators", () => {
-      expect(SOURCE).toContain("text-terminal-green");
-      expect(SOURCE).toContain("text-terminal-yellow");
-      expect(SOURCE).toContain("text-terminal-red");
+    it("uses shared semantic status primitives", () => {
+      expect(SOURCE).toContain("StatusCallout");
+      expect(SOURCE).toContain('variant="verification"');
+      expect(SOURCE).toContain('variant="warning"');
+      expect(SOURCE).toContain('variant="error"');
+    });
+
+    it("uses complement tokens for the verified trust state", () => {
+      expect(SOURCE).toContain("text-complement");
+      expect(SOURCE).not.toContain("text-terminal-green");
+      expect(SOURCE).not.toContain("bg-terminal-green");
+    });
+
+    it("uses terminal tokens only for warning and error states", () => {
+      expect(STATUS_CALLOUT_SOURCE).toContain("text-terminal-yellow");
+      expect(STATUS_CALLOUT_SOURCE).toContain("text-terminal-red");
+      expect(SOURCE).not.toContain("text-terminal-yellow");
     });
 
     it("uses stroke border token", () => {
@@ -185,7 +206,7 @@ describe("VerifyPage", () => {
     });
 
     it("all three cards have h1 headings", () => {
-      const h1Matches = SOURCE.match(/<h1\b/g) ?? [];
+      const h1Matches = SOURCE.match(/titleAs="h1"/g) ?? [];
       expect(h1Matches.length).toBe(3);
     });
   });

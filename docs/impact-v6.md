@@ -70,7 +70,7 @@ The badge radar chart renders as a 5-point pentagon when craft data exists, or f
 |--------|--------|-----|---------------|
 | Reviews submitted | 60% | 80 | Log |
 | Review-to-PR ratio | 25% | 5:1 | Linear |
-| Inverse micro-commit | 15% | — | Linear |
+| Batch size score | 15% | — | Linear |
 
 **Solo path** (reviewsSubmittedCount = 0):
 | Signal | Weight |
@@ -78,7 +78,14 @@ The badge radar chart renders as a 5-point pentagon when craft data exists, or f
 | PR description rate | 40% |
 | Feature branch rate | 25% |
 | Issue linkage rate | 20% |
-| Inverse micro-commit | 15% |
+| Batch size score | 15% |
+
+**Cliff guard (v6.2, #827):** for collaborative profiles, Quality returns
+`max(collaborativeFormula, soloFormula)`. This prevents a sharp drop when a
+user with strong solo signals (descriptions, feature branches, issue linkage)
+crosses the 0.15 review-to-PR threshold and switches scoring formulas. Without
+the guard, picking up a few reviews could lower Quality by 30–40 points;
+participation in code review must never be punished.
 
 ### Consistency (0–100) — Sustained contributions
 | Signal | Weight | Normalization |
@@ -140,6 +147,16 @@ Deliberate user actions (insights upload, platform connect) trigger immediate sc
 6. Updates the Redis snapshot cache
 
 This ensures that after an insights upload, the badge and share page immediately reflect the new score. EMA smoothing continues to apply for passive badge views where GitHub stats change organically.
+
+### Same-day refresh after a CLI supplemental upload (#826)
+
+A CLI supplemental upload (`POST /api/supplemental`) follows a different path than an insights upload — it does not call `/api/recalculate` directly. Instead, it sets a Redis marker `stats:dirty:<handle>` (1h TTL) so the **next** page render does the recompute:
+
+1. `materializeProfile` reads the marker via `isStatsDirty()` and threads `inputsChanged: true` through the impact pipeline.
+2. `applyImpactScorePolicy` propagates that flag into `smoothScore`, where `bypassSameDayLock` switches behavior: instead of returning today's snapshot value verbatim (the feedback-loop guard), EMA is applied against today's snapshot — anchoring the new score to today's already-smoothed value while absorbing partial credit for the change.
+3. `runPublicProfileSideEffects` routes today's snapshot through `dbReplaceSnapshot` (UPSERT), bypasses the per-day SETNX dedup guard so the legitimate refresh is not blocked, and clears the dirty marker after a successful write.
+
+When the marker is absent (the default), all of the above is no-op and the existing same-day lock applies — the feedback-loop protection is preserved.
 
 ### Upload Flow
 

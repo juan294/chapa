@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "SharePageOwnerContent.tsx"),
   "utf-8",
 );
+const COPY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../lib/copy/public-flow.ts"),
+  "utf-8",
+);
 
 describe("SharePageOwnerContent", () => {
   describe("client component", () => {
@@ -28,22 +32,22 @@ describe("SharePageOwnerContent", () => {
     });
   });
 
-  describe("owner-only sections", () => {
-    it("renders DataSources component for owners", () => {
+  describe("public insight sections", () => {
+    it("renders DataSources component for public viewers", () => {
       expect(SOURCE).toContain("DataSources");
     });
 
-    it("renders ImpactDashboard component for owners", () => {
+    it("renders ImpactDashboard component for public viewers", () => {
       expect(SOURCE).toContain("ImpactDashboard");
     });
 
-    it("renders embed snippets for owners", () => {
-      expect(SOURCE).toContain("Embed This Badge");
+    it("renders embed snippets for public viewers", () => {
+      expect(SOURCE).toContain("Incrustar esta insignia");
     });
 
     it("renders DataSources before Impact Breakdown heading", () => {
       const dsIndex = SOURCE.indexOf("DataSources");
-      const breakdownIndex = SOURCE.indexOf("Impact Breakdown");
+      const breakdownIndex = SOURCE.indexOf("Desglose de impacto");
       expect(dsIndex).toBeGreaterThan(-1);
       expect(breakdownIndex).toBeGreaterThan(-1);
       expect(dsIndex).toBeLessThan(breakdownIndex);
@@ -64,8 +68,8 @@ describe("SharePageOwnerContent", () => {
   });
 
   describe("visitor CTA", () => {
-    it("shows 'Discover your impact' CTA for non-owners", () => {
-      expect(SOURCE).toContain("Discover your impact");
+    it("shows a Spanish impact CTA for non-owners", () => {
+      expect(COPY_SOURCE).toContain("Descubre tu impacto");
     });
 
     it("CTA links to the homepage", () => {
@@ -73,7 +77,30 @@ describe("SharePageOwnerContent", () => {
     });
 
     it("uses curiosity-driven copy that focuses on the reader", () => {
-      expect(SOURCE).toContain("Curious what your developer impact looks like");
+      expect(COPY_SOURCE).toContain("¿Quieres ver cómo se ve tu impacto como desarrollador?");
+    });
+
+    it("uses centralized public-flow copy", () => {
+      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
+    });
+  });
+
+  // #743 — empty state retry mechanism
+  describe("empty state retry mechanism (#743)", () => {
+    it("has a Regenerate button in the empty state", () => {
+      expect(SOURCE).toContain("Regenerar");
+    });
+
+    it("empty state calls /api/refresh endpoint", () => {
+      expect(SOURCE).toContain("/api/refresh");
+    });
+
+    it("empty state includes support mailto link", () => {
+      expect(SOURCE).toContain("mailto:");
+    });
+
+    it("Regenerate button uses POST method", () => {
+      expect(SOURCE).toContain('method: "POST"');
     });
   });
 });

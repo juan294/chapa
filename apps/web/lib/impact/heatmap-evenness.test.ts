@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { computeHeatmapEvenness, computeWeekCoverage } from "./heatmap-evenness";
+import {
+  aggregateWeeklyTotals,
+  computeHeatmapEvenness,
+  computeWeekCoverage,
+  median,
+} from "./heatmap-evenness";
 import type { HeatmapDay } from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
@@ -9,14 +14,17 @@ import type { HeatmapDay } from "@chapa/shared";
 /** Build heatmap data from weekly totals (13 weeks × 7 days). */
 function makeHeatmap(weeklyTotals: number[]): HeatmapDay[] {
   const days: HeatmapDay[] = [];
+  const start = new Date("2025-01-05T00:00:00Z");
   for (let w = 0; w < 13; w++) {
     const weekTotal = weeklyTotals[w] ?? 0;
     for (let d = 0; d < 7; d++) {
+      const date = new Date(start);
+      date.setUTCDate(start.getUTCDate() + w * 7 + d);
       // Spread weekly total evenly across days (remainder goes to first days)
       const perDay = Math.floor(weekTotal / 7);
       const extra = d < weekTotal % 7 ? 1 : 0;
       days.push({
-        date: `2025-01-${String(w * 7 + d + 1).padStart(2, "0")}`,
+        date: date.toISOString().slice(0, 10),
         count: perDay + extra,
       });
     }
@@ -26,11 +34,37 @@ function makeHeatmap(weeklyTotals: number[]): HeatmapDay[] {
 
 /** Build heatmap from raw daily counts (91 entries). */
 function makeHeatmapFromDays(dailyCounts: number[]): HeatmapDay[] {
+  const start = new Date("2025-01-05T00:00:00Z");
   return dailyCounts.map((count, i) => ({
-    date: `2025-01-${String(i + 1).padStart(2, "0")}`,
+    date: new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10),
     count,
   }));
 }
+
+function makeDailyHeatmap(
+  startDate: string,
+  dailyCounts: number[],
+): HeatmapDay[] {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  return dailyCounts.map((count, index) => {
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    return {
+      date: date.toISOString().slice(0, 10),
+      count,
+    };
+  });
+}
+
+describe("median", () => {
+  it("returns the arithmetic mean of the middle pair for even-length arrays", () => {
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+  });
+
+  it("is stable for odd-length arrays", () => {
+    expect(median([1, 2, 3])).toBe(2);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // computeHeatmapEvenness(heatmapData)
@@ -166,10 +200,9 @@ describe("computeHeatmapEvenness(heatmapData)", () => {
   });
 
   it("handles all activity on a single day only", () => {
-    const days = new Array(91).fill(0).map((_, i) => ({
-      date: `2025-01-${String(i + 1).padStart(2, "0")}`,
-      count: i === 0 ? 100 : 0,
-    }));
+    const days = makeHeatmapFromDays(
+      Array.from({ length: 91 }, (_, i) => (i === 0 ? 100 : 0)),
+    );
     const score = computeHeatmapEvenness(days);
     expect(score).toBeLessThan(0.3);
   });
@@ -247,6 +280,17 @@ describe("computeWeekCoverage(heatmapData)", () => {
     expect(computeWeekCoverage(heatmap)).toBeCloseTo(1 / 13, 5);
   });
 
+  it("uses a minimum 4-week denominator for short windows", () => {
+    const oneWeek = makeHeatmapFromDays([1, 1, 1, 1, 1, 1, 1]);
+    expect(computeWeekCoverage(oneWeek)).toBe(0.25);
+  });
+
+  it("does not over-report consistency for a 7-day window that spans two calendar weeks", () => {
+    const spanningWeek = makeDailyHeatmap("2025-01-01", [1, 1, 1, 1, 1, 1, 1]);
+    expect(computeWeekCoverage(spanningWeek)).toBeLessThan(1);
+    expect(computeWeekCoverage(spanningWeek)).toBe(0.5);
+  });
+
   it("is always between 0 and 1 (inclusive)", () => {
     const scenarios = [
       makeHeatmap([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -262,6 +306,18 @@ describe("computeWeekCoverage(heatmapData)", () => {
 
   it("handles single-week heatmap", () => {
     const oneWeek = makeHeatmapFromDays([3, 0, 0, 0, 0, 0, 0]);
-    expect(computeWeekCoverage(oneWeek)).toBe(1.0);
+    expect(computeWeekCoverage(oneWeek)).toBe(0.25);
+  });
+});
+
+describe("aggregateWeeklyTotals", () => {
+  it("buckets by calendar week start instead of positional index", () => {
+    const wedStart = makeDailyHeatmap("2025-01-01", [1, 2, 3, 4, 5, 6, 7]);
+    const buckets = aggregateWeeklyTotals(wedStart);
+
+    expect(buckets).toEqual([
+      { startOfWeek: "2024-12-29", total: 10 },
+      { startOfWeek: "2025-01-05", total: 18 },
+    ]);
   });
 });

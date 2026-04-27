@@ -2,8 +2,29 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 
 const STORAGE_PREFIX = "chapa:refreshed:";
+
+/**
+ * Clear all owner cache warm sessionStorage entries.
+ *
+ * Call this on logout so that a subsequent login as a different user
+ * does not see warm-cache debounce state from the previous session.
+ */
+export function clearCacheWarmState(): void {
+  if (typeof sessionStorage === "undefined") return;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key?.startsWith(STORAGE_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+  for (const key of keysToRemove) {
+    sessionStorage.removeItem(key);
+  }
+}
 
 /**
  * Silently warm the stats cache with OAuth data when the badge owner
@@ -27,15 +48,17 @@ export function useOwnerCacheWarm(handle: string, isOwner: boolean): void {
       return;
     }
 
-    fetch(`/api/refresh?handle=${encodeURIComponent(handle)}`, {
-      method: "POST",
-    })
-      .then((res) => {
-        if (res.ok) {
-          try { sessionStorage.setItem(key, "1"); } catch {}
-          router.refresh();
-        }
-      })
-      .catch(() => {});
+    fireAndForget(
+      () =>
+        fetch(`/api/refresh?handle=${encodeURIComponent(handle)}`, {
+          method: "POST",
+        }).then((res) => {
+          if (res.ok) {
+            try { sessionStorage.setItem(key, "1"); } catch {}
+            router.refresh();
+          }
+        }),
+      () => undefined,
+    );
   }, [handle, isOwner, router]);
 }

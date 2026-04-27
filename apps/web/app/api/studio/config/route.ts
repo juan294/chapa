@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
-import { requireSession } from "@/lib/auth/require-session";
+import {
+  getOptionalRequestSession,
+  getSessionSecret,
+  requireRequestSession,
+} from "@/lib/auth/session";
 import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
@@ -15,13 +18,11 @@ export async function GET(request: NextRequest): Promise<Response> {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
+  if (!getSessionSecret()) {
     return NextResponse.json({ config: null });
   }
 
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
+  const session = getOptionalRequestSession(request);
   if (!session) {
     return NextResponse.json(
       { error: "Authentication required" },
@@ -42,7 +43,7 @@ export async function PUT(request: NextRequest): Promise<Response> {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { session, error } = requireSession(request);
+  const { session, error } = requireRequestSession(request);
   if (error) return error;
 
   // Parse body

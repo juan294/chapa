@@ -131,7 +131,7 @@ test.describe("Integration — Share page (/u/:handle)", () => {
     const response = await page.goto(`/u/${HANDLE}`, GOTO_OPTS);
     if (!response?.ok()) return;
 
-    // The badge is rendered as <img src="/u/handle/badge.svg?v=..." alt="Chapa badge for handle">
+    // The fallback badge is rendered as <img src="/u/handle/badge.svg?v=..." alt="Chapa badge for handle">
     const badgeImg = page.locator(`img[alt*="badge"][alt*="${HANDLE}"]`);
     const count = await badgeImg.count();
 
@@ -139,8 +139,7 @@ test.describe("Integration — Share page (/u/:handle)", () => {
       const src = await badgeImg.first().getAttribute("src");
       expect(src).toContain(`/u/${HANDLE}/badge.svg`);
     } else {
-      // If no <img>, the page might use the interactive ShareBadgePreviewLazy
-      // component which renders an inline SVG instead. Either is valid.
+      // The primary path server-renders the badge SVG inline.
       const inlineSvg = page.locator("svg");
       const svgCount = await inlineSvg.count();
       expect(svgCount).toBeGreaterThanOrEqual(1);

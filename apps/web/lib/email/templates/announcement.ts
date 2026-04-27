@@ -7,6 +7,7 @@
 
 import { escapeHtml } from "@/lib/email/resend";
 import { featureRow } from "@/lib/email/html-helpers";
+import { buildUnsubscribeUrl } from "@/lib/email/unsubscribe-url";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,17 +21,6 @@ export interface AnnouncementData {
   ctaText: string;
   ctaUrl: string;
   previewText?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Base URL helper
-// ---------------------------------------------------------------------------
-
-function getBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
-    "https://chapa.thecreativetoken.com"
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -56,10 +46,7 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
     .filter(Boolean);
   const ctaText = escapeHtml(data.ctaText);
   const ctaUrl = escapeHtml(data.ctaUrl);
-  const baseUrl = getBaseUrl();
-  const unsubscribeUrl = escapeHtml(
-    `${baseUrl}/api/notifications/unsubscribe?handle=${data.handle}`,
-  );
+  const unsubscribeUrl = escapeHtml(buildUnsubscribeUrl(data.handle));
   const previewText = data.previewText
     ? escapeHtml(data.previewText)
     : undefined;
@@ -167,7 +154,6 @@ export function buildAnnouncementHtml(data: AnnouncementData): string {
 // ---------------------------------------------------------------------------
 
 export function buildAnnouncementText(data: AnnouncementData): string {
-  const baseUrl = getBaseUrl();
   const lines = [
     "CHAPA",
     "\u2500\u2500\u2500\u2500\u2500",
@@ -184,7 +170,7 @@ export function buildAnnouncementText(data: AnnouncementData): string {
     "",
     "\u2500\u2500\u2500\u2500\u2500",
     "chapa.thecreativetoken.com",
-    `Unsubscribe: ${baseUrl}/api/notifications/unsubscribe?handle=${data.handle}`,
+    `Unsubscribe: ${buildUnsubscribeUrl(data.handle)}`,
   ];
   return lines.join("\n");
 }

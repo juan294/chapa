@@ -1,7 +1,11 @@
 import { getVerificationRecord } from "@/lib/verification/store";
 import { Navbar } from "@/components/Navbar";
+import { StatusCallout } from "@/components/StatusCallout";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 import Link from "next/link";
 import type { Metadata } from "next";
+
+const COPY = SPANISH_PUBLIC_COPY.verifyDetail;
 
 const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
 
@@ -15,9 +19,9 @@ export async function generateMetadata({
   const { hash } = await params;
   return {
     title: HASH_PATTERN.test(hash)
-      ? `Verify Badge ${hash} — Chapa`
-      : "Invalid Hash — Chapa",
-    description: "Verify the authenticity of a Chapa developer impact badge.",
+      ? `Verificar insignia ${hash} — Chapa`
+      : "Hash inválido — Chapa",
+    description: "Verifica la autenticidad de cualquier insignia Chapa con su hash de verificación.",
     robots: { index: false },
   };
 }
@@ -78,37 +82,16 @@ function VerifiedCard({
   };
 }) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-terminal-green/15">
-          <svg
-            className="h-5 w-5 text-terminal-green"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold text-terminal-green">
-            Verified Badge
-          </h1>
-          <p className="text-sm text-text-secondary">
-            This badge was generated from authentic platform data.
-          </p>
-        </div>
-      </div>
-
+    <StatusCallout
+      variant="verification"
+      title={COPY.verifiedTitle}
+      titleAs="h1"
+      description={COPY.verifiedDescription}
+    >
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
-        <p className="text-xs text-text-secondary">Verification Code</p>
-        <p className="font-heading text-lg tracking-widest text-terminal-red">
+        <p className="text-xs text-text-secondary">{COPY.verificationCode}</p>
+        <p className="font-heading text-lg tracking-widest text-complement">
           {hash}
         </p>
       </div>
@@ -116,38 +99,38 @@ function VerifiedCard({
       {/* Profile info */}
       <div className="mb-6 space-y-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Developer</span>
+          <span className="text-sm text-text-secondary">{COPY.developer}</span>
           <Link
             href={`/u/${record.handle}`}
-            className="font-heading text-sm text-amber hover:text-amber-light"
+            className="font-heading text-sm text-complement hover:text-complement-light"
           >
             @{record.handle}
           </Link>
         </div>
         {record.displayName && (
           <div className="flex items-baseline justify-between">
-            <span className="text-sm text-text-secondary">Name</span>
+            <span className="text-sm text-text-secondary">{COPY.name}</span>
             <span className="text-sm text-text-primary">
               {record.displayName}
             </span>
           </div>
         )}
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Impact Score</span>
+          <span className="text-sm text-text-secondary">{COPY.impactScore}</span>
           <span className="font-heading text-sm font-bold text-text-primary">
             {record.adjustedComposite}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Tier</span>
+          <span className="text-sm text-text-secondary">{COPY.tier}</span>
           <span className="text-sm text-text-primary">{record.tier}</span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Archetype</span>
+          <span className="text-sm text-text-secondary">{COPY.archetype}</span>
           <span className="text-sm text-text-primary">{record.archetype}</span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">Profile</span>
+          <span className="text-sm text-text-secondary">{COPY.profile}</span>
           <span className="text-sm capitalize text-text-primary">
             {record.profileType}
           </span>
@@ -157,7 +140,7 @@ function VerifiedCard({
       {/* Dimensions */}
       <div className="mb-6">
         <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
-          Dimensions
+          {COPY.dimensions}
         </h2>
         <div className="grid grid-cols-2 gap-2">
           {(
@@ -179,7 +162,7 @@ function VerifiedCard({
       {/* Key metrics */}
       <div className="mb-6">
         <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
-          Key Metrics
+          {COPY.keyMetrics}
         </h2>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
@@ -192,13 +175,13 @@ function VerifiedCard({
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.prsMergedCount}
             </p>
-            <p className="text-xs text-text-secondary">PRs Merged</p>
+            <p className="text-xs text-text-secondary">{COPY.prsMerged}</p>
           </div>
           <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.reviewsSubmittedCount}
             </p>
-            <p className="text-xs text-text-secondary">Reviews</p>
+            <p className="text-xs text-text-secondary">{COPY.reviews}</p>
           </div>
         </div>
       </div>
@@ -206,46 +189,27 @@ function VerifiedCard({
       {/* Footer */}
       <div className="flex items-center justify-between border-t border-stroke pt-4">
         <p className="text-xs text-text-secondary">
-          Generated on {record.generatedAt}
+          {COPY.generatedOn} {record.generatedAt}
         </p>
         <Link
           href={`/u/${record.handle}/badge.svg`}
-          className="text-xs text-amber hover:text-amber-light"
+          className="text-xs text-complement hover:text-complement-light"
         >
-          View Badge
+          {COPY.viewBadge}
         </Link>
       </div>
-    </div>
+    </StatusCallout>
   );
 }
 
 function NotFoundCard({ hash }: { hash: string }) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-8">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-terminal-yellow/15">
-          <svg
-            className="h-5 w-5 text-terminal-yellow"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 9v4m0 4h.01M12 2L2 20h20L12 2z" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold text-terminal-yellow">
-            Not Found
-          </h1>
-          <p className="text-sm text-text-secondary">
-            No verification record found for this hash.
-          </p>
-        </div>
-      </div>
+    <StatusCallout
+      variant="warning"
+      title={COPY.notFoundTitle}
+      titleAs="h1"
+      description={COPY.notFoundDescription}
+    >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">Hash</p>
         <p className="font-heading text-lg tracking-widest text-text-secondary">
@@ -253,45 +217,24 @@ function NotFoundCard({ hash }: { hash: string }) {
         </p>
       </div>
       <p className="mt-4 text-sm text-text-secondary">
-        This could mean the badge has expired (records are kept for 30 days) or
-        the hash is incorrect.
+        {COPY.notFoundExplanation}
       </p>
-    </div>
+    </StatusCallout>
   );
 }
 
 function InvalidHashCard({ hash }: { hash: string }) {
   return (
-    <div className="rounded-xl border border-stroke bg-card p-8">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-terminal-red/15">
-          <svg
-            className="h-5 w-5 text-terminal-red"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M15 9l-6 6m0-6l6 6" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="font-heading text-xl font-bold text-terminal-red">
-            Invalid Hash
-          </h1>
-          <p className="text-sm text-text-secondary">
-            The verification hash must be 8, 16, or 32 hex characters.
-          </p>
-        </div>
-      </div>
+    <StatusCallout
+      variant="error"
+      title={COPY.invalidHashTitle}
+      titleAs="h1"
+      description={COPY.invalidHashDescription}
+    >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
-        <p className="text-xs text-text-secondary">Provided</p>
+        <p className="text-xs text-text-secondary">{COPY.provided}</p>
         <p className="font-heading text-sm text-terminal-red">{hash}</p>
       </div>
-    </div>
+    </StatusCallout>
   );
 }

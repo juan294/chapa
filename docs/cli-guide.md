@@ -30,8 +30,8 @@ If your employer uses GitHub Enterprise Managed Users (EMU), your work contribut
 ### Check your setup
 
 ```bash
-node --version    # Should print v18.x.x or higher
-npm --version     # Should print 7.x.x or higher
+node --version    # Should print v20.x.x or higher
+npm --version     # Should print 10.x.x or higher
 ```
 
 If Node.js is not installed, download it from [nodejs.org](https://nodejs.org/) (LTS recommended). On corporate machines, you may need to request installation through your IT department or use a version manager like `nvm` if allowed.
@@ -269,8 +269,10 @@ Success! Supplemental stats uploaded. Your badge will reflect combined data on n
 After running the CLI:
 
 1. Go to your Chapa share page: `https://chapa.thecreativetoken.com/u/<your-handle>`
-2. Your badge should update on the next refresh (within 24 hours, or force-refresh if available)
+2. Your badge updates on the **next page render** — no waiting for tomorrow's cron run. The upload sets a same-day refresh marker that lets today's snapshot be replaced with the merged score.
 3. The stats should now include your EMU contributions (higher commit count, more PRs, etc.)
+
+> **Persistence**: Supplemental data is stored durably in Supabase, not just Redis. A missed CLI day no longer silently drops your EMU contribution from scores. The 24h Redis cache stays the hot read path; the database backs it.
 
 ---
 

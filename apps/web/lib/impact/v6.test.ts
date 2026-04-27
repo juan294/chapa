@@ -40,6 +40,12 @@ function makeStats(overrides: Partial<StatsData> = {}): StatsData {
   });
 }
 
+function heatmapDateAt(offset: number, startDate = "2025-01-05"): string {
+  const date = new Date(`${startDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
 /** Build a uniform 13-week heatmap with a given weekly total. */
 function makeUniformHeatmap(weeklyTotal: number) {
   const days = [];
@@ -48,7 +54,7 @@ function makeUniformHeatmap(weeklyTotal: number) {
       const perDay = Math.floor(weeklyTotal / 7);
       const extra = d < weeklyTotal % 7 ? 1 : 0;
       days.push({
-        date: `2025-01-${String(w * 7 + d + 1).padStart(2, "0")}`,
+        date: heatmapDateAt(w * 7 + d),
         count: perDay + extra,
       });
     }
@@ -63,7 +69,7 @@ function makeBurstHeatmap(total: number) {
     for (let d = 0; d < 7; d++) {
       const count = w === 0 ? Math.floor(total / 7) + (d < total % 7 ? 1 : 0) : 0;
       days.push({
-        date: `2025-01-${String(w * 7 + d + 1).padStart(2, "0")}`,
+        date: heatmapDateAt(w * 7 + d),
         count,
       });
     }
@@ -305,6 +311,91 @@ describe("computeQuality(stats)", () => {
       expect(score).toBeLessThanOrEqual(100);
     }
   });
+
+  // -------------------------------------------------------------------------
+  // #827 — Threshold cliff: collaborative Quality must never punish a user
+  // worse than the solo formula would have for the same inputs. A user with
+  // strong solo signals who picks up a few reviews should not see Quality
+  // collapse just because they crossed the 0.15 review-to-PR ratio threshold.
+  // -------------------------------------------------------------------------
+
+  describe("#827 cliff regression", () => {
+    // Inputs derived from juan294's live stats on 2026-04-23 (the day the
+    // profile flipped from solo to collaborative). With strong solo signals
+    // (descRate=1.0, branchRate=1.0) the solo formula produced ~79; the
+    // collaborative formula produced ~37 — a 42-point drop from picking up
+    // 4 extra reviews. Quality must never decrease under that transition.
+    const juan294 = {
+      prsMergedCount: 23,
+      reviewsSubmittedCount: 7,
+      batchSizeScore: 0.42857142857142855,
+      prDescriptionRate: 1,
+      featureBranchRate: 1,
+      issueLinkageRate: 0.38095238095238093,
+    } as const;
+
+    it("juan294 transition: collaborative Quality is at least as high as the solo formula", () => {
+      const collabStats = makeStats(juan294);
+      const soloStats = makeStats({
+        ...juan294,
+        // Drop reviews to 0 so detectProfileType returns "solo" deterministically
+        reviewsSubmittedCount: 0,
+      });
+
+      expect(detectProfileType(collabStats)).toBe("collaborative");
+      expect(detectProfileType(soloStats)).toBe("solo");
+
+      const collabQuality = computeQuality(collabStats);
+      const soloQuality = computeQuality(soloStats);
+
+      // The user has more participation signal in the collaborative case
+      // (7 reviews) than the solo case (0 reviews), so Quality must not drop.
+      expect(collabQuality).toBeGreaterThanOrEqual(soloQuality);
+    });
+
+    it("Quality is monotone non-decreasing as reviews grow from 0 to cap", () => {
+      // Hold all other Quality inputs constant at strong solo levels and step
+      // reviews from 0 to well past the cap. Quality must never decrease.
+      const base = {
+        prsMergedCount: 23,
+        batchSizeScore: 0.43,
+        prDescriptionRate: 1,
+        featureBranchRate: 1,
+        issueLinkageRate: 0.4,
+      } as const;
+
+      let prev = -1;
+      for (let reviews = 0; reviews <= 120; reviews++) {
+        const score = computeQuality(makeStats({ ...base, reviewsSubmittedCount: reviews }));
+        expect(score, `Quality regressed at reviews=${reviews} (was ${prev}, now ${score})`)
+          .toBeGreaterThanOrEqual(prev);
+        prev = score;
+      }
+    });
+
+    it("collaborative Quality never falls below the solo formula for the same stats", () => {
+      // Property: across a range of inputs that flip the profile to collaborative,
+      // Quality must be at least max(solo, collab) — i.e. participation never penalizes.
+      const cases = [
+        // Strong solo signals, a few reviews
+        { prsMergedCount: 22, reviewsSubmittedCount: 4, batchSizeScore: 0.5,
+          prDescriptionRate: 1, featureBranchRate: 1, issueLinkageRate: 0.4 },
+        // Moderate solo signals, more reviews
+        { prsMergedCount: 30, reviewsSubmittedCount: 12, batchSizeScore: 0.4,
+          prDescriptionRate: 0.8, featureBranchRate: 0.9, issueLinkageRate: 0.3 },
+        // Excellent solo signals, threshold-grazing reviews
+        { prsMergedCount: 40, reviewsSubmittedCount: 7, batchSizeScore: 0.6,
+          prDescriptionRate: 1, featureBranchRate: 1, issueLinkageRate: 0.5 },
+      ];
+
+      for (const c of cases) {
+        const collabStats = makeStats(c);
+        const soloEquivalent = makeStats({ ...c, reviewsSubmittedCount: 0 });
+        expect(detectProfileType(collabStats)).toBe("collaborative");
+        expect(computeQuality(collabStats)).toBeGreaterThanOrEqual(computeQuality(soloEquivalent));
+      }
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -409,7 +500,7 @@ describe("computeConsistency(stats)", () => {
     // Build a 52-week heatmap (364 days) with uniform activity
     const days: { date: string; count: number }[] = [];
     for (let i = 0; i < 364; i++) {
-      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count: 3 });
+      days.push({ date: heatmapDateAt(i), count: 3 });
     }
     const stats = makeStats({
       activeDays: 364,
@@ -424,7 +515,7 @@ describe("computeConsistency(stats)", () => {
     const days: { date: string; count: number }[] = [];
     for (let i = 0; i < 365; i++) {
       const count = i < 134 ? (i % 7 === 0 ? 50 : 5) : 0;
-      days.push({ date: `2025-01-${String(i + 1).padStart(2, "0")}`, count });
+      days.push({ date: heatmapDateAt(i), count });
     }
     const stats = makeStats({
       activeDays: 134,

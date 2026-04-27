@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { StatusCallout } from "@/components/StatusCallout";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+
+const COPY = SPANISH_PUBLIC_COPY.errors;
 
 export default function SharePageError({
   reset,
@@ -13,24 +17,25 @@ export default function SharePageError({
       id="main-content"
       className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center"
     >
-      <h1 className="font-heading text-4xl font-bold text-amber">
-        Something went wrong
-      </h1>
-      <p className="mt-4 text-sm text-text-secondary">
-        We couldn&apos;t load this badge profile. Please try again.
-      </p>
+      <StatusCallout
+        variant="error"
+        title={COPY.sharePage.title}
+        titleAs="h1"
+        description={COPY.sharePage.description}
+        className="w-full max-w-xl text-left"
+      />
       <div className="mt-8 flex items-center gap-4">
         <button
           onClick={reset}
-          className="rounded-lg border border-amber/20 bg-amber/10 px-6 py-2.5 text-sm font-medium text-amber transition-colors hover:bg-amber/20"
+          className="rounded-lg border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
         >
-          Try again
+          {COPY.tryAgain}
         </button>
         <Link
           href="/"
-          className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-amber/20 hover:text-text-primary"
+          className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
         >
-          Go home
+          {COPY.goHome}
         </Link>
       </div>
     </main>

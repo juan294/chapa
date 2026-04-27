@@ -5,6 +5,7 @@ import type { BadgeConfig, StatsData, ImpactV6Result } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { STUDIO_PRESETS } from "@/lib/effects/defaults";
+import { useIsClient } from "@/hooks/useIsClient";
 import { BadgePreviewCard } from "./BadgePreviewCard";
 import { QuickControls } from "./QuickControls";
 import { useStudioCommands } from "./useStudioCommands";
@@ -58,6 +59,7 @@ export function StudioClient({
   const [saving, setSaving] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [showQuickControls, setShowQuickControls] = useState(false);
+  const isClient = useIsClient();
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
 
@@ -261,7 +263,7 @@ export function StudioClient({
             config={config}
             stats={stats}
             impact={impact}
-            interactive={!reducedMotion}
+            interactive={isClient && !reducedMotion}
           />
 
           {saving && (

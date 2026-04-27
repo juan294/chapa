@@ -67,6 +67,7 @@ const validPayload = {
   targetHandle: "juan294",
   sourceHandle: "juan_corp",
   success: true,
+  verified: false,
   stats: {
     commitsTotal: 30,
     reposContributed: 3,
@@ -120,6 +121,7 @@ describe("dbInsertTelemetry", () => {
       upload_ms: 300,
       total_ms: 1500,
       cli_version: "0.3.1",
+      verified: false,
     });
   });
 
@@ -134,6 +136,17 @@ describe("dbInsertTelemetry", () => {
         error_category: "network",
         success: false,
       }),
+    );
+  });
+
+  it("persists the verified column when provided", async () => {
+    mockInsert.mockResolvedValue({ error: null });
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbInsertTelemetry(validPayload);
+
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ verified: false }),
     );
   });
 

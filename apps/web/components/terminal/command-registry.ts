@@ -197,8 +197,9 @@ export function createAdminCommands(): CommandDef[] {
 /** Navigation commands available on all pages (global command bar). */
 export function createNavigationCommands(options?: {
   isAdmin?: boolean;
+  studioEnabled?: boolean;
 }): CommandDef[] {
-  const studioEnabled = isStudioEnabledSync();
+  const studioEnabled = options?.studioEnabled ?? isStudioEnabledSync();
   const isAdmin = options?.isAdmin ?? false;
 
   const helpLines: OutputLine[] = [

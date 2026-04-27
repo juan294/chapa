@@ -1,0 +1,169 @@
+[
+  {
+    "label": "collab-craft",
+    "stats": {
+      "handle": "TestUser",
+      "commitsTotal": 200,
+      "prsMergedCount": 30,
+      "reviewsSubmittedCount": 50,
+      "activeDays": 120,
+      "reposContributed": 5
+    },
+    "impact": {
+      "adjustedComposite": 52,
+      "confidence": 85,
+      "tier": "Solid",
+      "archetype": "Builder",
+      "dimensions": {
+        "delivery": 70,
+        "quality": 50,
+        "consistency": 60,
+        "breadth": 40,
+        "craft": 0
+      }
+    },
+    "date": "2025-06-15",
+    "secret": "test-secret-with-enough-length-32chars!",
+    "expectedPayload": "v2|testuser|52|85|Solid|Builder|70|50|60|40|0|200|30|50|120|5|2025-06-15",
+    "expectedHash": "824bb07bd969b492eba8eb4e9f57b2d0"
+  },
+  {
+    "label": "minimal-solo-no-craft",
+    "stats": {
+      "handle": "solo-a",
+      "commitsTotal": 50,
+      "prsMergedCount": 10,
+      "reviewsSubmittedCount": 0,
+      "activeDays": 30,
+      "reposContributed": 3
+    },
+    "impact": {
+      "adjustedComposite": 55,
+      "confidence": 80,
+      "tier": "B",
+      "archetype": "marathoner",
+      "dimensions": {
+        "delivery": 60,
+        "quality": 50,
+        "consistency": 70,
+        "breadth": 40
+      }
+    },
+    "date": "2026-04-20",
+    "secret": "test-secret-32-chars-0123456789ab",
+    "expectedPayload": "v2|solo-a|55|80|B|marathoner|60|50|70|40|0|50|10|0|30|3|2026-04-20",
+    "expectedHash": "81376a73e597aa64d48b5e70bc011b50"
+  },
+  {
+    "label": "all-zero-dims",
+    "stats": {
+      "handle": "new-user",
+      "commitsTotal": 0,
+      "prsMergedCount": 0,
+      "reviewsSubmittedCount": 0,
+      "activeDays": 0,
+      "reposContributed": 0
+    },
+    "impact": {
+      "adjustedComposite": 0,
+      "confidence": 12,
+      "tier": "Unranked",
+      "archetype": "Explorer",
+      "dimensions": {
+        "delivery": 0,
+        "quality": 0,
+        "consistency": 0,
+        "breadth": 0,
+        "craft": 0
+      }
+    },
+    "date": "2026-01-01",
+    "secret": "all-zero-secret-0123456789abcdef",
+    "expectedPayload": "v2|new-user|0|12|Unranked|Explorer|0|0|0|0|0|0|0|0|0|0|2026-01-01",
+    "expectedHash": "c070aff769b5a3de06397fdc9cd36c75"
+  },
+  {
+    "label": "uppercase-handle-normalized",
+    "stats": {
+      "handle": "Juan294",
+      "commitsTotal": 321,
+      "prsMergedCount": 44,
+      "reviewsSubmittedCount": 12,
+      "activeDays": 210,
+      "reposContributed": 9
+    },
+    "impact": {
+      "adjustedComposite": 77,
+      "confidence": 92,
+      "tier": "Elite",
+      "archetype": "Polymath",
+      "dimensions": {
+        "delivery": 83,
+        "quality": 74,
+        "consistency": 69,
+        "breadth": 58,
+        "craft": 41
+      }
+    },
+    "date": "2026-04-23",
+    "secret": "caps-secret-0123456789abcdef012345",
+    "expectedPayload": "v2|juan294|77|92|Elite|Polymath|83|74|69|58|41|321|44|12|210|9|2026-04-23",
+    "expectedHash": "cbdf79e6d5cfc0944f48c250aa038651"
+  },
+  {
+    "label": "unicode-display-name-ignored",
+    "stats": {
+      "handle": "unicode-dev",
+      "commitsTotal": 88,
+      "prsMergedCount": 14,
+      "reviewsSubmittedCount": 6,
+      "activeDays": 45,
+      "reposContributed": 4
+    },
+    "impact": {
+      "adjustedComposite": 61,
+      "confidence": 73,
+      "tier": "High",
+      "archetype": "Builder",
+      "dimensions": {
+        "delivery": 62.2,
+        "quality": 47.5,
+        "consistency": 71.8,
+        "breadth": 33.1,
+        "craft": 12.6
+      }
+    },
+    "date": "2024-02-29",
+    "secret": "unicode-secret-0123456789abcdef0123",
+    "expectedPayload": "v2|unicode-dev|61|73|High|Builder|62|48|72|33|13|88|14|6|45|4|2024-02-29",
+    "expectedHash": "98faf9c5dc9df15fab904c5d7c374ae6"
+  },
+  {
+    "label": "edge-date-future",
+    "stats": {
+      "handle": "future-proof",
+      "commitsTotal": 999,
+      "prsMergedCount": 111,
+      "reviewsSubmittedCount": 222,
+      "activeDays": 365,
+      "reposContributed": 17
+    },
+    "impact": {
+      "adjustedComposite": 100,
+      "confidence": 99,
+      "tier": "Legend",
+      "archetype": "Architect",
+      "dimensions": {
+        "delivery": 99.9,
+        "quality": 88.8,
+        "consistency": 77.7,
+        "breadth": 66.6,
+        "craft": 55.5
+      }
+    },
+    "date": "2030-12-31",
+    "secret": "future-secret-0123456789abcdef01234",
+    "expectedPayload": "v2|future-proof|100|99|Legend|Architect|100|89|78|67|56|999|111|222|365|17|2030-12-31",
+    "expectedHash": "f1ce48851c53a560dffdc3d7a0257925"
+  }
+]

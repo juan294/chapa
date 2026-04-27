@@ -33,6 +33,7 @@ export async function GET(
       );
     }
 
+    // Authoritative rule: dbGetToolInsights returns the latest uploaded report.
     const craftScore = await dbGetToolInsights(handle);
 
     return NextResponse.json({ craftScore });

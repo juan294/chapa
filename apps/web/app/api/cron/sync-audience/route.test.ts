@@ -20,14 +20,23 @@ vi.mock("@/lib/email/audience", () => ({
   markUnsubscribed: vi.fn(),
 }));
 
+vi.mock("@/lib/cache/redis", () => ({
+  cacheGet: vi.fn(),
+  cacheSet: vi.fn(),
+}));
+
 import { dbGetUsersWithEmail } from "@/lib/db/users";
 import { getResend } from "@/lib/email/resend";
 import { ensureSegment, addContact, markUnsubscribed } from "@/lib/email/audience";
+import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.CRON_SECRET = "test-secret";
+  // Default: cache miss — fall through to Resend API
+  vi.mocked(cacheGet).mockResolvedValue(null);
+  vi.mocked(cacheSet).mockResolvedValue(true);
 });
 
 function makeRequest(bearer?: string): NextRequest {
@@ -43,14 +52,12 @@ function makeRequest(bearer?: string): NextRequest {
 // ---------------------------------------------------------------------------
 
 describe("sync-audience auth", () => {
-  it("passes through when CRON_SECRET env var is not set", async () => {
+  it("returns 503 when CRON_SECRET env var is not set (fail-secure)", async () => {
     delete process.env.CRON_SECRET;
-    // No CRON_SECRET configured = auth skipped (pass-through)
-    vi.mocked(ensureSegment).mockResolvedValue(null);
     const res = await GET(makeRequest("anything"));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     const body = await res.json();
-    expect(body.status).toBe("skipped");
+    expect(body.error).toBe("Cron secret not configured");
   });
 
   it("returns 401 with wrong Bearer token", async () => {
@@ -297,6 +304,54 @@ describe("listAllContacts behavior", () => {
     expect(body.status).toBe("ok");
     expect(body.totalEligible).toBe(0);
     expect(body.totalContacts).toBe(1);
+  });
+
+  it("stores contacts in Redis after fetching from Resend", async () => {
+    const mockContacts = [{ id: "c-1", email: "a@example.com", unsubscribed: false }];
+    vi.mocked(getResend).mockReturnValue({
+      contacts: {
+        list: vi.fn().mockResolvedValue({
+          data: { data: mockContacts, has_more: false },
+          error: null,
+        }),
+      },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    await GET(makeRequest("test-secret"));
+
+    expect(cacheSet).toHaveBeenCalledWith(
+      "sync-audience:contacts",
+      mockContacts,
+      3600,
+    );
+  });
+
+  it("uses cached contacts from Redis and skips Resend API call", async () => {
+    const cachedContacts = [{ id: "c-cached", email: "cached@example.com", unsubscribed: false }];
+    vi.mocked(cacheGet).mockResolvedValue(cachedContacts);
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.totalContacts).toBe(1);
+    // getResend should not be called when cache hits
+    expect(getResend).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Resend API when cacheGet throws", async () => {
+    vi.mocked(cacheGet).mockRejectedValue(new Error("Redis down"));
+    vi.mocked(getResend).mockReturnValue({
+      contacts: {
+        list: vi.fn().mockResolvedValue({
+          data: { data: [], has_more: false },
+          error: null,
+        }),
+      },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const res = await GET(makeRequest("test-secret"));
+    expect(res.status).toBe(200);
+    expect(getResend).toHaveBeenCalledTimes(1);
   });
 
   it("handles listAllContacts timeout by returning empty contacts", async () => {

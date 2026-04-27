@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readSessionCookie } from "@/lib/auth/github";
+import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -15,15 +15,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    const res = NextResponse.json({ user: null });
-    res.headers.set("Cache-Control", "no-store, private");
-    return res;
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
+  const session = getOptionalRequestSession(request);
 
   if (!session) {
     const res = NextResponse.json({ user: null });

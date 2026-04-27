@@ -97,6 +97,14 @@ const MOCK_CRAFT = {
   computedAt: "2026-03-27T08:00:00.000Z",
 };
 
+const LATEST_UPLOADED_CRAFT = {
+  ...MOCK_CRAFT,
+  tool: "cursor" as const,
+  craftScore: 81,
+  tier: "Master" as const,
+  computedAt: "2026-03-28T08:00:00.000Z",
+};
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -187,6 +195,21 @@ describe("GET /api/profile/:handle", () => {
 
     // Falls back to tool insights craft score
     expect(body.dimensions.craft).toBe(73);
+  });
+
+  it("surfaces the latest uploaded craft details returned by the DB layer", async () => {
+    mockDbGetLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
+    mockDbGetToolInsights.mockResolvedValue(LATEST_UPLOADED_CRAFT);
+
+    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
+    const body = await resp.json();
+
+    expect(body.dimensions.craft).toBe(81);
+    expect(body.craft).toEqual({
+      tool: "cursor",
+      tier: "Master",
+      score: 81,
+    });
   });
 
   // --- 404: no snapshot ---

@@ -333,6 +333,8 @@ describe("unsubscribe link", () => {
     const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain("/api/notifications/unsubscribe");
     expect(call.text).toContain("/api/notifications/unsubscribe");
+    expect(call.html).toContain("handle=testuser&token=");
+    expect(call.text).toContain("handle=testuser&token=");
   });
 });
 

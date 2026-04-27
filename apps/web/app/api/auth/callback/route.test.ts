@@ -10,22 +10,26 @@ const {
   mockFetchGitHubUserEmail,
   mockCreateSessionCookie,
   mockValidateState,
+  mockConsumeOauthState,
   mockClearStateCookie,
   mockRateLimit,
   mockDbUpsertUser,
   mockAddContact,
   mockCaptureServerError,
+  mockStoreGitHubToken,
 } = vi.hoisted(() => ({
   mockExchangeCodeForToken: vi.fn(),
   mockFetchGitHubUser: vi.fn(),
   mockFetchGitHubUserEmail: vi.fn(),
   mockCreateSessionCookie: vi.fn(),
   mockValidateState: vi.fn(),
+  mockConsumeOauthState: vi.fn(),
   mockClearStateCookie: vi.fn(),
   mockRateLimit: vi.fn(),
   mockDbUpsertUser: vi.fn(),
   mockAddContact: vi.fn(),
   mockCaptureServerError: vi.fn(),
+  mockStoreGitHubToken: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/github", () => ({
@@ -35,6 +39,10 @@ vi.mock("@/lib/auth/github", () => ({
   createSessionCookie: mockCreateSessionCookie,
   validateState: mockValidateState,
   clearStateCookie: mockClearStateCookie,
+}));
+
+vi.mock("@/lib/auth/oauth-state", () => ({
+  consumeOauthState: mockConsumeOauthState,
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -58,6 +66,10 @@ vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: mockCaptureServerError,
 }));
 
+vi.mock("@/lib/auth/github-session-token", () => ({
+  storeGitHubToken: mockStoreGitHubToken,
+}));
+
 import { GET } from "./route";
 import { NextRequest } from "next/server";
 
@@ -70,9 +82,10 @@ function makeRequest(params?: {
   state?: string;
   ip?: string;
   cookie?: string;
+  baseUrl?: string;
 }): NextRequest {
   const url = new URL(
-    "https://chapa.thecreativetoken.com/api/auth/callback",
+    params?.baseUrl ?? "https://chapa.thecreativetoken.com/api/auth/callback",
   );
   if (params?.code) url.searchParams.set("code", params.code);
   if (params?.state) url.searchParams.set("state", params.state);
@@ -92,10 +105,12 @@ function makeRequest(params?: {
 
 function allowRateLimit() {
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+  mockConsumeOauthState.mockResolvedValue(true);
   mockFetchGitHubUserEmail.mockResolvedValue(null);
   mockDbUpsertUser.mockResolvedValue(undefined);
   mockAddContact.mockResolvedValue(undefined);
   mockCaptureServerError.mockResolvedValue(undefined);
+  mockStoreGitHubToken.mockResolvedValue(true);
 }
 
 function setEnvVars() {
@@ -207,6 +222,80 @@ describe("GET /api/auth/callback — OAuth flow", () => {
     expect(location.searchParams.get("error")).toBe("invalid_state");
   });
 
+  it("consumes the state value server-side and rejects replay", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockConsumeOauthState
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const first = await GET(
+      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc; chapa_oauth_state_store=shared" }),
+    );
+    expect(first.status).toBe(307);
+
+    const second = await GET(
+      makeRequest({ code: "valid-code", state: "state-abc", cookie: "chapa_oauth_state=state-abc; chapa_oauth_state_store=shared" }),
+    );
+    expect(second.status).toBe(400);
+    await expect(second.json()).resolves.toEqual({ error: "state_already_used" });
+  });
+
+  it("skips shared-store replay enforcement when login marked the nonce as fallback-only", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "chapa_oauth_state=valid-state; chapa_oauth_state_store=fallback",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
+  });
+
+  it("skips shared-store replay enforcement on localhost during local dev", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockConsumeOauthState.mockResolvedValue(false);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted; HttpOnly; Path=/; Max-Age=86400");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=; HttpOnly; Path=/; Max-Age=0");
+
+    const res = await GET(
+      makeRequest({
+        baseUrl: "http://localhost:3001/api/auth/callback",
+        code: "valid-code",
+        state: "valid-state",
+        cookie: "chapa_oauth_state=valid-state; chapa_oauth_state_store=shared",
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(mockConsumeOauthState).not.toHaveBeenCalled();
+  });
+
   it("redirects to /?error=config when GITHUB_CLIENT_ID is missing", async () => {
     delete process.env.GITHUB_CLIENT_ID;
     mockValidateState.mockReturnValue(true);
@@ -294,10 +383,11 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     // Verify Set-Cookie headers are present
     const setCookies = res.headers.getSetCookie();
-    expect(setCookies).toHaveLength(3);
+    expect(setCookies).toHaveLength(4);
     expect(setCookies[0]).toContain("chapa_session=");
     expect(setCookies[1]).toContain("chapa_oauth_state=");
-    expect(setCookies[2]).toContain("chapa_redirect=");
+    expect(setCookies[2]).toContain("chapa_oauth_state_store=");
+    expect(setCookies[3]).toContain("chapa_redirect=");
   });
 
   it("passes correct arguments to exchangeCodeForToken", async () => {
@@ -339,13 +429,51 @@ describe("GET /api/auth/callback — OAuth flow", () => {
 
     expect(mockCreateSessionCookie).toHaveBeenCalledWith(
       {
-        token: "gho_valid_token",
         login: "octocat",
         name: "The Octocat",
         avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
       },
       "test-session-secret",
     );
+  });
+
+  it("stores the GitHub token server-side before creating the session cookie", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+
+    await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(mockStoreGitHubToken).toHaveBeenCalledWith("octocat", "gho_valid_token");
+  });
+
+  it("redirects when GitHub token storage fails", async () => {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockStoreGitHubToken.mockResolvedValue(false);
+
+    const res = await GET(
+      makeRequest({ code: "valid-code", state: "valid-state", cookie: "chapa_oauth_state=valid-state" }),
+    );
+
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("Location")!).searchParams.get("error")).toBe(
+      "session_storage",
+    );
+    expect(mockCreateSessionCookie).not.toHaveBeenCalled();
   });
 
   it("captures email and upserts user on successful login", async () => {
@@ -670,7 +798,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
     expect(redirectClear).not.toContain("Secure");
   });
 
-  it("omits Secure flag when NEXT_PUBLIC_BASE_URL is unset", async () => {
+  it("includes Secure flag when NEXT_PUBLIC_BASE_URL is unset", async () => {
     delete process.env.NEXT_PUBLIC_BASE_URL;
     setupHappyPath();
 
@@ -685,7 +813,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
     const setCookies = res.headers.getSetCookie();
     const redirectClear = setCookies.find((c) => c.startsWith("chapa_redirect="));
     expect(redirectClear).toBeDefined();
-    expect(redirectClear).not.toContain("Secure");
+    expect(redirectClear).toContain("Secure");
   });
 });
 
@@ -793,7 +921,7 @@ describe("GET /api/auth/callback — audience sync", () => {
     });
   });
 
-  it("swallows dbUpsertUser rejection via .catch() (fire-and-forget)", async () => {
+  it("swallows dbUpsertUser rejection and calls captureServerError (fire-and-forget)", async () => {
     mockValidateState.mockReturnValue(true);
     mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
     mockFetchGitHubUser.mockResolvedValue({
@@ -804,7 +932,7 @@ describe("GET /api/auth/callback — audience sync", () => {
     mockFetchGitHubUserEmail.mockResolvedValue(null);
     mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
     mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
-    // dbUpsertUser rejects — the .catch(() => {}) should swallow it
+    // dbUpsertUser rejects — should be captured, not silently discarded
     mockDbUpsertUser.mockRejectedValue(new Error("DB down"));
 
     const res = await GET(
@@ -815,9 +943,17 @@ describe("GET /api/auth/callback — audience sync", () => {
     expect(res.status).toBe(307);
     // Flush microtasks so .catch() runs
     await new Promise((r) => setTimeout(r, 0));
+    // Error must be tracked — not silently swallowed
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: expect.any(Error),
+      }),
+    );
   });
 
-  it("swallows addContact rejection via .catch() (fire-and-forget)", async () => {
+  it("swallows addContact rejection and calls captureServerError (fire-and-forget)", async () => {
     mockValidateState.mockReturnValue(true);
     mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
     mockFetchGitHubUser.mockResolvedValue({
@@ -828,7 +964,7 @@ describe("GET /api/auth/callback — audience sync", () => {
     mockFetchGitHubUserEmail.mockResolvedValue("octocat@github.com");
     mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
     mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
-    // addContact rejects — the .catch(() => {}) should swallow it
+    // addContact rejects — should be captured, not silently discarded
     mockAddContact.mockRejectedValue(new Error("Email service down"));
 
     const res = await GET(
@@ -839,5 +975,173 @@ describe("GET /api/auth/callback — audience sync", () => {
     expect(res.status).toBe(307);
     // Flush microtasks so .catch() runs
     await new Promise((r) => setTimeout(r, 0));
+    // Error must be tracked — not silently swallowed
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: expect.any(Error),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #705: Redirect allow-list enforcement
+// ---------------------------------------------------------------------------
+
+describe("GET /api/auth/callback — redirect allow-list (#705)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    allowRateLimit();
+    setEnvVars();
+    mockAddContact.mockResolvedValue(undefined);
+    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+  });
+
+  afterEach(() => {
+    clearEnvVars();
+    delete process.env.NEXT_PUBLIC_BASE_URL;
+  });
+
+  function setupHappyPath() {
+    mockValidateState.mockReturnValue(true);
+    mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
+    mockFetchGitHubUser.mockResolvedValue({
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
+    });
+    mockCreateSessionCookie.mockReturnValue("chapa_session=encrypted;");
+    mockClearStateCookie.mockReturnValue("chapa_oauth_state=;");
+  }
+
+  it("allows redirect to /u/ prefix", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/u/someuser")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/u/someuser");
+  });
+
+  it("allows redirect to /studio", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/studio")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/studio");
+  });
+
+  it("allows redirect to /about", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/about")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/about");
+  });
+
+  it("allows redirect to exactly /", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/");
+  });
+
+  it("blocks redirect to /evil-path (not on allow-list)", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/evil-path")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    // Falls back to generating page — /evil-path is not on allow-list
+    expect(location.pathname).toBe("/generating/octocat");
+  });
+
+  it("blocks redirect to /admin (not on allow-list)", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/admin")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/generating/octocat");
+  });
+
+  it("blocks redirect to /verify (not on allow-list)", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("/verify/abc123")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/generating/octocat");
+  });
+
+  it("blocks cross-origin redirect to https://evil.com", async () => {
+    setupHappyPath();
+
+    const res = await GET(
+      makeRequest({
+        code: "valid-code",
+        state: "valid-state",
+        cookie: `chapa_oauth_state=valid-state; chapa_redirect=${encodeURIComponent("https://evil.com/steal")}`,
+      }),
+    );
+
+    expect(res.status).toBe(307);
+    const location = new URL(res.headers.get("Location")!);
+    expect(location.pathname).toBe("/generating/octocat");
   });
 });

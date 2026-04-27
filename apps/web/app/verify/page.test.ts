@@ -6,11 +6,15 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
+const COPY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../../lib/copy/public-flow.ts"),
+  "utf-8",
+);
 
 describe("Verify input page", () => {
   describe("metadata", () => {
     it("exports metadata with title", () => {
-      expect(SOURCE).toContain('title: "Verify a Badge"');
+      expect(SOURCE).toContain('title: SPANISH_PUBLIC_COPY.verify.title');
     });
 
     it("includes description", () => {
@@ -33,9 +37,9 @@ describe("Verify input page", () => {
       expect(SOURCE).toContain("<h1");
     });
 
-    it("heading includes 'Badge' in complement color", () => {
+    it("heading includes Spanish badge copy in complement color", () => {
       expect(SOURCE).toContain("text-complement");
-      expect(SOURCE).toContain("Badge");
+      expect(COPY_SOURCE).toContain("insignia");
     });
   });
 
@@ -51,11 +55,15 @@ describe("Verify input page", () => {
 
   describe("instructions", () => {
     it("explains hash format (8, 16, or 32 characters)", () => {
-      expect(SOURCE).toContain("8, 16, or 32 character");
+      expect(COPY_SOURCE).toContain("8, 16 o 32 caracteres");
     });
 
     it("tells user where to find the hash", () => {
-      expect(SOURCE).toContain("right edge");
+      expect(COPY_SOURCE).toContain("borde derecho");
+    });
+
+    it("uses centralized public-flow copy", () => {
+      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
     });
   });
 

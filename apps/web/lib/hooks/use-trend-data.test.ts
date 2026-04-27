@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
+import { clearTrendDataCache, useTrendData } from "./use-trend-data";
 
 // ---------------------------------------------------------------------------
 // Mock fetch globally
@@ -11,6 +12,9 @@ import type { SnapshotDiff } from "@/lib/history/diff";
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  // Reset the module-level promise cache between every test so that
+  // tests do not share cached results from prior runs.
+  clearTrendDataCache();
   vi.stubGlobal("fetch", mockFetch);
 });
 
@@ -353,5 +357,78 @@ describe("useTrendData", () => {
     expect(result.current.error).toBe("Rate limited");
     expect(result.current.trend).toBeNull();
     expect(result.current.diff).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Module-level promise cache deduplication tests
+// ---------------------------------------------------------------------------
+
+describe("useTrendData — module-level promise cache", () => {
+  // The top-level beforeEach already stubs fetch and clears the cache,
+  // so no additional setup is needed here.
+
+  it("deduplicates fetches — two hooks for the same handle issue only ONE network call", async () => {
+    mockFetch.mockResolvedValue(makeSuccessResponse(fakeTrend, fakeDiff));
+
+    const { result: result1 } = renderHook(() => useTrendData("cacheuser"));
+    const { result: result2 } = renderHook(() => useTrendData("cacheuser"));
+
+    await waitFor(() => expect(result1.current.isLoading).toBe(false));
+    await waitFor(() => expect(result2.current.isLoading).toBe(false));
+
+    expect(result1.current.trend).toEqual(fakeTrend);
+    expect(result2.current.trend).toEqual(fakeTrend);
+
+    const callsForHandle = mockFetch.mock.calls.filter(
+      (call) => (call[0] as string).includes("/api/history/cacheuser"),
+    );
+    expect(callsForHandle.length).toBe(1);
+  });
+
+  it("uses separate cache entries for different handles", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeSuccessResponse(fakeTrend, fakeDiff))
+      .mockResolvedValueOnce(
+        makeSuccessResponse({ ...fakeTrend, direction: "declining" as const }, fakeDiff),
+      );
+
+    const { result: result1 } = renderHook(() => useTrendData("handle-a"));
+    const { result: result2 } = renderHook(() => useTrendData("handle-b"));
+
+    await waitFor(() => expect(result1.current.isLoading).toBe(false));
+    await waitFor(() => expect(result2.current.isLoading).toBe(false));
+
+    const callsA = mockFetch.mock.calls.filter(
+      (call) => (call[0] as string).includes("/api/history/handle-a"),
+    );
+    const callsB = mockFetch.mock.calls.filter(
+      (call) => (call[0] as string).includes("/api/history/handle-b"),
+    );
+    expect(callsA.length).toBe(1);
+    expect(callsB.length).toBe(1);
+  });
+
+  it("clearTrendDataCache() resets the cache so a new fetch fires on next mount", async () => {
+    mockFetch.mockResolvedValue(makeSuccessResponse(fakeTrend, fakeDiff));
+
+    const { result: result1, unmount } = renderHook(() => useTrendData("resetuser"));
+    await waitFor(() => expect(result1.current.isLoading).toBe(false));
+    unmount();
+
+    const callsAfterFirst = mockFetch.mock.calls.filter(
+      (call) => (call[0] as string).includes("/api/history/resetuser"),
+    ).length;
+
+    // Clear cache — next mount must trigger a fresh fetch
+    clearTrendDataCache();
+    const { result: result2 } = renderHook(() => useTrendData("resetuser"));
+    await waitFor(() => expect(result2.current.isLoading).toBe(false));
+
+    const callsAfterSecond = mockFetch.mock.calls.filter(
+      (call) => (call[0] as string).includes("/api/history/resetuser"),
+    ).length;
+
+    expect(callsAfterSecond).toBeGreaterThan(callsAfterFirst);
   });
 });

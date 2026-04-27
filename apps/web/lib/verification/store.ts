@@ -1,4 +1,7 @@
-import { dbStoreVerification, dbGetVerification } from "@/lib/db/verification";
+import {
+  dbGetVerification,
+  dbStoreVerification,
+} from "@/lib/db/verification";
 import type { VerificationRecord } from "./types";
 
 /**
@@ -18,7 +21,6 @@ export async function storeVerificationRecord(
 
 /**
  * Retrieve a verification record by hash.
- * Reads from Supabase.
  * Returns null on miss or if DB is unavailable.
  */
 export async function getVerificationRecord(

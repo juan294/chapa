@@ -17,7 +17,7 @@ describe("SharePage error.tsx — error boundary", () => {
   });
 
   it("contains a retry/reset button", () => {
-    expect(SOURCE).toContain("Try again");
+    expect(SOURCE).toContain("COPY.tryAgain");
   });
 
   it("calls reset on retry button click", () => {
@@ -25,22 +25,25 @@ describe("SharePage error.tsx — error boundary", () => {
   });
 
   it("contains a 'go home' link", () => {
-    expect(SOURCE).toContain("Go home");
+    expect(SOURCE).toContain("COPY.goHome");
   });
 
   it("links to the root path", () => {
     expect(SOURCE).toContain('href="/"');
   });
 
-  it("shows a badge-specific error message", () => {
-    expect(SOURCE).toMatch(/badge|profile/i);
+  it("uses share-page-specific error copy (not the generic error)", () => {
+    expect(SOURCE).toContain("COPY.sharePage");
   });
 
   it("uses design system background token", () => {
     expect(SOURCE).toContain("bg-bg");
   });
 
-  it("uses the amber accent color for the heading", () => {
-    expect(SOURCE).toContain("text-amber");
+  it("uses terminal-red semantics for the error state", () => {
+    expect(SOURCE).toContain("StatusCallout");
+    expect(SOURCE).toContain('variant="error"');
+    expect(SOURCE).toContain("text-terminal-red");
+    expect(SOURCE).not.toContain("amber");
   });
 });

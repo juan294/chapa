@@ -565,6 +565,17 @@ describe("BadgeContent — render-based", () => {
       expect(root.style.maxWidth).toBe("400px");
     });
   });
+
+  // Issue #737 — avatar must apply .img-outline per design system
+  describe("avatar design system compliance (#737)", () => {
+    it("applies img-outline class to avatar image", () => {
+      render(
+        <BadgeContent stats={makeStats()} impact={makeImpact()} />,
+      );
+      const img = screen.getByAltText("testuser's avatar");
+      expect(img.className).toContain("img-outline");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

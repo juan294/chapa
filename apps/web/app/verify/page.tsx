@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 import { VerifyForm } from "./VerifyForm";
 
 export const metadata: Metadata = {
-  title: "Verify a Badge",
-  description:
-    "Verify the authenticity of any Chapa badge using its verification hash.",
+  title: SPANISH_PUBLIC_COPY.verify.title,
+  description: SPANISH_PUBLIC_COPY.verify.description,
   robots: { index: false, follow: true },
 };
 
@@ -24,12 +24,13 @@ export default function VerifyInputPage() {
           <div className="pl-4 border-l border-stroke space-y-6">
             <div>
               <h1 className="font-heading text-2xl tracking-tight">
-                Verify a <span className="text-complement">Badge</span>
+                {SPANISH_PUBLIC_COPY.verify.headingBefore}{" "}
+                <span className="text-complement">
+                  {SPANISH_PUBLIC_COPY.verify.headingHighlight}
+                </span>
               </h1>
               <p className="text-text-secondary text-sm mt-2">
-                Enter the 8, 16, or 32 character verification hash from any Chapa badge
-                to confirm its authenticity. You can find it on the right edge
-                of the badge.
+                {SPANISH_PUBLIC_COPY.verify.instructions}
               </p>
             </div>
 

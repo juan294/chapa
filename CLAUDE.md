@@ -69,7 +69,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/verify/:hash` Badge verification endpoint
 - GET `/api/profile/:handle` Public impact profile snapshot (rate-limited, CORS-enabled)
 - GET `/api/history/:handle` Score history, trend, and diff (rate-limited)
-- GET `/api/health` Health check (Redis dbsize + Supabase query, rate-limited; returns "skipped" for unconfigured services)
+- GET `/api/health` Health check (Redis dbsize + Supabase query + GitHub API probe, rate-limited; returns "skipped" for unconfigured services)
 - GET `/api/feature-flags` Public feature flag values
 - GET `/u/:handle/og-image` OG image for share page (dynamic, cached)
 - GET `/og-image` Default OG image
@@ -145,6 +145,8 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Cache computed stats + impact per user/day (TTL 24h)
 - Cache SVG output per user/day + theme (TTL 24h)
 - **Lifetime metrics**: `MetricsSnapshot` records stored in Supabase `metrics_snapshots` table — permanent history. Max 1 snapshot per user per day (UNIQUE constraint on handle+date). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
+- **Supplemental EMU stats**: durably stored in Supabase `supplemental_stats` table (one row per `target_handle`). Redis (`supplemental:<handle>`, 24h TTL) is the hot read path; on miss, `getStats()` falls back to Supabase and rehydrates Redis via fire-and-forget. A missed CLI upload day no longer drops EMU data from scores.
+- **Same-day refresh signal**: a CLI supplemental upload sets `stats:dirty:<handle>` in Redis (1h TTL). `materializeProfile` reads the marker and the smoothing policy bypasses the same-day EMA lock so the user sees the new score immediately; `runPublicProfileSideEffects` then routes today's snapshot through `dbReplaceSnapshot` (UPSERT) and clears the marker. Default behavior (no dirty marker) preserves the existing feedback-loop protection.
 - **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`
@@ -176,6 +178,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Solo profile detection uses review-to-PR ratio threshold (0.15), not binary reviews === 0.
 - Consistency dimension uses week coverage (active weeks / total weeks) instead of inverse burst.
 - Quality dimension uses batch size score (fraction of PRs in 20-500 line sweet spot) instead of inverse micro-commit ratio.
+- Quality dimension never punishes participation in code review: collaborative `computeQuality` returns `max(collaborativeFormula, soloFormula)` so users with strong solo signals don't drop sharply when crossing the 0.15 review-to-PR threshold (the cliff guard, #827).
 - Delivery dimension applies a ±5% lead time modifier based on median PR open-to-merge duration.
 
 ## Engineering rules

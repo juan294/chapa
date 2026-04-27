@@ -74,6 +74,7 @@ export function renderRadarChart(
     const dist = val * radius;
     return toPoint(a.angle, dist);
   });
+  const allZero = axes.every((a) => (dimensions[a.key] ?? 0) === 0);
   const dataPointsStr = dataPoints.map(([x, y]) => `${x},${y}`).join(" ");
 
   // Axis labels — position based on angle direction (works for any rotation)
@@ -91,6 +92,16 @@ export function renderRadarChart(
       return `<text x="${x + dx}" y="${y + dy}" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="13" fill="${t.textSecondary}" text-anchor="${anchor}">${a.label}</text>`;
     })
     .join("\n    ");
+
+  if (allZero) {
+    return `<g>
+    ${ringSvg}
+    ${axisLines}
+    <circle cx="${cx}" cy="${cy}" r="3" fill="${t.textSecondary}" opacity="0.6" data-role="radar-empty-marker"/>
+    <text x="${cx}" y="${cy + 18}" font-family="'JetBrains Mono', monospace" font-size="10" fill="${t.textSecondary}" text-anchor="middle" opacity="0.7">no data yet</text>
+    ${labelSvg}
+  </g>`;
+  }
 
   return `<g>
     ${ringSvg}

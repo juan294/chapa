@@ -1,5 +1,3 @@
-"use client";
-
 import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";

@@ -4,11 +4,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit } = vi.hoisted(() => ({
+const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit, mockDbUpsertSupplemental } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockDbUpsertSupplemental: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -19,6 +20,10 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: mockCacheSet,
   cacheDel: mockCacheDel,
   rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/db/supplemental", () => ({
+  dbUpsertSupplemental: mockDbUpsertSupplemental,
 }));
 
 // Re-export real validation functions through the mock to avoid alias resolution issues
@@ -80,6 +85,7 @@ describe("POST /api/supplemental", () => {
     mockCacheSet.mockResolvedValue(undefined);
     mockCacheDel.mockResolvedValue(undefined);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    mockDbUpsertSupplemental.mockResolvedValue(undefined);
   });
 
   it("returns 401 when Authorization header is missing", async () => {
@@ -171,6 +177,47 @@ describe("POST /api/supplemental", () => {
         stats: validStats,
       }),
       86400,
+    );
+  });
+
+  it("persists supplemental data to Supabase alongside Redis (#825)", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    await POST(req);
+
+    // Both stores must be written: Redis (hot path, 24h) and Supabase (durable).
+    // Without DB persistence, a missed CLI upload day silently drops EMU data.
+    // Match by key — the route also writes the #826 stats:dirty marker.
+    const cacheSetKeys = mockCacheSet.mock.calls.map((c) => c[0]);
+    expect(cacheSetKeys).toContain("supplemental:juan294");
+    expect(mockDbUpsertSupplemental).toHaveBeenCalledTimes(1);
+    expect(mockDbUpsertSupplemental).toHaveBeenCalledWith(
+      "juan294",
+      expect.objectContaining({
+        targetHandle: "juan294",
+        sourceHandle: "juan_corp",
+        stats: validStats,
+      }),
+    );
+  });
+
+  it("marks stats dirty so today's snapshot lock yields to the new inputs (#826)", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    await POST(req);
+
+    // The dirty marker must be written so materializeProfile picks it up on
+    // the next page render and replaces today's locked snapshot value.
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "stats:dirty:juan294",
+      1,
+      3600, // DIRTY_STATS_TTL — 1h
     );
   });
 

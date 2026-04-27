@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { readSessionCookie } from "@/lib/auth/github";
+import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
@@ -13,11 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) redirect("/");
-
-  const headerStore = await headers();
-  const session = readSessionCookie(headerStore.get("cookie"), sessionSecret);
+  const session = getOptionalServerSessionFromHeaders(await headers());
   if (!session) redirect("/");
 
   if (!isAdminHandle(session.login)) redirect("/");

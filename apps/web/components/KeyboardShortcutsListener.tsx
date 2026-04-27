@@ -16,7 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
 import { type ShortcutScope } from "@/lib/keyboard/shortcuts";
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import dynamic from "next/dynamic";
 
 const ShortcutCheatSheet = dynamic(
@@ -124,6 +124,7 @@ export function useKeyboardShortcutsContext(): KeyboardShortcutsContextValue {
 
 export function KeyboardShortcutsListener() {
   const router = useRouter();
+  const { studioEnabled } = useClientFeatureFlags();
   const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
   const [activeScopes, setActiveScopes] = useState<ShortcutScope[]>([
     "navigation",
@@ -185,7 +186,7 @@ export function KeyboardShortcutsListener() {
           return;
         }
         case "go-studio":
-          if (isStudioEnabledSync()) {
+          if (studioEnabled) {
             router.push("/studio");
           }
           return;
@@ -206,7 +207,7 @@ export function KeyboardShortcutsListener() {
         handler(id);
       }
     },
-    [router],
+    [router, studioEnabled],
   );
 
   useKeyboardShortcuts({

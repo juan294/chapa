@@ -2,6 +2,9 @@
 // Types for the Agents admin dashboard
 // ---------------------------------------------------------------------------
 
+export type { SharedContextEntry } from "@/lib/agents/types";
+import type { SharedContextEntry } from "@/lib/agents/types";
+
 export interface AgentStatus {
   key: string;
   label: string;
@@ -12,12 +15,6 @@ export interface AgentStatus {
   lastRun: string | null;
   outputFile: string;
   reportContent: string | null;
-}
-
-export interface SharedContextEntry {
-  agent: string;
-  timestamp: string;
-  content: string;
 }
 
 export interface AgentsDashboardData {

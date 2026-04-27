@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetCampaigns, dbCreateCampaign } from "@/lib/db/campaigns";
 import type { CampaignType } from "@/lib/db/campaigns";
+import { parseCampaignCreatePayload } from "@/lib/campaigns/payload";
 
 const VALID_TYPES: CampaignType[] = ["announcement", "engagement"];
 
@@ -28,34 +29,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const required = ["name", "subject", "headline", "bodyText", "ctaText", "ctaUrl"];
-  for (const field of required) {
-    if (!body[field] || typeof body[field] !== "string") {
-      return NextResponse.json(
-        { error: `Missing required field: ${field}` },
-        { status: 400 },
-      );
-    }
-  }
-
-  const type = (body.type as string) ?? "announcement";
-  if (!VALID_TYPES.includes(type as CampaignType)) {
+  let campaign;
+  try {
+    campaign = parseCampaignCreatePayload(body);
+  } catch (error) {
     return NextResponse.json(
-      { error: `Invalid type: ${type}` },
+      { error: (error as Error).message },
       { status: 400 },
     );
   }
 
   const id = await dbCreateCampaign({
-    type: type as CampaignType,
-    name: body.name as string,
-    subject: body.subject as string,
-    previewText: (body.previewText as string) ?? null,
-    headline: body.headline as string,
-    bodyText: body.bodyText as string,
-    features: (body.features as { text: string }[]) ?? [],
-    ctaText: body.ctaText as string,
-    ctaUrl: body.ctaUrl as string,
+    type: campaign.type as CampaignType,
+    name: campaign.name,
+    subject: campaign.subject,
+    previewText: campaign.previewText,
+    headline: campaign.headline,
+    bodyText: campaign.bodyText,
+    features: campaign.features,
+    ctaText: campaign.ctaText,
+    ctaUrl: campaign.ctaUrl,
   });
 
   if (!id) {

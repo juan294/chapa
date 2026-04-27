@@ -424,4 +424,196 @@ describe("fetchContributionData", () => {
     );
     consoleSpy.mockRestore();
   });
+
+  // ---------------------------------------------------------------------------
+  // BE-H12: RATE_LIMITED / FORBIDDEN partial error handling (#699)
+  // ---------------------------------------------------------------------------
+
+  describe("partial error handling for rate-limited / forbidden responses (#699)", () => {
+    it("returns null when errors contain RATE_LIMITED type (extensions.type)", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              errors: [
+                {
+                  message: "API rate limit exceeded",
+                  extensions: { type: "RATE_LIMITED" },
+                },
+              ],
+              // GitHub returns partial data alongside the error
+              data: {
+                user: {
+                  login: "testuser",
+                  name: "Test",
+                  avatarUrl: "https://example.com/avatar.png",
+                  contributionsCollection: {
+                    contributionCalendar: { totalContributions: 0, weeks: [] },
+                    pullRequestContributions: { totalCount: 0, nodes: [] },
+                    pullRequestReviewContributions: { totalCount: 0 },
+                    issueContributions: { totalCount: 0 },
+                  },
+                  repositories: { totalCount: 0, nodes: [] },
+                },
+              },
+            }),
+        }),
+      );
+
+      const result = await fetchContributionData("testuser", "token");
+
+      expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[github] GraphQL errors for testuser:"),
+        expect.arrayContaining([
+          expect.objectContaining({ extensions: { type: "RATE_LIMITED" } }),
+        ]),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("returns null when errors contain FORBIDDEN type (extensions.type)", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              errors: [
+                {
+                  message: "Resource not accessible by integration",
+                  extensions: { type: "FORBIDDEN" },
+                },
+              ],
+              data: {
+                user: {
+                  login: "testuser",
+                  name: "Test",
+                  avatarUrl: "https://example.com/avatar.png",
+                  contributionsCollection: {
+                    contributionCalendar: { totalContributions: 0, weeks: [] },
+                    pullRequestContributions: { totalCount: 0, nodes: [] },
+                    pullRequestReviewContributions: { totalCount: 0 },
+                    issueContributions: { totalCount: 0 },
+                  },
+                  repositories: { totalCount: 0, nodes: [] },
+                },
+              },
+            }),
+        }),
+      );
+
+      const result = await fetchContributionData("testuser", "token");
+
+      expect(result).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("returns null when errors contain RATE_LIMITED code (error.code)", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              errors: [{ message: "rate limit exceeded", code: "RATE_LIMITED" }],
+              data: {
+                user: {
+                  login: "testuser",
+                  name: "Test",
+                  avatarUrl: "https://example.com/avatar.png",
+                  contributionsCollection: {
+                    contributionCalendar: { totalContributions: 0, weeks: [] },
+                    pullRequestContributions: { totalCount: 0, nodes: [] },
+                    pullRequestReviewContributions: { totalCount: 0 },
+                    issueContributions: { totalCount: 0 },
+                  },
+                  repositories: { totalCount: 0, nodes: [] },
+                },
+              },
+            }),
+        }),
+      );
+
+      const result = await fetchContributionData("testuser", "token");
+
+      expect(result).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("returns null when errors contain FORBIDDEN code (error.code)", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              errors: [{ message: "forbidden", code: "FORBIDDEN" }],
+              data: {
+                user: {
+                  login: "testuser",
+                  name: "Test",
+                  avatarUrl: "https://example.com/avatar.png",
+                  contributionsCollection: {
+                    contributionCalendar: { totalContributions: 0, weeks: [] },
+                    pullRequestContributions: { totalCount: 0, nodes: [] },
+                    pullRequestReviewContributions: { totalCount: 0 },
+                    issueContributions: { totalCount: 0 },
+                  },
+                  repositories: { totalCount: 0, nodes: [] },
+                },
+              },
+            }),
+        }),
+      );
+
+      const result = await fetchContributionData("testuser", "token");
+
+      expect(result).toBeNull();
+      consoleSpy.mockRestore();
+    });
+
+    it("still returns data when errors are non-blocking (e.g. missing field)", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              errors: [
+                { message: "Could not resolve field 'extraField'", extensions: { type: "FIELD_NOT_FOUND" } },
+              ],
+              data: {
+                user: {
+                  login: "testuser",
+                  name: "Test",
+                  avatarUrl: "https://example.com/avatar.png",
+                  contributionsCollection: {
+                    contributionCalendar: { totalContributions: 5, weeks: [] },
+                    pullRequestContributions: { totalCount: 2, nodes: [] },
+                    pullRequestReviewContributions: { totalCount: 1 },
+                    issueContributions: { totalCount: 0 },
+                  },
+                  repositories: { totalCount: 1, nodes: [] },
+                },
+              },
+            }),
+        }),
+      );
+
+      const result = await fetchContributionData("testuser", "token");
+
+      // Non-blocking error — should still return data
+      expect(result).not.toBeNull();
+      expect(result!.login).toBe("testuser");
+      consoleSpy.mockRestore();
+    });
+  });
 });

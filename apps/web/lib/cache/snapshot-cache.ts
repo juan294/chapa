@@ -10,13 +10,15 @@
  */
 
 import type { MetricsSnapshot } from "@/lib/history/types";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheGet, cacheSet, cacheDel } from "./redis";
 import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { CACHE_VERSION } from "./version";
 
 const SNAPSHOT_TTL = 86400; // 24 hours
 
-function snapshotCacheKey(handle: string): string {
-  return `snapshot:latest:${handle.toLowerCase()}`;
+export function buildSnapshotKey(handle: string): string {
+  return `snapshot:${CACHE_VERSION}:latest:${handle.toLowerCase()}`;
 }
 
 /**
@@ -31,7 +33,7 @@ function snapshotCacheKey(handle: string): string {
 export async function getCachedLatestSnapshot(
   handle: string,
 ): Promise<MetricsSnapshot | null> {
-  const key = snapshotCacheKey(handle);
+  const key = buildSnapshotKey(handle);
 
   // Try Redis first
   try {
@@ -47,7 +49,7 @@ export async function getCachedLatestSnapshot(
   // Cache the result (only if we got data — don't cache nulls)
   if (snapshot) {
     // Fire-and-forget: don't block on cache write
-    cacheSet(key, snapshot, SNAPSHOT_TTL).catch(() => {});
+    fireAndForget(() => cacheSet(key, snapshot, SNAPSHOT_TTL), () => undefined);
   }
 
   return snapshot;
@@ -63,7 +65,7 @@ export async function updateSnapshotCache(
   handle: string,
   snapshot: MetricsSnapshot,
 ): Promise<void> {
-  const key = snapshotCacheKey(handle);
+  const key = buildSnapshotKey(handle);
   try {
     await cacheSet(key, snapshot, SNAPSHOT_TTL);
   } catch {
@@ -83,7 +85,7 @@ export async function updateSnapshotCache(
 export async function invalidateSnapshotCache(
   handle: string,
 ): Promise<void> {
-  const key = snapshotCacheKey(handle);
+  const key = buildSnapshotKey(handle);
   try {
     await cacheDel(key);
   } catch {

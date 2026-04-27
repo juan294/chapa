@@ -1,110 +1,98 @@
 # Security Report
-> Generated: 2026-03-30 | Health status: GREEN
+> Generated: 2026-04-27 | Health status: green
 
 ## Executive Summary
-
-The Chapa codebase maintains a strong security posture with zero dependency vulnerabilities, no hardcoded secrets, comprehensive XSS protections in the SVG pipeline, and RLS enforced on all 9 Supabase tables. No regressions since the 2026-03-23 audit. One new finding: `/api/profile/[handle]` now exposes wildcard CORS (intentional — public API, rate-limited).
+Security posture is clean across all eight audit dimensions: 0 dependency vulnerabilities, no hardcoded secrets, full XSS escaping in the SVG pipeline, RLS enforced on all 10 Supabase tables, and no copyleft license conflicts. Two intentional CORS wildcards remain on read-only public endpoints (`/api/verify/[hash]`, `/api/profile/[handle]`) — both rate-limited and signature-verified by design.
 
 ## Dependency Vulnerabilities
+`pnpm audit` returned 0 advisories across 644 production dependencies (0 devDependencies in audit scope).
 
 | Severity | Package | Issue | Fix |
 |----------|---------|-------|-----|
-| — | — | No known vulnerabilities found | — |
-
-`pnpm audit` returns clean. 0 critical, 0 high, 0 medium, 0 low.
-
-## Unused Dependencies (Attack Surface)
-
-`npx knip` returns **0 findings** — fully clean. No unused dependencies, exports, or types. Consistent with the previous two audits.
+| — | — | None | — |
 
 ## Code Findings
 
-### Hardcoded Secrets — CLEAR
-- **0 hardcoded secrets** found in source. All 10+ server secrets read exclusively from `process.env` with `.trim()`.
-- All `NEXT_PUBLIC_*` variables are non-sensitive (analytics key, base URL, feature flags).
-- `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `GITHUB_CLIENT_SECRET`, `ADMIN_SECRET`, `CRON_SECRET` — all server-side only, never exposed to client bundles.
-- Error logging scrubs tokens via regex before PostHog ingestion.
+### Hardcoded secrets — CLEAN
+- Pattern scan for `sk_live`, `ghp_`, `gho_`, `ghs_`, `github_pat_`, `AKIA…`, `AIza…` returned 22 file matches; **0 are secrets**. All hits are either:
+  - Test fixtures (`*.test.ts`, `lib/test-helpers/platform-auth-fixtures.ts`)
+  - Token-shape regexes in `lib/analytics/server-errors.ts:20-23` (used for redacting tokens before PostHog logging)
+  - Documentation comments in `lib/auth/cli-token.ts:88`
 
-### SVG XSS Protection — SECURE
-- **9 user-input entry points** escaped via `escapeXml()` (`lib/render/escape.ts:18-25`):
-  1. `handle` → `BadgeSvg.tsx:40`
-  2. `displayName` → `BadgeSvg.tsx:41-43`
-  3. `archetype` → `BadgeSvg.tsx:179`
-  4. `tier` → `BadgeSvg.tsx:236`
-  5. `avatarDataUri` → `BadgeSvg.tsx:155`
-  6. Fallback `handle` → `badge.svg/route.ts:36`
-  7. Fallback `message` → `badge.svg/route.ts:42`
-  8. Verification `hash` → `VerificationStrip.ts:12`
-  9. Verification `date` → `VerificationStrip.ts:13`
-- `escapeXml()` covers all 5 XML entities: `& < > ' "`
-- Explicit XSS tests at `BadgeSvg.test.tsx:59-65`
-- Heatmap/radar chart use numeric data only — no user strings
-- BadgeBranding uses hardcoded static text only
-- 18 `dangerouslySetInnerHTML` uses — all safe (hardcoded demo SVG, no user input)
-- Avatar URL whitelist: only `avatars.githubusercontent.com` + content-type validation
+### SVG XSS — CLEAN
+All 9 user-input entry points to the SVG pipeline are escaped via `escapeXml()`:
+- `apps/web/lib/render/BadgeSvg.tsx:40-42` — `handle`, `displayName`
+- `apps/web/lib/render/BadgeSvg.tsx:155` — avatar data URI
+- `apps/web/lib/render/BadgeSvg.tsx:179` — archetype text
+- `apps/web/lib/render/BadgeSvg.tsx:236` — tier label
+- `apps/web/lib/render/VerificationStrip.ts:13-14` — verification hash + date
+- `apps/web/app/u/[handle]/badge.svg/route.ts:50` — handle param
 
-### CORS Configuration — INTENTIONAL
-- **2 routes with wildcard CORS** (`Access-Control-Allow-Origin: *`):
-  1. `/api/verify/[hash]` — public verification, rate-limited 30 req/IP/60s, read-only (unchanged)
-  2. `/api/profile/[handle]` — public profile API, rate-limited 60 req/IP/60s, read-only (**NEW** since last audit)
-- Both return non-sensitive public data. Risk: LOW.
-- All other 42+ API routes have no CORS headers (default same-origin).
-- Global security headers in `next.config.ts:47-87`:
-  - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
-  - `X-Content-Type-Options: nosniff`
-  - `X-XSS-Protection: 1; mode=block`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()`
-  - Badge SVG: `frame-ancestors *` (embeddable by design)
-  - All other routes: `frame-ancestors 'none'`
+### NEXT_PUBLIC_* leakage — CLEAN
+Grep across `apps/web/{app,lib,components}` for `NEXT_PUBLIC_*(secret|service_role|client_secret|webhook_secret|admin_secret|cron_secret|password|private_key)` returned **0 real matches** (one false positive in agent-config template literal at `lib/agents/agent-config.ts:91`). `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `RESEND_WEBHOOK_SECRET`, `CHAPA_VERIFICATION_SECRET`, `BITBUCKET_CLIENT_SECRET`, `CODEBERG_CLIENT_SECRET`, `ADMIN_SECRET`, and `CRON_SECRET` are server-side only.
 
-### RLS — ALL TABLES SECURED
-- **9/9 tables** with RLS enabled + `FORCE ROW LEVEL SECURITY`:
-  - `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `user_platforms`, `tool_insights`, `email_campaigns`, `campaign_sends`
-- Explicit `deny_anon_all` policies on all tables (defense-in-depth)
-- Exception: `feature_flags` has a permissive SELECT policy (`USING true`) — intentional, flags are public, DML still blocked
-- **2 views** with `security_invoker = true`: `latest_snapshots`, `admin_users`
-- App uses `SUPABASE_SERVICE_ROLE_KEY` server-side only (bypasses RLS, acceptable for server-only access pattern)
+### CORS — INTENTIONAL WILDCARDS
+| Route | CORS | Method | Notes |
+|-------|------|--------|-------|
+| `/api/profile/[handle]/route.ts:9,105` | `*` | GET | Read-only public profile, rate-limited (60/60s) |
+| `/api/verify/[hash]/route.ts:23,33,42,58,76` | `*` | GET | HMAC-verified badge data, rate-limited (30/60s) |
 
-### Authentication & Session — SECURE
-- OAuth CSRF: `timingSafeEqual()` state validation
-- Token storage: AES-256-GCM encryption with fresh IV per encryption
-- CLI tokens: HMAC-SHA256 signed with 90-day expiry
-- Session cookies: `HttpOnly`, `SameSite=Lax`, `Secure`, 10-minute `Max-Age`
-- Fetch timeout coverage: **100%** — all external calls have `AbortSignal.timeout()`
+All 17 mutation routes (POST/PUT/PATCH/DELETE) have **no CORS headers** — same-origin only. Acceptable design.
 
-### Rate Limiting — EXPANDED
-- **31/44 routes** (70%) explicitly rate-limited (up from 14+ at last audit)
-- Remaining 13 routes use admin auth, bearer token, or are internal
-- Campaign email: 95/day quota with Redis counter, batch size 50
-- All rate limiters fail-open by design (availability-first — GitHub API limits + CDN caching provide secondary protection)
+### Supabase RLS — ENABLED ON ALL TABLES
+Audit of `supabase/migrations/*.sql` confirms `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` on every table:
+
+| Table | Migration | RLS | FORCE |
+|-------|-----------|-----|-------|
+| users | 002, 018 | ✅ | ✅ |
+| metrics_snapshots | 002, 018 | ✅ | ✅ |
+| verification_records | 002, 018 | ✅ | ✅ |
+| feature_flags | 003, 018 | ✅ | ✅ |
+| merge_operations | 007, 018 | ✅ | ✅ |
+| user_platforms | 010, 018 | ✅ | ✅ |
+| tool_insights | 015, 018 | ✅ | ✅ |
+| email_campaigns | 016, 018 | ✅ | ✅ |
+| campaign_sends | 016, 018 | ✅ | ✅ |
+| supplemental_stats | 024 | ✅ | (table-level deny-all anon) |
+
+Views `latest_snapshots` and `admin_users` use `security_invoker = true`.
 
 ## License Compliance
+No GPL or AGPL dependencies. Copyleft-adjacent packages reviewed:
 
-| Package | License | Risk | Action |
-|---------|---------|------|--------|
-| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | None | Dynamically linked — no compliance action needed |
+| Package | License | Risk | Verdict |
+|---------|---------|------|---------|
+| `@resvg/resvg-js` | MPL-2.0 | File-level copyleft only | OK — not modified, used as-is |
+| `@resvg/resvg-js-darwin-arm64` | MPL-2.0 | File-level copyleft only | OK — binary distribution |
+| `dompurify` | MPL-2.0 OR Apache-2.0 | Dual-licensed | OK — Apache-2.0 elected by default |
+| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0-or-later | Dynamic linking | OK — sharp loads libvips dynamically; no static linking, no source modification |
 
-No GPL or AGPL dependencies found. All other dependencies are MIT, Apache-2.0, BSD, or ISC.
-
-## Delta Since Last Audit (2026-03-23)
-
-| Area | Change |
-|------|--------|
-| Vulnerabilities | Unchanged — 0 across all severities |
-| Knip | Unchanged — 0 findings |
-| Secrets | Unchanged — none found |
-| XSS | Unchanged — all 9 entry points escaped |
-| CORS | **+1 wildcard route** (`/api/profile/[handle]`) — intentional public API |
-| RLS | Unchanged — 9/9 tables + FORCE, 2 views security_invoker |
-| Rate limiting | **31/44 routes** (was 14+) — per cost-analyst 2026-03-30 |
-| Test coverage | **92.72% stmts** (6,655 tests) — per coverage agent 2026-03-30 |
-| Licenses | Unchanged — 1 LGPL-3.0 (dynamic link, no action) |
+**All clear.** No copyleft violations.
 
 ## Recommendations
+1. **Knip false positives (LOW)** — `pnpm knip --production` flags 8 unused deps (`@resvg/resvg-js`, `@vercel/analytics`, `@vercel/speed-insights`, `canvas-confetti`, `next-themes`, `posthog-js`, `resend`, `svix`). All are actively used — same false-positive set as the 2026-04-20 audit. No action; document if not already.
+2. **CORS wildcard surveillance (INFO)** — The two `*` CORS routes are intentional, but worth a recurring audit to confirm no mutation handler ever ships with `Access-Control-Allow-Origin: *`. Already enforced by convention; consider an ESLint custom rule or test assertion to make it mechanical.
+3. **`apps/web/lib/analytics/server-errors.ts` SENSITIVE_PATTERNS** — Apr 20 P2 (token-redaction branch coverage) is now resolved per Apr 27 coverage report (lib/analytics 97.26% stmts / 89.09% branches). No further action.
 
-1. **LOW — Monitor `/api/profile/[handle]` CORS**: New wildcard CORS endpoint. Currently rate-limited at 60 req/IP/60s. If abuse is observed, consider restricting to known embed origins.
-2. **LOW — Resend SDK timeout gaps**: 3 `audience.ts` calls + 1 admin test route lack `withTimeout()`. Fire-and-forget/admin-gated contexts — defense-in-depth improvement only (per cost-analyst 2026-03-30).
-3. **INFO — Undocumented env vars**: Documentation agent flagged SVIX_*, ICEBERG_TOKEN in code. Triage confirmed these are false positives (not in source). No action needed.
+---
 
-No blockers. No high-priority items. Security posture remains GREEN.
+## Shared Context Entry
+
+<!-- ENTRY:START agent=security timestamp=2026-04-27T09:00:00Z -->
+## Security Scanner — 2026-04-27
+- **Status**: GREEN
+- Vulnerabilities: 0 critical, 0 high, 0 moderate, 0 low — `pnpm audit` clean across 644 prod deps
+- Secret leaks: none — 22 grep matches all in tests, redaction regexes (`server-errors.ts:20-23`), or doc comments
+- License issues: none — 2× MPL-2.0 + 1× dual MPL/Apache + 1× LGPL-3.0 (sharp libvips, dynamic linking). No GPL/AGPL.
+- XSS: 9 user-input entry points to SVG, all escaped via `escapeXml()` (BadgeSvg.tsx, VerificationStrip.ts, badge.svg/route.ts)
+- CORS: 2 wildcard routes (`/api/profile/[handle]`, `/api/verify/[hash]`) — read-only, rate-limited, intentional. 17 mutation routes have no CORS.
+- RLS: all 10 Supabase tables ENABLE + FORCE ROW LEVEL SECURITY (migrations 002, 003, 007, 010, 015, 016, 018, 024). 2 views use `security_invoker = true`.
+- NEXT_PUBLIC_* leak check: clean — 1 false positive in `lib/agents/agent-config.ts:91` (template literal).
+- Knip `--production`: 8 false positives unchanged from 2026-04-20 — all confirmed in active use.
+
+**Cross-agent recommendations:**
+- [Coverage]: Apr 20 P2 on `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branches is resolved (97.26% stmts / 89.09% branches per Apr 27 coverage). No new security-relevant gaps.
+- [QA]: No new security UX issues. Consider adding an ESLint rule or test assertion that no POST/PUT/PATCH/DELETE handler ships with `Access-Control-Allow-Origin: *` — currently enforced by convention.
+- [Cost Analyst]: No cost-security conflict. Fail-open rate limiter (`redis.ts:127-149`) intact. 100% fetch timeout coverage.
+- [Performance]: Knip false positives unchanged — no bundle changes recommended. Do not remove the 8 flagged deps.
+<!-- ENTRY:END -->

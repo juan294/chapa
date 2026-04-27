@@ -5,7 +5,7 @@
  * and shared context files.
  */
 
-import type { SharedContextEntry } from "@/app/admin/agents-types";
+import type { SharedContextEntry } from "@/lib/agents/types";
 
 /**
  * Extract health status from report content.

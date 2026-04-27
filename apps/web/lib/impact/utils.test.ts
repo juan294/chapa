@@ -1,4 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
+import {
+  BURST_ACTIVITY_THRESHOLD,
+  MICRO_COMMIT_THRESHOLD,
+  SINGLE_REPO_CONCENTRATION,
+  TIER_THRESHOLDS,
+} from "@chapa/shared";
 import {
   normalize,
   clampScore,
@@ -92,6 +99,22 @@ describe("clampScore", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeConfidence", () => {
+  it("uses the shared scoring constants instead of local literals", () => {
+    const source = readFileSync(new URL("./utils.ts", import.meta.url), "utf8");
+    expect(source).not.toContain(
+      `maxCommitsIn10Min >= ${BURST_ACTIVITY_THRESHOLD}`,
+    );
+    expect(source).not.toContain(
+      `microCommitRatio >= ${MICRO_COMMIT_THRESHOLD}`,
+    );
+    expect(source).not.toContain(
+      `topRepoShare >= ${SINGLE_REPO_CONCENTRATION}`,
+    );
+    expect(source).toContain("maxCommitsIn10Min >= BURST_ACTIVITY_THRESHOLD");
+    expect(source).toContain("microCommitRatio >= MICRO_COMMIT_THRESHOLD");
+    expect(source).toContain("topRepoShare >= SINGLE_REPO_CONCENTRATION");
+  });
+
   it("returns 100 with no penalties when all flags are clear", () => {
     const { confidence, penalties } = computeConfidence(makeStats());
     expect(confidence).toBe(100);
@@ -100,9 +123,9 @@ describe("computeConfidence", () => {
 
   // --- burst_activity ---
   describe("burst_activity flag", () => {
-    it("applies -15 when maxCommitsIn10Min >= 100", () => {
+    it("applies -15 at the shared burst-activity threshold", () => {
       const { confidence, penalties } = computeConfidence(
-        makeStats({ maxCommitsIn10Min: 100 }),
+        makeStats({ maxCommitsIn10Min: BURST_ACTIVITY_THRESHOLD }),
       );
       expect(confidence).toBe(85);
       expect(penalties).toHaveLength(1);
@@ -129,9 +152,9 @@ describe("computeConfidence", () => {
 
   // --- micro_commit_pattern ---
   describe("micro_commit_pattern flag", () => {
-    it("applies -10 when microCommitRatio >= 0.6", () => {
+    it("applies -10 at the shared micro-commit threshold", () => {
       const { confidence, penalties } = computeConfidence(
-        makeStats({ microCommitRatio: 0.6 }),
+        makeStats({ microCommitRatio: MICRO_COMMIT_THRESHOLD }),
       );
       expect(confidence).toBe(90);
       expect(penalties).toHaveLength(1);
@@ -235,9 +258,12 @@ describe("computeConfidence", () => {
 
   // --- single_repo_concentration ---
   describe("single_repo_concentration flag", () => {
-    it("applies -5 when topRepoShare >= 0.95 AND repos <= 1", () => {
+    it("applies -5 at the shared single-repo threshold when repos <= 1", () => {
       const { confidence, penalties } = computeConfidence(
-        makeStats({ topRepoShare: 0.95, reposContributed: 1 }),
+        makeStats({
+          topRepoShare: SINGLE_REPO_CONCENTRATION,
+          reposContributed: 1,
+        }),
       );
       expect(confidence).toBe(95);
       expect(penalties).toHaveLength(1);
@@ -517,6 +543,18 @@ describe("computeConfidence", () => {
   });
 });
 
+describe("computeConfidence JSDoc", () => {
+  it("documents the burst_activity threshold as 100 commits", () => {
+    const source = readFileSync(
+      new URL("./utils.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toMatch(
+      /\| `burst_activity`\s+\|\s+-15\s+\|\s+>=\s*100 commits in a 10-minute window/,
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // computeAdjustedScore(base, confidence)
 // ---------------------------------------------------------------------------
@@ -561,6 +599,15 @@ describe("computeAdjustedScore", () => {
   it("handles confidence at minimum (50)", () => {
     // 80 * (0.85 + 0.15 * 0.5) = 80 * 0.925 = 74
     expect(computeAdjustedScore(80, 50)).toBe(74);
+  });
+});
+
+describe("getTier", () => {
+  it("maps threshold boundaries through shared constants", () => {
+    expect(getTier(TIER_THRESHOLDS.S)).toBe("Elite");
+    expect(getTier(TIER_THRESHOLDS.A)).toBe("High");
+    expect(getTier(TIER_THRESHOLDS.C)).toBe("Solid");
+    expect(getTier(TIER_THRESHOLDS.C - 1)).toBe("Emerging");
   });
 });
 

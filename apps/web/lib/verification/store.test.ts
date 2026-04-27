@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const { mockDbStoreVerification, mockDbGetVerification } = vi.hoisted(() => ({
+  mockDbStoreVerification: vi.fn(() => Promise.resolve()),
+  mockDbGetVerification: vi.fn(() => Promise.resolve(null)),
+}));
+
 vi.mock("@/lib/db/verification", () => ({
-  dbStoreVerification: vi.fn(() => Promise.resolve()),
-  dbGetVerification: vi.fn(() => Promise.resolve(null)),
+  dbStoreVerification: mockDbStoreVerification,
+  dbGetVerification: mockDbGetVerification,
 }));
 
 import { storeVerificationRecord, getVerificationRecord } from "./store";
-import { dbStoreVerification, dbGetVerification } from "@/lib/db/verification";
+import {
+  dbGetVerification,
+  dbStoreVerification,
+} from "@/lib/db/verification";
 import type { VerificationRecord } from "./types";
 
 const record: VerificationRecord = {
@@ -26,11 +34,9 @@ const record: VerificationRecord = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(dbStoreVerification).mockResolvedValue(undefined);
+  vi.mocked(dbGetVerification).mockResolvedValue(null);
 });
-
-// ---------------------------------------------------------------------------
-// storeVerificationRecord — writes to Supabase only (Phase 5)
-// ---------------------------------------------------------------------------
 
 describe("storeVerificationRecord", () => {
   it("calls dbStoreVerification with hash and record", async () => {
@@ -57,27 +63,27 @@ describe("storeVerificationRecord", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getVerificationRecord — reads from Supabase (Phase 4, unchanged)
-// ---------------------------------------------------------------------------
-
 describe("getVerificationRecord", () => {
-  it("delegates to dbGetVerification and returns result", async () => {
+  it("delegates reads to dbGetVerification", async () => {
     vi.mocked(dbGetVerification).mockResolvedValue(record);
+
     const result = await getVerificationRecord("abc12345");
+
     expect(result).toEqual(record);
-    expect(dbGetVerification).toHaveBeenCalledWith("abc12345");
+    expect(vi.mocked(dbGetVerification)).toHaveBeenCalledWith("abc12345");
   });
 
   it("returns null on Supabase miss", async () => {
-    vi.mocked(dbGetVerification).mockResolvedValue(null);
     const result = await getVerificationRecord("abc12345");
+
     expect(result).toBeNull();
   });
 
-  it("returns null if dbGetVerification throws", async () => {
+  it("returns null if the verification lookup throws", async () => {
     vi.mocked(dbGetVerification).mockRejectedValue(new Error("Supabase down"));
+
     const result = await getVerificationRecord("abc12345");
+
     expect(result).toBeNull();
   });
 });

@@ -33,23 +33,15 @@ describe("Studio page (server component)", () => {
   });
 
   describe("authentication", () => {
-    it("reads NEXTAUTH_SECRET from env", () => {
-      expect(SOURCE).toContain("NEXTAUTH_SECRET");
-    });
-
-    it("trims the secret", () => {
-      expect(SOURCE).toContain(".trim()");
-    });
-
-    it("reads session cookie", () => {
-      expect(SOURCE).toContain("readSessionCookie");
+    it("uses the shared server session helper", () => {
+      expect(SOURCE).toContain("getOptionalServerSessionFromHeaders");
     });
 
     it("redirects unauthenticated users to login", () => {
       expect(SOURCE).toContain("/api/auth/login");
     });
 
-    it("reads headers for cookie extraction", () => {
+    it("reads headers for server cookie extraction", () => {
       expect(SOURCE).toContain("headers()");
     });
   });
@@ -92,6 +84,11 @@ describe("Studio page (server component)", () => {
       expect(SOURCE).toContain("stats=");
       expect(SOURCE).toContain("impact=");
       expect(SOURCE).toContain("handle=");
+    });
+
+    it("mounts keyboard shortcuts only on the studio route", () => {
+      expect(SOURCE).toContain("KeyboardShortcutsListener");
+      expect(SOURCE).toContain("<KeyboardShortcutsListener />");
     });
 
     it("has a main element", () => {

@@ -189,3 +189,65 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+  deployment-smoke:
+    name: Deployment Smoke
+    needs: [build]
+    runs-on: ubuntu-latest
+    env:
+      DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
+    steps:
+      - name: Skip deployment smoke when not configured
+        if: env.DEPLOYMENT_SMOKE_BASE_URL == ''
+        run: echo "DEPLOYMENT_SMOKE_BASE_URL is not configured; skipping deployment smoke."
+
+      - uses: actions/checkout@v6
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+      - uses: pnpm/action-setup@v4
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+      - uses: actions/setup-node@v6
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+
+      - name: Cache Playwright browsers
+        id: deployment-playwright-cache
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != '' && steps.deployment-playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+
+      - name: Install Playwright system deps (cached)
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != '' && steps.deployment-playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: apps/web
+
+      - name: Run deployment-shaped smoke tests
+        if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
+        working-directory: apps/web
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: ${{ env.DEPLOYMENT_SMOKE_BASE_URL }}
+          DEPLOYMENT_SMOKE_STRICT: "true"
+        run: npx playwright test e2e/smoke.spec.ts
+
+      - name: Upload deployment smoke report
+        if: failure() && env.DEPLOYMENT_SMOKE_BASE_URL != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-smoke-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7

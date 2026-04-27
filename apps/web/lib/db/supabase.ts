@@ -6,6 +6,7 @@
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { withTimeout } from "@/lib/async/with-timeout";
 
 let _client: SupabaseClient | null | undefined;
 
@@ -40,12 +41,11 @@ export async function pingSupabase(): Promise<"ok" | "error" | "skipped"> {
   if (!db) return "skipped";
 
   try {
-    const result = await Promise.race([
-      db.from("users").select("id").limit(1),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("ping timeout")), 5000),
-      ),
-    ]);
+    const result = await withTimeout(
+      Promise.resolve().then(() => db.from("users").select("id").limit(1)),
+      5000,
+      "pingSupabase",
+    );
     return result.error ? "error" : "ok";
   } catch {
     return "error";

@@ -1,5 +1,10 @@
 import { isCliToken, verifyCliToken } from "@/lib/auth/cli-token";
-import { fetchGitHubUser, readSessionCookie } from "@/lib/auth/github";
+import { fetchGitHubUser } from "@/lib/auth/github";
+import {
+  getOptionalRequestSession,
+  getSessionSecret,
+} from "@/lib/auth/session";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 
 /**
  * Resolve the authenticated handle from a request.
@@ -15,21 +20,23 @@ import { fetchGitHubUser, readSessionCookie } from "@/lib/auth/github";
 export async function resolveRequestAuth(
   request: Request,
 ): Promise<{ handle: string; token?: string } | null> {
-  const secret = process.env.NEXTAUTH_SECRET?.trim();
+  const secret = getSessionSecret();
   if (!secret) return null;
 
   // 1. Check Authorization header (Bearer token)
   const authHeader = request.headers.get("Authorization");
   if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
+    const token = authHeader.slice(7).trim();
     return resolveHandle(token, secret);
   }
 
   // 2. Fall back to session cookie
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, secret);
+  const session = getOptionalRequestSession(request);
   if (session) {
-    return { handle: session.login, token: session.token };
+    const token = await getSessionGitHubToken(session);
+    return token
+      ? { handle: session.login, token }
+      : { handle: session.login };
   }
 
   return null;

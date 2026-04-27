@@ -108,8 +108,9 @@ describe("About page", () => {
       expect(SOURCE).toContain("<Navbar");
     });
 
-    it("uses GlobalCommandBar", () => {
-      expect(SOURCE).toContain("<GlobalCommandBar");
+    it("uses the lazy command bar", () => {
+      expect(SOURCE).toContain("GlobalCommandBarLazy");
+      expect(SOURCE).not.toContain("<GlobalCommandBar ");
     });
 
     it("has main landmark with id", () => {

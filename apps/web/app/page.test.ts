@@ -6,6 +6,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
+const COPY_SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "../lib/copy/public-flow.ts"),
+  "utf-8",
+);
 
 describe("Landing page (server component)", () => {
   describe("component type", () => {
@@ -34,7 +38,7 @@ describe("Landing page (server component)", () => {
     });
 
     it("renders hero heading", () => {
-      expect(SOURCE).toContain("Developer Impact,");
+      expect(COPY_SOURCE).toContain("Impacto de desarrollador,");
     });
 
     it("renders badge preview", () => {
@@ -60,20 +64,35 @@ describe("Landing page (server component)", () => {
 
   describe("features section", () => {
     it("lists all five features", () => {
-      expect(SOURCE).toContain("MULTI-DIMENSIONAL");
-      expect(SOURCE).toContain("DEVELOPER ARCHETYPE");
-      expect(SOURCE).toContain("VERIFIED METRICS");
-      expect(SOURCE).toContain("LIVING DOCUMENT");
-      expect(SOURCE).toContain("ONE-CLICK EMBED");
+      expect(COPY_SOURCE).toContain("MULTIDIMENSIONAL");
+      expect(COPY_SOURCE).toContain("ARQUETIPO DE DESARROLLADOR");
+      expect(COPY_SOURCE).toContain("MÉTRICAS VERIFICADAS");
+      expect(COPY_SOURCE).toContain("DOCUMENTO VIVO");
+      expect(COPY_SOURCE).toContain("EMBEBIDO EN UN CLIC");
     });
   });
 
   describe("dimensions section", () => {
     it("lists all four core dimensions", () => {
-      expect(SOURCE).toContain('"DELIVERY"');
-      expect(SOURCE).toContain('"QUALITY"');
-      expect(SOURCE).toContain('"CONSISTENCY"');
-      expect(SOURCE).toContain('"BREADTH"');
+      expect(COPY_SOURCE).toContain('"ENTREGA"');
+      expect(COPY_SOURCE).toContain('"CALIDAD"');
+      expect(COPY_SOURCE).toContain('"CONSTANCIA"');
+      expect(COPY_SOURCE).toContain('"ALCANCE"');
+    });
+  });
+
+  describe("Spanish launch copy", () => {
+    it("uses the centralized public-flow copy layer", () => {
+      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
+    });
+
+    it("does not keep the old English acquisition CTAs", () => {
+      expect(SOURCE).not.toContain("Get Your Badge");
+      expect(SOURCE).not.toContain("Verify a Badge");
+      expect(SOURCE).not.toContain("Ready to prove your impact?");
+      expect(COPY_SOURCE).not.toContain("Get Your Badge");
+      expect(COPY_SOURCE).not.toContain("Verify a Badge");
+      expect(COPY_SOURCE).not.toContain("Ready to prove your impact?");
     });
   });
 
@@ -88,6 +107,17 @@ describe("Landing page (server component)", () => {
 
     it("renders ErrorBanner conditionally", () => {
       expect(SOURCE).toContain("ErrorBanner");
+    });
+  });
+
+  // #740 — UX-M3: verification CTA uses complement (teal) tokens
+  describe("verification CTA uses complement tokens (#740)", () => {
+    it("Verify a Badge button uses bg-complement", () => {
+      expect(SOURCE).toContain("bg-complement");
+    });
+
+    it("Verify a Badge button links to /verify", () => {
+      expect(SOURCE).toContain('href="/verify"');
     });
   });
 
@@ -108,6 +138,27 @@ describe("Landing page (server component)", () => {
     it("CTA buttons use asymmetric padding for optical icon alignment", () => {
       // Hero buttons should have pl-6 pr-5 (not symmetric px-6)
       expect(SOURCE).toContain("pl-6 pr-5");
+    });
+  });
+
+  // #741 — visible section labels for landmark sections
+  describe("visible section labels (#741)", () => {
+    it("Features section has a visible label element (not only sr-only)", () => {
+      // There should be a visible label with font-heading + tracking-widest or similar
+      expect(SOURCE).toContain("tracking-widest");
+    });
+
+    it("section labels use text-text-secondary and font-heading", () => {
+      expect(SOURCE).toContain("text-text-secondary");
+      expect(SOURCE).toContain("font-heading");
+    });
+
+    it("section headings are still present for accessibility", () => {
+      expect(COPY_SOURCE).toContain("Funciones");
+      expect(COPY_SOURCE).toContain("Cómo funciona");
+      expect(COPY_SOURCE).toContain("Empresa");
+      expect(COPY_SOURCE).toContain("Datos");
+      expect(COPY_SOURCE).toContain("Empieza");
     });
   });
 });

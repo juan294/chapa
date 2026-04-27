@@ -1,85 +1,56 @@
+```markdown
 # QA Report
-> Generated: 2026-04-01 | Health status: green
+> Generated: 2026-04-22 | Health status: green
 
 ## Executive Summary
-All 6,879 tests pass across 386 files with zero TypeScript errors and zero lint issues. Accessibility, design system compliance, and error handling remain at the high standard established in the prior cycle, with the `debug-quality` temp endpoint confirmed deleted.
+All automated checks pass: 7048/7048 tests green, 0 TypeScript errors, 0 lint warnings. No accessibility or design-system regressions in production code.
 
 ## Test Results
-- Total: 6,879 tests across 386 files
-- Passed: 6,879 | Failed: 0 | Skipped: 0
+- Total: 7048 tests across 396 files
+- Passed: 7048 | Failed: 0 | Skipped: 0
+- Duration: 49.04s (vitest 4.1.4)
 
 ## TypeScript
-Clean — `tsc --noEmit` passes in both `packages/shared` and `apps/web` with 0 errors.
+Clean — `pnpm run typecheck` passed across both workspace projects (`packages/shared`, `apps/web`).
 
 ## Linting
-Clean — ESLint passes with 0 errors and 0 warnings.
+Clean — `eslint .` produced no warnings or errors.
 
 ## Accessibility
-
-### `<img>` tags missing `alt`
-No bare `<img>` elements found. All images use Next.js `<Image>` (which enforces `alt`) or inline SVG with `aria-hidden="true"`.
-
-### Heading hierarchy
-All production pages use valid descending hierarchy (h1 → h2 → h3). Two experiment pages (`number-counters/page.tsx`, `gradient-border/page.tsx`) render `<h2>` before a later `<h1>` — acceptable as feature-flagged, low-traffic experiment pages.
-
-### Interactive elements missing ARIA labels
-All buttons audited. Every icon-only button has an `aria-label`:
-- `BadgeToolbar.tsx` refresh, share, download buttons — labeled
-- `CopyButton.tsx:19` — `aria-label="Copy embed snippet"`
-- `Toast.tsx:143` — `aria-label="Dismiss notification"`
-- `ErrorBanner.tsx:47` — `aria-label="Dismiss error"`
-- `ThemeToggle.tsx` — dynamic label (light/dark toggle)
-- `MobileNav.tsx:75` — `aria-label="Toggle navigation"`
-- `InfoTooltip.tsx:108` — `aria-label="More info"`
-- `LiteYouTubeEmbed.tsx:39` — `aria-label="Play {title}"`
-- `ShortcutCheatSheet.tsx:104` — `aria-label="Close keyboard shortcuts"`
-- `SubMetricPanel.tsx:259` — `aria-label="Close breakdown panel"`
-- `UserMenu.tsx` — labeled trigger + unlink buttons; "Import Claude Code Insights" and "Sign out" buttons have visible text content (no label needed)
-- `ConfirmDialog.tsx` buttons use rendered `cancelLabel`/`confirmLabel` text (no label needed)
-- `AuthorTypewriter.tsx:200` — `aria-label="Made by {AUTHOR_NAME}"`
-- `BadgeToolbar.tsx` "Copy link" menuitem has visible text content
-
-**No ARIA label gaps found.**
-
-### Focus indicators
-`focus-visible` styles confirmed in `styles/globals.css`, `InfoTooltip.tsx`, `BadgeOverlay.tsx`, `VerifyForm.tsx`. Global focus ring via CSS, component-specific `focus-visible:ring-2 focus-visible:ring-amber` on interactive elements. Coverage is comprehensive.
+- **Bare `<img>`** — 0 violations. Grep for `<img(?![^>]*alt=)` returned no matches in production `.tsx/.jsx`.
+- **Unlabeled `<button>`** — 0 empty buttons without `aria-label`/`aria-labelledby` found.
+- **Focus indicators** — `focus-visible:`/`:focus-visible` used across 18 occurrences in 12 files (`InfoTooltip.tsx`, `BadgeToolbar.tsx`, `BadgeOverlay.tsx`, `VerifyForm.tsx`, `globals.css`, etc.). Focus-visible baseline is established.
+- **Error/loading/404 boundaries** — 29 route-level `error.tsx`/`loading.tsx`/`not-found.tsx` files, each with a co-located test. Coverage across `/about`, `/admin`, `/archetypes`, `/cli/authorize`, `/coming-soon`, `/experiments`, `/generating`, `/privacy`, `/studio`, `/terms`, `/u/[handle]`, `/verify`, plus root `error.tsx` / `global-error.tsx` / `not-found.tsx`.
+- Heading hierarchy skipping not detected in this pass (no automated scan run; defer to ux-reviewer for structural audit).
 
 ## Design System Compliance
-**0 violations** in production components and pages. No hardcoded hex colors found in `className` or `style` attributes outside of documented exceptions:
-- `app/apple-icon.tsx`, `app/icon.tsx` — static icon assets, correctly hardcoded
-- `app/experiments/*` — canvas/WebGL demos requiring raw color arrays; feature-flagged and accepted
-- Badge SVG pipeline — always dark, documented exception
-
-All production components use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, `text-amber`, `border-stroke`, etc.).
-
-## Error States
-- **13 error boundaries** (`error.tsx` files): root, global-error, about, admin, archetypes, cli/authorize, coming-soon, experiments, generating, privacy, studio, terms, u/[handle], verify
-- **13 loading states** (`loading.tsx` files) — full coverage across dynamic routes
-- SVG error fallback with XSS escaping in badge route
-- `debug-quality/route.ts` confirmed **deleted** — P1 item from Cost Analyst/Coverage reports resolved
+- **Production components**: 0 hardcoded hex violations found in `apps/web/components/**`. All hex matches are inside test files (`*.test.tsx`) or are color props passed into `Sparkline` (intended parameter, not violation).
+- **Accepted exceptions** (unchanged from prior cycles):
+  - `app/global-error.tsx` — intentional hardcoding; component renders outside the theme provider so CSS variables are unavailable.
+  - `app/apple-icon.tsx` — static icon asset rendered server-side by Next metadata API.
+  - `app/experiments/*` — Canvas/WebGL experiments use raw hex arrays (shader/canvas API requirement, documented accepted risk).
 
 ## Recommendations
-
-**P1 (carry from Cost Analyst):**
-- Revert refresh rate limit from 15→5 per hour — confirmed debugging artifact (commit `fd4aeaf`). Low blast radius but should be cleaned before next release.
-
-**P3 (monitored, stable):**
-- `AdminDashboardClient.tsx` function coverage at 68.4% — below 80% funcs threshold. Stable, not regressing. Add interaction tests for sort/filter/pagination handlers.
-- `UserMenu.tsx` function coverage at 78.6% — borderline. Stable.
-- Experiments pages at 56.1% coverage — accepted limitation (WebGL/Canvas JSDOM constraint).
+Prioritized:
+1. **(Carried — security-relevant)** Add tests for all 9 `SENSITIVE_PATTERNS` branches in `lib/analytics/server-errors.ts` (branch coverage 71.43%). These are token-redaction guards before PostHog ingestion.
+2. **(Carried)** Cover owner-only interactive handlers in `components/SharePageOwnerContent.tsx` (59.09% stmts, 50% funcs) — embed copy + refresh CTA still untested.
+3. **(Hygiene)** Harden `BadgeToolbar.render.test.tsx` @keyframes teardown: wrap `vi.stubGlobal('Image', …)` setup/restore in try/finally so `unstubAllGlobals` runs even if `waitFor` rejects. The test passed 3/3 this cycle but a race is structurally possible (per coverage 2026-04-21 report).
 
 ---
 
-SHARED_CONTEXT_START
-## QA Agent — 2026-04-01
+<!-- ENTRY:START agent=qa timestamp=2026-04-22T09:05:00Z -->
+## QA Agent — 2026-04-22
 - **Status**: GREEN
-- Tests: 6,879/6,879 passed across 386 files, 0 failed, 0 skipped (+16 tests, +1 file vs 2026-03-30)
+- Tests: 7048/7048 passed across 396 files, 0 failed, 0 skipped
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 0 — all buttons labeled, focus-visible present, no bare `<img>` tags, no heading skips in production pages
+- A11y issues: 0 — no bare `<img>`, no unlabeled `<button>`, focus-visible present across 18 occurrences in 12 files, 29 error/loading boundaries with tests
+- Design system: 0 violations in production components. Hex hits are confined to test files, color props, `global-error.tsx` (outside theme provider), `apple-icon.tsx` (static metadata icon), and `experiments/*` (Canvas/WebGL).
 
 **Cross-agent recommendations:**
-- [Coverage]: `debug-quality/route.ts` confirmed deleted — 0% coverage gap resolved. `AdminDashboardClient.tsx` funcs at 68.4% remains the top actionable gap.
-- [Security]: No new security-related quality issues. All XSS vectors covered, all interactive elements properly accessible.
-- [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — should be reverted before next production release.
-SHARED_CONTEXT_END
+- [Coverage]: Still no tests for the 9 `SENSITIVE_PATTERNS` redaction branches in `lib/analytics/server-errors.ts` (71.43% module branches). Highest-priority gap — feed each pattern type through `captureServerError()` and assert scrubbing.
+- [Coverage]: `components/SharePageOwnerContent.tsx` owner-only handlers (embed copy, refresh CTA) remain untested at 50% funcs.
+- [Coverage]: Harden `BadgeToolbar.render.test.tsx` by wrapping the `Image` `vi.stubGlobal` setup/restore in try/finally so `unstubAllGlobals` always runs even when `waitFor` throws — prevents flake regression.
+- [Security]: No new security-related UX regressions. All XSS-sensitive paths remain covered; no user-input escape gaps surfaced in this cycle.
+<!-- ENTRY:END -->
+```

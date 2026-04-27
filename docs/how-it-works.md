@@ -378,7 +378,7 @@ This is fully transparent to anyone viewing the badge or share page.
 | Token | Where it's used | Where it's stored | Exposure |
 |-------|----------------|-------------------|----------|
 | **EMU token** | User's local machine only (CLI) | Never sent to Chapa server | Zero server exposure |
-| **Personal OAuth token** | Chapa server (OAuth flow) | Encrypted in session cookie (AES-256-GCM) | Encrypted at rest |
+| **Personal OAuth token** | Chapa server (OAuth flow) | Supabase `user_platforms` table (server-side only) | Encrypted at rest in database |
 | **Personal PAT** (CLI upload) | Chapa server (one-time verification) | Not stored; used only to verify ownership | Transient |
 
 ### Upload endpoint security (`POST /api/supplemental`)
@@ -419,9 +419,9 @@ The endpoint implements 4 layers of protection:
 
 ### OAuth security
 
-- **CSRF protection:** OAuth flow uses a random state parameter stored in an HttpOnly cookie, validated on callback
-- **Token encryption:** Session tokens are encrypted with AES-256-GCM before being stored in cookies
-- **Secure cookies:** `HttpOnly`, `SameSite=Lax`, and `Secure` flag (conditional on HTTPS)
+- **CSRF protection:** OAuth flow uses a random state parameter stored in Redis (TTL 600s) with one-time consumption — the state is deleted immediately after validation, preventing replay attacks. An in-memory map provides fallback when Redis is unavailable
+- **Token storage:** GitHub OAuth tokens are stored server-side in Supabase (`user_platforms` table), not in session cookies — the session cookie holds only the user's identity (login + name), never the raw token
+- **Secure cookies:** `HttpOnly`, `SameSite=Lax`, and `Secure` flag (enforced on HTTPS; localhost gets `SameSite=Lax` without `Secure` for dev convenience, via centralized cookie policy)
 - **Minimal scope:** Only `read:user` is requested -- no write access to anything
 
 ### SVG injection prevention
@@ -490,7 +490,7 @@ The `compareSnapshots()` function produces structured deltas between two snapsho
 ## Privacy Guarantees
 
 1. **We never access your code.** We query contribution metadata (counts, dates, sizes) only.
-2. **We never store your tokens permanently.** OAuth tokens are encrypted in session cookies with a 24-hour expiry. CLI tokens are not stored at all.
+2. **We never expose your tokens.** GitHub OAuth tokens are stored server-side in our database (never in cookies or client-accessible storage). CLI tokens are not stored at all.
 3. **Your EMU token stays on your machine.** The CLI tool uses it locally and uploads only the extracted statistics.
 4. **Private repo names are never exposed.** We track "repos contributed to" as a count, not a list.
 5. **Cached data expires after 24 hours.** Supplemental data, stats, and badge renders all expire after one day. Lifetime metric snapshots are stored permanently but contain only public data (scores, stats, dates — no private repo names, no code, no tokens).

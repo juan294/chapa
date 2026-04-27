@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { isStudioEnabled } from "@/lib/feature-flags";
-import { readSessionCookie } from "@/lib/auth/github";
+import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { cacheGet } from "@/lib/cache/redis";
@@ -11,6 +11,8 @@ import { toDateString } from "@/lib/utils/date";
 import { StudioClient } from "./StudioClient";
 import type { BadgeConfig, StatsData } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
+import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
 
 function buildEmptyStats(session: {
   login: string;
@@ -58,25 +60,19 @@ export default async function StudioPage() {
     redirect("/");
   }
 
-  // Auth gate — redirect unauthenticated users to login
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
+  const session = getOptionalServerSessionFromHeaders(await headers());
+  if (!session) {
     redirect("/api/auth/login");
   }
 
-  const headerStore = await headers();
-  const session = readSessionCookie(
-    headerStore.get("cookie"),
-    sessionSecret,
-  );
-
-  if (!session) {
+  const token = await getSessionGitHubToken(session);
+  if (!token) {
     redirect("/api/auth/login");
   }
 
   // Fetch data in parallel: stats + saved config
   const [stats, savedConfig] = await Promise.all([
-    getStats(session.login, session.token),
+    getStats(session.login, token),
     cacheGet<BadgeConfig>(`config:${session.login}`),
   ]);
 
@@ -96,6 +92,7 @@ export default async function StudioPage() {
       />
 
       <div className="pt-[57px]">
+        <KeyboardShortcutsListener />
         <StudioClient
           initialConfig={initialConfig}
           stats={effectiveStats}

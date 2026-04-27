@@ -12,10 +12,11 @@ import { toDateString } from "@/lib/utils/date";
 export function buildSnapshot(
   stats: StatsData,
   impact: ImpactV6Result,
+  today?: string,
 ): MetricsSnapshot {
   const now = new Date();
   const snapshot: MetricsSnapshot = {
-    date: toDateString(now),
+    date: today ?? toDateString(now),
     capturedAt: now.toISOString(),
 
     commitsTotal: stats.commitsTotal,

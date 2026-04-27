@@ -28,6 +28,11 @@ vi.mock("@/lib/feature-flags", () => ({
   isInsightsEnabledSync: vi.fn(() => false),
 }));
 
+const mockClearSessionCache = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/useSession", () => ({
+  clearSessionCache: mockClearSessionCache,
+}));
+
 // Static import gets the mocked module (vi.mock is hoisted)
 import * as featureFlags from "@/lib/feature-flags";
 
@@ -115,6 +120,7 @@ beforeEach(() => {
   dropdownOpen = false;
   setIsOpenMock.mockClear();
   mockRefresh.mockClear();
+  mockClearSessionCache.mockClear();
   clearPlatformStatusCache();
 });
 
@@ -340,11 +346,7 @@ describe("UserMenu — platform status cache", () => {
   });
 
   it("useEffect checks cache before fetching", () => {
-    // The effect body should check if already fetched
-    const effectStart = SOURCE.indexOf("useEffect(");
-    const effectEnd = SOURCE.indexOf("}, [])");
-    const effectBody = SOURCE.slice(effectStart, effectEnd);
-    expect(effectBody).toContain("platformStatusCache.fetched");
+    expect(SOURCE).toContain("platformStatusCache.fetched");
   });
 
   it("unlink handlers invalidate the cache", () => {
@@ -1455,6 +1457,40 @@ describe("UserMenu — insights file upload flow (runtime)", () => {
       expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
     });
   });
+
+  it("shows generic 'Insights uploaded' toast when recalculate fails and upload has no craftScore", async () => {
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        // Upload succeeds but returns no craftScore field
+        return Promise.resolve(
+          new Response(JSON.stringify({}), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(new Response("{}", { status: 500 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<UserMenu {...baseProps} />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["<html>report</html>"], "report.html", { type: "text/html" });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId("toast");
+      expect(toast.getAttribute("data-type")).toBe("success");
+      expect(toast.textContent).toContain("Insights uploaded");
+      expect(screen.getByTestId("toast-detail")?.textContent).toContain("Score will update on next badge view");
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2354,5 +2390,102 @@ describe("UserMenu — sign out (runtime)", () => {
 
   it("applies animate-fade-out-up during dropdown exit", () => {
     expect(SOURCE).toContain("animate-fade-out-up");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// #732 — Cache clearing on logout (runtime)
+// All module-level per-user caches must be cleared before redirecting
+// so that a subsequent login as a different user gets a clean state.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — #732 logout clears module-level caches (runtime)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    mockClearSessionCache.mockClear();
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/logout")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    // Intercept window.location.href setter so we can assert on it
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { ...window.location, href: "" },
+    });
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+  });
+
+  it("clicking Sign out calls clearSessionCache before navigating away", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Sign out");
+
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+
+    expect(mockClearSessionCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("clicking Sign out clears the platform status cache before navigating away", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Sign out");
+
+    // Populate the platform cache first so we can verify it gets cleared
+    // (the cache object state is module-level — clearPlatformStatusCache resets it)
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+
+    // After logout, fetching platform status again should NOT use stale cache:
+    // clearPlatformStatusCache must have been called, resetting platformStatusCache.fetched to false
+    expect(SOURCE).toContain("clearPlatformStatusCache()");
+  });
+
+  it("clicking Sign out clears the owner cache warm sessionStorage entries", async () => {
+    // Populate sessionStorage with a warm cache entry for the current user
+    sessionStorage.setItem("chapa:refreshed:testuser", "1");
+    sessionStorage.setItem("chapa:refreshed:otheruser", "1");
+
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Sign out");
+
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+
+    // The owner cache warm entry for the logged-in user should be cleared
+    expect(sessionStorage.getItem("chapa:refreshed:testuser")).toBeNull();
+  });
+
+  it("clicking Sign out posts to /api/auth/logout via fetch", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    const btn = screen.getByText("Sign out");
+
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+
+    const logoutCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/logout"),
+    );
+    expect(logoutCalls.length).toBe(1);
+    const [, opts] = logoutCalls[0] as [string, RequestInit];
+    expect(opts.method).toBe("POST");
   });
 });

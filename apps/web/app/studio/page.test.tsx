@@ -19,8 +19,8 @@ describe("Studio page (server component)", () => {
   });
 
   describe("authentication", () => {
-    it("reads session cookie", () => {
-      expect(SOURCE).toContain("readSessionCookie");
+    it("uses the shared server session helper", () => {
+      expect(SOURCE).toContain("getOptionalServerSessionFromHeaders");
     });
 
     it("redirects unauthenticated users", () => {

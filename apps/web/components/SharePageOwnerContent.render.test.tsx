@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SharePageOwnerContent } from "./SharePageOwnerContent";
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import type { SessionUser } from "@/hooks/useSession";
@@ -89,10 +89,15 @@ beforeEach(() => {
   mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("SharePageOwnerContent — render", () => {
-  it("shows nothing while loading session", () => {
+  it("shows public content while loading session", () => {
     mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
 
     const { container } = render(
@@ -103,10 +108,13 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(container.innerHTML).toBe("");
+    expect(container.innerHTML).not.toBe("");
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
+    expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
   });
 
-  it("shows visitor CTA when user is not the profile owner", () => {
+  it("shows public insight content and CTA when user is not the profile owner", () => {
     mockUseSession.mockReturnValue({
       session: { login: "otheruser", name: null, avatar_url: "" },
       loading: false,
@@ -122,9 +130,12 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Curious what your developer impact looks like?"),
+      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
     ).toBeTruthy();
-    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
+    expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
   });
 
   it("shows visitor CTA when session fetch fails", () => {
@@ -139,8 +150,9 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText("Curious what your developer impact looks like?"),
+      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
     ).toBeTruthy();
+    expect(screen.getByTestId("data-sources")).toBeTruthy();
   });
 
   it("shows visitor CTA when user is null", () => {
@@ -154,7 +166,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
   });
 
   it("shows owner content when user matches the handle", () => {
@@ -174,8 +187,8 @@ describe("SharePageOwnerContent — render", () => {
 
     expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
-    expect(screen.getByText("Embed This Badge")).toBeTruthy();
-    expect(screen.getByText("Impact Breakdown")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    expect(screen.getByText("Desglose de impacto")).toBeTruthy();
   });
 
   it("renders embed snippets with correct handle", () => {
@@ -193,7 +206,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Embed This Badge")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
 
     const copyButtons = screen.getAllByTestId("copy-button");
     expect(copyButtons.length).toBe(2);
@@ -221,10 +234,81 @@ describe("SharePageOwnerContent — render", () => {
     );
 
     expect(
-      screen.getByText(
-        "Could not load impact data for this user. Try again later.",
-      ),
+      screen.getByText("No se pudieron cargar los datos de impacto. Intentalo de nuevo mas tarde."),
     ).toBeTruthy();
+  });
+
+  it("shows Regenerate button in empty state (#743)", () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    expect(screen.getByText("Regenerar")).toBeTruthy();
+  });
+
+  it("posts to refresh and shows success after a successful regenerate", async () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", mockFetch);
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Regenerar"));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/refresh?handle=testuser", {
+        method: "POST",
+      });
+    });
+
+    expect(screen.getByText("Listo")).toBeTruthy();
+  });
+
+  it("shows support fallback when regenerate fails", async () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Regenerar"));
+
+    expect(
+      await screen.findByText("La regeneracion fallo.", { exact: false }),
+    ).toBeTruthy();
+    const supportLink = screen.getByText("Contactar soporte");
+    expect(supportLink.getAttribute("href")).toContain(
+      "mailto:support@thecreativetoken.com",
+    );
   });
 
   it("hides DataSources when stats is null", () => {
@@ -242,7 +326,7 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Embed This Badge")).toBeTruthy();
+    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
     expect(screen.queryByTestId("data-sources")).toBeNull();
   });
 });

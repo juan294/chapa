@@ -19,7 +19,10 @@ vi.mock("@/lib/db/campaigns", () => ({
   dbCreateCampaign: vi.fn(),
 }));
 
-import { adminAuthBeforeEach, readSessionCookie, isAdminHandle, rateLimit } from "@/lib/test-helpers/admin-auth";
+import { adminAuthBeforeEach } from "@/lib/test-helpers/admin-auth";
+import { readSessionCookie } from "@/lib/auth/github";
+import { isAdminHandle } from "@/lib/auth/admin";
+import { rateLimit } from "@/lib/cache/redis";
 import { dbGetCampaigns, dbCreateCampaign } from "@/lib/db/campaigns";
 import { GET, POST } from "./route";
 
@@ -195,6 +198,34 @@ describe("POST /api/admin/campaigns", () => {
     );
   });
 
+  it("rejects malformed features on create", async () => {
+    const res = await POST(
+      makeRequest("POST", {
+        ...validBody,
+        features: [{ text: 42 }],
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/features\[0\]\.text/i);
+    expect(dbCreateCampaign).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string previewText on create", async () => {
+    const res = await POST(
+      makeRequest("POST", {
+        ...validBody,
+        previewText: 42,
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/previewText/i);
+    expect(dbCreateCampaign).not.toHaveBeenCalled();
+  });
+
   it("defaults previewText to null and features to [] when not provided", async () => {
     vi.mocked(dbCreateCampaign).mockResolvedValue("new-id");
     await POST(makeRequest("POST", validBody));
@@ -205,5 +236,40 @@ describe("POST /api/admin/campaigns", () => {
         features: [],
       }),
     );
+  });
+
+  // SE-L1: ctaUrl validation
+  it("rejects javascript: ctaUrl with 400", async () => {
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "javascript:evil()" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ctaUrl/i);
+  });
+
+  it("rejects invalid URL as ctaUrl with 400", async () => {
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "not-a-url" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/ctaUrl/i);
+  });
+
+  it("accepts https: ctaUrl", async () => {
+    vi.mocked(dbCreateCampaign).mockResolvedValue("new-id");
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "https://example.com/path" }),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts http: ctaUrl", async () => {
+    vi.mocked(dbCreateCampaign).mockResolvedValue("new-id");
+    const res = await POST(
+      makeRequest("POST", { ...validBody, ctaUrl: "http://example.com" }),
+    );
+    expect(res.status).toBe(201);
   });
 });

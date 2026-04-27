@@ -19,10 +19,13 @@ vi.mock("next/headers", () => ({
   headers: () => mockHeaders(),
 }));
 
-const mockReadSessionCookie = vi.fn();
+const mockGetOptionalServerSessionFromHeaders = vi.fn();
+const mockGetSessionSecret = vi.fn();
 
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: (...args: unknown[]) => mockReadSessionCookie(...args),
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalServerSessionFromHeaders: (...args: unknown[]) =>
+    mockGetOptionalServerSessionFromHeaders(...args),
+  getSessionSecret: (...args: unknown[]) => mockGetSessionSecret(...args),
 }));
 
 vi.mock("./AuthorizeClient", () => ({
@@ -45,7 +48,9 @@ const originalEnv = { ...process.env };
 beforeEach(() => {
   mockRedirect.mockClear();
   mockHeaders.mockClear();
-  mockReadSessionCookie.mockClear();
+  mockGetOptionalServerSessionFromHeaders.mockClear();
+  mockGetSessionSecret.mockClear();
+  mockGetSessionSecret.mockReturnValue("test-secret");
 });
 
 afterEach(() => {
@@ -87,7 +92,7 @@ describe("CliAuthorizePage", () => {
   // ─── Missing NEXTAUTH_SECRET ──────────────────────────────────────────
 
   it("redirects to '/' when NEXTAUTH_SECRET is not set", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    mockGetSessionSecret.mockReturnValue(null);
 
     await expect(renderPage({ session: "test-session-id" })).rejects.toThrow(
       "NEXT_REDIRECT:/",
@@ -98,13 +103,12 @@ describe("CliAuthorizePage", () => {
   // ─── No session cookie (not logged in) ────────────────────────────────
 
   it("redirects to login with return URL when no session cookie", async () => {
-    process.env.NEXTAUTH_SECRET = "test-secret";
     process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.example.com";
 
     mockHeaders.mockResolvedValue({
       get: (name: string) => (name === "cookie" ? null : null),
     });
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
 
     await expect(
       renderPage({ session: "abc123" }),
@@ -119,13 +123,12 @@ describe("CliAuthorizePage", () => {
   });
 
   it("uses empty base URL when NEXT_PUBLIC_BASE_URL is not set", async () => {
-    process.env.NEXTAUTH_SECRET = "test-secret";
     delete process.env.NEXT_PUBLIC_BASE_URL;
 
     mockHeaders.mockResolvedValue({
       get: () => null,
     });
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue(null);
 
     await expect(
       renderPage({ session: "abc123" }),
@@ -140,13 +143,11 @@ describe("CliAuthorizePage", () => {
   // ─── Valid session — renders AuthorizeClient ──────────────────────────
 
   it("renders AuthorizeClient with correct props when session is valid", async () => {
-    process.env.NEXTAUTH_SECRET = "test-secret";
-
     mockHeaders.mockResolvedValue({
       get: (name: string) =>
         name === "cookie" ? "chapa_session=encrypted-value" : null,
     });
-    mockReadSessionCookie.mockReturnValue({
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue({
       login: "testuser",
       token: "gh-token",
     });
@@ -159,23 +160,21 @@ describe("CliAuthorizePage", () => {
     expect(client.getAttribute("data-handle")).toBe("testuser");
   });
 
-  it("passes cookie header to readSessionCookie", async () => {
-    process.env.NEXTAUTH_SECRET = "test-secret";
-
+  it("passes the headers store to getOptionalServerSessionFromHeaders", async () => {
     const cookieValue = "chapa_session=some-encrypted-cookie";
-    mockHeaders.mockResolvedValue({
+    const headerStore = {
       get: (name: string) => (name === "cookie" ? cookieValue : null),
-    });
-    mockReadSessionCookie.mockReturnValue({
+    };
+    mockHeaders.mockResolvedValue(headerStore);
+    mockGetOptionalServerSessionFromHeaders.mockReturnValue({
       login: "user1",
       token: "tok",
     });
 
     await renderPage({ session: "sess-1" });
 
-    expect(mockReadSessionCookie).toHaveBeenCalledWith(
-      cookieValue,
-      "test-secret",
+    expect(mockGetOptionalServerSessionFromHeaders).toHaveBeenCalledWith(
+      headerStore,
     );
   });
 });

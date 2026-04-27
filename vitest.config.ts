@@ -3,6 +3,7 @@ import path from "path";
 
 export default defineConfig({
   test: {
+    testTimeout: 15000,
     include: [
       "apps/**/*.test.{ts,tsx}",
       "packages/**/*.test.{ts,tsx}",

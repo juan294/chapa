@@ -1,25 +1,39 @@
 import { type NextRequest, NextResponse, after } from "next/server";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
-import { readSessionCookie } from "@/lib/auth/github";
+import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isValidHandle } from "@/lib/validation";
 import { escapeXml } from "@/lib/render/escape";
-import { rateLimit, trackBadgeGenerated } from "@/lib/cache/redis";
-import { buildSnapshot } from "@/lib/history/snapshot";
-import { dbInsertSnapshot } from "@/lib/db/snapshots";
-import { dbUpsertUser } from "@/lib/db/users";
-import { getCachedLatestSnapshot, updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { generateVerificationCode } from "@/lib/verification/hmac";
-import { storeVerificationRecord } from "@/lib/verification/store";
-import type { VerificationRecord } from "@/lib/verification/types";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
+import {
+  cacheDel,
+  cacheGet,
+  cacheSet,
+  cacheSetNx,
+  rateLimit,
+} from "@/lib/cache/redis";
+import { CACHE_VERSION } from "@/lib/cache/version";
 import { getClientIp } from "@/lib/http/client-ip";
-import { notifyFirstBadge } from "@/lib/email/notifications";
-import { getCachedCraftScore } from "@/lib/cache/craft-cache";
-import { smoothScore } from "@/lib/impact/smoothing";
-import { getTier } from "@/lib/impact/utils";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { toDateString } from "@/lib/utils/date";
+import { withTimeout } from "@/lib/async/with-timeout";
+import {
+  getPublicProfileVerification,
+  materializePublicProfile,
+  runPublicProfileSideEffects,
+} from "@/lib/profile/public-profile";
+
+const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
+const BADGE_CACHE_DEADLINE_MS = 250;
+const BADGE_RATE_LIMIT_DEADLINE_MS = 150;
+const BADGE_RENDER_WAIT_SCHEDULE_MS = [50, 75, 100, 125, 150, 200, 250, 300, 350, 400];
+type BadgeRenderResult = {
+  svg: string;
+  headers: HeadersInit;
+  status?: number;
+};
+
+const inflightBadgeRenders = new Map<string, Promise<BadgeRenderResult>>();
 
 const CACHE_HEADERS = {
   "Content-Type": "image/svg+xml",
@@ -43,15 +57,102 @@ function fallbackSvg(handle: string, message: string): string {
 </svg>`;
 }
 
+function buildBadgeSvgCacheKey(handle: string, date: string): string {
+  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
+}
+
+function buildBadgeRenderLockKey(handle: string, date: string): string {
+  return `badge-lock:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withBadgeFallback<T>(
+  promise: Promise<T>,
+  fallback: T,
+  ms: number,
+  label: string,
+): Promise<T> {
+  try {
+    return await withTimeout(promise, ms, label);
+  } catch {
+    return fallback;
+  }
+}
+
+async function readBadgeSvgCache(key: string): Promise<string | null> {
+  return withBadgeFallback(
+    cacheGet<string>(key),
+    null,
+    BADGE_CACHE_DEADLINE_MS,
+    "badge cache read",
+  );
+}
+
+async function acquireBadgeRenderLock(key: string): Promise<boolean> {
+  return withBadgeFallback(
+    cacheSetNx(key, BADGE_RENDER_LOCK_TTL_SECONDS),
+    false,
+    BADGE_CACHE_DEADLINE_MS,
+    "badge render lock",
+  );
+}
+
+async function writeBadgeSvgCache(key: string, svg: string): Promise<boolean> {
+  return withBadgeFallback(
+    cacheSet(key, svg, 86400),
+    false,
+    BADGE_CACHE_DEADLINE_MS,
+    "badge cache write",
+  );
+}
+
+async function checkBadgeRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+) {
+  return withBadgeFallback(
+    rateLimit(key, limit, windowSeconds),
+    { allowed: true, current: 0, limit },
+    BADGE_RATE_LIMIT_DEADLINE_MS,
+    "badge rate limit",
+  );
+}
+
+async function waitForBadgeSvgCache(key: string): Promise<string | null> {
+  for (const waitMs of BADGE_RENDER_WAIT_SCHEDULE_MS) {
+    await sleep(waitMs);
+    const cached = await readBadgeSvgCache(key);
+    if (cached) return cached;
+  }
+
+  return null;
+}
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+
+  return { promise, resolve };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   const { handle } = await params;
 
-  // Rate limit: 100 requests per IP per 60 seconds
+  // Rate limit: 100 requests per IP+handle per 60 seconds
   const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:badge:${ip}`, 100, 60);
+  const rl = await checkBadgeRateLimit(`ratelimit:badge:${ip}:${handle}`, 100, 60);
   if (!rl.allowed) {
     return new NextResponse("Too many requests. Please try again later.", {
       status: 429,
@@ -71,124 +172,100 @@ export async function GET(
     });
   }
 
-  // Try to get an auth token from session (better rate limits)
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  let token: string | undefined;
-  if (sessionSecret) {
-    const session = readSessionCookie(
-      request.headers.get("cookie"),
-      sessionSecret,
-    );
-    if (session) token = session.token;
+  // SVG full-response cache: serve stale badge without hitting GitHub API
+  const today = toDateString(new Date());
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
+  if (cachedSvg) {
+    return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
   }
 
+  const inflightSvg = inflightBadgeRenders.get(svgCacheKey);
+  if (inflightSvg) {
+    const shared = await inflightSvg;
+    return new NextResponse(shared.svg, {
+      status: shared.status,
+      headers: shared.headers,
+    });
+  }
+
+  const deferred = createDeferred<BadgeRenderResult>();
+  inflightBadgeRenders.set(svgCacheKey, deferred.promise);
+
+  const renderLockKey = buildBadgeRenderLockKey(handle, today);
+  let gotRenderLock = false;
+
+  // Try to get an auth token from session (better rate limits)
+  const session = getOptionalRequestSession(request);
+  const token = session?.token;
+
   try {
-    // Fetch stats (cache-first)
-    const stats = await getStats(handle, token);
-    if (!stats) {
-      const svg = fallbackSvg(
-        handle,
-        "Could not load data — try again later.",
-      );
-      return new NextResponse(svg, {
+    gotRenderLock = await acquireBadgeRenderLock(renderLockKey);
+    if (!gotRenderLock) {
+      const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
+      if (lockedSvg) {
+        const sharedResult = {
+          svg: lockedSvg,
+          headers: CACHE_HEADERS,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(sharedResult);
+        return new NextResponse(sharedResult.svg, { headers: sharedResult.headers });
+      }
+    }
+
+    const materialized = await materializePublicProfile(handle, { token });
+    if (!materialized) {
+      const fallbackResult = {
+        svg: fallbackSvg(handle, "Could not load data — try again later."),
         headers: {
           "Content-Type": "image/svg+xml",
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
         },
-      });
+      } satisfies BadgeRenderResult;
+      deferred.resolve(fallbackResult);
+      return new NextResponse(fallbackResult.svg, { headers: fallbackResult.headers });
     }
 
-    // Fetch craft score, snapshot, and avatar in parallel — all are independent
-    // I/O operations. Craft score feeds into computeImpactV6 as the 5th dimension.
-    // Uses allSettled so a single DB/network error doesn't crash the entire badge.
-    const [craftSettled, snapshotSettled, avatarSettled] = await Promise.allSettled([
-      getCachedCraftScore(handle),
-      getCachedLatestSnapshot(handle),
-      stats.avatarUrl
-        ? getAvatarBase64(handle, stats.avatarUrl)
-        : Promise.resolve(undefined),
-    ]);
-    const craftResult = craftSettled.status === "fulfilled" ? craftSettled.value : null;
-    const latestSnapshot = snapshotSettled.status === "fulfilled" ? snapshotSettled.value : null;
-    const avatarDataUri = avatarSettled.status === "fulfilled" ? avatarSettled.value : undefined;
+    const avatarDataUri = materialized.stats.avatarUrl
+      ? await getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
+      : undefined;
+    const verification = getPublicProfileVerification(materialized);
 
-    // Compute impact (craft score feeds into the 5th pentagon dimension)
-    const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
-
-    // V5: Day-aware EMA smoothing — applies once per day, prevents feedback loop
-    // on same-day repeated requests (smoothScore returns cached value for today).
-    impact.adjustedComposite = smoothScore(impact.adjustedComposite, latestSnapshot);
-    impact.tier = getTier(impact.adjustedComposite);
-
-    // Generate verification code (returns null if secret is unset)
-    const verification = generateVerificationCode(stats, impact);
-
-    // Post-response work: use after() to guarantee completion on Vercel
-    // (void promises may be killed when the serverless function freezes).
-    // Operations run in parallel via allSettled — each has its own try/catch
-    // so individual failures don't block others.
     after(() => {
-      const ops: Promise<void>[] = [];
-
-      if (verification) {
-        const record: VerificationRecord = {
-          handle: stats.handle.toLowerCase(),
-          displayName: stats.displayName,
-          adjustedComposite: impact.adjustedComposite,
-          confidence: impact.confidence,
-          tier: impact.tier,
-          archetype: impact.archetype,
-          dimensions: impact.dimensions,
-          commitsTotal: stats.commitsTotal,
-          prsMergedCount: stats.prsMergedCount,
-          reviewsSubmittedCount: stats.reviewsSubmittedCount,
-          generatedAt: verification.date,
-          profileType: impact.profileType,
-        };
-        ops.push(storeVerificationRecord(verification.hash, record));
-      }
-
-      ops.push(trackBadgeGenerated(handle));
-      ops.push(notifyFirstBadge(handle, impact));
-      const snapshot = buildSnapshot(stats, impact);
-      ops.push(
-        dbInsertSnapshot(handle, snapshot).then((inserted) => {
-          if (inserted) updateSnapshotCache(handle, snapshot);
-        }),
-      );
-
-      // Persist profile fields so admin dashboard always has latest data
-      if (stats.displayName || stats.avatarUrl) {
-        ops.push(
-          dbUpsertUser(handle, {
-            displayName: stats.displayName ?? undefined,
-            avatarUrl: stats.avatarUrl ?? undefined,
-          }).catch(() => {}),
-        );
-      }
-
-      return Promise.allSettled(ops);
+      return runPublicProfileSideEffects(handle, materialized, { verification });
     });
 
-    // Render full badge
-    const svg = renderBadgeSvg(stats, impact, {
+    const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
     });
-
-    return new NextResponse(svg, { headers: CACHE_HEADERS });
+    await writeBadgeSvgCache(svgCacheKey, svg);
+    const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
+    deferred.resolve(successResult);
+    return new NextResponse(successResult.svg, { headers: successResult.headers });
   } catch (err) {
-    void captureServerError({
+    const fallbackResult = {
+      svg: fallbackSvg(handle, "Something went wrong — try again later."),
+      status: 500,
+      headers: { "Content-Type": "image/svg+xml" },
+    } satisfies BadgeRenderResult;
+    deferred.resolve(fallbackResult);
+
+    fireAndForget(() => captureServerError({
       route: `/u/${handle}/badge.svg`,
       statusCode: 500,
       error: err,
-    });
+    }));
 
-    const svg = fallbackSvg(handle, "Something went wrong — try again later.");
-    return new NextResponse(svg, {
-      status: 500,
-      headers: { "Content-Type": "image/svg+xml" },
+    return new NextResponse(fallbackResult.svg, {
+      status: fallbackResult.status,
+      headers: fallbackResult.headers,
     });
+  } finally {
+    inflightBadgeRenders.delete(svgCacheKey);
+    if (gotRenderLock) {
+      fireAndForget(() => cacheDel(renderLockKey), () => undefined);
+    }
   }
 }

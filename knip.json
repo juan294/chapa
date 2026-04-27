@@ -18,12 +18,13 @@
         "app/**/route.ts",
         "app/**/error.tsx",
         "app/**/loading.tsx",
-        "app/**/not-found.tsx"
+        "app/**/not-found.tsx",
+        "scripts/**/*.ts"
       ],
       "project": ["**/*.{ts,tsx}"],
       "ignoreDependencies": [
-        "tailwindcss",
-        "postcss"
+        "postcss",
+        "tsx"
       ]
     },
     "packages/shared": {

@@ -2,23 +2,29 @@ import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
+import { dbGetSupplemental } from "@/lib/db/supplemental";
 import { isBitbucketEnabled, isCodebergEnabled } from "@/lib/feature-flags";
-import {
-  dbGetLinkedPlatform,
-  dbDeleteLinkedPlatform,
-  dbUpdatePlatformTokens,
-} from "@/lib/db/user-platforms";
-import { isTokenExpired, refreshBitbucketToken } from "@/lib/auth/bitbucket";
-import { refreshCodebergToken } from "@/lib/auth/codeberg";
-import { fetchBitbucketStats } from "@/lib/bitbucket/stats";
-import { fetchCodebergStats } from "@/lib/codeberg/stats";
+import { dbGetLinkedPlatform } from "@/lib/db/user-platforms";
+import { fetchBitbucketIfLinked } from "@/lib/bitbucket/client";
+import { fetchCodebergIfLinked } from "@/lib/codeberg/client";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { withTimeout } from "@/lib/async/with-timeout";
 import type { StatsData, SupplementalStats, Platform } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
 const STALE_TTL = 604800; // 7 days
+const SUPPLEMENTAL_TTL = 86400; // 24h — must match POST /api/supplemental
+// Maximum time an in-flight fetch is allowed to hang before it is abandoned.
+// Without this limit, a fetch that hangs (e.g. GitHub API never responds) would
+// occupy the _inflight slot forever, blocking all subsequent requests for that
+// handle from ever retrying. The timeout causes the promise to reject, the
+// finally() cleanup fires, and future callers get a fresh attempt.
+const INFLIGHT_TIMEOUT_MS = 30_000;
 
 // In-flight request deduplication map.
-// Prevents concurrent calls for the same handle from making duplicate API calls.
+// Prevents concurrent calls for the same handle/auth context from making
+// duplicate API calls. Public callers may reuse an authenticated in-flight
+// fetch because it produces a safe superset of the public result.
 const _inflight = new Map<string, Promise<StatsData | null>>();
 
 /** @internal — exported for tests only. Resets the inflight map. */
@@ -43,22 +49,38 @@ export async function getStats(
 ): Promise<StatsData | null> {
   const lowerHandle = handle.toLowerCase();
   const cacheKey = `stats:v2:merged:${lowerHandle}`;
+  const publicInflightKey = `${lowerHandle}:public`;
+  const authenticatedInflightKey = `${lowerHandle}:authenticated`;
+  const inflightKey = token ? authenticatedInflightKey : publicInflightKey;
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
   if (cached) return _enrichWithLogins(cached, handle);
 
-  // Check if there's already an in-flight request for this handle
-  const existing = _inflight.get(lowerHandle);
+  // Public callers can share an authenticated fetch. Authenticated callers
+  // must not reuse a weaker public fetch.
+  const existing = token
+    ? _inflight.get(authenticatedInflightKey)
+    : _inflight.get(authenticatedInflightKey) ?? _inflight.get(publicInflightKey);
   if (existing) return existing;
 
-  // Create the fetch promise and store it for deduplication
-  const promise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
-  _inflight.set(lowerHandle, promise);
+  // Create the fetch promise, wrap it with a timeout, and store it for
+  // deduplication. The timeout ensures the _inflight slot is always cleaned up
+  // even if the underlying fetch hangs indefinitely (e.g. GitHub never responds).
+  // A timed-out promise resolves to null via the catch below, which causes the
+  // caller to fall back to stale cache exactly as a failed API call would.
+  const rawPromise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
+  const promise = withTimeout(rawPromise, INFLIGHT_TIMEOUT_MS, `getStats(${handle})`).catch(
+    (err) => {
+      console.error(`[github] inflight fetch timed out for ${handle}:`, err);
+      return null;
+    },
+  );
+  _inflight.set(inflightKey, promise);
 
-  // Clean up the inflight entry when done (success or failure)
+  // Clean up the inflight entry when done (success, failure, or timeout)
   promise.finally(() => {
-    _inflight.delete(lowerHandle);
+    _inflight.delete(inflightKey);
   });
 
   return promise;
@@ -90,7 +112,7 @@ async function _enrichWithLogins(
     : stats;
 }
 
-/** Internal: fetch from GitHub, merge Bitbucket + supplemental, cache. */
+/** Internal: fetch from GitHub, merge Bitbucket + Codeberg + supplemental, cache. */
 async function _fetchAndCache(
   handle: string,
   lowerHandle: string,
@@ -115,8 +137,8 @@ async function _fetchAndCache(
 
   // Fetch Bitbucket + Codeberg in parallel — error in one must not block the other
   const [bbResult, cbResult] = await Promise.allSettled([
-    _fetchBitbucketIfLinked(handle, lowerHandle),
-    _fetchCodebergIfLinked(handle, lowerHandle),
+    fetchBitbucketIfLinked(handle, lowerHandle),
+    fetchCodebergIfLinked(handle, lowerHandle),
   ]);
 
   const bbStats = bbResult.status === "fulfilled" ? bbResult.value : null;
@@ -132,8 +154,23 @@ async function _fetchAndCache(
     stats = mergeStats(stats, cbStats, { markAsSupplemental: false });
   }
 
-  // Check for supplemental data (e.g. EMU account)
-  const supplemental = await cacheGet<SupplementalStats>(`supplemental:${lowerHandle}`);
+  // Check for supplemental data (e.g. EMU account). Redis is the hot path
+  // with a 24h TTL; Supabase (#825) is the durable fallback so a missed CLI
+  // upload day no longer silently drops EMU stats from scores. On a Redis
+  // miss + DB hit, we rehydrate Redis so subsequent reads stay fast.
+  const supplementalKey = `supplemental:${lowerHandle}`;
+  const cachedSupplemental = await cacheGet<SupplementalStats>(supplementalKey);
+  let supplemental: SupplementalStats | null = cachedSupplemental;
+  if (!supplemental) {
+    const persisted = await dbGetSupplemental(lowerHandle);
+    if (persisted) {
+      supplemental = persisted;
+      fireAndForget(
+        () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
+        () => undefined,
+      );
+    }
+  }
   if (supplemental) {
     stats = mergeStats(stats, supplemental.stats);
   }
@@ -176,148 +213,7 @@ async function _fetchAndCache(
   await cacheSet(staleKey, stats, STALE_TTL);
 
   // Record in permanent user registry (fire-and-forget)
-  void dbUpsertUser(handle).catch(() => {});
+  fireAndForget(() => dbUpsertUser(handle), () => undefined);
 
   return stats;
-}
-
-/** Fetch Bitbucket stats from cache or live API. Returns null if not linked/disabled. */
-async function _fetchBitbucketIfLinked(
-  handle: string,
-  lowerHandle: string,
-): Promise<StatsData | null> {
-  const bbCacheKey = `stats:v2:bitbucket:${lowerHandle}`;
-
-  // Check Bitbucket cache first (cheap Redis read, always available)
-  const cached = await cacheGet<StatsData>(bbCacheKey);
-  if (cached) return cached;
-
-  // Check feature flag — only make live API calls if enabled
-  const enabled = await isBitbucketEnabled();
-  if (!enabled) return null;
-
-  // Check if user has linked Bitbucket
-  const linked = await dbGetLinkedPlatform(handle, "bitbucket");
-  if (!linked) return null;
-
-  let { accessToken } = linked.tokens;
-  const { refreshToken, expiresAt } = linked.tokens;
-
-  // Refresh token if expired
-  if (isTokenExpired(expiresAt)) {
-    if (!refreshToken) {
-      void dbDeleteLinkedPlatform(handle, "bitbucket");
-      return null;
-    }
-
-    const clientId = process.env.BITBUCKET_CLIENT_ID?.trim() ?? "";
-    const clientSecret = process.env.BITBUCKET_CLIENT_SECRET?.trim() ?? "";
-    const result = await refreshBitbucketToken(refreshToken, clientId, clientSecret);
-
-    if (!result.ok) {
-      if (result.reason === "revoked") {
-        void dbDeleteLinkedPlatform(handle, "bitbucket");
-      }
-      // Transient: keep the link, skip stats this time
-      return null;
-    }
-
-    accessToken = result.tokens.access_token;
-    void dbUpdatePlatformTokens(
-      handle,
-      "bitbucket",
-      result.tokens.access_token,
-      result.tokens.refresh_token,
-      new Date(Date.now() + result.tokens.expires_in * 1000),
-    );
-  }
-
-  // Fetch Bitbucket stats
-  const bbStats = await fetchBitbucketStats(
-    linked.remoteLogin,
-    accessToken,
-    { displayName: linked.remoteLogin, avatarUrl: "" },
-  );
-
-  if (bbStats) {
-    await cacheSet(bbCacheKey, bbStats, CACHE_TTL);
-  }
-
-  return bbStats;
-}
-
-/** Fetch Codeberg stats from cache or live API. Returns null if not linked/disabled. */
-async function _fetchCodebergIfLinked(
-  handle: string,
-  lowerHandle: string,
-): Promise<StatsData | null> {
-  const cbCacheKey = `stats:v2:codeberg:${lowerHandle}`;
-
-  // Check Codeberg cache first (cheap Redis read, always available)
-  const cached = await cacheGet<StatsData>(cbCacheKey);
-  if (cached) return cached;
-
-  // Check feature flag — only make live API calls if enabled
-  const enabled = await isCodebergEnabled();
-  if (!enabled) return null;
-
-  // Check if user has linked Codeberg
-  const linked = await dbGetLinkedPlatform(handle, "codeberg");
-  if (!linked) return null;
-
-  let { accessToken } = linked.tokens;
-  const { refreshToken, expiresAt } = linked.tokens;
-
-  // Refresh token if expired (only if refresh_token exists)
-  if (isTokenExpired(expiresAt)) {
-    if (!refreshToken) {
-      // No refresh token and token expired — can't recover
-      // If expiresAt is null, token may be long-lived — try anyway
-      if (expiresAt !== null) {
-        void dbDeleteLinkedPlatform(handle, "codeberg");
-        return null;
-      }
-      // expiresAt is null → token might be long-lived, proceed with current token
-    } else {
-      const clientId = process.env.CODEBERG_CLIENT_ID?.trim() ?? "";
-      const clientSecret = process.env.CODEBERG_CLIENT_SECRET?.trim() ?? "";
-      const result = await refreshCodebergToken(
-        refreshToken,
-        clientId,
-        clientSecret,
-      );
-
-      if (!result.ok) {
-        if (result.reason === "revoked") {
-          void dbDeleteLinkedPlatform(handle, "codeberg");
-        }
-        // Transient: keep the link, skip stats this time
-        return null;
-      }
-
-      accessToken = result.tokens.access_token;
-      void dbUpdatePlatformTokens(
-        handle,
-        "codeberg",
-        result.tokens.access_token,
-        result.tokens.refresh_token ?? null,
-        result.tokens.expires_in
-          ? new Date(Date.now() + result.tokens.expires_in * 1000)
-          : null,
-      );
-    }
-  }
-
-  // Fetch Codeberg stats
-  const cbStats = await fetchCodebergStats(
-    linked.remoteLogin,
-    accessToken,
-    { displayName: linked.remoteLogin, avatarUrl: "" },
-  );
-
-  if (cbStats) {
-    await cacheSet(cbCacheKey, cbStats, CACHE_TTL);
-  }
-
-  return cbStats;
 }

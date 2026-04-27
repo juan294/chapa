@@ -65,8 +65,8 @@ describe("Navbar", () => {
   });
 
   describe("authentication", () => {
-    it("reads session from cookie via readSessionCookie", () => {
-      expect(SOURCE).toContain("readSessionCookie");
+    it("reads session via the shared server session helper", () => {
+      expect(SOURCE).toContain("getOptionalServerSessionFromHeaders");
     });
 
     it("shows login link when session is null", () => {

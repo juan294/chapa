@@ -56,8 +56,12 @@ vi.mock("./AdminSearchBar", () => ({
 }));
 
 vi.mock("./AdminStatsCards", () => ({
-  AdminStatsCards: (props: { totalUsers: number }) => (
-    <div data-testid="admin-stats-cards" data-total={props.totalUsers} />
+  AdminStatsCards: (props: { totalUsers: number; pageUsers: number }) => (
+    <div
+      data-testid="admin-stats-cards"
+      data-total={props.totalUsers}
+      data-page={props.pageUsers}
+    />
   ),
 }));
 

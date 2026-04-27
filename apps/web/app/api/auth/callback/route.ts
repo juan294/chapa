@@ -7,39 +7,45 @@ import {
   validateState,
   clearStateCookie,
 } from "@/lib/auth/github";
+import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
+import { consumeOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
 import { addContact } from "@/lib/email/audience";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { storeGitHubToken } from "@/lib/auth/github-session-token";
 
-function isSecureOrigin(): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
-  return base.startsWith("https://");
+const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
+
+function cookieFlags(request: NextRequest): string {
+  return buildAuthCookieFlags(
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() || request.nextUrl.origin,
+  );
 }
 
-function cookieFlags(): string {
-  const secure = isSecureOrigin() ? " Secure;" : "";
-  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+function isLocalDevRequest(request: NextRequest): boolean {
+  const hostname = request.nextUrl.hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
 /**
- * Validate that a redirect URL is safe (same-origin only).
- * Prevents open-redirect attacks via the postLoginRedirect cookie.
+ * Validate that a redirect URL is on the explicit allow-list.
+ * Restricts post-login redirects to a known set of safe prefixes to prevent
+ * open-redirect attacks via the chapa_redirect cookie.
+ *
+ * Allow-list: exactly "/", or paths starting with "/u/", "/studio", "/about".
  */
 function isSafeRedirect(url: string): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  if (base) {
-    try {
-      const parsed = new URL(url, base);
-      const origin = new URL(base);
-      return parsed.origin === origin.origin;
-    } catch {
-      // URL parsing failed — fall through to path check
-    }
+  if (url === "/") return true;
+  if (
+    url.startsWith("/u/") ||
+    url.startsWith("/studio") ||
+    url.startsWith("/about")
+  ) {
+    return true;
   }
-  // Fallback: only allow paths starting with "/"
-  return url.startsWith("/") && !url.startsWith("//");
+  return false;
 }
 
 /**
@@ -58,6 +64,19 @@ function readRedirectCookie(cookieHeader: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+function readOauthStateStoreCookie(
+  cookieHeader: string | null,
+): "shared" | "fallback" | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${OAUTH_STATE_STORE_COOKIE}=`));
+  if (!match) return null;
+  const value = match.slice(`${OAUTH_STATE_STORE_COOKIE}=`.length);
+  return value === "shared" || value === "fallback" ? value : null;
 }
 
 export async function GET(request: NextRequest) {
@@ -80,6 +99,15 @@ export async function GET(request: NextRequest) {
   const cookieHeader = request.headers.get("cookie");
   if (!validateState(cookieHeader, queryState)) {
     return NextResponse.redirect(new URL("/?error=invalid_state", request.url));
+  }
+  const stateStoreMode = readOauthStateStoreCookie(cookieHeader);
+  const mustConsumeSharedState =
+    !isLocalDevRequest(request) && stateStoreMode === "shared";
+  const consumed = mustConsumeSharedState && queryState
+    ? await consumeOauthState(queryState)
+    : true;
+  if (mustConsumeSharedState && !consumed) {
+    return NextResponse.json({ error: "state_already_used" }, { status: 400 });
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();
@@ -115,25 +143,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/?error=user_fetch", request.url));
   }
 
+  const storedToken = await storeGitHubToken(user.login, token);
+  if (!storedToken) {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 500,
+      error: new Error("GitHub token storage failed"),
+    });
+    return NextResponse.redirect(new URL("/?error=session_storage", request.url));
+  }
+
   // Capture email and profile, register user (fire-and-forget, non-blocking)
   const email = await fetchGitHubUserEmail(token).catch(() => null);
   void dbUpsertUser(user.login, {
     email: email ?? undefined,
     displayName: user.name ?? null,
     avatarUrl: user.avatar_url ?? null,
-  }).catch(() => {});
+  }).catch((err: unknown) => {
+    void captureServerError({
+      route: "/api/auth/callback",
+      statusCode: 500,
+      error: err,
+    });
+  });
 
   // Sync to Resend audience (fire-and-forget, non-blocking)
   if (email) {
     void addContact(email, {
       firstName: user.name ?? undefined,
       handle: user.login,
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      void captureServerError({
+        route: "/api/auth/callback",
+        statusCode: 500,
+        error: err,
+      });
+    });
   }
 
   const cookie = createSessionCookie(
     {
-      token,
       login: user.login,
       name: user.name,
       avatar_url: user.avatar_url,
@@ -155,10 +204,14 @@ export async function GET(request: NextRequest) {
   );
   response.headers.append("Set-Cookie", cookie);
   response.headers.append("Set-Cookie", clearStateCookie());
+  response.headers.append(
+    "Set-Cookie",
+    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags(request)}; Max-Age=0`,
+  );
   // Clear the redirect cookie
   response.headers.append(
     "Set-Cookie",
-    `chapa_redirect=; ${cookieFlags()}; Max-Age=0`,
+    `chapa_redirect=; ${cookieFlags(request)}; Max-Age=0`,
   );
   return response;
 }

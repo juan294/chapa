@@ -153,4 +153,15 @@ describe("BadgeToolbar", () => {
       expect(SOURCE).toContain("animate-fade-out-up");
     });
   });
+
+  // #742 — focus-visible styles on toolbar buttons
+  describe("focus-visible keyboard styles (#742)", () => {
+    it("toolbar buttons have focus-visible:text-text-primary", () => {
+      expect(SOURCE).toContain("focus-visible:text-text-primary");
+    });
+
+    it("toolbar buttons have focus-visible:bg-amber/[0.06]", () => {
+      expect(SOURCE).toContain("focus-visible:bg-amber/[0.06]");
+    });
+  });
 });

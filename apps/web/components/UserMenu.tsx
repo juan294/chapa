@@ -4,9 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isStudioEnabledSync, isInsightsEnabledSync } from "@/lib/feature-flags";
+import { isInsightsEnabledSync } from "@/lib/feature-flags";
+import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
+import { clearSessionCache } from "@/hooks/useSession";
+import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
 
@@ -37,6 +41,7 @@ interface UserMenuProps {
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
+  const { studioEnabled } = useClientFeatureFlags();
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -59,6 +64,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
   // Insights import — file picker triggered directly from menu
   const insightsFileRef = useRef<HTMLInputElement>(null);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleToastDismiss = useCallback(() => setToast(null), []);
   const [toast, setToast] = useState<{
     message: string;
@@ -146,11 +152,22 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         });
       }
 
-      setTimeout(() => window.location.reload(), 2500);
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.reload();
+        }
+      }, 2500);
     } catch {
       setToast({ message: "Import failed", detail: "Please try again", type: "error" });
     }
   }
+
+  useEffect(() => () => {
+    if (reloadTimerRef.current) {
+      clearTimeout(reloadTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (platformStatusCache.fetched) {
@@ -164,16 +181,19 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       platform: "bitbucket" | "codeberg",
       setter: typeof setBbStatus,
     ) {
-      fetch(`/api/auth/${platform}/status`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.enabled) {
-            const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-            platformStatusCache[platform] = status;
-            setter(status);
-          }
-        })
-        .catch(() => {}); // Graceful — menu works without status
+      fireAndForget(
+        () =>
+          fetch(`/api/auth/${platform}/status`)
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.enabled) {
+                const status = { linked: data.linked, remoteLogin: data.remoteLogin };
+                platformStatusCache[platform] = status;
+                setter(status);
+              }
+            }),
+        () => undefined,
+      ); // Graceful — menu works without status
     }
     fetchPlatformStatus("bitbucket", setBbStatus);
     fetchPlatformStatus("codeberg", setCbStatus);
@@ -212,6 +232,18 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     } finally {
       setCbUnlinkLoading(false);
     }
+  }
+
+  async function handleSignOut() {
+    // Clear all module-level per-user caches before navigating away.
+    // This prevents the previous user's session, platform links, or
+    // cache warm state from appearing when a different user logs in
+    // in the same tab. (#732)
+    clearSessionCache();
+    clearPlatformStatusCache();
+    clearCacheWarmState();
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/";
   }
 
   const fallbackLetter = login.charAt(0).toUpperCase();
@@ -311,7 +343,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               </svg>
               My Badge
             </Link>
-            {isStudioEnabledSync() && (
+            {studioEnabled && (
               <Link
                 href="/studio"
                 role="menuitem"
@@ -529,7 +561,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
           {/* Sign out */}
           <div className="px-2 py-1.5">
-            <form method="POST" action="/api/auth/logout">
+            <form method="POST" action="/api/auth/logout" onSubmit={(e) => { e.preventDefault(); void handleSignOut(); }}>
               <button
                 type="submit"
                 role="menuitem"

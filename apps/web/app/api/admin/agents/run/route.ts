@@ -1,10 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { readSessionCookie } from "@/lib/auth/github";
-import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
-import { getClientIp } from "@/lib/http/client-ip";
+import { adminAuth } from "@/lib/auth/admin-route";
 import { AGENTS } from "@/lib/agents/agent-config";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +29,14 @@ const MAX_LOG_LINES = 500;
 const PROCESS_TIMEOUT_MS = 300_000;
 /** Grace period after SIGTERM before escalating to SIGKILL. */
 const SIGKILL_GRACE_MS = 5_000;
+/** Closed-format guard for configured and requested agent keys. */
+const AGENT_KEY_RE = /^[a-z0-9_]+$/;
+
+for (const [agentKey, config] of Object.entries(AGENTS)) {
+  if (!AGENT_KEY_RE.test(agentKey) || !AGENT_KEY_RE.test(config.key)) {
+    throw new Error(`Invalid AGENTS key at module load: ${agentKey}`);
+  }
+}
 
 let currentRun: RunState | null = null;
 
@@ -45,32 +50,26 @@ export function _resetRunState(): void {
   currentRun = null;
 }
 
-// ---------------------------------------------------------------------------
-// Auth + guards shared by all handlers
-// ---------------------------------------------------------------------------
-
-function authorize(
-  request: NextRequest,
-): { login: string } | NextResponse {
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!sessionSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const cookieHeader = request.headers.get("cookie");
-  const session = readSessionCookie(cookieHeader, sessionSecret);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!isAdminHandle(session.login)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  return { login: session.login };
-}
-
+/**
+ * Returns a 403 response when the route should not be available.
+ *
+ * Two conditions block execution:
+ * 1. NODE_ENV is not "development" AND ALLOW_AGENT_RUN is not "true" — prevents
+ *    accidental exposure in staging/CI environments.
+ * 2. VERCEL_ENV === "production" — hard blocks the route on Vercel production
+ *    regardless of ALLOW_AGENT_RUN, because module-level `currentRun` state is
+ *    not shared across Vercel instances (BE-H10/DO-M6). In production, a DELETE
+ *    may land on a different instance than the POST, seeing null and leaving
+ *    orphaned processes with no way to stop them.
+ */
 function devOnlyGuard(): NextResponse | null {
+  // Hard block in Vercel production — in-memory state breaks across instances.
+  if (process.env.VERCEL_ENV === "production") {
+    return NextResponse.json(
+      { error: "Not available in production" },
+      { status: 403 },
+    );
+  }
   const isDev = process.env.NODE_ENV === "development";
   const allowRun = process.env.ALLOW_AGENT_RUN?.trim() === "true";
   if (!isDev && !allowRun) {
@@ -87,18 +86,8 @@ function devOnlyGuard(): NextResponse | null {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
-  // Rate limit
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-agent-run:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
-
-  const auth = authorize(request);
-  if (auth instanceof NextResponse) return auth;
+  const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
+  if (authError) return authError;
 
   const devGuard = devOnlyGuard();
   if (devGuard) return devGuard;
@@ -114,10 +103,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { agentKey } = body;
+  const agentKey = typeof body.agentKey === "string" ? body.agentKey.trim() : "";
   if (!agentKey) {
     return NextResponse.json(
       { error: "Missing agentKey in request body" },
+      { status: 400 },
+    );
+  }
+
+  if (!AGENT_KEY_RE.test(agentKey)) {
+    return NextResponse.json(
+      { error: `Invalid agent key: ${agentKey}` },
       { status: 400 },
     );
   }
@@ -250,18 +246,11 @@ export async function POST(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function GET(request: NextRequest) {
-  // Rate limit
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-agent-run:${ip}`, 30, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
+  const authError = await adminAuth(request, "ratelimit:admin-agent-run", 30, 60);
+  if (authError) return authError;
 
-  const auth = authorize(request);
-  if (auth instanceof NextResponse) return auth;
+  const devGuard = devOnlyGuard();
+  if (devGuard) return devGuard;
 
   const agentKey = request.nextUrl.searchParams.get("agentKey");
   if (!currentRun || currentRun.agentKey !== agentKey) {
@@ -296,18 +285,11 @@ export async function GET(request: NextRequest) {
 // ---------------------------------------------------------------------------
 
 export async function DELETE(request: NextRequest) {
-  // Rate limit
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:admin-agent-run:${ip}`, 10, 60);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests." },
-      { status: 429, headers: { "Retry-After": "60" } },
-    );
-  }
+  const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
+  if (authError) return authError;
 
-  const auth = authorize(request);
-  if (auth instanceof NextResponse) return auth;
+  const devGuard = devOnlyGuard();
+  if (devGuard) return devGuard;
 
   const agentKey = request.nextUrl.searchParams.get("agentKey");
   if (!currentRun || currentRun.agentKey !== agentKey) {

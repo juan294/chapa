@@ -34,17 +34,19 @@ describe("SharePage", () => {
 
   // Phase 5 — Share page integration with Creator Studio
   describe("config-aware badge rendering", () => {
-    it("fetches saved config from Redis", () => {
-      expect(SOURCE).toContain("cacheGet");
-      expect(SOURCE).toContain("config:");
+    it("does not fetch Studio config on the public share route", () => {
+      expect(SOURCE).not.toContain("cacheGet<BadgeConfig>");
+      expect(SOURCE).not.toContain("config:");
     });
 
-    it("renders ShareBadgePreview for interactive badge", () => {
-      expect(SOURCE).toContain("ShareBadgePreview");
+    it("does not import the Studio-coupled share preview runtime", () => {
+      expect(SOURCE).not.toContain("ShareBadgePreview");
+      expect(SOURCE).not.toContain("@/app/studio/BadgePreviewCard");
     });
 
-    it("falls back to static SVG img when no config", () => {
-      expect(SOURCE).toContain("badge.svg");
+    it("renders the public badge with server SVG output", () => {
+      expect(SOURCE).toContain("renderBadgeSvg");
+      expect(SOURCE).toContain("dangerouslySetInnerHTML");
     });
   });
 

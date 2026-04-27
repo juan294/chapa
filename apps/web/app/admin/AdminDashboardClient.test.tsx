@@ -62,8 +62,12 @@ vi.mock("./AdminSearchBar", () => ({
 }));
 
 vi.mock("./AdminStatsCards", () => ({
-  AdminStatsCards: (props: { totalUsers: number }) => (
-    <div data-testid="admin-stats-cards" data-total={props.totalUsers} />
+  AdminStatsCards: (props: { totalUsers: number; pageUsers: number }) => (
+    <div
+      data-testid="admin-stats-cards"
+      data-total={props.totalUsers}
+      data-page={props.pageUsers}
+    />
   ),
 }));
 
@@ -101,7 +105,7 @@ vi.mock("./campaigns/campaigns-dashboard", () => ({
 vi.mock("next/dynamic", () => ({
   default: (loader: () => Promise<{ default: React.ComponentType }>, opts?: { loading?: () => React.ReactNode }) => {
     // Call loader to exercise the import factory function and .then() callback in coverage
-    void loader().catch(() => {});
+    loader().catch(() => undefined);
     const fallback = opts?.loading?.();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const text = ((fallback as any)?.props?.children as string) ?? "dynamic";

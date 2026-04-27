@@ -5,6 +5,12 @@ import type {
   ConfidenceFlag,
   ProfileType,
 } from "@chapa/shared";
+import {
+  BURST_ACTIVITY_THRESHOLD,
+  MICRO_COMMIT_THRESHOLD,
+  SINGLE_REPO_CONCENTRATION,
+  TIER_THRESHOLDS,
+} from "@chapa/shared";
 
 // ---------------------------------------------------------------------------
 // Clamp + round a raw score to 0–100 integer
@@ -80,7 +86,7 @@ const CONFIDENCE_REASONS: Record<ConfidenceFlag, string> = {
  *
  * | Flag                        | Penalty | Condition (collaborative)                      |
  * |-----------------------------|---------|------------------------------------------------|
- * | `burst_activity`            | -15     | >= 20 commits in a 10-minute window            |
+ * | `burst_activity`            | -15     | >= 100 commits in a 10-minute window           |
  * | `micro_commit_pattern`      | -10     | >= 60% of commits are micro-commits            |
  * | `generated_change_pattern`  | -15     | >= 20k lines changed with <= 2 reviews         |
  * | `low_collaboration_signal`  | -10     | >= 10 PRs merged with <= 1 review submitted    |
@@ -121,7 +127,7 @@ export function computeConfidence(
   const penalties: ConfidencePenalty[] = [];
   let score = 100;
 
-  if (stats.maxCommitsIn10Min >= 100) {
+  if (stats.maxCommitsIn10Min >= BURST_ACTIVITY_THRESHOLD) {
     penalties.push({
       flag: "burst_activity",
       penalty: 15,
@@ -132,7 +138,7 @@ export function computeConfidence(
 
   if (
     stats.microCommitRatio !== undefined &&
-    stats.microCommitRatio >= 0.6
+    stats.microCommitRatio >= MICRO_COMMIT_THRESHOLD
   ) {
     penalties.push({
       flag: "micro_commit_pattern",
@@ -161,7 +167,10 @@ export function computeConfidence(
     score -= 10;
   }
 
-  if (stats.topRepoShare >= 0.95 && stats.reposContributed <= 1) {
+  if (
+    stats.topRepoShare >= SINGLE_REPO_CONCENTRATION &&
+    stats.reposContributed <= 1
+  ) {
     penalties.push({
       flag: "single_repo_concentration",
       penalty: 5,
@@ -247,8 +256,8 @@ export function computeAdjustedScore(
  * @returns The corresponding {@link ImpactTier} label
  */
 export function getTier(adjustedScore: number): ImpactTier {
-  if (adjustedScore >= 85) return "Elite";
-  if (adjustedScore >= 70) return "High";
-  if (adjustedScore >= 30) return "Solid";
+  if (adjustedScore >= TIER_THRESHOLDS.S) return "Elite";
+  if (adjustedScore >= TIER_THRESHOLDS.A) return "High";
+  if (adjustedScore >= TIER_THRESHOLDS.C) return "Solid";
   return "Emerging";
 }

@@ -102,16 +102,6 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Accepted:** 2026-03-27
 
-## Cron auth fail-open when CRON_SECRET unset (#685)
-
-- **Risk:** `verifyCronSecret()` in `lib/auth/cron.ts` allows all requests when `CRON_SECRET` is not configured (returns `null` instead of a 401/503 response). This means cron endpoints (`/api/cron/warm-cache`, `/api/cron/sync-audience`, `/api/cron/process-campaigns`) become publicly accessible if the env var is missing.
-- **Accepted because:** On Vercel Pro (production), `CRON_SECRET` is auto-injected and cannot be accidentally deleted. The asymmetry with `ADMIN_SECRET` (which is fail-secure / 503) is intentional: cron endpoints perform read/cache operations only — no destructive writes, no data exposure. Making them fail-secure would silently break cache warming on preview deployments and local dev where `CRON_SECRET` is often unset.
-- **Mitigation:** The function logs a warning when the secret is missing. Cron endpoints are rate-limited. The warm-cache endpoint only reads public GitHub data and writes to cache. The sync-audience and process-campaigns endpoints only read from Supabase and write to Resend (both server-side, no user data exposure).
-- **Severity:** Low
-- **Accepted:** 2026-04-04
-
----
-
 ## Infrastructure
 
 ## `packages/shared` has no build step (#450)
@@ -154,6 +144,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
 - **Severity:** Low
 - **Accepted:** 2026-03-28
+
+---
+
+## Post-response side effects in badge route
+
+- **Risk:** After rendering a badge SVG, side effects (metrics snapshot capture, analytics events, cache warm, verification record store) are scheduled with Next.js `after()` and run via `Promise.allSettled` in `runPublicProfileSideEffects` (`apps/web/lib/profile/public-profile.ts`). Individual rejections are absorbed by `allSettled` with no retry and no alert, and the side-effect path currently has no `captureServerError`/PostHog instrumentation — failures produce, at most, whatever each callee logs internally.
+- **Mitigation:** Side effects are non-critical by design: the badge SVG is already returned to the requester before they run. Missing a single daily snapshot is acceptable — the next request or cron job (`/api/cron/warm-cache`) will fill the gap. A daily per-handle guard key (`sideeffects:done:{handle}:{date}`) prevents repeat work. This is intentional availability-first design; observability for this path is tracked as a follow-up improvement.
+- **Severity:** Low
+- **Accepted:** 2026-04-04
 
 ---
 

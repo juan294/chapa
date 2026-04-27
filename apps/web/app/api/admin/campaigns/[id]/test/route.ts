@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { requireSession } from "@/lib/auth/require-session";
+import { rateLimit } from "@/lib/cache/redis";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { getResend } from "@/lib/email/resend";
 import { buildEmailContent, EMAIL_FROM } from "@/lib/email/campaigns";
@@ -60,6 +61,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  const { session, error: sessionError } = requireSession(request);
+  if (sessionError) return sessionError;
+
+  const adminKey = session.login.toLowerCase();
+  const recipientKey = email.toLowerCase();
+
+  const adminRl = await rateLimit(`ratelimit:campaign-test:admin:${adminKey}`, 5, 60);
+  if (!adminRl.allowed) {
+    return NextResponse.json(
+      { error: "Too many test emails. Please try again later." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
+  const recipientRl = await rateLimit(
+    `ratelimit:campaign-test:recipient:${recipientKey}`,
+    1,
+    300,
+  );
+  if (!recipientRl.allowed) {
+    return NextResponse.json(
+      { error: "A test email was sent to this recipient recently." },
+      { status: 429, headers: { "Retry-After": "300" } },
+    );
+  }
+
   // Fetch campaign
   const { id } = await params;
   const campaign = await dbGetCampaign(id);
@@ -77,8 +104,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Use provided handle or fall back to session login
-  const { session } = requireSession(request);
-  const recipientHandle = handle || session!.login;
+  const recipientHandle = handle || session.login;
 
   // For engagement campaigns, interpolate placeholders with sample values
   const interpolated = campaign.type === "engagement"

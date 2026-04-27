@@ -5,6 +5,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Navbar } from "@/components/Navbar";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
+import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
@@ -16,55 +17,12 @@ const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   demoMode: true,
 });
 
-const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "How it Works", href: "#how-it-works" },
-  { label: "Enterprise", href: "#enterprise" },
-  { label: "Stats", href: "#stats" },
-];
-
-const FEATURES = [
-  {
-    title: "MULTI-DIMENSIONAL",
-    description: "Commit counts reward volume, not impact. Chapa scores four core dimensions — Delivery, Quality, Consistency, Breadth — plus an optional Craft dimension for AI tool mastery.",
-  },
-  {
-    title: "DEVELOPER ARCHETYPE",
-    description: (<>No two developers contribute the same way, but platforms treat everyone as a commit counter. Your archetype — <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>, <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>, <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>, <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>, <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">Artificer</Link>, <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link> — captures how you actually contribute.</>),
-  },
-  {
-    title: "VERIFIED METRICS",
-    description: "Anyone can fake a screenshot. Chapa badges carry an HMAC seal \u2014 click it to cryptographically prove the scores are real.",
-  },
-  {
-    title: "LIVING DOCUMENT",
-    description: "Static badges go stale the day you make them. Your Chapa badge re-renders from fresh data daily \u2014 embed it once, it stays current.",
-  },
-  {
-    title: "ONE-CLICK EMBED",
-    description: "No build steps, no API keys. One line of Markdown or HTML, anywhere that renders images.",
-  },
-];
-
-const STEPS = [
-  { number: "01", title: "Sign in with GitHub", description: "Secure OAuth over HTTPS \u2014 we only request read access to public data. No passwords stored, no private repos accessed." },
-  { number: "02", title: "We build your profile", description: "Your full profile analyzes 12 months of activity across Delivery, Quality, Consistency, and Breadth \u2014 plus optional Craft dimension, archetype, and composite score. The badge shows the last 90 days at a glance." },
-  { number: "03", title: "Share your badge", description: "Embed the live SVG in your README, portfolio, anywhere \u2014 and explore the full scoring breakdown on your share page." },
-];
-
-const DIMENSIONS = [
-  { title: "DELIVERY", description: "Shipping meaningful changes \u2014 PRs merged, issues closed, code shipped." },
-  { title: "QUALITY", description: "Engineering discipline \u2014 code reviews on teams, PR hygiene and structured workflow when solo." },
-  { title: "CONSISTENCY", description: "Reliable, sustained contributions \u2014 active days and even distribution over time." },
-  { title: "BREADTH", description: "Cross-project influence \u2014 working across repos and building community." },
-  { title: "CRAFT", description: "AI tool mastery (optional) \u2014 how effectively you use tools like Claude Code to ship better work." },
-];
-
-const STATS = [
-  { value: "7", label: "archetypes" },
-  { value: "5", label: "dimensions" },
-  { value: "365", label: "days scored" },
-];
+const LANDING_COPY = SPANISH_PUBLIC_COPY.landing;
+const NAV_LINKS = LANDING_COPY.navLinks.map((link) => ({ ...link }));
+const FEATURES = LANDING_COPY.features;
+const STEPS = LANDING_COPY.steps;
+const DIMENSIONS = LANDING_COPY.dimensions;
+const STATS = LANDING_COPY.stats;
 
 /* ── Icons ─────────────────────────────────────────────────────── */
 
@@ -148,23 +106,23 @@ export default async function Home({
         <div className="mx-auto max-w-4xl px-6 pt-24 pb-20 md:pt-28 md:pb-32 space-y-16 md:space-y-24">
 
           {/* ── Hero: $ chapa ──────────────────────────────── */}
-          <section className="animate-fade-in-up">
+          <section className="animate-fade-in-up motion-reduce:animate-none">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
               <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95] text-balance">
-                Developer Impact,
+                {LANDING_COPY.hero.title}
                 <br />
-                <span className="text-amber">Decoded</span>
+                <span className="text-amber">{LANDING_COPY.hero.highlight}</span>
               </h1>
               <div className="space-y-2 font-heading text-text-secondary">
-                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> The new way to <span className="bg-amber/10 px-1 rounded">quantify</span> your <span className="bg-amber/10 px-1 rounded">impact</span> in AI&#8209;assisted coding.</p>
+                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> {LANDING_COPY.hero.leadBefore} <span className="bg-amber/10 px-1 rounded">{LANDING_COPY.hero.leadQuantify}</span> {LANDING_COPY.hero.leadMiddle} <span className="bg-amber/10 px-1 rounded">{LANDING_COPY.hero.leadImpact}</span> {LANDING_COPY.hero.leadAfter}</p>
                 <div className="pl-5 space-y-1 text-sm">
-                  <p><span className="text-terminal-dim select-none">&gt;</span> Commit counts and green squares don&apos;t tell the complete story anymore.</p>
-                  <p><span className="text-terminal-dim select-none">&gt;</span> Chapa scores what actually matters — how you build, guard quality, stay consistent, and explore — across 365 days of activity.</p>
-                  <p><span className="text-terminal-dim select-none">&gt;</span> One embeddable badge. Multiple dimensions. Cryptographically verified.</p>
+                  {LANDING_COPY.hero.bullets.map((bullet) => (
+                    <p key={bullet}><span className="text-terminal-dim select-none">&gt;</span> {bullet}</p>
+                  ))}
                 </div>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
@@ -173,7 +131,7 @@ export default async function Home({
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                 >
                   <GitHubIcon className="w-4 h-4" />
-                  Get Your Badge
+                  {LANDING_COPY.hero.primaryCta}
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
                 <Link
@@ -181,7 +139,7 @@ export default async function Home({
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
                 >
                   <ShieldCheckIcon className="w-4 h-4" />
-                  Verify a Badge
+                  {LANDING_COPY.hero.verifyCta}
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
@@ -189,7 +147,7 @@ export default async function Home({
           </section>
 
           {/* ── Badge Preview: $ chapa preview @developer ──── */}
-          <section id="badge-preview" className="relative z-10 animate-fade-in-up [animation-delay:200ms]">
+          <section id="badge-preview" className="relative z-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:200ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa preview @developer</span>
@@ -200,7 +158,7 @@ export default async function Home({
                 <div
                   className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
                   role="img"
-                  aria-label="Example Chapa developer impact badge"
+                  aria-label={LANDING_COPY.hero.badgePreviewLabel}
                   dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
                 />
                 <BadgeOverlay />
@@ -209,7 +167,7 @@ export default async function Home({
           </section>
 
           {/* ── Embed: $ chapa embed ──────────────────────── */}
-          <section className="animate-fade-in-up [animation-delay:400ms]">
+          <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:400ms]">
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa embed</span>
@@ -221,20 +179,20 @@ export default async function Home({
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
                   <span className="ml-2 text-xs text-terminal-dim font-heading">
-                    embed snippet
+                    {LANDING_COPY.embed.windowLabel}
                   </span>
                   <div className="ml-auto">
-                    <CopyButton text="![Impact Badge](https://chapa.thecreativetoken.com/u/developer/badge.svg)" />
+                    <CopyButton text={`![${LANDING_COPY.embed.altText}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`} />
                   </div>
                 </div>
                 <div className="p-4 font-heading text-sm leading-relaxed">
                   <p className="text-terminal-dim">
                     <span className="text-amber/50">{"<!-- "}</span>
-                    Add to your README
+                    {LANDING_COPY.embed.comment}
                     <span className="text-amber/50">{" -->"}</span>
                   </p>
                   <p className="text-text-primary/80 mt-1">
-                    <span className="text-amber">{"![Impact Badge]("}</span>
+                    <span className="text-amber">{`![${LANDING_COPY.embed.altText}](`}</span>
                     <span className="text-text-secondary">
                       {"chapa.thecreativetoken.com/u/"}
                     </span>
@@ -247,8 +205,8 @@ export default async function Home({
           </section>
 
           {/* ── Features: $ chapa features ────────────────── */}
-          <h2 className="sr-only">Features</h2>
-          <section id="features" className="animate-fade-in-up [animation-delay:600ms]">
+          <section id="features" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:600ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.features}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa features</span>
@@ -260,16 +218,29 @@ export default async function Home({
                     {feature.title}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    {feature.description}
+                    {"description" in feature ? (
+                      feature.description
+                    ) : (
+                      <>
+                        {feature.descriptionBefore} —{" "}
+                        <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{LANDING_COPY.archetypes.builder}</Link>,{" "}
+                        <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{LANDING_COPY.archetypes.guardian}</Link>,{" "}
+                        <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{LANDING_COPY.archetypes.marathoner}</Link>,{" "}
+                        <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{LANDING_COPY.archetypes.polymath}</Link>,{" "}
+                        <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{LANDING_COPY.archetypes.artificer}</Link>,{" "}
+                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{LANDING_COPY.archetypes.balanced}</Link> o{" "}
+                        <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{LANDING_COPY.archetypes.emerging}</Link> — {feature.descriptionAfter}
+                      </>
+                    )}
                   </span>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* ── How It Works: $ chapa explain ─────────────── */}
-          <h2 className="sr-only">How It Works</h2>
-          <section id="how-it-works" className="animate-fade-in-up [animation-delay:800ms]">
+          {/* ── Cómo funciona: $ chapa explain ─────────────── */}
+          <section id="how-it-works" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:800ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.howItWorks}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa explain</span>
@@ -293,17 +264,17 @@ export default async function Home({
 
               <div className="pt-4 space-y-4">
                 <h3 className="font-heading text-sm text-text-primary font-medium">
-                  What we measure
+                  {LANDING_COPY.measure.title}
                 </h3>
                 <p className="text-text-secondary text-sm text-pretty">
-                  Chapa scores four core dimensions of your development activity from the last 12 months, plus an optional Craft dimension for AI tool mastery. Your unique combination determines your developer archetype:{" "}
-                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
-                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
-                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
-                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
-                  <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">Artificer</Link>,{" "}
-                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
-                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>.
+                  {LANDING_COPY.measure.descriptionBefore}{" "}
+                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{LANDING_COPY.archetypes.builder}</Link>,{" "}
+                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{LANDING_COPY.archetypes.guardian}</Link>,{" "}
+                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{LANDING_COPY.archetypes.marathoner}</Link>,{" "}
+                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{LANDING_COPY.archetypes.polymath}</Link>,{" "}
+                  <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{LANDING_COPY.archetypes.artificer}</Link>,{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{LANDING_COPY.archetypes.balanced}</Link> o{" "}
+                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{LANDING_COPY.archetypes.emerging}</Link>.
                 </p>
                 {DIMENSIONS.map((dim) => (
                   <div key={dim.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
@@ -319,7 +290,7 @@ export default async function Home({
                   href="/about/scoring"
                   className="inline-flex items-center gap-1 text-sm text-amber hover:text-amber-light transition-colors font-heading"
                 >
-                  Read the full scoring methodology
+                  {LANDING_COPY.measure.methodologyLink}
                   <ArrowRightIcon className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -327,8 +298,8 @@ export default async function Home({
           </section>
 
           {/* ── Enterprise: $ chapa enterprise ────────────── */}
-          <h2 className="sr-only">Enterprise</h2>
-          <section id="enterprise" className="animate-fade-in-up [animation-delay:900ms]">
+          <section id="enterprise" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:900ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.enterprise}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa enterprise</span>
@@ -336,12 +307,10 @@ export default async function Home({
             <div className="pl-4 border-l border-stroke space-y-5">
               <div>
                 <h3 className="font-heading text-lg tracking-tight text-text-primary">
-                  GitHub <span className="text-amber">Enterprise Managed Users</span>
+                  {LANDING_COPY.enterprise.title} <span className="text-amber">{LANDING_COPY.enterprise.highlight}</span>
                 </h3>
                 <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl text-pretty">
-                  Work at a company that uses GitHub Enterprise? Your corporate contributions
-                  (commits, PRs, reviews) live in a separate EMU namespace and don&apos;t show up
-                  on your personal profile. Chapa can merge them into your badge.
+                  {LANDING_COPY.enterprise.description}
                 </p>
               </div>
 
@@ -361,15 +330,15 @@ export default async function Home({
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
-                    Authenticated as @developer
+                    {LANDING_COPY.enterprise.terminalAuthenticated}
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
-                    Found EMU account: @developer_company
+                    {LANDING_COPY.enterprise.terminalFound}
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
-                    Merged 312 enterprise contributions into badge
+                    {LANDING_COPY.enterprise.terminalMerged}
                   </p>
                 </div>
               </div>
@@ -377,30 +346,30 @@ export default async function Home({
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                    WHAT IT DOES
+                    {LANDING_COPY.enterprise.whatItDoes}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    Links your EMU stats with your personal GitHub — one unified badge.
+                    {LANDING_COPY.enterprise.whatItDoesText}
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                    HOW TO USE
+                    {LANDING_COPY.enterprise.howToUse}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    Run{" "}
+                    {LANDING_COPY.enterprise.howToUseTextBefore}{" "}
                     <code className="font-heading text-text-primary/80 bg-amber/10 px-1.5 py-0.5 rounded text-xs">
                       npx chapa-cli
                     </code>{" "}
-                    and follow the prompts. Takes under a minute.
+                    {LANDING_COPY.enterprise.howToUseTextAfter}
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                    NO EMU?
+                    {LANDING_COPY.enterprise.noEmu}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    No problem — your public development activity is all you need. The CLI is optional.
+                    {LANDING_COPY.enterprise.noEmuText}
                   </span>
                 </div>
               </div>
@@ -408,8 +377,8 @@ export default async function Home({
           </section>
 
           {/* ── Stats: $ chapa stats ──────────────────────── */}
-          <h2 className="sr-only">Stats</h2>
-          <section id="stats" className="animate-fade-in-up [animation-delay:1100ms]">
+          <section id="stats" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1100ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.stats}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa stats</span>
@@ -432,22 +401,22 @@ export default async function Home({
           </section>
 
           {/* ── CTA: $ chapa login ────────────────────────── */}
-          <h2 className="sr-only">Get Started</h2>
-          <section className="animate-fade-in-up [animation-delay:1300ms]">
+          <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1300ms]">
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.getStarted}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa login</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-6">
               <p className="text-text-secondary text-sm">
-                Ready to prove your impact?
+                {LANDING_COPY.finalCta.prompt}
               </p>
               <a
                 href="/api/auth/login"
                 className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-8 pr-7 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 <GitHubIcon className="w-5 h-5" />
-                Get Your Badge
+                {LANDING_COPY.finalCta.button}
                 <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </a>
             </div>
@@ -467,12 +436,12 @@ export default async function Home({
                 Chapa<span className="text-amber">_</span>
               </span>
               <span className="text-xs text-text-secondary">
-                Built for developers, by developers.
+                {LANDING_COPY.footer.tagline}
               </span>
             </div>
 
             <div className="flex items-center gap-3 text-text-secondary">
-              <span className="text-xs">Powered by</span>
+              <span className="text-xs">{LANDING_COPY.footer.poweredBy}</span>
               <div className="flex items-center gap-2.5">
                 <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber transition-colors">
                   <GitHubIcon className="w-3.5 h-3.5" />
@@ -490,10 +459,10 @@ export default async function Home({
             </div>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
-              <Link href="/about" className="hover:text-amber transition-colors">About</Link>
-              <Link href="/about/scoring" className="hover:text-amber transition-colors">Scoring</Link>
-              <Link href="/terms" className="hover:text-amber transition-colors">Terms</Link>
-              <Link href="/privacy" className="hover:text-amber transition-colors">Privacy</Link>
+              <Link href="/about" className="hover:text-amber transition-colors">{LANDING_COPY.footer.about}</Link>
+              <Link href="/about/scoring" className="hover:text-amber transition-colors">{LANDING_COPY.footer.scoring}</Link>
+              <Link href="/terms" className="hover:text-amber transition-colors">{LANDING_COPY.footer.terms}</Link>
+              <Link href="/privacy" className="hover:text-amber transition-colors">{LANDING_COPY.footer.privacy}</Link>
             </div>
           </div>
 

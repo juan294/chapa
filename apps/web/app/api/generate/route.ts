@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/require-session";
 import { rateLimit } from "@/lib/cache/redis";
 import { getStats } from "@/lib/github/client";
 import { computeImpactV6 } from "@/lib/impact/v6";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 
 /**
  * POST /api/generate
@@ -36,7 +37,15 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    const stats = await getStats(handle, session.token);
+    const token = await getSessionGitHubToken(session);
+    if (!token) {
+      return NextResponse.json(
+        { error: "Reauthentication required" },
+        { status: 401 },
+      );
+    }
+
+    const stats = await getStats(handle, token);
     if (!stats) {
       return NextResponse.json(
         { error: "Failed to fetch stats. Try again later." },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
@@ -19,6 +19,10 @@ export function BadgeToolbar({
     "idle" | "loading" | "success" | "error"
   >("idle");
   const shareRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
   const { isOpen: shareOpen, setIsOpen: setShareOpen } = useDropdownMenu(shareRef);
   const { shouldRender: showShare, isAnimatingOut: shareExiting } =
     useAnimatedUnmount(shareOpen, 200);
@@ -127,12 +131,14 @@ export function BadgeToolbar({
       a.click();
       document.body.removeChild(a);
     } finally {
-      setDownloadStatus("idle");
+      if (mountedRef.current) {
+        setDownloadStatus("idle");
+      }
     }
   }, [handle]);
 
   const btnClass =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] transition-colors";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] focus-visible:text-text-primary focus-visible:bg-amber/[0.06] transition-colors";
 
   return (
     <div className="flex flex-wrap items-center gap-1">

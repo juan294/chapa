@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { setPosthogInstance } from "@/lib/analytics/posthog";
 
-function PostHogInit() {
+export function PostHogInit() {
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();

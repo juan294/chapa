@@ -13,6 +13,7 @@ set -euo pipefail
 CC_RPI_PATH="/Users/juan/code/cc-rpi"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/lib/agent-utils.sh"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LOGS_DIR="${PROJECT_ROOT}/logs"
 REPORT_FILE="${PROJECT_ROOT}/docs/agents/cc-rpi-update-report.md"
@@ -20,10 +21,6 @@ UPDATE_INSTRUCTIONS="${CC_RPI_PATH}/templates/commands/update.md"
 
 mkdir -p "${LOGS_DIR}"
 mkdir -p "$(dirname "${REPORT_FILE}")"
-
-# ── Logging ──
-log_info()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  $*"; }
-log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2; }
 
 # ── Preflight checks ──
 
@@ -72,6 +69,15 @@ while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
     --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git *)" \
     --output-format text \
     > "${REPORT_FILE}" 2>&1; then
+    if ! validate_report_file \
+      "${REPORT_FILE}" \
+      "cc-rpi-update" \
+      "^(# |\`\`\`markdown|cc-rpi sync: already up to date as of )"; then
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+      log_error "Attempt ${RETRY_COUNT} produced invalid report output. Retrying in 10s..."
+      sleep 10
+      continue
+    fi
     log_info "Report written to ${REPORT_FILE}"
     log_info "=== cc-rpi Blueprint Sync complete ==="
     exit 0

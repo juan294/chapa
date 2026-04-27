@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { dbUpdateFeatureFlag } from "@/lib/db/feature-flags";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
+import { invalidateFeatureFlagCache } from "@/lib/feature-flags";
 
 /**
  * PATCH /api/admin/feature-flags
@@ -49,6 +50,9 @@ export async function PATCH(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  // Same-instance reads should observe the new flag value immediately.
+  invalidateFeatureFlagCache(body.key);
 
   return NextResponse.json({ success: true });
 }

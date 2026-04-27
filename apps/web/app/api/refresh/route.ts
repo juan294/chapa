@@ -1,17 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import { dbRecomputeCraft } from "@/lib/db/tool-insights";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
-import { buildSnapshot } from "@/lib/history/snapshot";
-import { dbReplaceSnapshot } from "@/lib/db/snapshots";
-import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { invalidateHistoryCache } from "@/lib/history/history";
 import { captureServerError } from "@/lib/analytics/server-errors";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
+import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import {
+  materializeOrchestratedProfile,
+  persistOrchestratedSnapshot,
+} from "@/lib/profile/orchestrated-profile";
+import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 
 /**
  * POST /api/refresh?handle=:handle
@@ -58,15 +58,18 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Key must match lib/github/client.ts cache key: "stats:v2:merged:<handle>" (lowercase)
     await cacheDel(`stats:v2:merged:${normalizedHandle}`);
 
-    // Invalidate history cache so next /api/history/:handle request fetches fresh data
-    await invalidateHistoryCache(handle);
+    const token = await getSessionGitHubToken(session);
+    if (!token) {
+      return NextResponse.json(
+        { error: "Reauthentication required" },
+        { status: 401 },
+      );
+    }
 
-    // Fetch fresh stats and recompute craft in parallel
-    const [stats, craftResult] = await Promise.all([
-      getStats(handle, session.token),
-      dbRecomputeCraft(handle),
-    ]);
-    if (!stats) {
+    const materialized = await materializeOrchestratedProfile(handle, {
+      token,
+    });
+    if (!materialized) {
       void captureServerError({
         route: "/api/refresh",
         statusCode: 502,
@@ -78,28 +81,36 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    // Update craft cache so badge views use the recomputed score
-    if (craftResult) {
-      updateCraftCache(handle, craftResult).catch(() => {});
+    const persisted = await persistOrchestratedSnapshot(handle, materialized, {
+      mode: "replace",
+    });
+    if (!persisted) {
+      void captureServerError({
+        route: "/api/refresh",
+        statusCode: 500,
+        error: new Error(`Failed to persist refreshed snapshot for handle: ${handle}`),
+      });
+      return NextResponse.json(
+        { error: "Failed to save refreshed profile. Try again later." },
+        { status: 500 },
+      );
     }
 
-    const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
+    await invalidateProfileReadModels(handle, { history: true });
 
-    // Replace today's snapshot — a user-initiated refresh means the score has
-    // legitimately changed (e.g. after a scoring fix). dbReplaceSnapshot uses
-    // UPSERT so it overwrites the existing same-day row instead of silently
-    // skipping via ON CONFLICT DO NOTHING.
-    const snapshot = buildSnapshot(stats, impact);
-    dbReplaceSnapshot(handle, snapshot)
-      .then((replaced) => {
-        if (replaced) updateSnapshotCache(handle, snapshot);
-      })
-      .catch(() => {});
+    // Update craft cache after the durable snapshot write succeeds.
+    const craftResult = materialized.craftResult;
+    if (craftResult) {
+      fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
+    }
 
     // Invalidate ISR cache so the share page rebuilds with OAuth-sourced data
     revalidatePath(`/u/${handle}`);
 
-    return NextResponse.json({ stats, impact });
+    return NextResponse.json({
+      stats: materialized.stats,
+      impact: materialized.displayImpact,
+    });
   } catch (err) {
     console.error("[refresh] Unhandled error:", err);
     void captureServerError({

@@ -1,10 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import {
+  type Campaign,
   dbGetCampaign,
   dbUpdateCampaign,
   dbDeleteCampaign,
 } from "@/lib/db/campaigns";
+import { cacheDel } from "@/lib/cache/redis";
+import { parseCampaignPatchPayload } from "@/lib/campaigns/payload";
+
+const ENGAGEMENT_CACHE_KEY = "campaign:active-engagement";
+
+type AllowedPatchField =
+  | "name"
+  | "subject"
+  | "previewText"
+  | "headline"
+  | "bodyText"
+  | "features"
+  | "ctaText"
+  | "ctaUrl";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -46,13 +61,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const ok = await dbUpdateCampaign(id, body);
+  let updates: Partial<Pick<Campaign, AllowedPatchField>>;
+  try {
+    updates = parseCampaignPatchPayload(body);
+  } catch (error) {
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 400 },
+    );
+  }
+
+  // BE-H4: whitelist — only forward safe content fields to the DB layer
+  const ok = await dbUpdateCampaign(id, updates);
   if (!ok) {
     return NextResponse.json(
       { error: "Failed to update campaign" },
       { status: 500 },
     );
   }
+
+  // BE-M17: invalidate engagement campaign cache so changes are visible immediately
+  await cacheDel(ENGAGEMENT_CACHE_KEY);
 
   return NextResponse.json({ success: true });
 }

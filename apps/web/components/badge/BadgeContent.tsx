@@ -121,7 +121,7 @@ export function BadgeContent({
             <Image
               src={stats.avatarUrl}
               alt={`${stats.handle}'s avatar`}
-              className="w-8 h-8 rounded-full ring-2 ring-amber/30"
+              className="w-8 h-8 rounded-full ring-2 ring-amber/30 img-outline"
               width={32}
               height={32}
             />

@@ -1,17 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { buildAuthUrl, createStateCookie } from "@/lib/auth/github";
+import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
+import { issueOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
 
-function isSecureOrigin(): boolean {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
-  return base.startsWith("https://");
-}
+const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
-function cookieFlags(): string {
-  const secure = isSecureOrigin() ? " Secure;" : "";
-  return `HttpOnly;${secure} SameSite=Lax; Path=/`;
+function cookieFlags(request: NextRequest): string {
+  return buildAuthCookieFlags(
+    process.env.NEXT_PUBLIC_BASE_URL?.trim() || request.nextUrl.origin,
+  );
 }
 
 /**
@@ -56,17 +56,22 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${baseUrl}/api/auth/callback`;
 
   const { state, cookie: stateCookie } = createStateCookie();
+  const stateStoreMode = await issueOauthState(state);
   const authUrl = buildAuthUrl(clientId, redirectUri, state);
 
   const response = NextResponse.redirect(authUrl);
   response.headers.append("Set-Cookie", stateCookie);
+  response.headers.append(
+    "Set-Cookie",
+    `${OAUTH_STATE_STORE_COOKIE}=${stateStoreMode}; ${cookieFlags(request)}; Max-Age=600`,
+  );
 
   // Store post-login redirect URL if provided (same-origin only)
   const postLoginRedirect = request.nextUrl.searchParams.get("redirect");
   if (postLoginRedirect && isSafeRedirect(postLoginRedirect, baseUrl)) {
     response.headers.append(
       "Set-Cookie",
-      `chapa_redirect=${encodeURIComponent(postLoginRedirect)}; ${cookieFlags()}; Max-Age=600`,
+      `chapa_redirect=${encodeURIComponent(postLoginRedirect)}; ${cookieFlags(request)}; Max-Age=600`,
     );
   }
 

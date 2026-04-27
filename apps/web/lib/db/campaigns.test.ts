@@ -10,8 +10,23 @@ const mockInsert = vi.fn();
 const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 const mockUpsert = vi.fn();
+const mockRpc = vi.fn();
 
 let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
+let queryResults: Array<{ data?: unknown; error?: unknown; count?: number | null }> = [];
+
+function nextQueryResult(): { data: unknown; error: unknown; count?: number | null } {
+  if (queryResults.length > 0) {
+    const next = queryResults.shift()!;
+    return {
+      data: next.data ?? null,
+      error: next.error ?? null,
+      count: next.count,
+    };
+  }
+
+  return queryResult;
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockFrom = vi.fn((): any => ({
@@ -20,10 +35,10 @@ const mockFrom = vi.fn((): any => ({
     const chainable: any = {
       order: () => chainable,
       eq: () => chainable,
-      in: () => Promise.resolve(queryResult),
-      maybeSingle: () => Promise.resolve(queryResult),
+      in: () => Promise.resolve(nextQueryResult()),
+      maybeSingle: () => Promise.resolve(nextQueryResult()),
       limit: () => chainable,
-      then: (resolve: (v: unknown) => void) => resolve(queryResult),
+      then: (resolve: (v: unknown) => void) => resolve(nextQueryResult()),
     };
     return chainable;
   },
@@ -37,10 +52,12 @@ const mockFrom = vi.fn((): any => ({
   },
   update: (...args: unknown[]) => {
     mockUpdate(...args);
-    return {
-      eq: () => Promise.resolve(queryResult),
+    const chainable: any = {
+      eq: () => chainable,
       in: () => Promise.resolve(queryResult),
+      then: (resolve: (v: unknown) => void) => resolve(queryResult),
     };
+    return chainable;
   },
   delete: () => {
     mockDelete();
@@ -58,7 +75,7 @@ const mockFrom = vi.fn((): any => ({
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock("./supabase", () => ({
-  getSupabase: vi.fn(() => ({ from: mockFrom })),
+  getSupabase: vi.fn(() => ({ from: mockFrom, rpc: mockRpc })),
 }));
 
 const mockCacheGet = vi.fn();
@@ -70,22 +87,28 @@ vi.mock("../cache/redis", () => ({
 
 import { getSupabase } from "./supabase";
 import {
+  CampaignRowSchema,
+  CampaignSendRowSchema,
   dbGetCampaigns,
   dbGetCampaign,
   dbCreateCampaign,
   dbUpdateCampaign,
   dbDeleteCampaign,
   dbCreateCampaignSends,
+  dbClaimPendingSends,
   dbGetPendingSends,
   dbMarkSendsSent,
   dbMarkSendsFailed,
   dbGetCampaignStats,
   dbGetActiveEngagementCampaign,
+  mapCampaignRow,
+  mapSendRow,
 } from "./campaigns";
 
 beforeEach(() => {
   vi.clearAllMocks();
   queryResult = { data: null, error: null };
+  queryResults = [];
 });
 
 // ---------------------------------------------------------------------------
@@ -247,6 +270,26 @@ describe("dbGetCampaign", () => {
   });
 });
 
+describe("mapCampaignRow runtime validation", () => {
+  it("rejects rows with missing required fields", () => {
+    expect(() => mapCampaignRow({})).toThrow(/validation/i);
+  });
+
+  it("exposes a schema-like parse function for campaign rows", () => {
+    expect(typeof CampaignRowSchema.parse).toBe("function");
+  });
+});
+
+describe("mapSendRow runtime validation", () => {
+  it("rejects rows with missing required fields", () => {
+    expect(() => mapSendRow({})).toThrow(/validation/i);
+  });
+
+  it("exposes a schema-like parse function for send rows", () => {
+    expect(typeof CampaignSendRowSchema.parse).toBe("function");
+  });
+});
+
 describe("dbCreateCampaign", () => {
   const validInput = {
     type: "announcement" as const,
@@ -377,6 +420,13 @@ describe("dbUpdateCampaign", () => {
 
     expect(mockUpdate).toHaveBeenCalledWith({ name: "Only Name" });
   });
+
+  it("rejects invalid campaign statuses before writing", async () => {
+    await expect(
+      dbUpdateCampaign("c-1", { status: "bogus" as unknown as "draft" }),
+    ).rejects.toThrow(/invalid campaign status/i);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 });
 
 describe("dbDeleteCampaign", () => {
@@ -506,11 +556,81 @@ describe("dbGetPendingSends", () => {
   });
 });
 
+describe("dbClaimPendingSends", () => {
+  it("claims a bounded batch through the RPC", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [
+        {
+          id: "s-1",
+          campaign_id: "c-1",
+          handle: "alice",
+          email: "alice@example.com",
+          status: "processing",
+          sent_at: null,
+          error: null,
+        },
+      ],
+      error: null,
+    });
+
+    const result = await dbClaimPendingSends(
+      "c-1",
+      25,
+      "lease-token",
+      "2026-04-23T12:10:00.000Z",
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith("claim_campaign_sends", {
+      p_campaign_id: "c-1",
+      p_limit: 25,
+      p_lease_token: "lease-token",
+      p_lease_expires_at: "2026-04-23T12:10:00.000Z",
+    });
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "s-1",
+        campaignId: "c-1",
+        status: "processing",
+      }),
+    ]);
+  });
+
+  it("returns empty array when DB unavailable", async () => {
+    vi.mocked(getSupabase).mockReturnValueOnce(null);
+    const result = await dbClaimPendingSends(
+      "c-1",
+      10,
+      "lease-token",
+      "2026-04-23T12:10:00.000Z",
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("returns empty array on RPC error", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: new Error("rpc failed"),
+    });
+
+    const result = await dbClaimPendingSends(
+      "c-1",
+      10,
+      "lease-token",
+      "2026-04-23T12:10:00.000Z",
+    );
+
+    expect(result).toEqual([]);
+  });
+});
+
 describe("dbMarkSendsSent", () => {
-  it("updates status and timestamp", async () => {
+  it("updates claimed sends by lease token", async () => {
     queryResult = { data: null, error: null };
-    await dbMarkSendsSent(["s-1", "s-2"]);
-    expect(mockUpdate).toHaveBeenCalled();
+    await dbMarkSendsSent(["s-1", "s-2"], "lease-token");
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: "sent",
+      lease_token: null,
+    }));
   });
 
   it("does not throw when DB unavailable", async () => {
@@ -525,10 +645,14 @@ describe("dbMarkSendsSent", () => {
 });
 
 describe("dbMarkSendsFailed", () => {
-  it("updates status and error", async () => {
+  it("updates claimed sends with status and error", async () => {
     queryResult = { data: null, error: null };
-    await dbMarkSendsFailed(["s-1"], "Send failed");
-    expect(mockUpdate).toHaveBeenCalled();
+    await dbMarkSendsFailed(["s-1"], "Send failed", "lease-token");
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      status: "failed",
+      error: "Send failed",
+      lease_token: null,
+    }));
   });
 
   it("does not throw when DB unavailable", async () => {
@@ -544,70 +668,91 @@ describe("dbMarkSendsFailed", () => {
 
 describe("dbGetCampaignStats", () => {
   it("returns aggregate counts", async () => {
-    queryResult = {
-      data: [
-        { status: "sent" },
-        { status: "sent" },
-        { status: "pending" },
-        { status: "failed" },
-      ],
-      error: null,
-    };
+    queryResults = [
+      { count: 2, error: null },
+      { count: 1, error: null },
+      { count: 3, error: null },
+      { count: 1, error: null },
+    ];
 
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 2, pending: 1, failed: 1 });
+    expect(stats).toEqual({ sent: 2, pending: 1, processing: 3, failed: 1 });
+  });
+
+  it("uses count-only queries instead of loading campaign send rows", async () => {
+    queryResults = [
+      { count: 2, error: null },
+      { count: 1, error: null },
+      { count: 3, error: null },
+      { count: 1, error: null },
+    ];
+
+    await dbGetCampaignStats("c-1");
+
+    expect(mockSelect).toHaveBeenCalledTimes(4);
+    for (const call of mockSelect.mock.calls) {
+      expect(call[0]).not.toContain("*");
+      expect(call[0]).toBe("id");
+      expect(call[1]).toEqual({ count: "exact", head: true });
+    }
   });
 
   it("returns zeros when DB unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
 
   it("returns zeros when data is null", async () => {
-    queryResult = { data: null, error: null };
+    queryResults = [
+      { count: null, error: null },
+      { count: null, error: null },
+      { count: null, error: null },
+      { count: null, error: null },
+    ];
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
 
   it("returns zeros on query error", async () => {
-    queryResult = { data: null, error: new Error("query failed") };
+    queryResults = [{ error: new Error("query failed") }];
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
 
   it("counts all-sent data correctly", async () => {
-    queryResult = {
-      data: [
-        { status: "sent" },
-        { status: "sent" },
-        { status: "sent" },
-      ],
-      error: null,
-    };
+    queryResults = [
+      { count: 3, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    ];
 
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 3, pending: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 3, pending: 0, processing: 0, failed: 0 });
   });
 
-  it("ignores unknown status values in count", async () => {
-    queryResult = {
-      data: [
-        { status: "sent" },
-        { status: "unknown" },
-        { status: "pending" },
-      ],
-      error: null,
-    };
+  it("returns the server-side counts exactly", async () => {
+    queryResults = [
+      { count: 1, error: null },
+      { count: 1, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    ];
 
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 1, pending: 1, failed: 0 });
+    expect(stats).toEqual({ sent: 1, pending: 1, processing: 0, failed: 0 });
   });
 
   it("returns zeros for empty data array", async () => {
-    queryResult = { data: [], error: null };
+    queryResults = [
+      { count: 0, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+      { count: 0, error: null },
+    ];
     const stats = await dbGetCampaignStats("c-1");
-    expect(stats).toEqual({ sent: 0, pending: 0, failed: 0 });
+    expect(stats).toEqual({ sent: 0, pending: 0, processing: 0, failed: 0 });
   });
 });
 

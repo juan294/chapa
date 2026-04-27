@@ -73,7 +73,7 @@ describe("InfoTooltip", () => {
     fireEvent.click(screen.getByLabelText("More info"));
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip.className).toContain("fixed");
-    expect(tooltip.className).toContain("z-[9999]");
+    expect(tooltip.className).toContain("z-[99999]");
   });
 
   it("tooltip not visible before interaction", () => {

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.chapa.commit-reports</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec /bin/bash /Users/juan/code/chapa/scripts/commit-reports.sh</string>
+	</array>
+
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>10</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+
+	<key>WorkingDirectory</key>
+	<string>/Users/juan/code/chapa</string>
+
+	<key>StandardOutPath</key>
+	<string>/Users/juan/code/chapa/logs/commit-reports.log</string>
+
+	<key>StandardErrorPath</key>
+	<string>/Users/juan/code/chapa/logs/commit-reports.error.log</string>
+
+	<key>HardResourceLimits</key>
+	<dict>
+		<key>NumberOfFiles</key>
+		<integer>122880</integer>
+	</dict>
+
+	<key>SoftResourceLimits</key>
+	<dict>
+		<key>NumberOfFiles</key>
+		<integer>122880</integer>
+	</dict>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/juan</string>
+		<key>TERM</key>
+		<string>xterm-256color</string>
+		<key>PATH</key>
+		<string>/Users/juan/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+</dict>
+</plist>

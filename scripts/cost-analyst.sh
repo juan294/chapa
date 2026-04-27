@@ -46,6 +46,8 @@ claude -p "${PROMPT}" \
 
 log_info "Report written to ${OUTPUT_FILE}"
 
+validate_report_file "${OUTPUT_FILE}" "cost-analyst"
+
 # Extract shared context and update shared file
 extract_and_write_shared_context "${AGENT_KEY}" "${OUTPUT_FILE}"
 

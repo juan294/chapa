@@ -5,8 +5,11 @@ import {
   fetchReceivedEmail,
   forwardEmail,
 } from "@/lib/email/resend";
-import { rateLimit } from "@/lib/cache/redis";
+import { cacheGet, cacheSetNx, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+
+const EMAIL_ID_RE = /^[a-f0-9-]{8,64}$/i;
+const DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 /**
  * POST /api/webhooks/resend
@@ -81,6 +84,21 @@ export async function POST(request: Request) {
       { error: "Missing email_id in payload" },
       { status: 400 },
     );
+  }
+  if (!EMAIL_ID_RE.test(emailId)) {
+    return NextResponse.json(
+      { error: "Invalid email_id format" },
+      { status: 400 },
+    );
+  }
+
+  const dedupeKey = `webhook:resend:svix:${svixId}`;
+  const claimed = await cacheSetNx(dedupeKey, DEDUPE_TTL_SECONDS);
+  if (!claimed) {
+    const existing = await cacheGet<number>(dedupeKey);
+    if (existing !== null) {
+      return NextResponse.json({ status: "already_processed", id: svixId });
+    }
   }
 
   // 5. Fetch full email

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import type { InsightsUpload } from "@chapa/shared";
+import { MAX_INSIGHTS_BYTES } from "@/lib/insights/validation";
 
 // ---------------------------------------------------------------------------
 // Mocks — hoisted before any imports that depend on them
@@ -14,7 +15,10 @@ const {
   mockDbUpsert,
   mockDbGet,
   mockGetClientIp,
-  mockInvalidateSnapshotCache,
+  mockBuildSnapshotKey,
+  mockBuildCraftKey,
+  mockInvalidateHistoryCache,
+  mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
@@ -23,7 +27,10 @@ const {
   mockDbUpsert: vi.fn(),
   mockDbGet: vi.fn(),
   mockGetClientIp: vi.fn(),
-  mockInvalidateSnapshotCache: vi.fn(),
+  mockBuildSnapshotKey: vi.fn(),
+  mockBuildCraftKey: vi.fn(),
+  mockInvalidateHistoryCache: vi.fn(),
+  mockRevalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -36,7 +43,15 @@ vi.mock("@/lib/cache/redis", () => ({
 }));
 
 vi.mock("@/lib/cache/snapshot-cache", () => ({
-  invalidateSnapshotCache: mockInvalidateSnapshotCache,
+  buildSnapshotKey: mockBuildSnapshotKey,
+}));
+
+vi.mock("@/lib/cache/craft-cache", () => ({
+  buildCraftKey: mockBuildCraftKey,
+}));
+
+vi.mock("@/lib/history/history", () => ({
+  invalidateHistoryCache: mockInvalidateHistoryCache,
 }));
 
 vi.mock("@/lib/feature-flags", () => ({
@@ -50,6 +65,10 @@ vi.mock("@/lib/db/tool-insights", () => ({
 
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: mockRevalidatePath,
 }));
 
 // Mock next/server's after() to execute callbacks synchronously in tests
@@ -115,6 +134,10 @@ function makePostRequest(body: unknown): NextRequest {
   });
 }
 
+async function flushAfterCallbacks(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -125,10 +148,13 @@ beforeEach(() => {
   mockResolveRequestAuth.mockResolvedValue(AUTH);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
   mockCacheDel.mockResolvedValue(undefined);
-  mockInvalidateSnapshotCache.mockResolvedValue(undefined);
   mockDbUpsert.mockResolvedValue(null); // null = fallback to computed scores
   mockDbGet.mockResolvedValue(null);
   mockGetClientIp.mockReturnValue("127.0.0.1");
+  mockBuildSnapshotKey.mockImplementation((handle: string) => `snapshot:v2:latest:${handle}`);
+  mockBuildCraftKey.mockImplementation((handle: string) => `craft:v2:${handle}`);
+  mockInvalidateHistoryCache.mockResolvedValue(undefined);
+  mockRevalidatePath.mockImplementation(() => undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -173,8 +199,32 @@ describe("POST /api/insights", () => {
     const resp = await POST(makePostRequest({ tool: "claude-code" }));
     expect(resp.status).toBe(400);
     const body = await resp.json();
-    expect(body.error).toContain("Invalid insights data");
-    expect(body.reason).toBeDefined();
+    expect(body.error).toBe("Invalid insights data");
+  });
+
+  it("returns 413 for bodies larger than 256 KB before DB insert", async () => {
+    const tooLargeRequest = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/insights",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw_data: "x".repeat(MAX_INSIGHTS_BYTES + 1) }),
+      },
+    );
+
+    const resp = await POST(tooLargeRequest);
+
+    expect(resp.status).toBe(413);
+    expect(mockDbUpsert).not.toHaveBeenCalled();
+  });
+
+  it("does not expose Zod/validation schema details to caller on invalid data", async () => {
+    const resp = await POST(makePostRequest({ tool: "claude-code" }));
+    expect(resp.status).toBe(400);
+    const body = await resp.json();
+    // Must only contain the generic error message — no internal reason/details
+    expect(body.reason).toBeUndefined();
+    expect(Object.keys(body)).toEqual(["error"]);
   });
 
   it("returns 403 when feature is disabled", async () => {
@@ -191,12 +241,34 @@ describe("POST /api/insights", () => {
 
   it("invalidates badge cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:juan294");
   });
 
   it("invalidates snapshot cache after successful upload", async () => {
     await POST(makePostRequest(makeValidUpload()));
-    expect(mockInvalidateSnapshotCache).toHaveBeenCalledWith("juan294");
+    await flushAfterCallbacks();
+    expect(mockCacheDel).toHaveBeenCalledWith("snapshot:v2:latest:juan294");
+  });
+
+  it("invalidates craft cache after successful upload", async () => {
+    await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
+    expect(mockCacheDel).toHaveBeenCalledWith("craft:v2:juan294");
+  });
+
+  it("invalidates history cache after successful upload", async () => {
+    await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
+    expect(mockInvalidateHistoryCache).toHaveBeenCalledWith("juan294");
+  });
+
+  it("revalidates the share page after successful upload", async () => {
+    const resp = await POST(makePostRequest(makeValidUpload()));
+    await flushAfterCallbacks();
+
+    expect(resp.status).toBe(200);
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/u/juan294");
   });
 
   it("calls dbUpsert with correct arguments", async () => {

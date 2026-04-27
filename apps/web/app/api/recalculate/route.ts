@@ -1,26 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
-import { dbRecomputeCraft } from "@/lib/db/tool-insights";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
-import { buildSnapshot } from "@/lib/history/snapshot";
-import { dbReplaceSnapshot } from "@/lib/db/snapshots";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { revalidatePath } from "next/cache";
+import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import {
-  updateSnapshotCache,
-} from "@/lib/cache/snapshot-cache";
-import { getTier } from "@/lib/impact/utils";
+  materializeOrchestratedProfile,
+  persistOrchestratedSnapshot,
+} from "@/lib/profile/orchestrated-profile";
 
 /**
  * POST /api/recalculate — Force-recalculate impact score.
  *
- * Fetches stats (cached or fresh), recomputes craft score from stored
- * raw insights data (applying the current formula), computes fresh
- * impact, replaces today's snapshot, and returns the new score.
- *
- * Craft recomputation ensures formula changes are retroactively applied
- * without requiring the user to re-upload their insights report.
+ * Fetches stats (cached or fresh), reads the stored craft score, computes
+ * fresh impact, replaces today's snapshot, and returns the new score.
  *
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
  * Rate limited: 20 requests/handle/hour.
@@ -42,50 +36,48 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
 
-  // Fetch stats and recompute craft from stored raw data in parallel.
-  // dbRecomputeCraft reads raw_data from DB, runs computeCraftScore()
-  // with the current formula, and upserts the updated scores back.
-  const [stats, craftResult] = await Promise.all([
-    getStats(handle, auth.token),
-    dbRecomputeCraft(handle),
-  ]);
+  const materialized = await materializeOrchestratedProfile(handle, {
+    token: auth.token,
+  });
 
-  if (!stats) {
+  if (!materialized) {
     return NextResponse.json(
       { error: "Could not load stats. Try again later." },
       { status: 502 },
     );
   }
 
-  // Update craft cache so subsequent badge views use the recomputed score
+  const persisted = await persistOrchestratedSnapshot(handle, materialized, {
+    mode: "replace",
+  });
+  if (!persisted) {
+    return NextResponse.json(
+      { error: "Could not save recalculated profile. Try again later." },
+      { status: 500 },
+    );
+  }
+
+  await invalidateProfileReadModels(handle, { history: true });
+
+  // Update craft cache after the durable snapshot write succeeds.
+  const craftResult = materialized.craftResult;
   if (craftResult) {
-    updateCraftCache(handle, craftResult).catch(() => {});
+    fireAndForget(() => updateCraftCache(handle, craftResult), () => undefined);
   }
 
-  // Compute fresh impact with recomputed craft
-  const impact = computeImpactV6(stats, craftResult?.craftScore ?? undefined);
-
-  // For recalculate: use the RAW adjusted composite, NOT EMA-smoothed.
-  // This is a deliberate action — the user wants to see the actual score.
-  impact.tier = getTier(impact.adjustedComposite);
-
-  // Build snapshot and REPLACE today's (not insert-ignore)
-  const snapshot = buildSnapshot(stats, impact);
-  const replaced = await dbReplaceSnapshot(handle, snapshot);
-
-  if (replaced) {
-    await updateSnapshotCache(handle, snapshot);
-  }
+  revalidatePath(`/u/${handle}`);
 
   return NextResponse.json({
     success: true,
-    adjustedComposite: impact.adjustedComposite,
-    compositeScore: impact.compositeScore,
-    dimensions: impact.dimensions,
-    archetype: impact.archetype,
-    tier: impact.tier,
-    profileType: impact.profileType,
-    craftScore: craftResult?.craftScore ?? null,
-    craftTier: craftResult?.tier ?? null,
+    adjustedComposite: materialized.displayImpact.adjustedComposite,
+    displayAdjustedComposite: materialized.displayImpact.adjustedComposite,
+    rawAdjustedComposite: materialized.rawImpact.adjustedComposite,
+    compositeScore: materialized.displayImpact.compositeScore,
+    dimensions: materialized.displayImpact.dimensions,
+    archetype: materialized.displayImpact.archetype,
+    tier: materialized.displayImpact.tier,
+    profileType: materialized.displayImpact.profileType,
+    craftScore: materialized.craftResult?.craftScore ?? null,
+    craftTier: materialized.craftResult?.tier ?? null,
   });
 }

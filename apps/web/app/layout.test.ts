@@ -8,6 +8,25 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("RootLayout", () => {
+  describe("client shell baseline", () => {
+    it("does not mount analytics providers around every route", () => {
+      expect(SOURCE).not.toContain("<PostHogProvider>");
+      expect(SOURCE).not.toContain("<ClientAnalytics />");
+    });
+
+    it("does not mount keyboard shortcuts globally", () => {
+      expect(SOURCE).not.toContain("<KeyboardShortcutsListener />");
+    });
+
+    it("uses a deferred instrumentation island instead of global providers", () => {
+      expect(SOURCE).toContain("ClientInstrumentation");
+    });
+
+    it("does not preconnect to analytics hosts from the root document", () => {
+      expect(SOURCE).not.toContain("eu.i.posthog.com");
+    });
+  });
+
   describe("skip-to-main-content link (WCAG 2.4.1, #506)", () => {
     it("has a skip link targeting #main-content", () => {
       expect(SOURCE).toMatch(/href="#main-content"/);
@@ -51,6 +70,18 @@ describe("RootLayout", () => {
       const interactiveBeforeSkip = between.match(/<(a |button )/g);
       // The only <a in between should be the skip link's own opening tag
       expect(interactiveBeforeSkip?.length ?? 0).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe("feature flags", () => {
+    it("resolves the Studio flag through the DB-backed server helper", () => {
+      expect(SOURCE).toContain("isStudioEnabled");
+      expect(SOURCE).toContain("const studioEnabled = await isStudioEnabled()");
+    });
+
+    it("hydrates client navigation with the server-resolved Studio flag", () => {
+      expect(SOURCE).toContain("ClientFeatureFlagsProvider");
+      expect(SOURCE).toContain("studioEnabled={studioEnabled}");
     });
   });
 });

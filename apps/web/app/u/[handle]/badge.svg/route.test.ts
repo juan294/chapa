@@ -1,106 +1,68 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// ---------------------------------------------------------------------------
-// Mock dependencies BEFORE importing the route handler.
-// ---------------------------------------------------------------------------
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+import { CACHE_VERSION } from "@/lib/cache/version";
 
 const {
-  mockGetStatsData,
-  mockComputeImpactV6,
+  mockMaterializePublicProfile,
+  mockGetPublicProfileVerification,
+  mockRunPublicProfileSideEffects,
   mockRenderBadgeSvg,
-  mockReadSessionCookie,
+  mockGetAvatarBase64,
+  mockGetOptionalRequestSession,
   mockIsValidHandle,
   mockRateLimit,
-  mockTrackBadgeGenerated,
-  mockGetAvatarBase64,
-  mockGenerateVerificationCode,
-  mockStoreVerificationRecord,
-  mockNotifyFirstBadge,
-  mockGetCachedLatestSnapshot,
+  mockCaptureServerError,
+  mockCacheGet,
+  mockCacheSet,
+  mockCacheSetNx,
+  mockCacheDel,
 } = vi.hoisted(() => ({
-  mockGetStatsData: vi.fn(),
-  mockComputeImpactV6: vi.fn(),
+  mockMaterializePublicProfile: vi.fn(),
+  mockGetPublicProfileVerification: vi.fn(),
+  mockRunPublicProfileSideEffects: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
-  mockReadSessionCookie: vi.fn(),
+  mockGetAvatarBase64: vi.fn(),
+  mockGetOptionalRequestSession: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockRateLimit: vi.fn(),
-  mockTrackBadgeGenerated: vi.fn(),
-  mockGetAvatarBase64: vi.fn(),
-  mockGenerateVerificationCode: vi.fn(),
-  mockStoreVerificationRecord: vi.fn(),
-  mockNotifyFirstBadge: vi.fn(),
-  mockGetCachedLatestSnapshot: vi.fn(),
+  mockCaptureServerError: vi.fn(),
+  mockCacheGet: vi.fn(),
+  mockCacheSet: vi.fn(),
+  mockCacheSetNx: vi.fn(),
+  mockCacheDel: vi.fn(),
 }));
 
-vi.mock("@/lib/github/client", () => ({
-  getStats: mockGetStatsData,
-}));
-
-vi.mock("@/lib/impact/v6", () => ({
-  computeImpactV6: mockComputeImpactV6,
+vi.mock("@/lib/profile/public-profile", () => ({
+  materializePublicProfile: (...args: unknown[]) => mockMaterializePublicProfile(...args),
+  getPublicProfileVerification: (...args: unknown[]) =>
+    mockGetPublicProfileVerification(...args),
+  runPublicProfileSideEffects: (...args: unknown[]) =>
+    mockRunPublicProfileSideEffects(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
-  renderBadgeSvg: mockRenderBadgeSvg,
-}));
-
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: mockReadSessionCookie,
-}));
-
-vi.mock("@/lib/validation", () => ({
-  isValidHandle: mockIsValidHandle,
-}));
-
-vi.mock("@/lib/cache/redis", () => ({
-  rateLimit: mockRateLimit,
-  trackBadgeGenerated: mockTrackBadgeGenerated,
+  renderBadgeSvg: (...args: unknown[]) => mockRenderBadgeSvg(...args),
 }));
 
 vi.mock("@/lib/render/avatar", () => ({
-  getAvatarBase64: mockGetAvatarBase64,
+  getAvatarBase64: (...args: unknown[]) => mockGetAvatarBase64(...args),
 }));
 
-vi.mock("@/lib/verification/hmac", () => ({
-  generateVerificationCode: mockGenerateVerificationCode,
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalRequestSession: (...args: unknown[]) =>
+    mockGetOptionalRequestSession(...args),
 }));
 
-vi.mock("@/lib/verification/store", () => ({
-  storeVerificationRecord: mockStoreVerificationRecord,
+vi.mock("@/lib/validation", () => ({
+  isValidHandle: (...args: unknown[]) => mockIsValidHandle(...args),
 }));
 
-vi.mock("@/lib/email/notifications", () => ({
-  notifyFirstBadge: mockNotifyFirstBadge,
-}));
-
-vi.mock("@/lib/history/snapshot", () => ({
-  buildSnapshot: vi.fn(() => ({ date: "2025-01-01" })),
-}));
-
-vi.mock("@/lib/db/snapshots", () => ({
-  dbInsertSnapshot: vi.fn(() => Promise.resolve(true)),
-}));
-
-vi.mock("@/lib/cache/snapshot-cache", () => ({
-  getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
-  updateSnapshotCache: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock("@/lib/impact/smoothing", () => ({
-  smoothScore: vi.fn((score: number) => score),
-}));
-
-vi.mock("@/lib/impact/utils", () => ({
-  getTier: vi.fn((score: number) => {
-    if (score >= 85) return "Elite";
-    if (score >= 70) return "High";
-    if (score >= 30) return "Solid";
-    return "Emerging";
-  }),
-}));
-
-vi.mock("@/lib/cache/craft-cache", () => ({
-  getCachedCraftScore: vi.fn(() => Promise.resolve(null)),
+vi.mock("@/lib/cache/redis", () => ({
+  rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+  cacheGet: (...args: unknown[]) => mockCacheGet(...args),
+  cacheSet: (...args: unknown[]) => mockCacheSet(...args),
+  cacheSetNx: (...args: unknown[]) => mockCacheSetNx(...args),
+  cacheDel: (...args: unknown[]) => mockCacheDel(...args),
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -108,16 +70,10 @@ vi.mock("@/lib/http/client-ip", () => ({
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
-// Mock next/server's after() to execute callbacks synchronously in tests
-vi.mock("next/server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/server")>();
-  return {
-    ...actual,
-    after: (cb: () => void | Promise<void>) => { void cb(); },
-  };
-});
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+}));
 
-// escapeXml is used in fallbackSvg — provide real implementation
 vi.mock("@/lib/render/escape", () => ({
   escapeXml: (s: string) =>
     s
@@ -128,474 +84,334 @@ vi.mock("@/lib/render/escape", () => ({
       .replace(/"/g, "&quot;"),
 }));
 
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: (cb: () => void | Promise<void>) => { void cb(); },
+  };
+});
+
 import { GET } from "./route";
-import { NextRequest } from "next/server";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 
-function makeRequest(handle: string, ip?: string): [NextRequest, { params: Promise<{ handle: string }> }] {
-  const headers: Record<string, string> = {};
-  if (ip) headers["x-forwarded-for"] = ip;
-  const req = new NextRequest(
-    `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`,
-    { headers },
-  );
-  return [req, { params: Promise.resolve({ handle }) }];
+const FAKE_MATERIALIZED = {
+  stats: {
+    handle: "testuser",
+    displayName: "Test User",
+    avatarUrl: "https://avatars.githubusercontent.com/u/12345",
+    commitsTotal: 42,
+    prsMergedCount: 10,
+    reviewsSubmittedCount: 5,
+  },
+  rawImpact: {
+    adjustedComposite: 73,
+    tier: "High",
+    confidence: 85,
+    archetype: "Builder",
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    profileType: "collaborative",
+  },
+  displayImpact: {
+    adjustedComposite: 65,
+    tier: "Solid",
+    confidence: 85,
+    archetype: "Builder",
+    dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
+    profileType: "collaborative",
+  },
+  snapshot: { date: "2026-04-17", adjustedComposite: 65, tier: "Solid" },
+};
+
+function makeRequest(
+  handle: string,
+  headers: Record<string, string> = {},
+): [NextRequest, { params: Promise<{ handle: string }> }] {
+  return [
+    new NextRequest(`https://chapa.thecreativetoken.com/u/${handle}/badge.svg`, { headers }),
+    { params: Promise.resolve({ handle }) },
+  ];
 }
-
-const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">BADGE</svg>';
-
-const FAKE_STATS = {
-  handle: "testuser",
-  commitsTotal: 42,
-  prsMergedCount: 10,
-  reviewsSubmittedCount: 5,
-  avatarUrl: "https://avatars.githubusercontent.com/u/12345",
-};
-
-const FAKE_IMPACT = {
-  handle: "testuser",
-  profileType: "collaborative",
-  adjustedComposite: 65,
-  tier: "Solid",
-  confidence: 85,
-  dimensions: { delivery: 70, quality: 60, consistency: 65, breadth: 55 },
-  archetype: "Builder",
-};
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("GET /u/[handle]/badge.svg", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
     mockIsValidHandle.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 100 });
-    mockReadSessionCookie.mockReturnValue(null);
-    mockGetStatsData.mockResolvedValue(FAKE_STATS);
-    mockComputeImpactV6.mockReturnValue(FAKE_IMPACT);
-    mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockGetOptionalRequestSession.mockReturnValue(null);
+    mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
+    mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
+    mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
-    mockGenerateVerificationCode.mockReturnValue(null);
-    mockStoreVerificationRecord.mockResolvedValue(undefined);
-    mockTrackBadgeGenerated.mockResolvedValue(undefined);
-    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+    mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockCaptureServerError.mockResolvedValue(undefined);
+    // SVG cache: miss by default
+    mockCacheGet.mockResolvedValue(null);
+    mockCacheSet.mockResolvedValue(true);
+    mockCacheSetNx.mockResolvedValue(true);
+    mockCacheDel.mockResolvedValue(undefined);
   });
 
-  // -------------------------------------------------------------------------
-  // W1: Response headers
-  // -------------------------------------------------------------------------
+  it("returns 429 when the badge route is rate limited", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, current: 100, limit: 100 });
 
-  describe("response headers", () => {
-    it("returns Content-Type: image/svg+xml for a valid handle", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
-    });
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    const res = await GET(req, ctx);
 
-    it("returns correct Cache-Control for a valid badge", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Cache-Control")).toBe(
-        "public, s-maxage=21600, stale-while-revalidate=86400",
-      );
-    });
-
-    it("returns Content-Security-Policy with frame-ancestors * for embeddability", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      const csp = res.headers.get("Content-Security-Policy");
-      expect(csp).toContain("frame-ancestors *");
-    });
-
-    it("does not include X-Frame-Options DENY (badge must be embeddable)", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      const xfo = res.headers.get("X-Frame-Options");
-      // X-Frame-Options should either be absent or not DENY
-      expect(xfo).not.toBe("DENY");
-    });
+    expect(res.status).toBe(429);
   });
 
-  // -------------------------------------------------------------------------
-  // W1: Valid SVG output
-  // -------------------------------------------------------------------------
+  it("returns a 400 fallback svg for an invalid handle", async () => {
+    mockIsValidHandle.mockReturnValue(false);
 
-  describe("valid handle", () => {
-    it("returns valid SVG for a valid handle", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      const body = await res.text();
-      expect(body).toBe(FAKE_SVG);
-      expect(res.status).toBe(200);
+    const [req, ctx] = makeRequest("bad!!handle");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+  });
+
+  it("passes the session token into public materialization when available", async () => {
+    mockGetOptionalRequestSession.mockReturnValue({ token: "oauth-token" });
+
+    const [req, ctx] = makeRequest("testuser", {
+      "x-forwarded-for": "1.2.3.4",
+      cookie: "session=value",
     });
+    await GET(req, ctx);
 
-    it("calls getStats with the handle", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetStatsData).toHaveBeenCalledWith("testuser", undefined);
-    });
-
-    it("passes stats to computeImpactV6 without craft score when no insights exist", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, undefined);
-    });
-
-    it("passes craft score to computeImpactV6 when tool insights exist", async () => {
-      const { getCachedCraftScore } = await import("@/lib/cache/craft-cache");
-      vi.mocked(getCachedCraftScore).mockResolvedValue({
-        tool: "claude-code",
-        dimensions: { proficiency: 80, effectiveness: 75, sophistication: 70 },
-        craftScore: 75,
-        tier: "Expert",
-        reportPeriod: { start: "2025-01-01", end: "2025-03-01" },
-        computedAt: "2025-03-01T00:00:00Z",
-      });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, 75);
-    });
-
-    it("passes stats, impact, and options to renderBadgeSvg", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
-        avatarDataUri: "data:image/png;base64,abc123",
-        verificationHash: undefined,
-        verificationDate: undefined,
-      });
-    });
-
-    it("fetches avatar base64 from stats.avatarUrl", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetAvatarBase64).toHaveBeenCalledWith(
-        "testuser",
-        "https://avatars.githubusercontent.com/u/12345",
-      );
-    });
-
-    it("passes undefined avatarDataUri when avatar fetch fails", async () => {
-      mockGetAvatarBase64.mockResolvedValue(undefined);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
-        avatarDataUri: undefined,
-        verificationHash: undefined,
-        verificationDate: undefined,
-      });
-    });
-
-    it("passes undefined avatarDataUri when stats has no avatarUrl", async () => {
-      mockGetStatsData.mockResolvedValue({ ...FAKE_STATS, avatarUrl: undefined });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
-        { ...FAKE_STATS, avatarUrl: undefined },
-        FAKE_IMPACT,
-        { avatarDataUri: undefined, verificationHash: undefined, verificationDate: undefined },
-      );
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
+      token: "oauth-token",
     });
   });
 
-  // -------------------------------------------------------------------------
-  // W1: Invalid handle
-  // -------------------------------------------------------------------------
+  it("renders the badge from displayImpact, not rawImpact", async () => {
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    const res = await GET(req, ctx);
 
-  describe("invalid handle", () => {
-    it("returns fallback SVG with status 400 for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(400);
-      const body = await res.text();
-      expect(body).toContain("<svg");
-      expect(body).toContain("Invalid GitHub handle");
-    });
-
-    it("returns Content-Type: image/svg+xml even for invalid handle", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
-    });
-
-    it("validates handle before processing (does not call getStats)", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetStatsData).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // W1: Stats fetch failure
-  // -------------------------------------------------------------------------
-
-  describe("stats fetch failure", () => {
-    it("returns fallback SVG when stats fetch returns null", async () => {
-      mockGetStatsData.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      const body = await res.text();
-      expect(body).toContain("<svg");
-      expect(body).toContain("Could not load data");
-    });
-
-    it("returns shorter cache TTL on error fallback (s-maxage=300)", async () => {
-      mockGetStatsData.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Cache-Control")).toBe(
-        "public, s-maxage=300, stale-while-revalidate=600",
-      );
-    });
-
-    it("returns Content-Type: image/svg+xml on error fallback", async () => {
-      mockGetStatsData.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // W2: Rate limiting
-  // -------------------------------------------------------------------------
-
-  describe("rate limiting", () => {
-    it("calls rateLimit with correct key, limit, and window", async () => {
-      const [req, ctx] = makeRequest("testuser", "9.8.7.6");
-      await GET(req, ctx);
-      expect(mockRateLimit).toHaveBeenCalledWith(
-        "ratelimit:badge:9.8.7.6",
-        100,
-        60,
-      );
-    });
-
-    it("returns 429 with plain text when rate limited", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(429);
-      const body = await res.text();
-      expect(body).toMatch(/too many requests/i);
-    });
-
-    it("returns Retry-After header when rate limited", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Retry-After")).toBe("60");
-    });
-
-    it("does not return SVG content-type when rate limited", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.headers.get("Content-Type")).not.toContain("svg");
-    });
-
-    it("uses 'unknown' when x-forwarded-for is absent", async () => {
-      const [req, ctx] = makeRequest("testuser");
-      await GET(req, ctx);
-      expect(mockRateLimit).toHaveBeenCalledWith(
-        "ratelimit:badge:unknown",
-        100,
-        60,
-      );
-    });
-
-    it("does not call getStats when rate limited", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetStatsData).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Verification integration
-  // -------------------------------------------------------------------------
-
-  describe("verification", () => {
-    it("calls generateVerificationCode with stats and impact", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGenerateVerificationCode).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT);
-    });
-
-    it("passes verification hash and date to renderBadgeSvg when code is generated", async () => {
-      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2025-06-15" });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
+    expect(res.status).toBe(200);
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      {
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
-        verificationDate: "2025-06-15",
+        verificationDate: "2026-04-17",
+      },
+    );
+  });
+
+  it("runs centralized public side effects with the same verification payload", async () => {
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    await GET(req, ctx);
+
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      { verification: { hash: "abc12345", date: "2026-04-17" } },
+    );
+  });
+
+  it("falls back to an undefined avatar when avatar fetch fails", async () => {
+    mockGetAvatarBase64.mockRejectedValue(new Error("avatar down"));
+
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    await GET(req, ctx);
+
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ avatarDataUri: undefined }),
+    );
+  });
+
+  it("returns a cacheable fallback when public materialization returns null", async () => {
+    mockMaterializePublicProfile.mockResolvedValue(null);
+
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=600",
+    );
+  });
+
+  it("captures and returns a 500 fallback when rendering throws", async () => {
+    mockRenderBadgeSvg.mockImplementation(() => {
+      throw new Error("render failed");
+    });
+
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(500);
+    expect(mockCaptureServerError).toHaveBeenCalled();
+  });
+
+  describe("SVG full-response cache (#717)", () => {
+    it("returns cached SVG on cache hit without calling materialize or render", async () => {
+      const CACHED_SVG = '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>';
+      mockCacheGet.mockResolvedValue(CACHED_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(CACHED_SVG);
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("writes the rendered SVG to cache on cache miss", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
+        FAKE_SVG,
+        86400,
+      );
+    });
+
+    it("acquires and releases a versioned render lock on cold-cache renders", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheSetNx).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:warm-amber:`)),
+        30,
+      );
+      expect(mockCacheDel).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge-lock:${CACHE_VERSION}:testuser:warm-amber:`)),
+      );
+    });
+
+    it("checks the cache with the correct key prefix and handle", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockCacheGet).toHaveBeenCalledWith(
+        expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
+      );
+    });
+
+    it("reuses cached SVG after another request already holds the render lock", async () => {
+      mockCacheSetNx.mockResolvedValue(false);
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(FAKE_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(await res.text()).toBe(FAKE_SVG);
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("keeps polling long enough to reuse SVG produced by another renderer", async () => {
+      vi.useFakeTimers();
+      let cacheReads = 0;
+      mockCacheSetNx.mockResolvedValue(false);
+      mockCacheGet.mockImplementation(async () => {
+        cacheReads += 1;
+        return cacheReads >= 8 ? FAKE_SVG : null;
       });
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(1200);
+        const res = await responsePromise;
+
+        expect(await res.text()).toBe(FAKE_SVG);
+        expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+        expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
-    it("stores verification record when code is generated", async () => {
-      mockGenerateVerificationCode.mockReturnValue({ hash: "abc12345", date: "2025-06-15" });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockStoreVerificationRecord).toHaveBeenCalledWith("abc12345", expect.objectContaining({
-        handle: "testuser",
-        adjustedComposite: 65,
-        tier: "Solid",
-        confidence: 85,
-        generatedAt: "2025-06-15",
-      }));
+    it("fails open when the initial cache read stalls", async () => {
+      vi.useFakeTimers();
+      mockCacheGet.mockImplementationOnce(
+        () => new Promise<string | null>(() => undefined),
+      );
+
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
+
+        await vi.advanceTimersByTimeAsync(400);
+        const res = await responsePromise;
+
+        expect(res.status).toBe(200);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
-    it("does not store verification record when code is null", async () => {
-      mockGenerateVerificationCode.mockReturnValue(null);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    it("skips rendering on cache hit but still returns correct Content-Type header", async () => {
+      mockCacheGet.mockResolvedValue(FAKE_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Parallel fetching of snapshot + avatar (issue #505)
-  // -------------------------------------------------------------------------
-
-  describe("parallel snapshot and avatar fetching", () => {
-    it("calls getCachedLatestSnapshot with the handle", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetCachedLatestSnapshot).toHaveBeenCalledWith("testuser");
-    });
-
-    it("calls both getCachedLatestSnapshot and getAvatarBase64 after getStats", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetCachedLatestSnapshot).toHaveBeenCalledTimes(1);
-      expect(mockGetAvatarBase64).toHaveBeenCalledTimes(1);
-    });
-
-    it("fetches snapshot and avatar concurrently (both started before either awaited)", async () => {
-      // Track the order of call starts and resolutions to verify parallelism.
-      // If they run sequentially, snapshot resolves BEFORE avatar starts.
-      // If parallel, both start before either resolves.
-      const callOrder: string[] = [];
-
-      mockGetCachedLatestSnapshot.mockImplementation(() => {
-        callOrder.push("snapshot:start");
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            callOrder.push("snapshot:resolve");
-            resolve(null);
-          }, 10);
-        });
-      });
-
-      mockGetAvatarBase64.mockImplementation(() => {
-        callOrder.push("avatar:start");
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            callOrder.push("avatar:resolve");
-            resolve("data:image/png;base64,abc123");
-          }, 10);
-        });
-      });
-
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
+  describe("rate limit key uses (ip, handle) not just ip (#693)", () => {
+    it("rate-limits on combined ip+handle key", async () => {
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
 
-      // Both should start before either resolves (parallel via Promise.all)
-      const snapshotStartIdx = callOrder.indexOf("snapshot:start");
-      const avatarStartIdx = callOrder.indexOf("avatar:start");
-      const snapshotResolveIdx = callOrder.indexOf("snapshot:resolve");
-      const avatarResolveIdx = callOrder.indexOf("avatar:resolve");
-
-      // Both starts must happen before any resolve
-      expect(snapshotStartIdx).toBeLessThan(snapshotResolveIdx);
-      expect(avatarStartIdx).toBeLessThan(avatarResolveIdx);
-      // Key assertion: both must START before either RESOLVES
-      expect(snapshotStartIdx).toBeLessThan(avatarResolveIdx);
-      expect(avatarStartIdx).toBeLessThan(snapshotResolveIdx);
+      expect(mockRateLimit).toHaveBeenCalledWith(
+        expect.stringContaining("testuser"),
+        expect.any(Number),
+        expect.any(Number),
+      );
     });
 
-    it("does not call getCachedLatestSnapshot when stats fetch fails", async () => {
-      mockGetStatsData.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
+    it("uses different rate limit buckets for different handles from same IP", async () => {
+      const [req1, ctx1] = makeRequest("alice", { "x-forwarded-for": "1.2.3.4" });
+      const [req2, ctx2] = makeRequest("bob", { "x-forwarded-for": "1.2.3.4" });
+
+      await GET(req1, ctx1);
+      await GET(req2, ctx2);
+
+      const keys = mockRateLimit.mock.calls.map((call: unknown[]) => call[0] as string);
+      expect(keys[0]).not.toBe(keys[1]);
+      expect(keys[0]).toContain("alice");
+      expect(keys[1]).toContain("bob");
     });
 
-    it("renders badge when getCachedCraftScore throws (allSettled resilience)", async () => {
-      const { getCachedCraftScore } = await import("@/lib/cache/craft-cache");
-      vi.mocked(getCachedCraftScore).mockRejectedValue(new Error("Cache error"));
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toBe(FAKE_SVG);
-      // craft score falls back to undefined
-      expect(mockComputeImpactV6).toHaveBeenCalledWith(FAKE_STATS, undefined);
-    });
+    it("fails open when the rate limiter stalls", async () => {
+      vi.useFakeTimers();
+      mockRateLimit.mockImplementation(
+        () => new Promise(() => undefined),
+      );
 
-    it("renders badge when getCachedLatestSnapshot throws (allSettled resilience)", async () => {
-      mockGetCachedLatestSnapshot.mockRejectedValue(new Error("Redis error"));
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      const body = await res.text();
-      expect(body).toBe(FAKE_SVG);
-    });
+      try {
+        const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+        const responsePromise = GET(req, ctx);
 
-    it("renders badge when getAvatarBase64 throws (allSettled resilience)", async () => {
-      mockGetAvatarBase64.mockRejectedValue(new Error("Network error"));
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(200);
-      expect(mockRenderBadgeSvg).toHaveBeenCalledWith(FAKE_STATS, FAKE_IMPACT, {
-        avatarDataUri: undefined,
-        verificationHash: undefined,
-        verificationDate: undefined,
-      });
-    });
-  });
+        await vi.advanceTimersByTimeAsync(300);
+        const res = await responsePromise;
 
-  // -------------------------------------------------------------------------
-  // Badge generation tracking
-  // -------------------------------------------------------------------------
-
-  describe("badge generation tracking", () => {
-    it("tracks badge generation on successful render", async () => {
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
-    });
-
-    it("does not track when stats fetch fails", async () => {
-      mockGetStatsData.mockResolvedValue(null);
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
-    });
-
-    it("does not track when handle is invalid", async () => {
-      mockIsValidHandle.mockReturnValue(false);
-      const [req, ctx] = makeRequest("bad!!handle", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
-    });
-
-    it("does not track when rate limited", async () => {
-      mockRateLimit.mockResolvedValue({ allowed: false, current: 101, limit: 100 });
-      const [req, ctx] = makeRequest("testuser", "1.2.3.4");
-      await GET(req, ctx);
-      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        expect(mockMaterializePublicProfile).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

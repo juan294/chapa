@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidInsightsUpload } from "./validation";
+import { isValidInsightsUpload, MAX_INSIGHTS_BYTES } from "./validation";
 import type { InsightsUpload } from "@chapa/shared";
 
 function makeValid(): InsightsUpload {
@@ -21,6 +21,10 @@ function makeValid(): InsightsUpload {
 }
 
 describe("isValidInsightsUpload", () => {
+  it("exports the 256 KB payload cap constant", () => {
+    expect(MAX_INSIGHTS_BYTES).toBe(256 * 1024);
+  });
+
   it("accepts valid complete data", () => {
     expect(isValidInsightsUpload(makeValid())).toEqual({ valid: true });
   });

@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const strictDeploymentSmoke = process.env.DEPLOYMENT_SMOKE_STRICT === "true";
+
 test.describe("Smoke tests — core routes", () => {
   test("landing page loads", async ({ page }) => {
     await page.goto("/");
@@ -10,14 +12,34 @@ test.describe("Smoke tests — core routes", () => {
 
   test("health API returns JSON with status field", async ({ request }) => {
     const response = await request.get("/api/health");
+    const body = await response.json();
+
+    if (strictDeploymentSmoke) {
+      expect(response.status()).toBe(200);
+      expect(body.status).toBe("ok");
+      expect(["ok", "skipped"]).toContain(body.dependencies.redis);
+      expect(["ok", "skipped"]).toContain(body.dependencies.supabase);
+      expect(["ok", "skipped"]).toContain(body.dependencies.github);
+      return;
+    }
+
     // Health endpoint returns 200 when healthy, 503 when degraded (e.g. Redis unreachable in CI)
     expect([200, 503]).toContain(response.status());
-    const body = await response.json();
     expect(body).toHaveProperty("status");
   });
 
   test("badge SVG returns image/svg+xml", async ({ request }) => {
     const response = await request.get("/u/torvalds/badge.svg");
+    if (strictDeploymentSmoke) {
+      expect(response.status()).toBe(200);
+      const contentType = response.headers()["content-type"] ?? "";
+      expect(contentType).toContain("image/svg+xml");
+      const body = await response.text();
+      expect(body).toContain("<svg");
+      expect(body).toContain("</svg>");
+      return;
+    }
+
     // In CI without GitHub token/Redis, may return 500/503.
     // If successful, it must be SVG. If not, we accept graceful failure.
     if (response.ok()) {
@@ -35,6 +57,13 @@ test.describe("Smoke tests — core routes", () => {
     const response = await page.goto("/u/torvalds", {
       waitUntil: "domcontentloaded",
     });
+    if (strictDeploymentSmoke) {
+      expect(response!.status()).toBe(200);
+      const body = page.locator("body");
+      await expect(body).toBeVisible();
+      return;
+    }
+
     // Should not crash — 200 or graceful error page
     expect(response).not.toBeNull();
     expect(response!.status()).toBeLessThan(500);
@@ -50,16 +79,25 @@ test.describe("Smoke tests — core routes", () => {
     const response = await request.get("/api/auth/login", {
       maxRedirects: 0,
     });
-    // Should be a redirect (3xx) pointing to github.com
     const status = response.status();
+
+    if (strictDeploymentSmoke) {
+      expect(status).toBeGreaterThanOrEqual(300);
+      expect(status).toBeLessThan(400);
+      const location = response.headers()["location"] ?? "";
+      expect(location).toContain("github.com");
+      return;
+    }
+
     // Accept 3xx redirect OR 500 if GITHUB_CLIENT_ID is not configured
     if (status >= 300 && status < 400) {
       const location = response.headers()["location"] ?? "";
       expect(location).toContain("github.com");
-    } else {
-      // Without GITHUB_CLIENT_ID, the route returns 500 — acceptable in CI
-      expect(status).toBe(500);
+      return;
     }
+
+    // Without GITHUB_CLIENT_ID, the route returns 500 — acceptable in CI
+    expect(status).toBe(500);
   });
 
   test("404 page works for unknown route", async ({ page }) => {

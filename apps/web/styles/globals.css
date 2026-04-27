@@ -478,6 +478,20 @@ html {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .animate-fade-in-up,
+  .animate-scale-in,
+  .animate-terminal-fade-in,
+  .animate-shimmer,
+  .animate-drift,
+  .animate-float-slow,
+  .animate-float-medium,
+  .animate-float-fast,
+  .animate-pulse-glow-amber,
+  .animate-cursor-blink,
+  .animate-hex-cell-in {
+    animation: none !important;
+  }
 }
 
 /* ── Scrollbar ───────────────────────────────────────────── */

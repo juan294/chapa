@@ -51,7 +51,8 @@ export async function GET(
     }
 
     // Prefer snapshot.craft (computed at same time as other dimensions) for consistency.
-    // Fall back to tool insights craft score for legacy rows without the craft column.
+    // Fall back to the latest uploaded tool-insights report for legacy rows
+    // without the craft column.
     const craftScore = snapshot.craft ?? (craftResult ? craftResult.craftScore : undefined);
 
     const dimensions: DimensionScores = {

@@ -1,3 +1,4 @@
-No changes in cc-rpi since last sync. The HEAD commit is still `75f28d1d844716b8db60b4e14a33fba171a4e59d` and version is `v1.14.3`.
+Nothing has changed in cc-rpi since the last sync. The HEAD commit matches `lastSyncCommit` exactly.
 
-cc-rpi sync: already up to date as of v1.14.3.
+cc-rpi sync: already up to date as of v1.17.2.
+cc-rpi sync: FAILED after 2 attempts — Mon Apr 27 03:15:55 CEST 2026

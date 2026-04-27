@@ -1,19 +1,11 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useSyncExternalStore } from "react";
-
-const subscribe = () => () => {};
-const getSnapshot = () => true;
-const getServerSnapshot = () => false;
-
-function useHydrated() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-}
+import { useIsClient } from "@/hooks/useIsClient";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const hydrated = useHydrated();
+  const hydrated = useIsClient();
 
   if (!hydrated) {
     return <div className="h-11 w-11" aria-hidden="true" />;

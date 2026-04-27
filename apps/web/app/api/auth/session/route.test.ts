@@ -4,14 +4,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockReadSessionCookie, mockRateLimit, mockIsAdminHandle } = vi.hoisted(() => ({
-  mockReadSessionCookie: vi.fn(),
+const { mockGetOptionalRequestSession, mockRateLimit, mockIsAdminHandle } = vi.hoisted(() => ({
+  mockGetOptionalRequestSession: vi.fn(),
   mockRateLimit: vi.fn(),
   mockIsAdminHandle: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/github", () => ({
-  readSessionCookie: mockReadSessionCookie,
+vi.mock("@/lib/auth/session", () => ({
+  getOptionalRequestSession: mockGetOptionalRequestSession,
 }));
 
 vi.mock("@/lib/auth/admin", () => ({
@@ -27,8 +27,8 @@ vi.mock("@/lib/http/client-ip", () => ({
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
-import { GET } from "./route";
 import { NextRequest } from "next/server";
+import { GET } from "./route";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,13 +51,12 @@ function makeRequest(cookie?: string, ip?: string): NextRequest {
 describe("GET /api/auth/session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret-key");
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
     mockIsAdminHandle.mockReturnValue(false);
   });
 
   it("returns { user: null } when no session cookie is present", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const res = await GET(makeRequest());
 
@@ -67,7 +66,7 @@ describe("GET /api/auth/session", () => {
   });
 
   it("returns user data when a valid session cookie exists", async () => {
-    mockReadSessionCookie.mockReturnValue({
+    mockGetOptionalRequestSession.mockReturnValue({
       token: "gho_secret_token_123",
       login: "octocat",
       name: "The Octocat",
@@ -89,7 +88,7 @@ describe("GET /api/auth/session", () => {
   });
 
   it("does NOT expose the token in the response", async () => {
-    mockReadSessionCookie.mockReturnValue({
+    mockGetOptionalRequestSession.mockReturnValue({
       token: "gho_secret_token_123",
       login: "octocat",
       name: "The Octocat",
@@ -106,7 +105,7 @@ describe("GET /api/auth/session", () => {
   });
 
   it("returns { user: null } when session cookie is invalid/corrupted", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const res = await GET(
       makeRequest("chapa_session=corrupted-garbage-data"),
@@ -117,20 +116,18 @@ describe("GET /api/auth/session", () => {
     expect(json).toEqual({ user: null });
   });
 
-  it("passes the cookie header and secret to readSessionCookie", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+  it("passes the request into getOptionalRequestSession", async () => {
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const cookieStr = "chapa_session=some-encrypted-value";
-    await GET(makeRequest(cookieStr));
+    const request = makeRequest(cookieStr);
+    await GET(request);
 
-    expect(mockReadSessionCookie).toHaveBeenCalledWith(
-      cookieStr,
-      "test-secret-key",
-    );
+    expect(mockGetOptionalRequestSession).toHaveBeenCalledWith(request);
   });
 
   it("returns { user: null } when NEXTAUTH_SECRET is not set", async () => {
-    vi.stubEnv("NEXTAUTH_SECRET", "");
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const res = await GET(
       makeRequest("chapa_session=encrypted-cookie-value"),
@@ -139,12 +136,10 @@ describe("GET /api/auth/session", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ user: null });
-    // readSessionCookie should NOT be called when no secret
-    expect(mockReadSessionCookie).not.toHaveBeenCalled();
   });
 
   it("handles user with null name", async () => {
-    mockReadSessionCookie.mockReturnValue({
+    mockGetOptionalRequestSession.mockReturnValue({
       token: "gho_token",
       login: "anonymous-dev",
       name: null,
@@ -165,7 +160,7 @@ describe("GET /api/auth/session", () => {
   });
 
   it("sets Cache-Control: no-store, private header", async () => {
-    mockReadSessionCookie.mockReturnValue({
+    mockGetOptionalRequestSession.mockReturnValue({
       token: "gho_token",
       login: "octocat",
       name: "The Octocat",
@@ -180,7 +175,7 @@ describe("GET /api/auth/session", () => {
   });
 
   it("sets Cache-Control: no-store, private even when no session", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const res = await GET(makeRequest());
 
@@ -195,7 +190,6 @@ describe("GET /api/auth/session", () => {
 describe("GET /api/auth/session — rate limiting", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret-key");
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
   });
 
@@ -210,7 +204,7 @@ describe("GET /api/auth/session — rate limiting", () => {
   });
 
   it("rate limits by IP with correct key and window (60 req / 60s)", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     await GET(makeRequest(undefined, "1.2.3.4"));
 
@@ -218,7 +212,7 @@ describe("GET /api/auth/session — rate limiting", () => {
   });
 
   it("uses 'unknown' when x-forwarded-for is absent", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     await GET(makeRequest());
 
@@ -234,7 +228,7 @@ describe("GET /api/auth/session — rate limiting", () => {
   });
 
   it("proceeds normally when not rate limited", async () => {
-    mockReadSessionCookie.mockReturnValue(null);
+    mockGetOptionalRequestSession.mockReturnValue(null);
 
     const res = await GET(makeRequest(undefined, "1.2.3.4"));
 

@@ -1,23 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getStats } from "@/lib/github/client";
-import { computeImpactV6 } from "@/lib/impact/v6";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { isValidHandle } from "@/lib/validation";
-import { generateVerificationCode } from "@/lib/verification/hmac";
 import { svgToPng } from "@/lib/render/svg-to-png";
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
+import { getClientIp } from "@/lib/http/client-ip";
 import { toDateString } from "@/lib/utils/date";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { withTimeout, TimeoutError } from "@/lib/async/with-timeout";
+import {
+  getPublicProfileVerification,
+  materializePublicProfile,
+} from "@/lib/profile/public-profile";
 
 const OG_CACHE_TTL = 172800; // 48 hours
-const SVG_TO_PNG_TIMEOUT_MS = 10_000; // 10 seconds
-
-class SvgToPngTimeoutError extends Error {
-  constructor() {
-    super("svgToPng timed out");
-    this.name = "SvgToPngTimeoutError";
-  }
-}
+const SVG_TO_PNG_TIMEOUT_MS = 10_000;
 
 /**
  * GET /u/:handle/og-image
@@ -29,17 +26,29 @@ class SvgToPngTimeoutError extends Error {
  * redundant stats fetch + SVG render + PNG conversion on repeated requests.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   const { handle } = await params;
+
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:og:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return new NextResponse("Too many requests. Please try again later.", {
+      status: 429,
+      headers: {
+        "Content-Type": "text/plain",
+        "Retry-After": "60",
+      },
+    });
+  }
 
   if (!isValidHandle(handle)) {
     return new NextResponse("Invalid handle", { status: 400 });
   }
 
   const today = toDateString(new Date());
-  const ogCacheKey = `og-image:v1:${handle}:${today}`;
+  const ogCacheKey = `og-image:v2:${handle}:${today}`;
 
   // Try cached PNG first
   try {
@@ -59,34 +68,34 @@ export async function GET(
   }
 
   try {
-    const stats = await getStats(handle);
-    if (!stats) {
+    const materialized = await materializePublicProfile(handle);
+    if (!materialized) {
       return new NextResponse("Could not load data", { status: 404 });
     }
 
-    const impact = computeImpactV6(stats);
-
-    const avatarDataUri = stats.avatarUrl
-      ? await getAvatarBase64(handle, stats.avatarUrl)
+    const avatarDataUri = materialized.stats.avatarUrl
+      ? await getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : undefined;
 
-    const verification = generateVerificationCode(stats, impact);
+    const verification = getPublicProfileVerification(materialized);
 
-    const svg = renderBadgeSvg(stats, impact, {
+    const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
     });
 
-    const png = await Promise.race([
+    const png = await withTimeout(
       Promise.resolve().then(() => svgToPng(svg, 1200)),
-      new Promise<never>((_resolve, reject) =>
-        setTimeout(() => reject(new SvgToPngTimeoutError()), SVG_TO_PNG_TIMEOUT_MS),
-      ),
-    ]);
+      SVG_TO_PNG_TIMEOUT_MS,
+      "svgToPng",
+    );
 
     // Cache the PNG as base64 for 48h (fire-and-forget — don't block response)
-    cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL).catch(() => {});
+    fireAndForget(
+      () => cacheSet(ogCacheKey, Buffer.from(png).toString("base64"), OG_CACHE_TTL),
+      () => undefined,
+    );
 
     return new NextResponse(Buffer.from(png), {
       headers: {
@@ -96,7 +105,7 @@ export async function GET(
       },
     });
   } catch (e) {
-    if (e instanceof SvgToPngTimeoutError) {
+    if (e instanceof TimeoutError) {
       console.error("[og-image] svgToPng timed out after 10s");
       return new NextResponse("PNG conversion timed out", { status: 504 });
     }

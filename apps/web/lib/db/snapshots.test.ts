@@ -201,6 +201,15 @@ describe("dbInsertSnapshot", () => {
     const result = await dbInsertSnapshot("testuser", makeSnapshot());
     expect(result).toBe(false);
   });
+
+  it("does not send captured_at when inserting — DB default populates it", async () => {
+    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+
+    await dbInsertSnapshot("testuser", makeSnapshot());
+
+    const row = mockUpsert.mock.calls[0]![0];
+    expect(row.captured_at).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

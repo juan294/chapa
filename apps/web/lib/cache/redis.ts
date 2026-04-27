@@ -10,6 +10,7 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { withTimeout } from "@/lib/async/with-timeout";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton
@@ -154,6 +155,12 @@ export interface RateLimitResult {
   limit: number;
 }
 
+export interface QuotaReservationResult {
+  allowed: boolean;
+  current: number;
+  limit: number;
+}
+
 /**
  * Check and increment a rate limit counter.
  * Uses Redis INCR + EXPIRE for a fixed-window counter.
@@ -183,6 +190,47 @@ export async function rateLimit(
     return { allowed: current <= limit, current, limit };
   } catch {
     // Fail open — don't block requests if Redis is down
+    return { allowed: true, current: 0, limit };
+  }
+}
+
+/**
+ * Atomically reserve quota in Redis using a single pipeline for
+ * read + increment + TTL refresh.
+ *
+ * Returns the post-reservation counter when allowed. If the reservation would
+ * exceed the limit, the increment is immediately compensated and the previous
+ * counter is returned. Redis failures are fail-open.
+ */
+export async function cacheReserveQuota(
+  key: string,
+  amount: number,
+  limit: number,
+  ttlSeconds: number,
+): Promise<QuotaReservationResult> {
+  const redis = getRedis();
+  if (!redis || amount <= 0) {
+    return { allowed: true, current: 0, limit };
+  }
+
+  try {
+    const pipeline = redis.pipeline();
+    pipeline.get<number>(key);
+    pipeline.incrby(key, amount);
+    pipeline.expire(key, ttlSeconds);
+
+    const [beforeRaw, afterRaw] = await pipeline.exec<[number | null, number, number]>();
+    const before = beforeRaw ?? 0;
+    const after = typeof afterRaw === "number" ? afterRaw : before + amount;
+
+    if (after > limit) {
+      await redis.incrby(key, -amount);
+      return { allowed: false, current: before, limit };
+    }
+
+    return { allowed: true, current: after, limit };
+  } catch (error) {
+    console.error("[cache] cacheReserveQuota failed:", (error as Error).message);
     return { allowed: true, current: 0, limit };
   }
 }
@@ -259,16 +307,49 @@ export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
   if (!redis) return "skipped";
 
   try {
-    await Promise.race([
-      redis.dbsize(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("ping timeout")), 5000),
-      ),
-    ]);
+    await withTimeout(redis.dbsize(), 5000, "pingRedis");
     return "ok";
   } catch {
     return "error";
   }
+}
+
+// ---------------------------------------------------------------------------
+// Atomic set-if-not-exists (SETNX) — used for once-per-day guards
+// ---------------------------------------------------------------------------
+
+export type CacheSetNxStatus = "acquired" | "exists" | "unavailable";
+
+/**
+ * Set a key with a TTL only if it does not already exist (Redis SET NX EX).
+ *
+ * Returns:
+ * - `"acquired"` when the key was newly written
+ * - `"exists"` when the key already existed
+ * - `"unavailable"` when Redis is unavailable or throws
+ */
+export async function cacheSetNxStatus(
+  key: string,
+  ttlSeconds: number,
+): Promise<CacheSetNxStatus> {
+  const redis = getRedis();
+  if (!redis) return "unavailable";
+
+  try {
+    const result = await redis.set(key, 1, { ex: ttlSeconds, nx: true });
+    // Upstash returns "OK" when the key is newly set, null when it already existed.
+    return result === "OK" ? "acquired" : "exists";
+  } catch (error) {
+    console.error("[cache] cacheSetNx failed:", (error as Error).message);
+    return "unavailable";
+  }
+}
+
+/**
+ * Boolean wrapper for callers that only care whether the key was newly acquired.
+ */
+export async function cacheSetNx(key: string, ttlSeconds: number): Promise<boolean> {
+  return (await cacheSetNxStatus(key, ttlSeconds)) === "acquired";
 }
 
 // ---------------------------------------------------------------------------

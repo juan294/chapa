@@ -10,6 +10,7 @@ const mockSelect = vi.fn();
 const mockSingle = vi.fn();
 const mockEq = vi.fn();
 const mockLimit = vi.fn();
+const mockOrder = vi.fn();
 
 const { mockGetSupabase } = vi.hoisted(() => ({
   mockGetSupabase: vi.fn(),
@@ -36,6 +37,10 @@ const mockFrom = vi.fn((): any => {
   };
   chain.limit = (...args: unknown[]) => {
     mockLimit(...args);
+    return chain;
+  };
+  chain.order = (...args: unknown[]) => {
+    mockOrder(...args);
     return chain;
   };
   // Terminal .then to resolve the chain as a promise
@@ -146,6 +151,7 @@ describe("dbUpsertToolInsights", () => {
         sophistication: 58,
         craft_score: 65,
         craft_tier: "Practitioner",
+        uploaded_at: "2025-03-01T12:00:00Z",
       },
       { onConflict: "handle,tool" },
     );
@@ -171,6 +177,23 @@ describe("dbUpsertToolInsights", () => {
 
     expect(mockSelect).toHaveBeenCalled();
     expect(mockSingle).toHaveBeenCalled();
+  });
+
+  it("uses the provided uploaded timestamp override when supplied", async () => {
+    terminalResolve = { data: validRow, error: null };
+    mockGetSupabase.mockReturnValue({ from: mockFrom });
+
+    await dbUpsertToolInsights(
+      "testuser",
+      validUpload,
+      { ...validScores, computedAt: "2025-04-01T09:00:00Z" },
+      "2025-02-15T08:30:00Z",
+    );
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ uploaded_at: "2025-02-15T08:30:00Z" }),
+      expect.anything(),
+    );
   });
 
   it("returns CraftResult mapped from the returned row", async () => {
@@ -307,6 +330,57 @@ describe("dbGetToolInsights", () => {
     expect(mockSingle).toHaveBeenCalled();
   });
 
+  it("selects the latest uploaded report when multiple tool rows exist for one handle", async () => {
+    const olderRow = {
+      ...validRow,
+      tool: "cursor",
+      craft_score: 42,
+      craft_tier: "Novice",
+      uploaded_at: "2025-02-01T12:00:00Z",
+    };
+    const latestRow = {
+      ...validRow,
+      tool: "claude-code",
+      craft_score: 65,
+      craft_tier: "Practitioner",
+      uploaded_at: "2025-03-01T12:00:00Z",
+    };
+
+    // The authoritative rule is "latest uploaded report wins".
+    let rows = [olderRow, latestRow];
+    const chain: Record<string, unknown> = {};
+    chain.select = () => chain;
+    chain.eq = (...args: unknown[]) => {
+      mockEq(...args);
+      return chain;
+    };
+    chain.order = (...args: unknown[]) => {
+      mockOrder(...args);
+      rows = [...rows].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at));
+      return chain;
+    };
+    chain.limit = (...args: unknown[]) => {
+      mockLimit(...args);
+      rows = rows.slice(0, 1);
+      return chain;
+    };
+    chain.single = () => {
+      mockSingle();
+      return chain;
+    };
+    chain.then = (resolve: (value: unknown) => void) =>
+      resolve({ data: rows[0], error: null });
+
+    mockGetSupabase.mockReturnValue({ from: vi.fn(() => chain) });
+
+    const result = await dbGetToolInsights("testuser");
+
+    expect(mockOrder).toHaveBeenCalledWith("uploaded_at", { ascending: false });
+    expect(result?.tool).toBe("claude-code");
+    expect(result?.craftScore).toBe(65);
+    expect(result?.computedAt).toBe("2025-03-01T12:00:00Z");
+  });
+
   it("returns CraftResult from a valid row", async () => {
     terminalResolve = { data: validRow, error: null };
     mockGetSupabase.mockReturnValue({ from: mockFrom });
@@ -435,3 +509,4 @@ describe("dbGetToolInsights", () => {
     });
   });
 });
+

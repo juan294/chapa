@@ -2,24 +2,25 @@
  * Feature flags — DB-backed with env-var fallback.
  *
  * Two API styles:
- * - **Sync** (`isStudioEnabledSync`): env-var only — for client components
- *   and synchronous code that can't await.
+ * - **Sync** (`isStudioEnabledSync`): env-var fallback for tests and code
+ *   running outside the hydrated client feature-flag provider.
  * - **Async** (`isStudioEnabled`): checks Supabase first, falls back to
  *   env var — for server components and API routes.
  *
- * Client components should use the sync variants or receive the flag value
- * as a prop from a server component.
+ * Client navigation surfaces should use `ClientFeatureFlagsProvider`, which
+ * receives the DB-backed server value from the root layout.
  */
 
 import { dbGetFeatureFlag } from "./db/feature-flags";
+import { withTimeout } from "./async/with-timeout";
 
 // ---------------------------------------------------------------------------
 // Sync (env-var only) — for client components
 // ---------------------------------------------------------------------------
 
 /**
- * Synchronously check whether Creator Studio is enabled (env-var only).
- * Use in client components where `await` is not available.
+ * Synchronously check whether Creator Studio is enabled (env-var fallback).
+ * Client navigation should prefer `useClientFeatureFlags()`.
  *
  * @returns `true` if `NEXT_PUBLIC_STUDIO_ENABLED` is `"true"`
  */
@@ -63,6 +64,7 @@ export function isInsightsEnabledSync(): boolean {
 
 /** In-process TTL cache for feature flag DB lookups — 5 minutes. */
 const FLAG_CACHE_TTL_MS = 5 * 60 * 1000;
+const FLAG_DB_TIMEOUT_MS = 500;
 const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
 
 async function checkFlag(
@@ -72,10 +74,23 @@ async function checkFlag(
   const cached = flagCache.get(dbKey);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
-  const flag = await dbGetFeatureFlag(dbKey);
+  const flag = await withTimeout(
+    dbGetFeatureFlag(dbKey),
+    FLAG_DB_TIMEOUT_MS,
+    `featureFlag:${dbKey}`,
+  ).catch(() => null);
   const value = flag !== null ? flag.enabled : envVar?.trim() === "true";
   flagCache.set(dbKey, { value, expiresAt: Date.now() + FLAG_CACHE_TTL_MS });
   return value;
+}
+
+export function invalidateFeatureFlagCache(key?: string): void {
+  if (key) {
+    flagCache.delete(key);
+    return;
+  }
+
+  flagCache.clear();
 }
 
 /**
@@ -149,14 +164,22 @@ export async function isInsightsEnabled(): Promise<boolean> {
  * agent flag to be enabled. Returns false if either is missing or disabled.
  */
 export async function isAgentEnabled(agentKey: string): Promise<boolean> {
-  const master = await dbGetFeatureFlag("automated_agents");
+  const master = await withTimeout(
+    dbGetFeatureFlag("automated_agents"),
+    FLAG_DB_TIMEOUT_MS,
+    "featureFlag:automated_agents",
+  ).catch(() => null);
   if (!master?.enabled) return false;
 
-  const agent = await dbGetFeatureFlag(agentKey);
+  const agent = await withTimeout(
+    dbGetFeatureFlag(agentKey),
+    FLAG_DB_TIMEOUT_MS,
+    `featureFlag:${agentKey}`,
+  ).catch(() => null);
   return agent?.enabled ?? false;
 }
 
 /** Reset internal cache — for tests only. */
 export function _resetFlagCache(): void {
-  flagCache.clear();
+  invalidateFeatureFlagCache();
 }

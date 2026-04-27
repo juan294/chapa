@@ -10,12 +10,31 @@ interface BadgeTheme {
   heatmap: [string, string, string, string, string];
 }
 
+// Badge SVG renders on the server before app CSS is applied, so the palette
+// is duplicated here. Invariant: shared brand and archetype colors must stay
+// aligned with apps/web/styles/globals.css.
+const BADGE_BRAND_COLORS = {
+  accent: "#8B5CF6",
+  accentLight: "#A78BFA",
+  textMuted: "#9AA4B2",
+  textStrong: "#E6EDF3",
+  archetypes: {
+    Builder: "#8B5CF6",
+    "Quality Champion": "#EC4899",
+    Marathoner: "#22C55E",
+    Polymath: "#EAB308",
+    Balanced: "#0EA5E9",
+    Emerging: "#F97316",
+    Artificer: "#F59E0B",
+  } satisfies Record<DeveloperArchetype, string>,
+} as const;
+
 export const WARM_AMBER: BadgeTheme = {
   bg: "#0C0D14",
   card: "#13141E",
-  textPrimary: "#E6EDF3",
-  textSecondary: "#9AA4B2",
-  accent: "#8B5CF6",
+  textPrimary: BADGE_BRAND_COLORS.textStrong,
+  textSecondary: BADGE_BRAND_COLORS.textMuted,
+  accent: BADGE_BRAND_COLORS.accent,
   stroke: "rgba(139,92,246,0.12)",
   heatmap: [
     "rgba(139,92,246,0.12)", // 0: none
@@ -44,10 +63,10 @@ export function getHeatmapColor(count: number): string {
 }
 
 const TIER_COLORS: Record<ImpactTier, string> = {
-  Emerging: "#9AA4B2",
-  Solid: "#E6EDF3",
-  High: "#A78BFA",
-  Elite: "#8B5CF6",
+  Emerging: BADGE_BRAND_COLORS.textMuted,
+  Solid: BADGE_BRAND_COLORS.textStrong,
+  High: BADGE_BRAND_COLORS.accentLight,
+  Elite: BADGE_BRAND_COLORS.accent,
 };
 
 /**
@@ -62,15 +81,8 @@ export function getTierColor(tier: ImpactTier): string {
   return TIER_COLORS[tier];
 }
 
-const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> = {
-  Builder: "#8B5CF6",   // signature violet
-  "Quality Champion": "#EC4899",  // pink
-  Marathoner: "#22C55E", // green
-  Polymath: "#EAB308",  // amber/gold
-  Balanced: "#0EA5E9",  // sky blue
-  Emerging: "#F97316",  // warm orange
-  Artificer: "#F59E0B", // amber
-};
+const ARCHETYPE_COLORS: Record<DeveloperArchetype, string> =
+  BADGE_BRAND_COLORS.archetypes;
 
 /**
  * Get the badge accent color for a developer archetype.

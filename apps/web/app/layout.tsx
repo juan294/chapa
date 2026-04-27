@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "@/styles/globals.css";
-import PostHogProvider from "@/components/PostHogProvider";
-import { ClientAnalytics } from "@/components/ClientAnalytics";
+import { ClientInstrumentation } from "@/components/ClientInstrumentation";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
+import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvider";
 import { getBaseUrl } from "@/lib/env";
+import { isStudioEnabled } from "@/lib/feature-flags";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -63,11 +63,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const studioEnabled = await isStudioEnabled();
+
   return (
     <html
       lang="en"
@@ -79,8 +81,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://api.github.com" />
         <link rel="dns-prefetch" href="https://api.github.com" />
         <link rel="dns-prefetch" href="https://avatars.githubusercontent.com" />
-        <link rel="preconnect" href="https://eu.i.posthog.com" />
-        <link rel="dns-prefetch" href="https://eu.i.posthog.com" />
       </head>
       <body className="bg-bg text-text-primary font-body antialiased">
         {/* SAFETY: JSON-LD structured data from hardcoded constants — no user input. JSON.stringify escapes special characters. */}
@@ -123,12 +123,11 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider>
-          <PostHogProvider>
-            <KeyboardShortcutsListener />
+          <ClientFeatureFlagsProvider studioEnabled={studioEnabled}>
             {children}
-          </PostHogProvider>
+          </ClientFeatureFlagsProvider>
         </ThemeProvider>
-        <ClientAnalytics />
+        <ClientInstrumentation />
       </body>
     </html>
   );

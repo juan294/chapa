@@ -12,15 +12,17 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @chapa/web test:e2e",
+    "validate:migrations": "node scripts/validate-migrations.ts",
     "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/",
     "prepare": "husky"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.4",
     "husky": "^9.1.7",
-    "jsdom": "^29.0.1",
-    "vitest": "^4.1.2"
+    "jsdom": "^29.1.0",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.4"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -32,13 +34,27 @@
     ],
     "overrides": {
       "minimatch": ">=10.2.3",
-      "dompurify": ">=3.3.2",
+      "dompurify": ">=3.4.0",
       "ajv": ">=6.14.0 <7.0.0",
       "rollup": ">=4.59.0",
       "flatted": ">=3.4.2",
-      "undici": ">=7.24.0",
+      "undici": ">=7.24.0 <8.0.0",
       "picomatch": ">=4.0.4",
-      "brace-expansion": ">=5.0.5"
+      "brace-expansion": ">=5.0.5",
+      "protobufjs": ">=7.5.5",
+      "vite": ">=8.0.8",
+      "typescript-eslint": ">=8.58.0",
+      "@typescript-eslint/eslint-plugin": ">=8.58.0",
+      "@typescript-eslint/parser": ">=8.58.0",
+      "@typescript-eslint/utils": ">=8.58.0",
+      "@typescript-eslint/typescript-estree": ">=8.58.0",
+      "@typescript-eslint/type-utils": ">=8.58.0",
+      "@typescript-eslint/scope-manager": ">=8.58.0",
+      "@typescript-eslint/visitor-keys": ">=8.58.0",
+      "@typescript-eslint/project-service": ">=8.58.0",
+      "@typescript-eslint/tsconfig-utils": ">=8.58.0",
+      "svix": "1.92.2",
+      "postcss": ">=8.5.10"
     }
   }
 }

@@ -14,6 +14,13 @@ describe("GlobalCommandBar", () => {
     });
   });
 
+  describe("route-scoped shortcuts", () => {
+    it("mounts KeyboardShortcutsListener with command-bar routes", () => {
+      expect(SOURCE).toContain("KeyboardShortcutsListener");
+      expect(SOURCE).toContain("<KeyboardShortcutsListener />");
+    });
+  });
+
   describe("autoFocus on admin page (#283)", () => {
     it("passes autoFocus based on isAdmin prop so admin page gets focus", () => {
       // Admin page should auto-focus the command input; other pages should not.
@@ -34,9 +41,9 @@ describe("GlobalCommandBar", () => {
       expect(SOURCE).toMatch(/isAdmin\??:\s*boolean/);
     });
 
-    it("passes isAdmin to createNavigationCommands", () => {
-      // Must call createNavigationCommands with { isAdmin }
-      expect(SOURCE).toMatch(/createNavigationCommands\(\s*\{\s*isAdmin\s*\}\s*\)/);
+    it("passes isAdmin and studioEnabled to createNavigationCommands", () => {
+      // Must call createNavigationCommands with both page role and hydrated feature flag.
+      expect(SOURCE).toMatch(/createNavigationCommands\(\s*\{\s*isAdmin,\s*studioEnabled\s*\}\s*\)/);
     });
 
     it("handles custom event action type", () => {
