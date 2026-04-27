@@ -9,6 +9,29 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-27T03:00:00Z -->
+## Cost Analyst — 2026-04-27
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: TTL 100% on per-user / per-handle / per-IP keys. 16 distinct prefixes audited; 3 persistent (TTL=0) keys — `cron:warm-cache:offset` (int), `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). All intentional, bounded. Date-keyed `badge:{...}:{date}` and `history:{handle}:{from}:{to}` linear-but-bounded by 24h/1h TTLs. Growth risk: LOW.
+- GitHub API: cache-first (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage via `withTimeout` + `AbortSignal.timeout`. Only uncached call remains `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
+- Supabase: **11 tables** (users, metrics_snapshots, campaign_sends, email_campaigns, feature_flags, user_platforms, supplemental_stats, verification_records, merge_operations, tool_insights) + 2 views (`latest_snapshots`, `admin_users`, both `security_invoker=true`) + 1 RPC (`claim_campaign_sends`). Singleton lazy client at `lib/db/supabase.ts`. 0 N+1 patterns. `dbCleanOldSnapshots()` invoked from warm-cache cron at `route.ts:175` — 365d retention.
+- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. Bitbucket/Codeberg query paths in dedicated modules (`lib/bitbucket/client.ts`, `lib/codeberg/client.ts`).
+- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio` `force-dynamic` (intentional, auth-gated).
+- Cron: **4 handlers** at maxDuration=300s — `warm-cache`, `process-campaigns`, `sync-audience`, admin `bulk-recalculate`. No edge routes. No oversized routes.
+- Timers: All `setTimeout`/AbortController paired with cleanup; server-side timers go through `withTimeout()` finally. No leaks.
+- In-memory: `_inflight` Map bounded by 30s timeout + explicit `.finally()` clear (`lib/github/client.ts:82`). `inflightBadgeRenders` bounded by 30s `badge-lock` SETNX TTL. `flagCache` bounded by fixed flag set (~5–10 entries). `warmSet` bounded to MAX_HANDLES=50.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED**: `dbGetCampaignStats()` 4-query parallel `count` aggregation (`lib/db/campaigns.ts:727-765`). Move to `GROUP BY status` Postgres RPC at >5K sends/campaign.
+- **MONITOR M1–M4 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K users — cleanup wired, retention 365d).
+- **Observation**: `/api/webhooks/resend` has no rate limit but is Svix-signature-verified end-to-end. Acceptable as is; flagged so future changes do not open an unauthenticated path.
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. ISR coverage and `force-dynamic` set unchanged. No edge-route opportunities — Redis/Supabase clients require Node runtime.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127-149`). Resend webhook lacks rate limiting but Svix-verified — no cost-security conflict.
+- [Coverage]: app/api 97.34%, lib/db 96.48% (per 2026-04-27 coverage report) — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-26T03:00:00Z -->
 ## Cost Analyst — 2026-04-26
 - **Status**: GREEN
@@ -52,28 +75,6 @@
 - [Performance]: No new cost-performance tradeoffs. ISR correct on all static pages. `/studio` + `/experiments/*` force-dynamic unchanged.
 - [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127–149`). No cost-security conflicts.
 - [Coverage]: app/api 97.1%, lib/db 96.5% — stable (from 2026-04-25 coverage report). No cost-critical path coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-22T01:04:00Z -->
-## Cost Analyst — 2026-04-22
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 3 persistent (TTL=0) keys — `cron:warm-cache:offset` (int), `stats:badges_generated` (INCR counter), `stats:unique_badges` (HLL ~12 KB). All intentional, bounded. ~13 patterns verified. Growth risk: LOW.
-- GitHub API: cache-first (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage via `withTimeout`. Only uncached call remains `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
-- Supabase: **9 tables + 2 views** (`latest_snapshots`, `admin_users`, both `security_invoker=true`). Tables: users, metrics_snapshots, verification_records, feature_flags, merge_operations, user_platforms, tool_insights, email_campaigns, campaign_sends. RLS enabled across all tables with explicit deny-all for anon. Singleton lazy client at `lib/db/supabase.ts`. 0 N+1 patterns.
-- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts.
-- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio` + `/experiments/*` force-dynamic (intentional, auth-gated).
-- Cron: **4 handlers** at maxDuration=300s — `warm-cache`, `process-campaigns`, `sync-audience`, admin `bulk-recalculate`. API routes: 44 `route.ts` files.
-- Timers: `withTimeout` cleans up in finally. `pingRedis` uses `withTimeout` (redis.ts:263). Bitbucket/Codeberg query paths clear AbortController timers. **No leaks.**
-- In-memory: `_inflight` Map in GitHub client bounded by 30s timeout + explicit clear. `flagCache` bounded by fixed flag set (~5–10 entries).
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` client-side aggregation (`lib/db/campaigns.ts:439`). Move to Postgres RPC at >5K sends/campaign.
-- **MONITOR M1–M4 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` growth (~3.65M rows/year @10K users).
-
-**Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. ISR correct on all static pages. `/studio` + `/experiments/*` force-dynamic unchanged — no serverless reduction opportunity remains.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (documented accepted risk, `redis.ts:127–149`). No cost-security conflicts. `lib/analytics/server-errors.ts` branch coverage gap (SENSITIVE_PATTERNS scrubbing) flagged by security/coverage agents is a testing gap, not a cost concern.
-- [Coverage]: app/api 97.5%, lib/db 97.6% — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one — coverage is adequate.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-26T09:42:00Z -->
@@ -269,24 +270,25 @@
 - [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — should be reverted before next production release.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-24T02:40:00Z -->
-## Coverage Agent — 2026-04-24
-- **Status**: YELLOW
-- Overall coverage: **93.15% stmts** (8168/8768), 89.55% branches, 90.09% funcs, 94.25% lines
-- Test suite: 402 files, 7165 tests (+117 vs 2026-04-22; +6 files)
-- All critical paths GREEN: lib/impact 99.58%, lib/render 100%, lib/db 96.58%, lib/cache 98.03%, lib/auth 97.59%, lib/github 96.50%, lib/history 98.26%, lib/email 97.52%, app/api 96.88%, lib/profile 100%, lib/analytics 100% (branches 92.86%)
-- **P2 resolved (2026-04-22 triage work)**: `lib/analytics/server-errors.ts` branches **63.63%→90.9%** (SENSITIVE_PATTERNS covered); `SharePageOwnerContent.tsx` stmts **59.09%→90.9%**, funcs **50%→75%**.
-- **Flaky tests: 1 reproducible + fork-pool instability**. `apps/web/app/experiments/aurora/page.test.tsx > renders without throwing` times out at 15s in 2/3 coverage runs. Vitest fork workers dropped 5 and 8 times with "Timeout waiting for worker to respond" on different files.
-- **P2 NEW**: aurora page test — mount of canvas/animation pipeline exceeds the 15s test timeout under full-coverage fork parallelism. Recommend mocking the animation effect or raising `testTimeout` for that file.
-- **P2 NEW (infra)**: vitest fork-pool starvation under coverage. Pin `poolOptions.forks.maxForks` (e.g. max(cpus/2, 4)) for the coverage profile.
-- **P3 carried**: lib/verification/store.ts 71.42% branches (2 error paths), api/telemetry 66.66% funcs (1 untested handler), experiments/** 56.68% (Canvas/WebGL JSDOM-blocked), AuthorTypewriter 67.5% branches (JSDOM timing), refresh/recalculate fire-and-forget arrows, lazy wrapper factories.
-- Untested critical-path files: only `api/auth/bitbucket/config.ts` + `api/auth/codeberg/config.ts` — pure config wiring, exercised via routes; no direct test required.
+<!-- ENTRY:START agent=coverage timestamp=2026-04-27T02:01:00Z -->
+## Coverage Agent — 2026-04-27
+- **Status**: GREEN
+- Overall coverage: **93.27% stmts** (8254/8849), 89.89% branches, 90.53% funcs, 94.33% lines
+- Test suite: 408 files, 7224 tests (+53 vs 2026-04-26; +3 files). Duration 66s with coverage.
+- Delta vs 2026-04-26: stmts +0.08pp, branches +0.13pp, funcs +0.16pp — steady improvement
+- All critical paths GREEN: lib/impact 99.59%, lib/render 100%, lib/db 96.48%, app/api 97.34%, lib/profile 100%, lib/history 98.26%, lib/cache 97.48%, lib/auth 98.01%, lib/github 97.35%, lib/email 97.57%, lib/analytics 97.26%, lib/bitbucket 97.70%, lib/codeberg 98.03%
+- **Flaky tests: 0** — three consecutive runs all 7224/7224 passed. Prior `BadgeToolbar > strips @keyframes` flake (carried 4+ cycles) is **resolved** — Apr 26 triage's removal of redundant `vi.stubGlobal("Image", origImage)` lines is holding.
+- **P2 resolved**: `lib/async/fire-and-forget.ts` moved from 0% branches to **100%** (lib/async module now 100/100/100). Telemetry route funcs moved to 100%. `lib/auth/cookie-policy.ts` URL-parse catch + dedicated `unsubscribe-token.test.ts` both landed.
+- **P2 active (small)**: `app/u/[handle]/og-image/route.ts` 94.3% stmts / **60% funcs** — 2 helpers untested (avatar-fetch + error-fallback). `AuthorTypewriter.tsx` 67.5% branches (JSDOM, carried). `ParticleBackground.tsx` 72.2% branches (Canvas).
+- **P3 carried (accepted)**: experiments/** 56.7% (Canvas/WebGL JSDOM-blocked), HolographicOverlay 50% stmts (Canvas), `archetypeDemoData/demoData` 50% br (overload signatures), framework shells 0% (no logic), `log.ts` 50% br (ternary fallback).
+- Untested critical-path files unchanged: only `api/auth/bitbucket/config.ts` + `api/auth/codeberg/config.ts` — pure config wiring, exercised via routes.
 
 **Cross-agent recommendations:**
-- [QA]: Stabilize `experiments/aurora/page.test.tsx` — either mock the canvas-driving effect, render under `prefers-reduced-motion`, or bump `testTimeout` to 30s on that file.
-- [DevOps/Performance]: Coverage job should pin `poolOptions.forks.maxForks` in `vitest.config.ts`.
-- [Security]: `server-errors.ts` SENSITIVE_PATTERNS branch coverage objective is met (90.9% branches, all 9 pattern types exercised). Security P2 can be closed.
-- [Cost Analyst]: app/api 96.88%, lib/db 96.58% — stable. No cost-critical path regressions.
+- [Triage]: All P2 items from Apr 26 triage successfully landed. `fire-and-forget` branches at 100%, `telemetry` funcs at 100%, `cookie-policy` catch covered, dedicated `unsubscribe-token.test.ts` present, BadgeToolbar flake gone. Verification cycle worked.
+- [QA]: Flake-free across 3 runs. Suite stable at 7224 tests. Recommend leaving `poolOptions.forks.maxForks` pin in place — fork-pool starvation has not reproduced since.
+- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS coverage holds (lib/analytics 97.26% stmts / 89.09% branches). No new security-relevant gaps.
+- [Cost Analyst]: app/api 97.34%, lib/db 96.48% — stable. No cost-critical path coverage regressions. New `og-image/route.ts` funcs gap is rendering-side, not cost-path.
+- [Performance]: Suggest a small follow-up to cover the avatar-fetch branch + error-fallback in `og-image/route.ts` to retire the only critical-path P2.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-24T07:03:08Z -->
