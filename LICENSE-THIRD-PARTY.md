@@ -13,6 +13,7 @@ documented here for transparency.
 |---------|---------|---------|
 | `@resvg/resvg-js` | ^2.6.2 | SVG-to-PNG rasterization for badge rendering |
 | `lightningcss` | 1.32.0 | CSS transformation pipeline used by Tailwind / Next.js tooling |
+| `dompurify` | 3.4.0 | Transitive dependency (dual-licensed `MPL-2.0 OR Apache-2.0`); used unmodified through its public API. We accept it under MPL-2.0 since the same reasoning applies; the Apache-2.0 alternative is also available. |
 
 ## LGPL-3.0-or-later Dependencies
 

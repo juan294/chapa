@@ -68,6 +68,11 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  // Guarantee real timers between tests. A few tests below switch to fake
+  // timers and call useRealTimers() at the end without try/finally; if an
+  // assertion in between fails, fake timers leak into the next test and
+  // break Promise/queueMicrotask flushing (causes the SVG-strip test flake).
+  vi.useRealTimers();
 });
 
 describe("BadgeToolbar render", () => {
