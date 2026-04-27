@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-04-27
+
 ### Added
 - **Active alerts**: Launch-critical active alert integration for real-time status notifications
 - **Structured error logger**: `withErrorCapture()` wrapper and structured JSON logger (`lib/analytics/server-errors.ts`) for consistent server-side error observability
@@ -30,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 237 new tests; total test count: 7,192 across 438 files
 
 ### Fixed
+- **Quality cliff at solo→collaborative boundary** (#827): `computeQuality` now returns `max(collaborativeFormula, soloFormula)` so users with strong solo signals don't drop sharply when crossing the 0.15 review-to-PR threshold
+- **Supplemental EMU stats persistence** (#825): Supplemental stats now persist to a new Supabase table (`supplemental_stats`, migration 024) with Redis-as-hot-path / Supabase-as-fallback in `getStats()`. A missed CLI day no longer drops EMU contributions silently
+- **Same-day refresh after CLI supplemental upload** (#826): New `stats:dirty:<handle>` Redis marker; `materializeProfile` reads it as `inputsChanged` and `smoothScore` bypasses the same-day EMA lock so freshly uploaded data lands in today's score immediately. `runPublicProfileSideEffects` routes through `dbReplaceSnapshot` and clears the marker after a successful write
+- **BadgeToolbar render test flakiness** (#822): Added `vi.useRealTimers()` in `afterEach` to prevent fake-timer leak between tests
 - **Craft scoring single source of truth**: `/api/refresh` and `/api/recalculate` no longer mutate stored craft scores — all paths read from `getCachedCraftScore()`. Formula changes require explicit backfill via the new backfill script
 - **GitHub OAuth tokens moved to Supabase**: Tokens stored in `user_github_session_token` (encrypted) instead of session cookies, preventing token leak via log capture (#807)
 - **Campaign send deduplication**: Claim sends before delivery with lease-based locking; prevents duplicate emails in multi-worker environments (#793)
@@ -74,11 +80,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TypeScript: 6.0.2 → 6.0.3
 - ESLint: 9.27.0 → 9.39.0
 - vitest / @vitest/coverage-v8: 4.1.2 → 4.1.4
-- @supabase/supabase-js: 2.103.0 → 2.103.3
-- posthog-js: 1.367.0 → 1.369.3
-- resend: 6.10.0 → 6.12.0
+- @supabase/supabase-js: 2.103.0 → 2.104.1
+- posthog-js: 1.367.0 → 1.372.1
+- resend: 6.10.0 → 6.12.2
 - @playwright/test: 1.58.2 → 1.59.1
 - @types/node: 25.5.0 → 25.6.0
+- jsdom: 29.0.2 → 29.1.0
+- vite: 8.0.8 → 8.0.10
+- tailwindcss / @tailwindcss/postcss: 4.2.2 → 4.2.4
 
 ## [2.7.2] - 2026-04-04
 
@@ -421,6 +430,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
+[2.8.0]: https://github.com/juan294/chapa/compare/v2.7.2...v2.8.0
 [2.7.2]: https://github.com/juan294/chapa/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/juan294/chapa/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/juan294/chapa/compare/v2.6.0...v2.7.0
