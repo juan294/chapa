@@ -119,8 +119,7 @@ describe("POST /api/telemetry", () => {
 
     expect(res.status).toBe(200);
     expect(consoleErrorSpy).toHaveBeenCalledOnce();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const entry = JSON.parse(consoleErrorSpy.mock.calls[0]![0] as string) as Record<string, unknown>;
+    const entry = JSON.parse((consoleErrorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
     expect(entry.level).toBe("error");
     expect(entry.msg).toBe("[telemetry] insert failed");
     expect(entry.handle).toBe(validPayload.targetHandle);
@@ -139,8 +138,7 @@ describe("POST /api/telemetry", () => {
       expect(consoleErrorSpy).toHaveBeenCalledOnce();
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const entry = JSON.parse(consoleErrorSpy.mock.calls[0]![0] as string) as Record<string, unknown>;
+    const entry = JSON.parse((consoleErrorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
     expect(entry.level).toBe("error");
     expect(entry.msg).toBe("[telemetry] insert failed");
     expect(entry.handle).toBe(validPayload.targetHandle);

@@ -321,8 +321,7 @@ describe("POST /api/webhooks/resend", () => {
 
     expect(res.status).toBe(200);
     expect(errorSpy).toHaveBeenCalledOnce();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const entry = JSON.parse(errorSpy.mock.calls[0]![0] as string) as Record<string, unknown>;
+    const entry = JSON.parse((errorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
     expect(entry.level).toBe("warn");
     expect(entry.msg).toContain("attachment");
     expect(entry.count).toBe(1);
