@@ -4,6 +4,7 @@ import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { isValidHandle } from "@/lib/validation";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
+import { getRequestId } from "@/lib/log";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
@@ -23,6 +24,7 @@ import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
  * Rate limited: 5 refreshes per handle per hour.
  */
 export const POST = withErrorCapture("/api/refresh", async (request: NextRequest) => {
+  const requestId = getRequestId(request);
   const handle = request.nextUrl.searchParams.get("handle");
   if (!handle || !isValidHandle(handle)) {
     return NextResponse.json(
@@ -73,6 +75,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
       route: "/api/refresh",
       statusCode: 502,
       error: new Error(`Failed to fetch stats for handle: ${handle}`),
+      requestId,
     });
     return NextResponse.json(
       { error: "Failed to fetch stats. Try again later." },
@@ -88,6 +91,7 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
       route: "/api/refresh",
       statusCode: 500,
       error: new Error(`Failed to persist refreshed snapshot for handle: ${handle}`),
+      requestId,
     });
     return NextResponse.json(
       { error: "Failed to save refreshed profile. Try again later." },

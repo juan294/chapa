@@ -18,6 +18,7 @@ import {
   captureServerEvent,
   withErrorCapture,
 } from "@/lib/analytics/server-errors";
+import { getRequestId } from "@/lib/log";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import {
   materializeOrchestratedProfile,
@@ -57,6 +58,7 @@ interface HandleResult {
  * Protected by CRON_SECRET — Vercel sends this automatically as a Bearer token.
  */
 export const GET = withErrorCapture("/api/cron/warm-cache", async (request: NextRequest) => {
+  const requestId = getRequestId(request);
   // Auth: Vercel sends CRON_SECRET as Authorization: Bearer <secret>
   const denied = verifyCronSecret(request);
   if (denied) return denied;
@@ -125,7 +127,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     toWarm,
     BATCH_SIZE,
     async (handle) => {
-      const result = await warmHandle(handle, githubToken, previousSnapshots);
+      const result = await warmHandle(handle, githubToken, previousSnapshots, requestId);
       return { handle, ...result };
     },
   );
@@ -150,6 +152,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
         route: "/api/cron/warm-cache",
         statusCode: 500,
         error: new Error(`Unexpected failure for handle "${handle}": ${error.message}`),
+        requestId,
       });
     }
   }
@@ -234,6 +237,7 @@ async function warmHandle(
   handle: string,
   githubToken: string | undefined,
   previousSnapshots: Map<string, unknown>,
+  requestId?: string,
 ): Promise<HandleResult> {
   try {
     const materialized = await materializeOrchestratedProfile(handle, {
@@ -244,6 +248,7 @@ async function warmHandle(
         route: "/api/cron/warm-cache",
         statusCode: 502,
         error: new Error(`Stats fetch returned null for handle: ${handle}`),
+        requestId,
       });
       return { warmed: false, snapshotRecorded: false, notified: false };
     }
@@ -297,6 +302,7 @@ async function warmHandle(
       route: "/api/cron/warm-cache",
       statusCode: 500,
       error: err,
+      requestId,
     });
     return { warmed: false, snapshotRecorded: false, notified: false };
   }

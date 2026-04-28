@@ -118,10 +118,12 @@ describe("POST /api/telemetry", () => {
     await Promise.resolve();
 
     expect(res.status).toBe(200);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "[telemetry] insert failed",
-      { handle: validPayload.targetHandle },
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledOnce();
+    const entry = JSON.parse((consoleErrorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
+    expect(entry.level).toBe("error");
+    expect(entry.msg).toBe("[telemetry] insert failed");
+    expect(entry.handle).toBe(validPayload.targetHandle);
+    consoleErrorSpy.mockRestore();
   });
 
   it("logs via the fire-and-forget onError handler when dbInsertTelemetry rejects", async () => {
@@ -133,11 +135,14 @@ describe("POST /api/telemetry", () => {
     expect(res.status).toBe(200);
 
     await vi.waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "[telemetry] insert failed",
-        { handle: validPayload.targetHandle, err: dbError },
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledOnce();
     });
+
+    const entry = JSON.parse((consoleErrorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
+    expect(entry.level).toBe("error");
+    expect(entry.msg).toBe("[telemetry] insert failed");
+    expect(entry.handle).toBe(validPayload.targetHandle);
+    expect(entry.error).toBe(dbError.message);
 
     consoleErrorSpy.mockRestore();
   });

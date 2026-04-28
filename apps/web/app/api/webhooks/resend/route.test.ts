@@ -313,17 +313,20 @@ describe("POST /api/webhooks/resend", () => {
     mockFetchReceivedEmail.mockResolvedValueOnce(emailWithAttachments);
     mockForwardEmail.mockResolvedValueOnce({ id: "fwd_att" });
 
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // log("warn") routes to console.error (structured JSON), not console.warn
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const req = makeRequest(emailReceivedPayload, validHeaders);
     const res = await POST(req);
 
     expect(res.status).toBe(200);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("attachment"),
-    );
+    expect(errorSpy).toHaveBeenCalledOnce();
+    const entry = JSON.parse((errorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
+    expect(entry.level).toBe("warn");
+    expect(entry.msg).toContain("attachment");
+    expect(entry.count).toBe(1);
 
-    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 });
 

@@ -12,6 +12,7 @@ import { dbUpsertToolInsights } from "@/lib/db/tool-insights";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import type { InsightsUpload } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { log } from "@/lib/log";
 
 /**
  * POST /api/insights — Upload an insights report and compute craft score.
@@ -44,7 +45,7 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
   // Validate InsightsUpload shape
   const validation = isValidInsightsUpload(body);
   if (!validation.valid) {
-    console.warn("[insights] Validation failed:", validation.reason);
+    log("warn", "[insights] Validation failed", { route: "/api/insights", reason: validation.reason });
     return NextResponse.json({ error: "Invalid insights data" }, { status: 400 });
   }
 
