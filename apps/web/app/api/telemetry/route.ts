@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/cache/redis";
 import { isValidTelemetryPayload } from "@/lib/validation";
 import { dbInsertTelemetry, type TelemetryPayload } from "@/lib/db/telemetry";
 import { getClientIp } from "@/lib/http/client-ip";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 // Trust model: this endpoint intentionally remains unauthenticated for CLI compatibility.
 // Every accepted row is stored with verified=false until the CLI sends an auth token in a follow-up phase.
-export async function POST(request: Request): Promise<Response> {
+export const POST = withErrorCapture("/api/telemetry", async (request: NextRequest) => {
   // 1. Parse JSON body
   let body: unknown;
   try {
@@ -75,4 +76,4 @@ export async function POST(request: Request): Promise<Response> {
 
   // 5. Always return success — telemetry is a best-effort analytics sink.
   return NextResponse.json({ ok: true });
-}
+});

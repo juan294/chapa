@@ -13,7 +13,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
 import { addContact } from "@/lib/email/audience";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { storeGitHubToken } from "@/lib/auth/github-session-token";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
@@ -79,7 +79,7 @@ function readOauthStateStoreCookie(
   return value === "shared" || value === "fallback" ? value : null;
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/auth/callback", async (request: NextRequest) => {
   // Rate limit: 10 requests per IP per 15 minutes
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:callback:${ip}`, 10, 900);
@@ -214,4 +214,4 @@ export async function GET(request: NextRequest) {
     `chapa_redirect=; ${cookieFlags(request)}; Max-Age=0`,
   );
   return response;
-}
+});

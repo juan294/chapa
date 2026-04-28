@@ -5,6 +5,7 @@ import {
   type AdminSortField,
 } from "@/lib/db/admin-users";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 const VALID_SORT_FIELDS: AdminSortField[] = [
   "handle",
@@ -28,7 +29,7 @@ const VALID_SORT_FIELDS: AdminSortField[] = [
  * Server-side paginated, sorted, and filtered admin user list.
  * Data comes from Supabase `admin_users` view (users + latest snapshot).
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/admin/users", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-users");
   if (authError) return authError;
 
@@ -68,4 +69,4 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result, {
     headers: { "Cache-Control": "no-store" },
   });
-}
+});

@@ -16,6 +16,7 @@ import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
   captureServerEvent,
+  withErrorCapture,
 } from "@/lib/analytics/server-errors";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import {
@@ -55,7 +56,7 @@ interface HandleResult {
  *
  * Protected by CRON_SECRET — Vercel sends this automatically as a Bearer token.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/cron/warm-cache", async (request: NextRequest) => {
   // Auth: Vercel sends CRON_SECRET as Authorization: Bearer <secret>
   const denied = verifyCronSecret(request);
   if (denied) return denied;
@@ -207,7 +208,7 @@ export async function GET(request: NextRequest) {
     },
     { headers: { "Cache-Control": "no-store" } },
   );
-}
+});
 
 /**
  * Parse WARM_CACHE_PRIORITY_HANDLES env var into a list of handles

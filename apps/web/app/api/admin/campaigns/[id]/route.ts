@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/campaigns";
 import { cacheDel } from "@/lib/cache/redis";
 import { parseCampaignPatchPayload } from "@/lib/campaigns/payload";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 const ENGAGEMENT_CACHE_KEY = "campaign:active-engagement";
 
@@ -25,24 +26,24 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export const GET = withErrorCapture("/api/admin/campaigns/[id]", async (request: NextRequest, ctx) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const { id } = await params;
+  const { id } = await (ctx as RouteParams).params;
   const campaign = await dbGetCampaign(id);
   if (!campaign) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({ campaign });
-}
+});
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export const PATCH = withErrorCapture("/api/admin/campaigns/[id]", async (request: NextRequest, ctx) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const { id } = await params;
+  const { id } = await (ctx as RouteParams).params;
   const campaign = await dbGetCampaign(id);
   if (!campaign) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -84,13 +85,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   await cacheDel(ENGAGEMENT_CACHE_KEY);
 
   return NextResponse.json({ success: true });
-}
+});
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export const DELETE = withErrorCapture("/api/admin/campaigns/[id]", async (request: NextRequest, ctx) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const { id } = await params;
+  const { id } = await (ctx as RouteParams).params;
   const ok = await dbDeleteCampaign(id);
   if (!ok) {
     return NextResponse.json(
@@ -100,4 +101,4 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   }
 
   return NextResponse.json({ success: true });
-}
+});

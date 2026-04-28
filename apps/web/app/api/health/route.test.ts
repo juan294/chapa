@@ -24,6 +24,7 @@ vi.mock("@/lib/auth/admin", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureOperationalAlert: vi.fn(),
+  withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
 // GitHub API is probed via global fetch — mock at module level

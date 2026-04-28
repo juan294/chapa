@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { verifyUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /**
  * GET /api/notifications/unsubscribe?handle=:handle&token=:token
@@ -21,7 +22,7 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
  * Fail-open: even if the DB update fails, shows the confirmation
  * page so the user isn't confused.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/notifications/unsubscribe", async (request: NextRequest) => {
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:unsubscribe:${ip}`, 10, 60);
   if (!rl.allowed) {
@@ -99,4 +100,4 @@ export async function GET(request: NextRequest) {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-}
+});

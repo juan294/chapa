@@ -8,12 +8,13 @@ import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import type { BadgeConfig } from "@chapa/shared";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /**
  * GET /api/studio/config — Load the authenticated user's badge config.
  * Returns { config: BadgeConfig | null }.
  */
-export async function GET(request: NextRequest): Promise<Response> {
+export const GET = withErrorCapture("/api/studio/config", async (request: NextRequest) => {
   if (!(await isStudioEnabled())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -32,13 +33,13 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const config = await cacheGet<BadgeConfig>(`config:${session.login}`);
   return NextResponse.json({ config });
-}
+});
 
 /**
  * PUT /api/studio/config — Save the authenticated user's badge config.
  * Auth required. Rate limited: 30 requests/hour per user.
  */
-export async function PUT(request: NextRequest): Promise<Response> {
+export const PUT = withErrorCapture("/api/studio/config", async (request: NextRequest) => {
   if (!(await isStudioEnabled())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -72,4 +73,4 @@ export async function PUT(request: NextRequest): Promise<Response> {
   await cacheSet(`config:${session.login}`, body as BadgeConfig, 31536000);
 
   return NextResponse.json({ success: true });
-}
+});

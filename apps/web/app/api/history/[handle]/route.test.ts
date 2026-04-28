@@ -315,12 +315,9 @@ describe("GET /api/history/[handle]", () => {
     }
   });
 
-  it("returns 500 when an unexpected error is thrown", async () => {
+  it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
     mockGetSnapshots.mockRejectedValue(new Error("unexpected boom"));
 
-    const res = await GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) });
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toBe("Internal server error");
+    await expect(GET(makeRequest("testuser"), { params: Promise.resolve({ handle: "testuser" }) })).rejects.toThrow("unexpected boom");
   });
 });

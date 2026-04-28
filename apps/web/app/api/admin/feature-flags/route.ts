@@ -3,6 +3,7 @@ import { adminAuth } from "@/lib/auth/admin-route";
 import { dbUpdateFeatureFlag } from "@/lib/db/feature-flags";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 import { invalidateFeatureFlagCache } from "@/lib/feature-flags";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /**
  * PATCH /api/admin/feature-flags
@@ -11,7 +12,7 @@ import { invalidateFeatureFlagCache } from "@/lib/feature-flags";
  * Body: { key: string, enabled?: boolean, config?: Record<string, unknown> }
  * Rate limited: 10 requests per IP per 60 seconds.
  */
-export async function PATCH(request: NextRequest) {
+export const PATCH = withErrorCapture("/api/admin/feature-flags", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-feature-flags");
   if (authError) return authError;
 
@@ -55,4 +56,4 @@ export async function PATCH(request: NextRequest) {
   invalidateFeatureFlagCache(body.key);
 
   return NextResponse.json({ success: true });
-}
+});

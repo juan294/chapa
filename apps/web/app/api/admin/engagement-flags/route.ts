@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /** Feature flag keys that belong to the Engagement section. */
 const ENGAGEMENT_KEYS = new Set(["score_notifications"]);
@@ -12,7 +13,7 @@ const ENGAGEMENT_KEYS = new Set(["score_notifications"]);
  * Admin-only endpoint that returns engagement-related feature flags.
  * Rate limited: 10 requests per IP per 60 seconds.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/admin/engagement-flags", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-engagement");
   if (authError) return authError;
 
@@ -27,4 +28,4 @@ export async function GET(request: NextRequest) {
     }));
 
   return NextResponse.json({ flags: engagementFlags });
-}
+});

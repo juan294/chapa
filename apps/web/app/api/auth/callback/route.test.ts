@@ -64,6 +64,7 @@ vi.mock("@/lib/email/audience", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: mockCaptureServerError,
+  withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
 vi.mock("@/lib/auth/github-session-token", () => ({

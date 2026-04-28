@@ -4,7 +4,7 @@ import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
 import { issueOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
@@ -28,7 +28,7 @@ function isSafeRedirect(url: string, baseUrl: string): boolean {
   }
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/auth/login", async (request: NextRequest) => {
   // Rate limit: 20 requests per IP per 15 minutes
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:login:${ip}`, 20, 900);
@@ -76,4 +76,4 @@ export async function GET(request: NextRequest) {
   }
 
   return response;
-}
+});
