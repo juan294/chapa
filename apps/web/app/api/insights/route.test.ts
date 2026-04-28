@@ -309,21 +309,15 @@ describe("POST /api/insights", () => {
   // Error handling
   // -------------------------------------------------------------------------
 
-  it("returns 500 JSON when dbUpsertToolInsights throws", async () => {
+  it("re-throws when dbUpsertToolInsights throws (handled by withErrorCapture)", async () => {
     mockDbUpsert.mockRejectedValue(new Error("DB connection lost"));
-    const resp = await POST(makePostRequest(makeValidUpload()));
 
-    expect(resp.status).toBe(500);
-    const body = await resp.json();
-    expect(body.error).toBe("Internal server error");
+    await expect(POST(makePostRequest(makeValidUpload()))).rejects.toThrow("DB connection lost");
   });
 
-  it("returns 500 JSON when resolveRequestAuth throws", async () => {
+  it("re-throws when resolveRequestAuth throws (handled by withErrorCapture)", async () => {
     mockResolveRequestAuth.mockRejectedValue(new Error("Auth service down"));
-    const resp = await POST(makePostRequest(makeValidUpload()));
 
-    expect(resp.status).toBe(500);
-    const body = await resp.json();
-    expect(body.error).toBe("Internal server error");
+    await expect(POST(makePostRequest(makeValidUpload()))).rejects.toThrow("Auth service down");
   });
 });

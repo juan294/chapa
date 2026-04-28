@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -33,13 +33,13 @@ const SESSION = {
   avatar_url: "https://example.com/avatar.png",
 };
 
-function makeRequest(body: unknown, cookie?: string): Request {
+function makeRequest(body: unknown, cookie?: string): NextRequest {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (cookie) headers["cookie"] = cookie;
 
-  return new Request("https://chapa.thecreativetoken.com/api/cli/auth/approve", {
+  return new NextRequest("https://chapa.thecreativetoken.com/api/cli/auth/approve", {
     method: "POST",
     headers,
     body: JSON.stringify(body),

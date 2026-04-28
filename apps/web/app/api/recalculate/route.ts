@@ -9,6 +9,7 @@ import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /**
  * POST /api/recalculate — Force-recalculate impact score.
@@ -19,7 +20,7 @@ import {
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
  * Rate limited: 20 requests/handle/hour.
  */
-export async function POST(request: NextRequest): Promise<Response> {
+export const POST = withErrorCapture("/api/recalculate", async (request: NextRequest) => {
   const auth = await resolveRequestAuth(request);
   if (!auth) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -80,4 +81,4 @@ export async function POST(request: NextRequest): Promise<Response> {
     craftScore: materialized.craftResult?.craftScore ?? null,
     craftTier: materialized.craftResult?.tier ?? null,
   });
-}
+});

@@ -48,6 +48,7 @@ vi.mock("@/lib/profile/post-write-invalidation", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
+  withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
 vi.mock("next/cache", () => ({
@@ -275,19 +276,9 @@ describe("POST /api/refresh", () => {
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
-  it("returns 500 and captures the exception on unexpected failure", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
     mockMaterializeOrchestratedProfile.mockRejectedValue(new Error("unexpected boom"));
 
-    const res = await POST(makeRequest("testuser"));
-    expect(res.status).toBe(500);
-    expect(mockCaptureServerError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        route: "/api/refresh",
-        statusCode: 500,
-      }),
-    );
-
-    consoleErrorSpy.mockRestore();
+    await expect(POST(makeRequest("testuser"))).rejects.toThrow("unexpected boom");
   });
 });

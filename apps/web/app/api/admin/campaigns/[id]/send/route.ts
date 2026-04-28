@@ -6,16 +6,17 @@ import {
   processCampaignBatch,
   DAILY_SEND_LIMIT,
 } from "@/lib/email/campaigns";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export const POST = withErrorCapture("/api/admin/campaigns/[id]/send", async (request: NextRequest, ctx) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const { id } = await params;
+  const { id } = await (ctx as RouteParams).params;
   const campaign = await dbGetCampaign(id);
   if (!campaign) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -53,4 +54,4 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         ? "All emails sent"
         : `Sending ${result.totalRecipients} emails in daily batches of ${DAILY_SEND_LIMIT} (Free plan limit)`,
   });
-}
+});

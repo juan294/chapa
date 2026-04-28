@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Mock the email module BEFORE importing the route handler.
@@ -49,10 +50,10 @@ function makeRequest(
   body: string,
   headers: Record<string, string> = {},
   ip?: string,
-): Request {
+): NextRequest {
   const allHeaders = { ...headers };
   if (ip) allHeaders["x-forwarded-for"] = ip;
-  return new Request("https://chapa.thecreativetoken.com/api/webhooks/resend", {
+  return new NextRequest("https://chapa.thecreativetoken.com/api/webhooks/resend", {
     method: "POST",
     body,
     headers: allHeaders,

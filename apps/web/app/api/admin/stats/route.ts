@@ -3,6 +3,7 @@ import { verifyAdminSecret } from "@/lib/auth/admin";
 import { getBadgeStats, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /**
  * GET /api/admin/stats
@@ -10,7 +11,7 @@ import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
  * Returns badge generation stats (total + unique developers).
  * Protected by a Bearer token checked against the ADMIN_SECRET env var.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/admin/stats", async (request: NextRequest) => {
   // Rate limit: 10 requests per IP per 60 seconds
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:admin-stats:${ip}`, 10, 60);
@@ -32,5 +33,5 @@ export async function GET(request: NextRequest) {
     { badges },
     { headers: { "Cache-Control": "no-store" } },
   );
-}
+});
 

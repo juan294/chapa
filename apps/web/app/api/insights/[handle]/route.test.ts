@@ -246,23 +246,15 @@ describe("GET /api/insights/:handle", () => {
 
   // --- Error handling ---
 
-  it("returns 500 JSON when dbGetToolInsights throws", async () => {
+  it("re-throws when dbGetToolInsights throws (handled by withErrorCapture)", async () => {
     mockDbGet.mockRejectedValue(new Error("DB connection lost"));
 
-    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
-
-    expect(resp.status).toBe(500);
-    const body = await resp.json();
-    expect(body.error).toBe("Internal server error");
+    await expect(GET(makeRequest("juan294"), makeParams("juan294"))).rejects.toThrow("DB connection lost");
   });
 
-  it("returns 500 JSON when rateLimit throws", async () => {
+  it("re-throws when rateLimit throws (handled by withErrorCapture)", async () => {
     mockRateLimit.mockRejectedValue(new Error("Redis unavailable"));
 
-    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
-
-    expect(resp.status).toBe(500);
-    const body = await resp.json();
-    expect(body.error).toBe("Internal server error");
+    await expect(GET(makeRequest("juan294"), makeParams("juan294"))).rejects.toThrow("Redis unavailable");
   });
 });

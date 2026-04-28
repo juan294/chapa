@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
 import { dbGetCampaigns } from "@/lib/db/campaigns";
 import { processCampaignBatch } from "@/lib/email/campaigns";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 export const maxDuration = 300;
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/cron/process-campaigns", async (request: NextRequest) => {
   const denied = verifyCronSecret(request);
   if (denied) return denied;
 
@@ -29,4 +30,4 @@ export async function GET(request: NextRequest) {
     campaignName: campaign.name,
     ...result,
   });
-}
+});

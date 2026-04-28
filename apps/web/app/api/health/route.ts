@@ -4,7 +4,7 @@ import { isAdminHandle } from "@/lib/auth/admin";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
 import { pingSupabase } from "@/lib/db/supabase";
-import { captureOperationalAlert } from "@/lib/analytics/server-errors";
+import { captureOperationalAlert, withErrorCapture } from "@/lib/analytics/server-errors";
 
 /** Shape returned for a successful GitHub probe. */
 interface GitHubRateLimit {
@@ -58,7 +58,7 @@ async function pingGitHub(): Promise<{
  * Health check endpoint for monitoring.
  * Rate limited: 30 requests per IP per 60 seconds.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/health", async (request: NextRequest) => {
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:health:${ip}`, 30, 60);
   if (!rl.allowed) {
@@ -113,4 +113,4 @@ export async function GET(request: NextRequest) {
     },
     { status: httpStatus },
   );
-}
+});

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -54,16 +55,16 @@ const validPayload = {
   cliVersion: "0.3.1",
 };
 
-function makeRequest(body: unknown): Request {
-  return new Request("https://chapa.thecreativetoken.com/api/telemetry", {
+function makeRequest(body: unknown): NextRequest {
+  return new NextRequest("https://chapa.thecreativetoken.com/api/telemetry", {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
   });
 }
 
-function makeInvalidJsonRequest(): Request {
-  return new Request("https://chapa.thecreativetoken.com/api/telemetry", {
+function makeInvalidJsonRequest(): NextRequest {
+  return new NextRequest("https://chapa.thecreativetoken.com/api/telemetry", {
     method: "POST",
     body: "not json!!!",
     headers: { "Content-Type": "application/json" },

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 import { AGENTS } from "@/lib/agents/agent-config";
@@ -20,7 +21,7 @@ import type {
  * Admin-only endpoint that returns the status of all scheduled agents
  * plus cross-agent shared context entries.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/admin/agents-summary", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-agents");
   if (authError) return authError;
 
@@ -63,4 +64,4 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data, {
     headers: { "Cache-Control": "no-store" },
   });
-}
+});

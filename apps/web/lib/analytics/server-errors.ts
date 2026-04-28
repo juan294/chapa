@@ -260,7 +260,7 @@ export async function captureServerError(
 /** Route handler type compatible with Next.js App Router. */
 type RouteHandler = (
   req: NextRequest,
-  ctx: unknown,
+  ctx?: unknown,
 ) => Promise<NextResponse | Response>;
 
 /**
@@ -276,7 +276,7 @@ export function withErrorCapture(
   route: string,
   handler: RouteHandler,
 ): RouteHandler {
-  return async (req: NextRequest, ctx: unknown) => {
+  return async (req: NextRequest, ctx?: unknown) => {
     try {
       return await handler(req, ctx);
     } catch (err) {

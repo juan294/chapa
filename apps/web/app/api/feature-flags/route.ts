@@ -3,6 +3,7 @@ import { dbGetFeatureFlags } from "@/lib/db/feature-flags";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 /**
  * GET /api/feature-flags
@@ -10,7 +11,7 @@ import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
  * Public, read-only endpoint returning all feature flags.
  * Rate limited: 30 requests per IP per 60 seconds.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/feature-flags", async (request: NextRequest) => {
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:feature-flags:${ip}`, 30, 60);
   if (!rl.allowed) {
@@ -31,4 +32,4 @@ export async function GET(request: NextRequest) {
       },
     },
   );
-}
+});

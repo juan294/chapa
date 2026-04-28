@@ -90,6 +90,7 @@ vi.mock("@/lib/render/avatar", () => ({
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
   captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
+  withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
 const FAKE_MATERIALIZED = {

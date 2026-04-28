@@ -11,6 +11,7 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { withTimeout } from "@/lib/async/with-timeout";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 export const maxDuration = 300;
 
@@ -82,7 +83,7 @@ async function listAllContactsInner(
 // GET /api/cron/sync-audience
 // ---------------------------------------------------------------------------
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/cron/sync-audience", async (request: NextRequest) => {
   const denied = verifyCronSecret(request);
   if (denied) return denied;
 
@@ -138,4 +139,4 @@ export async function GET(request: NextRequest) {
     totalEligible: users.length,
     totalContacts: existingContacts.length,
   });
-}
+});

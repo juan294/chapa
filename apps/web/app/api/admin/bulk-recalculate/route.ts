@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAdminSecret } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUsers } from "@/lib/db/users";
 import {
@@ -31,7 +32,7 @@ const INLINE_DEADLINE_MS = 250_000;
  * - `handles?: string[]` — specific handles to recalculate. If omitted,
  *   recalculates all users from Supabase.
  */
-export async function POST(request: NextRequest) {
+export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (request: NextRequest) => {
   // Auth first: Bearer token must match ADMIN_SECRET.
   // Checking auth before rate limiting prevents unauthenticated callers from
   // exhausting the per-IP bucket and locking out legitimate admins (BE-H9).
@@ -160,4 +161,4 @@ export async function POST(request: NextRequest) {
     errors: errors.length > 0 ? errors : undefined,
     ...(afterCursor ? { cursor: afterCursor } : {}),
   });
-}
+});

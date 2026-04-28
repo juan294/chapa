@@ -221,14 +221,11 @@ describe("GET /api/verify/[hash]", () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it("returns 500 with CORS header when an unexpected error is thrown", async () => {
+    it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
       mockGetVerificationRecord.mockRejectedValue(new Error("unexpected boom"));
       const [req, ctx] = makeRequest("abc12345", "1.2.3.4");
-      const res = await GET(req, ctx);
-      expect(res.status).toBe(500);
-      const body = await res.json();
-      expect(body.error).toBe("Internal server error");
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+      await expect(GET(req, ctx)).rejects.toThrow("unexpected boom");
     });
   });
 
