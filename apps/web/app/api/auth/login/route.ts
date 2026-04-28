@@ -5,6 +5,7 @@ import { issueOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
+import { getRequestId } from "@/lib/log";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
@@ -29,6 +30,7 @@ function isSafeRedirect(url: string, baseUrl: string): boolean {
 }
 
 export const GET = withErrorCapture("/api/auth/login", async (request: NextRequest) => {
+  const requestId = getRequestId(request);
   // Rate limit: 20 requests per IP per 15 minutes
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:login:${ip}`, 20, 900);
@@ -45,6 +47,7 @@ export const GET = withErrorCapture("/api/auth/login", async (request: NextReque
       route: "/api/auth/login",
       statusCode: 500,
       error: new Error("GitHub OAuth not configured: GITHUB_CLIENT_ID missing"),
+      requestId,
     });
     return NextResponse.json(
       { error: "GitHub OAuth not configured" },

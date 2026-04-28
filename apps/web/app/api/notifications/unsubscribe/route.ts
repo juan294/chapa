@@ -7,6 +7,7 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { verifyUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { log } from "@/lib/log";
 
 /**
  * GET /api/notifications/unsubscribe?handle=:handle&token=:token
@@ -55,10 +56,10 @@ export const GET = withErrorCapture("/api/notifications/unsubscribe", async (req
   const [emailInfo] = await Promise.all([
     dbGetUserEmail(handle).catch(() => null),
     dbUpdateEmailNotifications(handle, false).catch((error: Error) => {
-      console.error(
-        "[unsubscribe] failed to update preferences:",
-        error.message,
-      );
+      log("error", "[unsubscribe] failed to update preferences", {
+        route: "/api/notifications/unsubscribe",
+        error: error.message,
+      });
     }),
   ]);
 

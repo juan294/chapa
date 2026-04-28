@@ -13,6 +13,7 @@
  */
 
 import type { NextRequest, NextResponse } from "next/server";
+import { getRequestId } from "@/lib/log";
 
 /** Patterns that match sensitive values in error messages and stack traces. */
 const SENSITIVE_PATTERNS = [
@@ -50,6 +51,8 @@ export interface CaptureServerErrorOptions {
   statusCode: number;
   /** The error object, string, or unknown value. */
   error: unknown;
+  /** Request correlation ID for tracing across a request chain. */
+  requestId?: string;
 }
 
 export interface OperationalAlertOptions {
@@ -191,7 +194,7 @@ export async function captureServerError(
     const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
     const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
 
-    const { route, statusCode, error } = options;
+    const { route, statusCode, error, requestId } = options;
 
     // Extract error details based on type
     let errorType: string;
@@ -222,6 +225,7 @@ export async function captureServerError(
       errorType,
       message,
       ...(stack !== undefined && { stack }),
+      ...(requestId !== undefined && { requestId }),
     };
 
     try {
@@ -277,10 +281,11 @@ export function withErrorCapture(
   handler: RouteHandler,
 ): RouteHandler {
   return async (req: NextRequest, ctx?: unknown) => {
+    const requestId = getRequestId(req);
     try {
       return await handler(req, ctx);
     } catch (err) {
-      void captureServerError({ route, statusCode: 500, error: err });
+      void captureServerError({ route, statusCode: 500, error: err, requestId });
       throw err;
     }
   };
