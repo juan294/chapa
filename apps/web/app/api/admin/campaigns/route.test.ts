@@ -77,7 +77,7 @@ describe("GET /api/admin/campaigns", () => {
   });
 
   it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
     const res = await GET(makeRequest());
     expect(res.status).toBe(500);
   });
@@ -176,7 +176,7 @@ describe("POST /api/admin/campaigns", () => {
   });
 
   it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
     const res = await POST(makeRequest("POST", validBody));
     expect(res.status).toBe(500);
   });

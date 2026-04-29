@@ -156,8 +156,8 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   afterEach(() => {
-    delete process.env.GITHUB_TOKEN;
-    delete process.env.WARM_CACHE_PRIORITY_HANDLES;
+    vi.stubEnv("GITHUB_TOKEN", undefined);
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", undefined);
   });
 
   it("returns the denied response when cron auth fails", async () => {
@@ -170,7 +170,7 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   it("warms discovered handles through the shared orchestrated materializer", async () => {
-    process.env.GITHUB_TOKEN = "ghp-server-token";
+    vi.stubEnv("GITHUB_TOKEN", "ghp-server-token");
 
     const res = await GET(makeRequest());
     const body = await res.json();
@@ -286,7 +286,7 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   it("includes WARM_CACHE_PRIORITY_HANDLES in the warm list even when outside the rotation slice", async () => {
-    process.env.WARM_CACHE_PRIORITY_HANDLES = "user0,user1,unknown-user";
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user0,user1,unknown-user");
     // 80 users, offset=60 → rotation slice is user60..user79 (20 handles, < MAX_HANDLES)
     mockCacheGet.mockResolvedValue(60);
     mockDbGetUsers.mockResolvedValue(

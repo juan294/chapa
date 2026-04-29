@@ -8,6 +8,7 @@ describe("fetchContributionData", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("sends Authorization header when token is provided", async () => {
@@ -43,8 +44,7 @@ describe("fetchContributionData", () => {
   });
 
   it("omits Authorization header when no token and no GITHUB_TOKEN", async () => {
-    const original = process.env.GITHUB_TOKEN;
-    delete process.env.GITHUB_TOKEN;
+    vi.stubEnv("GITHUB_TOKEN", undefined);
 
     // Silence expected 401 console.error from the error-handling code path
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -62,12 +62,10 @@ describe("fetchContributionData", () => {
     expect(opts.headers["Authorization"]).toBeUndefined();
 
     consoleSpy.mockRestore();
-    if (original !== undefined) process.env.GITHUB_TOKEN = original;
   });
 
   it("falls back to GITHUB_TOKEN env var when no session token is provided", async () => {
-    const original = process.env.GITHUB_TOKEN;
-    process.env.GITHUB_TOKEN = "ghp_ci_token_123";
+    vi.stubEnv("GITHUB_TOKEN", "ghp_ci_token_123");
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -95,17 +93,10 @@ describe("fetchContributionData", () => {
 
     const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBe("Bearer ghp_ci_token_123");
-
-    if (original !== undefined) {
-      process.env.GITHUB_TOKEN = original;
-    } else {
-      delete process.env.GITHUB_TOKEN;
-    }
   });
 
   it("prefers explicit token over GITHUB_TOKEN env var", async () => {
-    const original = process.env.GITHUB_TOKEN;
-    process.env.GITHUB_TOKEN = "ghp_ci_fallback";
+    vi.stubEnv("GITHUB_TOKEN", "ghp_ci_fallback");
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -133,12 +124,6 @@ describe("fetchContributionData", () => {
 
     const [, opts] = mockFetch.mock.calls[0]!;
     expect(opts.headers["Authorization"]).toBe("Bearer gho_session_token");
-
-    if (original !== undefined) {
-      process.env.GITHUB_TOKEN = original;
-    } else {
-      delete process.env.GITHUB_TOKEN;
-    }
   });
 
   it("logs HTTP errors with status code", async () => {

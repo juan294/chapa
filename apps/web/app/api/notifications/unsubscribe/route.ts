@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { dbUpdateEmailNotifications, dbGetUserEmail } from "@/lib/db/users";
+import { getNextauthSecret } from "@/lib/env";
 import { escapeHtml } from "@/lib/utils/escape";
 import { markUnsubscribed } from "@/lib/email/audience";
 import { rateLimit } from "@/lib/cache/redis";
@@ -43,7 +44,7 @@ export const GET = withErrorCapture("/api/notifications/unsubscribe", async (req
   }
 
   const token = request.nextUrl.searchParams.get("token") ?? "";
-  const secret = process.env.NEXTAUTH_SECRET?.trim() ?? "";
+  const secret = getNextauthSecret() ?? "";
 
   if (!verifyUnsubscribeToken(handle, token, secret)) {
     return NextResponse.json(

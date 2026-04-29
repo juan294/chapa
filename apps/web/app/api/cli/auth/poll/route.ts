@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import { getNextauthSecret } from "@/lib/env";
 import { generateCliToken } from "@/lib/auth/cli-token";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
@@ -45,7 +46,7 @@ export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRe
   }
 
   if (session.status === "approved" && session.handle) {
-    const secret = process.env.NEXTAUTH_SECRET?.trim();
+    const secret = getNextauthSecret();
     if (!secret) {
       return NextResponse.json(
         { error: "Server misconfigured" },

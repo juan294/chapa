@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAdminSecret } from "@/lib/auth/admin";
+import { getGithubToken } from "@/lib/env";
 import { rateLimit } from "@/lib/cache/redis";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -97,7 +98,7 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     );
   }
 
-  const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
+  const githubToken = getGithubToken();
   const errors: { handle: string; error: string }[] = [];
   let recalculated = 0;
   const completed: string[] = [];

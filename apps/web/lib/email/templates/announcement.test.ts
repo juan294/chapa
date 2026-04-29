@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/email/resend", () => ({
   escapeHtml: (s: string) =>
@@ -13,7 +13,11 @@ vi.mock("@/lib/email/resend", () => ({
 import { buildAnnouncementHtml, buildAnnouncementText } from "./announcement";
 
 beforeEach(() => {
-  process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+  vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 const sampleData = {
@@ -163,7 +167,7 @@ describe("buildAnnouncementHtml", () => {
   // ---------------------------------------------------------------------------
 
   it("uses NEXT_PUBLIC_BASE_URL when set", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://custom.example.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://custom.example.com");
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain(
@@ -173,7 +177,7 @@ describe("buildAnnouncementHtml", () => {
   });
 
   it("falls back to default URL when NEXT_PUBLIC_BASE_URL is not set", () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain(
@@ -182,7 +186,7 @@ describe("buildAnnouncementHtml", () => {
   });
 
   it("falls back to default URL when NEXT_PUBLIC_BASE_URL is empty string", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "   ";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "   ");
     const html = buildAnnouncementHtml(sampleData);
 
     expect(html).toContain(
@@ -265,7 +269,7 @@ describe("buildAnnouncementText", () => {
   });
 
   it("uses NEXT_PUBLIC_BASE_URL for unsubscribe link in plain text", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://custom.example.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://custom.example.com");
     const text = buildAnnouncementText(sampleData);
 
     expect(text).toContain(
@@ -274,7 +278,7 @@ describe("buildAnnouncementText", () => {
   });
 
   it("falls back to default URL in plain text when env var is not set", () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
     const text = buildAnnouncementText(sampleData);
 
     expect(text).toContain(

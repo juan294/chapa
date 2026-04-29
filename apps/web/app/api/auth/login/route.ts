@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { buildAuthUrl, createStateCookie } from "@/lib/auth/github";
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
+import { getBaseUrl, getGithubClientId } from "@/lib/env";
 import { issueOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -9,10 +10,8 @@ import { getRequestId } from "@/lib/log";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
-function cookieFlags(request: NextRequest): string {
-  return buildAuthCookieFlags(
-    process.env.NEXT_PUBLIC_BASE_URL?.trim() || request.nextUrl.origin,
-  );
+function cookieFlags(): string {
+  return buildAuthCookieFlags(getBaseUrl());
 }
 
 /**
@@ -41,7 +40,7 @@ export const GET = withErrorCapture("/api/auth/login", async (request: NextReque
     );
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID?.trim();
+  const clientId = getGithubClientId();
   if (!clientId) {
     void captureServerError({
       route: "/api/auth/login",
@@ -55,7 +54,7 @@ export const GET = withErrorCapture("/api/auth/login", async (request: NextReque
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() || "http://localhost:3001";
+  const baseUrl = getBaseUrl();
   const redirectUri = `${baseUrl}/api/auth/callback`;
 
   const { state, cookie: stateCookie } = createStateCookie();
@@ -66,7 +65,7 @@ export const GET = withErrorCapture("/api/auth/login", async (request: NextReque
   response.headers.append("Set-Cookie", stateCookie);
   response.headers.append(
     "Set-Cookie",
-    `${OAUTH_STATE_STORE_COOKIE}=${stateStoreMode}; ${cookieFlags(request)}; Max-Age=600`,
+    `${OAUTH_STATE_STORE_COOKIE}=${stateStoreMode}; ${cookieFlags()}; Max-Age=600`,
   );
 
   // Store post-login redirect URL if provided (same-origin only)
@@ -74,7 +73,7 @@ export const GET = withErrorCapture("/api/auth/login", async (request: NextReque
   if (postLoginRedirect && isSafeRedirect(postLoginRedirect, baseUrl)) {
     response.headers.append(
       "Set-Cookie",
-      `chapa_redirect=${encodeURIComponent(postLoginRedirect)}; ${cookieFlags(request)}; Max-Age=600`,
+      `chapa_redirect=${encodeURIComponent(postLoginRedirect)}; ${cookieFlags()}; Max-Age=600`,
     );
   }
 

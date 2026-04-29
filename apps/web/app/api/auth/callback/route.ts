@@ -8,6 +8,7 @@ import {
   clearStateCookie,
 } from "@/lib/auth/github";
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
+import { getBaseUrl, getGithubClientId, getGithubClientSecret, getNextauthSecret } from "@/lib/env";
 import { consumeOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -19,10 +20,8 @@ import { storeGitHubToken } from "@/lib/auth/github-session-token";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
-function cookieFlags(request: NextRequest): string {
-  return buildAuthCookieFlags(
-    process.env.NEXT_PUBLIC_BASE_URL?.trim() || request.nextUrl.origin,
-  );
+function cookieFlags(): string {
+  return buildAuthCookieFlags(getBaseUrl());
 }
 
 function isLocalDevRequest(request: NextRequest): boolean {
@@ -112,9 +111,9 @@ export const GET = withErrorCapture("/api/auth/callback", async (request: NextRe
     return NextResponse.json({ error: "state_already_used" }, { status: 400 });
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID?.trim();
-  const clientSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  const clientId = getGithubClientId();
+  const clientSecret = getGithubClientSecret();
+  const sessionSecret = getNextauthSecret();
 
   if (!clientId || !clientSecret || !sessionSecret) {
     void captureServerError({
@@ -214,12 +213,12 @@ export const GET = withErrorCapture("/api/auth/callback", async (request: NextRe
   response.headers.append("Set-Cookie", clearStateCookie());
   response.headers.append(
     "Set-Cookie",
-    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags(request)}; Max-Age=0`,
+    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags()}; Max-Age=0`,
   );
   // Clear the redirect cookie
   response.headers.append(
     "Set-Cookie",
-    `chapa_redirect=; ${cookieFlags(request)}; Max-Age=0`,
+    `chapa_redirect=; ${cookieFlags()}; Max-Age=0`,
   );
   return response;
 });

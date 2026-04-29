@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from "crypto";
 import { buildAuthCookieFlags } from "./cookie-policy";
+import { getBaseUrl } from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,7 +73,7 @@ export function buildBitbucketAuthUrl(
 const BB_STATE_COOKIE_NAME = "chapa_bb_oauth_state";
 
 function cookieFlags(): string {
-  return buildAuthCookieFlags(process.env.NEXT_PUBLIC_BASE_URL?.trim());
+  return buildAuthCookieFlags(getBaseUrl());
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   getOptionalServerSessionFromHeaders,
   getSessionSecret,
 } from "@/lib/auth/session";
+import { getBaseUrl } from "@/lib/env";
 import { AuthorizeClient } from "./AuthorizeClient";
 
 interface Props {
@@ -38,7 +39,7 @@ export default async function CliAuthorizePage({ searchParams }: Props) {
 
   if (!session) {
     // Redirect to login, then back here
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
+    const baseUrl = getBaseUrl();
     const returnUrl = `${baseUrl}/cli/authorize?session=${encodeURIComponent(sessionId)}`;
     redirect(`/api/auth/login?redirect=${encodeURIComponent(returnUrl)}`);
   }

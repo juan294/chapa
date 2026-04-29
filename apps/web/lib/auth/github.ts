@@ -1,5 +1,6 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 import { buildAuthCookieFlags } from "./cookie-policy";
+import { getBaseUrl } from "@/lib/env";
 
 /** 10-second timeout for all external OAuth fetches */
 const FETCH_TIMEOUT_MS = 10_000;
@@ -43,7 +44,7 @@ export function buildAuthUrl(clientId: string, redirectUri: string, state: strin
 const STATE_COOKIE_NAME = "chapa_oauth_state";
 
 function cookieFlags(): string {
-  return buildAuthCookieFlags(process.env.NEXT_PUBLIC_BASE_URL?.trim());
+  return buildAuthCookieFlags(getBaseUrl());
 }
 
 /**
@@ -248,7 +249,7 @@ function deriveKey(secret: string): Buffer {
  *
  * @example
  * ```ts
- * const encrypted = encryptToken(accessToken, process.env.NEXTAUTH_SECRET!);
+ * const encrypted = encryptToken(accessToken, getNextauthSecret()!);
  * // "a1b2c3...:d4e5f6...:789abc..."
  * ```
  */
@@ -281,7 +282,7 @@ export function encryptToken(token: string, secret: string): string {
  *
  * @example
  * ```ts
- * const token = decryptToken(encrypted, process.env.NEXTAUTH_SECRET!);
+ * const token = decryptToken(encrypted, getNextauthSecret()!);
  * if (!token) return new Response("Invalid session", { status: 401 });
  * ```
  */
@@ -379,7 +380,7 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
  * ```ts
  * const session = readSessionCookie(
  *   request.headers.get("cookie"),
- *   process.env.NEXTAUTH_SECRET!,
+ *   getNextauthSecret()!,
  * );
  * if (!session) return new Response("Unauthorized", { status: 401 });
  * // session.login, session.token, etc.

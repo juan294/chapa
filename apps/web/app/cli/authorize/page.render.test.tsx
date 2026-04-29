@@ -42,9 +42,6 @@ vi.mock("./AuthorizeClient", () => ({
   ),
 }));
 
-// Save original env
-const originalEnv = { ...process.env };
-
 beforeEach(() => {
   mockRedirect.mockClear();
   mockHeaders.mockClear();
@@ -55,8 +52,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  // Restore env
-  process.env = { ...originalEnv };
 });
 
 // Helper: import and call the async server component
@@ -103,7 +98,7 @@ describe("CliAuthorizePage", () => {
   // ─── No session cookie (not logged in) ────────────────────────────────
 
   it("redirects to login with return URL when no session cookie", async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.example.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.example.com");
 
     mockHeaders.mockResolvedValue({
       get: (name: string) => (name === "cookie" ? null : null),
@@ -123,7 +118,7 @@ describe("CliAuthorizePage", () => {
   });
 
   it("uses empty base URL when NEXT_PUBLIC_BASE_URL is not set", async () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
 
     mockHeaders.mockResolvedValue({
       get: () => null,

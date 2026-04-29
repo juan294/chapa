@@ -11,6 +11,25 @@ const eslintConfig = [
   ...nextConfig,
   ...nextCoreWebVitals,
   ...nextTypescript,
+  {
+    // Enforce typed env-getter usage in application source (lib/ and app/).
+    // Excludes: env.ts itself, test files, client components (where Next.js
+    // requires direct NEXT_PUBLIC_* access for build-time inlining), config
+    // files, and scripts.
+    files: ["app/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
+    ignores: ["lib/env.ts", "**/*.test.*", "**/*.spec.*"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'][computed=false]",
+          message:
+            "Access env vars through @/lib/env getters instead of process.env directly.",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

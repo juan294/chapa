@@ -11,23 +11,18 @@ function getCallBody(): Record<string, unknown> {
 }
 
 describe("captureServerError", () => {
-  const ORIGINAL_ENV = process.env;
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
-    process.env = {
-      ...ORIGINAL_ENV,
-      NEXT_PUBLIC_POSTHOG_KEY: "phc_test_key_123",
-      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
-    };
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_123");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com");
   });
 
   afterEach(() => {
-    process.env = ORIGINAL_ENV;
+    vi.unstubAllEnvs();
   });
 
   it("sends a server_error event with error name, message, and route", async () => {
@@ -138,8 +133,8 @@ describe("captureServerError", () => {
   });
 
   it("fails silently when PostHog env vars are not configured", async () => {
-    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", undefined);
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", undefined);
 
     const { captureServerError } = await import("./server-errors");
 
@@ -154,7 +149,7 @@ describe("captureServerError", () => {
   });
 
   it("fails silently when PostHog key is missing", async () => {
-    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", undefined);
 
     const { captureServerError } = await import("./server-errors");
 
@@ -296,7 +291,7 @@ describe("captureServerError", () => {
   });
 
   it("sends an active alert for launch-critical badge 5xx errors", async () => {
-    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
     mockFetch.mockResolvedValue({ ok: true });
 
     const { captureServerError } = await import("./server-errors");
@@ -319,7 +314,7 @@ describe("captureServerError", () => {
   });
 
   it("does not alert for non-critical server errors", async () => {
-    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
     mockFetch.mockResolvedValue({ ok: true });
 
     const { captureServerError } = await import("./server-errors");
@@ -337,7 +332,7 @@ describe("captureServerError", () => {
     ["/api/auth/callback", "oauth_callback_failure", "P1"],
     ["/api/cron/warm-cache", "cron_failure", "P2"],
   ])("alerts for %s failures", async (route, signal, severity) => {
-    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
     mockFetch.mockResolvedValue({ ok: true });
 
     const { captureServerError } = await import("./server-errors");
@@ -355,7 +350,7 @@ describe("captureServerError", () => {
   });
 
   it("still sends active alerts when PostHog delivery fails", async () => {
-    process.env.CHAPA_ALERT_WEBHOOK_URL = "https://alerts.example.com/chapa";
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
     mockFetch
       .mockRejectedValueOnce(new Error("PostHog down"))
       .mockResolvedValueOnce({ ok: true });
@@ -377,22 +372,17 @@ describe("captureServerError", () => {
 });
 
 describe("captureOperationalAlert", () => {
-  const ORIGINAL_ENV = process.env;
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
-    process.env = {
-      ...ORIGINAL_ENV,
-      CHAPA_ALERT_WEBHOOK_URL: "https://alerts.example.com/chapa",
-    };
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
   });
 
   afterEach(() => {
-    process.env = ORIGINAL_ENV;
+    vi.unstubAllEnvs();
   });
 
   it("posts a structured alert payload to the configured webhook", async () => {
@@ -429,7 +419,7 @@ describe("captureOperationalAlert", () => {
   });
 
   it("does not send when the alert webhook is not configured", async () => {
-    delete process.env.CHAPA_ALERT_WEBHOOK_URL;
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", undefined);
 
     const { captureOperationalAlert } = await import("./server-errors");
 
@@ -444,23 +434,18 @@ describe("captureOperationalAlert", () => {
 });
 
 describe("captureServerEvent", () => {
-  const ORIGINAL_ENV = process.env;
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
-    process.env = {
-      ...ORIGINAL_ENV,
-      NEXT_PUBLIC_POSTHOG_KEY: "phc_test_key_123",
-      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
-    };
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_123");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com");
   });
 
   afterEach(() => {
-    process.env = ORIGINAL_ENV;
+    vi.unstubAllEnvs();
   });
 
   it("sends arbitrary server events with provided properties", async () => {
@@ -497,8 +482,8 @@ describe("captureServerEvent", () => {
   });
 
   it("fails silently when PostHog is unconfigured", async () => {
-    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", undefined);
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", undefined);
 
     const { captureServerEvent } = await import("./server-errors");
 
@@ -523,23 +508,18 @@ describe("captureServerEvent", () => {
 });
 
 describe("withErrorCapture", () => {
-  const ORIGINAL_ENV = process.env;
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     mockFetch.mockReset();
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
-    process.env = {
-      ...ORIGINAL_ENV,
-      NEXT_PUBLIC_POSTHOG_KEY: "phc_test_key_123",
-      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
-    };
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", "phc_test_key_123");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com");
   });
 
   afterEach(() => {
-    process.env = ORIGINAL_ENV;
+    vi.unstubAllEnvs();
   });
 
   it("passes through successful handler responses unchanged", async () => {
@@ -595,8 +575,8 @@ describe("withErrorCapture", () => {
   });
 
   it("does not swallow the error even when captureServerError is unavailable", async () => {
-    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_KEY", undefined);
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", undefined);
 
     const { withErrorCapture } = await import("./server-errors");
     const { NextRequest } = await import("next/server");

@@ -20,10 +20,6 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
 }));
 
-vi.mock("@/lib/env", () => ({
-  getBaseUrl: () => "https://chapa.thecreativetoken.com",
-}));
-
 const mockDbGetUserEmail = vi.fn();
 
 vi.mock("@/lib/db/users", () => ({

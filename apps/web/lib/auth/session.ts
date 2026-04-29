@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
+import { getNextauthSecret } from "@/lib/env";
 
 export type SessionPayload = NonNullable<ReturnType<typeof readSessionCookie>>;
 const MIN_SESSION_SECRET_LENGTH = 32;
@@ -20,7 +21,7 @@ function assertSessionSecretLength(secret: string): string {
 }
 
 function getRawSessionSecret(): string | null {
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  const sessionSecret = getNextauthSecret();
   return sessionSecret || null;
 }
 

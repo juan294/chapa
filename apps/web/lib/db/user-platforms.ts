@@ -9,6 +9,7 @@
 import type { LinkedPlatform } from "@chapa/shared";
 import { getSupabase } from "./supabase";
 import { encryptToken, decryptToken } from "@/lib/auth/github";
+import { getNextauthSecret } from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,7 +26,7 @@ interface PlatformTokens {
 // ---------------------------------------------------------------------------
 
 function getSecret(): string {
-  const secret = process.env.NEXTAUTH_SECRET?.trim();
+  const secret = getNextauthSecret();
   if (!secret) throw new Error("NEXTAUTH_SECRET is required for token encryption");
   return secret;
 }

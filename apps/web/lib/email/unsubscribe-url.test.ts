@@ -1,21 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildUnsubscribeUrl } from "./unsubscribe-url";
 import { verifyUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
 
 const SECRET = "test-unsubscribe-secret";
 
 describe("buildUnsubscribeUrl", () => {
-  const originalSecret = process.env.NEXTAUTH_SECRET;
-  const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-
   beforeEach(() => {
-    process.env.NEXTAUTH_SECRET = SECRET;
-    process.env.NEXT_PUBLIC_BASE_URL = "https://example.test";
+    vi.stubEnv("NEXTAUTH_SECRET", SECRET);
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://example.test");
   });
 
   afterEach(() => {
-    process.env.NEXTAUTH_SECRET = originalSecret;
-    process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
+    vi.unstubAllEnvs();
   });
 
   it("builds an unsubscribe URL with lowercased handle and a verifiable token", () => {
@@ -31,7 +27,7 @@ describe("buildUnsubscribeUrl", () => {
   });
 
   it("falls back to the production base URL when NEXT_PUBLIC_BASE_URL is unset", () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
 
     const url = buildUnsubscribeUrl("juan294");
 

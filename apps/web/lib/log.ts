@@ -1,3 +1,5 @@
+import { getVercelEnv } from "@/lib/env";
+
 type Level = "debug" | "info" | "warn" | "error";
 
 export interface LogContext {
@@ -12,7 +14,7 @@ export function log(level: Level, msg: string, context: LogContext = {}): void {
     ts: new Date().toISOString(),
     level,
     msg,
-    env: process.env.VERCEL_ENV ?? "development",
+    env: getVercelEnv() ?? "development",
     ...context,
   });
   if (level === "error" || level === "warn") {

@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
+import { getChapaVerificationSecret, getVercelEnv } from "@/lib/env";
 
 const PAYLOAD_VERSION = "v2";
 
@@ -49,9 +50,9 @@ export function generateVerificationCode(
   stats: StatsData,
   impact: ImpactV6Result,
 ): { hash: string; date: string } | null {
-  const secret = process.env.CHAPA_VERIFICATION_SECRET?.trim();
+  const secret = getChapaVerificationSecret();
   if (!secret) {
-    if (process.env.VERCEL_ENV === "production") {
+    if (getVercelEnv() === "production") {
       throw new Error("CHAPA_VERIFICATION_SECRET is required in production");
     }
     console.warn(

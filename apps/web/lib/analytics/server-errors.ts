@@ -14,6 +14,7 @@
 
 import type { NextRequest, NextResponse } from "next/server";
 import { getRequestId } from "@/lib/log";
+import { getChapaAlertWebhookUrl, getPosthogKey, getPosthogHost } from "@/lib/env";
 
 /** Patterns that match sensitive values in error messages and stack traces. */
 const SENSITIVE_PATTERNS = [
@@ -120,7 +121,7 @@ export async function captureOperationalAlert(
   options: OperationalAlertOptions,
 ): Promise<void> {
   try {
-    const webhookUrl = process.env.CHAPA_ALERT_WEBHOOK_URL?.trim();
+    const webhookUrl = getChapaAlertWebhookUrl();
     if (!webhookUrl) return;
 
     const payload = {
@@ -158,8 +159,8 @@ export async function captureServerEvent(
   properties?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
+    const apiKey = getPosthogKey();
+    const host = getPosthogHost();
 
     if (!apiKey || !host) return;
 
@@ -191,8 +192,8 @@ export async function captureServerError(
   options: CaptureServerErrorOptions,
 ): Promise<void> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
+    const apiKey = getPosthogKey();
+    const host = getPosthogHost();
 
     const { route, statusCode, error, requestId } = options;
 

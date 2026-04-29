@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { getUpstashRedisRestUrl, getUpstashRedisRestToken } from "@/lib/env";
 
 const TTL_SECONDS = 600;
 const KEY_PREFIX = "oauth-state:";
@@ -20,8 +21,8 @@ function getKey(state: string): string {
 function getRedis(): Redis | null {
   if (_redis !== undefined) return _redis;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const url = getUpstashRedisRestUrl();
+  const token = getUpstashRedisRestToken();
 
   if (!url || !token) {
     _redis = null;

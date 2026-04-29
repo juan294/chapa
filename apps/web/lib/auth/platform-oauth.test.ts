@@ -139,15 +139,13 @@ function denySession() {
 }
 
 function setEnvVars() {
-  process.env.TESTPLATFORM_CLIENT_ID = "test-client-id";
-  process.env.TESTPLATFORM_CLIENT_SECRET = "test-client-secret";
-  process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+  vi.stubEnv("TESTPLATFORM_CLIENT_ID", "test-client-id");
+  vi.stubEnv("TESTPLATFORM_CLIENT_SECRET", "test-client-secret");
+  vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
 }
 
 function clearEnvVars() {
-  delete process.env.TESTPLATFORM_CLIENT_ID;
-  delete process.env.TESTPLATFORM_CLIENT_SECRET;
-  delete process.env.NEXT_PUBLIC_BASE_URL;
+  vi.unstubAllEnvs();
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +201,7 @@ describe("createConnectHandler", () => {
   });
 
   it("redirects to error when client ID env var is missing", async () => {
-    delete process.env.TESTPLATFORM_CLIENT_ID;
+    vi.stubEnv("TESTPLATFORM_CLIENT_ID", undefined);
 
     const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
     const res = await GET(req);
@@ -212,14 +210,18 @@ describe("createConnectHandler", () => {
     expect(location.searchParams.get("error")).toBe("config");
   });
 
-  it("redirects to error when BASE_URL is missing", async () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+  it("uses production URL fallback when NEXT_PUBLIC_BASE_URL is unset", async () => {
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
 
     const req = new NextRequest("https://chapa.thecreativetoken.com/api/auth/testplatform/connect");
     const res = await GET(req);
+    // getBaseUrl() always has a fallback — connect succeeds using production URL
     expect(res.status).toBe(307);
-    const location = new URL(res.headers.get("Location")!);
-    expect(location.searchParams.get("error")).toBe("config");
+    expect(config.mockBuildAuthUrl).toHaveBeenCalledWith(
+      "test-client-id",
+      "https://chapa.thecreativetoken.com/api/auth/testplatform/callback",
+      "test-state-token",
+    );
   });
 
   it("redirects to platform OAuth URL on success", async () => {
@@ -332,7 +334,7 @@ describe("createCallbackHandler", () => {
   });
 
   it("redirects with error=testplatform_config when env vars are missing", async () => {
-    delete process.env.TESTPLATFORM_CLIENT_ID;
+    vi.stubEnv("TESTPLATFORM_CLIENT_ID", undefined);
 
     const res = await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
 

@@ -151,7 +151,7 @@ describe("GET /api/auth/login — missing GITHUB_CLIENT_ID", () => {
   });
 
   it("returns 500 when GITHUB_CLIENT_ID is undefined", async () => {
-    delete process.env.GITHUB_CLIENT_ID;
+    vi.stubEnv("GITHUB_CLIENT_ID", undefined);
 
     const res = await GET(makeRequest("1.2.3.4"));
 
@@ -340,7 +340,7 @@ describe("GET /api/auth/login — fallback URL", () => {
     setupDefaultMocks();
   });
 
-  it("uses localhost:3001 as fallback when NEXT_PUBLIC_BASE_URL is not set", async () => {
+  it("uses production URL fallback when NEXT_PUBLIC_BASE_URL is not set", async () => {
     vi.stubEnv("GITHUB_CLIENT_ID", "test-client-id");
     vi.stubEnv("NEXT_PUBLIC_BASE_URL", "");
 
@@ -348,7 +348,7 @@ describe("GET /api/auth/login — fallback URL", () => {
 
     expect(mockBuildAuthUrl).toHaveBeenCalledWith(
       "test-client-id",
-      "http://localhost:3001/api/auth/callback",
+      "https://chapa.thecreativetoken.com/api/auth/callback",
       "abc",
     );
   });

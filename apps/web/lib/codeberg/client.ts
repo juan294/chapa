@@ -1,5 +1,6 @@
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { isCodebergEnabled } from "@/lib/feature-flags";
+import { getCodebergClientId, getCodebergClientSecret } from "@/lib/env";
 import {
   dbGetLinkedPlatform,
   dbDeleteLinkedPlatform,
@@ -41,8 +42,8 @@ export async function fetchCodebergIfLinked(
       }
       // expiresAt is null → long-lived token, proceed with current token
     } else {
-      const clientId = process.env.CODEBERG_CLIENT_ID?.trim() ?? "";
-      const clientSecret = process.env.CODEBERG_CLIENT_SECRET?.trim() ?? "";
+      const clientId = getCodebergClientId() ?? "";
+      const clientSecret = getCodebergClientSecret() ?? "";
       const result = await refreshCodebergToken(
         refreshToken,
         clientId,

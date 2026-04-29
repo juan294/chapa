@@ -17,7 +17,7 @@ describe("getBaseUrl", () => {
   });
 
   it("returns fallback when NEXT_PUBLIC_BASE_URL is undefined", () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
     expect(getBaseUrl()).toBe("https://chapa.thecreativetoken.com");
   });
 

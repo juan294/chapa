@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pingRedis, rateLimit } from "@/lib/cache/redis";
+import { getGithubToken } from "@/lib/env";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -23,7 +24,7 @@ async function pingGitHub(): Promise<{
   status: "ok" | "error" | "skipped";
   rateLimit?: GitHubRateLimit;
 }> {
-  const token = process.env.GITHUB_TOKEN?.trim();
+  const token = getGithubToken();
   if (!token) return { status: "skipped" };
 
   try {

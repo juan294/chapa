@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -18,12 +18,7 @@ vi.mock("@/lib/auth/github", () => ({
 }));
 
 // All DB functions that encrypt/decrypt need NEXTAUTH_SECRET
-const originalEnv = process.env.NEXTAUTH_SECRET;
-process.env.NEXTAUTH_SECRET = "test-secret-for-encryption";
-afterAll(() => {
-  if (originalEnv === undefined) delete process.env.NEXTAUTH_SECRET;
-  else process.env.NEXTAUTH_SECRET = originalEnv;
-});
+vi.stubEnv("NEXTAUTH_SECRET", "test-secret-for-encryption");
 
 import { getSupabase } from "./supabase";
 import {

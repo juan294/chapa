@@ -1,5 +1,5 @@
 import { generateUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
-import { getBaseUrl } from "@/lib/env";
+import { getBaseUrl, getNextauthSecret } from "@/lib/env";
 
 /**
  * Build a signed unsubscribe URL for outbound emails.
@@ -8,7 +8,7 @@ export function buildUnsubscribeUrl(handle: string): string {
   const normalizedHandle = handle.toLowerCase();
   const token = generateUnsubscribeToken(
     normalizedHandle,
-    process.env.NEXTAUTH_SECRET?.trim() ?? "",
+    getNextauthSecret() ?? "",
   );
 
   const params = new URLSearchParams({

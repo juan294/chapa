@@ -81,7 +81,7 @@ describe("log", () => {
   });
 
   it("includes VERCEL_ENV as env field", async () => {
-    process.env.VERCEL_ENV = "production";
+    vi.stubEnv("VERCEL_ENV", "production");
     const { log } = await import("./log");
     log("info", "prod log");
 

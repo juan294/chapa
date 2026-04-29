@@ -13,7 +13,7 @@ import type { ImpactV6Result } from "@chapa/shared";
 import { getResend } from "./resend";
 import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
-import { getBaseUrl } from "@/lib/env";
+import { getBaseUrl, getVercelEnv, getSupportForwardEmail } from "@/lib/env";
 
 const MARKER_TTL = 31_536_000; // 365 days in seconds
 
@@ -23,7 +23,7 @@ export async function notifyFirstBadge(
 ): Promise<void> {
   try {
     // 1. Production guard
-    if (process.env.VERCEL_ENV !== "production") return;
+    if (getVercelEnv() !== "production") return;
 
     const lowerHandle = handle.toLowerCase();
     const key = `badge:notified:${lowerHandle}`;
@@ -37,7 +37,7 @@ export async function notifyFirstBadge(
     if (!resend) return;
 
     // 4. Recipient
-    const to = process.env.SUPPORT_FORWARD_EMAIL?.trim();
+    const to = getSupportForwardEmail();
     if (!to) return;
 
     // 5. Build email

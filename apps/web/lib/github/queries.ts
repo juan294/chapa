@@ -1,5 +1,6 @@
 import type { RawContributionData } from "@chapa/shared";
 import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
+import { getGithubToken } from "@/lib/env";
 
 // Re-export for consumers that import from this module
 export type { RawContributionData };
@@ -31,7 +32,7 @@ export async function fetchContributionData(
 
   // Use session token if available, otherwise fall back to server-side
   // GITHUB_TOKEN (provided automatically by GitHub Actions in CI).
-  const effectiveToken = token ?? process.env.GITHUB_TOKEN?.trim();
+  const effectiveToken = token ?? getGithubToken();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

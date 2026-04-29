@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
+import { getGithubToken, getWarmCachePriorityHandles } from "@/lib/env";
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbGetLatestSnapshotBatch,
@@ -110,7 +111,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
   await cacheSet(ROTATION_KEY, nextOffset, 0);
 
   // Use fallback GitHub token for server-side fetches (no user session)
-  const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
+  const githubToken = getGithubToken();
 
   // Pre-fetch all previous snapshots in one batch query (instead of N+1 individual calls)
   const previousSnapshots = await dbGetLatestSnapshotBatch(toWarm);
@@ -219,14 +220,8 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
  * that exist in the authoritative user list (allHandles).
  */
 function parsePriorityHandles(allHandles: string[]): string[] {
-  const raw = process.env.WARM_CACHE_PRIORITY_HANDLES?.trim();
-  if (!raw) return [];
-
   const handleSet = new Set(allHandles);
-  return raw
-    .split(",")
-    .map((h) => h.trim())
-    .filter((h) => h.length > 0 && handleSet.has(h));
+  return getWarmCachePriorityHandles().filter((h) => handleSet.has(h));
 }
 
 /**

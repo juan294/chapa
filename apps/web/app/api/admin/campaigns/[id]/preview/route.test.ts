@@ -91,7 +91,7 @@ describe("GET /api/admin/campaigns/[id]/preview", () => {
   });
 
   it("returns 500 when NEXTAUTH_SECRET is missing", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
     const res = await GET(makeRequest(), { params: mockParams });
     expect(res.status).toBe(500);
   });

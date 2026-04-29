@@ -212,43 +212,40 @@ describe("computeHash", () => {
 });
 
 describe("generateVerificationCode", () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-06-15T12:00:00Z"));
-    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it("throws when the secret is unset in production", () => {
-    delete process.env.CHAPA_VERIFICATION_SECRET;
-    process.env.VERCEL_ENV = "production";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", undefined);
+    vi.stubEnv("VERCEL_ENV", "production");
     expect(() => generateVerificationCode(baseStats, baseImpact)).toThrow(
       /CHAPA_VERIFICATION_SECRET/,
     );
   });
 
   it("returns null when CHAPA_VERIFICATION_SECRET is empty outside production", () => {
-    process.env.CHAPA_VERIFICATION_SECRET = "";
-    process.env.VERCEL_ENV = "preview";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
     const result = generateVerificationCode(baseStats, baseImpact);
     expect(result).toBeNull();
   });
 
   it("returns null when CHAPA_VERIFICATION_SECRET is unset outside production", () => {
-    delete process.env.CHAPA_VERIFICATION_SECRET;
-    process.env.VERCEL_ENV = "preview";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", undefined);
+    vi.stubEnv("VERCEL_ENV", "preview");
     const result = generateVerificationCode(baseStats, baseImpact);
     expect(result).toBeNull();
   });
 
   it("returns hash and date when secret is set", () => {
-    process.env.CHAPA_VERIFICATION_SECRET = "test-secret-with-enough-length-32chars!";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", "test-secret-with-enough-length-32chars!");
     const result = generateVerificationCode(baseStats, baseImpact);
     expect(result).not.toBeNull();
     expect(result!.hash).toMatch(/^[0-9a-f]{32}$/);
@@ -256,14 +253,14 @@ describe("generateVerificationCode", () => {
   });
 
   it("is deterministic for same data on same day", () => {
-    process.env.CHAPA_VERIFICATION_SECRET = "test-secret-with-enough-length-32chars!";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", "test-secret-with-enough-length-32chars!");
     const a = generateVerificationCode(baseStats, baseImpact);
     const b = generateVerificationCode(baseStats, baseImpact);
     expect(a!.hash).toBe(b!.hash);
   });
 
   it("changes on different days", () => {
-    process.env.CHAPA_VERIFICATION_SECRET = "test-secret-with-enough-length-32chars!";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", "test-secret-with-enough-length-32chars!");
     const a = generateVerificationCode(baseStats, baseImpact);
 
     vi.setSystemTime(new Date("2025-06-16T12:00:00Z"));
@@ -273,7 +270,7 @@ describe("generateVerificationCode", () => {
   });
 
   it("trims whitespace from secret env var", () => {
-    process.env.CHAPA_VERIFICATION_SECRET = "  test-secret-with-enough-length-32chars!  \n";
+    vi.stubEnv("CHAPA_VERIFICATION_SECRET", "  test-secret-with-enough-length-32chars!  \n");
     const result = generateVerificationCode(baseStats, baseImpact);
     expect(result).not.toBeNull();
     expect(result!.hash).toMatch(/^[0-9a-f]{32}$/);

@@ -58,7 +58,7 @@ beforeEach(() => {
   vi.mocked(getOptionalRequestSession).mockReturnValue(null);
   vi.mocked(isAdminHandle).mockReturnValue(false);
   // Default: GITHUB_TOKEN not set — skipped
-  delete process.env.GITHUB_TOKEN;
+  vi.stubEnv("GITHUB_TOKEN", undefined);
 });
 
 describe("GET /api/health", () => {
@@ -178,7 +178,7 @@ describe("GET /api/health", () => {
 
   describe("GitHub API probe (#709)", () => {
     it("reports github as 'skipped' when GITHUB_TOKEN is not set", async () => {
-      delete process.env.GITHUB_TOKEN;
+      vi.stubEnv("GITHUB_TOKEN", undefined);
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
@@ -192,7 +192,7 @@ describe("GET /api/health", () => {
     });
 
     it("reports github as 'ok' with rateLimit data when GITHUB_TOKEN is set and API responds", async () => {
-      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
       mockFetch.mockResolvedValueOnce(makeGitHubRateLimitResponse(4999, 5000));
@@ -207,7 +207,7 @@ describe("GET /api/health", () => {
     });
 
     it("calls the GitHub rate_limit endpoint with Authorization header", async () => {
-      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
       mockFetch.mockResolvedValueOnce(makeGitHubRateLimitResponse(60, 60));
@@ -225,7 +225,7 @@ describe("GET /api/health", () => {
     });
 
     it("reports github as 'error' and status 'degraded' when fetch throws", async () => {
-      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
       mockFetch.mockRejectedValueOnce(new Error("network error"));
@@ -239,7 +239,7 @@ describe("GET /api/health", () => {
     });
 
     it("reports github as 'error' and status 'degraded' when API returns non-2xx", async () => {
-      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
       mockFetch.mockResolvedValueOnce(new Response("Service Unavailable", { status: 503 }));
@@ -253,7 +253,7 @@ describe("GET /api/health", () => {
     });
 
     it("does not degrade overall status when github is 'skipped'", async () => {
-      delete process.env.GITHUB_TOKEN;
+      vi.stubEnv("GITHUB_TOKEN", undefined);
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
 
@@ -265,7 +265,7 @@ describe("GET /api/health", () => {
     });
 
     it("redacts githubRateLimit details for unauthenticated callers", async () => {
-      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
       mockFetch.mockResolvedValueOnce(makeGitHubRateLimitResponse(4999, 5000));
@@ -279,7 +279,7 @@ describe("GET /api/health", () => {
     });
 
     it("includes githubRateLimit details for admin sessions", async () => {
-      process.env.GITHUB_TOKEN = "ghp_test_token";
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
       vi.mocked(pingRedis).mockResolvedValueOnce("ok");
       vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
       vi.mocked(getOptionalRequestSession).mockReturnValue({

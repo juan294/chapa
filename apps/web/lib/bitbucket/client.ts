@@ -1,5 +1,6 @@
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { isBitbucketEnabled } from "@/lib/feature-flags";
+import { getBitbucketClientId, getBitbucketClientSecret } from "@/lib/env";
 import {
   dbGetLinkedPlatform,
   dbDeleteLinkedPlatform,
@@ -36,8 +37,8 @@ export async function fetchBitbucketIfLinked(
       return null;
     }
 
-    const clientId = process.env.BITBUCKET_CLIENT_ID?.trim() ?? "";
-    const clientSecret = process.env.BITBUCKET_CLIENT_SECRET?.trim() ?? "";
+    const clientId = getBitbucketClientId() ?? "";
+    const clientSecret = getBitbucketClientSecret() ?? "";
     const result = await refreshBitbucketToken(refreshToken, clientId, clientSecret);
 
     if (!result.ok) {

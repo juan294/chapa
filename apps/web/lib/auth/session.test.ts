@@ -36,7 +36,7 @@ describe("session helpers", () => {
 
   describe("getOptionalRequestSession", () => {
     it("returns null when NEXTAUTH_SECRET is missing", () => {
-      delete process.env.NEXTAUTH_SECRET;
+      vi.stubEnv("NEXTAUTH_SECRET", undefined);
 
       const result = getOptionalRequestSession(makeRequest("chapa_session=test"));
 
@@ -96,7 +96,7 @@ describe("session helpers", () => {
 
   describe("requireRequestSession", () => {
     it("returns 500 when NEXTAUTH_SECRET is missing", async () => {
-      delete process.env.NEXTAUTH_SECRET;
+      vi.stubEnv("NEXTAUTH_SECRET", undefined);
 
       const result = requireRequestSession(makeRequest());
 

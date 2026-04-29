@@ -122,7 +122,7 @@ describe("GET /api/auth/codeberg/connect", () => {
   });
 
   it("redirects to error when CODEBERG_CLIENT_ID is missing", async () => {
-    delete process.env.CODEBERG_CLIENT_ID;
+    vi.stubEnv("CODEBERG_CLIENT_ID", undefined);
 
     const res = await GET(makeRequest());
     expect(res.status).toBe(307);
@@ -130,13 +130,17 @@ describe("GET /api/auth/codeberg/connect", () => {
     expect(location.searchParams.get("error")).toBe("config");
   });
 
-  it("redirects to error when NEXT_PUBLIC_BASE_URL is missing", async () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+  it("uses production URL fallback when NEXT_PUBLIC_BASE_URL is unset", async () => {
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
 
     const res = await GET(makeRequest());
+    // getBaseUrl() always has a fallback — connect succeeds using production URL
     expect(res.status).toBe(307);
-    const location = new URL(res.headers.get("Location")!);
-    expect(location.searchParams.get("error")).toBe("config");
+    expect(mockBuildCodebergAuthUrl).toHaveBeenCalledWith(
+      "test-cb-client-id",
+      "https://chapa.thecreativetoken.com/api/auth/codeberg/callback",
+      "random-csrf-state",
+    );
   });
 
   it("redirects to Codeberg OAuth URL on success", async () => {
