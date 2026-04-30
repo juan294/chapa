@@ -107,9 +107,6 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     ? 0
     : (offset + MAX_HANDLES) % allHandles.length;
 
-  // Persist rotation offset for next cron run (TTL=0 means no expiry)
-  await cacheSet(ROTATION_KEY, nextOffset, 0);
-
   // Use fallback GitHub token for server-side fetches (no user session)
   const githubToken = getGithubToken();
 
@@ -118,7 +115,6 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
 
   // Counters aggregated from per-handle results
   let warmed = 0;
-  let failed = 0;
   let snapshots = 0;
   let notifications = 0;
 
@@ -139,24 +135,33 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       warmed++;
       if (snapshotRecorded) snapshots++;
       if (notified) notifications++;
-    } else {
-      failed++;
     }
   }
 
-  // Aggregate unexpected failures (warmHandle catches internally, but guard against
-  // any unhandled throws that bypass the internal catch)
-  if (warmFailures.length > 0) {
-    failed += warmFailures.length;
-    for (const { item: handle, error } of warmFailures) {
-      void captureServerError({
-        route: "/api/cron/warm-cache",
-        statusCode: 500,
-        error: new Error(`Unexpected failure for handle "${handle}": ${error.message}`),
-        requestId,
-      });
-    }
+  // Only advance rotation after processInBatches completes, and only if at least one
+  // handle was processed — prevents a timeout from advancing the offset past handles
+  // that were never warmed (#750).
+  if (warmResults.length > 0) {
+    await cacheSet(ROTATION_KEY, nextOffset, 0);
   }
+
+  // Log unexpected hard failures (warmHandle catches internally; these guard against
+  // any unhandled throws that bypass the internal catch)
+  for (const { item: handle, error } of warmFailures) {
+    void captureServerError({
+      route: "/api/cron/warm-cache",
+      statusCode: 500,
+      error: new Error(`Unexpected failure for handle "${handle}": ${error.message}`),
+      requestId,
+    });
+  }
+
+  // Build structured failure list for response observability (#702)
+  const failures = [
+    ...warmFailures.map(({ item, error }) => ({ handle: item, reason: error.message })),
+    ...warmResults.filter((r) => !r.warmed).map((r) => ({ handle: r.handle, reason: "warm returned false" })),
+  ];
+  const failed = failures.length;
 
   // Clean expired verification records from Supabase (fire-and-forget safe)
   let expiredVerificationsDeleted = 0;
@@ -195,6 +200,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     {
       warmed,
       failed,
+      failures,
       snapshots,
       notifications,
       expiredVerificationsDeleted,

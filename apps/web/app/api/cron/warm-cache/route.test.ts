@@ -431,4 +431,34 @@ describe("GET /api/cron/warm-cache", () => {
     // The failing handle should be counted and the error should surface
     expect(body.failed).toBeGreaterThanOrEqual(1);
   });
+
+  // #702: failures[] surface in response
+  it("includes failures[] with handle and reason for each failed warm", async () => {
+    mockDbGetUsers.mockResolvedValue([user("alice"), user("bob"), user("charlie")]);
+    mockMaterializeOrchestratedProfile
+      .mockResolvedValueOnce(FAKE_MATERIALIZED) // alice succeeds
+      .mockResolvedValueOnce(FAKE_MATERIALIZED) // bob succeeds
+      .mockResolvedValueOnce(null);             // charlie fails (soft — returns false)
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.failed).toBe(1);
+    expect(body.failures).toHaveLength(1);
+    expect(body.failures[0]).toEqual({ handle: "charlie", reason: "warm returned false" });
+  });
+
+  // #750: rotation offset only advances after processInBatches completes
+  it("does not advance the rotation offset when no handles were processed", async () => {
+    mockDbGetUsers.mockResolvedValue([]);
+
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockCacheSet).not.toHaveBeenCalledWith(
+      "cron:warm-cache:offset",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
 });
