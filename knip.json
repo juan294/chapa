@@ -2,6 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": ["du"],
+  "ignore": ["vitest.setup.ts"],
   "workspaces": {
     ".": {
       "entry": ["scripts/**/*.ts"],
@@ -24,7 +25,15 @@
       "project": ["**/*.{ts,tsx}"],
       "ignoreDependencies": [
         "postcss",
-        "tsx"
+        "tsx",
+        "@resvg/resvg-js",
+        "@vercel/analytics",
+        "@vercel/speed-insights",
+        "canvas-confetti",
+        "next-themes",
+        "posthog-js",
+        "resend",
+        "svix"
       ]
     },
     "packages/shared": {

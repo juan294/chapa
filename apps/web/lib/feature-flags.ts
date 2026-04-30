@@ -11,6 +11,7 @@
  * receives the DB-backed server value from the root layout.
  */
 
+import { unstable_cache } from "next/cache";
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import { withTimeout } from "./async/with-timeout";
 import {
@@ -72,7 +73,24 @@ export function isInsightsEnabledSync(): boolean {
 /** In-process TTL cache for feature flag DB lookups — 5 minutes. */
 const FLAG_CACHE_TTL_MS = 5 * 60 * 1000;
 const FLAG_DB_TIMEOUT_MS = 500;
+const FEATURE_FLAG_CACHE_TAG = "feature-flags";
 const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
+
+// Wrap dbGetFeatureFlag in Next.js's data cache so the underlying Upstash REST
+// `no-store` fetch does not force any consuming server component (including
+// the root layout) into dynamic rendering. Without this, every page that
+// inherits the layout — including ISR-eligible pages like /about and
+// /archetypes/* — gets server-rendered on each request.
+const fetchFlagFromDbCached = unstable_cache(
+  (key: string) =>
+    withTimeout(
+      dbGetFeatureFlag(key),
+      FLAG_DB_TIMEOUT_MS,
+      `featureFlag:${key}`,
+    ).catch(() => null),
+  ["feature-flag-v1"],
+  { revalidate: 300, tags: [FEATURE_FLAG_CACHE_TAG] },
+);
 
 async function checkFlag(
   dbKey: string,
@@ -81,11 +99,7 @@ async function checkFlag(
   const cached = flagCache.get(dbKey);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
-  const flag = await withTimeout(
-    dbGetFeatureFlag(dbKey),
-    FLAG_DB_TIMEOUT_MS,
-    `featureFlag:${dbKey}`,
-  ).catch(() => null);
+  const flag = await fetchFlagFromDbCached(dbKey);
   const value = flag !== null ? flag.enabled : envVar?.trim() === "true";
   flagCache.set(dbKey, { value, expiresAt: Date.now() + FLAG_CACHE_TTL_MS });
   return value;

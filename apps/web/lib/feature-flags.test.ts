@@ -5,6 +5,13 @@ vi.mock("./db/feature-flags", () => ({
   dbGetFeatureFlag: vi.fn(),
 }));
 
+// `unstable_cache` requires a Next.js incremental cache that doesn't exist in
+// vitest. Pass-through so the wrapped function still calls the mocked DB.
+vi.mock("next/cache", () => ({
+  unstable_cache: <Args extends unknown[], R>(fn: (...args: Args) => R) => fn,
+  revalidateTag: vi.fn(),
+}));
+
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import {
   isStudioEnabled,
@@ -456,6 +463,27 @@ describe("feature flag TTL cache", () => {
     expect(before).toBe(false);
     expect(after).toBe(true);
     expect(dbGetFeatureFlag).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unstable_cache wrapping (ISR-safe DB fetch)
+// ---------------------------------------------------------------------------
+
+describe("feature-flags ISR-safe DB wrapper", () => {
+  it("imports unstable_cache from next/cache so ISR is not defeated", async () => {
+    // The root layout calls isStudioEnabled(), which transitively hits Upstash
+    // Redis with a `no-store` fetch. Without unstable_cache, that defeats ISR
+    // for every page that inherits the root layout. This guards against a
+    // regression that removes the wrapper.
+    const source = await import("node:fs").then((fs) =>
+      fs.promises.readFile(
+        new URL("./feature-flags.ts", import.meta.url),
+        "utf8",
+      ),
+    );
+    expect(source).toMatch(/from "next\/cache"/);
+    expect(source).toMatch(/unstable_cache\(/);
   });
 });
 
