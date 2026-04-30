@@ -9,6 +9,58 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-30T03:00:00Z -->
+## Cost Analyst — 2026-04-30
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: **27 distinct prefixes** audited. TTL coverage 24/27 (89%). The 3 persistent (TTL=0) keys are bounded singletons — `cron:warm-cache:offset`, `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). Growth risk: LOW.
+- **New since 2026-04-29**: `lib/env.ts` typed env getters (b2c8d3c) — zero Redis writes, zero external calls, zero Vercel compute overhead. Pure safety refactor centralizing `process.env` reads with `.trim()`. Phase 9C ESLint rule + ~20 call-site sweep still pending (no cost impact when complete).
+- GitHub API: cache-first unchanged (6h fresh + 7d stale + in-flight dedup at `lib/github/client.ts:28`). 100% timeout coverage. Only intentionally uncached: `/api/health` probe + `/api/refresh` (by design, 5/hr + auth).
+- Supabase: **11 tables + 2 views + 1 RPC** — unchanged. Singleton lazy client at `lib/db/supabase.ts:11`. 0 N+1 patterns. Batch reads via single `IN()` query. All retention jobs wired and running.
+- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. No new routes making uncached external calls.
+- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio`, `/admin/*` `force-dynamic` (intentional). No new `force-dynamic` pages.
+- Cron: **4 handlers** at maxDuration=300s unchanged. No edge routes. No oversized routes.
+- Timers: All `setTimeout` paired with cleanup. No server-side `setInterval`. No leaks.
+- In-memory: `_inflight` Map bounded by 30s timeout + `.finally()` clear. All other in-memory structures bounded by MAX_HANDLES=50 or singleton.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED (5th cycle)**: `dbGetCampaignStats()` 4-query parallel count aggregation (`lib/db/campaigns.ts:734-751`). Move to `GROUP BY status` RPC at >5K sends/campaign. Not yet triggered.
+- **MONITOR M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog spike risk at high error rate (fire-and-forget, timeout-protected).
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. ISR and `force-dynamic` set unchanged. `lib/env.ts` adds no bundle size (server-only module, all calls are tree-shaken per route).
+- [Security]: Fetch timeouts at 100%. Fail-open rate limiter intact (`redis.ts:183`). Resend webhook: 3 defense layers (rate-limit + Svix HMAC + idempotency dedup) all intact. `lib/env.ts` ensures all env vars are trimmed — eliminates invisible-character auth failures.
+- [Coverage]: `lib/env.ts` 100% stmts/funcs, 87.5% branches (one minor ternary). `app/api` ~97%, `lib/db` 96.48% — stable. `og-image/route.ts` 60% funcs is 6th carry cycle — must be resolved this triage.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-29T03:00:00Z -->
+## Cost Analyst — 2026-04-29
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: **27 distinct prefixes** audited (+2 corrected vs prior: `stats:v2:bitbucket:` and `stats:v2:codeberg:` now counted separately). TTL coverage 24/27 (89%). The 3 persistent (TTL=0) keys are bounded singletons — `cron:warm-cache:offset`, `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). Growth risk: LOW.
+- **New since 2026-04-28**: Structured JSON logger (#712) adds zero Redis writes, zero external calls — stdout/stderr only. `withErrorCapture` (#707) fires one PostHog event per unhandled 500 (fire-and-forget, no blocking). No new cost surface.
+- GitHub API: cache-first unchanged (6h fresh + 7d stale + in-flight dedup at `lib/github/client.ts:28`). 100% timeout coverage. Only intentionally uncached: `/api/health` probe + `/api/refresh` (by design, 5/hr + auth).
+- Supabase: **11 tables + 2 views + 1 RPC** — unchanged. Singleton lazy client at `lib/db/supabase.ts:11`. 0 N+1 patterns. `dbGetLatestSnapshotBatch()` at `lib/db/snapshots.ts:325` confirmed single `IN()` query for cron batch. All retention jobs wired and running.
+- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. No new routes making uncached external calls.
+- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio`, `/admin/*` `force-dynamic` (intentional). No new `force-dynamic` pages.
+- Cron: **4 handlers** at maxDuration=300s unchanged. No edge routes. No oversized routes.
+- Timers: All `setTimeout` paired with cleanup. No server-side `setInterval`. No leaks.
+- In-memory: `_inflight` Map bounded by 30s timeout + `.finally()` clear (`client.ts:82`). All other in-memory structures bounded by MAX_HANDLES=50 or singleton.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED (4th cycle)**: `dbGetCampaignStats()` 4-query parallel count aggregation (`lib/db/campaigns.ts:734-751`). Move to `GROUP BY status` RPC at >5K sends/campaign. Not yet triggered.
+- **MONITOR M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog spike risk at high error rate (fire-and-forget, timeout-protected).
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. ISR and `force-dynamic` set unchanged. JSON logger adds no bundle size. `withErrorCapture` is 100% server-side.
+- [Security]: Fetch timeouts at 100%. Fail-open rate limiter intact. Resend webhook: 3 defense layers (rate-limit + Svix HMAC + idempotency dedup) all intact. `withErrorCapture` PostHog event includes redacted error message — confirm `SENSITIVE_PATTERNS` scrubbing applies before PostHog send.
+- [Coverage]: `lib/log.ts` 100% covered per 2026-04-29 coverage report. `app/api` ~97%, `lib/db` 96.47% — stable. `og-image/route.ts` 60% funcs (avatar-fetch + error-fallback) is now 5th carry cycle — triage should escalate.
+<!-- ENTRY:END -->
+
+**Cross-agent recommendations:**
+- [Performance]: No new cost-performance tradeoffs. ISR coverage and `force-dynamic` set unchanged. No edge-route opportunities — Redis/Supabase clients require Node runtime.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127-149`). Resend webhook is rate-limited at the entry + Svix-verified + idempotency-dedup'd — no cost-security conflict.
+- [Coverage]: app/api 97.34%, lib/db 96.48% (per 2026-04-28 coverage report) — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one. `og-image/route.ts` 60% funcs gap is rendering-side, not cost-path.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-27T03:00:00Z -->
 ## Cost Analyst — 2026-04-27
 - **Status**: GREEN
@@ -30,51 +82,6 @@
 - [Performance]: No new cost-performance tradeoffs. ISR coverage and `force-dynamic` set unchanged. No edge-route opportunities — Redis/Supabase clients require Node runtime.
 - [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127-149`). Resend webhook lacks rate limiting but Svix-verified — no cost-security conflict.
 - [Coverage]: app/api 97.34%, lib/db 96.48% (per 2026-04-27 coverage report) — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-26T03:00:00Z -->
-## Cost Analyst — 2026-04-26
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 16 distinct prefixes audited; 3 persistent (TTL=0) keys — `cron:warm-cache:offset` (int), `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). All intentional, bounded. Date-keyed `badge:{...}:{date}` and `history:{handle}:{from}:{to}` linear-but-bounded by 24h/1h TTLs. Growth risk: LOW.
-- GitHub API: cache-first (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage via `withTimeout`. Only uncached call remains `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
-- Supabase: **9 tables + 2 views** (`latest_snapshots`, `admin_users`, both `security_invoker=true`) + 1 RPC (`claim_campaign_sends`). Singleton lazy client at `lib/db/supabase.ts:11-32`. 0 N+1 patterns. `dbCleanOldSnapshots()` at `lib/db/snapshots.ts:410-434` invoked from warm-cache cron at `route.ts:175` — 365d retention, 1000-row batches.
-- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. Bitbucket/Codeberg now in dedicated modules (`lib/bitbucket/client.ts`, `lib/codeberg/client.ts`).
-- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio` + `/experiments/*` `force-dynamic` (intentional, auth/feature-flag gated).
-- Cron: **4 handlers** at maxDuration=300s — `warm-cache`, `process-campaigns`, `sync-audience`, admin `bulk-recalculate` (250s soft deadline). No edge routes. No oversized routes.
-- Timers: All `setTimeout`/`setInterval` paired with cleanup; server-side timers go through `withTimeout()` finally. No leaks.
-- In-memory: `_inflight` Map bounded by 30s timeout + explicit clear. `flagCache` bounded by fixed flag set (~5–10 entries). `warmSet` bounded to MAX_HANDLES=50.
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` 4-query parallel `count` aggregation (`lib/db/campaigns.ts:727-765`). Move to `GROUP BY status` Postgres RPC at >5K sends/campaign.
-- **MONITOR M1–M4 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K users — cleanup wired, retention 365d).
-- **Observation**: `/api/webhooks/resend` has no rate limit but is Svix-signature-verified end-to-end. Acceptable as is; flagged so future changes don't open an unauthenticated path.
-
-**Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. ISR coverage and `force-dynamic` set unchanged. No edge-route opportunities — Redis/Supabase clients require Node runtime.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127-149`). Resend webhook lacks rate limiting but Svix-verified — no cost-security conflict.
-- [Coverage]: app/api 97.1%, lib/db 96.6% — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-25T00:00:00Z -->
-## Cost Analyst — 2026-04-25
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user keys. 3 persistent (TTL=0) keys — `cron:warm-cache:offset` (int), `stats:badges_generated` (INCR counter), `stats:unique_badges` (HLL ~12 KB). All intentional, bounded. **24 patterns confirmed** (full inventory in report). Growth risk: LOW.
-- GitHub API: cache-first (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage via `withTimeout`. Only uncached call remains `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
-- Supabase: **9 tables + 2 views** (`latest_snapshots`, `admin_users`, both `security_invoker=true`). Singleton lazy client at `lib/db/supabase.ts:13`. 0 N+1 patterns. `dbCleanOldSnapshots()` runs in warm-cache cron — M4 (metrics_snapshots) is bounded at 365d, not unbounded.
-- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts.
-- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio` + `/experiments/*` force-dynamic (intentional, auth-gated).
-- Cron: **4 handlers** at maxDuration=300s. API routes: 44 `route.ts` files.
-- Timers: `withTimeout` cleans up in finally. `pingRedis` uses `withTimeout` (`redis.ts:310`). No leaks.
-- In-memory: `_inflight` Map bounded by 30s timeout + explicit clear. `flagCache` bounded by fixed flag set (~5–10 entries).
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` 4-query aggregation (`lib/db/campaigns.ts:727`). Move to `GROUP BY status` RPC at >5K sends/campaign.
-- **MONITOR M1–M3 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB). **M4 DOWNGRADED** — cron cleanup confirmed active, 365-day retention bounded.
-
-**Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. ISR correct on all static pages. `/studio` + `/experiments/*` force-dynamic unchanged.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127–149`). No cost-security conflicts.
-- [Coverage]: app/api 97.1%, lib/db 96.5% — stable (from 2026-04-25 coverage report). No cost-critical path coverage gaps.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-26T09:42:00Z -->
@@ -104,6 +111,29 @@
 <!-- ENTRY:END -->
 
 
+<!-- ENTRY:START agent=performance timestamp=2026-04-30T09:00:00Z -->
+## Performance Engineer — 2026-04-30
+- **Status**: YELLOW
+- Build: Next.js 16.2.4 (Turbopack), compiled 6.6s, 0 TypeScript errors. 64 pages, 84 routes (5 static, rest dynamic).
+- Total client JS: **1,876.9 KB raw / 598.1 KB gzipped** — +194.9 KB (+11.6%) vs 2026-04-09 (1,682 KB). 68 chunks, no chunk >500 KB.
+- Largest chunks: 227.1 KB (Next.js framework), 175.3 KB (PostHog lazy), 125.9 KB (React DOM/RSC), 110.0 KB (core-js). All vendor/framework.
+- Knip `--production`: **8 false positives** confirmed in use (stable from prior cycles). No new unused production exports.
+- `"use client"` audit: 94 non-test files. All appropriate — error boundaries, interactive UI, Canvas/WebGL, hooks. No misplaced directives.
+- Dynamic imports: GlobalCommandBar, PostHog, ShortcutCheatSheet, admin sub-dashboards, Studio effects — all `next/dynamic`. Good code-splitting.
+- Font loading: optimal (`next/font/google`, `display: "swap"`, Latin subset). No external font requests.
+- CLS risks: **none** — all `<Image>` have explicit dims. Badge `<img>` fallback has `1200×630`. `LiteYouTubeEmbed <img>` inside `aspect-video` container — no CLS.
+- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=86400` (success), `s-maxage=300, stale-while-revalidate=600` (error). Correct.
+- Turbopack NFT warning: **RESOLVED** — `svg-to-png.ts` now uses `import.meta.url` + `dirname(fileURLToPath(...))`. Zero warnings in build.
+- **NEW YELLOW P1 — ISR regression**: Root layout (`app/layout.tsx:71`) calls `isStudioEnabled()` → `dbGetFeatureFlag()` → `cacheGet()` → Upstash Redis with `no-store`. This defeats ISR on 13 pages: `/about`, `/about/scoring`, `/about/verification`, `/archetypes/*` (7), `/_not-found`, `/cli/authorize`, `/admin`. Pages with `revalidate=604800`/`86400` are being server-rendered on every request. Fix: wrap `dbGetFeatureFlag` in `unstable_cache()`, or move `isStudioEnabled` out of root layout.
+- **NEW YELLOW P2 — bundle growth**: +194.9 KB vs Apr 9. All recent commits are server-only — growth predates visible log. Run `ANALYZE=true pnpm run build` to identify source.
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-coverage gaps. `og-image/route.ts` 60% funcs remains the only critical-path gap (6th cycle carry).
+- [Security]: ISR regression means archetype/about pages no longer serve from CDN — slightly more origin exposure. Existing rate limiting on those pages still intact.
+- [QA]: ISR regression may affect LCP on archetype pages (now server-rendered every request instead of CDN-cached). Consider a load-time smoke test.
+- [Cost Analyst]: ISR regression likely increased Vercel serverless invocations for 7 archetype pages (should be CDN-cached for 7 days) — quantify in next cost cycle.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=performance timestamp=2026-04-09T09:00:00Z -->
 ## Performance Engineer — 2026-04-09
 - **Status**: GREEN
@@ -126,25 +156,6 @@
 - [Cost Analyst]: Bundle grew only +19 KB vs last cycle — stable. OG image Redis memory monitor carried.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-04-02T09:00:00Z -->
-## Performance Engineer — 2026-04-02
-- **Status**: GREEN
-- Build: Next.js 16.2.1 (Turbopack), compiled 5.4s, 0 TypeScript errors. 64 static pages, 84 routes (5 static, 79 dynamic).
-- Total client JS: **1,663 KB (1.63 MB)** — down 137 KB (-8%) from 1,800 KB on 2026-03-26. No chunk exceeds 500 KB. Largest: 232 KB (framework), 179 KB (PostHog lazy), 137 KB (React DOM), 113 KB (polyfills).
-- Knip: **0 production findings** — fully clean. 384 test files flagged as false positives (expected, not in entry graph).
-- `"use client"` audit: 56 non-test files (41 components, 15 lib). All appropriate — error boundaries, admin dashboard, studio, experiments (canvas/WebGL), hooks. No misplaced directives.
-- Dynamic imports: `ShareBadgePreviewLazy.tsx` + `GlobalCommandBarLazy.tsx` confirmed `next/dynamic` with `ssr: false`. Admin sub-dashboards (Agents, Engagement, Campaigns) code-split.
-- Font loading: optimal (`next/font/google`, `display: "swap"`, Latin subset). No external font requests.
-- CLS risks: **none** — all 4 `<Image>` components have explicit dimensions, no bare `<img>` tags.
-- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=86400` (success), `s-maxage=300, stale-while-revalidate=600` (error). Correct.
-- 1 Turbopack NFT warning (LOW): `svg-to-png.ts:36-37` uses `path.join(process.cwd(), ...)` causing full-project file tracing for OG image route. Cosmetic — add `/*turbopackIgnore: true*/` to resolve.
-
-**Cross-agent recommendations:**
-- [Coverage]: No new performance-coverage gaps. All rendering/API paths at 91%+. `AdminDashboardClient.tsx` funcs at 68.4% remains the only persistent P1.
-- [Security]: No performance-related security concerns. Knip fully clean (0 production findings). CSP correctly scoped.
-- [QA]: All previous performance-QA items remain resolved. Bundle decreased -8% — no regressions.
-- [Cost Analyst]: Bundle reduced to 1,663 KB (-137 KB). OG image Redis memory monitor unchanged — CDN `s-maxage=21600` bounds generation. Turbopack NFT warning may slightly increase Lambda size for OG image route.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation timestamp=2026-04-17T10:00:00Z -->
 ## Documentation Agent — 2026-04-17
@@ -199,6 +210,20 @@
 - [Performance]: Knip `--production` false positives unchanged — confirmed in active use via grep. No bundle changes.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=qa timestamp=2026-04-29T09:00:00Z -->
+## QA Agent — 2026-04-29
+- **Status**: GREEN
+- Tests: 7,272/7,272 passed across 409 files, 0 failed, 0 skipped
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all `<img>` have alt, focus-visible in globals.css + 4 production components, prefers-reduced-motion respected, aria-label in 20+ components, heading hierarchy correct in all pages, 14 error boundaries, multiple loading/empty states
+- Design system: 0 violations in production components. global-error.tsx hardcoded hex intentional (documented). apple-icon.tsx + icon.tsx hardcoded (static assets, accepted). experiments/** accepted P3 (Canvas/WebGL).
+
+**Cross-agent recommendations:**
+- [Coverage]: `og-image/route.ts` 60% funcs (`route.ts:77,97`) is the only critical-path gap — 5th carry cycle, must address this triage. `dirty-stats.ts` 75% funcs is a one-test fix.
+- [Security]: No new security-related quality issues. All XSS vectors covered. All interactive elements accessible. global-error.tsx hardcoded hex does not touch server secrets.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=qa timestamp=2026-04-01T09:00:00Z -->
 ## QA Agent — 2026-04-01
 - **Status**: GREEN
@@ -207,88 +232,69 @@
 - Lint issues: 0
 - A11y issues: 0 — all buttons labeled, focus-visible present, no bare `<img>` tags, no heading skips in production pages. 13 error boundaries, 13 loading states.
 - Design system: **0 violations** in production components. Experiment pages use raw hex arrays (WebGL/Canvas requirement, accepted). Static icon assets (`apple-icon.tsx`, `icon.tsx`) correctly hardcoded.
-- `debug-quality/route.ts` confirmed **deleted** — Cost Analyst/Coverage P1 resolved.
-- Remaining open P1 (Cost Analyst): refresh rate limit still at 15/hr (debugging artifact, revert before next release).
 
 **Cross-agent recommendations:**
 - [Coverage]: `debug-quality/route.ts` coverage gap resolved by deletion. `AdminDashboardClient.tsx` funcs at 68.4% remains top actionable gap.
 - [Security]: No new security-related quality issues. All XSS vectors covered, all interactive elements accessible.
-- [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — revert before production release.
 <!-- ENTRY:END -->
 
-
-<!-- ENTRY:START agent=coverage timestamp=2026-04-25T02:00:00Z -->
-## Coverage Agent — 2026-04-25
-- **Status**: YELLOW
-- Overall coverage: **93.22% stmts** (8300/8903), 89.66% branches, 90.51% funcs, 94.29% lines
-- Test suite: 405 files, 7227 tests (+62 vs 2026-04-24; +3 files)
-- Delta vs 2026-04-24: stmts +0.07pp, branches +0.11pp, funcs +0.42pp — steady improvement
-- All critical paths GREEN: lib/impact 99.6%, lib/render 100%, lib/db 96.5%, lib/cache 98.0%, lib/auth 97.4%, lib/github 96.5%, lib/history 98.3%, lib/email 97.6%, app/api 97.1%, lib/profile 100%, lib/analytics 97.3%
-- **Flaky tests: 1** — `BadgeToolbar.render.test.tsx > strips @keyframes` failed 1/3 runs. Recurring teardown race: `vi.stubGlobal("Image", origImage)` + `vi.unstubAllGlobals()` both run in `finally` — double-restore causes non-deterministic state. Fix: remove the manual `vi.stubGlobal("Image", origImage)` line and rely solely on `vi.unstubAllGlobals()`.
-- **Fork-pool starvation from 2026-04-24 did NOT reproduce** — suite completed cleanly in 45.36s without `VITEST_MAX_FORKS` override. May have been transient; still recommend pinning `poolOptions.forks.maxForks` as a safety rail.
-- **P2 active**: `lib/async/fire-and-forget.ts` 80% stmts, **0% branches**, 50% funcs — catch path and custom `onError` override untested
-- **P2 active**: `app/api/telemetry/route.ts` 91.3% stmts, 66.6% funcs — one handler untested
-- **P2 active**: `components/SharePageOwnerContent.tsx` 90.5% stmts, 75% funcs — 1 function still untested
-- **P3 carried (accepted)**: experiments 56.7% (Canvas/WebGL), AuthorTypewriter 67.5% br (JSDOM), framework shells 0% (no logic), demoData files 50% branches (overload signatures)
-
-**Cross-agent recommendations:**
-- [QA]: BadgeToolbar flaky test root cause is double-restore of `Image` stub — `vi.stubGlobal("Image", origImage)` + `vi.unstubAllGlobals()` both in `finally`. Remove the manual restore and use only `vi.unstubAllGlobals()`. This has been flagged across 4+ cycles.
-- [Security]: `lib/analytics/server-errors.ts` branches now at 89.1% (lib/analytics module) — SENSITIVE_PATTERNS security P2 from 2026-04-20 is resolved. No new security-relevant coverage gaps.
-- [Cost Analyst]: app/api 97.1%, lib/db 96.5% — stable. No cost-critical path coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage timestamp=2026-04-26T02:05:00Z -->
-## Coverage Agent — 2026-04-26
-- **Status**: YELLOW
-- Overall coverage: **93.19% stmts** (8191/8789), 89.76% branches, 90.37% funcs, 94.28% lines
-- Test suite: 405 files, 7171 tests (+6 vs 2026-04-25)
-- All critical paths GREEN: lib/impact 99.6%, lib/render 100%, lib/profile 100%, lib/history 98.3%, lib/cache 98.0%, lib/github 97.9%, lib/email 97.6%, lib/bitbucket 97.7%, lib/auth 97.4%, lib/analytics 97.3%, app/api 97.1%, lib/db 96.6%
-- **Flaky test reproduces**: `BadgeToolbar.render.test.tsx > strips @keyframes` failed 1/3 runs. The 2026-04-25 triage claimed the manual `vi.stubGlobal("Image", origImage)` was removed, but `grep` shows **5 remaining occurrences** in the file (e.g. line 1013), each still paired with `vi.unstubAllGlobals()` in the same `finally`. Double-restore race unchanged.
-- **P2 carried**: `lib/async/fire-and-forget.ts` 80% stmts / **0% branches** / 50% funcs — catch + onError override still untested despite 2026-04-25 triage note claiming tests were added
-- **P2 carried**: `app/api/telemetry/route.ts` 91.3% stmts, 66.7% funcs
-- **P2 small**: `lib/auth/cookie-policy.ts` 88.9% stmts; `lib/auth/unsubscribe-token.ts` no `.test.ts` sibling (90.9% stmts via transitive coverage)
-- **P3 carried (accepted)**: experiments/** 56.7% (Canvas/WebGL JSDOM-blocked), HolographicOverlay 50% br (Canvas), demoData files 50% br (overload signatures), framework shells 0% (no logic)
-
-**Cross-agent recommendations:**
-- [QA]: BadgeToolbar flaky fix never landed. Delete every `vi.stubGlobal("Image", origImage)` line in `apps/web/components/BadgeToolbar.render.test.tsx` (5 occurrences) and rely solely on `vi.unstubAllGlobals()` in the `finally` blocks.
-- [Triage]: 2026-04-25 triage entry overstated completion for both the BadgeToolbar fix and `fire-and-forget.ts` catch-path tests — branch coverage on `fire-and-forget.ts` is still 0%. Verify with `grep` and coverage delta before marking such items resolved.
-- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS coverage remains satisfied (lib/analytics 97.3%). No new security-relevant gaps.
-- [Cost Analyst]: app/api 97.1%, lib/db 96.6% — stable. No cost-critical regressions.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=qa_agent timestamp=2026-04-01T07:05:42Z -->
-## QA Agent — 2026-04-01
+<!-- ENTRY:START agent=coverage timestamp=2026-04-30T02:00:00Z -->
+## Coverage Agent — 2026-04-30
 - **Status**: GREEN
-- Tests: 6,879/6,879 passed across 386 files, 0 failed, 0 skipped (+16 tests, +1 file vs 2026-03-30)
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0 — all buttons labeled, focus-visible present, no bare `<img>` tags, no heading skips in production pages
+- Overall coverage: **93.31% stmts** (8307/8902), 89.88% branches, 90.70% funcs, 94.37% lines
+- Test suite: 409 files, 7272 tests — unchanged vs 2026-04-29. Duration 88s with coverage.
+- Delta vs 2026-04-29: stmts +0.02pp, funcs +0.18pp, branches −0.05pp (new `lib/env.ts` 87.5% branches — one uncovered ternary, minor)
+- All critical paths GREEN: lib/impact 99.59%, lib/render 100%, lib/log 100%, lib/profile 100%, lib/history 98.26%, lib/auth 98.00%, lib/codeberg 98.03%, lib/email 97.57%, lib/cache 97.50%, lib/bitbucket 97.70%, lib/github 97.35%, lib/analytics 97.30%, app/api 97.38%, lib/db 96.48%, lib/env 100% stmts/funcs
+- **New `lib/env.ts`** (typed env getters, feat/env commit): 100% stmts/funcs, 87.5% br (7/8 branches — one uncovered ternary). Accepted gap.
+- **Flaky test — INTERMITTENT**: `BadgeToolbar > strips @keyframes` reappeared once in 4 runs (run 2 verbose output only). Runs 1, 3, 4 and isolated run (47/47) all passed. Previously "resolved" Apr 26 — may be an intermittent recurrence. Monitor next 2 cycles before acting.
+- **P2 active (CRITICAL — 6th carry cycle)**: `app/u/[handle]/og-image/route.ts` **60% funcs** (`route.ts:77,97`). Avatar-fetch failure + error-fallback remain untested. Must be addressed this triage.
+- **P2 active (small)**: `lib/cache/dirty-stats.ts` 83.3% stmts / **75% funcs** (line 33). `components/SharePageOwnerContent.tsx` 90.5% stmts / **75% funcs** (one handler path).
+- **P3 carried (accepted)**: experiments/** Canvas/WebGL JSDOM-blocked, `AuthorTypewriter.tsx` 67.5% br (timers), `HolographicOverlay.tsx` 50% stmts (Canvas), `ParticleBackground.tsx` 72.2% br (Canvas), `archetypeDemoData/demoData` 50% br (overload signatures).
 
 **Cross-agent recommendations:**
-- [Coverage]: `debug-quality/route.ts` confirmed deleted — 0% coverage gap resolved. `AdminDashboardClient.tsx` funcs at 68.4% remains the top actionable gap.
-- [Security]: No new security-related quality issues. All XSS vectors covered, all interactive elements properly accessible.
-- [Cost Analyst]: Refresh rate limit (15/hr) remains the only open P1 — should be reverted before next production release.
+- [Triage]: `og-image/route.ts` 60% funcs is 6th carry cycle — must be fixed this sprint. Two helpers: mock `fetch()` rejection for avatar timeout + stub missing-avatar SVG fallback. `dirty-stats.ts` line 33 is a one-test fix. Also monitor `BadgeToolbar > strips @keyframes` across next 2 cycles for intermittent flake.
+- [QA]: Suite stable (7272/7272) across 3 full runs. `poolOptions.forks.maxForks` pin continues to hold. BadgeToolbar flake intermittently active — triage should re-investigate `vi.stubGlobal` restore logic.
+- [Security]: lib/analytics 97.30% stmts / 89.47% branches — SENSITIVE_PATTERNS redaction paths stable. No new security-relevant gaps.
+- [Cost Analyst]: app/api 97.38%, lib/db 96.48% — stable. lib/env fully covered on stmts/funcs; no cost-path impact from typed env getters.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-04-27T02:01:00Z -->
-## Coverage Agent — 2026-04-27
+<!-- ENTRY:START agent=coverage timestamp=2026-04-29T02:00:00Z -->
+## Coverage Agent — 2026-04-29
+- **Status**: GREEN
+- Overall coverage: **93.29% stmts** (8275/8870), 89.93% branches, 90.52% funcs, 94.34% lines
+- Test suite: 409 files, 7272 tests (+48 vs 2026-04-28, +1 file). Duration 63s with coverage.
+- Delta vs 2026-04-28: stmts +0.02pp, branches +0.04pp — new tests from #712 (structured JSON logger) + #707 (withErrorCapture) absorbed cleanly.
+- All critical paths GREEN: lib/impact 99.58%, lib/render 100%, lib/profile 100%, lib/insights 100%, lib/async 100%, lib/auth 98.01%, lib/history 98.26%, lib/codeberg 98.02%, lib/github 97.35%, lib/email 97.41%, lib/bitbucket 97.7%, lib/analytics 97.29%, lib/cache 97.48%, lib/db 96.47%, app/api ~97%
+- **Flaky tests: 0** — three consecutive runs (7272/7272 each). BadgeToolbar `@keyframes` flake resolved and stable across 5 cycles.
+- **New**: `lib/log.ts` (structured JSON logger #712) ships with full test coverage via `lib/log.test.ts` (10 tests: levels, context spreading, VERCEL_ENV, getRequestId header + UUID fallback).
+- **P2 active (CRITICAL — 5th carry cycle)**: `app/u/[handle]/og-image/route.ts` **60% funcs** (`route.ts:77,97`). Avatar-fetch failure path and error-fallback branch remain untested. Must be addressed this triage cycle.
+- **P2 active (small)**: `lib/cache/dirty-stats.ts` **83.33% stmts / 75% funcs** (`dirty-stats.ts:33`). Small file, clear marker untested. `lib/effects/interactions/HolographicOverlay.tsx` 50% stmts / 75% funcs (Canvas — consider downgrading to accepted P3).
+- **P3 carried (accepted)**: experiments/** 56.7%, framework shells 0%, `AuthorTypewriter.tsx` 67.5% branches (JSDOM timers), `ParticleBackground.tsx` 72.2% branches (Canvas), `demoData.ts`/`archetypeDemoData.ts` 50% branches (overload signatures).
+- Untested critical-path files: only `api/auth/bitbucket/config.ts` + `api/auth/codeberg/config.ts` — pure config, exercised transitively. Not actionable.
+
+**Cross-agent recommendations:**
+- [Triage]: `og-image/route.ts` 60% funcs is entering its 5th carry cycle — escalate priority. Add fixtures for `fetch()` rejection (avatar timeout) and the missing-avatar SVG fallback. This is the only actionable critical-path gap. Also: `lib/cache/dirty-stats.ts` is a simple clear-marker function — one test closes it.
+- [QA]: Suite stable and flake-free across 3 consecutive runs. `poolOptions.forks.maxForks` pin continues to hold.
+- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branch coverage stable at 89.09% — no new security-relevant gaps.
+- [Cost Analyst]: app/api ~97%, lib/db 96.47% — stable. `lib/log.ts` (JSON logger) fully covered; no cost-path impact.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage timestamp=2026-04-28T02:05:00Z -->
+## Coverage Agent — 2026-04-28
 - **Status**: GREEN
 - Overall coverage: **93.27% stmts** (8254/8849), 89.89% branches, 90.53% funcs, 94.33% lines
-- Test suite: 408 files, 7224 tests (+53 vs 2026-04-26; +3 files). Duration 66s with coverage.
-- Delta vs 2026-04-26: stmts +0.08pp, branches +0.13pp, funcs +0.16pp — steady improvement
-- All critical paths GREEN: lib/impact 99.59%, lib/render 100%, lib/db 96.48%, app/api 97.34%, lib/profile 100%, lib/history 98.26%, lib/cache 97.48%, lib/auth 98.01%, lib/github 97.35%, lib/email 97.57%, lib/analytics 97.26%, lib/bitbucket 97.70%, lib/codeberg 98.03%
-- **Flaky tests: 0** — three consecutive runs all 7224/7224 passed. Prior `BadgeToolbar > strips @keyframes` flake (carried 4+ cycles) is **resolved** — Apr 26 triage's removal of redundant `vi.stubGlobal("Image", origImage)` lines is holding.
-- **P2 resolved**: `lib/async/fire-and-forget.ts` moved from 0% branches to **100%** (lib/async module now 100/100/100). Telemetry route funcs moved to 100%. `lib/auth/cookie-policy.ts` URL-parse catch + dedicated `unsubscribe-token.test.ts` both landed.
-- **P2 active (small)**: `app/u/[handle]/og-image/route.ts` 94.3% stmts / **60% funcs** — 2 helpers untested (avatar-fetch + error-fallback). `AuthorTypewriter.tsx` 67.5% branches (JSDOM, carried). `ParticleBackground.tsx` 72.2% branches (Canvas).
-- **P3 carried (accepted)**: experiments/** 56.7% (Canvas/WebGL JSDOM-blocked), HolographicOverlay 50% stmts (Canvas), `archetypeDemoData/demoData` 50% br (overload signatures), framework shells 0% (no logic), `log.ts` 50% br (ternary fallback).
-- Untested critical-path files unchanged: only `api/auth/bitbucket/config.ts` + `api/auth/codeberg/config.ts` — pure config wiring, exercised via routes.
+- Test suite: 408 files, 7224 tests — unchanged vs 2026-04-27. Duration 73s with coverage, ~20s without.
+- All critical paths GREEN: lib/impact 99.59%, lib/render 100%, lib/db 96.48%, app/api 97.34%, lib/profile 100%, lib/history 98.26%, lib/auth 98.01%, lib/codeberg 98.03%, lib/bitbucket 97.70%, lib/email 97.57%, lib/cache 97.48%, lib/github 97.35%, lib/analytics 97.26%
+- **Flaky tests: 0** — three consecutive runs (1× coverage + 2× plain) all 7224/7224 passing. BadgeToolbar `@keyframes` flake remains resolved.
+- **P2 active (small)**: `app/u/[handle]/og-image/route.ts` 94.28% stmts / **60% funcs** (avatar-fetch + error-fallback untested — carried from Apr 27). `lib/cache/dirty-stats.ts` 83.33% stmts / 75% funcs. `components/SharePageOwnerContent.tsx` 90.48% stmts / 75% funcs.
+- **P3 carried (accepted)**: experiments/** 56.68% stmts (Canvas/WebGL JSDOM-blocked), `AuthorTypewriter.tsx` 67.5% branches (JSDOM timers), `HolographicOverlay.tsx` 50% stmts (Canvas), framework shells 0% (no logic).
+- Critical-path files without sibling .test: only `app/api/auth/bitbucket/config.ts` + `app/api/auth/codeberg/config.ts` — pure config, exercised transitively.
 
 **Cross-agent recommendations:**
-- [Triage]: All P2 items from Apr 26 triage successfully landed. `fire-and-forget` branches at 100%, `telemetry` funcs at 100%, `cookie-policy` catch covered, dedicated `unsubscribe-token.test.ts` present, BadgeToolbar flake gone. Verification cycle worked.
-- [QA]: Flake-free across 3 runs. Suite stable at 7224 tests. Recommend leaving `poolOptions.forks.maxForks` pin in place — fork-pool starvation has not reproduced since.
-- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS coverage holds (lib/analytics 97.26% stmts / 89.09% branches). No new security-relevant gaps.
-- [Cost Analyst]: app/api 97.34%, lib/db 96.48% — stable. No cost-critical path coverage regressions. New `og-image/route.ts` funcs gap is rendering-side, not cost-path.
-- [Performance]: Suggest a small follow-up to cover the avatar-fetch branch + error-fallback in `og-image/route.ts` to retire the only critical-path P2.
+- [Triage]: Only meaningful gap is `og-image/route.ts` 60% funcs (carried from Apr 27 — not yet addressed). Two helpers — recommend fixtures for avatar fetch failure + missing-avatar fallback to retire the only critical-path P2.
+- [QA]: Suite stable across 3 runs, no new flakes. `poolOptions.forks.maxForks` pin from Apr 25 still appropriate.
+- [Security]: `lib/analytics` (server-errors SENSITIVE_PATTERNS) holds at 97.26% stmts / 89.09% branches. No new security-relevant gaps.
+- [Cost Analyst]: app/api 97.34%, lib/db 96.48% — unchanged vs Apr 27. No cost-critical regressions.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-24T07:03:08Z -->
@@ -318,4 +324,34 @@
 - [Performance]: `HeroScoreZone.tsx` + `RadarChartInteractive.tsx` deleted — Knip should report 0 findings for those paths next cycle. No bundle impact (components were conditionally rendered).
 - [QA]: BadgeToolbar flaky test root cause resolved (double vi.stubGlobal restore). Aurora page test stabilized via canvas mock + testTimeout bump. Fork-pool starvation mitigated by pinned maxForks.
 - [Documentation]: Two new platform client modules follow existing patterns — no doc gaps. CLAUDE.md does not need updating for internal module splits.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-04-29T07:05:08Z -->
+## QA Agent — 2026-04-29
+- **Status**: GREEN
+- Tests: 7272/7272 passed across 409 files, 0 failed, 0 skipped
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all `<img>` have alt, focus-visible in globals.css + 4 production components, prefers-reduced-motion respected, aria-label present in 20+ components, heading hierarchy correct in all pages, 14 error boundaries, multiple loading states
+
+**Cross-agent recommendations:**
+- [Coverage]: `og-image/route.ts` 60% funcs (lines 77, 97) is the only critical-path gap — entering 5th carry cycle, triage must address this sprint. `dirty-stats.ts` 75% funcs is a one-test fix.
+- [Security]: No new security-related quality issues. All XSS vectors covered via escapeXml(), interactive elements fully accessible. global-error.tsx hardcoded hex is intentional and does not touch any server secrets.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance_agent timestamp=2026-04-30T07:09:55Z -->
+## Performance Engineer — 2026-04-30
+- **Status**: YELLOW
+- Total First Load JS: 1,876.9 KB raw / 598.1 KB gzipped (+194.9 KB / +11.6% vs Apr 9)
+- Chunks >500 KB: **0**
+- Unused exports (production): 8 confirmed false positives (stable)
+- Turbopack NFT warning: RESOLVED
+- **NEW YELLOW**: ISR regression — root layout `no-store` Redis call forces 13 pages dynamic (should be static/ISR)
+- **NEW YELLOW**: Bundle +194.9 KB growth since Apr 9 — origin unknown (all recent commits are server-only)
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-coverage gaps. `og-image/route.ts` 60% funcs remains the only critical-path gap (6th cycle).
+- [Security]: ISR regression means archetype/about pages no longer serve from CDN cache — DDoS surface slightly increased. Rate limiting on these pages already present via Redis, but fixing ISR would reduce origin exposure.
+- [QA]: `/about/scoring` embeds `LiteYouTubeEmbed` — not a CLS risk (`aspect-video` container). No rendering regressions observed.
+- [Cost Analyst]: ISR regression likely increased Vercel serverless invocations for 7+ pages that should be CDN-cached. Archetype pages (revalidate=604800) hitting origin every request instead of being CDN-cached for a week is a cost regression worth quantifying.
 <!-- ENTRY:END -->

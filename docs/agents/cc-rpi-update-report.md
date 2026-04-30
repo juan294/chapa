@@ -1,4 +1,4 @@
-Nothing has changed in cc-rpi since the last sync. The HEAD commit matches `lastSyncCommit` exactly.
+No changes in cc-rpi since the last sync (commit `7313cc395fa7b97bb4b3b4811e3cb9800098aa41`, tag `v1.17.2`).
 
 cc-rpi sync: already up to date as of v1.17.2.
-cc-rpi sync: FAILED after 2 attempts — Mon Apr 27 03:15:55 CEST 2026
+cc-rpi sync: FAILED after 2 attempts — Thu Apr 30 03:16:32 CEST 2026
