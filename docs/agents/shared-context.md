@@ -77,6 +77,23 @@
 - [Coverage]: app/api 97.1%, lib/db 96.5% — stable (from 2026-04-25 coverage report). No cost-critical path coverage gaps.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=triage timestamp=2026-04-30T18:35:00Z -->
+## Triage — 2026-04-30
+- **Reports processed**: 7 (cost-analyst GREEN, performance YELLOW, coverage GREEN, security GREEN, cc-rpi-update OK, update-docs OK, qa GREEN)
+- **Action items resolved**: 8 of 8 — all implemented
+- **Summary**: (1) Wrapped `dbGetFeatureFlag` in `unstable_cache` (5-min revalidate, `feature-flags` tag) so the root layout's `isStudioEnabled()` no longer leaks the Upstash REST `no-store` fetch into ISR — closes performance YELLOW P1. Tests mock `next/cache` with a pass-through. (2) Closed the 6th-cycle critical og-image route gap: added 3 fixtures covering avatar-fetch rejection (line 77 catch), missing avatarUrl branch, and cacheSet-rejected fire-and-forget (line 97 onError) — `og-image/route.ts` now 100% (5/5 funcs, 34/34 lines, 12/12 branches). (3) Added `dirty-stats.test.ts` (5 tests) — `lib/cache/dirty-stats.ts` 100% covered. (4) Added reload-after-success and fetch-rejects-network-error fixtures to `SharePageOwnerContent.render.test.tsx` — file 100% covered. (5) Investigated +194.9 KB bundle growth: traced to a 325 KB layout client-modules entry (`0-v7viuocyjmh.js`) aggregating ClientInstrumentation/ThemeProvider/UserMenu/etc. plus a Buffer polyfill and ua-parser-js — likely Turbopack aggregation behavior, no single import to unwind. Filing a follow-up issue. (6) Extended `knip.json` with the 8 stable false-positive deps + `vitest.setup.ts` ignore — `knip --production` now clean. (7) Phase 9C: ESLint `no-restricted-syntax` rule against direct `process.env.*` was already wired in `eslint.config.mjs` for `app/**` + `lib/**` — swept the one in-scope script (`backfill-craft-scores.ts`) to use `getSupabaseUrl()`/`getSupabaseServiceRoleKey()`. Remaining `process.env` reads are all intentional: client components (Next.js inlines `NEXT_PUBLIC_*` only via direct member access), config files, and unrelated scripts. (8) Added `cors-mutation-guard.test.ts` — mechanical test that fails the build if any POST/PUT/PATCH/DELETE handler ever ships with `Access-Control-Allow-Origin: *`. Verification: 7294/7294 tests pass (+22), 0 type errors, 0 lint issues, knip clean.
+- **Skipped with reason**:
+  - Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; report classifies "not yet triggered, acceptable today". Premature.
+  - Flaky `BadgeToolbar > strips @keyframes` — coverage report explicitly says "Low confidence in recurrence — confirm over next 2 cycles before taking action." 1 of 4 runs after a previous fix.
+  - Bundle growth root-cause fix (P2) — investigated; not a single-source fix, deferred to a follow-up issue with the 325 KB chunk findings documented above.
+
+**Cross-agent recommendations:**
+- [Performance]: Layout-bundle aggregation (`0-v7viuocyjmh.js`, 325 KB) is now the dominant client-side cost. Next investigation: identify whether the Buffer polyfill / ua-parser-js entries are pulled from `posthog-js` or `@vercel/analytics`/`speed-insights` and consider lazy-loading further. Also: archetype/about pages remain ƒ in build output because `Navbar` calls `await headers()` — a separate dynamic source from the report's Redis-no-store finding (which IS now fixed).
+- [Coverage]: Three files moved to 100%: `og-image/route.ts`, `lib/cache/dirty-stats.ts`, `components/SharePageOwnerContent.tsx`. `BadgeToolbar @keyframes` flake should be re-checked next cycle — if it appears again, the `vi.stubGlobal` restore pattern needs another look.
+- [Security]: `cors-mutation-guard.test.ts` mechanically enforces the wildcard-CORS-only-on-read-only-routes invariant — the security report's INFO recommendation is now mandatory.
+- [Cost Analyst]: ISR regression fix lands `unstable_cache` around `dbGetFeatureFlag` with a 5-minute revalidate + `feature-flags` tag. When DB flags change, a future admin write hook should call `revalidateTag("feature-flags")` to propagate; currently the in-process `flagCache` is invalidated but the data cache will lag up to 5 minutes.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-04-26T09:42:00Z -->
 ## Triage — 2026-04-26
 - **Reports processed**: 5 (cost-analyst GREEN, coverage YELLOW, cc-rpi-update GREEN, update-docs GREEN, prior triage)
