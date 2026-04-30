@@ -144,6 +144,22 @@ describe("POST /api/admin/bulk-recalculate", () => {
     expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(1);
   });
 
+  it("strips non-string and invalid-format handles before processing", async () => {
+    const res = await POST(
+      makeRequest(VALID_SECRET, {
+        // Mix of: valid handle, non-string, blank string, handle that fails isValidHandle (starts with hyphen)
+        handles: ["alice", 42, null, "", "-invalid", "bob"],
+      }),
+    );
+    const body = await res.json();
+
+    // Only "alice" and "bob" pass the filter; the rest are silently dropped.
+    expect(body.recalculated).toBe(2);
+    expect(body.total).toBe(2);
+    expect(body.completed).toEqual(["alice", "bob"]);
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects payloads with more than 100 handles", async () => {
     const handles = Array.from({ length: 101 }, (_, index) => `user${index}`);
 

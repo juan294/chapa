@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
 import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
 import { getBaseUrl } from "@/lib/env";
+import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { getAvatarBase64 } from "@/lib/render/avatar";
@@ -148,11 +149,11 @@ export async function SharePageContent({ handle }: { handle: string }) {
         handle={handle}
 
       />
-      {/* SAFETY: JSON-LD uses JSON.stringify (auto-escapes quotes/special chars) + explicit < escape to prevent </script> injection. User handle is a URL param but only appears as a JSON string value, never raw HTML. */}
+      {/* SAFETY: renderJsonLd escapes <, >, & to prevent </script> injection. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(personJsonLd).replace(/</g, "\\u003c"),
+          __html: renderJsonLd(personJsonLd),
         }}
       />
 

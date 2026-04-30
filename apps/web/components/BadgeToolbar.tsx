@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
@@ -13,6 +14,7 @@ interface BadgeToolbarProps {
 export function BadgeToolbar({
   handle,
 }: BadgeToolbarProps) {
+  const router = useRouter();
   const { session } = useSession();
   const isOwner = session?.login === handle;
   const [refreshStatus, setRefreshStatus] = useState<
@@ -36,7 +38,7 @@ export function BadgeToolbar({
       );
       if (res.ok) {
         setRefreshStatus("success");
-        setTimeout(() => window.location.reload(), 500);
+        setTimeout(() => router.refresh(), 500);
       } else {
         setRefreshStatus("error");
         setTimeout(() => setRefreshStatus("idle"), 3000);

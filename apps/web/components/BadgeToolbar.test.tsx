@@ -30,6 +30,13 @@ describe("BadgeToolbar", () => {
     it("shows loading state with animate-spin", () => {
       expect(SOURCE).toContain("animate-spin");
     });
+
+    it("uses router.refresh() for SPA-friendly page refresh (#768)", () => {
+      expect(SOURCE).toContain("router.refresh()");
+      expect(SOURCE).toContain("useRouter");
+      // Must NOT use window.location.reload — that triggers a full page load
+      expect(SOURCE).not.toContain("window.location.reload");
+    });
   });
 
   describe("share dropdown", () => {

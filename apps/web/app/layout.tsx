@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvider";
 import { getBaseUrl } from "@/lib/env";
 import { isStudioEnabled } from "@/lib/feature-flags";
+import { renderJsonLd } from "@/lib/jsonld";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -83,11 +84,11 @@ export default async function RootLayout({
         <link rel="dns-prefetch" href="https://avatars.githubusercontent.com" />
       </head>
       <body className="bg-bg text-text-primary font-body antialiased">
-        {/* SAFETY: JSON-LD structured data from hardcoded constants — no user input. JSON.stringify escapes special characters. */}
+        {/* SAFETY: JSON-LD from hardcoded constants — renderJsonLd escapes <, >, & to prevent </script> injection. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: renderJsonLd({
               "@context": "https://schema.org",
               "@type": "SoftwareApplication",
               name: "Chapa",
@@ -113,7 +114,7 @@ export default async function RootLayout({
                 "Cryptographic badge verification (HMAC-SHA256)",
                 "Score history and trend tracking",
               ],
-            }),
+            })
           }}
         />
         <a

@@ -6,21 +6,17 @@ test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
   }) => {
     const response = await request.get("/u/torvalds/badge.svg");
 
-    // Always assert a specific status — never silently swallow crashes.
-    // In CI without a GitHub token the route returns 200 with a fallback SVG
-    // or 500 on an unexpected error; 429 is possible under rate-limiting.
-    // All are acceptable, but we must see a concrete status code.
-    const status = response.status();
-    expect([200, 429, 500]).toContain(status);
+    // Must be 200 — the route always returns a fallback SVG on error paths;
+    // a 500 means an unhandled crash leaked through and must be caught.
+    expect(response.status()).toBe(200);
 
-    // Content-Type is always image/svg+xml regardless of success or error —
-    // the route returns a fallback SVG on every code path (see badge route).
+    // Content-Type is always image/svg+xml — fallback SVG on every code path.
     const contentType = response.headers()["content-type"] ?? "";
     expect(contentType).toContain("image/svg+xml");
 
-    // Body must always be SVG markup (fallback or full badge).
+    // Body must start with an SVG root element.
     const body = await response.text();
-    expect(body).toContain("<svg");
+    expect(body).toMatch(/^<svg /);
   });
 
   test("successful response includes public cache headers", async ({
@@ -28,18 +24,13 @@ test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
   }) => {
     const response = await request.get("/u/torvalds/badge.svg");
 
-    // Assert a concrete status — guard against silent 500 crashes.
-    const status = response.status();
-    expect([200, 429, 500]).toContain(status);
+    // Must be 200 — a 500 means an unhandled crash that bypassed the fallback.
+    expect(response.status()).toBe(200);
 
-    if (status === 200) {
-      // On a full success the route sets long-lived public cache headers.
-      const cacheControl = response.headers()["cache-control"] ?? "";
-      expect(cacheControl).toContain("public");
-      expect(cacheControl).toContain("s-maxage");
-    }
-    // On 500/429 cache headers differ — that's acceptable; the status
-    // assertion above already confirmed the server didn't crash silently.
+    // On a full success the route sets long-lived public cache headers.
+    const cacheControl = response.headers()["cache-control"] ?? "";
+    expect(cacheControl).toContain("public");
+    expect(cacheControl).toContain("s-maxage");
   });
 
   test("syntactically invalid handle returns 400 with SVG body", async ({

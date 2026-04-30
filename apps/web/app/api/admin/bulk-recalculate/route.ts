@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/cache/redis";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUsers } from "@/lib/db/users";
+import { isValidHandle } from "@/lib/validation";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -60,9 +61,10 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
   try {
     const body = await request.json().catch(() => ({}));
     if (Array.isArray(body.handles) && body.handles.length > 0) {
-      handles = body.handles.filter(
-        (h: unknown): h is string => typeof h === "string" && h.length > 0,
-      );
+      handles = (body.handles as unknown[])
+        .filter((h): h is string => typeof h === "string")
+        .map((h) => h.trim())
+        .filter((h) => isValidHandle(h));
     } else {
       const users = await dbGetUsers();
       handles = users.map((u) => u.handle);

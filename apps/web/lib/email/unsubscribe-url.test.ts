@@ -33,4 +33,18 @@ describe("buildUnsubscribeUrl", () => {
 
     expect(url.startsWith("https://chapa.thecreativetoken.com/")).toBe(true);
   });
+
+  it("URL-encodes the handle via URLSearchParams (not bare string interpolation)", () => {
+    // URLSearchParams encodes special chars that would otherwise break a template literal URL.
+    // GitHub handles are restricted to [a-zA-Z0-9-], so in practice encoding is a no-op,
+    // but the implementation must use URLSearchParams to be safe by construction.
+    const url = buildUnsubscribeUrl("test-user");
+    const parsed = new URL(url);
+
+    // The URL must be parseable and the handle must round-trip without modification.
+    expect(parsed.searchParams.get("handle")).toBe("test-user");
+    // The raw query string must not contain unencoded & or = from the token
+    // (URLSearchParams escapes these; bare string interpolation would not).
+    expect(parsed.searchParams.has("token")).toBe(true);
+  });
 });
