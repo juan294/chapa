@@ -284,6 +284,58 @@ describe("SharePageOwnerContent — render", () => {
     expect(screen.getByText("Listo")).toBeTruthy();
   });
 
+  it("reloads the page 800ms after a successful regenerate", async () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+    const reload = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, reload },
+    });
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Regenerar"));
+    await vi.advanceTimersByTimeAsync(0); // resolve fetch microtask
+    await vi.advanceTimersByTimeAsync(800);
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to error state when fetch itself rejects (network error)", async () => {
+    mockUseSession.mockReturnValue({
+      session: { login: "testuser", name: null, avatar_url: "" },
+      loading: false,
+      invalidate: vi.fn(),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+
+    render(
+      <SharePageOwnerContent
+        handle="testuser"
+        stats={MOCK_STATS}
+        impact={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Regenerar"));
+
+    expect(
+      await screen.findByText("La regeneracion fallo.", { exact: false }),
+    ).toBeTruthy();
+  });
+
   it("shows support fallback when regenerate fails", async () => {
     mockUseSession.mockReturnValue({
       session: { login: "testuser", name: null, avatar_url: "" },
