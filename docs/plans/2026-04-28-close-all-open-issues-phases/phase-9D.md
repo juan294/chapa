@@ -76,9 +76,9 @@ return NextResponse.json({
 ## Acceptance criteria
 
 ### Automated
-- [ ] New test: simulate `processInBatches` returning 2 succeeded + 1 failed, assert `failures[]` length 1 with correct handle/reason
-- [ ] New test: when `warmResults.length === 0`, `cacheSet(ROTATION_KEY)` is NOT called
-- [ ] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
+- [x] New test: simulate `processInBatches` returning 2 succeeded + 1 failed, assert `failures[]` length 1 with correct handle/reason
+- [x] New test: when `warmResults.length === 0`, `cacheSet(ROTATION_KEY)` is NOT called
+- [x] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
 
 ### Manual
 - Hit `/api/cron/warm-cache` locally with a stubbed warmHandle that throws

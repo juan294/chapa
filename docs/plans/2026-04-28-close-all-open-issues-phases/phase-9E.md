@@ -109,9 +109,9 @@ asserting on `window.location.reload`.
 ## Acceptance criteria
 
 ### Automated
-- [ ] All five test files updated with regression tests
-- [ ] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
-- [ ] E2E suite passes (`pnpm run test:e2e`) — `#726` test now fails on a
+- [x] All five test files updated with regression tests
+- [x] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
+- [x] E2E suite passes (`pnpm run test:e2e`) — `#726` test now fails on a
       seeded 500 from the badge route
 
 ### Manual (#726 only)

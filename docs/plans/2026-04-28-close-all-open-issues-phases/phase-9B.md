@@ -89,10 +89,10 @@ For v2.9.0:
 ## Acceptance criteria
 
 ### Automated
-- [ ] `lib/log.ts` exists with `log()` and `getRequestId()` exports
-- [ ] `pnpm run test apps/web/lib/log.test.ts` passes
-- [ ] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
-- [ ] `grep -r "console.log\|console.error" apps/web/app/api/` returns no
+- [x] `lib/log.ts` exists with `log()` and `getRequestId()` exports
+- [x] `pnpm run test apps/web/lib/log.test.ts` passes
+- [x] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
+- [x] `grep -r "console.log\|console.error" apps/web/app/api/` returns no
       matches in handler bodies (only allowed inside `withErrorCapture`
       wrapper or in catch blocks that explicitly want stderr)
 

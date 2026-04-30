@@ -106,9 +106,9 @@ export function getAdminSecret(): string | undefined {
 ## Acceptance criteria
 
 ### Automated
-- [ ] `grep -rE "process\.env\.[A-Z_]+" apps/web/lib apps/web/app | grep -v "lib/env.ts"` returns no matches
-- [ ] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
-- [ ] `pnpm run lint` rejects new direct `process.env` reads outside `lib/env.ts`
+- [x] `grep -rE "process\.env\.[A-Z_]+" apps/web/lib apps/web/app | grep -v "lib/env.ts"` returns no matches
+- [x] `pnpm run typecheck && pnpm run test && pnpm run lint` all pass
+- [x] `pnpm run lint` rejects new direct `process.env` reads outside `lib/env.ts`
 
 ### Manual
 - Verify a missing required env var produces the explicit "Required env var X is unset" error path
