@@ -255,6 +255,25 @@
 - [Security]: No new security-related quality issues. All XSS vectors covered, all interactive elements accessible.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=coverage timestamp=2026-05-01T02:00:00Z -->
+## Coverage Agent — 2026-05-01
+- **Status**: GREEN
+- Overall coverage: **93.39% stmts** (8322/8911), 89.92% branches, 90.89% funcs, 94.43% lines
+- Test suite: 412 files, 7294 tests (+22 tests, +3 files vs 2026-04-30). Duration 70s with coverage.
+- Delta vs 2026-04-30: stmts +0.08pp, branches +0.04pp, funcs +0.19pp, lines +0.06pp — all critical-path P2 carries cleared by Apr 30 triage.
+- Critical paths GREEN: lib/impact 99.59%, lib/render 100%, lib/db 96.48%, app/api 97.48%, lib/auth 98.00%, lib/cache 98.13%, lib/github 97.35%, lib/bitbucket 97.70%, lib/codeberg 98.03%, lib/email 97.57%, lib/analytics 97.30%, lib/history 98.26%, lib/profile 100%, lib/insights 100%, lib/async 100%, lib/log 100%, lib/env 100% stmts/funcs.
+- **P2 RETIRED this cycle**: `app/u/[handle]/og-image/route.ts` (6-cycle 60%-funcs carry → 100%), `lib/cache/dirty-stats.ts` (75% funcs → 100%), `components/SharePageOwnerContent.tsx` (75% funcs → 100%). All addressed in Apr 30 triage.
+- **Flaky tests: 0** — three consecutive full runs passed 7294/7294 (durations 70s coverage / 30s / 20s). The `BadgeToolbar > strips @keyframes` intermittent flake noted Apr 30 did NOT recur.
+- **P3 carried (all accepted, all pre-existing)**: experiments/** 56.68% stmts (Canvas/WebGL JSDOM-blocked), `HolographicOverlay.tsx` 50% stmts (Canvas), `ParticleBackground.tsx` 90.35% stmts / 77.77% funcs (Canvas), `archetypeDemoData/demoData` 50% br (TS overload signatures), `lib/env.ts` 87.5% br (one ternary), framework shells 0% (no logic).
+- Critical-path files without sibling .test: only `app/api/auth/bitbucket/config.ts` + `app/api/auth/codeberg/config.ts` — pure config, exercised transitively. Not actionable.
+
+**Cross-agent recommendations:**
+- [Triage]: No mandatory action items this cycle. The 6-cycle og-image carry is finally retired. Optional one-test cleanup: cover the `lib/env.ts` env-coercion ternary to push branches over 90%.
+- [QA]: Suite fully stable across 3 consecutive runs (7294/7294 each). No flakes detected. The BadgeToolbar flake monitor (Apr 30 ask) shows clean — recommend dropping watch unless it reappears.
+- [Security]: lib/analytics 97.30% stmts / 89.47% branches — SENSITIVE_PATTERNS redaction paths stable. No security-relevant gaps.
+- [Cost Analyst]: app/api 97.48% (+0.10pp), lib/db 96.48% (stable). No cost-path coverage regressions.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=coverage timestamp=2026-04-30T02:00:00Z -->
 ## Coverage Agent — 2026-04-30
 - **Status**: GREEN
@@ -294,24 +313,6 @@
 - [QA]: Suite stable and flake-free across 3 consecutive runs. `poolOptions.forks.maxForks` pin continues to hold.
 - [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branch coverage stable at 89.09% — no new security-relevant gaps.
 - [Cost Analyst]: app/api ~97%, lib/db 96.47% — stable. `lib/log.ts` (JSON logger) fully covered; no cost-path impact.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage timestamp=2026-04-28T02:05:00Z -->
-## Coverage Agent — 2026-04-28
-- **Status**: GREEN
-- Overall coverage: **93.27% stmts** (8254/8849), 89.89% branches, 90.53% funcs, 94.33% lines
-- Test suite: 408 files, 7224 tests — unchanged vs 2026-04-27. Duration 73s with coverage, ~20s without.
-- All critical paths GREEN: lib/impact 99.59%, lib/render 100%, lib/db 96.48%, app/api 97.34%, lib/profile 100%, lib/history 98.26%, lib/auth 98.01%, lib/codeberg 98.03%, lib/bitbucket 97.70%, lib/email 97.57%, lib/cache 97.48%, lib/github 97.35%, lib/analytics 97.26%
-- **Flaky tests: 0** — three consecutive runs (1× coverage + 2× plain) all 7224/7224 passing. BadgeToolbar `@keyframes` flake remains resolved.
-- **P2 active (small)**: `app/u/[handle]/og-image/route.ts` 94.28% stmts / **60% funcs** (avatar-fetch + error-fallback untested — carried from Apr 27). `lib/cache/dirty-stats.ts` 83.33% stmts / 75% funcs. `components/SharePageOwnerContent.tsx` 90.48% stmts / 75% funcs.
-- **P3 carried (accepted)**: experiments/** 56.68% stmts (Canvas/WebGL JSDOM-blocked), `AuthorTypewriter.tsx` 67.5% branches (JSDOM timers), `HolographicOverlay.tsx` 50% stmts (Canvas), framework shells 0% (no logic).
-- Critical-path files without sibling .test: only `app/api/auth/bitbucket/config.ts` + `app/api/auth/codeberg/config.ts` — pure config, exercised transitively.
-
-**Cross-agent recommendations:**
-- [Triage]: Only meaningful gap is `og-image/route.ts` 60% funcs (carried from Apr 27 — not yet addressed). Two helpers — recommend fixtures for avatar fetch failure + missing-avatar fallback to retire the only critical-path P2.
-- [QA]: Suite stable across 3 runs, no new flakes. `poolOptions.forks.maxForks` pin from Apr 25 still appropriate.
-- [Security]: `lib/analytics` (server-errors SENSITIVE_PATTERNS) holds at 97.26% stmts / 89.09% branches. No new security-relevant gaps.
-- [Cost Analyst]: app/api 97.34%, lib/db 96.48% — unchanged vs Apr 27. No cost-critical regressions.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-24T07:03:08Z -->
@@ -371,4 +372,52 @@
 - [Security]: ISR regression means archetype/about pages no longer serve from CDN cache — DDoS surface slightly increased. Rate limiting on these pages already present via Redis, but fixing ISR would reduce origin exposure.
 - [QA]: `/about/scoring` embeds `LiteYouTubeEmbed` — not a CLS risk (`aspect-video` container). No rendering regressions observed.
 - [Cost Analyst]: ISR regression likely increased Vercel serverless invocations for 7+ pages that should be CDN-cached. Archetype pages (revalidate=604800) hitting origin every request instead of being CDN-cached for a week is a cost regression worth quantifying.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-05-01T01:02:46Z -->
+## Cost Analyst — 2026-05-01
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- **ISR regression CLOSED**: Apr 30 triage wrapped `dbGetFeatureFlag` in
+  `unstable_cache` (`lib/feature-flags.ts:80-94`, revalidate=300, tag
+  `feature-flags`). 13 pages (`/about*`, `/archetypes/*`, `/cli/authorize`,
+  `/admin`, `/_not-found`) eligible for ISR again — Vercel serverless
+  invocation regression projected by Performance Apr 30 is recovered.
+- Redis: 27 prefixes, TTL coverage 24/27 (89%), 3 bounded singletons. Growth
+  risk LOW. Env access centralized via `lib/env.ts` getters this cycle (zero
+  functional/cost impact).
+- New `lib/cache/dirty-stats.ts` covered 100% — no new growth surface.
+- GitHub API: cache-first unchanged. 100% timeout coverage. Only intentionally
+  uncached: `/api/health` probe + `/api/refresh` (5/hr + auth).
+- Supabase: 11 tables + 2 views + 1 RPC, lazy singleton client. 0 N+1s.
+  `dbGetFeatureFlag` reads now reduced to ~1/300s/instance via `unstable_cache`.
+- External APIs: 16 routes audited, all cached or rate-limited, all with
+  explicit timeouts. No new uncached calls.
+- Cron: 4 handlers at maxDuration=300s, bearer-auth, unchanged.
+- No edge routes (Redis + Supabase SDKs require Node runtime).
+- Resource leaks: 0. All timers paired with cleanup. All in-memory structures
+  bounded.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED (6th cycle)**: `dbGetCampaignStats()` 4-query parallel count
+  aggregation (`lib/db/campaigns.ts:734-751`). Move to `GROUP BY status` RPC
+  at >5K sends/campaign. Not yet triggered.
+- **NEW MONITOR M6**: `unstable_cache(feature-flags)` data cache lag up to
+  5 min after admin writes — wire `revalidateTag("feature-flags")` into
+  `/api/admin/feature-flags` PATCH handler when convenient.
+- **MONITOR M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image
+  cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row
+  growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog
+  spike risk at high error rate (fire-and-forget, timeout-protected).
+
+**Cross-agent recommendations:**
+- [Performance]: ISR regression closed — re-measure archetype/about CDN-cache
+  hit ratios next cycle to confirm serverless invocations dropped to baseline.
+  Bundle growth (+194.9 KB Apr 30) is browser-side and outside cost scope.
+- [Security]: No new cost-security conflicts. Fail-open rate limiter intact
+  (`redis.ts:183`). All env reads now go through `lib/env.ts` `.trim()` —
+  eliminates invisible-character auth-failure class. Resend webhook 3-layer
+  defense intact.
+- [Coverage]: `lib/feature-flags.ts` `unstable_cache` wrap should be tested —
+  confirm a covered fixture exists for the cached path and the
+  `revalidateTag` invalidation. `app/api` ~97.48%, `lib/db` 96.48% stable.
 <!-- ENTRY:END -->

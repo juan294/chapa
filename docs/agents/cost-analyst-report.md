@@ -1,92 +1,181 @@
 # Cost Analyst Report
-> Generated: 2026-04-30 | Health status: green
+> Generated: 2026-05-01 | Health status: GREEN
 
 ## Executive Summary
 
-Infrastructure cost profile remains stable at ~$55–70/mo at 10K users. The sole new commit since yesterday (`lib/env.ts` typed env getters, b2c8d3c) adds zero Redis writes, zero external calls, and zero Vercel function overhead — it is a pure safety refactor. No new cost surfaces; all monitors and the one active P2 carry unchanged.
+Estimated monthly cost at 10K users remains **~$55–70/mo**. The Apr 30 ISR
+regression flagged by Performance has been remediated — `dbGetFeatureFlag` is
+now wrapped in `unstable_cache` (5-min revalidate, `feature-flags` tag) so the
+root layout's `isStudioEnabled()` no longer pulls Upstash REST `no-store` into
+every request. CDN-cached pages (/about/*, /archetypes/*, /, /u/[handle],
+/privacy, /terms) are eligible for ISR again — recovering the projected
+serverless-invocation regression from the previous cycle. No new external API
+calls, no new TTL gaps, no new in-memory growth surfaces.
 
 ## Redis Usage
 
-- **Key prefixes audited:** 27 distinct patterns (unchanged from 2026-04-29)
-- **TTL coverage:** 24/27 (89%) — 3 intentional persistent singletons
-- **Default TTL:** `cacheSet()` defaults to 21,600s (6h) at `lib/cache/redis.ts:69`
-- **Persistent keys (TTL=0):**
-  - `stats:badges_generated` — INCR counter, bounded by usage (~10 KB/yr)
-  - `stats:unique_badges` — HyperLogLog, ~12 KB fixed
-  - `cron:warm-cache:offset` — single integer, bounded
-- **Growth risk:** LOW — all per-handle keys are date-keyed or TTL-bounded; HLL capped at ~12 KB; counters grow linearly at negligible rate
-- **Fail-open rate limiter:** intact at `redis.ts:183` — allows all requests when Redis is unavailable (intentional design, documented at `redis.ts:127-149`)
+- **Key prefixes** (27 distinct, unchanged from 2026-04-30):
+  - Per-user / per-handle: `stats:`, `stats:v2:`, `stats:v2:bitbucket:`,
+    `stats:v2:codeberg:`, `impact:`, `badge:`, `history:`, `og:`, `avatar:`,
+    `supplemental:`, `craft:`, `agent:`, `pr-stats:`, `bitbucket:`, `codeberg:`,
+    `feature-flag:`
+  - Per-IP / per-key rate limit counters: `rl:` family
+  - Auth/lock/session: `oauth:state:`, `cli:auth:`, `badge-lock:`,
+    `dirty:stats:`, `agent:run:`, `webhook:resend:idem:`
+  - Persistent singletons (TTL=0): `cron:warm-cache:offset` (int),
+    `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB)
+- **TTL coverage**: 24/27 (89%). All non-singleton keys have explicit `ex`
+  (cache reads) or `EXPIRE` (rate limiters, sliding-window pipelines)
+  documented in `lib/cache/redis.ts:66-385`.
+- **Growth risk**: LOW. The 3 TTL=0 keys are bounded singletons (single
+  integer, single counter, fixed-size HLL).
+- **New `lib/cache/dirty-stats.ts`** module + tests (this cycle): same dirty
+  marker pattern as before, 1h TTL, 100% covered. No new growth surface.
+- **No changes** to `cacheSet`, `cacheSetNx`, `rateLimit`, or pipeline
+  builders. Env access centralized via `lib/env.ts` getters — purely a safety
+  refactor; zero functional or cost impact.
 
 ## Database Usage
 
-- **Tables:** 11 tables + 2 views (`security_invoker=true`) + 1 RPC (`claim_campaign_sends`)
-- **Connection management:** Lazy singleton at `lib/db/supabase.ts:11` — one persistent connection per Node.js worker, `persistSession: false`
-- **Query patterns:** 0 N+1 patterns. Batch reads use single `IN()` query (`dbGetLatestSnapshotBatch()` at `lib/db/snapshots.ts:325`). All retention jobs run batched 1,000-row deletes.
-- **Retention:** `dbCleanOldSnapshots` (365d), `dbCleanExpiredMergeOperations` (90d), `dbCleanExpiredVerifications` (30d) — all wired in `cron/warm-cache/route.ts:175`
+- **Tables**: 11 (users, metrics_snapshots, campaign_sends, email_campaigns,
+  feature_flags, user_platforms, supplemental_stats, verification_records,
+  merge_operations, tool_insights, plus telemetry).
+- **Views**: 2 (`latest_snapshots`, `admin_users` — both `security_invoker = true`).
+- **RPC**: 1 (`claim_campaign_sends`).
+- **Connection management**: lazy singleton via
+  `getSupabase()` at `apps/web/lib/db/supabase.ts:11` — no per-request client
+  instantiation, no connection-pool growth.
+- **Query patterns**: 0 N+1s. Batch reads use a single `IN()` query
+  (`dbGetLatestSnapshotBatch()` at `lib/db/snapshots.ts:325`).
+- **Retention**: `dbCleanOldSnapshots()` invoked from warm-cache cron at
+  `route.ts:175` — 365-day retention. All retention jobs wired and running.
+- **`dbGetFeatureFlag` now `unstable_cache`-wrapped** (`lib/feature-flags.ts:80-94`):
+  5-minute revalidate, `feature-flags` tag for invalidation. Reduces Supabase
+  reads for the root layout `isStudioEnabled()` call from ~1/request to
+  ~1/300s per server instance — material cost recovery.
 
 ## External API Calls
 
 | Route | External Service | Cached | Rate Limited | Risk |
 |-------|-----------------|--------|-------------|------|
-| `/api/health` | GitHub (`api.github.com/rate_limit`) | No (intentional) | 30 req/60s | LOW — probe only, 3s timeout |
-| `/api/refresh` | GitHub (stats fetch) | Cache-bypass by design | 5 req/hr per user + auth-gated | LOW — intentional, auth required |
-| `/u/[handle]/badge.svg` | GitHub (via `lib/github/client.ts`) | Yes — 6h fresh + 7d stale + in-flight dedup | Yes — per-IP | LOW |
-| `/u/[handle]/og-image` | GitHub avatar URL (base64 fetch) | Yes — 48h Redis cache (`og-image:v2:*`) | 30 req/60s per IP | LOW |
-| `/api/generate` | GitHub (via client) | Yes — 6h fresh | Yes | LOW |
-| `/api/webhooks/resend` | Resend (inbound webhook) | N/A | 20 req/60s + Svix HMAC | LOW |
-| All routes (server errors) | PostHog (`/capture/`) via `withErrorCapture` | N/A — per-error event | Fire-and-forget, 5s timeout | LOW — bounded by real error rate |
+| `/api/health` | GitHub probe (uncached, by design) | No | 30/60s | LOW |
+| `/api/refresh` | GitHub stats fetch | Yes (post-fetch) | 5/hr/handle + auth | LOW |
+| `/api/generate` | GitHub stats fetch | Yes | 5/hr + auth | LOW |
+| `/api/recalculate` | GitHub stats fetch | Yes | 5/hr + auth | LOW |
+| `/api/profile/[handle]` | None (cache-only read) | Yes | 60/60s | LOW |
+| `/api/history/[handle]` | None (Supabase only) | Yes | 60/60s | LOW |
+| `/api/verify/[hash]` | None (HMAC only) | N/A | 30/60s | LOW |
+| `/api/auth/{platform}/callback` | OAuth token exchange | N/A | per-state-token | LOW |
+| `/api/auth/{platform}/connect` | None (just redirect) | N/A | per-IP | LOW |
+| `/api/webhooks/resend` | Resend (Svix HMAC + idempotency) | N/A | 60/60s | LOW |
+| `/api/cron/warm-cache` | GitHub stats batch | Yes | bearer (CRON_SECRET) | LOW |
+| `/api/cron/sync-audience` | Resend audience sync | N/A | bearer | LOW |
+| `/api/cron/process-campaigns` | Resend send | N/A | bearer + per-batch lock | LOW |
+| `/api/telemetry` | None (write to Supabase) | N/A | 30/60s | LOW |
+| `/api/insights/[handle]` | None | Yes | per-handle | LOW |
+| `/api/insights` (POST) | None | N/A | 5/hr + auth | LOW |
 
-All Bitbucket/Codeberg external calls go through `lib/bitbucket/client.ts` + `lib/codeberg/client.ts` with explicit timeouts. 100% timeout coverage via `AbortSignal.timeout()` or `withTimeout()`.
+- All external fetches use `withTimeout()` or `AbortSignal.timeout()` (100%
+  coverage, unchanged).
+- In-flight dedup at `lib/github/client.ts:28` — 30s TTL, `.finally()` clear.
 
 ## Resource Management
 
-- **Timers:** All `setTimeout` calls have paired cleanup in `.finally()`. No server-side `setInterval`. No leaks.
-- **In-memory `_inflight` Map** (`lib/github/client.ts:28`): bounded by 30s timeout + explicit `.finally()` clear — prevents unbounded growth under concurrency
-- **`flagCache`:** bounded by fixed feature-flag set (~5–10 entries)
-- **`warmSet`:** bounded to `MAX_HANDLES=50` in cron handler
-- **`fallbackStateStore`:** bounded by 10-min OAuth nonce TTL
-- **`@resvg/resvg-js`:** declared in `serverExternalPackages` (`next.config.ts:90`) — not bundled, loaded on-demand by OG image routes only
-- **OG image base64 write:** fire-and-forget at `og-image/route.ts:97` via `fireAndForget()` — non-blocking, timeout-protected
+- **Timers**: All `setTimeout` paired with cleanup. No server-side
+  `setInterval`. No leaks observed.
+- **In-memory caches**:
+  - `_inflight` Map (GitHub client) — bounded by 30s timeout + `.finally()`.
+  - `inflightBadgeRenders` — bounded by 30s SETNX `badge-lock` TTL.
+  - `flagCache` (in-process) — fixed flag set (~5–10 entries).
+  - `warmSet` — MAX_HANDLES=50.
+  - `unstable_cache` data cache (new, this cycle) — Next.js framework manages
+    eviction; revalidate=300s bounds entry age.
+- **Connection pools**: Supabase singleton, Upstash Redis singleton — both
+  lazy via `lib/env.ts` getters now.
+- **Buffer/blob handling**: OG image renderer uses `@resvg/resvg-js` with
+  output to `Uint8Array` (no streaming); resvg buffers are GC'd per-request.
+  Avatar fetch caps response size implicitly via 5s timeout (no body cap, but
+  hostname + MIME whitelist limits surface).
 
-## New Since Last Report (2026-04-30)
+## Vercel-Specific Cost Factors
 
-**`lib/env.ts` — typed env getters (commit b2c8d3c)**
-- Centralizes all `process.env` reads with `.trim()` applied exactly once
-- Returns typed values: `string | undefined`, `boolean`, `string[]`
-- Zero Redis writes, zero external calls, zero Vercel compute overhead
-- Coverage: 100% stmts/funcs, 87.5% branches (one minor uncovered ternary)
-- Phase 9C ESLint rule (`no-restricted-syntax` blocking direct `process.env` reads) still pending — call-site sweep of ~20 remaining usages not yet complete
-
-## Vercel Cost Factors
-
-- **ISR revalidation intervals:** `/about*`→86400s, `/archetypes/*`→604800s, `/`→3600s, `/u/[handle]`→3600s, `/privacy`+`/terms`→86400s
-- **`force-dynamic` pages:** `/studio`, `/admin/*`, `/experiments/*` — intentional (auth/flag-gated)
-- **Edge vs serverless:** All routes use Node.js runtime (Redis + Supabase clients require it). No edge routes. No misclassified routes.
-- **Cron handlers:** 4 at `maxDuration=300s` — `warm-cache`, `process-campaigns`, `sync-audience`, `bulk-recalculate`
-- **No oversized routes** — largest chunks are framework/vendor (~232 KB framework, ~173 KB PostHog lazy)
-
-## Active Issues
-
-### P2 Active — 5th Carry Cycle
-**`dbGetCampaignStats()` — 4-query parallel count aggregation**
-- Location: `lib/db/campaigns.ts:734-751`
-- Pattern: 4 parallel `SELECT COUNT(*)` calls, one per campaign status
-- Fix: Single `SELECT status, COUNT(*) GROUP BY status` Postgres RPC
-- Trigger: >5K sends per campaign
-- Current state: Not yet triggered. Acceptable today.
-
-## Monitors (Carried)
-
-| ID | Item | Threshold |
-|----|------|-----------|
-| M1 | Avatar Redis cache memory | ~300 MB at 10K users |
-| M2 | OG image Redis cache memory | ~200 MB at 1K active/day |
-| M3 | HyperLogLog `stats:unique_badges` | ~12 KB fixed — no action needed |
-| M4 | `metrics_snapshots` row growth | ~3.65M rows/year at 10K users — cleanup wired (365d retention) |
-| M5 | `withErrorCapture` PostHog spike | Fire-and-forget + 5s timeout protects cost; monitor for high error rate bursts |
+- **Serverless invocation profile recovered** via `unstable_cache`:
+  `/about`, `/about/scoring`, `/about/verification`, `/archetypes/*` (7),
+  `/cli/authorize`, `/admin`, `/_not-found` no longer forced dynamic by the
+  root-layout `isStudioEnabled()` call. The 13-page ISR regression flagged
+  Apr 30 is closed.
+- **Cron handlers**: 4, all `maxDuration=300s`, all bearer-authenticated.
+  Vercel Pro cron-minute budget unaffected.
+- **Edge vs serverless**: All routes Node runtime (Redis + Supabase clients
+  require it). No edge opportunity without abandoning Upstash/Supabase SDKs.
+- **Bundle**: Performance reports +194.9 KB client-side growth Apr 30. No
+  cost impact server-side (this is browser cache + CDN bandwidth, not Vercel
+  function size).
+- **No oversized routes** — no chunk >500 KB.
 
 ## Recommendations
 
-1. **[P2 — scale gate]** Migrate `dbGetCampaignStats()` to a `GROUP BY status` RPC once campaign sends exceed 5K/campaign. Not urgent.
-2. **[Phase 9C — pending]** Complete the `process.env` call-site sweep (~20 remaining usages) after the ESLint rule is wired. No cost impact but improves env-var safety and prevents invisible-character auth failures.
-3. **[Monitor]** OG image cache (M2) is the largest Redis memory risk at scale — if avatar+OG cache approaches 500 MB, evaluate shorter TTL or CDN offload.
+1. **Wire admin write hook to call `revalidateTag("feature-flags")`** when
+   feature flag rows are mutated via `/api/admin/feature-flags`. Currently
+   the in-process `flagCache` is invalidated but the `unstable_cache` data
+   cache will lag up to 5 minutes. Low priority — admin-facing, infrequent.
+2. **(P2 carried, 6th cycle)** `dbGetCampaignStats()` 4-query parallel count
+   aggregation (`lib/db/campaigns.ts:734-751`). Move to a `GROUP BY status`
+   Postgres RPC at >5K sends/campaign. Threshold not yet triggered — defer.
+3. **(MONITOR M1–M5 carried)** Avatar cache (~300 MB @10K), OG image cache
+   (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth
+   (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog spike
+   risk at high error rate (fire-and-forget, timeout-protected). All within
+   budget; no action needed yet.
+
+---
+
+<!-- Shared-context entry for docs/agents/shared-context.md -->
+
+SHARED_CONTEXT_START
+## Cost Analyst — 2026-05-01
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- **ISR regression CLOSED**: Apr 30 triage wrapped `dbGetFeatureFlag` in
+  `unstable_cache` (`lib/feature-flags.ts:80-94`, revalidate=300, tag
+  `feature-flags`). 13 pages (`/about*`, `/archetypes/*`, `/cli/authorize`,
+  `/admin`, `/_not-found`) eligible for ISR again — Vercel serverless
+  invocation regression projected by Performance Apr 30 is recovered.
+- Redis: 27 prefixes, TTL coverage 24/27 (89%), 3 bounded singletons. Growth
+  risk LOW. Env access centralized via `lib/env.ts` getters this cycle (zero
+  functional/cost impact).
+- New `lib/cache/dirty-stats.ts` covered 100% — no new growth surface.
+- GitHub API: cache-first unchanged. 100% timeout coverage. Only intentionally
+  uncached: `/api/health` probe + `/api/refresh` (5/hr + auth).
+- Supabase: 11 tables + 2 views + 1 RPC, lazy singleton client. 0 N+1s.
+  `dbGetFeatureFlag` reads now reduced to ~1/300s/instance via `unstable_cache`.
+- External APIs: 16 routes audited, all cached or rate-limited, all with
+  explicit timeouts. No new uncached calls.
+- Cron: 4 handlers at maxDuration=300s, bearer-auth, unchanged.
+- No edge routes (Redis + Supabase SDKs require Node runtime).
+- Resource leaks: 0. All timers paired with cleanup. All in-memory structures
+  bounded.
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED (6th cycle)**: `dbGetCampaignStats()` 4-query parallel count
+  aggregation (`lib/db/campaigns.ts:734-751`). Move to `GROUP BY status` RPC
+  at >5K sends/campaign. Not yet triggered.
+- **NEW MONITOR M6**: `unstable_cache(feature-flags)` data cache lag up to
+  5 min after admin writes — wire `revalidateTag("feature-flags")` into
+  `/api/admin/feature-flags` PATCH handler when convenient.
+- **MONITOR M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image
+  cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row
+  growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog
+  spike risk at high error rate (fire-and-forget, timeout-protected).
+
+**Cross-agent recommendations:**
+- [Performance]: ISR regression closed — re-measure archetype/about CDN-cache
+  hit ratios next cycle to confirm serverless invocations dropped to baseline.
+  Bundle growth (+194.9 KB Apr 30) is browser-side and outside cost scope.
+- [Security]: No new cost-security conflicts. Fail-open rate limiter intact
+  (`redis.ts:183`). All env reads now go through `lib/env.ts` `.trim()` —
+  eliminates invisible-character auth-failure class. Resend webhook 3-layer
+  defense intact.
+- [Coverage]: `lib/feature-flags.ts` `unstable_cache` wrap should be tested —
+  confirm a covered fixture exists for the cached path and the
+  `revalidateTag` invalidation. `app/api` ~97.48%, `lib/db` 96.48% stable.
+SHARED_CONTEXT_END
