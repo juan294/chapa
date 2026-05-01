@@ -13,6 +13,11 @@ import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import {
+  buildBadgeSvgCacheKey,
+  readBadgeSvgCache,
+  writeBadgeSvgCache,
+} from "@/lib/render/badge-svg-cache";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
@@ -90,35 +95,50 @@ export async function SharePageContent({ handle }: { handle: string }) {
   const materialized = await materializePublicProfile(handle);
   const stats = materialized?.stats ?? null;
   const impact = materialized?.displayImpact ?? null;
-
-  // Start avatar fetch immediately (runs concurrently with EMA computation)
-  const avatarPromise = stats?.avatarUrl
-    ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
-    : Promise.resolve(undefined);
-
-  // Render badge SVG inline during SSR. Cap avatar wait at 500ms so a slow
-  // external image server can't block TTFB — badge renders with placeholder on miss.
-  const AVATAR_DEADLINE_MS = 500;
-  const avatarDataUri = await Promise.race([
-    avatarPromise,
-    new Promise<undefined>((resolve) =>
-      setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
-    ),
-  ]);
   const verification = materialized
     ? getPublicProfileVerification(materialized)
     : null;
-  const inlineSvg = stats && impact
-    ? renderBadgeSvg(stats, impact, {
-        avatarDataUri,
-        verificationHash: verification?.hash,
-        verificationDate: verification?.date,
-      })
-    : null;
 
-  // Deferred work: verification storage, tracking, snapshots (runs after response)
+  // #720 — try the shared SVG cache first. The /u/[handle]/badge.svg route
+  // writes here after every successful render, so on warm caches the share
+  // page can skip avatar fetch + render entirely.
+  const today = toDateString(new Date());
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
+
+  let inlineSvg: string | null = cachedSvg;
+  let renderedFresh = false;
+
+  if (!cachedSvg && stats && impact) {
+    // Cache miss — render inline. Avatar fetch is best-effort with a 500ms
+    // deadline so a slow external image server can't block TTFB.
+    const avatarPromise = stats.avatarUrl
+      ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
+      : Promise.resolve(undefined);
+    const AVATAR_DEADLINE_MS = 500;
+    const avatarDataUri = await Promise.race([
+      avatarPromise,
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
+      ),
+    ]);
+    inlineSvg = renderBadgeSvg(stats, impact, {
+      avatarDataUri,
+      verificationHash: verification?.hash,
+      verificationDate: verification?.date,
+    });
+    renderedFresh = true;
+  }
+
+  // Deferred work: verification storage, tracking, snapshots, and (on
+  // fresh render) cache write so future requests / the badge.svg route
+  // can hit the cache.
   if (materialized && inlineSvg) {
+    const svgToCache = renderedFresh ? inlineSvg : null;
     after(() => {
+      if (svgToCache) {
+        void writeBadgeSvgCache(svgCacheKey, svgToCache);
+      }
       return runPublicProfileSideEffects(handle, materialized, { verification });
     });
   }

@@ -7,11 +7,14 @@ import { escapeXml } from "@/lib/render/escape";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import {
   cacheDel,
-  cacheGet,
-  cacheSet,
   cacheSetNx,
   rateLimit,
 } from "@/lib/cache/redis";
+import {
+  buildBadgeSvgCacheKey,
+  readBadgeSvgCache,
+  writeBadgeSvgCache,
+} from "@/lib/render/badge-svg-cache";
 import { CACHE_VERSION } from "@/lib/cache/version";
 import { getClientIp } from "@/lib/http/client-ip";
 import { captureServerError } from "@/lib/analytics/server-errors";
@@ -57,10 +60,6 @@ function fallbackSvg(handle: string, message: string): string {
 </svg>`;
 }
 
-function buildBadgeSvgCacheKey(handle: string, date: string): string {
-  return `badge:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
-}
-
 function buildBadgeRenderLockKey(handle: string, date: string): string {
   return `badge-lock:${CACHE_VERSION}:${handle.toLowerCase()}:warm-amber:${date}`;
 }
@@ -82,30 +81,12 @@ async function withBadgeFallback<T>(
   }
 }
 
-async function readBadgeSvgCache(key: string): Promise<string | null> {
-  return withBadgeFallback(
-    cacheGet<string>(key),
-    null,
-    BADGE_CACHE_DEADLINE_MS,
-    "badge cache read",
-  );
-}
-
 async function acquireBadgeRenderLock(key: string): Promise<boolean> {
   return withBadgeFallback(
     cacheSetNx(key, BADGE_RENDER_LOCK_TTL_SECONDS),
     false,
     BADGE_CACHE_DEADLINE_MS,
     "badge render lock",
-  );
-}
-
-async function writeBadgeSvgCache(key: string, svg: string): Promise<boolean> {
-  return withBadgeFallback(
-    cacheSet(key, svg, 86400),
-    false,
-    BADGE_CACHE_DEADLINE_MS,
-    "badge cache write",
   );
 }
 
