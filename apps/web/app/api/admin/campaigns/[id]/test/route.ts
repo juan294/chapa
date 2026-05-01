@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { requireSession } from "@/lib/auth/require-session";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { rateLimit } from "@/lib/cache/redis";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { getResend } from "@/lib/email/resend";
@@ -29,7 +30,7 @@ function interpolate(template: string, handle: string): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key as string] ?? "");
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export const POST = withErrorCapture("/api/admin/campaigns/[id]/test", async (request: NextRequest, ctx) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Fetch campaign
-  const { id } = await params;
+  const { id } = await (ctx as RouteParams).params;
   const campaign = await dbGetCampaign(id);
   if (!campaign) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -152,4 +153,4 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { status: 500 },
     );
   }
-}
+});

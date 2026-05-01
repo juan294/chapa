@@ -23,6 +23,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { InsightsUpload } from "@chapa/shared";
 import { computeCraftScore } from "@/lib/insights/scoring";
+import { getSupabaseUrl, getSupabaseServiceRoleKey } from "@/lib/env";
 
 interface ToolInsightsRow {
   handle: string;
@@ -61,8 +62,8 @@ async function fetchAllRows(supabase: SupabaseClient): Promise<ToolInsightsRow[]
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
 
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseServiceRoleKey();
   if (!supabaseUrl || !supabaseKey) {
     console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     process.exit(1);

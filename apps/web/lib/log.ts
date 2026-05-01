@@ -1,19 +1,29 @@
-type LogLevel = "info" | "warn" | "error";
-type LogExtras = Record<string, unknown>;
+import { getVercelEnv } from "@/lib/env";
 
-function emit(level: LogLevel, msg: string, extras?: LogExtras): void {
-  const entry = {
-    level,
-    msg,
-    ts: new Date().toISOString(),
-    env: process.env.VERCEL_ENV ?? "development",
-    ...extras,
-  };
-  console.log(JSON.stringify(entry));
+type Level = "debug" | "info" | "warn" | "error";
+
+export interface LogContext {
+  route?: string;
+  requestId?: string;
+  handle?: string;
+  [k: string]: unknown;
 }
 
-export const log = {
-  info: (msg: string, extras?: LogExtras) => emit("info", msg, extras),
-  warn: (msg: string, extras?: LogExtras) => emit("warn", msg, extras),
-  error: (msg: string, extras?: LogExtras) => emit("error", msg, extras),
-};
+export function log(level: Level, msg: string, context: LogContext = {}): void {
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    level,
+    msg,
+    env: getVercelEnv() ?? "development",
+    ...context,
+  });
+  if (level === "error" || level === "warn") {
+    console.error(line);
+  } else {
+    console.log(line);
+  }
+}
+
+export function getRequestId(req: Request): string {
+  return req.headers.get("x-vercel-id") ?? crypto.randomUUID();
+}

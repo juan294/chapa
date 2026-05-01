@@ -8,20 +8,20 @@ import {
   clearStateCookie,
 } from "@/lib/auth/github";
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
+import { getBaseUrl, getGithubClientId, getGithubClientSecret, getNextauthSecret } from "@/lib/env";
 import { consumeOauthState } from "@/lib/auth/oauth-state";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
 import { addContact } from "@/lib/email/audience";
-import { captureServerError } from "@/lib/analytics/server-errors";
+import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
+import { getRequestId } from "@/lib/log";
 import { storeGitHubToken } from "@/lib/auth/github-session-token";
 
 const OAUTH_STATE_STORE_COOKIE = "chapa_oauth_state_store";
 
-function cookieFlags(request: NextRequest): string {
-  return buildAuthCookieFlags(
-    process.env.NEXT_PUBLIC_BASE_URL?.trim() || request.nextUrl.origin,
-  );
+function cookieFlags(): string {
+  return buildAuthCookieFlags(getBaseUrl());
 }
 
 function isLocalDevRequest(request: NextRequest): boolean {
@@ -79,7 +79,8 @@ function readOauthStateStoreCookie(
   return value === "shared" || value === "fallback" ? value : null;
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/auth/callback", async (request: NextRequest) => {
+  const requestId = getRequestId(request);
   // Rate limit: 10 requests per IP per 15 minutes
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:callback:${ip}`, 10, 900);
@@ -110,15 +111,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "state_already_used" }, { status: 400 });
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID?.trim();
-  const clientSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
-  const sessionSecret = process.env.NEXTAUTH_SECRET?.trim();
+  const clientId = getGithubClientId();
+  const clientSecret = getGithubClientSecret();
+  const sessionSecret = getNextauthSecret();
 
   if (!clientId || !clientSecret || !sessionSecret) {
     void captureServerError({
       route: "/api/auth/callback",
       statusCode: 500,
       error: new Error("OAuth config incomplete: missing required env vars"),
+      requestId,
     });
     return NextResponse.redirect(new URL("/?error=config", request.url));
   }
@@ -129,6 +131,7 @@ export async function GET(request: NextRequest) {
       route: "/api/auth/callback",
       statusCode: 502,
       error: new Error("GitHub token exchange failed"),
+      requestId,
     });
     return NextResponse.redirect(new URL("/?error=token_exchange", request.url));
   }
@@ -139,6 +142,7 @@ export async function GET(request: NextRequest) {
       route: "/api/auth/callback",
       statusCode: 502,
       error: new Error("GitHub user fetch failed after token exchange"),
+      requestId,
     });
     return NextResponse.redirect(new URL("/?error=user_fetch", request.url));
   }
@@ -149,6 +153,7 @@ export async function GET(request: NextRequest) {
       route: "/api/auth/callback",
       statusCode: 500,
       error: new Error("GitHub token storage failed"),
+      requestId,
     });
     return NextResponse.redirect(new URL("/?error=session_storage", request.url));
   }
@@ -164,6 +169,7 @@ export async function GET(request: NextRequest) {
       route: "/api/auth/callback",
       statusCode: 500,
       error: err,
+      requestId,
     });
   });
 
@@ -177,6 +183,7 @@ export async function GET(request: NextRequest) {
         route: "/api/auth/callback",
         statusCode: 500,
         error: err,
+        requestId,
       });
     });
   }
@@ -206,12 +213,12 @@ export async function GET(request: NextRequest) {
   response.headers.append("Set-Cookie", clearStateCookie());
   response.headers.append(
     "Set-Cookie",
-    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags(request)}; Max-Age=0`,
+    `${OAUTH_STATE_STORE_COOKIE}=; ${cookieFlags()}; Max-Age=0`,
   );
   // Clear the redirect cookie
   response.headers.append(
     "Set-Cookie",
-    `chapa_redirect=; ${cookieFlags(request)}; Max-Age=0`,
+    `chapa_redirect=; ${cookieFlags()}; Max-Age=0`,
   );
   return response;
-}
+});

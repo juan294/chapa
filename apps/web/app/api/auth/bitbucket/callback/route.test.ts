@@ -179,7 +179,7 @@ describe("GET /api/auth/bitbucket/callback", () => {
   });
 
   it("redirects with error=bitbucket_config when env vars are missing", async () => {
-    delete process.env.BITBUCKET_CLIENT_ID;
+    vi.stubEnv("BITBUCKET_CLIENT_ID", undefined);
 
     const res = await GET(
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_bb_oauth_state=xyz" }),

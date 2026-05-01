@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/crypto/safe-equal";
+import { getCronSecret } from "@/lib/env";
 
 /**
  * Verify that an incoming request carries a valid CRON_SECRET bearer token.
@@ -22,7 +23,7 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
  * ```
  */
 export function verifyCronSecret(request: Request): NextResponse | null {
-  const secret = process.env.CRON_SECRET?.trim();
+  const secret = getCronSecret();
   if (!secret) {
     console.error(
       "[cron] CRON_SECRET not configured — rejecting request (fail-secure)",

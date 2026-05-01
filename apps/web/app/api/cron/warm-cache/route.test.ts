@@ -90,6 +90,7 @@ vi.mock("@/lib/render/avatar", () => ({
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
   captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
+  withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
 const FAKE_MATERIALIZED = {
@@ -155,8 +156,8 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   afterEach(() => {
-    delete process.env.GITHUB_TOKEN;
-    delete process.env.WARM_CACHE_PRIORITY_HANDLES;
+    vi.stubEnv("GITHUB_TOKEN", undefined);
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", undefined);
   });
 
   it("returns the denied response when cron auth fails", async () => {
@@ -169,7 +170,7 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   it("warms discovered handles through the shared orchestrated materializer", async () => {
-    process.env.GITHUB_TOKEN = "ghp-server-token";
+    vi.stubEnv("GITHUB_TOKEN", "ghp-server-token");
 
     const res = await GET(makeRequest());
     const body = await res.json();
@@ -285,7 +286,7 @@ describe("GET /api/cron/warm-cache", () => {
   });
 
   it("includes WARM_CACHE_PRIORITY_HANDLES in the warm list even when outside the rotation slice", async () => {
-    process.env.WARM_CACHE_PRIORITY_HANDLES = "user0,user1,unknown-user";
+    vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user0,user1,unknown-user");
     // 80 users, offset=60 → rotation slice is user60..user79 (20 handles, < MAX_HANDLES)
     mockCacheGet.mockResolvedValue(60);
     mockDbGetUsers.mockResolvedValue(
@@ -429,5 +430,35 @@ describe("GET /api/cron/warm-cache", () => {
 
     // The failing handle should be counted and the error should surface
     expect(body.failed).toBeGreaterThanOrEqual(1);
+  });
+
+  // #702: failures[] surface in response
+  it("includes failures[] with handle and reason for each failed warm", async () => {
+    mockDbGetUsers.mockResolvedValue([user("alice"), user("bob"), user("charlie")]);
+    mockMaterializeOrchestratedProfile
+      .mockResolvedValueOnce(FAKE_MATERIALIZED) // alice succeeds
+      .mockResolvedValueOnce(FAKE_MATERIALIZED) // bob succeeds
+      .mockResolvedValueOnce(null);             // charlie fails (soft — returns false)
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(body.failed).toBe(1);
+    expect(body.failures).toHaveLength(1);
+    expect(body.failures[0]).toEqual({ handle: "charlie", reason: "warm returned false" });
+  });
+
+  // #750: rotation offset only advances after processInBatches completes
+  it("does not advance the rotation offset when no handles were processed", async () => {
+    mockDbGetUsers.mockResolvedValue([]);
+
+    const res = await GET(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockCacheSet).not.toHaveBeenCalledWith(
+      "cron:warm-cache:offset",
+      expect.anything(),
+      expect.anything(),
+    );
   });
 });

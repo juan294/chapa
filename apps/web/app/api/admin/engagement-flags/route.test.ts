@@ -133,7 +133,7 @@ describe("GET /api/admin/engagement-flags", () => {
     });
 
     it("returns 500 when NEXTAUTH_SECRET is undefined", async () => {
-      delete process.env.NEXTAUTH_SECRET;
+      vi.stubEnv("NEXTAUTH_SECRET", undefined);
 
       const res = await GET(makeRequest());
       expect(res.status).toBe(500);

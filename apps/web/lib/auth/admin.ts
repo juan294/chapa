@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/crypto/safe-equal";
+import { getAdminSecret, getAdminHandles } from "@/lib/env";
 
 /**
  * Verify that an incoming request carries a valid ADMIN_SECRET bearer token.
@@ -29,7 +30,7 @@ import { safeEqual } from "@/lib/crypto/safe-equal";
  * ```
  */
 export function verifyAdminSecret(request: Request): NextResponse | null {
-  const secret = process.env.ADMIN_SECRET?.trim();
+  const secret = getAdminSecret();
   if (!secret) {
     console.error(
       "[admin] ADMIN_SECRET not configured — rejecting request (fail-secure)",
@@ -58,9 +59,7 @@ export function verifyAdminSecret(request: Request): NextResponse | null {
  */
 export function isAdminHandle(handle: string): boolean {
   if (!handle) return false;
-  const raw = process.env.ADMIN_HANDLES?.trim();
-  if (!raw) return false;
-
-  const admins = raw.split(",").map((h) => h.trim().toLowerCase());
+  const admins = getAdminHandles().map((h) => h.toLowerCase());
+  if (!admins.length) return false;
   return admins.includes(handle.toLowerCase());
 }

@@ -572,24 +572,18 @@ describe("Bitbucket OAuth fetch AbortSignal timeout", () => {
 // ---------------------------------------------------------------------------
 
 describe("Bitbucket cookie Secure flag", () => {
-  const originalEnv = process.env.NEXT_PUBLIC_BASE_URL;
-
   afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.NEXT_PUBLIC_BASE_URL = originalEnv;
-    } else {
-      delete process.env.NEXT_PUBLIC_BASE_URL;
-    }
+    vi.unstubAllEnvs();
   });
 
   it("state cookie includes Secure when base URL is HTTPS", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
     const { cookie } = createBitbucketStateCookie();
     expect(cookie).toContain("Secure");
   });
 
   it("state cookie omits Secure when base URL is HTTP", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
     const { cookie } = createBitbucketStateCookie();
     expect(cookie).not.toContain("Secure");
   });

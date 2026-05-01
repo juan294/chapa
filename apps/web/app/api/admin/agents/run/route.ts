@@ -3,6 +3,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { AGENTS } from "@/lib/agents/agent-config";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { getVercelEnv, getNodeEnv, getAllowAgentRun } from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // In-memory run state — one agent at a time
@@ -64,14 +66,14 @@ export function _resetRunState(): void {
  */
 function devOnlyGuard(): NextResponse | null {
   // Hard block in Vercel production — in-memory state breaks across instances.
-  if (process.env.VERCEL_ENV === "production") {
+  if (getVercelEnv() === "production") {
     return NextResponse.json(
       { error: "Not available in production" },
       { status: 403 },
     );
   }
-  const isDev = process.env.NODE_ENV === "development";
-  const allowRun = process.env.ALLOW_AGENT_RUN?.trim() === "true";
+  const isDev = getNodeEnv() === "development";
+  const allowRun = getAllowAgentRun();
   if (!isDev && !allowRun) {
     return NextResponse.json(
       { error: "Agent runs are only available in development mode." },
@@ -85,7 +87,7 @@ function devOnlyGuard(): NextResponse | null {
 // POST /api/admin/agents/run — spawn an agent
 // ---------------------------------------------------------------------------
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorCapture("/api/admin/agents/run", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
   if (authError) return authError;
 
@@ -239,13 +241,13 @@ export async function POST(request: NextRequest) {
     startedAt: run.startedAt,
     agentKey: run.agentKey,
   });
-}
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/admin/agents/run — poll log lines
 // ---------------------------------------------------------------------------
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/admin/agents/run", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-agent-run", 30, 60);
   if (authError) return authError;
 
@@ -278,13 +280,13 @@ export async function GET(request: NextRequest) {
     lines,
     totalLines: currentRun.lines.length,
   });
-}
+});
 
 // ---------------------------------------------------------------------------
 // DELETE /api/admin/agents/run — stop an agent
 // ---------------------------------------------------------------------------
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withErrorCapture("/api/admin/agents/run", async (request: NextRequest) => {
   const authError = await adminAuth(request, "ratelimit:admin-agent-run", 10, 60);
   if (authError) return authError;
 
@@ -319,4 +321,4 @@ export async function DELETE(request: NextRequest) {
   currentRun = null;
 
   return NextResponse.json(result);
-}
+});

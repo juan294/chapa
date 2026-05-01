@@ -24,7 +24,7 @@ describe("requireSession", () => {
 
   describe("when NEXTAUTH_SECRET is missing", () => {
     beforeEach(() => {
-      delete process.env.NEXTAUTH_SECRET;
+      vi.stubEnv("NEXTAUTH_SECRET", undefined);
     });
 
     it("returns an error Response with status 500", () => {

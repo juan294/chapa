@@ -8,10 +8,16 @@ import { NavbarClient } from "@/components/NavbarClient";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
-import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
+import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
 import { getBaseUrl } from "@/lib/env";
+import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
+import {
+  buildBadgeSvgCacheKey,
+  readBadgeSvgCache,
+  writeBadgeSvgCache,
+} from "@/lib/render/badge-svg-cache";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
@@ -89,35 +95,57 @@ export async function SharePageContent({ handle }: { handle: string }) {
   const materialized = await materializePublicProfile(handle);
   const stats = materialized?.stats ?? null;
   const impact = materialized?.displayImpact ?? null;
-
-  // Start avatar fetch immediately (runs concurrently with EMA computation)
-  const avatarPromise = stats?.avatarUrl
-    ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
-    : Promise.resolve(undefined);
-
-  // Render badge SVG inline during SSR. Cap avatar wait at 500ms so a slow
-  // external image server can't block TTFB — badge renders with placeholder on miss.
-  const AVATAR_DEADLINE_MS = 500;
-  const avatarDataUri = await Promise.race([
-    avatarPromise,
-    new Promise<undefined>((resolve) =>
-      setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
-    ),
-  ]);
   const verification = materialized
     ? getPublicProfileVerification(materialized)
     : null;
-  const inlineSvg = stats && impact
-    ? renderBadgeSvg(stats, impact, {
-        avatarDataUri,
-        verificationHash: verification?.hash,
-        verificationDate: verification?.date,
-      })
-    : null;
 
-  // Deferred work: verification storage, tracking, snapshots (runs after response)
+  // #720 — try the shared SVG cache first. The /u/[handle]/badge.svg route
+  // writes here after every successful render, so on warm caches the share
+  // page can skip avatar fetch + render entirely.
+  const today = toDateString(new Date());
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
+
+  let inlineSvg: string | null = cachedSvg;
+  let renderedFresh = false;
+  let avatarResolved = false;
+
+  if (!cachedSvg && stats && impact) {
+    // Cache miss — render inline. Avatar fetch is best-effort with a tight
+    // 250ms deadline (#800) so a slow external image server can't block
+    // TTFB. The /u/[handle]/badge.svg route awaits the avatar fully on its
+    // own first render and writes the avatar-bearing SVG to the same
+    // cache, so warm visits to the share page get the real avatar.
+    const avatarPromise = stats.avatarUrl
+      ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
+      : Promise.resolve(undefined);
+    const AVATAR_DEADLINE_MS = 250;
+    const avatarDataUri = await Promise.race([
+      avatarPromise,
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
+      ),
+    ]);
+    avatarResolved = avatarDataUri !== undefined;
+    inlineSvg = renderBadgeSvg(stats, impact, {
+      avatarDataUri,
+      verificationHash: verification?.hash,
+      verificationDate: verification?.date,
+    });
+    renderedFresh = true;
+  }
+
+  // Deferred work: verification storage, tracking, snapshots, and (on a
+  // fresh render where the avatar resolved) cache write so future requests
+  // and the badge.svg route can hit the cache. We deliberately do NOT
+  // cache renders that fell back to a placeholder avatar — that would
+  // poison the shared cache with a degraded SVG for up to 24h. (#800)
   if (materialized && inlineSvg) {
+    const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
     after(() => {
+      if (svgToCache) {
+        void writeBadgeSvgCache(svgCacheKey, svgToCache);
+      }
       return runPublicProfileSideEffects(handle, materialized, { verification });
     });
   }
@@ -148,11 +176,11 @@ export async function SharePageContent({ handle }: { handle: string }) {
         handle={handle}
 
       />
-      {/* SAFETY: JSON-LD uses JSON.stringify (auto-escapes quotes/special chars) + explicit < escape to prevent </script> injection. User handle is a URL param but only appears as a JSON string value, never raw HTML. */}
+      {/* SAFETY: renderJsonLd escapes <, >, & to prevent </script> injection. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(personJsonLd).replace(/</g, "\\u003c"),
+          __html: renderJsonLd(personJsonLd),
         }}
       />
 
@@ -204,7 +232,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
         </div>
 
         {/* ── Owner/Visitor Content (client-side session check) ── */}
-        <SharePageOwnerContent
+        <SharePageOwnerContentLazy
           handle={handle}
           stats={stats}
           impact={impact}

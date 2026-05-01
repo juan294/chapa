@@ -279,18 +279,12 @@ describe("validateState", () => {
 // ---------------------------------------------------------------------------
 
 describe("cookie Secure flag", () => {
-  const originalEnv = process.env.NEXT_PUBLIC_BASE_URL;
-
   afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.NEXT_PUBLIC_BASE_URL = originalEnv;
-    } else {
-      delete process.env.NEXT_PUBLIC_BASE_URL;
-    }
+    vi.unstubAllEnvs();
   });
 
   it("session cookie includes Secure when base URL is HTTPS", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
     const cookie = createSessionCookie(
       { login: "u", name: null, avatar_url: "" },
       "secret-key-for-test-32-chars!!!!",
@@ -299,7 +293,7 @@ describe("cookie Secure flag", () => {
   });
 
   it("session cookie omits Secure when base URL is HTTP", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
     const cookie = createSessionCookie(
       { login: "u", name: null, avatar_url: "" },
       "secret-key-for-test-32-chars!!!!",
@@ -308,19 +302,19 @@ describe("cookie Secure flag", () => {
   });
 
   it("state cookie omits Secure when base URL is HTTP", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
     const { cookie } = createStateCookie();
     expect(cookie).not.toContain("Secure");
   });
 
   it("clear cookies omit Secure when base URL is HTTP", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
     expect(clearSessionCookie()).not.toContain("Secure");
     expect(clearStateCookie()).not.toContain("Secure");
   });
 
   it("session cookie roundtrips correctly (encrypt+decrypt)", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
     const secret = "secret-key-for-test-32-chars!!!!";
     const payload = { login: "juan294", name: "Juan", avatar_url: "https://img" };
     const cookie = createSessionCookie(payload, secret);
@@ -467,11 +461,11 @@ describe("readSessionCookie — additional edge cases", () => {
   const secret = "secret-key-for-test-32-chars!!!!";
 
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
   });
 
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.unstubAllEnvs();
   });
 
   it("returns null when cookie header has no chapa_session cookie", () => {
@@ -612,30 +606,24 @@ describe("exchangeCodeForToken — additional edge cases", () => {
 });
 
 describe("cookie Secure flag — env var edge cases", () => {
-  const originalEnv = process.env.NEXT_PUBLIC_BASE_URL;
-
   afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.NEXT_PUBLIC_BASE_URL = originalEnv;
-    } else {
-      delete process.env.NEXT_PUBLIC_BASE_URL;
-    }
+    vi.unstubAllEnvs();
   });
 
   it("includes Secure when NEXT_PUBLIC_BASE_URL is undefined", () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
     const { cookie } = createStateCookie();
     expect(cookie).toContain("Secure");
   });
 
   it("includes Secure when NEXT_PUBLIC_BASE_URL is empty string", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "");
     const { cookie } = createStateCookie();
     expect(cookie).toContain("Secure");
   });
 
   it("includes Secure when NEXT_PUBLIC_BASE_URL has trailing whitespace", () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "  ";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "  ");
     const { cookie } = createStateCookie();
     expect(cookie).toContain("Secure");
   });
@@ -645,11 +633,11 @@ describe("readSessionCookie — shape validation", () => {
   const secret = "secret-key-for-test-32-chars!!!!";
 
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
   });
 
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.unstubAllEnvs();
   });
 
   it("returns null for session with missing login field", () => {

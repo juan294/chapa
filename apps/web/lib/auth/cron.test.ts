@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/crypto/safe-equal", () => ({
@@ -7,7 +7,11 @@ vi.mock("@/lib/crypto/safe-equal", () => ({
 
 describe("verifyCronSecret", () => {
   beforeEach(() => {
-    delete process.env.CRON_SECRET;
+    vi.stubEnv("CRON_SECRET", undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns 503 when CRON_SECRET is not set (fail-secure)", async () => {
@@ -32,7 +36,7 @@ describe("verifyCronSecret", () => {
   });
 
   it("returns 401 when Authorization header is missing", async () => {
-    process.env.CRON_SECRET = "test-secret";
+    vi.stubEnv("CRON_SECRET", "test-secret");
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test");
     const result = verifyCronSecret(req);
@@ -43,7 +47,7 @@ describe("verifyCronSecret", () => {
   });
 
   it("returns 401 when token does not match", async () => {
-    process.env.CRON_SECRET = "test-secret";
+    vi.stubEnv("CRON_SECRET", "test-secret");
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test", {
       headers: { Authorization: "Bearer wrong-secret" },
@@ -56,7 +60,7 @@ describe("verifyCronSecret", () => {
   });
 
   it("returns null (success) when token matches", async () => {
-    process.env.CRON_SECRET = "test-secret";
+    vi.stubEnv("CRON_SECRET", "test-secret");
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test", {
       headers: { Authorization: "Bearer test-secret" },
@@ -66,7 +70,7 @@ describe("verifyCronSecret", () => {
   });
 
   it("trims whitespace from CRON_SECRET", async () => {
-    process.env.CRON_SECRET = "  test-secret  \n";
+    vi.stubEnv("CRON_SECRET", "  test-secret  \n");
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test", {
       headers: { Authorization: "Bearer test-secret" },
@@ -76,7 +80,7 @@ describe("verifyCronSecret", () => {
   });
 
   it("returns 401 when Authorization header is not Bearer format", async () => {
-    process.env.CRON_SECRET = "test-secret";
+    vi.stubEnv("CRON_SECRET", "test-secret");
     const { verifyCronSecret } = await import("@/lib/auth/cron");
     const req = new NextRequest("https://example.com/api/cron/test", {
       headers: { Authorization: "Basic test-secret" },

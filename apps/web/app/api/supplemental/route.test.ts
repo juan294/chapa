@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Mock dependencies BEFORE importing the route handler.
@@ -61,14 +62,14 @@ const validStats = {
 function makeRequest(
   body: Record<string, unknown>,
   token?: string,
-): Request {
+): NextRequest {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  return new Request("https://chapa.thecreativetoken.com/api/supplemental", {
+  return new NextRequest("https://chapa.thecreativetoken.com/api/supplemental", {
     method: "POST",
     body: JSON.stringify(body),
     headers,
@@ -294,7 +295,7 @@ describe("POST /api/supplemental", () => {
   // Error handling
   // -------------------------------------------------------------------------
 
-  it("returns 500 JSON when cacheSet throws", async () => {
+  it("re-throws when cacheSet throws (handled by withErrorCapture)", async () => {
     mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     mockCacheSet.mockRejectedValue(new Error("Redis down"));
 
@@ -302,24 +303,18 @@ describe("POST /api/supplemental", () => {
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
     );
-    const res = await POST(req);
 
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.error).toBe("Internal server error");
+    await expect(POST(req)).rejects.toThrow("Redis down");
   });
 
-  it("returns 500 JSON when resolveRequestAuth throws", async () => {
+  it("re-throws when resolveRequestAuth throws (handled by withErrorCapture)", async () => {
     mockResolveRequestAuth.mockRejectedValue(new Error("Auth service down"));
 
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
     );
-    const res = await POST(req);
 
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.error).toBe("Internal server error");
+    await expect(POST(req)).rejects.toThrow("Auth service down");
   });
 });

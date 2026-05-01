@@ -124,7 +124,7 @@ describe("POST /api/admin/campaigns/[id]/send", () => {
   });
 
   it("returns 500 when NEXTAUTH_SECRET is missing (server misconfiguration)", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
     const res = await POST(makeRequest(), { params: mockParams });
     expect(res.status).toBe(500);
   });

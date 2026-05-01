@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "crypto";
 import { classifyOAuthError, type TokenRefreshResult } from "./bitbucket";
 import { buildAuthCookieFlags } from "./cookie-policy";
+import { getBaseUrl } from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,7 +60,7 @@ export function buildCodebergAuthUrl(
 const CB_STATE_COOKIE_NAME = "chapa_cb_oauth_state";
 
 function cookieFlags(): string {
-  return buildAuthCookieFlags(process.env.NEXT_PUBLIC_BASE_URL?.trim());
+  return buildAuthCookieFlags(getBaseUrl());
 }
 
 /**

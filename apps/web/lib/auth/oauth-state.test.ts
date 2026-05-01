@@ -5,8 +5,8 @@ describe("oauth-state store", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-22T00:00:00.000Z"));
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", undefined);
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", undefined);
   });
 
   afterEach(() => {

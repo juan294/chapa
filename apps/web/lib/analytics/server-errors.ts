@@ -13,6 +13,8 @@
  */
 
 import type { NextRequest, NextResponse } from "next/server";
+import { getRequestId } from "@/lib/log";
+import { getChapaAlertWebhookUrl, getPosthogKey, getPosthogHost } from "@/lib/env";
 
 /** Patterns that match sensitive values in error messages and stack traces. */
 const SENSITIVE_PATTERNS = [
@@ -50,6 +52,8 @@ export interface CaptureServerErrorOptions {
   statusCode: number;
   /** The error object, string, or unknown value. */
   error: unknown;
+  /** Request correlation ID for tracing across a request chain. */
+  requestId?: string;
 }
 
 export interface OperationalAlertOptions {
@@ -117,7 +121,7 @@ export async function captureOperationalAlert(
   options: OperationalAlertOptions,
 ): Promise<void> {
   try {
-    const webhookUrl = process.env.CHAPA_ALERT_WEBHOOK_URL?.trim();
+    const webhookUrl = getChapaAlertWebhookUrl();
     if (!webhookUrl) return;
 
     const payload = {
@@ -155,8 +159,8 @@ export async function captureServerEvent(
   properties?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
+    const apiKey = getPosthogKey();
+    const host = getPosthogHost();
 
     if (!apiKey || !host) return;
 
@@ -188,10 +192,10 @@ export async function captureServerError(
   options: CaptureServerErrorOptions,
 ): Promise<void> {
   try {
-    const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim();
+    const apiKey = getPosthogKey();
+    const host = getPosthogHost();
 
-    const { route, statusCode, error } = options;
+    const { route, statusCode, error, requestId } = options;
 
     // Extract error details based on type
     let errorType: string;
@@ -222,6 +226,7 @@ export async function captureServerError(
       errorType,
       message,
       ...(stack !== undefined && { stack }),
+      ...(requestId !== undefined && { requestId }),
     };
 
     try {
@@ -260,7 +265,7 @@ export async function captureServerError(
 /** Route handler type compatible with Next.js App Router. */
 type RouteHandler = (
   req: NextRequest,
-  ctx: unknown,
+  ctx?: unknown,
 ) => Promise<NextResponse | Response>;
 
 /**
@@ -276,11 +281,12 @@ export function withErrorCapture(
   route: string,
   handler: RouteHandler,
 ): RouteHandler {
-  return async (req: NextRequest, ctx: unknown) => {
+  return async (req: NextRequest, ctx?: unknown) => {
+    const requestId = getRequestId(req);
     try {
       return await handler(req, ctx);
     } catch (err) {
-      void captureServerError({ route, statusCode: 500, error: err });
+      void captureServerError({ route, statusCode: 500, error: err, requestId });
       throw err;
     }
   };

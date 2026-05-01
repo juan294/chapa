@@ -5,6 +5,7 @@ import { getClientIp } from "@/lib/http/client-ip";
 import { getSnapshots } from "@/lib/history/history";
 import { compareSnapshots } from "@/lib/history/diff";
 import { computeTrend } from "@/lib/history/trend";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 type Params = { params: Promise<{ handle: string }> };
 
@@ -21,101 +22,93 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * historical trend data. Rate limiting (100 req/IP/60s) provides abuse
  * protection instead of authentication.
  */
-export async function GET(request: NextRequest, context: Params) {
-  try {
-    const { handle } = await context.params;
+export const GET = withErrorCapture("/api/history/[handle]", async (request: NextRequest, ctx) => {
+  const { handle } = await (ctx as Params).params;
 
-    if (!isValidHandle(handle)) {
-      return NextResponse.json({ error: "Invalid handle" }, { status: 400 });
-    }
+  if (!isValidHandle(handle)) {
+    return NextResponse.json({ error: "Invalid handle" }, { status: 400 });
+  }
 
-    // Rate limit: 100 req/IP/60s
-    const ip = getClientIp(request);
-    const rl = await rateLimit(`ratelimit:history:${ip}`, 100, 60);
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429, headers: { "Retry-After": "60" } },
-      );
-    }
-
-    // Parse query params
-    const url = new URL(request.url);
-    const from = url.searchParams.get("from") ?? undefined;
-    const to = url.searchParams.get("to") ?? undefined;
-    const windowParam = url.searchParams.get("window");
-    const includeParam = url.searchParams.get("include") ?? "snapshots,trend";
-
-    // Validate date params
-    if (from && !DATE_RE.test(from)) {
-      return NextResponse.json({ error: "Invalid 'from' date format (YYYY-MM-DD)" }, { status: 400 });
-    }
-    if (to && !DATE_RE.test(to)) {
-      return NextResponse.json({ error: "Invalid 'to' date format (YYYY-MM-DD)" }, { status: 400 });
-    }
-
-    const includes = new Set(
-      includeParam
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => VALID_INCLUDES.has(s)),
-    );
-
-    // Validate window param: must be a positive integer when provided
-    let window: number | undefined;
-    if (windowParam) {
-      const parsed = parseInt(windowParam, 10);
-      if (isNaN(parsed) || parsed <= 0 || String(parsed) !== windowParam) {
-        return NextResponse.json(
-          { error: "Invalid 'window' param — must be a positive integer" },
-          { status: 400 },
-        );
-      }
-      window = parsed;
-    }
-
-    // Fetch snapshots
-    const snapshots = await getSnapshots(handle, from, to);
-
-    // Strip internal-only fields (confidence is internal; penalty flags could
-    // be perceived as accusatory if discovered by end-users).
-    const publicSnapshots = snapshots.map((s) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { confidence, confidencePenalties, ...publicSnapshot } = s;
-      return publicSnapshot;
-    });
-
-    // Build response
-    const response: Record<string, unknown> = { handle };
-
-    if (includes.has("snapshots")) {
-      response.snapshots = publicSnapshots;
-    }
-
-    if (includes.has("trend")) {
-      response.trend = snapshots.length >= 2 ? computeTrend(snapshots, window) : null;
-    }
-
-    if (includes.has("diff")) {
-      if (snapshots.length >= 2) {
-        const prev = snapshots[snapshots.length - 2]!;
-        const curr = snapshots[snapshots.length - 1]!;
-        response.diff = compareSnapshots(prev, curr);
-      } else {
-        response.diff = null;
-      }
-    }
-
-    return NextResponse.json(response, {
-      headers: {
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
-      },
-    });
-  } catch (err) {
-    console.error("[history] Unhandled error:", err);
+  // Rate limit: 100 req/IP/60s
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:history:${ip}`, 100, 60);
+  if (!rl.allowed) {
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": "60" } },
     );
   }
-}
+
+  // Parse query params
+  const url = new URL(request.url);
+  const from = url.searchParams.get("from") ?? undefined;
+  const to = url.searchParams.get("to") ?? undefined;
+  const windowParam = url.searchParams.get("window");
+  const includeParam = url.searchParams.get("include") ?? "snapshots,trend";
+
+  // Validate date params
+  if (from && !DATE_RE.test(from)) {
+    return NextResponse.json({ error: "Invalid 'from' date format (YYYY-MM-DD)" }, { status: 400 });
+  }
+  if (to && !DATE_RE.test(to)) {
+    return NextResponse.json({ error: "Invalid 'to' date format (YYYY-MM-DD)" }, { status: 400 });
+  }
+
+  const includes = new Set(
+    includeParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => VALID_INCLUDES.has(s)),
+  );
+
+  // Validate window param: must be a positive integer when provided
+  let window: number | undefined;
+  if (windowParam) {
+    const parsed = parseInt(windowParam, 10);
+    if (isNaN(parsed) || parsed <= 0 || String(parsed) !== windowParam) {
+      return NextResponse.json(
+        { error: "Invalid 'window' param — must be a positive integer" },
+        { status: 400 },
+      );
+    }
+    window = parsed;
+  }
+
+  // Fetch snapshots
+  const snapshots = await getSnapshots(handle, from, to);
+
+  // Strip internal-only fields (confidence is internal; penalty flags could
+  // be perceived as accusatory if discovered by end-users).
+  const publicSnapshots = snapshots.map((s) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confidence, confidencePenalties, ...publicSnapshot } = s;
+    return publicSnapshot;
+  });
+
+  // Build response
+  const response: Record<string, unknown> = { handle };
+
+  if (includes.has("snapshots")) {
+    response.snapshots = publicSnapshots;
+  }
+
+  if (includes.has("trend")) {
+    response.trend = snapshots.length >= 2 ? computeTrend(snapshots, window) : null;
+  }
+
+  if (includes.has("diff")) {
+    if (snapshots.length >= 2) {
+      const prev = snapshots[snapshots.length - 2]!;
+      const curr = snapshots[snapshots.length - 1]!;
+      response.diff = compareSnapshots(prev, curr);
+    } else {
+      response.diff = null;
+    }
+  }
+
+  return NextResponse.json(response, {
+    headers: {
+      "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+    },
+  });
+});

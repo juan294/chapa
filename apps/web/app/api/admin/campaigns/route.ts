@@ -3,10 +3,11 @@ import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetCampaigns, dbCreateCampaign } from "@/lib/db/campaigns";
 import type { CampaignType } from "@/lib/db/campaigns";
 import { parseCampaignCreatePayload } from "@/lib/campaigns/payload";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 const VALID_TYPES: CampaignType[] = ["announcement", "engagement"];
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/admin/campaigns", async (request: NextRequest) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
@@ -16,9 +17,9 @@ export async function GET(request: NextRequest) {
     : undefined;
   const campaigns = await dbGetCampaigns(undefined, type);
   return NextResponse.json({ campaigns });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorCapture("/api/admin/campaigns", async (request: NextRequest) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
@@ -59,4 +60,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ id }, { status: 201 });
-}
+});

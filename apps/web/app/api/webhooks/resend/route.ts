@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import {
   verifyWebhookSignature,
@@ -7,6 +7,8 @@ import {
 } from "@/lib/email/resend";
 import { cacheGet, cacheSetNx, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { log } from "@/lib/log";
 
 const EMAIL_ID_RE = /^[a-f0-9-]{8,64}$/i;
 const DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -20,7 +22,7 @@ const DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
  * Resend retries on non-2xx responses, so returning 502 on transient
  * failures gives automatic retry for free.
  */
-export async function POST(request: Request) {
+export const POST = withErrorCapture("/api/webhooks/resend", async (request: NextRequest) => {
   // Rate limit: 20 requests per IP per 60 seconds
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:webhook:${ip}`, 20, 60);
@@ -112,9 +114,10 @@ export async function POST(request: Request) {
 
   // 6. Log warning for attachments (not forwarded in v1)
   if (email.attachments && email.attachments.length > 0) {
-    console.warn(
-      `[webhook] Email has ${email.attachments.length} attachment(s) — not forwarded in v1`,
-    );
+    log("warn", "[webhook] Email has attachments — not forwarded in v1", {
+      route: "/api/webhooks/resend",
+      count: email.attachments.length,
+    });
   }
 
   // 7. Forward to Gmail
@@ -133,4 +136,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ status: "forwarded", id: result.id });
-}
+});

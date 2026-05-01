@@ -3,16 +3,17 @@ import { adminAuth } from "@/lib/auth/admin-route";
 import { dbGetCampaign } from "@/lib/db/campaigns";
 import { buildAnnouncementHtml } from "@/lib/email/templates/announcement";
 import { buildEmailContent } from "@/lib/email/campaigns";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export const GET = withErrorCapture("/api/admin/campaigns/[id]/preview", async (request: NextRequest, ctx) => {
   const authError = await adminAuth(request);
   if (authError) return authError;
 
-  const { id } = await params;
+  const { id } = await (ctx as RouteParams).params;
   const campaign = await dbGetCampaign(id);
   if (!campaign) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -23,4 +24,4 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-}
+});

@@ -5,6 +5,7 @@
  * data that every platform's connect/callback/disconnect/status test uses.
  */
 
+import { vi } from "vitest";
 import { NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
@@ -138,7 +139,7 @@ export const CODEBERG_CLEAR_COOKIE =
  */
 export function setEnvVars(vars: Record<string, string>) {
   for (const [key, value] of Object.entries(vars)) {
-    process.env[key] = value;
+    vi.stubEnv(key, value);
   }
 }
 
@@ -147,7 +148,7 @@ export function setEnvVars(vars: Record<string, string>) {
  */
 export function clearEnvVars(vars: Record<string, string>) {
   for (const key of Object.keys(vars)) {
-    delete process.env[key];
+    vi.stubEnv(key, undefined);
   }
 }
 

@@ -11,6 +11,8 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { processInBatches } from "@/lib/async/process-in-batches";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { withTimeout } from "@/lib/async/with-timeout";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { log } from "@/lib/log";
 
 export const maxDuration = 300;
 
@@ -38,7 +40,7 @@ async function listAllContacts(): Promise<Contact[]> {
     LIST_CONTACTS_TIMEOUT_MS,
     "listAllContacts",
   ).catch((error) => {
-    console.error("[sync-audience] listAllContacts error:", (error as Error).message);
+    log("error", "[sync-audience] listAllContacts error", { route: "/api/cron/sync-audience", error: (error as Error).message });
     return [];
   });
 
@@ -82,7 +84,7 @@ async function listAllContactsInner(
 // GET /api/cron/sync-audience
 // ---------------------------------------------------------------------------
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/cron/sync-audience", async (request: NextRequest) => {
   const denied = verifyCronSecret(request);
   if (denied) return denied;
 
@@ -138,4 +140,4 @@ export async function GET(request: NextRequest) {
     totalEligible: users.length,
     totalContacts: existingContacts.length,
   });
-}
+});

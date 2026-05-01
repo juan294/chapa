@@ -5,6 +5,13 @@ vi.mock("./db/feature-flags", () => ({
   dbGetFeatureFlag: vi.fn(),
 }));
 
+// `unstable_cache` requires a Next.js incremental cache that doesn't exist in
+// vitest. Pass-through so the wrapped function still calls the mocked DB.
+vi.mock("next/cache", () => ({
+  unstable_cache: <Args extends unknown[], R>(fn: (...args: Args) => R) => fn,
+  revalidateTag: vi.fn(),
+}));
+
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import {
   isStudioEnabled,
@@ -42,7 +49,7 @@ function makeFlag(key: string, enabled: boolean) {
 
 describe("isStudioEnabled", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     _resetFlagCache();
   });
@@ -63,7 +70,7 @@ describe("isStudioEnabled", () => {
 
   it("falls back to env var when DB returns null", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "true");
 
     const result = await isStudioEnabled();
     expect(result).toBe(true);
@@ -71,7 +78,7 @@ describe("isStudioEnabled", () => {
 
   it("returns false when both DB and env var are absent", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    delete process.env.NEXT_PUBLIC_STUDIO_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", undefined);
 
     const result = await isStudioEnabled();
     expect(result).toBe(false);
@@ -79,7 +86,7 @@ describe("isStudioEnabled", () => {
 
   it("handles whitespace around the env var value", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "  true  ";
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "  true  ");
 
     const result = await isStudioEnabled();
     expect(result).toBe(true);
@@ -87,7 +94,7 @@ describe("isStudioEnabled", () => {
 
   it('returns false for env var "1" (must be exactly "true")', async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "1";
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "1");
 
     const result = await isStudioEnabled();
     expect(result).toBe(false);
@@ -96,7 +103,7 @@ describe("isStudioEnabled", () => {
   it("falls back after 500ms when the DB lookup hangs", async () => {
     vi.useFakeTimers();
     vi.mocked(dbGetFeatureFlag).mockReturnValue(new Promise(() => {}));
-    process.env.NEXT_PUBLIC_STUDIO_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "true");
 
     const resultPromise = isStudioEnabled();
     await vi.advanceTimersByTimeAsync(501);
@@ -112,7 +119,7 @@ describe("isStudioEnabled", () => {
 
 describe("isExperimentsEnabled", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED;
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     _resetFlagCache();
   });
@@ -126,7 +133,7 @@ describe("isExperimentsEnabled", () => {
 
   it("falls back to env var when DB unavailable", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_EXPERIMENTS_ENABLED", "true");
 
     const result = await isExperimentsEnabled();
     expect(result).toBe(true);
@@ -134,7 +141,7 @@ describe("isExperimentsEnabled", () => {
 
   it("returns false when both DB and env var are absent", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    delete process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_EXPERIMENTS_ENABLED", undefined);
 
     const result = await isExperimentsEnabled();
     expect(result).toBe(false);
@@ -142,7 +149,7 @@ describe("isExperimentsEnabled", () => {
 
   it("handles whitespace around the env var", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED = "  true  ";
+    vi.stubEnv("NEXT_PUBLIC_EXPERIMENTS_ENABLED", "  true  ");
 
     const result = await isExperimentsEnabled();
     expect(result).toBe(true);
@@ -209,26 +216,26 @@ describe("isAgentEnabled", () => {
 
 describe("isBitbucketEnabledSync", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+    vi.unstubAllEnvs();
   });
 
   it("returns false when env var not set", () => {
-    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_BITBUCKET_ENABLED", undefined);
     expect(isBitbucketEnabledSync()).toBe(false);
   });
 
   it('returns true when env var is "true"', () => {
-    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_BITBUCKET_ENABLED", "true");
     expect(isBitbucketEnabledSync()).toBe(true);
   });
 
   it('returns false when env var is "false"', () => {
-    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "false";
+    vi.stubEnv("NEXT_PUBLIC_BITBUCKET_ENABLED", "false");
     expect(isBitbucketEnabledSync()).toBe(false);
   });
 
   it("handles whitespace", () => {
-    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "  true  ";
+    vi.stubEnv("NEXT_PUBLIC_BITBUCKET_ENABLED", "  true  ");
     expect(isBitbucketEnabledSync()).toBe(true);
   });
 });
@@ -239,7 +246,7 @@ describe("isBitbucketEnabledSync", () => {
 
 describe("isBitbucketEnabled", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     _resetFlagCache();
   });
@@ -264,7 +271,7 @@ describe("isBitbucketEnabled", () => {
 
   it("falls back to env var when DB unavailable", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_BITBUCKET_ENABLED", "true");
 
     const result = await isBitbucketEnabled();
     expect(result).toBe(true);
@@ -272,7 +279,7 @@ describe("isBitbucketEnabled", () => {
 
   it("returns false when both DB and env var are absent", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    delete process.env.NEXT_PUBLIC_BITBUCKET_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_BITBUCKET_ENABLED", undefined);
 
     const result = await isBitbucketEnabled();
     expect(result).toBe(false);
@@ -285,26 +292,26 @@ describe("isBitbucketEnabled", () => {
 
 describe("isCodebergEnabledSync", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+    vi.unstubAllEnvs();
   });
 
   it("returns false when env var not set", () => {
-    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", undefined);
     expect(isCodebergEnabledSync()).toBe(false);
   });
 
   it('returns true when env var is "true"', () => {
-    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", "true");
     expect(isCodebergEnabledSync()).toBe(true);
   });
 
   it('returns false when env var is "false"', () => {
-    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "false";
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", "false");
     expect(isCodebergEnabledSync()).toBe(false);
   });
 
   it("handles whitespace", () => {
-    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "  true  ";
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", "  true  ");
     expect(isCodebergEnabledSync()).toBe(true);
   });
 });
@@ -315,7 +322,7 @@ describe("isCodebergEnabledSync", () => {
 
 describe("isCodebergEnabled", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     _resetFlagCache();
   });
@@ -340,7 +347,7 @@ describe("isCodebergEnabled", () => {
 
   it("falls back to env var when DB unavailable", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", "true");
 
     const result = await isCodebergEnabled();
     expect(result).toBe(true);
@@ -348,7 +355,7 @@ describe("isCodebergEnabled", () => {
 
   it("returns false when both DB and env var are absent", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", undefined);
 
     const result = await isCodebergEnabled();
     expect(result).toBe(false);
@@ -361,26 +368,26 @@ describe("isCodebergEnabled", () => {
 
 describe("isInsightsEnabledSync", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+    vi.unstubAllEnvs();
   });
 
   it("returns false when env var not set", () => {
-    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", undefined);
     expect(isInsightsEnabledSync()).toBe(false);
   });
 
   it('returns true when env var is "true"', () => {
-    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", "true");
     expect(isInsightsEnabledSync()).toBe(true);
   });
 
   it('returns false when env var is "false"', () => {
-    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "false";
+    vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", "false");
     expect(isInsightsEnabledSync()).toBe(false);
   });
 
   it("handles whitespace", () => {
-    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "  true  ";
+    vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", "  true  ");
     expect(isInsightsEnabledSync()).toBe(true);
   });
 });
@@ -436,13 +443,12 @@ describe("feature flag TTL cache", () => {
 
   it("caches env-var fallback result so DB is not re-queried", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_CODEBERG_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", "true");
 
     await isCodebergEnabled();
     await isCodebergEnabled();
 
     expect(dbGetFeatureFlag).toHaveBeenCalledTimes(1);
-    delete process.env.NEXT_PUBLIC_CODEBERG_ENABLED;
   });
 
   it("serves updated values immediately after invalidating the in-process cache", async () => {
@@ -461,12 +467,33 @@ describe("feature flag TTL cache", () => {
 });
 
 // ---------------------------------------------------------------------------
+// unstable_cache wrapping (ISR-safe DB fetch)
+// ---------------------------------------------------------------------------
+
+describe("feature-flags ISR-safe DB wrapper", () => {
+  it("imports unstable_cache from next/cache so ISR is not defeated", async () => {
+    // The root layout calls isStudioEnabled(), which transitively hits Upstash
+    // Redis with a `no-store` fetch. Without unstable_cache, that defeats ISR
+    // for every page that inherits the root layout. This guards against a
+    // regression that removes the wrapper.
+    const source = await import("node:fs").then((fs) =>
+      fs.promises.readFile(
+        new URL("./feature-flags.ts", import.meta.url),
+        "utf8",
+      ),
+    );
+    expect(source).toMatch(/from "next\/cache"/);
+    expect(source).toMatch(/unstable_cache\(/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isInsightsEnabled (async, DB-backed)
 // ---------------------------------------------------------------------------
 
 describe("isInsightsEnabled", () => {
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     _resetFlagCache();
   });
@@ -491,7 +518,7 @@ describe("isInsightsEnabled", () => {
 
   it("falls back to env var when DB unavailable", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED = "true";
+    vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", "true");
 
     const result = await isInsightsEnabled();
     expect(result).toBe(true);
@@ -499,7 +526,7 @@ describe("isInsightsEnabled", () => {
 
   it("returns false when both DB and env var are absent", async () => {
     vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
-    delete process.env.NEXT_PUBLIC_INSIGHTS_ENABLED;
+    vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", undefined);
 
     const result = await isInsightsEnabled();
     expect(result).toBe(false);

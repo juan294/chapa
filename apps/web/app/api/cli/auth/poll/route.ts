@@ -1,14 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import { getNextauthSecret } from "@/lib/env";
 import { generateCliToken } from "@/lib/auth/cli-token";
 import { getClientIp } from "@/lib/http/client-ip";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 interface DeviceSession {
   status: "pending" | "approved";
   handle?: string;
 }
 
-export async function GET(request: Request): Promise<Response> {
+export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get("session");
 
@@ -44,7 +46,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   if (session.status === "approved" && session.handle) {
-    const secret = process.env.NEXTAUTH_SECRET?.trim();
+    const secret = getNextauthSecret();
     if (!secret) {
       return NextResponse.json(
         { error: "Server misconfigured" },
@@ -65,4 +67,4 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   return NextResponse.json({ status: "pending" });
-}
+});

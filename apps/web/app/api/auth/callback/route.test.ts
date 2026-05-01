@@ -64,6 +64,7 @@ vi.mock("@/lib/email/audience", () => ({
 
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: mockCaptureServerError,
+  withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
 vi.mock("@/lib/auth/github-session-token", () => ({
@@ -114,15 +115,15 @@ function allowRateLimit() {
 }
 
 function setEnvVars() {
-  process.env.GITHUB_CLIENT_ID = "test-client-id";
-  process.env.GITHUB_CLIENT_SECRET = "test-client-secret";
-  process.env.NEXTAUTH_SECRET = "test-session-secret";
+  vi.stubEnv("GITHUB_CLIENT_ID", "test-client-id");
+  vi.stubEnv("GITHUB_CLIENT_SECRET", "test-client-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-session-secret");
 }
 
 function clearEnvVars() {
-  delete process.env.GITHUB_CLIENT_ID;
-  delete process.env.GITHUB_CLIENT_SECRET;
-  delete process.env.NEXTAUTH_SECRET;
+  vi.stubEnv("GITHUB_CLIENT_ID", undefined);
+  vi.stubEnv("GITHUB_CLIENT_SECRET", undefined);
+  vi.stubEnv("NEXTAUTH_SECRET", undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +298,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
   });
 
   it("redirects to /?error=config when GITHUB_CLIENT_ID is missing", async () => {
-    delete process.env.GITHUB_CLIENT_ID;
+    vi.stubEnv("GITHUB_CLIENT_ID", undefined);
     mockValidateState.mockReturnValue(true);
 
     const res = await GET(
@@ -310,7 +311,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
   });
 
   it("redirects to /?error=config when GITHUB_CLIENT_SECRET is missing", async () => {
-    delete process.env.GITHUB_CLIENT_SECRET;
+    vi.stubEnv("GITHUB_CLIENT_SECRET", undefined);
     mockValidateState.mockReturnValue(true);
 
     const res = await GET(
@@ -323,7 +324,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
   });
 
   it("redirects to /?error=config when NEXTAUTH_SECRET is missing", async () => {
-    delete process.env.NEXTAUTH_SECRET;
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
     mockValidateState.mockReturnValue(true);
 
     const res = await GET(
@@ -524,7 +525,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
   });
 
   it("ignores malicious redirect cookie and falls back to profile page", async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
     mockValidateState.mockReturnValue(true);
     mockExchangeCodeForToken.mockResolvedValue("gho_valid_token");
     mockFetchGitHubUser.mockResolvedValue({
@@ -547,7 +548,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
     const location = new URL(res.headers.get("Location")!);
     expect(location.pathname).toBe("/generating/octocat");
 
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
   });
 });
 
@@ -565,11 +566,11 @@ describe("GET /api/auth/callback — error telemetry", () => {
 
   afterEach(() => {
     clearEnvVars();
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
   });
 
   it("calls captureServerError when config env vars are missing", async () => {
-    delete process.env.GITHUB_CLIENT_ID;
+    vi.stubEnv("GITHUB_CLIENT_ID", undefined);
     mockValidateState.mockReturnValue(true);
 
     await GET(
@@ -632,7 +633,7 @@ describe("GET /api/auth/callback — redirect cookie", () => {
 
   afterEach(() => {
     clearEnvVars();
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
   });
 
   function setupHappyPath() {
@@ -648,7 +649,7 @@ describe("GET /api/auth/callback — redirect cookie", () => {
   }
 
   it("redirects to a safe same-origin path from the cookie", async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
     setupHappyPath();
 
     const res = await GET(
@@ -665,7 +666,7 @@ describe("GET /api/auth/callback — redirect cookie", () => {
   });
 
   it("rejects double-slash redirect (protocol-relative URL)", async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
     setupHappyPath();
 
     const res = await GET(
@@ -747,7 +748,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
 
   afterEach(() => {
     clearEnvVars();
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
   });
 
   function setupHappyPath() {
@@ -763,7 +764,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
   }
 
   it("includes Secure flag when NEXT_PUBLIC_BASE_URL is https", async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
     setupHappyPath();
 
     const res = await GET(
@@ -781,7 +782,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
   });
 
   it("omits Secure flag when NEXT_PUBLIC_BASE_URL is http", async () => {
-    process.env.NEXT_PUBLIC_BASE_URL = "http://localhost:3001";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
     setupHappyPath();
 
     const res = await GET(
@@ -799,7 +800,7 @@ describe("GET /api/auth/callback — cookie flags", () => {
   });
 
   it("includes Secure flag when NEXT_PUBLIC_BASE_URL is unset", async () => {
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
     setupHappyPath();
 
     const res = await GET(
@@ -996,12 +997,12 @@ describe("GET /api/auth/callback — redirect allow-list (#705)", () => {
     allowRateLimit();
     setEnvVars();
     mockAddContact.mockResolvedValue(undefined);
-    process.env.NEXT_PUBLIC_BASE_URL = "https://chapa.thecreativetoken.com";
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "https://chapa.thecreativetoken.com");
   });
 
   afterEach(() => {
     clearEnvVars();
-    delete process.env.NEXT_PUBLIC_BASE_URL;
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", undefined);
   });
 
   function setupHappyPath() {

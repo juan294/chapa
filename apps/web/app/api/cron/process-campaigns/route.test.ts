@@ -16,7 +16,7 @@ import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.CRON_SECRET = "test-secret";
+  vi.stubEnv("CRON_SECRET", "test-secret");
 });
 
 function makeRequest(bearer?: string): NextRequest {
@@ -29,7 +29,7 @@ function makeRequest(bearer?: string): NextRequest {
 
 describe("process-campaigns cron", () => {
   it("returns 503 when CRON_SECRET is not set (fail-secure)", async () => {
-    delete process.env.CRON_SECRET;
+    vi.stubEnv("CRON_SECRET", undefined);
     const res = await GET(makeRequest("anything"));
     expect(res.status).toBe(503);
     const body = await res.json();

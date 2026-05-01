@@ -355,22 +355,10 @@ describe("GET /api/profile/:handle", () => {
 
   // --- Error handling ---
 
-  it("returns 500 when dbGetLatestSnapshot throws", async () => {
+  it("re-throws when dbGetLatestSnapshot throws (handled by withErrorCapture)", async () => {
     mockDbGetLatestSnapshot.mockRejectedValue(new Error("DB down"));
 
-    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
-
-    expect(resp.status).toBe(500);
-    const body = await resp.json();
-    expect(body.error).toContain("Internal server error");
-  });
-
-  it("includes CORS header on 500 response", async () => {
-    mockDbGetLatestSnapshot.mockRejectedValue(new Error("DB down"));
-
-    const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
-
-    expect(resp.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    await expect(GET(makeRequest("juan294"), makeParams("juan294"))).rejects.toThrow("DB down");
   });
 });
 

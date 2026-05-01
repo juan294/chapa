@@ -33,7 +33,7 @@ import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.CRON_SECRET = "test-secret";
+  vi.stubEnv("CRON_SECRET", "test-secret");
   // Default: cache miss — fall through to Resend API
   vi.mocked(cacheGet).mockResolvedValue(null);
   vi.mocked(cacheSet).mockResolvedValue(true);
@@ -53,7 +53,7 @@ function makeRequest(bearer?: string): NextRequest {
 
 describe("sync-audience auth", () => {
   it("returns 503 when CRON_SECRET env var is not set (fail-secure)", async () => {
-    delete process.env.CRON_SECRET;
+    vi.stubEnv("CRON_SECRET", undefined);
     const res = await GET(makeRequest("anything"));
     expect(res.status).toBe(503);
     const body = await res.json();

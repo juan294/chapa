@@ -3,8 +3,9 @@ import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/auth/session", async (request: NextRequest) => {
   // Rate limit: 60 requests per IP per 60 seconds
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:session:${ip}`, 60, 60);
@@ -33,4 +34,4 @@ export async function GET(request: NextRequest) {
   });
   res.headers.set("Cache-Control", "no-store, private");
   return res;
-}
+});

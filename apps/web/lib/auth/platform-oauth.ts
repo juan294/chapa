@@ -12,6 +12,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/require-session";
+import { getBaseUrl } from "@/lib/env";
 import { dbUpsertLinkedPlatform, dbDeleteLinkedPlatform, dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -107,8 +108,7 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
 
     // 4. Validate env vars
     const clientId = process.env[config.clientIdEnvVar]?.trim();
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-    if (!clientId || !baseUrl) {
+    if (!clientId) {
       return NextResponse.redirect(
         new URL(`/u/${session.login}?error=config`, request.url),
       );
@@ -116,6 +116,7 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
 
     // 5. Generate CSRF state + cookie
     const { state, cookie } = config.createStateCookie();
+    const baseUrl = getBaseUrl();
     const redirectUri = `${baseUrl}/api/auth/${config.platform}/callback`;
     const authUrl = config.buildAuthUrl(clientId, redirectUri, state);
 
@@ -177,15 +178,14 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
     // 6. Validate env vars
     const clientId = process.env[config.clientIdEnvVar]?.trim();
     const clientSecret = process.env[config.clientSecretEnvVar]?.trim();
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-    if (!clientId || !clientSecret || !baseUrl) {
+    if (!clientId || !clientSecret) {
       return NextResponse.redirect(
         new URL(`${errorRedirectBase}?error=${config.platform}_config`, request.url),
       );
     }
 
     // 7. Exchange code for tokens
-    const redirectUri = `${baseUrl}/api/auth/${config.platform}/callback`;
+    const redirectUri = `${getBaseUrl()}/api/auth/${config.platform}/callback`;
     const tokens = await config.exchangeCode(code, clientId, clientSecret, redirectUri);
     if (!tokens) {
       return NextResponse.redirect(

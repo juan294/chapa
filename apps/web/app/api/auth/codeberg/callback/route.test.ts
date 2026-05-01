@@ -182,7 +182,7 @@ describe("GET /api/auth/codeberg/callback", () => {
   });
 
   it("redirects with error=codeberg_config when env vars are missing", async () => {
-    delete process.env.CODEBERG_CLIENT_ID;
+    vi.stubEnv("CODEBERG_CLIENT_ID", undefined);
 
     const res = await GET(
       makeRequest({ code: "abc", state: "xyz", cookie: "chapa_cb_oauth_state=xyz" }),

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -29,12 +30,12 @@ import { generateCliToken } from "@/lib/auth/cli-token";
 
 const VALID_UUID = "1feae8e3-6bc0-47da-84aa-0e24e2510454";
 
-function makeRequest(session?: string, ip?: string): Request {
+function makeRequest(session?: string, ip?: string): NextRequest {
   const url = new URL("https://chapa.thecreativetoken.com/api/cli/auth/poll");
   if (session !== undefined) url.searchParams.set("session", session);
   const headers: Record<string, string> = {};
   if (ip) headers["x-forwarded-for"] = ip;
-  return new Request(url.toString(), { headers });
+  return new NextRequest(url.toString(), { headers });
 }
 
 beforeEach(() => {

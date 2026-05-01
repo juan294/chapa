@@ -103,12 +103,13 @@ describe("SharePage", () => {
     });
   });
 
-  // #120 — JSON-LD script injection prevention
+  // #120/#731 — JSON-LD script injection prevention via shared renderJsonLd helper
   describe("JSON-LD security", () => {
-    it("escapes < characters in JSON-LD to prevent script injection", () => {
-      // The dangerouslySetInnerHTML for JSON-LD must use .replace to escape <
-      expect(SOURCE).toContain("JSON.stringify(personJsonLd).replace(");
-      expect(SOURCE).toContain("u003c");
+    it("uses renderJsonLd to escape <, >, & in JSON-LD", () => {
+      // renderJsonLd() unicode-escapes <, >, and & — covers </script> injection
+      // and &-based vectors that bare JSON.stringify misses.
+      expect(SOURCE).toContain("renderJsonLd(personJsonLd)");
+      expect(SOURCE).toContain("renderJsonLd");
     });
   });
 

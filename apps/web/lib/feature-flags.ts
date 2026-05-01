@@ -11,8 +11,16 @@
  * receives the DB-backed server value from the root layout.
  */
 
+import { unstable_cache } from "next/cache";
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import { withTimeout } from "./async/with-timeout";
+import {
+  getStudioEnabledEnv,
+  getBitbucketEnabledEnv,
+  getCodebergEnabledEnv,
+  getExperimentsEnabledEnv,
+  getInsightsEnabledEnv,
+} from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // Sync (env-var only) — for client components
@@ -25,7 +33,7 @@ import { withTimeout } from "./async/with-timeout";
  * @returns `true` if `NEXT_PUBLIC_STUDIO_ENABLED` is `"true"`
  */
 export function isStudioEnabledSync(): boolean {
-  return process.env.NEXT_PUBLIC_STUDIO_ENABLED?.trim() === "true";
+  return getStudioEnabledEnv() === "true";
 }
 
 /**
@@ -35,7 +43,7 @@ export function isStudioEnabledSync(): boolean {
  * @returns `true` if `NEXT_PUBLIC_BITBUCKET_ENABLED` is `"true"`
  */
 export function isBitbucketEnabledSync(): boolean {
-  return process.env.NEXT_PUBLIC_BITBUCKET_ENABLED?.trim() === "true";
+  return getBitbucketEnabledEnv() === "true";
 }
 
 /**
@@ -45,7 +53,7 @@ export function isBitbucketEnabledSync(): boolean {
  * @returns `true` if `NEXT_PUBLIC_CODEBERG_ENABLED` is `"true"`
  */
 export function isCodebergEnabledSync(): boolean {
-  return process.env.NEXT_PUBLIC_CODEBERG_ENABLED?.trim() === "true";
+  return getCodebergEnabledEnv() === "true";
 }
 
 /**
@@ -55,7 +63,7 @@ export function isCodebergEnabledSync(): boolean {
  * @returns `true` if `NEXT_PUBLIC_INSIGHTS_ENABLED` is `"true"`
  */
 export function isInsightsEnabledSync(): boolean {
-  return process.env.NEXT_PUBLIC_INSIGHTS_ENABLED?.trim() === "true";
+  return getInsightsEnabledEnv() === "true";
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +73,24 @@ export function isInsightsEnabledSync(): boolean {
 /** In-process TTL cache for feature flag DB lookups — 5 minutes. */
 const FLAG_CACHE_TTL_MS = 5 * 60 * 1000;
 const FLAG_DB_TIMEOUT_MS = 500;
+const FEATURE_FLAG_CACHE_TAG = "feature-flags";
 const flagCache = new Map<string, { value: boolean; expiresAt: number }>();
+
+// Wrap dbGetFeatureFlag in Next.js's data cache so the underlying Upstash REST
+// `no-store` fetch does not force any consuming server component (including
+// the root layout) into dynamic rendering. Without this, every page that
+// inherits the layout — including ISR-eligible pages like /about and
+// /archetypes/* — gets server-rendered on each request.
+const fetchFlagFromDbCached = unstable_cache(
+  (key: string) =>
+    withTimeout(
+      dbGetFeatureFlag(key),
+      FLAG_DB_TIMEOUT_MS,
+      `featureFlag:${key}`,
+    ).catch(() => null),
+  ["feature-flag-v1"],
+  { revalidate: 300, tags: [FEATURE_FLAG_CACHE_TAG] },
+);
 
 async function checkFlag(
   dbKey: string,
@@ -74,11 +99,7 @@ async function checkFlag(
   const cached = flagCache.get(dbKey);
   if (cached && Date.now() < cached.expiresAt) return cached.value;
 
-  const flag = await withTimeout(
-    dbGetFeatureFlag(dbKey),
-    FLAG_DB_TIMEOUT_MS,
-    `featureFlag:${dbKey}`,
-  ).catch(() => null);
+  const flag = await fetchFlagFromDbCached(dbKey);
   const value = flag !== null ? flag.enabled : envVar?.trim() === "true";
   flagCache.set(dbKey, { value, expiresAt: Date.now() + FLAG_CACHE_TTL_MS });
   return value;
@@ -102,7 +123,7 @@ export function invalidateFeatureFlagCache(key?: string): void {
 export async function isStudioEnabled(): Promise<boolean> {
   return checkFlag(
     "studio_enabled",
-    process.env.NEXT_PUBLIC_STUDIO_ENABLED,
+    getStudioEnabledEnv(),
   );
 }
 
@@ -115,7 +136,7 @@ export async function isStudioEnabled(): Promise<boolean> {
 export async function isExperimentsEnabled(): Promise<boolean> {
   return checkFlag(
     "experiments_enabled",
-    process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED,
+    getExperimentsEnabledEnv(),
   );
 }
 
@@ -128,7 +149,7 @@ export async function isExperimentsEnabled(): Promise<boolean> {
 export async function isBitbucketEnabled(): Promise<boolean> {
   return checkFlag(
     "bitbucket_integration",
-    process.env.NEXT_PUBLIC_BITBUCKET_ENABLED,
+    getBitbucketEnabledEnv(),
   );
 }
 
@@ -141,7 +162,7 @@ export async function isBitbucketEnabled(): Promise<boolean> {
 export async function isCodebergEnabled(): Promise<boolean> {
   return checkFlag(
     "codeberg_integration",
-    process.env.NEXT_PUBLIC_CODEBERG_ENABLED,
+    getCodebergEnabledEnv(),
   );
 }
 
@@ -154,7 +175,7 @@ export async function isCodebergEnabled(): Promise<boolean> {
 export async function isInsightsEnabled(): Promise<boolean> {
   return checkFlag(
     "insights_integration",
-    process.env.NEXT_PUBLIC_INSIGHTS_ENABLED,
+    getInsightsEnabledEnv(),
   );
 }
 

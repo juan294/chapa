@@ -25,8 +25,8 @@ describe("oauth-state store (redis)", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
-    process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://example.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "test-token");
     setSpy.mockResolvedValue("OK");
     getdelSpy
       .mockResolvedValueOnce("1")
@@ -34,8 +34,7 @@ describe("oauth-state store (redis)", () => {
   });
 
   afterEach(() => {
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    vi.unstubAllEnvs();
   });
 
   it("enables read-your-writes consistency and consumes state exactly once", async () => {

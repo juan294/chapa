@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronSecret } from "@/lib/auth/cron";
+import { getGithubToken, getWarmCachePriorityHandles } from "@/lib/env";
 import { dbGetUsers } from "@/lib/db/users";
 import {
   dbGetLatestSnapshotBatch,
@@ -16,7 +17,9 @@ import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
   captureServerEvent,
+  withErrorCapture,
 } from "@/lib/analytics/server-errors";
+import { getRequestId } from "@/lib/log";
 import { getAvatarBase64 } from "@/lib/render/avatar";
 import {
   materializeOrchestratedProfile,
@@ -55,7 +58,8 @@ interface HandleResult {
  *
  * Protected by CRON_SECRET — Vercel sends this automatically as a Bearer token.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/cron/warm-cache", async (request: NextRequest) => {
+  const requestId = getRequestId(request);
   // Auth: Vercel sends CRON_SECRET as Authorization: Bearer <secret>
   const denied = verifyCronSecret(request);
   if (denied) return denied;
@@ -103,18 +107,14 @@ export async function GET(request: NextRequest) {
     ? 0
     : (offset + MAX_HANDLES) % allHandles.length;
 
-  // Persist rotation offset for next cron run (TTL=0 means no expiry)
-  await cacheSet(ROTATION_KEY, nextOffset, 0);
-
   // Use fallback GitHub token for server-side fetches (no user session)
-  const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
+  const githubToken = getGithubToken();
 
   // Pre-fetch all previous snapshots in one batch query (instead of N+1 individual calls)
   const previousSnapshots = await dbGetLatestSnapshotBatch(toWarm);
 
   // Counters aggregated from per-handle results
   let warmed = 0;
-  let failed = 0;
   let snapshots = 0;
   let notifications = 0;
 
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     toWarm,
     BATCH_SIZE,
     async (handle) => {
-      const result = await warmHandle(handle, githubToken, previousSnapshots);
+      const result = await warmHandle(handle, githubToken, previousSnapshots, requestId);
       return { handle, ...result };
     },
   );
@@ -135,23 +135,33 @@ export async function GET(request: NextRequest) {
       warmed++;
       if (snapshotRecorded) snapshots++;
       if (notified) notifications++;
-    } else {
-      failed++;
     }
   }
 
-  // Aggregate unexpected failures (warmHandle catches internally, but guard against
-  // any unhandled throws that bypass the internal catch)
-  if (warmFailures.length > 0) {
-    failed += warmFailures.length;
-    for (const { item: handle, error } of warmFailures) {
-      void captureServerError({
-        route: "/api/cron/warm-cache",
-        statusCode: 500,
-        error: new Error(`Unexpected failure for handle "${handle}": ${error.message}`),
-      });
-    }
+  // Only advance rotation after processInBatches completes, and only if at least one
+  // handle was processed — prevents a timeout from advancing the offset past handles
+  // that were never warmed (#750).
+  if (warmResults.length > 0) {
+    await cacheSet(ROTATION_KEY, nextOffset, 0);
   }
+
+  // Log unexpected hard failures (warmHandle catches internally; these guard against
+  // any unhandled throws that bypass the internal catch)
+  for (const { item: handle, error } of warmFailures) {
+    void captureServerError({
+      route: "/api/cron/warm-cache",
+      statusCode: 500,
+      error: new Error(`Unexpected failure for handle "${handle}": ${error.message}`),
+      requestId,
+    });
+  }
+
+  // Build structured failure list for response observability (#702)
+  const failures = [
+    ...warmFailures.map(({ item, error }) => ({ handle: item, reason: error.message })),
+    ...warmResults.filter((r) => !r.warmed).map((r) => ({ handle: r.handle, reason: "warm returned false" })),
+  ];
+  const failed = failures.length;
 
   // Clean expired verification records from Supabase (fire-and-forget safe)
   let expiredVerificationsDeleted = 0;
@@ -190,6 +200,7 @@ export async function GET(request: NextRequest) {
     {
       warmed,
       failed,
+      failures,
       snapshots,
       notifications,
       expiredVerificationsDeleted,
@@ -207,7 +218,7 @@ export async function GET(request: NextRequest) {
     },
     { headers: { "Cache-Control": "no-store" } },
   );
-}
+});
 
 /**
  * Parse WARM_CACHE_PRIORITY_HANDLES env var into a list of handles
@@ -215,14 +226,8 @@ export async function GET(request: NextRequest) {
  * that exist in the authoritative user list (allHandles).
  */
 function parsePriorityHandles(allHandles: string[]): string[] {
-  const raw = process.env.WARM_CACHE_PRIORITY_HANDLES?.trim();
-  if (!raw) return [];
-
   const handleSet = new Set(allHandles);
-  return raw
-    .split(",")
-    .map((h) => h.trim())
-    .filter((h) => h.length > 0 && handleSet.has(h));
+  return getWarmCachePriorityHandles().filter((h) => handleSet.has(h));
 }
 
 /**
@@ -233,6 +238,7 @@ async function warmHandle(
   handle: string,
   githubToken: string | undefined,
   previousSnapshots: Map<string, unknown>,
+  requestId?: string,
 ): Promise<HandleResult> {
   try {
     const materialized = await materializeOrchestratedProfile(handle, {
@@ -243,6 +249,7 @@ async function warmHandle(
         route: "/api/cron/warm-cache",
         statusCode: 502,
         error: new Error(`Stats fetch returned null for handle: ${handle}`),
+        requestId,
       });
       return { warmed: false, snapshotRecorded: false, notified: false };
     }
@@ -296,6 +303,7 @@ async function warmHandle(
       route: "/api/cron/warm-cache",
       statusCode: 500,
       error: err,
+      requestId,
     });
     return { warmed: false, snapshotRecorded: false, notified: false };
   }

@@ -4,6 +4,11 @@ import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-libra
 import { BadgeToolbar } from "./BadgeToolbar";
 import type { SessionUser } from "@/hooks/useSession";
 
+const mockRouterRefresh = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: mockRouterRefresh }),
+}));
+
 interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
 const mockUseSession = vi.fn<() => UseSessionReturn>();
 

@@ -20,10 +20,6 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: (...args: unknown[]) => mockCacheSet(...args),
 }));
 
-vi.mock("@/lib/env", () => ({
-  getBaseUrl: () => "https://chapa.thecreativetoken.com",
-}));
-
 // Import after mocks are set up
 import { notifyFirstBadge } from "./notifications";
 import { _resetClient } from "./resend";

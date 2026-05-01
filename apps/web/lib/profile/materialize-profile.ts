@@ -73,17 +73,23 @@ export async function materializeProfile(
   handle: string,
   options: MaterializeProfileOptions = {},
 ): Promise<MaterializedProfile | null> {
-  const stats = await getStats(handle, options.token);
+  // #800 — getStats and the three cache lookups all only need the handle, so
+  // they run concurrently. On cache miss for stats, GitHub's GraphQL still
+  // dominates; on cache hit, this saves a round-trip vs the previous serial
+  // shape. Cache lookup failures fail open to defaults rather than rejecting
+  // the whole profile fetch.
+  const [statsSettled, craftSettled, snapshotSettled, dirtySettled] =
+    await Promise.allSettled([
+      getStats(handle, options.token),
+      getCachedCraftScore(handle),
+      getCachedLatestSnapshot(handle),
+      isStatsDirty(handle),
+    ]);
 
+  const stats = statsSettled.status === "fulfilled" ? statsSettled.value : null;
   if (!stats) {
     return null;
   }
-
-  const [craftSettled, snapshotSettled, dirtySettled] = await Promise.allSettled([
-    getCachedCraftScore(handle),
-    getCachedLatestSnapshot(handle),
-    isStatsDirty(handle),
-  ]);
 
   const craftResult = craftSettled.status === "fulfilled"
     ? craftSettled.value
@@ -94,7 +100,8 @@ export async function materializeProfile(
   // Dirty-signal lookup failures fail open — defaulting to false preserves
   // the existing same-day-lock behavior rather than introducing surprise
   // refreshes when Redis hiccups.
-  const dirtyFromCache = dirtySettled.status === "fulfilled" && dirtySettled.value === true;
+  const dirtyFromCache =
+    dirtySettled.status === "fulfilled" && dirtySettled.value === true;
   const inputsChanged = options.inputsChanged ?? dirtyFromCache;
 
   return {

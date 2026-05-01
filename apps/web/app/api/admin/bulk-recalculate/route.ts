@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAdminSecret } from "@/lib/auth/admin";
+import { getGithubToken } from "@/lib/env";
 import { rateLimit } from "@/lib/cache/redis";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbGetUsers } from "@/lib/db/users";
+import { isValidHandle } from "@/lib/validation";
 import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
@@ -31,7 +34,7 @@ const INLINE_DEADLINE_MS = 250_000;
  * - `handles?: string[]` — specific handles to recalculate. If omitted,
  *   recalculates all users from Supabase.
  */
-export async function POST(request: NextRequest) {
+export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (request: NextRequest) => {
   // Auth first: Bearer token must match ADMIN_SECRET.
   // Checking auth before rate limiting prevents unauthenticated callers from
   // exhausting the per-IP bucket and locking out legitimate admins (BE-H9).
@@ -58,9 +61,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     if (Array.isArray(body.handles) && body.handles.length > 0) {
-      handles = body.handles.filter(
-        (h: unknown): h is string => typeof h === "string" && h.length > 0,
-      );
+      handles = (body.handles as unknown[])
+        .filter((h): h is string => typeof h === "string")
+        .map((h) => h.trim())
+        .filter((h) => isValidHandle(h));
     } else {
       const users = await dbGetUsers();
       handles = users.map((u) => u.handle);
@@ -96,7 +100,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const githubToken = process.env.GITHUB_TOKEN?.trim() || undefined;
+  const githubToken = getGithubToken();
   const errors: { handle: string; error: string }[] = [];
   let recalculated = 0;
   const completed: string[] = [];
@@ -160,4 +164,4 @@ export async function POST(request: NextRequest) {
     errors: errors.length > 0 ? errors : undefined,
     ...(afterCursor ? { cursor: afterCursor } : {}),
   });
-}
+});

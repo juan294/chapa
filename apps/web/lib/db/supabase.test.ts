@@ -207,7 +207,7 @@ describe("getSupabase lazy singleton", () => {
   });
 
   it("returns null when SUPABASE_URL is undefined", () => {
-    delete process.env.SUPABASE_URL;
+    vi.stubEnv("SUPABASE_URL", undefined);
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
 
     expect(getSupabase()).toBeNull();
@@ -216,7 +216,7 @@ describe("getSupabase lazy singleton", () => {
 
   it("returns null when SUPABASE_SERVICE_ROLE_KEY is undefined", () => {
     vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", undefined);
 
     expect(getSupabase()).toBeNull();
     expect(mockCreateClient).not.toHaveBeenCalled();

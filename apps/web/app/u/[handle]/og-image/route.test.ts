@@ -200,6 +200,51 @@ describe("GET /u/[handle]/og-image", () => {
     consoleSpy.mockRestore();
   });
 
+  it("renders without an avatar when the avatar fetch rejects", async () => {
+    mockGetAvatarBase64.mockRejectedValue(new Error("avatar timeout"));
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ avatarDataUri: undefined }),
+    );
+  });
+
+  it("renders without an avatar when stats has no avatarUrl", async () => {
+    mockMaterializePublicProfile.mockResolvedValue({
+      ...FAKE_MATERIALIZED,
+      stats: { ...FAKE_MATERIALIZED.stats, avatarUrl: undefined },
+    });
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ avatarDataUri: undefined }),
+    );
+  });
+
+  it("returns the rendered PNG even when caching it rejects (fire-and-forget)", async () => {
+    mockCacheSet.mockRejectedValue(new Error("redis down"));
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    // give the fire-and-forget rejection a tick to settle so the onError
+    // handler runs and is observed by coverage instrumentation
+    await vi.advanceTimersByTimeAsync(0);
+  });
+
   it("rate-limits to 30 requests per IP per 60 seconds", async () => {
     const counts = new Map<string, number>();
     mockRateLimit.mockImplementation(async (key: string) => {

@@ -136,19 +136,10 @@ describe("POST /api/generate", () => {
     expect(body.error).toContain("Failed to fetch");
   });
 
-  it("returns 500 when an unexpected error is thrown", async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-
+  it("re-throws when an unexpected error is thrown (handled by withErrorCapture)", async () => {
     mockRequireSession.mockReturnValue({ session: SESSION });
     mockGetStats.mockRejectedValue(new Error("unexpected boom"));
 
-    const res = await POST(makeRequest("chapa_session=abc"));
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toBe("Internal server error");
-
-    consoleErrorSpy.mockRestore();
+    await expect(POST(makeRequest("chapa_session=abc"))).rejects.toThrow("unexpected boom");
   });
 });

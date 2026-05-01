@@ -1,13 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/cache/redis";
 import { isValidTelemetryPayload } from "@/lib/validation";
 import { dbInsertTelemetry, type TelemetryPayload } from "@/lib/db/telemetry";
 import { getClientIp } from "@/lib/http/client-ip";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { log } from "@/lib/log";
 
 // Trust model: this endpoint intentionally remains unauthenticated for CLI compatibility.
 // Every accepted row is stored with verified=false until the CLI sends an auth token in a follow-up phase.
-export async function POST(request: Request): Promise<Response> {
+export const POST = withErrorCapture("/api/telemetry", async (request: NextRequest) => {
   // 1. Parse JSON body
   let body: unknown;
   try {
@@ -65,14 +67,14 @@ export async function POST(request: Request): Promise<Response> {
     async () => {
       const ok = await dbInsertTelemetry(dbPayload);
       if (!ok) {
-        console.error("[telemetry] insert failed", { handle: payload.targetHandle });
+        log("error", "[telemetry] insert failed", { route: "/api/telemetry", handle: payload.targetHandle });
       }
     },
     (err) => {
-      console.error("[telemetry] insert failed", { handle: payload.targetHandle, err });
+      log("error", "[telemetry] insert failed", { route: "/api/telemetry", handle: payload.targetHandle, error: err instanceof Error ? err.message : String(err) });
     },
   );
 
   // 5. Always return success — telemetry is a best-effort analytics sink.
   return NextResponse.json({ ok: true });
-}
+});

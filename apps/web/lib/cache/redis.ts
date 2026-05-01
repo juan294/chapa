@@ -11,6 +11,7 @@
 
 import { Redis } from "@upstash/redis";
 import { withTimeout } from "@/lib/async/with-timeout";
+import { getUpstashRedisRestUrl, getUpstashRedisRestToken } from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // Lazy singleton
@@ -21,8 +22,8 @@ let _redis: Redis | null | undefined;
 function getRedis(): Redis | null {
   if (_redis !== undefined) return _redis;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const url = getUpstashRedisRestUrl();
+  const token = getUpstashRedisRestToken();
 
   if (!url || !token) {
     console.warn(

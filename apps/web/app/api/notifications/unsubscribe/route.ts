@@ -1,11 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { dbUpdateEmailNotifications, dbGetUserEmail } from "@/lib/db/users";
+import { getNextauthSecret } from "@/lib/env";
 import { escapeHtml } from "@/lib/utils/escape";
 import { markUnsubscribed } from "@/lib/email/audience";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { verifyUnsubscribeToken } from "@/lib/auth/unsubscribe-token";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { log } from "@/lib/log";
 
 /**
  * GET /api/notifications/unsubscribe?handle=:handle&token=:token
@@ -21,7 +24,7 @@ import { fireAndForget } from "@/lib/async/fire-and-forget";
  * Fail-open: even if the DB update fails, shows the confirmation
  * page so the user isn't confused.
  */
-export async function GET(request: NextRequest) {
+export const GET = withErrorCapture("/api/notifications/unsubscribe", async (request: NextRequest) => {
   const ip = getClientIp(request);
   const rl = await rateLimit(`ratelimit:unsubscribe:${ip}`, 10, 60);
   if (!rl.allowed) {
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
   }
 
   const token = request.nextUrl.searchParams.get("token") ?? "";
-  const secret = process.env.NEXTAUTH_SECRET?.trim() ?? "";
+  const secret = getNextauthSecret() ?? "";
 
   if (!verifyUnsubscribeToken(handle, token, secret)) {
     return NextResponse.json(
@@ -54,10 +57,10 @@ export async function GET(request: NextRequest) {
   const [emailInfo] = await Promise.all([
     dbGetUserEmail(handle).catch(() => null),
     dbUpdateEmailNotifications(handle, false).catch((error: Error) => {
-      console.error(
-        "[unsubscribe] failed to update preferences:",
-        error.message,
-      );
+      log("error", "[unsubscribe] failed to update preferences", {
+        route: "/api/notifications/unsubscribe",
+        error: error.message,
+      });
     }),
   ]);
 
@@ -99,4 +102,4 @@ export async function GET(request: NextRequest) {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-}
+});

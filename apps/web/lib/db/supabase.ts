@@ -7,14 +7,15 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { withTimeout } from "@/lib/async/with-timeout";
+import { getSupabaseUrl, getSupabaseServiceRoleKey } from "@/lib/env";
 
 let _client: SupabaseClient | null | undefined;
 
 export function getSupabase(): SupabaseClient | null {
   if (_client !== undefined) return _client;
 
-  const url = process.env.SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceRoleKey();
 
   if (!url || !key) {
     console.warn(

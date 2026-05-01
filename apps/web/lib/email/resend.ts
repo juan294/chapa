@@ -13,6 +13,7 @@ import { Resend } from "resend";
 import { Webhook } from "svix";
 import { escapeHtml } from "@/lib/utils/escape";
 import { withTimeout, EMAIL_SEND_TIMEOUT_MS } from "@/lib/async/with-timeout";
+import { getResendApiKey, getResendWebhookSecret, getSupportForwardEmail } from "@/lib/env";
 // Re-export so existing consumers (score-bump.ts, unsubscribe/route.ts) keep working
 export { escapeHtml };
 
@@ -44,7 +45,7 @@ let _resend: Resend | null | undefined;
 export function getResend(): Resend | null {
   if (_resend !== undefined) return _resend;
 
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = getResendApiKey();
 
   if (!apiKey) {
     console.warn("[email] RESEND_API_KEY is missing — email disabled");
@@ -68,7 +69,7 @@ export function verifyWebhookSignature(
   rawBody: string,
   headers: Record<string, string>,
 ): boolean {
-  const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
+  const secret = getResendWebhookSecret();
 
   if (!secret) {
     console.warn(
@@ -116,7 +117,7 @@ export async function fetchReceivedEmail(
     return null;
   }
 
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = getResendApiKey();
   if (!apiKey) {
     console.warn("[email] RESEND_API_KEY is missing — cannot fetch email");
     return null;
@@ -170,7 +171,7 @@ export async function forwardEmail(
   const resend = getResend();
   if (!resend) return null;
 
-  const forwardTo = process.env.SUPPORT_FORWARD_EMAIL?.trim();
+  const forwardTo = getSupportForwardEmail();
   if (!forwardTo) {
     console.warn(
       "[email] SUPPORT_FORWARD_EMAIL is missing — cannot forward email",
