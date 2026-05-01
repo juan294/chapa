@@ -37,6 +37,12 @@ function getRedis(): Redis | null {
     // Without read-your-writes consistency, the callback can briefly miss the
     // fresh nonce and incorrectly reject a first-time login as a replay.
     readYourWrites: true,
+    // We store the literal string "1" as a flag and check `existed === "1"`
+    // on consume. Upstash's default JSON-shaped deserialization parses "1"
+    // back as the number 1, breaking the equality check and rejecting every
+    // first login with state_already_used (production incident 2026-05-01).
+    // Disabling auto-deserialization keeps responses as raw strings.
+    automaticDeserialization: false,
   });
   return _redis;
 }
@@ -78,9 +84,15 @@ export async function consumeOauthState(state: string): Promise<boolean> {
     try {
       const key = getKey(state);
       const existed = await (
-        redis as unknown as { getdel<T>(key: string): Promise<T | null> }
-      ).getdel<string>(key);
-      if (existed === "1") return true;
+        redis as unknown as {
+          getdel<T>(key: string): Promise<T | null>;
+        }
+      ).getdel<string | number>(key);
+      // Accept both the raw string "1" and the JSON-parsed number 1. With
+      // automaticDeserialization disabled (above) we should always see the
+      // string, but staying defensive avoids the same outage if a future
+      // Upstash version flips the default back on.
+      if (existed === "1" || existed === 1) return true;
 
       // Upstash read-your-writes consistency is client-scoped. In dev and
       // serverless environments, /login and /callback may hit distinct Redis
@@ -90,9 +102,11 @@ export async function consumeOauthState(state: string): Promise<boolean> {
       for (const delayMs of REDIS_READ_RETRY_DELAYS_MS) {
         await sleep(delayMs);
         const retried = await (
-          redis as unknown as { getdel<T>(key: string): Promise<T | null> }
-        ).getdel<string>(key);
-        if (retried === "1") return true;
+          redis as unknown as {
+            getdel<T>(key: string): Promise<T | null>;
+          }
+        ).getdel<string | number>(key);
+        if (retried === "1" || retried === 1) return true;
       }
       return false;
     } catch {
