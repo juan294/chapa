@@ -21,6 +21,8 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
       - run: pnpm run check:circular
+      - name: Craft propagation guard (#680)
+        run: bash scripts/check-craft-propagation.sh
 
   test:
     name: Test
