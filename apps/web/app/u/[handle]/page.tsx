@@ -108,20 +108,25 @@ export async function SharePageContent({ handle }: { handle: string }) {
 
   let inlineSvg: string | null = cachedSvg;
   let renderedFresh = false;
+  let avatarResolved = false;
 
   if (!cachedSvg && stats && impact) {
-    // Cache miss — render inline. Avatar fetch is best-effort with a 500ms
-    // deadline so a slow external image server can't block TTFB.
+    // Cache miss — render inline. Avatar fetch is best-effort with a tight
+    // 250ms deadline (#800) so a slow external image server can't block
+    // TTFB. The /u/[handle]/badge.svg route awaits the avatar fully on its
+    // own first render and writes the avatar-bearing SVG to the same
+    // cache, so warm visits to the share page get the real avatar.
     const avatarPromise = stats.avatarUrl
       ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
       : Promise.resolve(undefined);
-    const AVATAR_DEADLINE_MS = 500;
+    const AVATAR_DEADLINE_MS = 250;
     const avatarDataUri = await Promise.race([
       avatarPromise,
       new Promise<undefined>((resolve) =>
         setTimeout(() => resolve(undefined), AVATAR_DEADLINE_MS),
       ),
     ]);
+    avatarResolved = avatarDataUri !== undefined;
     inlineSvg = renderBadgeSvg(stats, impact, {
       avatarDataUri,
       verificationHash: verification?.hash,
@@ -130,11 +135,13 @@ export async function SharePageContent({ handle }: { handle: string }) {
     renderedFresh = true;
   }
 
-  // Deferred work: verification storage, tracking, snapshots, and (on
-  // fresh render) cache write so future requests / the badge.svg route
-  // can hit the cache.
+  // Deferred work: verification storage, tracking, snapshots, and (on a
+  // fresh render where the avatar resolved) cache write so future requests
+  // and the badge.svg route can hit the cache. We deliberately do NOT
+  // cache renders that fell back to a placeholder avatar — that would
+  // poison the shared cache with a degraded SVG for up to 24h. (#800)
   if (materialized && inlineSvg) {
-    const svgToCache = renderedFresh ? inlineSvg : null;
+    const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
     after(() => {
       if (svgToCache) {
         void writeBadgeSvgCache(svgCacheKey, svgToCache);
