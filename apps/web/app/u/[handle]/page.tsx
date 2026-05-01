@@ -8,7 +8,7 @@ import { NavbarClient } from "@/components/NavbarClient";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SharePageShortcuts } from "@/components/SharePageShortcuts";
-import { SharePageOwnerContent } from "@/components/SharePageOwnerContent";
+import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
 import { getBaseUrl } from "@/lib/env";
 import { renderJsonLd } from "@/lib/jsonld";
 import { toDateString } from "@/lib/utils/date";
@@ -205,7 +205,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
         </div>
 
         {/* ── Owner/Visitor Content (client-side session check) ── */}
-        <SharePageOwnerContent
+        <SharePageOwnerContentLazy
           handle={handle}
           stats={stats}
           impact={impact}
