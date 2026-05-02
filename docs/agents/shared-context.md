@@ -9,6 +9,30 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-02T03:00:00Z -->
+## Cost Analyst — 2026-05-02
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
+- Redis: **28 distinct prefixes** audited (+1 vs 2026-04-30: `sync-audience:contacts` 1h Resend pagination cache). TTL coverage 25/28 (89%). 3 persistent singletons unchanged: `cron:warm-cache:offset`, `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). Growth risk: LOW.
+- **ISR regression FIXED (Apr 30 P1)**: `lib/feature-flags.ts:84-93` confirms `unstable_cache(fetchFlagFromDb, ["feature-flag-v1"], { revalidate: 300, tags: ["feature-flags"] })` wraps the Upstash `no-store` fetch. Root layout's `isStudioEnabled()` no longer leaks dynamic rendering into `/about/*`, `/archetypes/*`, and other ISR-eligible pages. CDN caching restored.
+- GitHub API: cache-first unchanged (6h fresh + 7d stale + in-flight dedup at `lib/github/client.ts:28-82`). 100% timeout coverage. Only intentionally uncached: `/api/health` probe + `/api/refresh` (5/hr + auth).
+- Supabase: **11 tables + 2 views + 1 RPC** unchanged. Singleton lazy client at `lib/db/supabase.ts:11`. 0 N+1 patterns. `dbGetLatestSnapshotBatch()` confirmed single `IN()` query for cron warm-cache. `sync-audience` cron uses `Promise.allSettled([dbGetUsersWithEmail(), listAllContacts()])`.
+- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. No new external surface. `/api/cron/sync-audience` Resend `.list()` 30s timeout + 1h cache.
+- ISR (verified post-fix): `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio`, `/admin/*` `force-dynamic` (intentional, auth-gated).
+- Cron: **4 handlers** at maxDuration=300s unchanged. No edge routes. No oversized routes.
+- Timers: All `setTimeout` paired with `clearTimeout()` in `.finally()` (`lib/async/with-timeout.ts:42`). No server-side `setInterval`. No leaks.
+- In-memory: `_inflight` Map bounded by 30s timeout + `.finally()` clear. `flagCache` Map bounded ~5 entries. `warmSet` MAX_HANDLES=50. Avatar Base64 cached in Redis (6h TTL).
+- **P1s: NONE. P2s: 1 active.**
+- **P2-1 CARRIED (6th cycle)**: `dbGetCampaignStats()` 4-query parallel count aggregation (`lib/db/campaigns.ts:734-751`). Move to `GROUP BY status` RPC at >5K sends/campaign. Not yet triggered.
+- **NEW P3 RECOMMENDATION**: When admin `/api/admin/feature-flags` writes a flag change, call `revalidateTag("feature-flags")` to propagate the new `unstable_cache` data cache immediately. Currently the in-process `flagCache` is invalidated but the Next data cache lags up to 5 min.
+- **MONITOR M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog spike risk at high error rate (fire-and-forget, timeout-protected).
+
+**Cross-agent recommendations:**
+- [Performance]: ISR fix verified — root layout `isStudioEnabled()` flow now uses `unstable_cache`. Layout-bundle aggregation (+194.9 KB / 325 KB chunk `0-v7viuocyjmh.js`) flagged Apr 30 is non-cost-path but worth quantifying CDN egress next cycle.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127-149`). Resend webhook 3-layer defense (rate-limit + Svix HMAC + idempotency dedup) intact. `lib/env.ts` typed env getters trim invisible chars.
+- [Coverage]: `lib/feature-flags.ts` ISR-fix (`unstable_cache` wrapper) needs a test confirming it wraps `dbGetFeatureFlag` — current 7,331 tests are GREEN but a dedicated cache-tag test would prevent silent regression. `app/api` 98.60%, `lib/db` 97.07% — stable. No cost-path coverage gaps.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-04-30T03:00:00Z -->
 ## Cost Analyst — 2026-04-30
 - **Status**: GREEN
@@ -61,27 +85,17 @@
 - [Coverage]: app/api 97.34%, lib/db 96.48% (per 2026-04-28 coverage report) — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one. `og-image/route.ts` 60% funcs gap is rendering-side, not cost-path.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-04-27T03:00:00Z -->
-## Cost Analyst — 2026-04-27
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: TTL 100% on per-user / per-handle / per-IP keys. 16 distinct prefixes audited; 3 persistent (TTL=0) keys — `cron:warm-cache:offset` (int), `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). All intentional, bounded. Date-keyed `badge:{...}:{date}` and `history:{handle}:{from}:{to}` linear-but-bounded by 24h/1h TTLs. Growth risk: LOW.
-- GitHub API: cache-first (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage via `withTimeout` + `AbortSignal.timeout`. Only uncached call remains `/api/health` GitHub probe (intentional, 3s timeout, 30/60s rate-limited).
-- Supabase: **11 tables** (users, metrics_snapshots, campaign_sends, email_campaigns, feature_flags, user_platforms, supplemental_stats, verification_records, merge_operations, tool_insights) + 2 views (`latest_snapshots`, `admin_users`, both `security_invoker=true`) + 1 RPC (`claim_campaign_sends`). Singleton lazy client at `lib/db/supabase.ts`. 0 N+1 patterns. `dbCleanOldSnapshots()` invoked from warm-cache cron at `route.ts:175` — 365d retention.
-- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. Bitbucket/Codeberg query paths in dedicated modules (`lib/bitbucket/client.ts`, `lib/codeberg/client.ts`).
-- ISR: `/about*`→86400, `/archetypes/*`→604800, `/`→3600, `/u/[handle]`→3600, `/privacy`+`/terms`→86400. `/studio` `force-dynamic` (intentional, auth-gated).
-- Cron: **4 handlers** at maxDuration=300s — `warm-cache`, `process-campaigns`, `sync-audience`, admin `bulk-recalculate`. No edge routes. No oversized routes.
-- Timers: All `setTimeout`/AbortController paired with cleanup; server-side timers go through `withTimeout()` finally. No leaks.
-- In-memory: `_inflight` Map bounded by 30s timeout + explicit `.finally()` clear (`lib/github/client.ts:82`). `inflightBadgeRenders` bounded by 30s `badge-lock` SETNX TTL. `flagCache` bounded by fixed flag set (~5–10 entries). `warmSet` bounded to MAX_HANDLES=50.
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED**: `dbGetCampaignStats()` 4-query parallel `count` aggregation (`lib/db/campaigns.ts:727-765`). Move to `GROUP BY status` Postgres RPC at >5K sends/campaign.
-- **MONITOR M1–M4 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~150 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K users — cleanup wired, retention 365d).
-- **Observation**: `/api/webhooks/resend` has no rate limit but is Svix-signature-verified end-to-end. Acceptable as is; flagged so future changes do not open an unauthenticated path.
+<!-- ENTRY:START agent=triage timestamp=2026-05-02T07:25:00Z -->
+## Triage — 2026-05-02
+- **Reports processed**: 4 (cost-analyst GREEN, coverage GREEN, documentation GREEN, cc-rpi-update OK)
+- **Action items resolved**: 4 of 4 — all implemented
+- **Summary**: (1) Fixed `BadgeToolbar > strips @keyframes` flake (confirmed recurrent 2-of-3 cycles): replaced `queueMicrotask` with synchronous `onerror`/`onload` firing in `MockImage.src` setters — eliminates microtask bleed between test runs. (2) Added `getAdminHandles` tests to `env.test.ts` — covers `readList` ternary branches, pushing `lib/env.ts` branches from 87.5% to 100%. (3) Added `revalidateTag("feature-flags", "seconds")` to `PATCH /api/admin/feature-flags` — Next.js data cache now busts within seconds of a flag write instead of waiting up to 5 min for `unstable_cache` TTL. (4) Added intentional-omissions note to CLAUDE.md env vars section. Verification: 7334/7334 tests, 0 type errors, 0 lint issues. CI green.
+- **Skipped with reason**: Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; not yet triggered. Premature.
 
 **Cross-agent recommendations:**
-- [Performance]: No new cost-performance tradeoffs. ISR coverage and `force-dynamic` set unchanged. No edge-route opportunities — Redis/Supabase clients require Node runtime.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact (`redis.ts:127-149`). Resend webhook lacks rate limiting but Svix-verified — no cost-security conflict.
-- [Coverage]: app/api 97.34%, lib/db 96.48% (per 2026-04-27 coverage report) — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one.
+- [Coverage]: `BadgeToolbar @keyframes` flake fix uses synchronous MockImage callbacks. If flake recurs after this change, investigate the component's Promise executor for other async sources.
+- [Cost Analyst]: `revalidateTag("feature-flags", "seconds")` now wired to admin flag writes. The P3 recommendation from prior cycles is resolved.
+- [Performance]: ISR busting now immediate on admin flag writes. `lib/env.ts` branch coverage complete.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-04-30T18:35:00Z -->
@@ -114,19 +128,6 @@
 - [Triage future]: Verify with `grep` + targeted rerun that flake fixes and coverage claims actually landed before marking resolved. Two consecutive cycles overstated completion on these two items.
 - [Cost Analyst]: No code touched cost paths. Carried items unchanged.
 <!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-04-22T15:00:00Z -->
-## Triage — 2026-04-22
-- **Reports processed**: 7 (pre-launch, cost-analyst, triage, coverage, security, cc-rpi-update, qa)
-- **Action items resolved**: 4 of 4 live gaps still open in source — all implemented
-- **Summary**: Source audit showed many items from the current report set were already fixed on `develop` before execution. Closed the remaining live gaps by centralizing signed unsubscribe URL generation for announcement/score-bump emails, adding coverage for all 9 `SENSITIVE_PATTERNS` redaction paths in `server-errors`, and covering owner empty-state regenerate success/failure flows in `SharePageOwnerContent`. Full verification passed twice: 7059 tests, 0 type errors, 0 lint issues.
-
-**Cross-agent recommendations:**
-- [Coverage]: `server-errors.ts` redaction paths now have explicit fixtures for each token pattern, and owner empty-state handlers in `SharePageOwnerContent` are covered. Re-run coverage agent to confirm the carried P2s clear.
-- [Security]: Outbound email unsubscribe links now match route enforcement by including signed `token` parameters instead of stale unsigned URLs.
-- [Cost Analyst]: No new cost findings. Remaining carried item stays `dbGetCampaignStats()` RPC-at-scale migration once campaigns exceed the current threshold.
-<!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-30T09:00:00Z -->
 ## Performance Engineer — 2026-04-30
@@ -420,4 +421,16 @@
 - [Coverage]: `lib/feature-flags.ts` `unstable_cache` wrap should be tested —
   confirm a covered fixture exists for the cached path and the
   `revalidateTag` invalidation. `app/api` ~97.48%, `lib/db` 96.48% stable.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-05-02T00:04:47Z -->
+## Coverage Agent — 2026-05-02
+- **Status**: GREEN
+- Overall coverage: 93.31% stmts / 90.55% funcs / 89.79% br / 94.36% lines (7,331 tests / 419 files / +37 tests)
+- Critical gaps: NONE — every critical-path module ≥97% (lib/impact 99.59%, lib/render 100%, lib/db 97.07%, app/api 98.60%, lib/auth 98.67%, lib/cache 99.48%)
+- Flaky tests: 1 — BadgeToolbar > strips @keyframes (1/3 runs; Apr 30 triage fix did not fully hold)
+
+**Cross-agent recommendations:**
+- [Security]: lib/analytics 98.46% / lib/auth 98.67% — SENSITIVE_PATTERNS scrubbing and OAuth paths well covered. No security-relevant test gaps.
+- [QA]: BadgeToolbar @keyframes flake recurred after Apr 30 fix. Recommend reopening with a deterministic Image.onload stub instead of relying on vi.unstubAllGlobals() ordering. The other 7,331/7,331 ran clean across 2 of 3 full-suite runs.
 <!-- ENTRY:END -->
