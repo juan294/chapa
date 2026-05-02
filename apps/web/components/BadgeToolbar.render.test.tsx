@@ -971,10 +971,9 @@ describe("BadgeToolbar render", () => {
         text: () => Promise.resolve(svgWithAnimations),
       } as Response));
 
-      // Use class-based Image mock to avoid vitest warning.
-      // Use queueMicrotask (not setTimeout) so the onerror fires within the
-      // same act() flush — setTimeout schedules a macrotask that act() won't
-      // drain, causing a race where capturedSrc is still empty at assertion time.
+      // Fire onerror synchronously in the src setter so no pending microtask
+      // can bleed into subsequent tests. This eliminates the intermittent race
+      // where a prior test's queueMicrotask fires during this test's setup.
       class MockImage {
         width = 0;
         height = 0;
@@ -985,10 +984,8 @@ describe("BadgeToolbar render", () => {
         set src(val: string) {
           this._src = val;
           capturedSrc = val;
-          // Trigger error to force SVG fallback
-          queueMicrotask(() => {
-            this.onerror?.(new Event("error"));
-          });
+          // Synchronous — onerror is already set before src is assigned (line 124 of component)
+          this.onerror?.(new Event("error"));
         }
       }
       vi.stubGlobal("Image", MockImage);
@@ -1000,9 +997,6 @@ describe("BadgeToolbar render", () => {
 
         fireEvent.click(screen.getByLabelText("Download badge as PNG"));
 
-        // waitFor polls until capturedSrc is populated — more reliable than a
-        // fixed-tick setTimeout which can miss the queueMicrotask→promise chain
-        // (fetch → text() → Image → queueMicrotask(onerror) → reject → finally)
         await waitFor(() => {
           expect(capturedSrc).not.toBe("");
         }, { timeout: 2000 });
@@ -1047,8 +1041,9 @@ describe("BadgeToolbar render", () => {
       const createObjectURL = vi.fn(() => "blob:mock-url");
       vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
 
-      // Use class-based Image mock — trigger onload synchronously in the src setter
-      // so the canvas path runs within the same act() flush
+      // Fire onload synchronously in the src setter — handlers are set before
+      // img.src is assigned (component lines 102-124), so this is safe and
+      // eliminates any microtask bleed between tests.
       class MockImage {
         width = 0;
         height = 0;
@@ -1058,11 +1053,7 @@ describe("BadgeToolbar render", () => {
         get src() { return this._src; }
         set src(val: string) {
           this._src = val;
-          // Fire synchronously so the Promise chain inside handleDownload
-          // resolves within the act() wrapper
-          queueMicrotask(() => {
-            this.onload?.(new Event("load"));
-          });
+          this.onload?.(new Event("load"));
         }
       }
       vi.stubGlobal("Image", MockImage);

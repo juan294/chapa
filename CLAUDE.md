@@ -339,6 +339,8 @@ VERCEL_ENV=                    # Auto-injected by Vercel (production/preview/dev
 ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer in next.config.ts (dev-only)
 ```
 
+> **Intentionally omitted:** `CI`, `NODE_ENV`, and `VERCEL_*` are standard Node/Vercel build vars and do not need to be configured manually. `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` are test-only mocks — not real credentials and not needed in any deployed environment.
+
 ### Environment Variable Safety
 
 **Always `.trim()` environment variables before use, especially API keys.**

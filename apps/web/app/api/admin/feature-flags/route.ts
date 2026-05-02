@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { dbUpdateFeatureFlag } from "@/lib/db/feature-flags";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
@@ -52,8 +53,12 @@ export const PATCH = withErrorCapture("/api/admin/feature-flags", async (request
     );
   }
 
-  // Same-instance reads should observe the new flag value immediately.
+  // Same-instance reads observe the new flag value immediately.
   invalidateFeatureFlagCache(body.key);
+  // Bust the Next.js data cache so ISR pages pick up the new value within
+  // seconds instead of waiting up to 5 min for the unstable_cache TTL.
+  // "seconds" profile: revalidate=1s, expire=60s — appropriate for admin writes.
+  revalidateTag("feature-flags", "seconds");
 
   return NextResponse.json({ success: true });
 });
