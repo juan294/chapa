@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  act,
+} from "@testing-library/react";
 
 // Mock requestAnimationFrame for counter animations
 beforeEach(() => {
@@ -9,6 +15,12 @@ beforeEach(() => {
     return 0;
   });
   vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 // Mock matchMedia for reduced motion check
@@ -60,5 +72,56 @@ describe("number-counters experiment page", () => {
     for (let i = 1; i < headings.length; i++) {
       expect(headings[i]!.tagName).toBe("H2");
     }
+  });
+
+  it("updates global animation controls and replays all counters", async () => {
+    const { default: Page } = await import("./page");
+    render(<Page />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Spring" }));
+    fireEvent.change(screen.getByLabelText(/Duration:/), {
+      target: { value: "3000" },
+    });
+    fireEvent.change(screen.getByLabelText("Target Value"), {
+      target: { value: "91" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Replay All" }));
+
+    expect(screen.getByText("3000ms")).toBeTruthy();
+    expect(screen.getByDisplayValue("91")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Target Value"), {
+      target: { value: "10000" },
+    });
+    expect(screen.getByDisplayValue("91")).toBeTruthy();
+  });
+
+  it("animates in-view counters when sections intersect", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(
+          private readonly callback: IntersectionObserverCallback,
+        ) {}
+
+        observe = vi.fn(() => {
+          this.callback(
+            [{ isIntersecting: true } as IntersectionObserverEntry],
+            this as unknown as IntersectionObserver,
+          );
+        });
+        disconnect = vi.fn();
+        unobserve = vi.fn();
+      },
+    );
+
+    const { default: Page } = await import("./page");
+    render(<Page />);
+
+    await act(() => vi.runAllTimersAsync());
+
+    expect(screen.getByText("Stars")).toBeTruthy();
+    expect(screen.getAllByText("Confidence").length).toBeGreaterThan(1);
   });
 });

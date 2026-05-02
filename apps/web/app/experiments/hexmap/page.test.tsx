@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import fs from "fs";
 import { resolve } from "path";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import HexmapExperimentPage from "./page";
 
 const SOURCE = fs.readFileSync(
   resolve(__dirname, "page.tsx"),
   "utf-8"
 );
+
+afterEach(cleanup);
 
 describe("HexmapExperimentPage — no hardcoded colors", () => {
   it("uses CSS variables for dimension colors, not hardcoded hex", () => {
@@ -42,5 +46,74 @@ describe("HexmapExperimentPage — no hardcoded colors", () => {
         !line.includes("var(--")
     );
     expect(rawRgbaLiterals).toHaveLength(0);
+  });
+});
+
+describe("HexmapExperimentPage — render behavior", () => {
+  it("renders the experiment controls and all heatmap variants", () => {
+    render(<HexmapExperimentPage />);
+
+    expect(
+      screen.getByRole("heading", { name: "Hexagonal Heatmap" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Dominant Dimension" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Dimension Blend" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Radial Glow" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Replay/ })).toBeTruthy();
+
+    expect(screen.getAllByRole("img", { name: /Hexagonal heatmap/ })).toHaveLength(4);
+  });
+
+  it("switches variants and updates the selected showcase", () => {
+    render(<HexmapExperimentPage />);
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Radial Glow" })[0]!,
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Radial Glow" }),
+    ).toBeTruthy();
+    expect(screen.getAllByText(/Dark mode with glowing hexes/).length).toBe(2);
+  });
+
+  it("updates the hex size from the slider", () => {
+    render(<HexmapExperimentPage />);
+
+    const slider = screen.getByLabelText("Hex Size");
+    fireEvent.change(slider, { target: { value: "20" } });
+
+    expect(screen.getByText("20px")).toBeTruthy();
+  });
+
+  it("shows and hides a tooltip for contribution cells", () => {
+    render(<HexmapExperimentPage />);
+
+    const firstCell = screen
+      .getAllByRole("img", { name: /Hexagonal heatmap/ })[0]!
+      .querySelector("div")!;
+
+    firstCell.getBoundingClientRect = () =>
+      ({
+        left: 20,
+        top: 160,
+        bottom: 182,
+        width: 28,
+        height: 24,
+        right: 48,
+        x: 20,
+        y: 160,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    fireEvent.mouseEnter(firstCell);
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    fireEvent.mouseLeave(firstCell);
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });
