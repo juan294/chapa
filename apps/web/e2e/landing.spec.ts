@@ -61,7 +61,7 @@ test.describe("Landing page — sections and content", () => {
 
   test("embed snippet section has copy button", async ({ page }) => {
     // The embed snippet section on the landing page
-    const copyButton = page.locator("button").filter({ hasText: /copy|copied/i });
+    const copyButton = page.locator("button").filter({ hasText: /copy|copied|copiar|copiado/i });
     // At least one copy button should exist (embed snippet area)
     const count = await copyButton.count();
     expect(count).toBeGreaterThanOrEqual(1);

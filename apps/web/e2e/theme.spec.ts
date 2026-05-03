@@ -7,7 +7,7 @@ test.describe("Theme toggle — light/dark switching", () => {
     await page.goto("/");
 
     const html = page.locator("html");
-    const toggle = page.locator('button[aria-label*="Switch to"]');
+    const toggle = page.locator('button[aria-label*="Cambiar"]');
 
     // Get initial theme
     const initialTheme = await html.getAttribute("data-theme");
@@ -25,7 +25,7 @@ test.describe("Theme toggle — light/dark switching", () => {
   }) => {
     await page.goto("/");
 
-    const toggle = page.locator('button[aria-label*="Switch to"]');
+    const toggle = page.locator('button[aria-label*="Cambiar"]');
     const initialLabel = await toggle.getAttribute("aria-label");
 
     await toggle.click();
@@ -34,7 +34,7 @@ test.describe("Theme toggle — light/dark switching", () => {
     expect(newLabel).not.toBe(initialLabel);
 
     // Both labels should be one of the valid values
-    const validLabels = ["Switch to light theme", "Switch to dark theme"];
+    const validLabels = ["Cambiar a tema claro", "Cambiar a tema oscuro"];
     expect(validLabels).toContain(initialLabel);
     expect(validLabels).toContain(newLabel);
   });
@@ -43,7 +43,7 @@ test.describe("Theme toggle — light/dark switching", () => {
     await page.goto("/");
 
     const html = page.locator("html");
-    const toggle = page.locator('button[aria-label*="Switch to"]');
+    const toggle = page.locator('button[aria-label*="Cambiar"]');
 
     // Switch theme
     await toggle.click();
@@ -53,7 +53,7 @@ test.describe("Theme toggle — light/dark switching", () => {
     await page.reload();
 
     // Wait for hydration (theme toggle re-renders after hydration)
-    await page.locator('button[aria-label*="Switch to"]').waitFor();
+    await page.locator('button[aria-label*="Cambiar"]').waitFor();
 
     const themeAfterReload = await html.getAttribute("data-theme");
     expect(themeAfterReload).toBe(themeAfterToggle);
