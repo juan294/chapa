@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
+import { getServerLocale, getServerT } from "@/lib/i18n";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
 import { NavLink } from "./NavLink";
@@ -17,10 +18,13 @@ interface NavbarProps {
 }
 
 export async function Navbar({ navLinks }: NavbarProps) {
-  const session = getOptionalServerSessionFromHeaders(await headers());
+  const h = await headers();
+  const session = getOptionalServerSessionFromHeaders(h);
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
 
   return (
-    <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
+    <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
@@ -63,7 +67,7 @@ export async function Navbar({ navLinks }: NavbarProps) {
               href="/api/auth/login"
               className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"
             >
-              <span className="text-amber/50">/</span> login
+              <span className="text-amber/50">/</span> {t('common.login') as string}
             </a>
           )}
         </div>

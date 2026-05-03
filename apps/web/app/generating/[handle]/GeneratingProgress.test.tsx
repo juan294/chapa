@@ -6,8 +6,8 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "GeneratingProgress.tsx"),
   "utf-8",
 );
-const COPY_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../../../lib/copy/public-flow.ts"),
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../../../lib/i18n/dictionaries/en.ts"),
   "utf-8",
 );
 
@@ -17,20 +17,45 @@ describe("GeneratingProgress", () => {
   });
 
   describe("progress steps", () => {
-    it("shows Spanish GitHub authentication step", () => {
-      expect(COPY_SOURCE).toContain("Autenticado con GitHub");
+    it("GitHub authentication step copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Authenticated with GitHub");
     });
 
-    it("shows Spanish contribution fetch step", () => {
-      expect(COPY_SOURCE).toContain("Recopilando datos de contribución");
+    it("contribution fetch step copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Collecting contribution data");
     });
 
-    it("shows Spanish impact profile step", () => {
-      expect(COPY_SOURCE).toContain("Calculando perfil de impacto");
+    it("impact profile step copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Computing impact profile");
     });
 
-    it("shows Spanish badge render step", () => {
-      expect(COPY_SOURCE).toContain("Renderizando insignia");
+    it("badge render step copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Rendering badge");
+    });
+
+    it("uses useTranslation() for step labels (i18n-reactive)", () => {
+      expect(SOURCE).toContain("useTranslation");
+    });
+
+    it("step labels are derived from translation keys (step0–step3)", () => {
+      expect(SOURCE).toContain("generation.step0");
+      expect(SOURCE).toContain("generation.step1");
+      expect(SOURCE).toContain("generation.step2");
+      expect(SOURCE).toContain("generation.step3");
+    });
+
+    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
+      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
+    });
+  });
+
+  describe("error handling", () => {
+    it("retry copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Try again");
+    });
+
+    it("has error state", () => {
+      expect(SOURCE).toContain("error");
     });
   });
 
@@ -52,20 +77,6 @@ describe("GeneratingProgress", () => {
 
     it("redirects to /u/:handle on success", () => {
       expect(SOURCE).toContain("/u/${handle}");
-    });
-  });
-
-  describe("error handling", () => {
-    it("has error state", () => {
-      expect(SOURCE).toContain("error");
-    });
-
-    it("provides a retry mechanism", () => {
-      expect(COPY_SOURCE).toContain("Intentar de nuevo");
-    });
-
-    it("uses centralized public-flow copy", () => {
-      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
     });
   });
 

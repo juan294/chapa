@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
 
 interface NavLink {
   label: string;
@@ -16,6 +17,7 @@ export function MobileNav({ links }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -73,7 +75,7 @@ export function MobileNav({ links }: MobileNavProps) {
       <button
         type="button"
         className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg border border-stroke text-text-secondary transition-colors hover:text-text-primary hover:bg-amber/[0.06]"
-        aria-label="Toggle navigation"
+        aria-label={t('aria.toggleNavigation') as string}
         aria-controls="mobile-nav-panel"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
@@ -104,7 +106,7 @@ export function MobileNav({ links }: MobileNavProps) {
       </button>
 
       {open && (
-        <div ref={panelRef} id="mobile-nav-panel" role="navigation" aria-label="Mobile navigation" className="absolute top-full left-0 w-full border-b border-stroke bg-card md:hidden shadow-lg">
+        <div ref={panelRef} id="mobile-nav-panel" role="navigation" aria-label={t('aria.mobileNavigation') as string} className="absolute top-full left-0 w-full border-b border-stroke bg-card md:hidden shadow-lg">
           <div className="flex flex-col px-6 py-4 gap-1 font-heading text-sm">
             {links.map((link) => (
               <a

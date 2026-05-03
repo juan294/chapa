@@ -30,7 +30,8 @@ describe("ErrorBanner", () => {
     });
 
     it("has aria-label on dismiss button", () => {
-      expect(SOURCE).toContain('aria-label="Dismiss error"');
+      // Now uses t('aria.dismissError') via useTranslation()
+      expect(SOURCE).toContain("aria.dismissError");
     });
 
     it("has aria-hidden on decorative icons", () => {

@@ -2,10 +2,12 @@
 
 import { useTheme } from "next-themes";
 import { useIsClient } from "@/hooks/useIsClient";
+import { useTranslation } from "@/lib/i18n";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const hydrated = useIsClient();
+  const { t } = useTranslation();
 
   if (!hydrated) {
     return <div className="h-11 w-11" aria-hidden="true" />;
@@ -17,7 +19,7 @@ export function ThemeToggle() {
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg text-terminal-dim transition-colors hover:text-amber"
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      aria-label={isDark ? t('aria.themeToggleLight') as string : t('aria.themeToggleDark') as string}
     >
       <span
         className={`absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-200 ${

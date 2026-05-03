@@ -6,8 +6,8 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "SharePageOwnerContent.tsx"),
   "utf-8",
 );
-const COPY_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../lib/copy/public-flow.ts"),
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
   "utf-8",
 );
 
@@ -19,6 +19,16 @@ describe("SharePageOwnerContent", () => {
 
     it("does NOT import from next/headers", () => {
       expect(SOURCE).not.toContain("next/headers");
+    });
+  });
+
+  describe("i18n integration", () => {
+    it("uses useTranslation() for all copy", () => {
+      expect(SOURCE).toContain("useTranslation");
+    });
+
+    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
+      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
     });
   });
 
@@ -41,16 +51,24 @@ describe("SharePageOwnerContent", () => {
       expect(SOURCE).toContain("ImpactDashboard");
     });
 
-    it("renders embed snippets for public viewers", () => {
-      expect(SOURCE).toContain("Incrustar esta insignia");
+    it("embed badge copy is looked up via t() key", () => {
+      expect(SOURCE).toContain("shareOwner.embedBadge");
     });
 
-    it("renders DataSources before Impact Breakdown heading", () => {
+    it("embed badge copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Embed this badge");
+    });
+
+    it("renders DataSources before Impact Breakdown (DOM order preserved)", () => {
       const dsIndex = SOURCE.indexOf("DataSources");
-      const breakdownIndex = SOURCE.indexOf("Desglose de impacto");
+      const breakdownIndex = SOURCE.indexOf("shareOwner.impactBreakdown");
       expect(dsIndex).toBeGreaterThan(-1);
       expect(breakdownIndex).toBeGreaterThan(-1);
       expect(dsIndex).toBeLessThan(breakdownIndex);
+    });
+
+    it("impact breakdown copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Impact breakdown");
     });
 
     it("passes stats and handle to DataSources", () => {
@@ -68,27 +86,27 @@ describe("SharePageOwnerContent", () => {
   });
 
   describe("visitor CTA", () => {
-    it("shows a Spanish impact CTA for non-owners", () => {
-      expect(COPY_SOURCE).toContain("Descubre tu impacto");
+    it("visitor CTA copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Discover your impact");
     });
 
     it("CTA links to the homepage", () => {
       expect(SOURCE).toContain('href="/"');
     });
 
-    it("uses curiosity-driven copy that focuses on the reader", () => {
-      expect(COPY_SOURCE).toContain("¿Quieres ver cómo se ve tu impacto como desarrollador?");
-    });
-
-    it("uses centralized public-flow copy", () => {
-      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
+    it("visitor description copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Want to see what your developer impact looks like?");
     });
   });
 
   // #743 — empty state retry mechanism
   describe("empty state retry mechanism (#743)", () => {
-    it("has a Regenerate button in the empty state", () => {
-      expect(SOURCE).toContain("Regenerar");
+    it("has a Regenerate translation key", () => {
+      expect(SOURCE).toContain("shareOwner.regenerate");
+    });
+
+    it("Regenerate copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Regenerate");
     });
 
     it("empty state calls /api/refresh endpoint", () => {

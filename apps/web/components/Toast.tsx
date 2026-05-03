@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "@/lib/i18n";
 
 interface ToastProps {
   message: string;
@@ -94,6 +95,7 @@ export function Toast({
 }: ToastProps) {
   const [visible, setVisible] = useState(true);
   const onDismissRef = useRef(onDismiss);
+  const { t } = useTranslation();
   useEffect(() => {
     onDismissRef.current = onDismiss;
   }, [onDismiss]);
@@ -140,7 +142,7 @@ export function Toast({
             setVisible(false);
             onDismiss();
           }}
-          aria-label="Dismiss notification"
+          aria-label={t('aria.dismissNotification') as string}
           className="flex-shrink-0 rounded-full p-1 text-text-secondary transition-colors hover:text-text-primary"
         >
           <svg

@@ -156,6 +156,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Public-page i18n requires dynamic rendering (2026-05-02)
+
+- **Risk:** All translated public pages use `export const dynamic = 'force-dynamic'`, disabling ISR/static caching. First-byte time is per-request rather than served from CDN cache.
+- **Mitigation:** Short edge-cache via `Cache-Control: s-maxage=60, stale-while-revalidate=86400` per translated page. The most-cached endpoint (`/u/:handle/badge.svg`) is unaffected — it remains ISR-cached. Server render time is fast (<50ms) since locale resolution reads a single cookie header.
+- **Severity:** Low
+- **Accepted:** 2026-05-02
+
+---
+
 ## Review schedule
 
 These accepted risks should be re-evaluated:

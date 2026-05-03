@@ -1,19 +1,26 @@
 import { notFound } from "next/navigation";
 import { isValidHandle } from "@/lib/validation";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+import { getServerLocale, getServerT } from "@/lib/i18n";
 import { GeneratingProgress } from "./GeneratingProgress";
 import type { Metadata } from "next";
 
+export const dynamic = 'force-dynamic';
+
 interface GeneratingPageProps {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: GeneratingPageProps): Promise<Metadata> {
   const { handle } = await params;
+  const { lang } = await searchParams;
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
   return {
-    title: `${SPANISH_PUBLIC_COPY.generation.metadataTitle} — @${handle}`,
+    title: `${t('generation.metadataTitle') as string} — @${handle}`,
     robots: { index: false },
   };
 }

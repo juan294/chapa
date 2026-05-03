@@ -66,7 +66,8 @@ describe("NavbarClient", () => {
 
   describe("accessibility", () => {
     it("uses <nav> element with aria-label", () => {
-      expect(SOURCE).toContain('aria-label="Main navigation"');
+      // Now uses t('aria.mainNavigation') via useTranslation()
+      expect(SOURCE).toContain("aria.mainNavigation");
     });
   });
 

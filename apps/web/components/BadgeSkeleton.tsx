@@ -1,13 +1,19 @@
+"use client";
+
+import { useTranslation } from "@/lib/i18n";
+
 /**
  * Skeleton placeholder displayed while the badge SVG loads via <img> fallback.
  * Matches badge proportions (1200x630) to prevent layout shift.
  * Pure CSS animation — no client JS required.
  */
 export function BadgeSkeleton() {
+  const { t } = useTranslation();
+
   return (
     <div
       role="img"
-      aria-label="Loading badge..."
+      aria-label={t('aria.loadingBadge') as string}
       className="relative w-full aspect-[1200/630] rounded-xl bg-card overflow-hidden"
     >
       {/* Shimmer overlay */}

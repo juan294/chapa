@@ -4,6 +4,7 @@ import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 import { ThemeToggle } from "./ThemeToggle";
 import { useSession } from "@/hooks/useSession";
+import { useTranslation } from "@/lib/i18n";
 
 /**
  * Client-side Navbar variant for ISR-compatible pages.
@@ -17,9 +18,10 @@ import { useSession } from "@/hooks/useSession";
 
 export function NavbarClient() {
   const { session } = useSession();
+  const { t } = useTranslation();
 
   return (
-    <nav aria-label="Main navigation" className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
+    <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
@@ -43,7 +45,7 @@ export function NavbarClient() {
               href="/api/auth/login"
               className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"
             >
-              <span className="text-amber/50">/</span> login
+              <span className="text-amber/50">/</span> {t('common.login') as string}
             </a>
           )}
         </div>

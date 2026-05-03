@@ -17,7 +17,8 @@ describe("error.tsx — error boundary", () => {
   });
 
   it("contains a retry/reset button", () => {
-    expect(SOURCE).toContain("COPY.tryAgain");
+    // Now uses t('errors.tryAgain') via useTranslation()
+    expect(SOURCE).toContain("errors.tryAgain");
   });
 
   it("calls reset on retry button click", () => {
@@ -25,7 +26,8 @@ describe("error.tsx — error boundary", () => {
   });
 
   it("contains a 'go home' link", () => {
-    expect(SOURCE).toContain("COPY.goHome");
+    // Now uses t('errors.goHome') via useTranslation()
+    expect(SOURCE).toContain("errors.goHome");
   });
 
   it("links to the root path", () => {

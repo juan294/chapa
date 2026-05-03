@@ -2,6 +2,30 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
+// Mock getServerLocale + getServerT to return English without needing Next.js headers()/cookies()
+// Uses a deep-traversal resolver that returns sub-objects (not just leaves) for intermediate keys.
+vi.mock("@/lib/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  function deepGet(obj: Record<string, unknown>, key: string): unknown {
+    const parts = key.split(".");
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
+      current = (current as Record<string, unknown>)[part];
+      if (current === undefined) return key;
+    }
+    return current;
+  }
+  return {
+    ...actual,
+    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerT: vi.fn().mockImplementation(() => (key: string) =>
+      deepGet(en as unknown as Record<string, unknown>, key)
+    ),
+  };
+});
+
 // Mock heavy dependencies before import
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: vi.fn(() => "<svg data-testid='demo-badge'></svg>"),
@@ -45,7 +69,9 @@ describe("Home page render", () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("decodificado")).toBeDefined();
+    // useTranslation falls back to English when LanguageProvider is absent
+    // English key: landing.hero.headingWord2 = 'decoded'
+    expect(screen.getByText("decoded")).toBeDefined();
   });
 
   it("renders the navbar", async () => {
@@ -59,25 +85,29 @@ describe("Home page render", () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("MULTIDIMENSIONAL")).toBeDefined();
-    expect(screen.getByText("MÉTRICAS VERIFICADAS")).toBeDefined();
+    // English dict: landing.features[0].title = 'MULTI-DIMENSIONAL'
+    expect(screen.getByText("MULTI-DIMENSIONAL")).toBeDefined();
+    // English dict: landing.features[2].title = 'VERIFIED METRICS'
+    expect(screen.getByText("VERIFIED METRICS")).toBeDefined();
   });
 
   it("renders how-it-works steps", async () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("Inicia sesión con GitHub")).toBeDefined();
-    expect(screen.getByText("Construimos tu perfil")).toBeDefined();
-    expect(screen.getByText("Comparte tu insignia")).toBeDefined();
+    // English dict: landing.steps[0,1,2].title
+    expect(screen.getByText("Sign in with GitHub")).toBeDefined();
+    expect(screen.getByText("We build your profile")).toBeDefined();
+    expect(screen.getByText("Share your badge")).toBeDefined();
   });
 
   it("renders stats section", async () => {
     const { default: Home } = await import("./page");
     const page = await Home({ searchParams: Promise.resolve({}) });
     render(page);
-    expect(screen.getByText("arquetipos")).toBeDefined();
-    expect(screen.getByText("dimensiones")).toBeDefined();
+    // English dict: landing.stats[*].label
+    expect(screen.getByText("archetypes")).toBeDefined();
+    expect(screen.getByText("dimensions")).toBeDefined();
   });
 
   it("renders error banner when error param present", async () => {

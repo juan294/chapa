@@ -1,11 +1,12 @@
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Navbar } from "@/components/Navbar";
+import { LocaleSync } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
@@ -16,13 +17,6 @@ const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   includeBranding: true,
   demoMode: true,
 });
-
-const LANDING_COPY = SPANISH_PUBLIC_COPY.landing;
-const NAV_LINKS = LANDING_COPY.navLinks.map((link) => ({ ...link }));
-const FEATURES = LANDING_COPY.features;
-const STEPS = LANDING_COPY.steps;
-const DIMENSIONS = LANDING_COPY.dimensions;
-const STATS = LANDING_COPY.stats;
 
 /* ── Icons ─────────────────────────────────────────────────────── */
 
@@ -91,15 +85,44 @@ function ShieldCheckIcon({ className }: { className?: string }) {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; lang?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, lang } = await searchParams;
   const errorMessage = getOAuthErrorMessage(error);
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
+
+  const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
+  const hero = t('landing.hero') as unknown as Record<string, string | string[]>;
+  const heroTitle = hero.title as string;
+  const heroHighlight = hero.highlight as string;
+  const heroLeadBefore = hero.leadBefore as string;
+  const heroLeadQuantify = hero.leadQuantify as string;
+  const heroLeadMiddle = hero.leadMiddle as string;
+  const heroLeadImpact = hero.leadImpact as string;
+  const heroLeadAfter = hero.leadAfter as string;
+  const heroBullets = hero.bullets as string[];
+  const heroPrimaryCta = hero.primaryCta as string;
+  const heroVerifyCta = hero.verifyCta as string;
+  const heroBadgePreviewLabel = hero.badgePreviewLabel as string;
+
+  const embed = t('landing.embed') as unknown as Record<string, string>;
+  const sections = t('landing.sections') as unknown as Record<string, string>;
+  const features = t('landing.features') as unknown as Array<{ title: string; description?: string; descriptionBefore?: string; descriptionAfter?: string }>;
+  const archetypes = t('landing.archetypes') as unknown as Record<string, string>;
+  const steps = t('landing.steps') as unknown as Array<{ number: string; title: string; description: string }>;
+  const measure = t('landing.measure') as unknown as Record<string, string>;
+  const dimensions = t('landing.dimensions') as unknown as Array<{ title: string; description: string }>;
+  const enterprise = t('landing.enterprise') as unknown as Record<string, string>;
+  const stats = t('landing.stats') as unknown as Array<{ value: string; label: string }>;
+  const finalCta = t('landing.finalCta') as unknown as Record<string, string>;
+  const footer = t('landing.footer') as unknown as Record<string, string>;
 
   return (
     <div className="bg-bg min-h-screen text-text-primary">
+      <LocaleSync queryLang={lang} />
       {errorMessage && <ErrorBanner message={errorMessage} />}
-      <Navbar navLinks={NAV_LINKS} />
+      <Navbar navLinks={navLinks} />
 
       <main id="main-content">
         {/* ── Terminal session ─────────────────────────────── */}
@@ -113,14 +136,14 @@ export default async function Home({
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
               <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl tracking-tight leading-[0.95] text-balance">
-                {LANDING_COPY.hero.title}
+                {heroTitle}
                 <br />
-                <span className="text-amber">{LANDING_COPY.hero.highlight}</span>
+                <span className="text-amber">{heroHighlight}</span>
               </h1>
               <div className="space-y-2 font-heading text-text-secondary">
-                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> {LANDING_COPY.hero.leadBefore} <span className="bg-amber/10 px-1 rounded">{LANDING_COPY.hero.leadQuantify}</span> {LANDING_COPY.hero.leadMiddle} <span className="bg-amber/10 px-1 rounded">{LANDING_COPY.hero.leadImpact}</span> {LANDING_COPY.hero.leadAfter}</p>
+                <p className="text-base text-text-primary font-medium text-pretty"><span className="text-amber select-none">&gt;</span> {heroLeadBefore} <span className="bg-amber/10 px-1 rounded">{heroLeadQuantify}</span> {heroLeadMiddle} <span className="bg-amber/10 px-1 rounded">{heroLeadImpact}</span> {heroLeadAfter}</p>
                 <div className="pl-5 space-y-1 text-sm">
-                  {LANDING_COPY.hero.bullets.map((bullet) => (
+                  {heroBullets.map((bullet) => (
                     <p key={bullet}><span className="text-terminal-dim select-none">&gt;</span> {bullet}</p>
                   ))}
                 </div>
@@ -131,7 +154,7 @@ export default async function Home({
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
                 >
                   <GitHubIcon className="w-4 h-4" />
-                  {LANDING_COPY.hero.primaryCta}
+                  {heroPrimaryCta}
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
                 <Link
@@ -139,7 +162,7 @@ export default async function Home({
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
                 >
                   <ShieldCheckIcon className="w-4 h-4" />
-                  {LANDING_COPY.hero.verifyCta}
+                  {heroVerifyCta}
                   <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </div>
@@ -158,7 +181,7 @@ export default async function Home({
                 <div
                   className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
                   role="img"
-                  aria-label={LANDING_COPY.hero.badgePreviewLabel}
+                  aria-label={heroBadgePreviewLabel}
                   dangerouslySetInnerHTML={{ __html: demoBadgeSvg }}
                 />
                 <BadgeOverlay />
@@ -179,20 +202,20 @@ export default async function Home({
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-yellow/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-terminal-green/60" />
                   <span className="ml-2 text-xs text-terminal-dim font-heading">
-                    {LANDING_COPY.embed.windowLabel}
+                    {embed.windowLabel}
                   </span>
                   <div className="ml-auto">
-                    <CopyButton text={`![${LANDING_COPY.embed.altText}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`} />
+                    <CopyButton text={`![${embed.altText}](https://chapa.thecreativetoken.com/u/developer/badge.svg)`} />
                   </div>
                 </div>
                 <div className="p-4 font-heading text-sm leading-relaxed">
                   <p className="text-terminal-dim">
                     <span className="text-amber/50">{"<!-- "}</span>
-                    {LANDING_COPY.embed.comment}
+                    {embed.comment}
                     <span className="text-amber/50">{" -->"}</span>
                   </p>
                   <p className="text-text-primary/80 mt-1">
-                    <span className="text-amber">{`![${LANDING_COPY.embed.altText}](`}</span>
+                    <span className="text-amber">{`![${embed.altText}](`}</span>
                     <span className="text-text-secondary">
                       {"chapa.thecreativetoken.com/u/"}
                     </span>
@@ -206,13 +229,13 @@ export default async function Home({
 
           {/* ── Features: $ chapa features ────────────────── */}
           <section id="features" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:600ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.features}</h2>
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.features}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa features</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-4">
-              {FEATURES.map((feature) => (
+              {features.map((feature) => (
                 <div key={feature.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                     {feature.title}
@@ -223,13 +246,13 @@ export default async function Home({
                     ) : (
                       <>
                         {feature.descriptionBefore} —{" "}
-                        <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{LANDING_COPY.archetypes.builder}</Link>,{" "}
-                        <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{LANDING_COPY.archetypes.guardian}</Link>,{" "}
-                        <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{LANDING_COPY.archetypes.marathoner}</Link>,{" "}
-                        <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{LANDING_COPY.archetypes.polymath}</Link>,{" "}
-                        <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{LANDING_COPY.archetypes.artificer}</Link>,{" "}
-                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{LANDING_COPY.archetypes.balanced}</Link> o{" "}
-                        <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{LANDING_COPY.archetypes.emerging}</Link> — {feature.descriptionAfter}
+                        <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{archetypes.builder}</Link>,{" "}
+                        <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{archetypes.guardian}</Link>,{" "}
+                        <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
+                        <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
+                        <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
+                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> o{" "}
+                        <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link> — {feature.descriptionAfter}
                       </>
                     )}
                   </span>
@@ -240,13 +263,13 @@ export default async function Home({
 
           {/* ── Cómo funciona: $ chapa explain ─────────────── */}
           <section id="how-it-works" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:800ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.howItWorks}</h2>
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.howItWorks}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa explain</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-6">
-              {STEPS.map((step) => (
+              {steps.map((step) => (
                 <div key={step.number} className="flex gap-4 items-start">
                   <span className="font-heading text-amber text-lg shrink-0">
                     {step.number}
@@ -264,19 +287,19 @@ export default async function Home({
 
               <div className="pt-4 space-y-4">
                 <h3 className="font-heading text-sm text-text-primary font-medium">
-                  {LANDING_COPY.measure.title}
+                  {measure.title}
                 </h3>
                 <p className="text-text-secondary text-sm text-pretty">
-                  {LANDING_COPY.measure.descriptionBefore}{" "}
-                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{LANDING_COPY.archetypes.builder}</Link>,{" "}
-                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{LANDING_COPY.archetypes.guardian}</Link>,{" "}
-                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{LANDING_COPY.archetypes.marathoner}</Link>,{" "}
-                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{LANDING_COPY.archetypes.polymath}</Link>,{" "}
-                  <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{LANDING_COPY.archetypes.artificer}</Link>,{" "}
-                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{LANDING_COPY.archetypes.balanced}</Link> o{" "}
-                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{LANDING_COPY.archetypes.emerging}</Link>.
+                  {measure.descriptionBefore}{" "}
+                  <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">{archetypes.builder}</Link>,{" "}
+                  <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">{archetypes.guardian}</Link>,{" "}
+                  <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
+                  <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
+                  <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> o{" "}
+                  <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link>.
                 </p>
-                {DIMENSIONS.map((dim) => (
+                {dimensions.map((dim) => (
                   <div key={dim.title} className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                     <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
                       {dim.title}
@@ -290,7 +313,7 @@ export default async function Home({
                   href="/about/scoring"
                   className="inline-flex items-center gap-1 text-sm text-amber hover:text-amber-light transition-colors font-heading"
                 >
-                  {LANDING_COPY.measure.methodologyLink}
+                  {measure.methodologyLink}
                   <ArrowRightIcon className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -299,7 +322,7 @@ export default async function Home({
 
           {/* ── Enterprise: $ chapa enterprise ────────────── */}
           <section id="enterprise" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:900ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.enterprise}</h2>
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.enterprise}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa enterprise</span>
@@ -307,10 +330,10 @@ export default async function Home({
             <div className="pl-4 border-l border-stroke space-y-5">
               <div>
                 <h3 className="font-heading text-lg tracking-tight text-text-primary">
-                  {LANDING_COPY.enterprise.title} <span className="text-amber">{LANDING_COPY.enterprise.highlight}</span>
+                  {enterprise.title} <span className="text-amber">{enterprise.highlight}</span>
                 </h3>
                 <p className="text-text-secondary text-sm mt-2 leading-relaxed max-w-2xl text-pretty">
-                  {LANDING_COPY.enterprise.description}
+                  {enterprise.description}
                 </p>
               </div>
 
@@ -330,15 +353,15 @@ export default async function Home({
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
-                    {LANDING_COPY.enterprise.terminalAuthenticated}
+                    {enterprise.terminalAuthenticated}
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
-                    {LANDING_COPY.enterprise.terminalFound}
+                    {enterprise.terminalFound}
                   </p>
                   <p className="text-terminal-green">
                     <span className="text-terminal-dim select-none">&gt; </span>
-                    {LANDING_COPY.enterprise.terminalMerged}
+                    {enterprise.terminalMerged}
                   </p>
                 </div>
               </div>
@@ -346,30 +369,30 @@ export default async function Home({
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                    {LANDING_COPY.enterprise.whatItDoes}
+                    {enterprise.whatItDoes}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    {LANDING_COPY.enterprise.whatItDoesText}
+                    {enterprise.whatItDoesText}
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                    {LANDING_COPY.enterprise.howToUse}
+                    {enterprise.howToUse}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    {LANDING_COPY.enterprise.howToUseTextBefore}{" "}
+                    {enterprise.howToUseTextBefore}{" "}
                     <code className="font-heading text-text-primary/80 bg-amber/10 px-1.5 py-0.5 rounded text-xs">
                       npx chapa-cli
                     </code>{" "}
-                    {LANDING_COPY.enterprise.howToUseTextAfter}
+                    {enterprise.howToUseTextAfter}
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
                   <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
-                    {LANDING_COPY.enterprise.noEmu}
+                    {enterprise.noEmu}
                   </span>
                   <span className="text-text-secondary text-sm">
-                    {LANDING_COPY.enterprise.noEmuText}
+                    {enterprise.noEmuText}
                   </span>
                 </div>
               </div>
@@ -378,20 +401,20 @@ export default async function Home({
 
           {/* ── Stats: $ chapa stats ──────────────────────── */}
           <section id="stats" className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1100ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.stats}</h2>
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.stats}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa stats</span>
             </div>
             <div className="pl-4 border-l border-stroke">
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-4 font-heading text-sm">
-                {STATS.map((stat, i) => (
+                {stats.map((stat, i) => (
                   <span key={stat.label} className="flex items-baseline gap-2">
                     <span className="text-3xl sm:text-4xl tracking-tight text-amber tabular-nums">
                       {stat.value}
                     </span>
                     <span className="text-text-secondary">{stat.label}</span>
-                    {i < STATS.length - 1 && (
+                    {i < stats.length - 1 && (
                       <span className="text-terminal-dim ml-4">|</span>
                     )}
                   </span>
@@ -402,21 +425,21 @@ export default async function Home({
 
           {/* ── CTA: $ chapa login ────────────────────────── */}
           <section className="animate-fade-in-up motion-reduce:animate-none [animation-delay:1300ms]">
-            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{LANDING_COPY.sections.getStarted}</h2>
+            <h2 className="font-heading text-xs tracking-widest uppercase text-text-secondary mb-3">{sections.getStarted}</h2>
             <div className="flex items-center gap-2 mb-6 font-heading text-sm">
               <span className="text-terminal-dim select-none">$</span>
               <span className="text-text-secondary">chapa login</span>
             </div>
             <div className="pl-4 border-l border-stroke space-y-6">
               <p className="text-text-secondary text-sm">
-                {LANDING_COPY.finalCta.prompt}
+                {finalCta.prompt}
               </p>
               <a
                 href="/api/auth/login"
                 className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-8 pr-7 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
               >
                 <GitHubIcon className="w-5 h-5" />
-                {LANDING_COPY.finalCta.button}
+                {finalCta.button}
                 <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </a>
             </div>
@@ -436,12 +459,12 @@ export default async function Home({
                 Chapa<span className="text-amber">_</span>
               </span>
               <span className="text-xs text-text-secondary">
-                {LANDING_COPY.footer.tagline}
+                {footer.tagline}
               </span>
             </div>
 
             <div className="flex items-center gap-3 text-text-secondary">
-              <span className="text-xs">{LANDING_COPY.footer.poweredBy}</span>
+              <span className="text-xs">{footer.poweredBy}</span>
               <div className="flex items-center gap-2.5">
                 <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub" className="hover:text-amber transition-colors">
                   <GitHubIcon className="w-3.5 h-3.5" />
@@ -459,10 +482,10 @@ export default async function Home({
             </div>
 
             <div className="flex items-center gap-4 text-xs text-text-secondary">
-              <Link href="/about" className="hover:text-amber transition-colors">{LANDING_COPY.footer.about}</Link>
-              <Link href="/about/scoring" className="hover:text-amber transition-colors">{LANDING_COPY.footer.scoring}</Link>
-              <Link href="/terms" className="hover:text-amber transition-colors">{LANDING_COPY.footer.terms}</Link>
-              <Link href="/privacy" className="hover:text-amber transition-colors">{LANDING_COPY.footer.privacy}</Link>
+              <Link href="/about" className="hover:text-amber transition-colors">{footer.about}</Link>
+              <Link href="/about/scoring" className="hover:text-amber transition-colors">{footer.scoring}</Link>
+              <Link href="/terms" className="hover:text-amber transition-colors">{footer.terms}</Link>
+              <Link href="/privacy" className="hover:text-amber transition-colors">{footer.privacy}</Link>
             </div>
           </div>
 

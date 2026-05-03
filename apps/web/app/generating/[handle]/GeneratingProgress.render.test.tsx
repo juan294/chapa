@@ -38,10 +38,11 @@ describe("GeneratingProgress", () => {
   it("renders initial steps", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
     render(<GeneratingProgress handle="testuser" />);
-    expect(screen.getByText("Autenticado con GitHub")).toBeDefined();
-    expect(screen.getByText("Recopilando datos de contribución")).toBeDefined();
-    expect(screen.getByText("Calculando perfil de impacto")).toBeDefined();
-    expect(screen.getByText("Renderizando insignia")).toBeDefined();
+    // English dict (useTranslation falls back to English without LanguageProvider)
+    expect(screen.getByText("Authenticated with GitHub")).toBeDefined();
+    expect(screen.getByText("Collecting contribution data")).toBeDefined();
+    expect(screen.getByText("Computing impact profile")).toBeDefined();
+    expect(screen.getByText("Rendering badge")).toBeDefined();
     vi.unstubAllGlobals();
   });
 
@@ -65,8 +66,9 @@ describe("GeneratingProgress", () => {
     });
 
     expect(screen.getByRole("alert")).toBeDefined();
+    // English: generation.error = 'Something went wrong generating your badge.'
     expect(
-      screen.getByText("Algo salió mal al generar tu insignia."),
+      screen.getByText("Something went wrong generating your badge."),
     ).toBeDefined();
     vi.unstubAllGlobals();
   });
@@ -97,7 +99,8 @@ describe("GeneratingProgress", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(screen.getByText("Intentar de nuevo")).toBeDefined();
+    // English: generation.retry = 'Try again'
+    expect(screen.getByText("Try again")).toBeDefined();
     vi.unstubAllGlobals();
   });
 
@@ -118,8 +121,8 @@ describe("GeneratingProgress", () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
 
-    // Should show redirect notice
-    expect(screen.getByText("Redirigiendo a tu insignia...")).toBeDefined();
+    // English: generation.redirect = 'Redirecting to your badge...'
+    expect(screen.getByText("Redirecting to your badge...")).toBeDefined();
 
     // Advance through redirect delay (800ms)
     await act(async () => {

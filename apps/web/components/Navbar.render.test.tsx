@@ -10,6 +10,10 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(async () => ({
     get: mockHeadersGet,
   })),
+  // readLocaleCookie uses cookies() — return empty jar so locale defaults to 'en'
+  cookies: vi.fn(async () => ({
+    get: vi.fn().mockReturnValue(undefined),
+  })),
 }));
 
 vi.mock("@/lib/auth/github", () => ({

@@ -1,17 +1,38 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+import { LocaleSync } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n";
 import { VerifyForm } from "./VerifyForm";
 
-export const metadata: Metadata = {
-  title: SPANISH_PUBLIC_COPY.verify.title,
-  description: SPANISH_PUBLIC_COPY.verify.description,
-  robots: { index: false, follow: true },
-};
+export const dynamic = 'force-dynamic';
 
-export default function VerifyInputPage() {
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}): Promise<Metadata> {
+  const { lang } = await searchParams;
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
+  return {
+    title: t('verify.title') as string,
+    description: t('verify.description') as string,
+    robots: { index: false, follow: true },
+  };
+}
+
+export default async function VerifyInputPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}) {
+  const { lang } = await searchParams;
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
+
   return (
     <div className="min-h-screen bg-bg text-text-primary">
+      <LocaleSync queryLang={lang} />
       <Navbar />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         <div className="animate-fade-in-up">
@@ -24,13 +45,13 @@ export default function VerifyInputPage() {
           <div className="pl-4 border-l border-stroke space-y-6">
             <div>
               <h1 className="font-heading text-2xl tracking-tight">
-                {SPANISH_PUBLIC_COPY.verify.headingBefore}{" "}
+                {t('verify.headingBefore') as string}{" "}
                 <span className="text-complement">
-                  {SPANISH_PUBLIC_COPY.verify.headingHighlight}
+                  {t('verify.headingHighlight') as string}
                 </span>
               </h1>
               <p className="text-text-secondary text-sm mt-2">
-                {SPANISH_PUBLIC_COPY.verify.instructions}
+                {t('verify.instructions') as string}
               </p>
             </div>
 

@@ -8,6 +8,10 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "BadgeOverlay.tsx"),
   "utf-8",
 );
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
+  "utf-8",
+);
 
 // Minimal InfoTooltip stub — avoids dependency on portal/positioning logic
 vi.mock("./InfoTooltip", () => ({
@@ -223,13 +227,15 @@ describe("BadgeOverlay — archetype tooltip completeness (#735)", () => {
   ];
 
   it('archetype tooltip says "Seven types" (not Six)', () => {
-    expect(SOURCE).toContain("Seven types");
-    expect(SOURCE).not.toContain("Six types");
+    // Tooltip copy lives in en.ts dictionary (badgeOverlay.archetype key)
+    expect(EN_DICT).toContain("Seven types");
+    expect(EN_DICT).not.toContain("Six types");
   });
 
   it("archetype tooltip includes all 7 archetype names", () => {
+    // Archetype names live in en.ts dictionary (badgeOverlay.archetype key)
     for (const name of EXPECTED_ARCHETYPES) {
-      expect(SOURCE).toContain(name);
+      expect(EN_DICT).toContain(name);
     }
   });
 

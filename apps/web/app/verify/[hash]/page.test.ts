@@ -38,8 +38,9 @@ describe("VerifyPage", () => {
   });
 
   describe("VerifiedCard content", () => {
-    it("displays verified heading via copy", () => {
-      expect(SOURCE).toContain("COPY.verifiedTitle");
+    it("displays verified heading via i18n key", () => {
+      // Now uses t('verifyDetail.verifiedTitle')
+      expect(SOURCE).toContain("verifyDetail.verifiedTitle");
     });
 
     it("shows developer handle as a link to share page", () => {
@@ -77,12 +78,14 @@ describe("VerifyPage", () => {
   });
 
   describe("NotFoundCard content", () => {
-    it("displays not-found heading via copy", () => {
-      expect(SOURCE).toContain("COPY.notFoundTitle");
+    it("displays not-found heading via i18n key", () => {
+      // Now uses t('verifyDetail.notFoundTitle')
+      expect(SOURCE).toContain("verifyDetail.notFoundTitle");
     });
 
-    it("mentions 30-day record retention via copy", () => {
-      expect(SOURCE).toContain("COPY.notFoundExplanation");
+    it("mentions 30-day record retention via i18n key", () => {
+      // Now uses t('verifyDetail.notFoundExplanation')
+      expect(SOURCE).toContain("verifyDetail.notFoundExplanation");
     });
 
     it("shows the queried hash", () => {
@@ -92,12 +95,14 @@ describe("VerifyPage", () => {
   });
 
   describe("InvalidHashCard content", () => {
-    it("displays invalid-hash heading via copy", () => {
-      expect(SOURCE).toContain("COPY.invalidHashTitle");
+    it("displays invalid-hash heading via i18n key", () => {
+      // Now uses t('verifyDetail.invalidHashTitle')
+      expect(SOURCE).toContain("verifyDetail.invalidHashTitle");
     });
 
-    it("explains the expected format via copy", () => {
-      expect(SOURCE).toContain("COPY.invalidHashDescription");
+    it("explains the expected format via i18n key", () => {
+      // Now uses t('verifyDetail.invalidHashDescription')
+      expect(SOURCE).toContain("verifyDetail.invalidHashDescription");
     });
   });
 
@@ -126,14 +131,17 @@ describe("VerifyPage", () => {
   });
 
   describe("heading hierarchy (#288)", () => {
-    it("uses <h2> for Dimensions section heading", () => {
-      expect(SOURCE).toContain("COPY.dimensions");
-      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?COPY\.dimensions[\s\S]*?<\/h2>/);
+    it("uses <h2> for Dimensions section heading via i18n key", () => {
+      // Now uses t('verifyDetail.dimensions')
+      expect(SOURCE).toContain("verifyDetail.dimensions");
+      // The h2 tag should contain the t() call
+      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?verifyDetail\.dimensions[\s\S]*?<\/h2>/);
     });
 
-    it("uses <h2> for Key Metrics section heading", () => {
-      expect(SOURCE).toContain("COPY.keyMetrics");
-      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?COPY\.keyMetrics[\s\S]*?<\/h2>/);
+    it("uses <h2> for Key Metrics section heading via i18n key", () => {
+      // Now uses t('verifyDetail.keyMetrics')
+      expect(SOURCE).toContain("verifyDetail.keyMetrics");
+      expect(SOURCE).toMatch(/<h2[^>]*>[\s\S]*?verifyDetail\.keyMetrics[\s\S]*?<\/h2>/);
     });
 
     it("section headings use font-heading class", () => {
@@ -151,8 +159,9 @@ describe("VerifyPage", () => {
       expect(SOURCE).toContain("Chapa");
     });
 
-    it("returns invalid hash title for invalid hashes", () => {
-      expect(SOURCE).toContain("COPY.invalidHashTitle");
+    it("returns invalid hash title for invalid hashes via i18n key", () => {
+      // Now uses t('verifyDetail.invalidHashTitle')
+      expect(SOURCE).toContain("verifyDetail.invalidHashTitle");
     });
 
     it("disables indexing with robots noindex", () => {

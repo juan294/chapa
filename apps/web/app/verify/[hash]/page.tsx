@@ -1,40 +1,49 @@
 import { getVerificationRecord } from "@/lib/verification/store";
 import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+import { getServerLocale, getServerT } from "@/lib/i18n";
+import type { Translations } from "@/lib/i18n";
 import Link from "next/link";
 import type { Metadata } from "next";
 
-const COPY = SPANISH_PUBLIC_COPY.verifyDetail;
-
 const HASH_PATTERN = /^(?:[0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32})$/;
+
+export const dynamic = 'force-dynamic';
 
 interface VerifyPageProps {
   params: Promise<{ hash: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: VerifyPageProps): Promise<Metadata> {
   const { hash } = await params;
+  const { lang } = await searchParams;
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
   return {
     title: HASH_PATTERN.test(hash)
-      ? `Verificar insignia ${hash} — Chapa`
-      : "Hash inválido — Chapa",
-    description: "Verifica la autenticidad de cualquier insignia Chapa con su hash de verificación.",
+      ? `${t('verify.title') as string} ${hash} — Chapa`
+      : `${t('verifyDetail.invalidHashTitle') as string} — Chapa`,
+    description: t('verify.description') as string,
     robots: { index: false },
   };
 }
 
-export default async function VerifyPage({ params }: VerifyPageProps) {
+export default async function VerifyPage({ params, searchParams }: VerifyPageProps) {
   const { hash } = await params;
+  const { lang } = await searchParams;
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
 
   if (!HASH_PATTERN.test(hash)) {
     return (
       <div className="min-h-screen bg-bg text-text-primary">
         <Navbar />
         <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32">
-          <InvalidHashCard hash={hash} />
+          <InvalidHashCard hash={hash} t={t} />
         </main>
       </div>
     );
@@ -47,18 +56,21 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
       <Navbar />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         {record ? (
-          <VerifiedCard hash={hash} record={record} />
+          <VerifiedCard hash={hash} record={record} t={t} />
         ) : (
-          <NotFoundCard hash={hash} />
+          <NotFoundCard hash={hash} t={t} />
         )}
       </main>
     </div>
   );
 }
 
+type TFunc = (key: string) => string | string[] | Translations[];
+
 function VerifiedCard({
   hash,
   record,
+  t,
 }: {
   hash: string;
   record: {
@@ -80,17 +92,18 @@ function VerifiedCard({
     generatedAt: string;
     profileType: string;
   };
+  t: TFunc;
 }) {
   return (
     <StatusCallout
       variant="verification"
-      title={COPY.verifiedTitle}
+      title={t('verifyDetail.verifiedTitle') as string}
       titleAs="h1"
-      description={COPY.verifiedDescription}
+      description={t('verifyDetail.verifiedDescription') as string}
     >
       {/* Hash display */}
       <div className="mb-6 rounded-lg border border-stroke bg-bg px-4 py-3">
-        <p className="text-xs text-text-secondary">{COPY.verificationCode}</p>
+        <p className="text-xs text-text-secondary">{t('verifyDetail.verificationCode') as string}</p>
         <p className="font-heading text-lg tracking-widest text-complement">
           {hash}
         </p>
@@ -99,7 +112,7 @@ function VerifiedCard({
       {/* Profile info */}
       <div className="mb-6 space-y-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{COPY.developer}</span>
+          <span className="text-sm text-text-secondary">{t('verifyDetail.developer') as string}</span>
           <Link
             href={`/u/${record.handle}`}
             className="font-heading text-sm text-complement hover:text-complement-light"
@@ -109,28 +122,28 @@ function VerifiedCard({
         </div>
         {record.displayName && (
           <div className="flex items-baseline justify-between">
-            <span className="text-sm text-text-secondary">{COPY.name}</span>
+            <span className="text-sm text-text-secondary">{t('verifyDetail.name') as string}</span>
             <span className="text-sm text-text-primary">
               {record.displayName}
             </span>
           </div>
         )}
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{COPY.impactScore}</span>
+          <span className="text-sm text-text-secondary">{t('verifyDetail.impactScore') as string}</span>
           <span className="font-heading text-sm font-bold text-text-primary">
             {record.adjustedComposite}
           </span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{COPY.tier}</span>
+          <span className="text-sm text-text-secondary">{t('verifyDetail.tier') as string}</span>
           <span className="text-sm text-text-primary">{record.tier}</span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{COPY.archetype}</span>
+          <span className="text-sm text-text-secondary">{t('verifyDetail.archetype') as string}</span>
           <span className="text-sm text-text-primary">{record.archetype}</span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-text-secondary">{COPY.profile}</span>
+          <span className="text-sm text-text-secondary">{t('verifyDetail.profile') as string}</span>
           <span className="text-sm capitalize text-text-primary">
             {record.profileType}
           </span>
@@ -140,7 +153,7 @@ function VerifiedCard({
       {/* Dimensions */}
       <div className="mb-6">
         <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
-          {COPY.dimensions}
+          {t('verifyDetail.dimensions') as string}
         </h2>
         <div className="grid grid-cols-2 gap-2">
           {(
@@ -162,7 +175,7 @@ function VerifiedCard({
       {/* Key metrics */}
       <div className="mb-6">
         <h2 className="mb-2 font-heading text-xs font-medium uppercase tracking-wider text-text-secondary">
-          {COPY.keyMetrics}
+          {t('verifyDetail.keyMetrics') as string}
         </h2>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
@@ -175,13 +188,13 @@ function VerifiedCard({
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.prsMergedCount}
             </p>
-            <p className="text-xs text-text-secondary">{COPY.prsMerged}</p>
+            <p className="text-xs text-text-secondary">{t('verifyDetail.prsMerged') as string}</p>
           </div>
           <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.reviewsSubmittedCount}
             </p>
-            <p className="text-xs text-text-secondary">{COPY.reviews}</p>
+            <p className="text-xs text-text-secondary">{t('verifyDetail.reviews') as string}</p>
           </div>
         </div>
       </div>
@@ -189,26 +202,26 @@ function VerifiedCard({
       {/* Footer */}
       <div className="flex items-center justify-between border-t border-stroke pt-4">
         <p className="text-xs text-text-secondary">
-          {COPY.generatedOn} {record.generatedAt}
+          {t('verifyDetail.generatedOn') as string} {record.generatedAt}
         </p>
         <Link
           href={`/u/${record.handle}/badge.svg`}
           className="text-xs text-complement hover:text-complement-light"
         >
-          {COPY.viewBadge}
+          {t('verifyDetail.viewBadge') as string}
         </Link>
       </div>
     </StatusCallout>
   );
 }
 
-function NotFoundCard({ hash }: { hash: string }) {
+function NotFoundCard({ hash, t }: { hash: string; t: TFunc }) {
   return (
     <StatusCallout
       variant="warning"
-      title={COPY.notFoundTitle}
+      title={t('verifyDetail.notFoundTitle') as string}
       titleAs="h1"
-      description={COPY.notFoundDescription}
+      description={t('verifyDetail.notFoundDescription') as string}
     >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
         <p className="text-xs text-text-secondary">Hash</p>
@@ -217,22 +230,22 @@ function NotFoundCard({ hash }: { hash: string }) {
         </p>
       </div>
       <p className="mt-4 text-sm text-text-secondary">
-        {COPY.notFoundExplanation}
+        {t('verifyDetail.notFoundExplanation') as string}
       </p>
     </StatusCallout>
   );
 }
 
-function InvalidHashCard({ hash }: { hash: string }) {
+function InvalidHashCard({ hash, t }: { hash: string; t: TFunc }) {
   return (
     <StatusCallout
       variant="error"
-      title={COPY.invalidHashTitle}
+      title={t('verifyDetail.invalidHashTitle') as string}
       titleAs="h1"
-      description={COPY.invalidHashDescription}
+      description={t('verifyDetail.invalidHashDescription') as string}
     >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
-        <p className="text-xs text-text-secondary">{COPY.provided}</p>
+        <p className="text-xs text-text-secondary">{t('verifyDetail.provided') as string}</p>
         <p className="font-heading text-sm text-terminal-red">{hash}</p>
       </div>
     </StatusCallout>

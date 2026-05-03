@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { trackEvent } from "@/lib/analytics/posthog";
+import { useTranslation } from "@/lib/i18n";
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const { t } = useTranslation();
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
@@ -16,10 +18,10 @@ export function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      aria-label="Copy embed snippet"
+      aria-label={t('aria.copyEmbed') as string}
       className="relative min-h-[44px] min-w-[44px] p-2.5 rounded-lg text-text-secondary hover:text-amber transition-colors"
     >
-      <span aria-live="polite" className="sr-only">{copied ? "Copied!" : "Copy"}</span>
+      <span aria-live="polite" className="sr-only">{copied ? t('common.copied') as string : t('common.copy') as string}</span>
       <span
         className={`absolute inset-0 flex items-center justify-center transition-all duration-150 ${
           copied ? "opacity-0 scale-75" : "opacity-100 scale-100"
