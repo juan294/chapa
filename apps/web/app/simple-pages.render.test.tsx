@@ -20,6 +20,30 @@ vi.mock("@/components/LiteYouTubeEmbed", () => ({
   LiteYouTubeEmbed: () => <div data-testid="youtube-embed" />,
 }));
 
+vi.mock("@/lib/i18n/server", async () => {
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  function deepGet(obj: Record<string, unknown>, key: string): unknown {
+    const parts = key.split(".");
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
+      current = (current as Record<string, unknown>)[part];
+      if (current === undefined) return key;
+    }
+    return current;
+  }
+  return {
+    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerT: vi.fn().mockImplementation(() => (key: string) =>
+      deepGet(en as unknown as Record<string, unknown>, key)
+    ),
+  };
+});
+
+vi.mock("./verify/VerifyForm", () => ({
+  VerifyForm: () => <div data-testid="verify-form" />,
+}));
+
 afterEach(cleanup);
 
 // ---------------------------------------------------------------------------
@@ -50,7 +74,8 @@ describe("TermsPage render", () => {
 describe("ComingSoonPage render", () => {
   it("renders with Chapa heading", async () => {
     const { default: ComingSoonPage } = await import("./coming-soon/page");
-    render(<ComingSoonPage />);
+    const jsx = await ComingSoonPage({ searchParams: Promise.resolve({}) });
+    render(jsx);
     expect(screen.getByText(/Coming soon/)).toBeDefined();
   });
 });
@@ -60,28 +85,6 @@ describe("ComingSoonPage render", () => {
 // ---------------------------------------------------------------------------
 describe("VerifyInputPage render", () => {
   it("renders with verify heading", async () => {
-    vi.mock("@/lib/i18n/server", async () => {
-      const { en } = await import("@/lib/i18n/dictionaries/en");
-      function deepGet(obj: Record<string, unknown>, key: string): unknown {
-        const parts = key.split(".");
-        let current: unknown = obj;
-        for (const part of parts) {
-          if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
-          current = (current as Record<string, unknown>)[part];
-          if (current === undefined) return key;
-        }
-        return current;
-      }
-      return {
-        getServerLocale: vi.fn().mockResolvedValue("en"),
-        getServerT: vi.fn().mockImplementation(() => (key: string) =>
-          deepGet(en as unknown as Record<string, unknown>, key)
-        ),
-      };
-    });
-    vi.mock("./verify/VerifyForm", () => ({
-      VerifyForm: () => <div data-testid="verify-form" />,
-    }));
     const { default: VerifyInputPage } = await import("./verify/page");
     const jsx = await VerifyInputPage({ searchParams: Promise.resolve({}) });
     render(jsx);

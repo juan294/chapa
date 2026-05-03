@@ -16,20 +16,28 @@ describe("cli/authorize error.tsx — error boundary", () => {
     expect(SOURCE).toContain("export default function");
   });
 
-  it("contains an authorization-specific error message", () => {
-    expect(SOURCE).toContain("Authorization error");
+  it("uses useTranslation for i18n", () => {
+    expect(SOURCE).toContain("useTranslation");
   });
 
-  it("contains a retry/reset button", () => {
-    expect(SOURCE).toContain("Try again");
+  it("uses cliAuthorize.errorBoundaryHeading key", () => {
+    expect(SOURCE).toContain("cliAuthorize.errorBoundaryHeading");
+  });
+
+  it("uses cliAuthorize.errorBoundaryBody key", () => {
+    expect(SOURCE).toContain("cliAuthorize.errorBoundaryBody");
+  });
+
+  it("uses common.tryAgain key for retry button", () => {
+    expect(SOURCE).toContain("common.tryAgain");
+  });
+
+  it("uses common.goHome key for home link", () => {
+    expect(SOURCE).toContain("common.goHome");
   });
 
   it("calls reset on retry button click", () => {
     expect(SOURCE).toContain("onClick={reset}");
-  });
-
-  it("contains a 'go home' link", () => {
-    expect(SOURCE).toContain("Go home");
   });
 
   it("links to the root path", () => {

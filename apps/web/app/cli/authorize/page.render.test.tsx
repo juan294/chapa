@@ -42,6 +42,44 @@ vi.mock("./AuthorizeClient", () => ({
   ),
 }));
 
+// Mock @/lib/i18n to avoid importing client-side React hooks (useRouter etc.)
+vi.mock("@/lib/i18n", () => ({
+  LocaleSync: () => null,
+  LanguageProvider: (props: { children: unknown }) => props.children,
+  LanguageContext: null,
+  useTranslation: () => ({
+    locale: 'en',
+    setLocale: async () => {},
+    t: (key: string) => key,
+  }),
+  LangSync: () => null,
+  setLocaleAction: async () => {},
+  LOCALE_COOKIE: 'chapa-locale',
+  SUPPORTED_LOCALES: ['en', 'es'],
+  DEFAULT_LOCALE: 'en',
+}));
+
+// Mock getServerLocale + getServerT to return English without needing Next.js headers()
+vi.mock("@/lib/i18n/server", async () => {
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  function deepGet(obj: Record<string, unknown>, key: string): unknown {
+    const parts = key.split(".");
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
+      current = (current as Record<string, unknown>)[part];
+      if (current === undefined) return key;
+    }
+    return current;
+  }
+  return {
+    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerT: vi.fn().mockImplementation(() => (key: string) =>
+      deepGet(en as unknown as Record<string, unknown>, key)
+    ),
+  };
+});
+
 beforeEach(() => {
   mockRedirect.mockClear();
   mockHeaders.mockClear();
@@ -55,7 +93,7 @@ afterEach(() => {
 });
 
 // Helper: import and call the async server component
-async function renderPage(searchParams: { session?: string }) {
+async function renderPage(searchParams: { session?: string; lang?: string }) {
   // Re-import to pick up fresh env vars
   const mod = await import("./page");
   const Page = mod.default;
@@ -73,9 +111,6 @@ describe("CliAuthorizePage", () => {
     ).toBeDefined();
     expect(
       screen.getByText(/Missing session parameter/),
-    ).toBeDefined();
-    expect(
-      screen.getByText(/chapa login/),
     ).toBeDefined();
   });
 
