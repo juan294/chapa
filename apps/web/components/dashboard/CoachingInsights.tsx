@@ -32,7 +32,6 @@ export function CoachingInsights({
   const { t } = useTranslation();
   const insights = useMemo(
     () => generateInsights(impact, trend, diff, t),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [impact, trend, diff, t],
   );
 
