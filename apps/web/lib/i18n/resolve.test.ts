@@ -18,9 +18,9 @@ describe('resolveTranslation', () => {
     expect(resolveTranslation('a.missing', t)).toBe('a.missing');
   });
 
-  it('returns the key when the resolved value is an intermediate object (not a leaf)', () => {
-    const t: Translations = { a: { b: 'c' } };
-    expect(resolveTranslation('a', t)).toBe('a');
+  it('returns the sub-tree when key resolves to an intermediate object', () => {
+    const tree: Translations = { a: { b: 'c' } };
+    expect(resolveTranslation('a', tree)).toEqual({ b: 'c' });
   });
 
   it('resolves a deeply nested key', () => {

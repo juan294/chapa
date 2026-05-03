@@ -1,6 +1,6 @@
 import type { Translations } from './types';
 
-type TranslationLeaf = string | string[] | string[][] | Translations[];
+type TranslationLeaf = string | string[] | string[][] | Translations | Translations[];
 
 export function resolveTranslation(
   key: string,
@@ -22,6 +22,6 @@ export function resolveTranslation(
   if (typeof current === 'string') return current;
   if (Array.isArray(current)) return current as string[] | string[][] | Translations[];
 
-  // Intermediate object reached — return key as fallback
-  return key;
+  // Intermediate object — return the sub-tree so callers can cast as needed
+  return current as Translations;
 }
