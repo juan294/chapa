@@ -33,7 +33,7 @@ test.describe("Static pages — load and render", () => {
     await page.goto("/verify");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Verificar una insignia");
+    await expect(h1).toContainText("Verificar una Chapa");
 
     // Form with hash input should be present
     const input = page.locator("#hash-input");

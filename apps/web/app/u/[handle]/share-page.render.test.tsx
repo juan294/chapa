@@ -199,7 +199,7 @@ describe("Phase 4d — Share page i18n", () => {
 
     it("es.ts shareOwner has ariaBusy key in Spanish", () => {
       expect(ES_DICT).toContain("ariaBusy:");
-      expect(ES_DICT).toContain("Regenerando insignia");
+      expect(ES_DICT).toContain("Regenerando Chapa");
     });
   });
 

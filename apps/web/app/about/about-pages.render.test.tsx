@@ -273,7 +273,7 @@ describe("AboutPage render (es)", () => {
         "about.index.privacyBody": "Chapa solo solicita acceso a datos públicos.",
         "about.index.scoringLinkLabel": "metodología de puntuación",
         "about.index.privacyBodyMiddle": " Aprende más en nuestra ",
-        "about.index.verificationLinkLabel": "verificación de insignia",
+        "about.index.verificationLinkLabel": "verificación de Chapa",
         "about.index.privacyBodyEnd": ".",
         "about.index.sectionContact": "Contacto",
         "about.index.contactBody": "¿Preguntas? Escríbeme a ",
@@ -425,27 +425,27 @@ describe("VerificationPage render (es)", () => {
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const map: Record<string, any> = {
-        "about.verification.h1": "Verificación de insignia",
+        "about.verification.h1": "Verificación de Chapa",
         "about.verification.sectionWhy": "Por qué existe la verificación",
         "about.verification.whatTableHeaders": ["Campo", "Ejemplo", "Por qué se incluye"],
         "about.verification.whatTableRows": [["Handle", "juan294", "Identifica al desarrollador"]],
         "about.verification.designTableHeaders": ["Decisión", "Justificación"],
         "about.verification.designTableRows": [["HMAC-SHA256", "Estándar de la industria."]],
         "about.verification.ctaHeading": "Pruébalo tú mismo",
-        "about.verification.ctaButton": "Verificar una insignia",
-        "about.verification.intro": "Cada insignia Chapa lleva un hash de verificación.",
+        "about.verification.ctaButton": "Verificar una Chapa",
+        "about.verification.intro": "Cada Chapa lleva un hash de verificación.",
         "about.verification.sectionHow": "Cómo funciona",
         "about.verification.sectionWhat": "Qué datos se firman",
         "about.verification.sectionGuarantees": "Qué garantiza",
         "about.verification.sectionLimits": "Qué no garantiza",
-        "about.verification.sectionHowTo": "Cómo verificar una insignia",
+        "about.verification.sectionHowTo": "Cómo verificar una Chapa",
         "about.verification.sectionDesign": "Decisiones de diseño",
       };
       return map[key] ?? (key.split('.').pop() ?? key);
     });
     const { default: VerificationPage } = await import("./verification/page");
     render(await VerificationPage({ searchParams: Promise.resolve({ lang: "es" }) }));
-    expect(screen.getByText("Verificación de insignia")).toBeDefined();
+    expect(screen.getByText("Verificación de Chapa")).toBeDefined();
     expect(screen.getByText("Por qué existe la verificación")).toBeDefined();
   });
 });

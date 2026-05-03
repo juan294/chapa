@@ -15,7 +15,7 @@ test.describe("Landing page — sections and content", () => {
     // The main/hero area has the primary badge CTA (not the nav login).
     const cta = page.locator('main a[href="/api/auth/login"]').first();
     await expect(cta).toBeVisible();
-    await expect(cta).toContainText("Consigue tu insignia");
+    await expect(cta).toContainText("Consigue tu Chapa");
   });
 
   test("feature cards render (all 5 features)", async ({ page }) => {
@@ -70,6 +70,6 @@ test.describe("Landing page — sections and content", () => {
   test("Verify a Badge link points to /verify", async ({ page }) => {
     const verifyLink = page.locator('a[href="/verify"]').first();
     await expect(verifyLink).toBeVisible();
-    await expect(verifyLink).toContainText("Verificar una insignia");
+    await expect(verifyLink).toContainText("Verificar una Chapa");
   });
 });

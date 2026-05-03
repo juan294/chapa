@@ -235,7 +235,7 @@ describe("Archetype pages — Spanish locale", () => {
         "archetypes.builder.h1Before": "El ",
         "archetypes.builder.h1Highlight": "Builder",
         "archetypes.builder.dominantDimension": "Entrega",
-        "archetypes.builder.badgeAriaLabel": "Ejemplo de insignia Chapa para el arquetipo Builder",
+        "archetypes.builder.badgeAriaLabel": "Ejemplo de Chapa para el arquetipo Builder",
         "archetypes.builder.essay": ["Parrafo uno del Builder.", "Parrafo dos del Builder."],
         "archetypes.builder.sectionIdentifies": "Como Chapa identifica a un Builder",
         "archetypes.builder.keySignalsHeading": "Senales clave",
