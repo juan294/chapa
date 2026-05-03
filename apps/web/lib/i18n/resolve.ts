@@ -1,6 +1,6 @@
 import type { Translations } from './types';
 
-type TranslationLeaf = string | string[] | Translations[];
+type TranslationLeaf = string | string[] | string[][] | Translations[];
 
 export function resolveTranslation(
   key: string,
@@ -20,7 +20,7 @@ export function resolveTranslation(
 
   // Leaf must be a string, string[], or Translations[]
   if (typeof current === 'string') return current;
-  if (Array.isArray(current)) return current as string[] | Translations[];
+  if (Array.isArray(current)) return current as string[] | string[][] | Translations[];
 
   // Intermediate object reached — return key as fallback
   return key;

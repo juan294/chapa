@@ -8,19 +8,19 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("About page", () => {
-  describe("ISR", () => {
-    it("exports revalidate = 86400 (24h)", () => {
-      expect(SOURCE).toContain("export const revalidate = 86400");
+  describe("dynamic rendering", () => {
+    it("exports force-dynamic (i18n locale resolution)", () => {
+      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
     });
   });
 
   describe("metadata", () => {
-    it("exports metadata with title", () => {
-      expect(SOURCE).toContain('title: "About"');
+    it("exports generateMetadata function", () => {
+      expect(SOURCE).toContain("export async function generateMetadata");
     });
 
-    it("exports metadata with description", () => {
-      expect(SOURCE).toContain("description:");
+    it("uses about.index.metadataTitle key", () => {
+      expect(SOURCE).toContain("about.index.metadataTitle");
     });
 
     it("includes openGraph metadata", () => {
@@ -32,8 +32,28 @@ describe("About page", () => {
     });
   });
 
-  it("exports a default component", () => {
-    expect(SOURCE).toContain("export default function AboutPage");
+  it("exports a default async component", () => {
+    expect(SOURCE).toContain("export default async function AboutPage");
+  });
+
+  describe("i18n integration", () => {
+    it("imports getServerLocale and getServerT from server module", () => {
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).toContain("getServerT");
+      expect(SOURCE).toContain("@/lib/i18n/server");
+    });
+
+    it("imports LocaleSync", () => {
+      expect(SOURCE).toContain("LocaleSync");
+    });
+
+    it("uses about.index translation keys", () => {
+      expect(SOURCE).toContain("about.index.h1");
+      expect(SOURCE).toContain("about.index.sectionDimensions");
+      expect(SOURCE).toContain("about.index.sectionArchetypes");
+      expect(SOURCE).toContain("about.index.sectionPrivacy");
+      expect(SOURCE).toContain("about.index.sectionContact");
+    });
   });
 
   describe("heading hierarchy", () => {
@@ -48,18 +68,11 @@ describe("About page", () => {
   });
 
   describe("content sections", () => {
-    it("explains four dimensions", () => {
-      expect(SOURCE).toContain("Delivery");
-      expect(SOURCE).toContain("Quality");
-      expect(SOURCE).toContain("Consistency");
-      expect(SOURCE).toContain("Breadth");
+    it("references dimension keys in translations", () => {
+      expect(SOURCE).toContain("about.index.dimensionsBody");
     });
 
-    it("explains developer archetypes", () => {
-      expect(SOURCE).toContain("Developer archetypes");
-    });
-
-    it("links to all 6 archetype pages", () => {
+    it("links to all archetype pages", () => {
       expect(SOURCE).toContain('href="/archetypes/builder"');
       expect(SOURCE).toContain('href="/archetypes/guardian"');
       expect(SOURCE).toContain('href="/archetypes/marathoner"');
@@ -68,12 +81,8 @@ describe("About page", () => {
       expect(SOURCE).toContain('href="/archetypes/emerging"');
     });
 
-    it("has privacy and fairness section", () => {
-      expect(SOURCE).toContain("Privacy and fairness");
-    });
-
-    it("has contact section", () => {
-      expect(SOURCE).toContain("Contact");
+    it("has privacy and fairness section key", () => {
+      expect(SOURCE).toContain("about.index.sectionPrivacy");
     });
 
     it("links to badge verification page", () => {
@@ -83,13 +92,8 @@ describe("About page", () => {
 
   describe("logo branding", () => {
     it("uses underscore cursor instead of dot for Chapa logo", () => {
-      expect(SOURCE).toContain("Chapa<span");
       expect(SOURCE).toContain("animate-cursor-blink");
       expect(SOURCE).toContain(">_</span>");
-    });
-
-    it("does NOT use the old dot logo", () => {
-      expect(SOURCE).not.toMatch(/>About Chapa<span[^>]*>\.<\/span>/);
     });
   });
 

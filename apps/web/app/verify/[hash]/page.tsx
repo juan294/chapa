@@ -65,7 +65,7 @@ export default async function VerifyPage({ params, searchParams }: VerifyPagePro
   );
 }
 
-type TFunc = (key: string) => string | string[] | Translations[];
+type TFunc = (key: string) => string | string[] | string[][] | Translations[];
 
 function VerifiedCard({
   hash,

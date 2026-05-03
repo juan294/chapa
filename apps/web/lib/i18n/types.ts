@@ -4,5 +4,5 @@ export const DEFAULT_LOCALE: Locale = 'en';
 export const LOCALE_COOKIE = 'chapa-locale';
 
 export interface Translations {
-  [key: string]: string | string[] | Translations | Translations[];
+  [key: string]: string | string[] | string[][] | Translations | Translations[];
 }
