@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-05-03
+
 ### Added
 - **Full i18n system** (#837): Chapa now supports English and Spanish across every public page. Includes structured locale dictionaries (`en.ts` / `es.ts`, 650+ keys each), cookie-based locale persistence (`chapa-locale`), `Accept-Language` header detection, `useTranslation()` client hook, `getServerT(locale)` server helper, `interpolate()` placeholder substitution, and `LangSync` / `LocaleSync` utilities
 - **`LanguageSwitcher` component**: Globe-icon dropdown in the navbar (between ThemeToggle and login CTA). Shows `ES | EN` pill — active locale highlighted in amber; choice persists across page loads
