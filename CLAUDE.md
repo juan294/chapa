@@ -197,6 +197,36 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 
 ---
 
+## Internationalization (i18n)
+
+The app supports two locales: `es` (Spanish, default) and `en` (English). All public-facing pages are translated.
+
+### Architecture
+- **Dictionaries**: `apps/web/lib/i18n/dictionaries/en.ts` and `es.ts` — both must be kept in sync (550+ leaf keys each). Run `pnpm run test` to verify key parity via `dictionaries/parity.test.ts`.
+- **Locale detection**: `apps/web/lib/i18n/detect.ts` — reads the `locale` cookie first, then `Accept-Language` header, falls back to `DEFAULT_LOCALE` ('es').
+- **Server components**: `import { getServerT } from '@/lib/i18n/server'` — pass the `locale` from params/cookies.
+- **Client components**: `import { useTranslation } from '@/lib/i18n'` — returns `{ locale, t, setLocale }`. Always wraps in `LanguageProvider` on any real page.
+- **Key resolution**: `t('section.key')` returns a string (or subtree for intermediate keys). Leaf keys always return `string` — cast with `as string` when TypeScript needs it for HTML attrs.
+- **Locale switching**: `LanguageSwitcher` component calls `setLocale()`, which sets the `locale` cookie and soft-reloads via `router.refresh()`.
+
+### Adding new strings
+1. Add the English string to `en.ts` and the Spanish string to `es.ts` under the same key path.
+2. Both files must have identical key structure — `parity.test.ts` will fail otherwise.
+3. Use `t('section.key') as string` for `aria-label` and other HTML string attributes.
+4. `DEFAULT_LOCALE` is `'es'` — server renders Spanish by default. Tests use English via the `useTranslation` fallback (no LanguageProvider).
+
+### Key paths (common)
+| Path | Usage |
+|------|-------|
+| `aria.*` | All `aria-label` strings for accessibility |
+| `landing.*` | Landing page copy |
+| `about.*` | About / scoring page copy |
+| `sharePage.*` | Share page (`/u/:handle`) copy |
+| `privacy.*`, `terms.*` | Legal pages |
+| `archetypes.*` | Archetype guide pages |
+
+---
+
 ## RPI Workflow
 
 This project follows Research-Plan-Implement (RPI).
