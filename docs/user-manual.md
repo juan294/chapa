@@ -477,6 +477,25 @@ Repeat the same sort command to toggle between ascending and descending order.
 
 ---
 
+## Language Switcher
+
+Chapa's interface is available in **Spanish** (default) and **English**.
+
+The language picker appears in the top navigation bar as a globe icon (🌐), between the light/dark theme toggle and the login link.
+
+### Switching Language
+
+1. Click the globe icon in the nav bar.
+2. A small dropdown appears with two options: **ES** and **EN**. The active locale is highlighted in purple.
+3. Click your preferred language. The page reloads in the selected locale.
+4. Your choice is saved in a `chapa-locale` cookie and persists across page loads.
+
+### Default Language Detection
+
+If you have not set a preference, the app detects your browser's `Accept-Language` header and defaults to Spanish. If your browser prefers Spanish-speaking locales (e.g., `es`, `es-ES`, `es-MX`), you will see the Spanish UI automatically.
+
+---
+
 ## Tooltips
 
 The share page and badge preview include **explanatory tooltips** that appear on hover (desktop) or tap (mobile).
