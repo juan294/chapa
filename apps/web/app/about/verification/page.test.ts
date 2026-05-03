@@ -8,19 +8,45 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("Verification explainer page (server component)", () => {
-  describe("ISR configuration", () => {
-    it("exports revalidate = 86400 (24h)", () => {
-      expect(SOURCE).toContain("export const revalidate = 86400");
+  describe("dynamic rendering", () => {
+    it("exports force-dynamic (i18n locale resolution)", () => {
+      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
     });
   });
 
   describe("metadata", () => {
-    it("exports metadata with title", () => {
-      expect(SOURCE).toContain("Badge Verification");
+    it("exports generateMetadata function", () => {
+      expect(SOURCE).toContain("export async function generateMetadata");
+    });
+
+    it("uses about.verification.metadataTitle key", () => {
+      expect(SOURCE).toContain("about.verification.metadataTitle");
     });
 
     it("includes OpenGraph metadata", () => {
       expect(SOURCE).toContain("openGraph");
+    });
+  });
+
+  describe("i18n integration", () => {
+    it("imports getServerLocale and getServerT from server module", () => {
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).toContain("getServerT");
+      expect(SOURCE).toContain("@/lib/i18n/server");
+    });
+
+    it("imports LocaleSync", () => {
+      expect(SOURCE).toContain("LocaleSync");
+    });
+
+    it("uses about.verification translation keys", () => {
+      expect(SOURCE).toContain("about.verification.sectionWhy");
+      expect(SOURCE).toContain("about.verification.sectionHow");
+      expect(SOURCE).toContain("about.verification.sectionWhat");
+      expect(SOURCE).toContain("about.verification.sectionGuarantees");
+      expect(SOURCE).toContain("about.verification.sectionLimits");
+      expect(SOURCE).toContain("about.verification.sectionHowTo");
+      expect(SOURCE).toContain("about.verification.sectionDesign");
     });
   });
 
@@ -40,8 +66,16 @@ describe("Verification explainer page (server component)", () => {
   });
 
   describe("content", () => {
-    it("explains HMAC verification", () => {
-      expect(SOURCE).toContain("HMAC");
+    it("references HMAC key in translations", () => {
+      expect(SOURCE).toContain("about.verification.howHighlight");
+    });
+
+    it("uses what table rows key", () => {
+      expect(SOURCE).toContain("about.verification.whatTableRows");
+    });
+
+    it("uses design table rows key", () => {
+      expect(SOURCE).toContain("about.verification.designTableRows");
     });
   });
 });

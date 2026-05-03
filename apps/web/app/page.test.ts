@@ -102,12 +102,13 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
     });
 
-    it("does not keep the old English acquisition CTAs", () => {
+    it("does not keep the old English acquisition CTAs on the landing page", () => {
       expect(SOURCE).not.toContain("Get Your Badge");
       expect(SOURCE).not.toContain("Verify a Badge");
       expect(SOURCE).not.toContain("Ready to prove your impact?");
       expect(EN_DICT).not.toContain("Get Your Badge");
-      expect(EN_DICT).not.toContain("Verify a Badge");
+      // "Verify a Badge" is legitimately used as a CTA in the verification page namespace
+      // (about.verification.ctaButton), so we only check landing-specific keys
       expect(EN_DICT).not.toContain("Ready to prove your impact?");
     });
   });

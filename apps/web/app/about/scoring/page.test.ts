@@ -8,19 +8,47 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("Scoring methodology page (server component)", () => {
-  describe("ISR configuration", () => {
-    it("exports revalidate = 86400 (24h)", () => {
-      expect(SOURCE).toContain("export const revalidate = 86400");
+  describe("dynamic rendering", () => {
+    it("exports force-dynamic (i18n locale resolution)", () => {
+      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
     });
   });
 
   describe("metadata", () => {
-    it("exports metadata with title", () => {
-      expect(SOURCE).toContain("Scoring Methodology");
+    it("exports generateMetadata function", () => {
+      expect(SOURCE).toContain("export async function generateMetadata");
+    });
+
+    it("uses about.scoring.metadataTitle key", () => {
+      expect(SOURCE).toContain("about.scoring.metadataTitle");
     });
 
     it("includes OpenGraph metadata", () => {
       expect(SOURCE).toContain("openGraph");
+    });
+  });
+
+  describe("i18n integration", () => {
+    it("imports getServerLocale and getServerT from server module", () => {
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).toContain("getServerT");
+      expect(SOURCE).toContain("@/lib/i18n/server");
+    });
+
+    it("imports LocaleSync", () => {
+      expect(SOURCE).toContain("LocaleSync");
+    });
+
+    it("uses about.scoring translation keys for sections", () => {
+      expect(SOURCE).toContain("about.scoring.sectionPhilosophy");
+      expect(SOURCE).toContain("about.scoring.sectionNormalization");
+      expect(SOURCE).toContain("about.scoring.sectionDimensions");
+      expect(SOURCE).toContain("about.scoring.sectionCraft");
+      expect(SOURCE).toContain("about.scoring.sectionArchetypes");
+      expect(SOURCE).toContain("about.scoring.sectionComposite");
+      expect(SOURCE).toContain("about.scoring.sectionConfidence");
+      expect(SOURCE).toContain("about.scoring.sectionSmoothing");
+      expect(SOURCE).toContain("about.scoring.sectionExcludes");
     });
   });
 
@@ -49,39 +77,37 @@ describe("Scoring methodology page (server component)", () => {
     });
   });
 
-  describe("scoring content sections", () => {
-    it("covers Philosophy section", () => {
-      expect(SOURCE).toContain("Philosophy");
+  describe("scoring content keys", () => {
+    it("covers delivery dimension key", () => {
+      expect(SOURCE).toContain("about.scoring.deliveryHeading");
     });
 
-    it("covers Normalization section", () => {
-      expect(SOURCE).toContain("Normalization");
+    it("covers quality dimension key", () => {
+      expect(SOURCE).toContain("about.scoring.qualityHeading");
     });
 
-    it("covers all four core dimensions", () => {
-      expect(SOURCE).toContain("Delivery");
-      expect(SOURCE).toContain("Quality");
-      expect(SOURCE).toContain("Consistency");
-      expect(SOURCE).toContain("Breadth");
+    it("covers consistency dimension key", () => {
+      expect(SOURCE).toContain("about.scoring.consistencyHeading");
     });
 
-    it("covers archetypes section", () => {
-      expect(SOURCE).toContain("Developer archetypes");
+    it("covers breadth dimension key", () => {
+      expect(SOURCE).toContain("about.scoring.breadthHeading");
     });
 
-    it("covers confidence system", () => {
-      expect(SOURCE).toContain("Confidence system");
+    it("covers archetypes section key", () => {
+      expect(SOURCE).toContain("about.scoring.sectionArchetypes");
     });
 
-    it("covers score smoothing", () => {
-      expect(SOURCE).toContain("Score smoothing");
+    it("covers confidence system key", () => {
+      expect(SOURCE).toContain("about.scoring.sectionConfidence");
     });
 
-    it("covers tiers", () => {
-      expect(SOURCE).toContain("Emerging");
-      expect(SOURCE).toContain("Solid");
-      expect(SOURCE).toContain("High");
-      expect(SOURCE).toContain("Elite");
+    it("covers score smoothing key", () => {
+      expect(SOURCE).toContain("about.scoring.sectionSmoothing");
+    });
+
+    it("covers tiers table", () => {
+      expect(SOURCE).toContain("about.scoring.tiersTableRows");
     });
   });
 });
