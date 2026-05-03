@@ -53,13 +53,13 @@ describe('getServerLocale', () => {
     expect(await getServerLocale()).toBe('es');
   });
 
-  it('defaults to "en" when no cookie and no relevant Accept-Language', async () => {
+  it('defaults to "es" when no cookie and no relevant Accept-Language', async () => {
     vi.mocked(readLocaleCookie).mockResolvedValue(null);
     vi.mocked(headers).mockResolvedValue({
       get: vi.fn().mockReturnValue(null),
     } as unknown as Awaited<ReturnType<typeof headers>>);
 
-    expect(await getServerLocale()).toBe('en');
+    expect(await getServerLocale()).toBe('es');
   });
 });
 

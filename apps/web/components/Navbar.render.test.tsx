@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(async () => ({
     get: mockHeadersGet,
   })),
-  // readLocaleCookie uses cookies() — return empty jar so locale defaults to 'en'
+  // readLocaleCookie uses cookies() — return empty jar (locale resolved via Accept-Language below)
   cookies: vi.fn(async () => ({
     get: vi.fn().mockReturnValue(undefined),
   })),
@@ -83,6 +83,8 @@ beforeEach(() => {
   mockReadSessionCookie.mockReset();
   mockIsAdminHandle.mockReset();
   mockHeadersGet.mockReset();
+  // Navbar renders in English — set Accept-Language so tests don't depend on DEFAULT_LOCALE
+  mockHeadersGet.mockReturnValue('en-US');
 });
 
 afterEach(() => {

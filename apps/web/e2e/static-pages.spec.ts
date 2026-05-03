@@ -5,28 +5,28 @@ test.describe("Static pages — load and render", () => {
     await page.goto("/about");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("About");
+    await expect(h1).toContainText("Acerca de");
   });
 
   test("/about/scoring loads with heading", async ({ page }) => {
     await page.goto("/about/scoring");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Scoring Methodology");
+    await expect(h1).toContainText("Metodología");
   });
 
   test("/privacy loads with heading", async ({ page }) => {
     await page.goto("/privacy");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Privacy");
+    await expect(h1).toContainText("privacidad");
   });
 
   test("/terms loads with heading", async ({ page }) => {
     await page.goto("/terms");
     const h1 = page.locator("h1");
     await expect(h1).toBeVisible();
-    await expect(h1).toContainText("Terms");
+    await expect(h1).toContainText("Términos");
   });
 
   test("/verify loads with heading and form input", async ({ page }) => {
@@ -72,6 +72,6 @@ test.describe("Static pages — load and render", () => {
     await page.goto("/archetypes/marathoner");
     const backLink = page.locator('a[href="/#features"]');
     await expect(backLink).toBeVisible();
-    await expect(backLink).toContainText("Back to features");
+    await expect(backLink).toContainText("Volver");
   });
 });
