@@ -141,8 +141,8 @@ describe("CoachingInsights", () => {
 
     render(<CoachingInsights impact={mockImpact} trend={null} diff={null} />);
 
-    // generateInsights should have been called with null args
-    expect(mockGenerateInsights).toHaveBeenCalledWith(mockImpact, null, null);
+    // generateInsights should have been called with null args and a translation function
+    expect(mockGenerateInsights).toHaveBeenCalledWith(mockImpact, null, null, expect.any(Function));
 
     // Cards should still render
     expect(screen.getByTestId("insight-card-tip-archetype")).toBeTruthy();

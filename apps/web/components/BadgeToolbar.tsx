@@ -154,12 +154,12 @@ export function BadgeToolbar({
           aria-busy={refreshStatus === "loading"}
           title={
             refreshStatus === "idle"
-              ? "Refresh badge data"
+              ? t('badgeToolbar.refresh') as string
               : refreshStatus === "loading"
-                ? "Refreshing\u2026"
+                ? t('badgeToolbar.refreshing') as string
                 : refreshStatus === "success"
-                  ? "Refreshed!"
-                  : "Failed \u2014 try again"
+                  ? t('badgeToolbar.refreshed') as string
+                  : t('badgeToolbar.failed') as string
           }
           aria-label={t('aria.refreshBadge') as string}
           className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -179,10 +179,10 @@ export function BadgeToolbar({
             <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
             <path d="M16 16h5v5" />
           </svg>
-          {refreshStatus === "idle" && "Refresh"}
-          {refreshStatus === "loading" && "Refreshing\u2026"}
-          {refreshStatus === "success" && "Refreshed!"}
-          {refreshStatus === "error" && "Failed"}
+          {refreshStatus === "idle" && t('badgeToolbar.refresh') as string}
+          {refreshStatus === "loading" && t('badgeToolbar.refreshing') as string}
+          {refreshStatus === "success" && t('badgeToolbar.refreshed') as string}
+          {refreshStatus === "error" && t('badgeToolbar.failed') as string}
         </button>
       )}
 
@@ -209,7 +209,7 @@ export function BadgeToolbar({
             <polyline points="16 6 12 2 8 6" />
             <line x1="12" y1="2" x2="12" y2="15" />
           </svg>
-          Share
+          {t('badgeToolbar.share') as string}
         </button>
 
         {showShare && (
@@ -229,7 +229,7 @@ export function BadgeToolbar({
               role="menuitem"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
             >
-              Post on
+              {t('badgeToolbar.postOn') as string}
               <svg
                 className="w-3.5 h-3.5"
                 viewBox="0 0 24 24"
@@ -250,7 +250,7 @@ export function BadgeToolbar({
               role="menuitem"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
             >
-              Share on
+              {t('badgeToolbar.shareOn') as string}
               <svg
                 className="w-3.5 h-3.5"
                 viewBox="0 0 24 24"
@@ -271,7 +271,7 @@ export function BadgeToolbar({
               role="menuitem"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors"
             >
-              Post on
+              {t('badgeToolbar.postOn') as string}
               <svg
                 className="w-3.5 h-3.5"
                 viewBox="0 0 360 320"
@@ -287,7 +287,7 @@ export function BadgeToolbar({
               role="menuitem"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text-secondary hover:bg-amber/10 hover:text-text-primary transition-colors w-full"
             >
-              {copied ? "Copied!" : "Copy link"}
+              {copied ? t('badgeToolbar.copied') as string : t('badgeToolbar.copyLink') as string}
               <svg
                 className="w-3.5 h-3.5"
                 viewBox="0 0 24 24"
@@ -334,7 +334,7 @@ export function BadgeToolbar({
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        {downloadStatus === "loading" ? "Downloading\u2026" : "Download"}
+        {downloadStatus === "loading" ? t('badgeToolbar.downloading') as string : t('badgeToolbar.download') as string}
       </button>
 
     </div>

@@ -1,8 +1,11 @@
+"use client";
+
 import type { StatsData } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { DeltaIndicator } from "./DeltaIndicator";
+import { useTranslation } from "@/lib/i18n";
 
 const STAT_TOOLTIPS: Record<string, { id: string; tip: string }> = {
   Stars: {
@@ -51,6 +54,7 @@ interface StatsGridProps {
 }
 
 export function StatsGrid({ stats, diff }: StatsGridProps) {
+  const { t } = useTranslation();
   const items: StatItem[] = [
     {
       value: stats.totalStars,
@@ -97,7 +101,7 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
   return (
     <section aria-label="Key statistics">
       <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-4">
-        Key Numbers
+        {t('dashboard.keyNumbers') as string}
       </h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

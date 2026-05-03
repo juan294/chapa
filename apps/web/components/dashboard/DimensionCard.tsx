@@ -9,26 +9,11 @@ import { Sparkline } from "./Sparkline";
 import { DeltaIndicator } from "./DeltaIndicator";
 import { SubMetricPanel } from "./SubMetricPanel";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { useTranslation } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
-  delivery: "Delivery",
-  quality: "Quality",
-  consistency: "Consistency",
-  breadth: "Breadth",
-  craft: "Craft",
-};
-
-const DIMENSION_SUBTITLES: Record<keyof DimensionScores, string> = {
-  delivery: "PRs merged \u00B7 issues closed \u00B7 commits",
-  quality: "Code reviews \u00B7 quality gatekeeping",
-  consistency: "Active days \u00B7 sustained contributions",
-  breadth: "Repos contributed \u00B7 community reach",
-  craft: "AI tool proficiency \u00B7 effectiveness \u00B7 sophistication",
-};
 
 const DIMENSION_COLORS: Record<
   keyof DimensionScores,
@@ -118,6 +103,7 @@ export function DimensionCard({
   className = "",
   profileType = "collaborative",
 }: DimensionCardProps) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelId = `dim-panel-${dimension}`;
@@ -149,11 +135,11 @@ export function DimensionCard({
     [toggle],
   );
 
-  const label = DIMENSION_LABELS[dimension];
+  const label = t(`dimensions.${dimension}.label`) as string;
   const isSoloQuality = dimension === "quality" && profileType === "solo";
   const subtitle = isSoloQuality
     ? SOLO_QUALITY_SUBTITLE
-    : DIMENSION_SUBTITLES[dimension];
+    : t(`dimensions.${dimension}.subtitle`) as string;
   const colors = DIMENSION_COLORS[dimension];
   const tooltip = isSoloQuality
     ? SOLO_QUALITY_TOOLTIP
@@ -213,7 +199,7 @@ export function DimensionCard({
           </div>
           <div>
             {delta != null && (
-              <DeltaIndicator delta={delta} label="vs last week" />
+              <DeltaIndicator delta={delta} label={t('dashboard.vsLastWeek') as string} />
             )}
           </div>
         </div>

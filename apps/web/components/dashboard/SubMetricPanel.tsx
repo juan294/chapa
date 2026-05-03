@@ -27,14 +27,6 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   craft: "var(--color-dimension-craft)",
 };
 
-const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
-  delivery: "Delivery",
-  quality: "Quality",
-  consistency: "Consistency",
-  breadth: "Breadth",
-  craft: "Craft",
-};
-
 function getSubMetrics(
   dimension: keyof DimensionScores,
   stats: StatsData,
@@ -241,7 +233,7 @@ export function SubMetricPanel({
 
   const subMetrics = getSubMetrics(dimension, stats, profileType);
   const color = DIMENSION_COLORS[dimension];
-  const label = DIMENSION_LABELS[dimension];
+  const label = t(`dimensions.${dimension}.label`) as string;
 
   return (
     <div
@@ -254,7 +246,7 @@ export function SubMetricPanel({
           className="font-heading text-sm uppercase tracking-wider text-text-secondary"
           style={{ color }}
         >
-          {label} Breakdown
+          {label} {t('dashboard.breakdown') as string}
         </h3>
         <button
           type="button"

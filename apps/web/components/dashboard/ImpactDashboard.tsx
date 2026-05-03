@@ -7,6 +7,7 @@ import { DimensionCardsRow } from "./DimensionCardsRow";
 import { CoachingInsights } from "./CoachingInsights";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { StatsGrid } from "./StatsGrid";
+import { useTranslation } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -28,8 +29,9 @@ export function ImpactDashboard({
   handle,
 }: ImpactDashboardProps) {
   const { trend, diff } = useTrendData(handle);
+  const { t } = useTranslation();
 
-  const profileText = getArchetypeProfile(impact);
+  const profileText = getArchetypeProfile(impact, t);
 
   return (
     <div className="space-y-12">

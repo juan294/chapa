@@ -183,10 +183,10 @@ describe("StatsGrid", () => {
 });
 
 // ---------------------------------------------------------------------------
-// FE-H2: StatsGrid must NOT have "use client" (no hooks or browser APIs)
+// FE-H2: StatsGrid is now a client component (uses useTranslation hook for i18n)
 // ---------------------------------------------------------------------------
 describe("StatsGrid — client boundary (#728)", () => {
-  it("does not have 'use client' directive (pure presentational component)", () => {
-    expect(STATS_GRID_SOURCE).not.toMatch(/^["']use client["']/m);
+  it("has 'use client' directive for useTranslation hook", () => {
+    expect(STATS_GRID_SOURCE).toMatch(/^["']use client["']/m);
   });
 });

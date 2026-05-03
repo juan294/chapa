@@ -1,7 +1,10 @@
+"use client";
+
 import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
+import { useTranslation } from "@/lib/i18n";
 
 /** Core dimensions — always shown. */
 const CORE_DIMENSIONS = ["delivery", "quality", "consistency", "breadth"] as const;
@@ -23,6 +26,7 @@ export function DimensionCardsRow({
   activeDimension,
   className,
 }: DimensionCardsRowProps) {
+  const { t } = useTranslation();
   const hasCraft = impact.dimensions.craft != null;
   const dimensions: (keyof DimensionScores)[] = hasCraft
     ? [...CORE_DIMENSIONS, "craft"]
@@ -35,7 +39,7 @@ export function DimensionCardsRow({
   return (
     <section className={className}>
       <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-3">
-        Performance Dimensions
+        {t('dashboard.performanceDimensions') as string}
       </h3>
       <div className={`grid ${gridCols} gap-3`}>
         {dimensions.map((dim, i) => {
