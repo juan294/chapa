@@ -6,6 +6,7 @@ import { trackEvent } from "@/lib/analytics/posthog";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { useSession } from "@/hooks/useSession";
+import { useTranslation } from "@/lib/i18n";
 
 interface BadgeToolbarProps {
   handle: string;
@@ -15,6 +16,7 @@ export function BadgeToolbar({
   handle,
 }: BadgeToolbarProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { session } = useSession();
   const isOwner = session?.login === handle;
   const [refreshStatus, setRefreshStatus] = useState<
@@ -159,7 +161,7 @@ export function BadgeToolbar({
                   ? "Refreshed!"
                   : "Failed \u2014 try again"
           }
-          aria-label="Refresh badge data"
+          aria-label={t('aria.refreshBadge') as string}
           className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <svg
@@ -190,7 +192,7 @@ export function BadgeToolbar({
           onClick={() => setShareOpen(!shareOpen)}
           aria-expanded={shareOpen}
           aria-haspopup="true"
-          aria-label="Share badge"
+          aria-label={t('aria.shareBadge') as string}
           className={btnClass}
         >
           <svg
@@ -214,7 +216,7 @@ export function BadgeToolbar({
           <div
             className={`absolute top-full right-0 sm:left-0 sm:right-auto mt-2 min-w-[140px] rounded-xl bg-card shadow-card p-1.5 z-20 ${shareExiting ? "animate-fade-out-up" : "animate-terminal-fade-in"}`}
             role="menu"
-            aria-label="Share options"
+            aria-label={t('aria.shareOptions') as string}
           >
             <a
               href={`https://x.com/intent/tweet?text=${tweetText}`}
@@ -315,7 +317,7 @@ export function BadgeToolbar({
         onClick={handleDownload}
         disabled={downloadStatus === "loading"}
         aria-busy={downloadStatus === "loading"}
-        aria-label="Download badge as PNG"
+        aria-label={t('aria.downloadBadge') as string}
         className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <svg

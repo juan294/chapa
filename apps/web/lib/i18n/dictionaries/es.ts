@@ -32,6 +32,11 @@ export const es: Translations = {
     badgeTooltips: 'Tooltips de elementos de la insignia',
     avatarOf: '{login}',
     moreInfo: 'Más información',
+    refreshBadge: 'Actualizar datos de la insignia',
+    shareBadge: 'Compartir insignia',
+    shareOptions: 'Opciones para compartir',
+    downloadBadge: 'Descargar insignia como PNG',
+    closeBreakdown: 'Cerrar panel de desglose',
   },
   landing: {
     navLinks: [

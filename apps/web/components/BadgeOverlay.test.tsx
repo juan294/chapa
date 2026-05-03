@@ -37,7 +37,7 @@ describe("BadgeOverlay — static structure", () => {
 
   it("has role=group with aria-label on root element", () => {
     expect(SOURCE).toContain('role="group"');
-    expect(SOURCE).toContain('aria-label="Badge element tooltips"');
+    expect(SOURCE).toContain("t('aria.badgeTooltips')");
   });
 
   it("leader lines SVG is aria-hidden", () => {

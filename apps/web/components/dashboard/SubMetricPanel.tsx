@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
+import { useTranslation } from "@/lib/i18n";
 
 interface SubMetric {
   label: string;
@@ -222,6 +223,7 @@ export function SubMetricPanel({
   onClose,
   profileType = "collaborative",
 }: SubMetricPanelProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!isOpen) return;
 
@@ -256,7 +258,7 @@ export function SubMetricPanel({
         </h3>
         <button
           type="button"
-          aria-label="Close breakdown panel"
+          aria-label={t('aria.closeBreakdown') as string}
           onClick={onClose}
           className="rounded-full p-1 text-text-secondary transition-colors hover:text-text-primary"
         >

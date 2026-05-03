@@ -249,7 +249,7 @@ export function BadgeOverlay() {
       className="absolute inset-0 z-10 group/badge"
       style={{ overflow: "visible" }}
       role="group"
-      aria-label="Badge element tooltips"
+      aria-label={t('aria.badgeTooltips') as string}
     >
       {/* ── Desktop: animated leader line paths (hidden on mobile) ── */}
       {/* Only the active hotspot's line + dot renders (#323 — lazy render) */}

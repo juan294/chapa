@@ -32,6 +32,11 @@ export const en: Translations = {
     badgeTooltips: 'Badge element tooltips',
     avatarOf: '{login}',
     moreInfo: 'More information',
+    refreshBadge: 'Refresh badge data',
+    shareBadge: 'Share badge',
+    shareOptions: 'Share options',
+    downloadBadge: 'Download badge as PNG',
+    closeBreakdown: 'Close breakdown panel',
   },
   landing: {
     navLinks: [
