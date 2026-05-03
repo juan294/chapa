@@ -1,109 +1,72 @@
-export const revalidate = 86400;
-
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { LocaleSync } from "@/lib/i18n";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Terms of Service",
-  description:
-    "Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.",
-  openGraph: {
-    title: "Terms of Service — Chapa",
-    description:
-      "Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.",
-  },
-};
+export const dynamic = 'force-dynamic';
 
-export default function TermsPage() {
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}): Promise<Metadata> {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+  return {
+    title: t('legal.terms.metadataTitle') as string,
+    description: t('legal.terms.metadataDescription') as string,
+    openGraph: {
+      title: t('legal.terms.metadataOgTitle') as string,
+      description: t('legal.terms.metadataDescription') as string,
+    },
+  };
+}
+
+export default async function TermsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const resolvedParams = await searchParams;
+  const locale = await getServerLocale(resolvedParams.lang);
+  const t = getServerT(locale);
+  const sections = t('legal.terms.sections') as Array<{ heading: string; body: string }>;
+
   return (
     <div className="min-h-screen bg-bg">
       <Navbar />
-
+      <LocaleSync queryLang={resolvedParams.lang} />
       <main id="main-content" className="relative mx-auto max-w-3xl px-6 pt-32 pb-24">
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">
-            Terms of <span className="text-amber">Service</span>
+            {t('legal.terms.h1Before') as string}<span className="text-amber">{t('legal.terms.h1Highlight') as string}</span>
           </h1>
-
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
             <p className="text-xs text-text-secondary/60">
-              Last updated: February 2026
+              {t('legal.terms.lastUpdated') as string}
             </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              1. Acceptance of Terms
-            </h2>
-            <p>
-              By accessing or using Chapa, you agree to be bound by these Terms
-              of Service. If you do not agree, please do not use the service.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              2. Description of Service
-            </h2>
-            <p>
-              Chapa provides a developer impact scoring and badge generation
-              service using publicly available data from linked developer
-              platforms (GitHub, Bitbucket, Codeberg). The service is
-              provided &quot;as is&quot; without warranties of any kind.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              3. Platform Data Usage
-            </h2>
-            <p>
-              Chapa accesses your public profile and activity data through
-              the APIs of linked platforms (GitHub, Bitbucket, Codeberg).
-              We only request read access to public information. We do not
-              access private repositories or private profile data on any
-              platform.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              4. User Conduct
-            </h2>
-            <p>
-              You agree not to misuse the service, including but not limited to:
-              attempting to manipulate scores, abusing API rate limits, or using
-              the service for any unlawful purpose.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              5. Limitation of Liability
-            </h2>
-            <p>
-              Chapa and its creators shall not be liable for any indirect,
-              incidental, or consequential damages arising from the use of the
-              service.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              6. Changes to Terms
-            </h2>
-            <p>
-              We reserve the right to modify these terms at any time. Continued
-              use of the service after changes constitutes acceptance of the
-              new terms.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              7. Contact
-            </h2>
-            <p>
-              For questions about these terms, contact us at{" "}
-              <a
-                href="mailto:support@chapa.thecreativetoken.com"
-                className="text-amber hover:text-amber-light transition-colors"
-              >
-                support@chapa.thecreativetoken.com
-              </a>
-              .
-            </p>
+            {sections.map((section, i) => (
+              <div key={i}>
+                <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
+                  {section.heading}
+                </h2>
+                <p>
+                  {section.body}
+                  {i === sections.length - 1 && (
+                    <a
+                      href={`mailto:${t('legal.terms.contactEmail') as string}`}
+                      className="text-amber hover:text-amber-light transition-colors"
+                    >
+                      {t('legal.terms.contactEmail') as string}
+                    </a>
+                  )}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </main>
-
       <GlobalCommandBarLazy />
     </div>
   );

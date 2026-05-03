@@ -1,104 +1,72 @@
-export const revalidate = 86400;
-
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { LocaleSync } from "@/lib/i18n";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description:
-    "Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.",
-  openGraph: {
-    title: "Privacy Policy — Chapa",
-    description:
-      "Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.",
-  },
-};
+export const dynamic = 'force-dynamic';
 
-export default function PrivacyPage() {
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}): Promise<Metadata> {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+  return {
+    title: t('legal.privacy.metadataTitle') as string,
+    description: t('legal.privacy.metadataDescription') as string,
+    openGraph: {
+      title: t('legal.privacy.metadataOgTitle') as string,
+      description: t('legal.privacy.metadataDescription') as string,
+    },
+  };
+}
+
+export default async function PrivacyPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const resolvedParams = await searchParams;
+  const locale = await getServerLocale(resolvedParams.lang);
+  const t = getServerT(locale);
+  const sections = t('legal.privacy.sections') as Array<{ heading: string; body: string }>;
+
   return (
     <div className="min-h-screen bg-bg">
       <Navbar />
-
+      <LocaleSync queryLang={resolvedParams.lang} />
       <main id="main-content" className="relative mx-auto max-w-3xl px-6 pt-32 pb-24">
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">
-            Privacy <span className="text-amber">Policy</span>
+            {t('legal.privacy.h1Before') as string}<span className="text-amber">{t('legal.privacy.h1Highlight') as string}</span>
           </h1>
-
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
             <p className="text-xs text-text-secondary/60">
-              Last updated: February 2026
+              {t('legal.privacy.lastUpdated') as string}
             </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              1. Information We Collect
-            </h2>
-            <p>
-              When you sign in with GitHub, we receive your public profile
-              information (username, display name, avatar URL) and a
-              time-limited access token to fetch your public activity data.
-              If you link additional platforms (Bitbucket, Codeberg), we
-              receive similar public profile and activity data from those
-              services.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              2. How We Use Your Information
-            </h2>
-            <p>
-              We use your development activity data solely to compute your Developer
-              Impact Profile and generate your badge. We cache computed profiles
-              for up to 24 hours to reduce API calls. We do not sell, share, or
-              transfer your data to third parties.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              3. Data Storage
-            </h2>
-            <p>
-              Session data is stored in an encrypted HTTP-only cookie in your
-              browser. Cached scores are stored in Upstash Redis with a 24-hour
-              TTL and are automatically deleted after expiration.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              4. Analytics
-            </h2>
-            <p>
-              We use PostHog for basic, privacy-friendly analytics (page views
-              and key events). No personal information is sent to analytics
-              services.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              5. Your Rights
-            </h2>
-            <p>
-              You can sign out at any time to clear your session. You can revoke
-              Chapa&apos;s access to your GitHub account through your GitHub
-              settings under &quot;Authorized OAuth Apps.&quot; You can also
-              unlink Bitbucket or Codeberg accounts from your profile at
-              any time.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              6. Contact
-            </h2>
-            <p>
-              For privacy-related inquiries, contact us at{" "}
-              <a
-                href="mailto:support@chapa.thecreativetoken.com"
-                className="text-amber hover:text-amber-light transition-colors"
-              >
-                support@chapa.thecreativetoken.com
-              </a>
-              .
-            </p>
+            {sections.map((section, i) => (
+              <div key={i}>
+                <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
+                  {section.heading}
+                </h2>
+                <p>
+                  {section.body}
+                  {i === sections.length - 1 && (
+                    <a
+                      href={`mailto:${t('legal.privacy.contactEmail') as string}`}
+                      className="text-amber hover:text-amber-light transition-colors"
+                    >
+                      {t('legal.privacy.contactEmail') as string}
+                    </a>
+                  )}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </main>
-
       <GlobalCommandBarLazy />
     </div>
   );

@@ -4,24 +4,33 @@ import * as path from "node:path";
 
 const LEGAL_PAGES = ["privacy", "terms"] as const;
 
-describe("legal pages — ISR", () => {
+describe("legal pages — i18n server component", () => {
   for (const page of LEGAL_PAGES) {
     const source = fs.readFileSync(
       path.resolve(__dirname, "..", page, "page.tsx"),
       "utf-8",
     );
 
-    it(`/${page} exports revalidate = 86400`, () => {
-      expect(source).toContain("export const revalidate = 86400");
+    it(`/${page} exports dynamic = 'force-dynamic'`, () => {
+      expect(source).toContain("export const dynamic = 'force-dynamic'");
     });
 
-    it(`/${page} does NOT import headers from next/headers`, () => {
-      expect(source).not.toContain('from "next/headers"');
-      expect(source).not.toContain("from 'next/headers'");
+    it(`/${page} exports generateMetadata`, () => {
+      expect(source).toContain("export async function generateMetadata");
     });
 
-    it(`/${page} does NOT call headers()`, () => {
-      expect(source).not.toMatch(/\bheaders\(\)/);
+    it(`/${page} imports getServerT and getServerLocale from @/lib/i18n/server`, () => {
+      expect(source).toContain('from "@/lib/i18n/server"');
+      expect(source).toContain('getServerT');
+      expect(source).toContain('getServerLocale');
+    });
+
+    it(`/${page} does NOT use static metadata export`, () => {
+      expect(source).not.toContain("export const metadata");
+    });
+
+    it(`/${page} does NOT export revalidate`, () => {
+      expect(source).not.toContain("export const revalidate");
     });
   }
 });
