@@ -16,7 +16,8 @@ describe("MobileNav", () => {
 
   describe("accessibility", () => {
     it("has aria-label on the hamburger button", () => {
-      expect(SOURCE).toContain('aria-label="Toggle navigation"');
+      // Now uses t('aria.toggleNavigation') via useTranslation()
+      expect(SOURCE).toContain("aria.toggleNavigation");
     });
 
     it("has aria-expanded attribute on the hamburger button", () => {

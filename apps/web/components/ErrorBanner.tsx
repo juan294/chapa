@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 interface ErrorBannerProps {
   message: string;
@@ -14,6 +15,7 @@ interface ErrorBannerProps {
  */
 export function ErrorBanner({ message }: ErrorBannerProps) {
   const [dismissed, setDismissed] = useState(false);
+  const { t } = useTranslation();
 
   if (dismissed) return null;
 
@@ -44,7 +46,7 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
         type="button"
         onClick={() => setDismissed(true)}
         className="ml-2 flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full p-1 text-terminal-red/70 transition-colors hover:bg-terminal-red/10 hover:text-terminal-red"
-        aria-label="Dismiss error"
+        aria-label={t('aria.dismissError') as string}
       >
         <svg
           className="h-4 w-4"

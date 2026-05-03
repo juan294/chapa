@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { InfoTooltip } from "./InfoTooltip";
+import { useTranslation } from "@/lib/i18n";
 
 /**
  * Leader line configuration for hotspots that show an animated path
@@ -30,9 +31,9 @@ interface LeaderLineConfig {
  *   PAD=60  metaRowY=160  heatmap=(60,190)  radarCenter=(870,275)
  *   scoreCenter=(870,460) r=46  tierY≈530  footerY=585  verifyX=1145
  */
-interface Hotspot {
+interface HotspotBase {
   id: string;
-  tooltip: string;
+  dictKey: string;
   position: "top" | "bottom";
   top: string;
   left: string;
@@ -41,11 +42,10 @@ interface Hotspot {
   leaderLine: LeaderLineConfig;
 }
 
-const HOTSPOTS: Hotspot[] = [
+const HOTSPOT_BASES: HotspotBase[] = [
   {
     id: "badge-archetype",
-    tooltip:
-      "Your developer archetype based on which dimension is strongest. Seven types: Builder, Quality Champion, Marathoner, Polymath, Artificer, Balanced, Emerging.",
+    dictKey: "badgeOverlay.archetype",
     position: "bottom",
     // Pill at x=60, y=143, ~170×34 → center (144, 159)
     top: "22.5%",
@@ -61,7 +61,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-watchers",
-    tooltip: "People watching your repositories for updates.",
+    dictKey: "badgeOverlay.watchers",
     position: "bottom",
     // Pill after archetype + dot separator → center (312, 159)
     top: "22.5%",
@@ -77,7 +77,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-forks",
-    tooltip: "Times others forked your repositories.",
+    dictKey: "badgeOverlay.forks",
     position: "bottom",
     // center (450, 159)
     top: "22.5%",
@@ -93,8 +93,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-stars",
-    tooltip:
-      "Stars received on your repos \u2014 not repos you\u2019ve starred.",
+    dictKey: "badgeOverlay.stars",
     position: "bottom",
     // center (594, 159)
     top: "22.5%",
@@ -110,8 +109,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-heatmap",
-    tooltip:
-      "Contribution activity over the last 90 days. Darker cells = more contributions that day.",
+    dictKey: "badgeOverlay.heatmap",
     position: "top",
     // Grid at x=60, y=190, 622×328 → bottom-center (372, 517)
     top: "30%",
@@ -128,8 +126,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-radar",
-    tooltip:
-      "Your four-dimension profile as a diamond. Each axis is one dimension. Larger shape = stronger scores.",
+    dictKey: "badgeOverlay.radar",
     position: "top",
     // Center (870,275) r=85 → center (864, 277)
     top: "28%",
@@ -145,8 +142,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-score",
-    tooltip:
-      "Your adjusted composite impact score (0\u2013100), averaged from four dimensions and adjusted by confidence.",
+    dictKey: "badgeOverlay.score",
     position: "top",
     // Ring center (870,460) r=46 → center (864, 458)
     top: "65%",
@@ -162,8 +158,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-tier",
-    tooltip:
-      "Impact tier: Emerging (0\u201329), Solid (30\u201369), High (70\u201384), Elite (85\u2013100).",
+    dictKey: "badgeOverlay.tier",
     position: "top",
     // Label at (870, ~530) → center (864, 524)
     top: "80%",
@@ -179,8 +174,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-verification",
-    tooltip:
-      "Cryptographic seal proving these scores haven\u2019t been tampered with.",
+    dictKey: "badgeOverlay.verification",
     position: "top",
     // Strip at x=1145-1190, y=30-600 → center (1164, 315)
     top: "5%",
@@ -196,8 +190,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-craft",
-    tooltip:
-      "AI Craft Score — measures your proficiency, effectiveness, and sophistication with AI coding tools like Claude Code.",
+    dictKey: "badgeOverlay.craft",
     position: "top",
     // Pill at x=60, y=530, ~110×24 → center (115, 542)
     top: "84%",
@@ -213,8 +206,7 @@ const HOTSPOTS: Hotspot[] = [
   },
   {
     id: "badge-github",
-    tooltip:
-      "Chapa analyzes public metrics from GitHub and other linked platforms. These platforms are not affiliated with or endorsing this project.",
+    dictKey: "badgeOverlay.github",
     position: "top",
     // Footer: GitHub logo+text at x=60, y≈575 → center (156, 589)
     top: "90%",
@@ -240,10 +232,16 @@ function parsePathStart(d: string): { cx: string; cy: string } {
 
 export function BadgeOverlay() {
   const [activeLeaderLine, setActiveLeaderLine] = useState<string | null>(null);
+  const { t } = useTranslation();
+
+  // Build tooltip map from dictionary
+  const TOOLTIP_MAP: Record<string, string> = Object.fromEntries(
+    HOTSPOT_BASES.map((h) => [h.id, t(h.dictKey) as string])
+  );
 
   // Lazy lookup: only resolve the active hotspot's data when needed (#323)
-  const activeHotspot = activeLeaderLine
-    ? HOTSPOTS.find((h) => h.id === activeLeaderLine)
+  const activeBase = activeLeaderLine
+    ? HOTSPOT_BASES.find((h) => h.id === activeLeaderLine)
     : null;
 
   return (
@@ -251,7 +249,7 @@ export function BadgeOverlay() {
       className="absolute inset-0 z-10 group/badge"
       style={{ overflow: "visible" }}
       role="group"
-      aria-label="Badge element tooltips"
+      aria-label={t('aria.badgeTooltips') as string}
     >
       {/* ── Desktop: animated leader line paths (hidden on mobile) ── */}
       {/* Only the active hotspot's line + dot renders (#323 — lazy render) */}
@@ -262,12 +260,12 @@ export function BadgeOverlay() {
         style={{ overflow: "visible" }}
         aria-hidden="true"
       >
-        {activeHotspot && (() => {
-          const { cx, cy } = parsePathStart(activeHotspot.leaderLine.path);
+        {activeBase && (() => {
+          const { cx, cy } = parsePathStart(activeBase.leaderLine.path);
           return (
-            <g key={activeHotspot.id}>
+            <g key={activeBase.id}>
               <path
-                d={activeHotspot.leaderLine.path}
+                d={activeBase.leaderLine.path}
                 fill="none"
                 stroke="var(--color-amber)"
                 strokeWidth="1.5"
@@ -297,17 +295,18 @@ export function BadgeOverlay() {
       {/* ── Desktop: leader line annotation panel (hidden on mobile) ── */}
       {/* Only the active hotspot's panel renders (#323 — lazy render) */}
       <div className="hidden md:contents">
-        {activeHotspot && (() => {
-          const isAbove = activeHotspot.leaderLine.panelAnchor === "above";
+        {activeBase && (() => {
+          const isAbove = activeBase.leaderLine.panelAnchor === "above";
+          const tooltip = TOOLTIP_MAP[activeBase.id] ?? '';
           return (
             <div
-              key={`panel-${activeHotspot.id}`}
+              key={`panel-${activeBase.id}`}
               role="tooltip"
-              id={`${activeHotspot.id}-panel`}
+              id={`${activeBase.id}-panel`}
               className="absolute z-20 max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out opacity-100 translate-y-0"
               style={{
-                top: activeHotspot.leaderLine.panelTop,
-                left: activeHotspot.leaderLine.panelLeft,
+                top: activeBase.leaderLine.panelTop,
+                left: activeBase.leaderLine.panelLeft,
                 transform: isAbove
                   ? "translate(-50%, -100%)"
                   : "translate(-50%, 0%)",
@@ -315,50 +314,53 @@ export function BadgeOverlay() {
               }}
             >
               <span className="text-amber font-heading text-[10px] uppercase tracking-wider block mb-1">
-                {activeHotspot.id.replace("badge-", "")}
+                {activeBase.id.replace("badge-", "")}
               </span>
-              {activeHotspot.tooltip}
+              {tooltip}
             </div>
           );
         })()}
       </div>
 
       {/* ── Hotspot regions ── */}
-      {HOTSPOTS.map((hotspot) => (
-        <div
-          key={hotspot.id}
-          role="group"
-          tabIndex={0}
-          className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber"
-          style={{
-            top: hotspot.top,
-            left: hotspot.left,
-            width: hotspot.width,
-            height: hotspot.height,
-          }}
-          onMouseEnter={() => setActiveLeaderLine(hotspot.id)}
-          onMouseLeave={() => setActiveLeaderLine(null)}
-          onFocus={() => setActiveLeaderLine(hotspot.id)}
-          onBlur={() => setActiveLeaderLine(null)}
-          aria-describedby={`${hotspot.id}-desc`}
-          aria-label={`${hotspot.id.replace("badge-", "")} info`}
-        >
-          {/* Always-present sr-only description for screen readers (W5).
-              aria-describedby must point to a DOM element that is always
-              present — the lazy-rendered leader-line panel only exists while
-              active, which is too late for the AT to read on focus. */}
-          <span id={`${hotspot.id}-desc`} className="sr-only">
-            {hotspot.tooltip}
-          </span>
-          {/* Mobile: standard InfoTooltip (hidden on desktop via md:hidden) */}
-          <InfoTooltip
-            id={hotspot.id}
-            content={hotspot.tooltip}
-            position={hotspot.position}
-            className={`opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 md:hidden`}
-          />
-        </div>
-      ))}
+      {HOTSPOT_BASES.map((hotspot) => {
+        const tooltip = TOOLTIP_MAP[hotspot.id] ?? '';
+        return (
+          <div
+            key={hotspot.id}
+            role="group"
+            tabIndex={0}
+            className="absolute flex items-center justify-center group-hover/badge:cursor-help rounded hover:bg-amber/5 transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            style={{
+              top: hotspot.top,
+              left: hotspot.left,
+              width: hotspot.width,
+              height: hotspot.height,
+            }}
+            onMouseEnter={() => setActiveLeaderLine(hotspot.id)}
+            onMouseLeave={() => setActiveLeaderLine(null)}
+            onFocus={() => setActiveLeaderLine(hotspot.id)}
+            onBlur={() => setActiveLeaderLine(null)}
+            aria-describedby={`${hotspot.id}-desc`}
+            aria-label={`${hotspot.id.replace("badge-", "")} info`}
+          >
+            {/* Always-present sr-only description for screen readers (W5).
+                aria-describedby must point to a DOM element that is always
+                present — the lazy-rendered leader-line panel only exists while
+                active, which is too late for the AT to read on focus. */}
+            <span id={`${hotspot.id}-desc`} className="sr-only">
+              {tooltip}
+            </span>
+            {/* Mobile: standard InfoTooltip (hidden on desktop via md:hidden) */}
+            <InfoTooltip
+              id={hotspot.id}
+              content={tooltip}
+              position={hotspot.position}
+              className={`opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 md:hidden`}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

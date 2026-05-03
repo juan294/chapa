@@ -6,8 +6,8 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
-const COPY_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../lib/copy/public-flow.ts"),
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
   "utf-8",
 );
 
@@ -22,9 +22,13 @@ describe("Landing page (server component)", () => {
     });
   });
 
-  describe("ISR configuration", () => {
-    it("exports revalidate = 3600", () => {
-      expect(SOURCE).toContain("export const revalidate = 3600");
+  describe("dynamic rendering (i18n requires per-request locale)", () => {
+    it("exports dynamic = 'force-dynamic' (replaces revalidate)", () => {
+      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
+    });
+
+    it("does NOT export revalidate (incompatible with force-dynamic)", () => {
+      expect(SOURCE).not.toContain("export const revalidate");
     });
   });
 
@@ -37,8 +41,8 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain('id="main-content"');
     });
 
-    it("renders hero heading", () => {
-      expect(COPY_SOURCE).toContain("Impacto de desarrollador,");
+    it("hero heading copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Developer Impact,");
     });
 
     it("renders badge preview", () => {
@@ -63,36 +67,49 @@ describe("Landing page (server component)", () => {
   });
 
   describe("features section", () => {
-    it("lists all five features", () => {
-      expect(COPY_SOURCE).toContain("MULTIDIMENSIONAL");
-      expect(COPY_SOURCE).toContain("ARQUETIPO DE DESARROLLADOR");
-      expect(COPY_SOURCE).toContain("MÉTRICAS VERIFICADAS");
-      expect(COPY_SOURCE).toContain("DOCUMENTO VIVO");
-      expect(COPY_SOURCE).toContain("EMBEBIDO EN UN CLIC");
+    it("lists all five features in the English dictionary", () => {
+      expect(EN_DICT).toContain("MULTI-DIMENSIONAL");
+      expect(EN_DICT).toContain("DEVELOPER ARCHETYPE");
+      expect(EN_DICT).toContain("VERIFIED METRICS");
+      expect(EN_DICT).toContain("LIVING DOCUMENT");
+      expect(EN_DICT).toContain("ONE-CLICK EMBED");
     });
   });
 
   describe("dimensions section", () => {
-    it("lists all four core dimensions", () => {
-      expect(COPY_SOURCE).toContain('"ENTREGA"');
-      expect(COPY_SOURCE).toContain('"CALIDAD"');
-      expect(COPY_SOURCE).toContain('"CONSTANCIA"');
-      expect(COPY_SOURCE).toContain('"ALCANCE"');
+    it("lists all four core dimensions in the English dictionary", () => {
+      expect(EN_DICT).toContain("'DELIVERY'");
+      expect(EN_DICT).toContain("'QUALITY'");
+      expect(EN_DICT).toContain("'CONSISTENCY'");
+      expect(EN_DICT).toContain("'BREADTH'");
     });
   });
 
-  describe("Spanish launch copy", () => {
-    it("uses the centralized public-flow copy layer", () => {
-      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
+  describe("i18n integration", () => {
+    it("uses getServerT() for translations", () => {
+      expect(SOURCE).toContain("getServerT");
     });
 
-    it("does not keep the old English acquisition CTAs", () => {
+    it("uses getServerLocale() for locale resolution", () => {
+      expect(SOURCE).toContain("getServerLocale");
+    });
+
+    it("renders LocaleSync for sticky lang override", () => {
+      expect(SOURCE).toContain("LocaleSync");
+    });
+
+    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
+      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
+    });
+
+    it("does not keep the old English acquisition CTAs on the landing page", () => {
       expect(SOURCE).not.toContain("Get Your Badge");
       expect(SOURCE).not.toContain("Verify a Badge");
       expect(SOURCE).not.toContain("Ready to prove your impact?");
-      expect(COPY_SOURCE).not.toContain("Get Your Badge");
-      expect(COPY_SOURCE).not.toContain("Verify a Badge");
-      expect(COPY_SOURCE).not.toContain("Ready to prove your impact?");
+      expect(EN_DICT).not.toContain("Get Your Badge");
+      // "Verify a Badge" is legitimately used as a CTA in the verification page namespace
+      // (about.verification.ctaButton), so we only check landing-specific keys
+      expect(EN_DICT).not.toContain("Ready to prove your impact?");
     });
   });
 
@@ -153,12 +170,12 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("font-heading");
     });
 
-    it("section headings are still present for accessibility", () => {
-      expect(COPY_SOURCE).toContain("Funciones");
-      expect(COPY_SOURCE).toContain("Cómo funciona");
-      expect(COPY_SOURCE).toContain("Empresa");
-      expect(COPY_SOURCE).toContain("Datos");
-      expect(COPY_SOURCE).toContain("Empieza");
+    it("section headings are present in the English dictionary", () => {
+      expect(EN_DICT).toContain("Features");
+      expect(EN_DICT).toContain("How it Works");
+      expect(EN_DICT).toContain("Enterprise");
+      expect(EN_DICT).toContain("Stats");
+      expect(EN_DICT).toContain("Get started");
     });
   });
 });

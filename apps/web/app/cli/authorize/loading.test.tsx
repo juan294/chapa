@@ -20,17 +20,23 @@ describe("CLI authorize loading.tsx", () => {
     expect(SOURCE).toContain("animate-pulse");
   });
 
-  it("has role='status' and aria-label='Loading' on the main container", () => {
+  it("has role='status' on the main container", () => {
     expect(SOURCE).toContain('role="status"');
-    expect(SOURCE).toContain('aria-label="Loading"');
   });
 
   it("has an sr-only loading text span", () => {
     expect(SOURCE).toContain('className="sr-only"');
-    expect(SOURCE).toContain("Loading...");
   });
 
   it("uses terminal aesthetic with font-heading", () => {
     expect(SOURCE).toContain("font-heading");
+  });
+
+  it("uses useTranslation for i18n", () => {
+    expect(SOURCE).toContain("useTranslation");
+  });
+
+  it("uses common.loading key", () => {
+    expect(SOURCE).toContain("common.loading");
   });
 });

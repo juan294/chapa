@@ -61,6 +61,7 @@ const tipNoDimensionInsight = {
   headline: "You're a Builder",
   body: "Your profile is driven by output.",
   priority: 6,
+  archetypeName: "Builder",
 };
 
 const achievementInsight = {
@@ -79,6 +80,13 @@ const nextTierInsight = {
   headline: "17 points to High",
   body: "Focus on your strongest dimension.",
   priority: 5,
+  nextTierMeta: {
+    gap: 17,
+    nextTierKey: "High" as const,
+    currentIndex: 1, // Solid
+    nextIndex: 2,    // High
+    tierLabels: ["Emerging", "Solid", "High", "Elite"],
+  },
 };
 
 // ---------------------------------------------------------------------------

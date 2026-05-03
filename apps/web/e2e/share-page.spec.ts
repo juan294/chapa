@@ -33,11 +33,11 @@ test.describe("Share page — /u/:handle", () => {
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
-  test('"Your Impact, Decoded" heading is visible', async ({ page }) => {
+  test('"Tu Impacto, Decodificado" heading is visible', async ({ page }) => {
     const response = await page.goto("/u/torvalds", GOTO_OPTS);
     if (!response?.ok()) return;
 
-    const heading = page.getByText("Your Impact, Decoded");
+    const heading = page.getByText("Tu Impacto, Decodificado");
     await expect(heading).toBeVisible();
   });
 

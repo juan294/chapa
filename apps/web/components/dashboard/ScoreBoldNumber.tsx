@@ -13,6 +13,7 @@ import {
   SCORE_EFFECT_CSS,
 } from "@/lib/effects/text/ScoreEffectText";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
+import { useTranslation } from "@/lib/i18n";
 
 interface HeroScoreProps {
   impact: ImpactV6Result;
@@ -35,8 +36,9 @@ export function ScoreBoldNumber({ impact, className = "" }: HeroScoreProps) {
     }
   }, [inView, animate]);
 
+  const { t } = useTranslation();
   const isElite = impact.tier === "Elite";
-  const profileText = getArchetypeProfile(impact);
+  const profileText = getArchetypeProfile(impact, t);
 
   const scoreNumber = (
     <span className="font-heading text-7xl sm:text-8xl font-extrabold">

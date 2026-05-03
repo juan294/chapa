@@ -1,26 +1,33 @@
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
+import { LocaleSync } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import type { Metadata } from "next";
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: "Scoring Methodology",
-  description:
-    "How Chapa decodes your developer impact. Every dimension, weight, cap, and confidence penalty explained with full rationale.",
-  openGraph: {
-    title: "Chapa Scoring Methodology",
-    description:
-      "Full transparency on how the multi-dimension Impact Profile is calculated. Every weight and decision explained.",
-  },
-  twitter: {
-    card: "summary",
-    title: "Chapa Scoring Methodology",
-    description:
-      "Full transparency on how the Impact Profile is calculated.",
-  },
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}): Promise<Metadata> {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+  return {
+    title: t('about.scoring.metadataTitle') as string,
+    description: t('about.scoring.metadataDescription') as string,
+    openGraph: {
+      title: t('about.scoring.ogTitle') as string,
+      description: t('about.scoring.ogDescription') as string,
+    },
+    twitter: {
+      card: "summary",
+      title: t('about.scoring.twitterTitle') as string,
+      description: t('about.scoring.twitterDescription') as string,
+    },
+  };
+}
 
 /* ---------------------------------------------------------------------- */
 /* Reusable sub-components                                                 */
@@ -88,9 +95,17 @@ function Table({
 /* Page                                                                    */
 /* ---------------------------------------------------------------------- */
 
-export default function ScoringMethodologyPage() {
+export default async function ScoringMethodologyPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+
   return (
     <div className="min-h-screen bg-bg">
+      <LocaleSync queryLang={(await searchParams).lang} />
       <Navbar />
 
       <main
@@ -99,13 +114,12 @@ export default function ScoringMethodologyPage() {
       >
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-4 animate-fade-in-up">
-            Scoring Methodology
+            {t('about.scoring.h1') as string}
             <span className="text-amber animate-cursor-blink">_</span>
           </h1>
 
           <p className="text-text-secondary text-lg mb-8 animate-fade-in-up [animation-delay:100ms]">
-            Full transparency on how Chapa decodes your developer impact.
-            Every weight, cap, and decision is explained here.
+            {t('about.scoring.intro') as string}
           </p>
 
           {/* ---------------------------------------------------------- */}
@@ -127,15 +141,15 @@ export default function ScoringMethodologyPage() {
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
               <h2 className="font-heading text-lg font-medium text-text-primary tracking-tight">
-                Watch the explainer
+                {t('about.scoring.videoHeading') as string}
               </h2>
             </div>
             <LiteYouTubeEmbed
               videoId="wcXXGn3JYyw"
-              title="How Chapa Scores Developer Impact"
+              title={t('about.scoring.videoTitle') as string}
             />
             <p className="text-text-secondary text-sm mt-2">
-              Prefer reading? The full methodology is detailed below.
+              {t('about.scoring.videoReadingNote') as string}
             </p>
           </div>
 
@@ -143,580 +157,248 @@ export default function ScoringMethodologyPage() {
             {/* ---------------------------------------------------------- */}
             {/* Philosophy                                                  */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Philosophy</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionPhilosophy') as string}</SectionHeading>
             <p>
-              AI-assisted development makes traditional volume metrics — commits,
-              lines of code, PR counts — increasingly meaningless. A single
-              number that blends everything together hides the difference between
-              a prolific code shipper and a dedicated reviewer.
+              {t('about.scoring.philosophyBody1') as string}
             </p>
             <p>
-              Chapa replaces that single number with a{" "}
+              {t('about.scoring.philosophyBody2Prefix') as string}
               <strong className="text-text-primary">
-                multi-dimensional impact breakdown
+                {t('about.scoring.philosophyBody2Highlight') as string}
               </strong>
-              : four core dimension scores (each 0-100) plus an optional
-              fifth Craft dimension, a developer archetype, a composite score,
-              and a confidence rating. Each contribution style can shine on its
-              own terms.
+              {t('about.scoring.philosophyBody2Suffix') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* Normalization                                               */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Normalization</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionNormalization') as string}</SectionHeading>
             <p>
-              Most raw metrics are transformed using{" "}
+              {t('about.scoring.normalizationBody') as string}
               <strong className="text-text-primary">
-                logarithmic normalization
-              </strong>{" "}
-              to reward genuine contribution while making gaming impractical:
+                {t('about.scoring.normalizationHighlight') as string}
+              </strong>
+              {t('about.scoring.normalizationBodySuffix') as string}
             </p>
             <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
-              f(x, cap) = ln(1 + min(x, cap)) / ln(1 + cap)
+              {t('about.scoring.normalizationFormula') as string}
             </div>
             <p>
-              This produces a value between 0 and 1. The logarithmic curve means
-              early contributions add significant value, but volume beyond the
-              cap has zero effect. Pushing 1,000 commits does not produce a
-              score 10x higher than 100 commits.
+              {t('about.scoring.normalizationCurveNote') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* Caps                                                        */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Signal caps</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionCaps') as string}</SectionHeading>
             <p>
-              Each signal has a cap — the point beyond which additional volume
-              adds nothing. Caps are calibrated to the P50-P75 developer range,
-              so a solid year of consistent work can reach maximum credit.
+              {t('about.scoring.capsBody') as string}
             </p>
             <Table
-              headers={["Signal", "Cap", "Rationale"]}
-              rows={[
-                [
-                  "Commits",
-                  "300",
-                  "150 commits/year normalizes to ~81%; a strong year is fully rewarded",
-                ],
-                [
-                  "PR Weight",
-                  "60",
-                  "Weighted by complexity, not count; 25 weight normalizes to ~83%",
-                ],
-                [
-                  "Reviews",
-                  "80",
-                  "30 reviews/year normalizes to ~78%; collaboration without extreme volume",
-                ],
-                [
-                  "Issues",
-                  "40",
-                  "10 issues/year normalizes to ~70%; meaningful resolution, not churn",
-                ],
-                [
-                  "Repos",
-                  "12",
-                  "Cross-project work; 5 repos normalizes to ~42%",
-                ],
-                [
-                  "Stars",
-                  "150",
-                  "Community recognition; 10 stars normalizes to ~49%",
-                ],
-                [
-                  "Forks",
-                  "80",
-                  "People building on your work; 10 forks normalizes to ~55%",
-                ],
-                [
-                  "Watchers",
-                  "50",
-                  "Active repo followers; retained for normalization but dropped from Breadth weights",
-                ],
-              ]}
+              headers={t('about.scoring.capsTableHeaders') as string[]}
+              rows={t('about.scoring.capsTableRows') as unknown as string[][]}
             />
 
             {/* ---------------------------------------------------------- */}
             {/* The dimensions                                               */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>The core dimensions</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionDimensions') as string}</SectionHeading>
             <p>
-              Each dimension is scored 0-100 independently. A dimension returns
-              0 when its primary signal is completely absent.
+              {t('about.scoring.dimensionsBody') as string}
             </p>
 
             {/* Delivery */}
-            <SubHeading>Delivery — shipping meaningful changes</SubHeading>
+            <SubHeading>{t('about.scoring.deliveryHeading') as string}</SubHeading>
             <Table
-              headers={["Signal", "Weight", "Rationale"]}
-              rows={[
-                [
-                  "PR Weight",
-                  "70%",
-                  "Merged PRs weighted by file count and line changes are the strongest signal of meaningful code shipped",
-                ],
-                [
-                  "Issues Closed",
-                  "20%",
-                  "Resolving issues shows end-to-end ownership from problem to solution",
-                ],
-                [
-                  "Commits",
-                  "10%",
-                  "Raw commit count is the weakest signal — easy to inflate, so it gets the lowest weight",
-                ],
-              ]}
+              headers={t('about.scoring.deliveryTableHeaders') as string[]}
+              rows={t('about.scoring.deliveryTableRows') as unknown as string[][]}
             />
             <p>
-              PR weight is not a simple count. Each merged PR is weighted by its
-              size and complexity, capped at 3.0 per PR to prevent a single
-              massive PR from dominating. A size multiplier scales the weight
-              from 0 to 1 as total changes (files + additions + deletions) grow
-              from 0 to 10, so trivial or empty PRs contribute zero weight while
-              normal PRs are unaffected.
+              {t('about.scoring.deliveryPrWeightNote1') as string}
             </p>
             <p>
-              Delivery also includes a{" "}
+              {t('about.scoring.deliveryPrWeightNote2') as string}
               <strong className="text-text-primary">
-                flow efficiency modifier
-              </strong>{" "}
-              (±5%) based on median PR lead time — how quickly your PRs go from
-              creation to merge. Fast turnaround (≤4 hours) earns a 5% boost;
-              slow flow (&gt;7 days) applies a 5% penalty. This aligns with the
-              DORA &quot;lead time for changes&quot; metric.
+                {t('about.scoring.deliveryFlowHighlight') as string}
+              </strong>
+              {t('about.scoring.deliveryFlowSuffix') as string}
             </p>
 
             {/* Quality */}
             <SubHeading>
-              Quality — engineering discipline
+              {t('about.scoring.qualityHeading') as string}
             </SubHeading>
             <p>
-              Quality is measured differently depending on your profile type.
-              Collaborative developers (those who actively review others&apos;
-              code) are scored on review behavior. Solo developers — those with
-              a review-to-PR ratio below 15% — are scored on engineering
-              discipline signals visible in their PR workflow.
+              {t('about.scoring.qualityIntro') as string}
             </p>
-            <SubHeading>Collaborative Quality</SubHeading>
+            <SubHeading>{t('about.scoring.collaborativeQualityHeading') as string}</SubHeading>
             <Table
-              headers={["Signal", "Weight", "Rationale"]}
-              rows={[
-                [
-                  "Reviews Submitted",
-                  "60%",
-                  "The core signal — how much time you spend reviewing others' code",
-                ],
-                [
-                  "Review-to-PR Ratio",
-                  "25%",
-                  "A high ratio means you review more than you ship, signaling a quality-focused role. Capped at 5:1",
-                ],
-                [
-                  "Batch Size Score",
-                  "15%",
-                  "Fraction of PRs in the reviewable sweet spot (20-500 lines). Rewards small, focused changes; penalizes both micro and oversized PRs",
-                ],
-              ]}
+              headers={t('about.scoring.collaborativeQualityTableHeaders') as string[]}
+              rows={t('about.scoring.collaborativeQualityTableRows') as unknown as string[][]}
             />
-            <SubHeading>Solo Quality</SubHeading>
+            <SubHeading>{t('about.scoring.soloQualityHeading') as string}</SubHeading>
             <Table
-              headers={["Signal", "Weight", "Rationale"]}
-              rows={[
-                [
-                  "PR Description Rate",
-                  "40%",
-                  "Percentage of merged PRs with a non-empty description — the strongest solo discipline signal",
-                ],
-                [
-                  "Feature Branch Rate",
-                  "25%",
-                  "Percentage of PRs from a feature branch (not main/master/develop) — shows structured development workflow",
-                ],
-                [
-                  "Issue Linkage Rate",
-                  "20%",
-                  "Percentage of PRs that close at least one issue — connects code to tracked work",
-                ],
-                [
-                  "Batch Size Score",
-                  "15%",
-                  "Fraction of PRs in the reviewable sweet spot (20-500 lines). Rewards small, focused changes",
-                ],
-              ]}
+              headers={t('about.scoring.soloQualityTableHeaders') as string[]}
+              rows={t('about.scoring.soloQualityTableRows') as unknown as string[][]}
             />
             <p>
-              Solo developers are never penalized for working alone. Instead of
-              skipping Quality entirely, Chapa evaluates the engineering habits
-              visible in their PR workflow. All core dimensions are always scored
-              for every developer.
+              {t('about.scoring.soloQualityNote') as string}
             </p>
 
             {/* Consistency */}
             <SubHeading>
-              Consistency — reliable, sustained contributions
+              {t('about.scoring.consistencyHeading') as string}
             </SubHeading>
             <Table
-              headers={["Signal", "Weight", "Rationale"]}
-              rows={[
-                [
-                  "Active Days (sqrt curve)",
-                  "45%",
-                  "Square root of activeDays/365 — rewards getting started while still valuing sustained contribution. 120 active days scores ~57% (vs 33% with linear)",
-                ],
-                [
-                  "Heatmap Evenness",
-                  "40%",
-                  "Measures how evenly activity is distributed across weeks. A steady rhythm scores higher than concentrated bursts",
-                ],
-                [
-                  "Week Coverage",
-                  "15%",
-                  "Fraction of weeks with at least one contribution — captures sustainable cadence, how regularly you show up",
-                ],
-              ]}
+              headers={t('about.scoring.consistencyTableHeaders') as string[]}
+              rows={t('about.scoring.consistencyTableRows') as unknown as string[][]}
             />
             <p>
-              The active days signal uses a{" "}
+              {t('about.scoring.consistencyNote1Prefix') as string}
               <strong className="text-text-primary">
-                square root curve
-              </strong>{" "}
-              instead of a linear ratio. This makes it easier to build early
-              momentum — 50 active days scores 37% instead of 14% — while
-              preserving the full range for dedicated daily contributors.
-              Heatmap evenness uses the inverted coefficient of variation across
-              weekly totals, with outlier weeks clipped at 3&times; the median
-              to prevent a single ultra-productive week from dominating the
-              variance. Week coverage measures what fraction of weeks had any
-              activity at all — rewarding developers who show up consistently
-              regardless of daily output volume.
+                {t('about.scoring.consistencyNote1Highlight') as string}
+              </strong>
+              {t('about.scoring.consistencyNote1Suffix') as string}
             </p>
 
             {/* Breadth */}
-            <SubHeading>Breadth — cross-project influence</SubHeading>
+            <SubHeading>{t('about.scoring.breadthHeading') as string}</SubHeading>
             <Table
-              headers={["Signal", "Weight", "Rationale"]}
-              rows={[
-                [
-                  "Repos Contributed",
-                  "40%",
-                  "How many repos you contributed 3+ commits to. Single-commit drive-by contributions are excluded to ensure depth",
-                ],
-                [
-                  "Inverse Top-repo Share",
-                  "25%",
-                  "Rewards diverse contribution across repos rather than concentration in one. If 95% of your work is in one repo, this approaches 0",
-                ],
-                [
-                  "Docs-only PR Ratio",
-                  "15%",
-                  "Documentation contributions show breadth of involvement beyond code — something every developer can control",
-                ],
-                [
-                  "Stars",
-                  "10%",
-                  "Broadest community recognition signal, but weighted lower because it is outside your direct control",
-                ],
-                [
-                  "Forks",
-                  "5%",
-                  "Deeper engagement than stars — someone intends to build on your work. Narrower and noisier signal",
-                ],
-              ]}
+              headers={t('about.scoring.breadthTableHeaders') as string[]}
+              rows={t('about.scoring.breadthTableRows') as unknown as string[][]}
             />
             <p>
-              Breadth prioritizes signals you can directly control — repo
-              diversity (40%), contribution spread (25%), and documentation
-              (15%) — over community signals like stars and forks that depend on
-              external recognition. Watchers have been dropped entirely as the
-              weakest and most passive indicator.
+              {t('about.scoring.breadthNote') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* Craft dimension                                             */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Craft — AI tool mastery (optional)</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionCraft') as string}</SectionHeading>
             <p>
-              Craft is an optional fifth dimension that measures how effectively
-              you use AI coding tools like Claude Code. It appears on your badge
-              as a pentagon axis when you upload an insights report.
+              {t('about.scoring.craftIntro') as string}
             </p>
-            <SubHeading>How to unlock Craft</SubHeading>
+            <SubHeading>{t('about.scoring.craftHowToHeading') as string}</SubHeading>
             <p>
-              In Claude Code, run <code className="bg-card px-1.5 py-0.5 rounded text-sm font-heading">/insights</code> to
-              generate your insights report. Then upload it to Chapa from the
-              user menu. Claude Code updates your insights every two weeks, so
-              you can re-upload on that cadence to keep your Craft score fresh.
+              {t('about.scoring.craftHowToBody') as string}<code className="bg-card px-1.5 py-0.5 rounded text-sm font-heading">{t('about.scoring.craftHowToCode') as string}</code>{t('about.scoring.craftHowToBodySuffix') as string}
             </p>
-            <SubHeading>What Craft measures</SubHeading>
+            <SubHeading>{t('about.scoring.craftWhatHeading') as string}</SubHeading>
             <p>
-              Craft is the average of three sub-dimensions, each scored 0 to 100:
+              {t('about.scoring.craftWhatIntro') as string}
             </p>
             <Table
-              headers={["Sub-dimension", "What it measures", "Key signals"]}
-              rows={[
-                [
-                  "Proficiency",
-                  "Tool mastery & feature adoption",
-                  "Tool diversity, agent usage, multi-clauding, session type diversity, engagement depth",
-                ],
-                [
-                  "Effectiveness",
-                  "Outcome quality",
-                  "Achievement rate (55%), satisfaction rate (45%)",
-                ],
-                [
-                  "Sophistication",
-                  "Workflow complexity",
-                  "Complex session rate, lines per session, multi-clauding intensity, files per session",
-                ],
-              ]}
+              headers={t('about.scoring.craftTableHeaders') as string[]}
+              rows={t('about.scoring.craftTableRows') as unknown as string[][]}
             />
             <p>
-              Friction events (wrong approach, buggy code) and tool errors are
-              excluded from scoring. These reflect the AI tool&apos;s behavior, not
-              your skill as a developer. Only your outcomes and satisfaction
-              count.
+              {t('about.scoring.craftFrictionNote1') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* Archetypes                                                  */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Developer archetypes</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionArchetypes') as string}</SectionHeading>
             <p>
-              Your archetype is derived from the shape of your dimension
-              profile. It tells you what kind of developer you are, not how good
-              you are.
+              {t('about.scoring.archetypesIntro') as string}
             </p>
             <Table
-              headers={["Archetype", "Rule", "What it means"]}
-              rows={[
-                [
-                  "Emerging",
-                  "Average < 25 OR no dimension >= 40",
-                  "Getting started or light activity period",
-                ],
-                [
-                  "Balanced",
-                  "All dimensions within 20 pts AND avg >= 50",
-                  "Well-rounded contributor across all areas",
-                ],
-                [
-                  "Artificer",
-                  "Craft is highest AND >= 60",
-                  "Master of AI tool collaboration — amplifies output while maintaining quality",
-                ],
-                [
-                  "Polymath",
-                  "Breadth is highest AND >= 60",
-                  "Cross-project influence is your strongest suit",
-                ],
-                [
-                  "Quality Champion",
-                  "Quality is highest AND >= 60",
-                  "Your strongest trait is engineering discipline — through reviews (collaborative) or PR hygiene (solo)",
-                ],
-                [
-                  "Marathoner",
-                  "Consistency is highest AND >= 60",
-                  "Your most notable trait is sustained, reliable contribution",
-                ],
-                [
-                  "Builder",
-                  "Delivery is highest AND >= 60",
-                  "You ship a high volume of meaningful code changes",
-                ],
-              ]}
+              headers={t('about.scoring.archetypesTableHeaders') as string[]}
+              rows={t('about.scoring.archetypesTableRows') as unknown as string[][]}
             />
             <p>
-              Tie-breaking priority: Polymath &gt; Quality Champion &gt; Marathoner &gt;
-              Builder &gt; Artificer. If no specific archetype matches (highest
-              dimension &lt; 60 and not Balanced), the fallback is Emerging.
+              {t('about.scoring.archetypesTieBreaking') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* Composite score and tiers                                   */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Composite score and tiers</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionComposite') as string}</SectionHeading>
             <p>
-              The composite score is the average of all active dimensions,
-              rounded to an integer. For collaborative developers, all 4 (or 5
-              with Craft) dimensions are included. For solo developers, Quality
-              is excluded from the composite — only Delivery, Consistency,
-              Breadth, and optional Craft are averaged. The score then passes
-              through recency weighting and confidence adjustment:
+              {t('about.scoring.compositeIntro') as string}
             </p>
             <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary space-y-1">
-              <p>recencyWeighted = composite × recencyMultiplier</p>
+              <p>{t('about.scoring.compositeFormula1') as string}</p>
               <p>
-                adjustedScore = recencyWeighted × (0.85 + 0.15 × confidence /
-                100)
+                {t('about.scoring.compositeFormula2') as string}
               </p>
             </div>
             <p>
-              The recency multiplier ranges from 0.98x (all activity is old) to
-              1.06x (all activity is recent), with proportional activity (25% in
-              the last 90 days) being neutral at 1.0x. This cushions the impact
-              of old contributions dropping out of the rolling window.
+              {t('about.scoring.compositeRecencyNote') as string}
             </p>
             <p>
-              At full confidence (100), there is no confidence reduction. At
-              minimum confidence (50), the reduction is only 7.5% — deliberate
-              and gentle.
+              {t('about.scoring.compositeConfidenceNote') as string}
             </p>
             <Table
-              headers={["Tier", "Score Range", "Description"]}
-              rows={[
-                [
-                  "Emerging",
-                  "0 – 29",
-                  "Getting started or light activity period",
-                ],
-                [
-                  "Solid",
-                  "30 – 69",
-                  "Active hobbyists through consistent contributors",
-                ],
-                [
-                  "High",
-                  "70 – 84",
-                  "Strong impact across multiple dimensions",
-                ],
-                [
-                  "Elite",
-                  "85 – 100",
-                  "Exceptional breadth and depth of contribution",
-                ],
-              ]}
+              headers={t('about.scoring.tiersTableHeaders') as string[]}
+              rows={t('about.scoring.tiersTableRows') as unknown as string[][]}
             />
 
             {/* ---------------------------------------------------------- */}
             {/* Confidence system                                           */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Confidence system</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionConfidence') as string}</SectionHeading>
             <p>
-              Confidence (50-100) measures{" "}
-              <strong className="text-text-primary">signal clarity</strong>, not
-              morality. A low confidence score never accuses wrongdoing — it
-              simply means the data patterns make it harder to assess impact
-              precisely.
+              {t('about.scoring.confidenceIntro1Prefix') as string}
+              <strong className="text-text-primary">{t('about.scoring.confidenceIntro1Highlight') as string}</strong>
+              {t('about.scoring.confidenceIntro1Suffix') as string}
             </p>
             <p>
-              Confidence starts at 100 and can be reduced by detected patterns:
+              {t('about.scoring.confidenceIntro2') as string}
             </p>
             <Table
-              headers={["Pattern", "Penalty", "Trigger", "What it means"]}
-              rows={[
-                [
-                  "Burst activity",
-                  "-15",
-                  "100+ contributions in a single day",
-                  "Extreme daily spikes reduce timing confidence",
-                ],
-                [
-                  "Micro-commits",
-                  "-10",
-                  "60%+ of commits are very small",
-                  "Many tiny changes reduce signal clarity",
-                ],
-                [
-                  "Generated changes",
-                  "-15",
-                  "20,000+ lines changed AND fewer than 3 reviews",
-                  "Large volume with limited review suggests possible automation",
-                ],
-                [
-                  "Low collaboration",
-                  "-10",
-                  "10+ PRs merged AND 1 or fewer reviews given",
-                  "Significant output without peer interaction",
-                ],
-                [
-                  "Single repo focus",
-                  "-5",
-                  "95%+ of activity in one repo AND only 1 repo",
-                  "Less cross-project signal (not bad, just less diverse data)",
-                ],
-                [
-                  "Supplemental data",
-                  "-5",
-                  "Includes merged EMU account data",
-                  "Data from a linked account that cannot be independently verified",
-                ],
-                [
-                  "Low activity signal",
-                  "-10",
-                  "Fewer than 30 active days OR fewer than 50 commits",
-                  "Very limited activity reduces the signal available for scoring",
-                ],
-                [
-                  "Review volume imbalance",
-                  "-10",
-                  "50+ reviews submitted AND fewer than 3 PRs merged",
-                  "High review volume with very few merged changes reduces confidence in the activity mix",
-                ],
-              ]}
+              headers={t('about.scoring.confidenceTableHeaders') as string[]}
+              rows={t('about.scoring.confidenceTableRows') as unknown as string[][]}
             />
             <p>
-              The confidence floor is{" "}
-              <strong className="text-text-primary">50</strong>. No combination
-              of penalties can push confidence below 50. All messaging is
-              non-accusatory — we describe patterns, not intent.
+              {t('about.scoring.confidenceFloor1Prefix') as string}
+              <strong className="text-text-primary">{t('about.scoring.confidenceFloor1Highlight') as string}</strong>
+              {t('about.scoring.confidenceFloor1Suffix') as string}
             </p>
             <p>
-              Review volume imbalance and low collaboration are{" "}
-              <strong className="text-text-primary">mutually exclusive</strong>
-              {" "} — only one can apply at a time, so the maximum of 7
-              simultaneous penalties cannot be exceeded.
+              {t('about.scoring.confidenceMutuallyExclusivePrefix') as string}
+              <strong className="text-text-primary">{t('about.scoring.confidenceMutuallyExclusiveHighlight') as string}</strong>
+              {t('about.scoring.confidenceMutuallyExclusiveSuffix') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* Score smoothing                                             */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>Score smoothing</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionSmoothing') as string}</SectionHeading>
             <p>
-              Your displayed score uses an{" "}
+              {t('about.scoring.smoothingIntro1Prefix') as string}
               <strong className="text-text-primary">
-                exponential moving average (EMA)
-              </strong>{" "}
-              to prevent jarring day-to-day swings. Instead of recalculating
-              from scratch each time, the displayed score blends 15% of the
-              newly computed score with 85% of the previous day&apos;s smoothed
-              score.
+                {t('about.scoring.smoothingIntro1Highlight') as string}
+              </strong>
+              {t('about.scoring.smoothingIntro1Suffix') as string}
             </p>
             <div className="my-4 rounded-lg border border-stroke bg-card p-4 font-heading text-sm text-text-primary">
-              displayed = 0.15 × current + 0.85 × previous
+              {t('about.scoring.smoothingFormula') as string}
             </div>
             <p>
-              This means a sudden 10-point raw drop manifests as roughly -1.5
-              per day, reaching the new level over about 4 days. On your first
-              visit (no previous score), the raw score passes through with no
-              smoothing.
+              {t('about.scoring.smoothingNote') as string}
             </p>
 
             {/* ---------------------------------------------------------- */}
             {/* What we don't use                                           */}
             {/* ---------------------------------------------------------- */}
-            <SectionHeading>What we deliberately exclude</SectionHeading>
+            <SectionHeading>{t('about.scoring.sectionExcludes') as string}</SectionHeading>
             <p>
-              Some signals are intentionally left out of scoring:
+              {t('about.scoring.excludesIntro') as string}
             </p>
             <ul className="list-disc pl-6 space-y-1">
               <li>
-                <strong className="text-text-primary">Followers</strong> — a
-                social metric with no correlation to engineering output
+                <strong className="text-text-primary">{t('about.scoring.excludeFollowers') as string}</strong>
+                {t('about.scoring.excludeFollowersSuffix') as string}
               </li>
               <li>
-                <strong className="text-text-primary">Lines of code</strong> —
-                easily gamed; used only for confidence heuristics, never for
-                dimension scoring
+                <strong className="text-text-primary">{t('about.scoring.excludeLOC') as string}</strong>
+                {t('about.scoring.excludeLOCSuffix') as string}
               </li>
               <li>
                 <strong className="text-text-primary">
-                  Private repo names
-                </strong>{" "}
-                — we track repo count, not identities. Your private repos are
-                never exposed
+                  {t('about.scoring.excludePrivate') as string}
+                </strong>
+                {t('about.scoring.excludePrivateSuffix') as string}
               </li>
             </ul>
 
@@ -725,12 +407,10 @@ export default function ScoringMethodologyPage() {
             {/* ---------------------------------------------------------- */}
             <div className="mt-16 rounded-xl border border-stroke bg-card p-6 sm:p-8">
               <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight mb-3">
-                Help us improve this
+                {t('about.scoring.ctaHeading') as string}
               </h2>
               <p className="mb-4">
-                We believe scoring methodology should be a conversation, not a
-                black box. If you have ideas on how to make this fairer, more
-                accurate, or more transparent — we want to hear from you.
+                {t('about.scoring.ctaBody') as string}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <a
@@ -739,13 +419,13 @@ export default function ScoringMethodologyPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-lg bg-amber px-6 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all"
                 >
-                  Reach out on Twitter (@juang294)
+                  {t('about.scoring.ctaTwitter') as string}
                 </a>
                 <a
                   href="mailto:support@chapa.thecreativetoken.com"
                   className="inline-flex items-center justify-center rounded-lg border border-stroke px-6 py-3 text-sm font-medium text-text-secondary hover:border-amber/20 hover:text-text-primary transition-all"
                 >
-                  Email support@chapa.thecreativetoken.com
+                  {t('about.scoring.ctaEmail') as string}
                 </a>
               </div>
             </div>

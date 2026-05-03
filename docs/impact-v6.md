@@ -123,7 +123,7 @@ computeImpactV6(stats, craftScore?)
   ├→ Optional 5th craft dimension
   ├→ compositeScore = avg(active dimensions)
   ├→ Recency weighting (0.98x to 1.06x)
-  ├→ Confidence (50-100, 8 penalty flags)
+  ├→ Confidence (50-100, 9 flag entries: 8 scored + 1 informational at 0 penalty)
   ├→ adjustedComposite = composite × (0.85 + 0.15 × confidence/100)
   ├→ Archetype derivation (7 types)
   └→ Tier classification (Emerging/Solid/High/Elite)

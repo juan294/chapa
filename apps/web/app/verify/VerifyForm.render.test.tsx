@@ -15,44 +15,48 @@ afterEach(() => {
 });
 
 describe("VerifyForm", () => {
+  // useTranslation falls back to English without LanguageProvider in all tests
+
   // ─── Basic rendering ──────────────────────────────────────────────────
 
-  it("renders Spanish verification hash label and input with placeholder", () => {
+  it("renders verification hash label and input with placeholder", () => {
     render(<VerifyForm />);
-    expect(screen.getByLabelText("Hash de verificación")).toBeDefined();
+    // English: verifyForm.label = 'Verification hash'
+    expect(screen.getByLabelText("Verification hash")).toBeDefined();
     expect(
       screen.getByPlaceholderText("a1b2c3d4e5f6a7b8"),
     ).toBeDefined();
   });
 
-  it("renders a submit button with Spanish text", () => {
+  it("renders a submit button", () => {
     render(<VerifyForm />);
-    expect(screen.getByRole("button", { name: /verificar/i })).toBeDefined();
+    // English: verifyForm.submit = 'Verify'
+    expect(screen.getByRole("button", { name: /verify/i })).toBeDefined();
   });
 
   // ─── Valid submission ─────────────────────────────────────────────────
 
   it("navigates to /verify/{hash} on valid 8-char hex submission", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4");
   });
 
   it("navigates to /verify/{hash} on valid 16-char hex submission", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4e5f6a7b8" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8");
   });
 
   it("navigates to /verify/{hash} on valid 32-char hex submission", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8");
   });
 
@@ -60,30 +64,31 @@ describe("VerifyForm", () => {
 
   it("shows error alert for input shorter than 8 chars", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "abc" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(screen.getByRole("alert")).toBeDefined();
+    // English: verifyForm.invalidHash
     expect(screen.getByRole("alert").textContent).toContain(
-      "Introduce un hash hexadecimal válido de 8, 16 o 32 caracteres",
+      "Enter a valid 8, 16, or 32-character hex hash",
     );
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("shows error alert for non-hex characters", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "zzzzzzzz" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(screen.getByRole("alert")).toBeDefined();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("shows error alert for 12-char hex (neither 8 nor 16)", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "a1b2c3d4e5f6" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(screen.getByRole("alert")).toBeDefined();
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -92,11 +97,11 @@ describe("VerifyForm", () => {
 
   it("clears error when input changes", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
 
     // Trigger an error first
     fireEvent.change(input, { target: { value: "bad" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(screen.getByRole("alert")).toBeDefined();
 
     // Change input — error should disappear
@@ -108,27 +113,27 @@ describe("VerifyForm", () => {
 
   it("trims whitespace before validation and navigation", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "  a1b2c3d4  " } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4");
   });
 
   it("lowercases input before validation and navigation", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, { target: { value: "A1B2C3D4" } });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4");
   });
 
   it("trims and lowercases combined", () => {
     render(<VerifyForm />);
-    const input = screen.getByLabelText("Hash de verificación");
+    const input = screen.getByLabelText("Verification hash");
     fireEvent.change(input, {
       target: { value: "  A1B2C3D4E5F6A7B8  " },
     });
-    fireEvent.submit(screen.getByRole("button", { name: /verificar/i }));
+    fireEvent.submit(screen.getByRole("button", { name: /verify/i }));
     expect(mockPush).toHaveBeenCalledWith("/verify/a1b2c3d4e5f6a7b8");
   });
 });

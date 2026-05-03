@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "@/lib/i18n";
 
 interface InfoTooltipProps {
   content: string;
@@ -16,6 +17,7 @@ export function InfoTooltip({
   position = "top",
   className,
 }: InfoTooltipProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
@@ -105,7 +107,7 @@ export function InfoTooltip({
       <button
         ref={buttonRef}
         type="button"
-        aria-label="More info"
+        aria-label={t('aria.moreInfo') as string}
         aria-describedby={id}
         onClick={() => setOpen((prev) => !prev)}
         onFocus={() => setHovered(true)}

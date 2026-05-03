@@ -39,6 +39,7 @@ Every push to `develop` creates a Vercel preview deployment automatically.
 | **Share page** | Visit `/u/<handle>` → badge preview, breakdown, and embed snippet visible |
 | **Health endpoint** | `curl <preview-url>/api/health` → `{"status":"ok","dependencies":{"redis":"ok","supabase":"ok","github":"ok|skipped"}}` |
 | **Verification** | Click verify link on share page → `/verify/:hash` renders correctly |
+| **Language switcher** | Click the globe icon in the nav bar → switch from ES to EN and back → confirm page re-renders in the selected locale with no untranslated strings |
 
 For production, confirm `CHAPA_ALERT_WEBHOOK_URL` is configured before release. It receives `health_degraded`, `badge_5xx`, `oauth_callback_failure`, and `cron_failure` alerts as documented in `docs/runbooks/incident-response.md`.
 

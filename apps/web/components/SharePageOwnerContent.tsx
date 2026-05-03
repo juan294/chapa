@@ -8,7 +8,7 @@ import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+import { useTranslation } from "@/lib/i18n";
 
 /**
  * Client-side component that renders public share-page sections plus owner-only
@@ -21,12 +21,11 @@ import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
  * Sections rendered:
  * - Public: DataSources, ImpactDashboard, Embed Snippets
  * - Owner-only: OAuth-backed cache warm
- * - Visitor: Spanish public acquisition CTA
+ * - Visitor: i18n-aware acquisition CTA
  */
 
-const SHARE_VISITOR_COPY = SPANISH_PUBLIC_COPY.shareVisitor;
-
 function EmptyImpactState({ handle }: { handle: string }) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   async function handleRegenerate() {
@@ -50,7 +49,7 @@ function EmptyImpactState({ handle }: { handle: string }) {
     <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
       <div className="rounded-2xl border border-stroke bg-card p-8 space-y-4">
         <p className="text-text-secondary text-sm">
-          No se pudieron cargar los datos de impacto. Intentalo de nuevo mas tarde.
+          {t('shareOwner.emptyState') as string}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -58,18 +57,23 @@ function EmptyImpactState({ handle }: { handle: string }) {
             onClick={handleRegenerate}
             disabled={status === "loading" || status === "success"}
             aria-busy={status === "loading"}
+            aria-label={status === "loading" ? (t('shareOwner.ariaBusy') as string) : undefined}
             className="inline-flex items-center gap-2 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white transition-all motion-reduce:transition-none hover:bg-amber-light disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {status === "loading" ? "Regenerando..." : status === "success" ? "Listo" : "Regenerar"}
+            {status === "loading"
+              ? t('shareOwner.regenerating') as string
+              : status === "success"
+                ? t('shareOwner.ready') as string
+                : t('shareOwner.regenerate') as string}
           </button>
           {status === "error" && (
             <p className="text-terminal-red text-xs">
-              La regeneracion fallo.{" "}
+              {t('shareOwner.regenerateError') as string}{" "}
               <a
                 href={`mailto:support@thecreativetoken.com?subject=Badge%20data%20issue%20for%20%40${encodeURIComponent(handle)}`}
                 className="underline hover:text-terminal-red/80 transition-colors motion-reduce:transition-none"
               >
-                Contactar soporte
+                {t('shareOwner.contactSupport') as string}
               </a>
             </p>
           )}
@@ -90,6 +94,7 @@ export function SharePageOwnerContent({
   stats,
   impact,
 }: SharePageOwnerContentProps) {
+  const { t } = useTranslation();
   const { session, loading } = useSession();
   const isOwner = !loading && session?.login === handle;
   const isVisitor = !loading && !isOwner;
@@ -98,8 +103,10 @@ export function SharePageOwnerContent({
   useOwnerCacheWarm(handle, isOwner);
 
   const badgeUrl = `https://chapa.thecreativetoken.com/u/${handle}/badge.svg`;
-  const embedMarkdown = `![Insignia Chapa](${badgeUrl})`;
-  const embedHtml = `<img src="${badgeUrl}" alt="Insignia Chapa de ${handle}" width="600" height="315" />`;
+  const badgeAlt = t('shareOwner.badgeAlt') as string;
+  const badgeAltOf = t('shareOwner.badgeAltOf') as string;
+  const embedMarkdown = `![${badgeAlt}](${badgeUrl})`;
+  const embedHtml = `<img src="${badgeUrl}" alt="${badgeAltOf} ${handle}" width="600" height="315" />`;
 
   return (
     <>
@@ -113,7 +120,7 @@ export function SharePageOwnerContent({
       )}
 
       <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-8 animate-fade-in-up motion-reduce:animate-none [animation-delay:280ms]">
-        Desglose de impacto
+        {t('shareOwner.impactBreakdown') as string}
       </h2>
 
       {/* Impact Dashboard */}
@@ -128,7 +135,7 @@ export function SharePageOwnerContent({
       {/* Embed Snippets */}
       <section className="space-y-6 animate-fade-in-up motion-reduce:animate-none [animation-delay:500ms]">
         <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary">
-          Incrustar esta insignia
+          {t('shareOwner.embedBadge') as string}
         </h2>
 
         {/* Markdown snippet */}
@@ -146,7 +153,7 @@ export function SharePageOwnerContent({
           </div>
           <div className="p-4 font-heading text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <p className="text-text-primary/80 whitespace-nowrap">
-              <span className="text-amber">{"![Insignia Chapa]("}</span>
+              <span className="text-amber">{`![${badgeAlt}](`}</span>
               <span className="text-text-secondary">
                 {badgeUrl}
               </span>
@@ -174,7 +181,7 @@ export function SharePageOwnerContent({
               <span className="text-text-secondary">{"src="}</span>
               <span className="text-amber/70">{`"${badgeUrl}"`}</span>
               <span className="text-text-secondary">{" alt="}</span>
-              <span className="text-amber/70">{`"Insignia Chapa de ${handle}"`}</span>
+              <span className="text-amber/70">{`"${badgeAltOf} ${handle}"`}</span>
               <span className="text-text-secondary">{" width="}</span>
               <span className="text-amber/70">{'"600"'}</span>
               <span className="text-text-secondary">{" height="}</span>
@@ -189,16 +196,16 @@ export function SharePageOwnerContent({
         <section className="mt-10 animate-fade-in-up motion-reduce:animate-none [animation-delay:560ms]">
           <div className="rounded-2xl border border-stroke bg-card p-6 sm:p-8 text-center">
             <h2 className="font-heading text-lg sm:text-xl font-bold text-text-primary tracking-tight mb-2 text-balance">
-              {SHARE_VISITOR_COPY.title}
+              {t('shareVisitor.title') as string}
             </h2>
             <p className="text-sm text-text-secondary leading-relaxed mb-6 max-w-md mx-auto text-pretty">
-              {SHARE_VISITOR_COPY.description}
+              {t('shareVisitor.description') as string}
             </p>
             <Link
               href="/"
               className="inline-flex items-center gap-2 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25 transition-all motion-reduce:transition-none"
             >
-              {SHARE_VISITOR_COPY.cta}
+              {t('shareVisitor.cta') as string}
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>

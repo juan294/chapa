@@ -3,6 +3,13 @@ import type { ImpactV6Result } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { generateInsights } from "./generate-insights";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+
+/** English translation function for tests */
+function tEn(key: string): string | string[] | Record<string, unknown>[] {
+  return resolveTranslation(key, en) as string | string[] | Record<string, unknown>[];
+}
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -71,7 +78,7 @@ const mockDiff: SnapshotDiff = {
 
 describe("generateInsights", () => {
   it("returns archetype context insight for any impact data", () => {
-    const insights = generateInsights(mockImpact, null, null);
+    const insights = generateInsights(mockImpact, null, null, tEn);
     const archetype = insights.find((i) => i.id === "tip-archetype");
     expect(archetype).toBeDefined();
     expect(archetype!.type).toBe("tip");
@@ -84,7 +91,7 @@ describe("generateInsights", () => {
 
   it("returns next-tier insight with correct gap calculation", () => {
     // Solid tier, adjustedComposite=53, next threshold=70 (High), gap=17
-    const insights = generateInsights(mockImpact, null, null);
+    const insights = generateInsights(mockImpact, null, null, tEn);
     const nextTier = insights.find((i) => i.id === "next-tier");
     expect(nextTier).toBeDefined();
     expect(nextTier!.type).toBe("next-tier");
@@ -95,7 +102,7 @@ describe("generateInsights", () => {
 
   it("returns weakest dimension tip (skips Balanced/Emerging)", () => {
     // Weakest dimension is breadth (50)
-    const insights = generateInsights(mockImpact, null, null);
+    const insights = generateInsights(mockImpact, null, null, tEn);
     const tip = insights.find((i) => i.id === "tip-breadth");
     expect(tip).toBeDefined();
     expect(tip!.type).toBe("tip");
@@ -106,13 +113,13 @@ describe("generateInsights", () => {
 
     // Verify it is skipped for Balanced
     const balancedImpact = { ...mockImpact, archetype: "Balanced" as const };
-    const balancedInsights = generateInsights(balancedImpact, null, null);
+    const balancedInsights = generateInsights(balancedImpact, null, null, tEn);
     const balancedTip = balancedInsights.find((i) => i.type === "tip" && i.dimension !== undefined);
     expect(balancedTip).toBeUndefined();
 
     // Verify it is skipped for Emerging
     const emergingImpact = { ...mockImpact, archetype: "Emerging" as const };
-    const emergingInsights = generateInsights(emergingImpact, null, null);
+    const emergingInsights = generateInsights(emergingImpact, null, null, tEn);
     const emergingTip = emergingInsights.find(
       (i) => i.type === "tip" && i.dimension !== undefined,
     );
@@ -120,7 +127,7 @@ describe("generateInsights", () => {
   });
 
   it("returns trend-based insight when direction is improving", () => {
-    const insights = generateInsights(mockImpact, mockTrendSummary, null);
+    const insights = generateInsights(mockImpact, mockTrendSummary, null, tEn);
     const trend = insights.find((i) => i.id === "trend-overall");
     expect(trend).toBeDefined();
     expect(trend!.type).toBe("trend");
@@ -142,7 +149,7 @@ describe("generateInsights", () => {
         breadth: { avgDelta: -3.0, values: [{ date: "2026-02-21", value: 49 }] },
       },
     };
-    const insights = generateInsights(mockImpact, decliningTrend, null);
+    const insights = generateInsights(mockImpact, decliningTrend, null, tEn);
     const trend = insights.find((i) => i.id === "trend-overall");
     expect(trend).toBeDefined();
     expect(trend!.icon).toBe("trending-down");
@@ -158,20 +165,20 @@ describe("generateInsights", () => {
       direction: "stable",
       avgDelta: 0.2,
     };
-    const insights = generateInsights(mockImpact, stableTrend, null);
+    const insights = generateInsights(mockImpact, stableTrend, null, tEn);
     const trend = insights.find((i) => i.id === "trend-overall");
     expect(trend).toBeUndefined();
   });
 
   it("returns dimension improvement insight when diff dimension > 5", () => {
     // delivery delta = 8 (> 5), others are <= 5
-    const insights = generateInsights(mockImpact, null, mockDiff);
+    const insights = generateInsights(mockImpact, null, mockDiff, tEn);
     const dimImprovement = insights.find((i) => i.id === "trend-delivery");
     expect(dimImprovement).toBeDefined();
     expect(dimImprovement!.type).toBe("trend");
     expect(dimImprovement!.icon).toBe("trending-up");
     expect(dimImprovement!.headline).toBe("Delivery improved by +8");
-    expect(dimImprovement!.body).toContain("delivery score jumped significantly");
+    expect(dimImprovement!.body).toContain("Delivery score jumped significantly");
     expect(dimImprovement!.dimension).toBe("delivery");
   });
 
@@ -180,7 +187,7 @@ describe("generateInsights", () => {
       ...mockDiff,
       tier: { from: "Solid", to: "High" },
     };
-    const insights = generateInsights(mockImpact, null, tierUpDiff);
+    const insights = generateInsights(mockImpact, null, tierUpDiff, tEn);
     const achievement = insights.find((i) => i.id === "achievement-tier");
     expect(achievement).toBeDefined();
     expect(achievement!.type).toBe("achievement");
@@ -194,7 +201,7 @@ describe("generateInsights", () => {
       ...mockDiff,
       tier: { from: "High", to: "Solid" },
     };
-    const downInsights = generateInsights(mockImpact, null, tierDownDiff);
+    const downInsights = generateInsights(mockImpact, null, tierDownDiff, tEn);
     const downAchievement = downInsights.find((i) => i.id === "achievement-tier");
     expect(downAchievement).toBeDefined();
     expect(downAchievement!.headline).toBe("Your tier shifted to Solid");
@@ -208,7 +215,7 @@ describe("generateInsights", () => {
       tier: { from: "Emerging", to: "Solid" },
       dimensions: { delivery: 10, quality: 8, consistency: 7, breadth: 6 },
     };
-    const insights = generateInsights(mockImpact, mockTrendSummary, tierDiff);
+    const insights = generateInsights(mockImpact, mockTrendSummary, tierDiff, tEn);
     expect(insights.length).toBeLessThanOrEqual(5);
   });
 
@@ -217,7 +224,7 @@ describe("generateInsights", () => {
       ...mockDiff,
       tier: { from: "Emerging", to: "Solid" },
     };
-    const insights = generateInsights(mockImpact, mockTrendSummary, tierDiff);
+    const insights = generateInsights(mockImpact, mockTrendSummary, tierDiff, tEn);
     for (let i = 1; i < insights.length; i++) {
       expect(insights[i]!.priority).toBeGreaterThanOrEqual(insights[i - 1]!.priority);
     }
@@ -229,7 +236,7 @@ describe("generateInsights", () => {
       ...mockDiff,
       dimensions: { delivery: 2, quality: 1, consistency: 0, breadth: 8 },
     };
-    const insights = generateInsights(mockImpact, null, diffWithBreadthImprovement);
+    const insights = generateInsights(mockImpact, null, diffWithBreadthImprovement, tEn);
     const breadthInsights = insights.filter((i) => i.dimension === "breadth");
     // Should only have the improvement, not the tip
     expect(breadthInsights.length).toBe(1);
@@ -241,7 +248,7 @@ describe("generateInsights", () => {
       ...mockImpact,
       archetype: "Artificer",
     };
-    const insights = generateInsights(artificerImpact, null, null);
+    const insights = generateInsights(artificerImpact, null, null, tEn);
     const archetype = insights.find((i) => i.id === "tip-archetype");
     expect(archetype).toBeDefined();
     expect(archetype!.headline).toBe("You're a Artificer");
@@ -255,7 +262,7 @@ describe("generateInsights", () => {
       archetype: "Builder",
       dimensions: { delivery: 85, quality: 60, consistency: 70, breadth: 50, craft: 20 },
     };
-    const insights = generateInsights(craftImpact, null, null);
+    const insights = generateInsights(craftImpact, null, null, tEn);
     const craftTip = insights.find((i) => i.id === "tip-craft");
     expect(craftTip).toBeDefined();
     expect(craftTip!.dimension).toBe("craft");

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-05-03
+
+### Added
+- **Full i18n system** (#837): Chapa now supports English and Spanish across every public page. Includes structured locale dictionaries (`en.ts` / `es.ts`, 650+ keys each), cookie-based locale persistence (`chapa-locale`), `Accept-Language` header detection, `useTranslation()` client hook, `getServerT(locale)` server helper, `interpolate()` placeholder substitution, and `LangSync` / `LocaleSync` utilities
+- **`LanguageSwitcher` component**: Globe-icon dropdown in the navbar (between ThemeToggle and login CTA). Shows `ES | EN` pill — active locale highlighted in amber; choice persists across page loads
+- **Shared `ArchetypePage` component** (`app/archetypes/_components/ArchetypePage.tsx`): All 7 archetype guide pages consolidated into one locale-aware component, eliminating duplication
+- **Dictionary parity test** (`lib/i18n/dictionaries/parity.test.ts`): CI enforces identical key structure between `en.ts` and `es.ts`
+
+### Fixed
+- **`DEFAULT_LOCALE` set to `'es'`**: Server renders Spanish by default, matching the project language policy
+- **`resolveTranslation` sub-tree access**: Intermediate key paths now return the sub-tree rather than `undefined`
+- **Turbopack build**: Removed server-only exports (`server.ts`, `cookie.ts`) from the i18n barrel `index.ts` to fix Turbopack bundling errors
+- **E2E locale**: Playwright config updated with `locale: 'es-ES'` globally; copy-button and theme-toggle selectors updated for Spanish UI
+- **Feature-flag cache bust**: `PATCH /api/admin/feature-flags` now calls `revalidateTag('feature-flags')` after writes, reducing ISR stale window from ~5 min to seconds
+
+### Changed
+- **`SPANISH_PUBLIC_COPY` removed**: `lib/copy/public-flow.ts` deleted; all copy migrated to structured i18n dictionaries
+- **"Insignia" → "Chapa"**: All references to "insignia/insignias" in the Spanish dictionary replaced with "Chapa/Chapas" (brand name)
+- 338 new tests; total test count: 7,530 across 440 files
+
+## [2.9.1] - 2026-05-01
+
+### Fixed
+- **OAuth state comparison** (#835): Upstash auto-deserialises stored `"1"` as the number `1`; state comparison now coerces both sides to string before comparing, restoring OAuth login for affected users
+
+## [2.9.0] - 2026-05-01
+
+### Added
+- **Typed env getters**: Centralised `process.env` access with runtime type assertions (`lib/env.ts`)
+- **Structured JSON logger with request correlation** (#712): `withStructuredLogger()` wrapper emits `requestId`-correlated JSON logs for all API routes
+- **`withErrorCapture()` on all 44 API routes** (#707): Unified error capture wrapper replaces scattered try/catch; all errors flow to `lib/analytics/server-errors.ts`
+
+### Fixed
+- **ISR regression** (triage 2026-04-30): Pages with `force-dynamic` incorrectly fell through to stale ISR cache; routing corrected
+- **Five correctness fixes** (#726, #731, #766, #767, #768): One-line fixes across scoring edge cases and API response shapes
+- **Warm-cache observability** (#702, #750): Failures array included in warm-cache cron response; rotation logic deferred to avoid blocking the main pass
+- **CORS guard**: Added missing `Access-Control-Allow-Origin` headers on affected public API routes
+
+### Performance
+- **Share page TTFB** (#800): Profile lookups parallelised; avatar fetch deadline tightened — measured ~200 ms improvement on cold-start
+- **Cached SVG read-before-render** (#720): Share page reads a previously rendered SVG from Redis before triggering a re-render pass
+- **Bundle size**: `SharePageOwnerContent` and `PostHogInit` deferred from initial render bundle
+
 ## [2.8.0] - 2026-04-27
 
 ### Added
@@ -430,6 +473,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/juan294/chapa/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/juan294/chapa/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/juan294/chapa/compare/v2.7.2...v2.8.0
 [2.7.2]: https://github.com/juan294/chapa/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/juan294/chapa/compare/v2.7.0...v2.7.1

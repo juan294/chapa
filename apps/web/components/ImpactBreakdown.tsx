@@ -1,14 +1,9 @@
-import type { ImpactV6Result, DeveloperArchetype, StatsData, Platform, DimensionScores } from "@chapa/shared";
+"use client";
+
+import type { ImpactV6Result, StatsData, Platform, DimensionScores } from "@chapa/shared";
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
-
-const DIMENSION_LABELS: Record<string, string> = {
-  delivery: "Delivery",
-  quality: "Quality",
-  consistency: "Consistency",
-  breadth: "Breadth",
-  craft: "Craft",
-};
+import { useTranslation } from "@/lib/i18n";
 
 const DIMENSION_SUBTITLES: Record<string, string> = {
   delivery: "PRs merged \u00b7 issues closed \u00b7 commits",
@@ -104,6 +99,7 @@ interface DataSourcesProps {
 }
 
 export function DataSources({ stats, handle }: DataSourcesProps) {
+  const { t } = useTranslation();
   const platforms: Platform[] = [
     "github",
     ...(stats.linkedPlatforms?.filter((p): p is Platform => p !== "github") ?? []),
@@ -112,7 +108,7 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
   return (
     <div>
       <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up [animation-delay:260ms]">
-        Data Sources
+        {t('dashboard.dataSources') as string}
       </h3>
       <div className="flex flex-wrap gap-3">
         {platforms.map((platform, i) => {
@@ -168,44 +164,31 @@ export function DataSources({ stats, handle }: DataSourcesProps) {
   );
 }
 
-const ARCHETYPE_PROFILES: Record<DeveloperArchetype, string> = {
-  Builder:
-    "Your profile is driven by output \u2014 you turn ideas into merged pull requests and closed issues at a pace that keeps the roadmap moving. Delivery is clearly your dominant dimension, meaning you thrive when shipping features and moving codebases forward.",
-  "Quality Champion":
-    "Your profile is shaped by quality \u2014 you\u2019re the one reviewing pull requests, catching edge cases, and making sure nothing ships that shouldn\u2019t. Quality is your dominant dimension, and your team\u2019s code quality reflects it.",
-  Marathoner:
-    "Your profile is defined by consistency \u2014 you show up day after day with steady, sustained contributions that compound over time. Consistency is your dominant dimension, making you the reliable backbone of any team.",
-  Polymath:
-    "Your profile is marked by reach \u2014 you contribute across multiple repositories and technology areas, connecting the dots between projects. Breadth is your dominant dimension, giving you a uniquely wide perspective.",
-  Balanced:
-    "Your profile is impressively well-rounded \u2014 no single dimension dominates because you invest across delivery, reviewing, consistency, and breadth. This balance makes you versatile and adaptable to any team need.",
-  Emerging:
-    "Your profile is still taking shape \u2014 with more contributions over the coming months, your strongest dimensions will emerge and reveal your developer identity. Every commit, review, and repo you touch sharpens the picture.",
-  Artificer:
-    "Your profile is defined by craft \u2014 you leverage AI coding tools with exceptional skill and sophistication, turning them into force multipliers for your development workflow. Craft is your dominant dimension, showcasing mastery of modern AI-assisted development.",
-};
-
-const DIMENSION_TIPS: Record<string, string> = {
-  delivery: "To strengthen Delivery, focus on opening and merging more pull requests \u2014 even small, focused PRs that close open issues count significantly.",
-  quality: "To strengthen Quality, start reviewing teammates\u2019 pull requests more often \u2014 thoughtful code reviews are the fastest way to grow this dimension.",
-  consistency: "To strengthen Consistency, aim for regular contributions across more weeks \u2014 showing up consistently matters more than output volume on any given day.",
-  breadth: "To strengthen Breadth, contribute to repos outside your main project \u2014 opening issues, submitting PRs, or reviewing code in other repositories all count.",
-  craft: "To strengthen Craft, explore AI coding tools more deeply \u2014 use them for complex refactoring, test generation, and code review to build proficiency and sophistication.",
-};
-
-const SOLO_DIMENSION_TIPS: Partial<Record<string, string>> = {
-  quality: "To strengthen Quality, write PR descriptions, use feature branches, and link PRs to issues \u2014 even as a solo dev, these habits protect your codebase.",
-};
+function toArchetypeKey(archetype: string): string {
+  const map: Record<string, string> = {
+    'Builder': 'builder',
+    'Quality Champion': 'qualityChampion',
+    'Marathoner': 'marathoner',
+    'Polymath': 'polymath',
+    'Balanced': 'balanced',
+    'Emerging': 'emerging',
+    'Artificer': 'artificer',
+  };
+  return map[archetype] ?? archetype.toLowerCase();
+}
 
 /**
  * Generate a rich profile description with archetype context and an
- * actionable tip for the developer\u2019s weakest dimension.
+ * actionable tip for the developer's weakest dimension.
  */
-export function getArchetypeProfile(impact: ImpactV6Result): string {
-  const profile = ARCHETYPE_PROFILES[impact.archetype];
+export function getArchetypeProfile(
+  impact: ImpactV6Result,
+  t: (key: string) => string | string[] | Record<string, unknown>[],
+): string {
+  const profile = t(`archetypeProfiles.${toArchetypeKey(impact.archetype)}`) as string;
   const dims = impact.dimensions;
 
-  // Find the weakest dimension (skip for Balanced/Emerging — tips don't apply the same way)
+  // Find the weakest dimension (skip for Balanced/Emerging -- tips don't apply the same way)
   if (impact.archetype === "Balanced" || impact.archetype === "Emerging") {
     return profile;
   }
@@ -213,9 +196,11 @@ export function getArchetypeProfile(impact: ImpactV6Result): string {
   const entries = Object.entries(dims) as [string, number][];
   const weakest = entries.reduce((min, curr) => (curr[1] < min[1] ? curr : min));
   const isSolo = impact.profileType === "solo";
-  const tip = (isSolo ? SOLO_DIMENSION_TIPS[weakest[0]] : undefined) ?? DIMENSION_TIPS[weakest[0]];
+  const finalTip = (isSolo && weakest[0] === 'quality')
+    ? t('dimensionTips.qualitySolo') as string
+    : t(`dimensionTips.${weakest[0]}`) as string;
 
-  return `${profile} ${tip}`;
+  return `${profile} ${finalTip}`;
 }
 
 interface ImpactBreakdownProps {
@@ -224,6 +209,8 @@ interface ImpactBreakdownProps {
 }
 
 export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
+  const { t } = useTranslation();
+
   if (!impact || !stats) {
     return (
       <div className="rounded-xl border border-stroke bg-card p-8 text-center">
@@ -244,7 +231,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
       {/* ── Dimension Cards ────────────────────────────────── */}
       <div>
         <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 text-balance">
-          Performance Dimensions
+          {t('dashboard.performanceDimensions') as string}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {activeDimensions.map(
@@ -256,7 +243,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
               >
                 <div className="flex items-start justify-between mb-3">
                   <span className="text-xs text-text-secondary uppercase tracking-wider flex items-center gap-1">
-                    {DIMENSION_LABELS[key]}
+                    {t(`dimensions.${key}.label`) as string}
                     <InfoTooltip
                       id={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.id : undefined) ?? DIMENSION_TOOLTIPS[key]!.id}
                       content={(isSolo ? SOLO_DIMENSION_TOOLTIPS[key]?.tip : undefined) ?? DIMENSION_TOOLTIPS[key]!.tip}
@@ -271,7 +258,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   aria-valuenow={dims[key]}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label={`${DIMENSION_LABELS[key]} score`}
+                  aria-label={`${t(`dimensions.${key}.label`) as string} score`}
                   className="h-1.5 rounded-full bg-track overflow-hidden"
                 >
                   <div
@@ -295,7 +282,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
       {/* ── Stats Grid ─────────────────────────────────────── */}
       <div>
         <h3 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4">
-          Key Numbers
+          {t('dashboard.keyNumbers') as string}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[

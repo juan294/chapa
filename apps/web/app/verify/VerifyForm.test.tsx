@@ -6,8 +6,8 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "VerifyForm.tsx"),
   "utf-8",
 );
-const COPY_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../../lib/copy/public-flow.ts"),
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../../lib/i18n/dictionaries/en.ts"),
   "utf-8",
 );
 
@@ -27,8 +27,8 @@ describe("VerifyForm", () => {
       expect(SOURCE).toContain("hash.trim().toLowerCase()");
     });
 
-    it("shows error for invalid hash format", () => {
-      expect(COPY_SOURCE).toContain("Introduce un hash hexadecimal válido de 8, 16 o 32 caracteres");
+    it("invalid hash error copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Enter a valid 8, 16, or 32-character hex hash");
     });
   });
 
@@ -42,8 +42,8 @@ describe("VerifyForm", () => {
       expect(SOURCE).toContain('id="hash-input"');
     });
 
-    it("label text is Spanish", () => {
-      expect(COPY_SOURCE).toContain("Hash de verificación");
+    it("label copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Verification hash");
     });
 
     it("input has maxLength of 32", () => {
@@ -59,13 +59,16 @@ describe("VerifyForm", () => {
       expect(SOURCE).toContain("spellCheck={false}");
     });
 
-    it("has a submit button with Spanish text", () => {
-      expect(SOURCE).toContain('type="submit"');
-      expect(COPY_SOURCE).toContain("Verificar");
+    it("submit button copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Verify");
     });
 
-    it("uses centralized public-flow copy", () => {
-      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
+    it("uses useTranslation() (i18n-integrated)", () => {
+      expect(SOURCE).toContain("useTranslation");
+    });
+
+    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
+      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
     });
   });
 

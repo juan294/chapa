@@ -117,7 +117,7 @@ describe("InfoTooltip", () => {
   describe("tooltip visibility on click", () => {
     it("shows tooltip when button is clicked", () => {
       render(<InfoTooltip content="Test tooltip" id="tt-1" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
 
@@ -127,7 +127,7 @@ describe("InfoTooltip", () => {
 
     it("hides tooltip when button is clicked again (toggle)", () => {
       render(<InfoTooltip content="Test tooltip" id="tt-2" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
       expect(screen.getByRole("tooltip")).toBeDefined();
@@ -145,7 +145,7 @@ describe("InfoTooltip", () => {
   describe("Escape key handling", () => {
     it("closes tooltip when Escape is pressed", () => {
       render(<InfoTooltip content="Escape me" id="tt-esc" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
       expect(screen.getByRole("tooltip")).toBeDefined();
@@ -175,7 +175,7 @@ describe("InfoTooltip", () => {
           <button data-testid="external">External</button>
         </div>,
       );
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
       expect(screen.getByRole("tooltip")).toBeDefined();
@@ -187,7 +187,7 @@ describe("InfoTooltip", () => {
 
     it("does not close tooltip when clicking inside the wrapper", () => {
       render(<InfoTooltip content="Stay open" id="tt-inside" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
       expect(screen.getByRole("tooltip")).toBeDefined();
@@ -226,7 +226,7 @@ describe("InfoTooltip", () => {
 
     it("shows tooltip on button focus", () => {
       render(<InfoTooltip content="Focus content" id="tt-focus" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.focus(button);
       expect(screen.getByRole("tooltip")).toBeDefined();
@@ -234,7 +234,7 @@ describe("InfoTooltip", () => {
 
     it("hides tooltip on button blur", () => {
       render(<InfoTooltip content="Blur content" id="tt-blur" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.focus(button);
       expect(screen.getByRole("tooltip")).toBeDefined();
@@ -247,7 +247,7 @@ describe("InfoTooltip", () => {
   describe("position calculation", () => {
     it("uses position=top by default (translate -50%, -100%)", () => {
       render(<InfoTooltip content="Top tooltip" id="tt-top" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       // Mock getBoundingClientRect
       vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
@@ -280,7 +280,7 @@ describe("InfoTooltip", () => {
           position="bottom"
         />,
       );
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
         left: 100,
@@ -311,7 +311,7 @@ describe("InfoTooltip", () => {
           <InfoTooltip content="Portal test" id="tt-portal" />
         </div>,
       );
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
       fireEvent.click(button);
 
       const tooltip = screen.getByRole("tooltip");
@@ -331,7 +331,7 @@ describe("InfoTooltip", () => {
     it("adds scroll and resize listeners when tooltip is visible", () => {
       const addSpy = vi.spyOn(window, "addEventListener");
       render(<InfoTooltip content="Listeners" id="tt-listen" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
 
@@ -350,7 +350,7 @@ describe("InfoTooltip", () => {
     it("removes scroll and resize listeners when tooltip hides", () => {
       const removeSpy = vi.spyOn(window, "removeEventListener");
       render(<InfoTooltip content="Cleanup" id="tt-cleanup" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       // Open tooltip
       fireEvent.click(button);
@@ -374,7 +374,7 @@ describe("InfoTooltip", () => {
       const { unmount } = render(
         <InfoTooltip content="Unmount cleanup" id="tt-unmount" />,
       );
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
 
       fireEvent.click(button);
       removeSpy.mockClear();
@@ -397,19 +397,19 @@ describe("InfoTooltip", () => {
   describe("tooltip content and id", () => {
     it("renders the content text inside the tooltip", () => {
       render(<InfoTooltip content="Specific content here" id="tt-content" />);
-      fireEvent.click(screen.getByRole("button", { name: "More info" }));
+      fireEvent.click(screen.getByRole("button", { name: "More information" }));
       expect(screen.getByText("Specific content here")).toBeDefined();
     });
 
     it("applies the id to the tooltip element", () => {
       render(<InfoTooltip content="With ID" id="my-custom-id" />);
-      fireEvent.click(screen.getByRole("button", { name: "More info" }));
+      fireEvent.click(screen.getByRole("button", { name: "More information" }));
       expect(document.getElementById("my-custom-id")).not.toBeNull();
     });
 
     it("links aria-describedby on button to tooltip id", () => {
       render(<InfoTooltip content="Linked" id="aria-link-id" />);
-      const button = screen.getByRole("button", { name: "More info" });
+      const button = screen.getByRole("button", { name: "More information" });
       expect(button.getAttribute("aria-describedby")).toBe("aria-link-id");
     });
   });

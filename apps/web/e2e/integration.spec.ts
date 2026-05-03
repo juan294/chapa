@@ -146,13 +146,13 @@ test.describe("Integration — Share page (/u/:handle)", () => {
     }
   });
 
-  test('"Your Impact, Decoded" section heading is visible', async ({
+  test('"Tu Impacto, Decodificado" section heading is visible', async ({
     page,
   }) => {
     const response = await page.goto(`/u/${HANDLE}`, GOTO_OPTS);
     if (!response?.ok()) return;
 
-    const heading = page.getByText("Your Impact, Decoded");
+    const heading = page.getByText("Tu Impacto, Decodificado");
     await expect(heading).toBeVisible();
   });
 

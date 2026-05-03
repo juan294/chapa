@@ -144,12 +144,12 @@ describe("UserMenu — admin link", () => {
   it("renders Admin Panel link conditionally on isAdmin", () => {
     expect(SOURCE).toContain("{isAdmin && (");
     expect(SOURCE).toContain('href="/admin"');
-    expect(SOURCE).toContain("Admin Panel");
+    expect(SOURCE).toContain("userMenu.adminPanel");
   });
 
   it("Admin Panel section has role=menuitem and aria-hidden icon", () => {
     const start = SOURCE.indexOf("{isAdmin && (");
-    const end = SOURCE.indexOf("Admin Panel") + 20;
+    const end = SOURCE.indexOf("userMenu.adminPanel") + 30;
     const section = SOURCE.slice(start, end);
     expect(section).toContain('role="menuitem"');
     expect(section).toContain('aria-hidden="true"');
@@ -164,7 +164,7 @@ describe("UserMenu — Bitbucket integration", () => {
 
   it("renders Link Bitbucket item when status is loaded", () => {
     expect(SOURCE).toContain("bbStatus");
-    expect(SOURCE).toContain("Link Bitbucket");
+    expect(SOURCE).toContain("userMenu.linkBitbucket");
     expect(SOURCE).toContain('href="/api/auth/bitbucket/connect"');
   });
 
@@ -185,9 +185,9 @@ describe("UserMenu — Bitbucket integration", () => {
   });
 
   it("Bitbucket section appears after Creator Studio and before Admin Panel", () => {
-    const studioIdx = SOURCE.indexOf("Creator Studio");
-    const bitbucketIdx = SOURCE.indexOf("Link Bitbucket");
-    const adminIdx = SOURCE.indexOf("Admin Panel");
+    const studioIdx = SOURCE.indexOf("userMenu.creatorStudio");
+    const bitbucketIdx = SOURCE.indexOf("userMenu.linkBitbucket");
+    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
     expect(studioIdx).toBeLessThan(bitbucketIdx);
     expect(bitbucketIdx).toBeLessThan(adminIdx);
   });
@@ -204,8 +204,8 @@ describe("UserMenu — Bitbucket integration", () => {
   });
 
   it("ConfirmDialog has correct props for unlink", () => {
-    expect(SOURCE).toContain('title="Unlink Bitbucket?"');
-    expect(SOURCE).toContain('confirmLabel="Unlink"');
+    expect(SOURCE).toContain("userMenu.confirmUnlinkBitbucketTitle");
+    expect(SOURCE).toContain("userMenu.confirmBtn");
     expect(SOURCE).toContain('variant="destructive"');
   });
 });
@@ -218,7 +218,7 @@ describe("UserMenu — Codeberg integration", () => {
 
   it("renders Link Codeberg item when status is loaded", () => {
     expect(SOURCE).toContain("cbStatus");
-    expect(SOURCE).toContain("Link Codeberg");
+    expect(SOURCE).toContain("userMenu.linkCodeberg");
     expect(SOURCE).toContain('href="/api/auth/codeberg/connect"');
   });
 
@@ -235,9 +235,9 @@ describe("UserMenu — Codeberg integration", () => {
   });
 
   it("Codeberg section appears after Bitbucket and before Admin Panel", () => {
-    const bitbucketIdx = SOURCE.indexOf("Link Bitbucket");
-    const codebergIdx = SOURCE.indexOf("Link Codeberg");
-    const adminIdx = SOURCE.indexOf("Admin Panel");
+    const bitbucketIdx = SOURCE.indexOf("userMenu.linkBitbucket");
+    const codebergIdx = SOURCE.indexOf("userMenu.linkCodeberg");
+    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
     expect(bitbucketIdx).toBeLessThan(codebergIdx);
     expect(codebergIdx).toBeLessThan(adminIdx);
   });
@@ -248,8 +248,8 @@ describe("UserMenu — Codeberg integration", () => {
   });
 
   it("ConfirmDialog has correct props for Codeberg unlink", () => {
-    expect(SOURCE).toContain('title="Unlink Codeberg?"');
-    expect(SOURCE).toContain('confirmLabel="Unlink"');
+    expect(SOURCE).toContain("userMenu.confirmUnlinkCodebergTitle");
+    expect(SOURCE).toContain("userMenu.confirmBtn");
     expect(SOURCE).toContain("handleUnlinkCodeberg");
     expect(SOURCE).toContain("cbUnlinkLoading");
   });
@@ -263,17 +263,17 @@ describe("UserMenu — Codeberg integration", () => {
 
 describe("UserMenu — #520 aria-label on dropdown menu", () => {
   it("dropdown menu has aria-label 'User menu options'", () => {
-    expect(SOURCE).toContain('aria-label="User menu options"');
+    expect(SOURCE).toContain("aria.userMenuOptions");
   });
 });
 
 describe("UserMenu — #521 distinguishing aria-labels on Unlink buttons", () => {
   it("Bitbucket Unlink button has aria-label 'Unlink Bitbucket account'", () => {
-    expect(SOURCE).toContain('aria-label="Unlink Bitbucket account"');
+    expect(SOURCE).toContain("aria.unlinkBitbucket");
   });
 
   it("Codeberg Unlink button has aria-label 'Unlink Codeberg account'", () => {
-    expect(SOURCE).toContain('aria-label="Unlink Codeberg account"');
+    expect(SOURCE).toContain("aria.unlinkCodeberg");
   });
 });
 
@@ -423,15 +423,15 @@ describe("UserMenu — insights upload with Toast", () => {
     const fnStart = SOURCE.indexOf("async function handleInsightsFile");
     const fnEnd = SOURCE.indexOf("setOpen(false)", SOURCE.indexOf("async function handleInsightsFile"));
     const fnBody = SOURCE.slice(fnStart, fnEnd);
-    expect(fnBody).toContain("File too large");
+    expect(fnBody).toContain("userMenu.insightsFileTooLarge");
   });
 
   it("shows error toast when upload fails", () => {
-    expect(SOURCE).toContain("Import failed");
+    expect(SOURCE).toContain("userMenu.insightsImportFailed");
   });
 
   it("handles recalculate failure gracefully (still shows upload success)", () => {
-    expect(SOURCE).toContain("Score will update on next badge view");
+    expect(SOURCE).toContain("userMenu.insightsImportedDetail");
   });
 });
 
@@ -443,7 +443,7 @@ describe("UserMenu — semantic HTML (#578)", () => {
 
   it("insights import trigger is a <button> with role=menuitem", () => {
     // The Import Claude Code Insights item should be a button
-    const insightsStart = SOURCE.indexOf("Import Claude Code Insights");
+    const insightsStart = SOURCE.indexOf("userMenu.importInsights");
     const blockStart = SOURCE.lastIndexOf("<button", insightsStart);
     const block = SOURCE.slice(blockStart, insightsStart);
     expect(block).toContain('role="menuitem"');

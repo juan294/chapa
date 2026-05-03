@@ -334,10 +334,10 @@ describe("DimensionCardsRow", () => {
 });
 
 // ---------------------------------------------------------------------------
-// FE-H2: DimensionCardsRow must NOT have "use client" (no hooks or browser APIs)
+// FE-H2: DimensionCardsRow is now a client component (uses useTranslation hook)
 // ---------------------------------------------------------------------------
 describe("DimensionCardsRow — client boundary (#728)", () => {
-  it("does not have 'use client' directive (pure presentational component)", () => {
-    expect(DIMENSION_CARDS_ROW_SOURCE).not.toMatch(/^["']use client["']/m);
+  it("has 'use client' directive for useTranslation hook", () => {
+    expect(DIMENSION_CARDS_ROW_SOURCE).toMatch(/^["']use client["']/m);
   });
 });

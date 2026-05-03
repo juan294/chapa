@@ -162,6 +162,9 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Admin dashboard: `apps/web/app/admin/*`, `apps/web/components/AdminDashboardClient.tsx`
 - Global command bar: `apps/web/components/GlobalCommandBar.tsx`, `apps/web/components/terminal/command-registry.ts`
 - Tooltips: `apps/web/components/InfoTooltip.tsx`, `apps/web/components/BadgeOverlay.tsx`
+- i18n: `apps/web/lib/i18n/*` (dictionaries, detection, server/client translation, locale cookie)
+- Dashboard components: `apps/web/lib/dashboard/generate-insights.ts`, `apps/web/components/dashboard/DimensionCard.tsx`, `apps/web/components/dashboard/InsightCard.tsx`, `apps/web/components/dashboard/SubMetricPanel.tsx`
+- Share toolbar: `apps/web/components/BadgeToolbar.tsx`
 
 ## Acceptance criteria
 - A user can log in with GitHub (OAuth success).
@@ -197,6 +200,36 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 
 ---
 
+## Internationalization (i18n)
+
+The app supports two locales: `es` (Spanish, default) and `en` (English). All public-facing pages are translated.
+
+### Architecture
+- **Dictionaries**: `apps/web/lib/i18n/dictionaries/en.ts` and `es.ts` — both must be kept in sync (650+ leaf keys each). Run `pnpm run test` to verify key parity via `dictionaries/parity.test.ts`.
+- **Locale detection**: `apps/web/lib/i18n/detect.ts` — reads the `chapa-locale` cookie first, then `Accept-Language` header, falls back to `DEFAULT_LOCALE` ('es').
+- **Server components**: `import { getServerT } from '@/lib/i18n/server'` — pass the `locale` from params/cookies.
+- **Client components**: `import { useTranslation } from '@/lib/i18n'` — returns `{ locale, t, setLocale }`. Always wraps in `LanguageProvider` on any real page.
+- **Key resolution**: `t('section.key')` returns a string (or subtree for intermediate keys). Leaf keys always return `string` — cast with `as string` when TypeScript needs it for HTML attrs.
+- **Locale switching**: `LanguageSwitcher` component calls `setLocale()`, which sets the `chapa-locale` cookie and soft-reloads via `router.refresh()`.
+
+### Adding new strings
+1. Add the English string to `en.ts` and the Spanish string to `es.ts` under the same key path.
+2. Both files must have identical key structure — `parity.test.ts` will fail otherwise.
+3. Use `t('section.key') as string` for `aria-label` and other HTML string attributes.
+4. `DEFAULT_LOCALE` is `'es'` — server renders Spanish by default. Tests use English via the `useTranslation` fallback (no LanguageProvider).
+
+### Key paths (common)
+| Path | Usage |
+|------|-------|
+| `aria.*` | All `aria-label` strings for accessibility |
+| `landing.*` | Landing page copy |
+| `about.*` | About / scoring page copy |
+| `sharePage.*` | Share page (`/u/:handle`) copy |
+| `privacy.*`, `terms.*` | Legal pages |
+| `archetypes.*` | Archetype guide pages |
+
+---
+
 ## RPI Workflow
 
 This project follows Research-Plan-Implement (RPI).
@@ -215,7 +248,7 @@ Go directly to these paths -- never search for them.
 
 | Topic | Path | Notes |
 |-------|------|-------|
-| Agent reports | `docs/agents/*-report.md` | Operational history. Committed to repo for team visibility |
+| Agent reports | `docs/agents/*-report.md` | Gitignored on public repos; tracked on private (Rule #70) |
 | Agent logs | `logs/<name>.log`, `<name>.error.log` | Gitignored. Read alongside reports to diagnose failures |
 | Agent scripts | `scripts/agents/` | Gitignored. Standalone bash files invoking Claude CLI headless |
 | ADRs | `docs/decisions/` | Architecture decision records |
@@ -338,6 +371,8 @@ WARM_CACHE_PRIORITY_HANDLES=   # Comma-separated GitHub handles always included 
 VERCEL_ENV=                    # Auto-injected by Vercel (production/preview/development — do not set manually)
 ANALYZE=                       # Set to "true" to enable @next/bundle-analyzer in next.config.ts (dev-only)
 ```
+
+> **Intentionally omitted:** `CI`, `NODE_ENV`, and `VERCEL_*` are standard Node/Vercel build vars and do not need to be configured manually. `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` are test-only mocks — not real credentials and not needed in any deployed environment.
 
 ### Environment Variable Safety
 

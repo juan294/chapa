@@ -209,11 +209,9 @@ const ARCHETYPE_COLOR_MAP: Record<string, string> = {
   Artificer: "var(--color-archetype-artificer)",
 };
 
-function resolveArchetypeColor(headline: string): string {
-  const match = headline.match(/You're (?:a |an )?(.+)/);
-  const name = match?.[1];
-  if (name) {
-    return ARCHETYPE_COLOR_MAP[name] ?? "var(--color-amber)";
+function resolveArchetypeColor(archetypeName?: string): string {
+  if (archetypeName) {
+    return ARCHETYPE_COLOR_MAP[archetypeName] ?? "var(--color-amber)";
   }
   return "var(--color-amber)";
 }
@@ -222,22 +220,8 @@ function resolveArchetypeColor(headline: string): string {
 // Tier progress bar helpers
 // ---------------------------------------------------------------------------
 
-const TIER_LIST = ["Emerging", "Solid", "High", "Elite"];
-
-function parseNextTier(
-  headline: string,
-): { gap: number; nextTier: string; currentIndex: number; nextIndex: number } | null {
-  const match = headline.match(/^(\d+)\s+points?\s+to\s+(\w+)/i);
-  const gapStr = match?.[1];
-  const nextTier = match?.[2];
-  if (!gapStr || !nextTier) return null;
-
-  const gap = parseInt(gapStr, 10);
-  const nextIndex = TIER_LIST.indexOf(nextTier);
-  if (nextIndex < 1) return null;
-
-  return { gap, nextTier, currentIndex: nextIndex - 1, nextIndex };
-}
+// Kept for backwards-compat parsing of English headlines (fallback only)
+const TIER_LIST_EN = ["Emerging", "Solid", "High", "Elite"];
 
 // ---------------------------------------------------------------------------
 // Type-specific renderers
@@ -317,7 +301,9 @@ function TrendCard({ insight, animationDelay = 0 }: InsightCardProps) {
 
 /** Next-tier — progress bar with tier labels */
 function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
-  const tierInfo = parseNextTier(insight.headline);
+  const tierInfo = insight.nextTierMeta ?? null;
+  // Use translated tier labels from metadata, fall back to English list
+  const tierLabels = tierInfo?.tierLabels ?? TIER_LIST_EN;
 
   return (
     <div
@@ -344,9 +330,9 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
               className="flex items-center gap-1.5 mt-3"
               aria-hidden="true"
             >
-              {TIER_LIST.map((tier, i) => (
+              {tierLabels.map((tierLabel, i) => (
                 <div
-                  key={tier}
+                  key={tierLabel}
                   className="flex-1 flex flex-col items-center gap-1"
                 >
                   <div
@@ -367,7 +353,7 @@ function NextTierCard({ insight, animationDelay = 0 }: InsightCardProps) {
                           : "text-text-secondary/40"
                     }`}
                   >
-                    {tier}
+                    {tierLabel}
                   </span>
                 </div>
               ))}
@@ -411,7 +397,7 @@ function CoachingTipCard({ insight, animationDelay = 0 }: InsightCardProps) {
 
 /** Archetype — identity card with colored icon and headline */
 function ArchetypeCard({ insight, animationDelay = 0 }: InsightCardProps) {
-  const archetypeColor = resolveArchetypeColor(insight.headline);
+  const archetypeColor = resolveArchetypeColor(insight.archetypeName);
 
   return (
     <div

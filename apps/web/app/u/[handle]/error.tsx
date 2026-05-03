@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { StatusCallout } from "@/components/StatusCallout";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
-
-const COPY = SPANISH_PUBLIC_COPY.errors;
+import { useTranslation } from "@/lib/i18n";
 
 export default function SharePageError({
   reset,
@@ -12,6 +10,8 @@ export default function SharePageError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <main
       id="main-content"
@@ -19,9 +19,9 @@ export default function SharePageError({
     >
       <StatusCallout
         variant="error"
-        title={COPY.sharePage.title}
+        title={t('errors.sharePage.title') as string}
         titleAs="h1"
-        description={COPY.sharePage.description}
+        description={t('errors.sharePage.description') as string}
         className="w-full max-w-xl text-left"
       />
       <div className="mt-8 flex items-center gap-4">
@@ -29,13 +29,13 @@ export default function SharePageError({
           onClick={reset}
           className="rounded-lg border border-terminal-red/30 bg-terminal-red/10 px-6 py-2.5 text-sm font-medium text-terminal-red transition-colors hover:bg-terminal-red/20"
         >
-          {COPY.tryAgain}
+          {t('errors.tryAgain') as string}
         </button>
         <Link
           href="/"
           className="rounded-lg border border-stroke px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:border-terminal-red/30 hover:text-text-primary"
         >
-          {COPY.goHome}
+          {t('errors.goHome') as string}
         </Link>
       </div>
     </main>

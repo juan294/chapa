@@ -7,6 +7,8 @@ import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvi
 import { getBaseUrl } from "@/lib/env";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { renderJsonLd } from "@/lib/jsonld";
+import { LanguageProvider, LangSync } from "@/lib/i18n";
+import { getServerLocale } from "@/lib/i18n/server";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -70,10 +72,11 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const studioEnabled = await isStudioEnabled();
+  const locale = await getServerLocale();
 
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${jetbrainsMono.variable} ${plusJakarta.variable}`}
       suppressHydrationWarning
       data-scroll-behavior="smooth"
@@ -124,9 +127,12 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider>
-          <ClientFeatureFlagsProvider studioEnabled={studioEnabled}>
-            {children}
-          </ClientFeatureFlagsProvider>
+          <LanguageProvider initialLocale={locale}>
+            <LangSync />
+            <ClientFeatureFlagsProvider studioEnabled={studioEnabled}>
+              {children}
+            </ClientFeatureFlagsProvider>
+          </LanguageProvider>
         </ThemeProvider>
         <ClientInstrumentation />
       </body>

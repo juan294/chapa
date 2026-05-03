@@ -42,6 +42,10 @@ vi.mock("./ThemeToggle", () => ({
   ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
 }));
 
+vi.mock("./LanguageSwitcher", () => ({
+  LanguageSwitcher: () => <div data-testid="language-switcher">LanguageSwitcher</div>,
+}));
+
 beforeEach(() => {
   mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
@@ -69,6 +73,11 @@ describe("NavbarClient", () => {
   it("renders ThemeToggle", () => {
     render(<NavbarClient />);
     expect(screen.getByTestId("theme-toggle")).toBeDefined();
+  });
+
+  it("renders LanguageSwitcher", () => {
+    render(<NavbarClient />);
+    expect(screen.getByTestId("language-switcher")).toBeDefined();
   });
 
   // ─── Logged-out state ─────────────────────────────────────────────────

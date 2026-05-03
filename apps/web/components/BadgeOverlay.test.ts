@@ -3,6 +3,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const SRC = readFileSync(resolve(__dirname, "BadgeOverlay.tsx"), "utf-8");
+const EN_DICT = readFileSync(
+  resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
+  "utf-8",
+);
 
 describe("BadgeOverlay (source-reading a11y)", () => {
   it("outer div with aria-label also has role='group' (#308)", () => {
@@ -57,7 +61,8 @@ describe("BadgeOverlay GitHub disclaimer hotspot", () => {
   });
 
   it("has a disclaimer that GitHub is not affiliated", () => {
-    expect(SRC).toMatch(/github.*not affiliated/i);
+    // The disclaimer is now in the en.ts dictionary (badgeOverlay.github key)
+    expect(EN_DICT).toMatch(/github.*not affiliated/i);
   });
 });
 
@@ -97,17 +102,19 @@ describe("BadgeOverlay leader lines", () => {
     expect(SRC).toMatch(/leader-lines-svg[\s\S]*?pointer-events-none/);
   });
 
-  it("all tooltip texts are present in the source", () => {
-    expect(SRC).toContain("Times others forked your repositories");
-    expect(SRC).toContain("Stars received on your repos");
-    expect(SRC).toContain("People watching your repositories");
-    expect(SRC).toContain("developer archetype");
-    expect(SRC).toContain("Contribution activity");
-    expect(SRC).toContain("four-dimension profile");
-    expect(SRC).toContain("composite impact score");
-    expect(SRC).toContain("Impact tier");
-    expect(SRC).toContain("Cryptographic seal");
-    expect(SRC).toMatch(/github.*not affiliated/i);
+  it("all tooltip texts are present in the English dictionary", () => {
+    // Tooltip strings are now in the en.ts dictionary (badgeOverlay.* keys)
+    // and resolved at runtime via t(h.dictKey) in the component
+    expect(EN_DICT).toContain("Times others forked your repositories");
+    expect(EN_DICT).toContain("Stars received on your repos");
+    expect(EN_DICT).toContain("People watching your repositories");
+    expect(EN_DICT).toContain("developer archetype");
+    expect(EN_DICT).toContain("Contribution activity");
+    expect(EN_DICT).toContain("four-dimension profile");
+    expect(EN_DICT).toContain("composite impact score");
+    expect(EN_DICT).toContain("Impact tier");
+    expect(EN_DICT).toContain("Cryptographic seal");
+    expect(EN_DICT).toMatch(/github.*not affiliated/i);
   });
 });
 
@@ -134,10 +141,10 @@ describe("BadgeOverlay lazy rendering (#323)", () => {
     expect(panelSection).not.toMatch(/HOTSPOTS\.map/);
   });
 
-  it("uses activeHotspot for conditional rendering", () => {
-    expect(SRC).toContain("activeHotspot");
-    // Should find the hotspot from the array based on activeLeaderLine state
-    expect(SRC).toMatch(/HOTSPOTS\.find/);
+  it("uses activeBase for conditional rendering (lazy render of active hotspot)", () => {
+    expect(SRC).toContain("activeBase");
+    // Should find the hotspot data from HOTSPOT_BASES based on activeLeaderLine state
+    expect(SRC).toMatch(/HOTSPOT_BASES\.find/);
   });
 });
 

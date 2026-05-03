@@ -10,6 +10,27 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar">Navbar</nav>,
 }));
 
+// Mock getServerLocale + getServerT to return English without needing Next.js headers()
+vi.mock("@/lib/i18n/server", async () => {
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  function deepGet(obj: Record<string, unknown>, key: string): unknown {
+    const parts = key.split(".");
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
+      current = (current as Record<string, unknown>)[part];
+      if (current === undefined) return key;
+    }
+    return current;
+  }
+  return {
+    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerT: vi.fn().mockImplementation(() => (key: string) =>
+      deepGet(en as unknown as Record<string, unknown>, key)
+    ),
+  };
+});
+
 vi.mock("next/link", () => ({
   default: ({
     children,
@@ -62,21 +83,26 @@ describe("generateMetadata", () => {
   it("returns verified title for a valid 8-char hex hash", async () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ hash: "a1b2c3d4" }),
+      searchParams: Promise.resolve({}),
     });
-    expect(meta.title).toContain("Verificar");
+    // English: verify.title = 'Verify a badge'
+    expect(meta.title).toContain("Verify");
     expect(meta.title).toContain("a1b2c3d4");
   });
 
   it("returns invalid hash title for a non-hex hash", async () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ hash: "not-valid!" }),
+      searchParams: Promise.resolve({}),
     });
-    expect(meta.title).toContain("Hash inválido");
+    // English: verifyDetail.invalidHashTitle = 'Invalid hash'
+    expect(meta.title).toContain("Invalid hash");
   });
 
   it("disables robots indexing for all verify pages", async () => {
     const meta = await generateMetadata({
       params: Promise.resolve({ hash: "a1b2c3d4" }),
+      searchParams: Promise.resolve({}),
     });
     expect((meta.robots as { index: boolean }).index).toBe(false);
   });
@@ -87,13 +113,16 @@ describe("VerifyPage", () => {
     it("renders InvalidHashCard for non-hex characters", async () => {
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "zzzzzzzz" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
-      expect(screen.getByText("Hash inválido")).toBeDefined();
+      // English: verifyDetail.invalidHashTitle = 'Invalid hash'
+      expect(screen.getByText("Invalid hash")).toBeDefined();
+      // English: verifyDetail.invalidHashDescription
       expect(
         screen.getByText(
-          "El hash de verificación debe tener 8, 16 o 32 caracteres hexadecimales.",
+          "The verification hash must be 8, 16, or 32 hexadecimal characters.",
         ),
       ).toBeDefined();
       expect(screen.getByText("zzzzzzzz")).toBeDefined();
@@ -102,10 +131,12 @@ describe("VerifyPage", () => {
     it("renders InvalidHashCard for wrong-length hash", async () => {
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "abc" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
-      expect(screen.getByText("Hash inválido")).toBeDefined();
+      // English: verifyDetail.invalidHashTitle = 'Invalid hash'
+      expect(screen.getByText("Invalid hash")).toBeDefined();
     });
   });
 
@@ -115,12 +146,15 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
-      expect(screen.getByText("No encontrado")).toBeDefined();
+      // English: verifyDetail.notFoundTitle = 'Not found'
+      expect(screen.getByText("Not found")).toBeDefined();
+      // English: verifyDetail.notFoundDescription
       expect(
-        screen.getByText("No se encontró ningún registro de verificación para este hash."),
+        screen.getByText("No verification record found for this hash."),
       ).toBeDefined();
       expect(screen.getByText("a1b2c3d4")).toBeDefined();
     });
@@ -132,10 +166,12 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
-      expect(screen.getByText("Insignia verificada")).toBeDefined();
+      // English: verifyDetail.verifiedTitle = 'Badge verified'
+      expect(screen.getByText("Badge verified")).toBeDefined();
       expect(screen.getByText("@testuser")).toBeDefined();
       expect(screen.getByText("Test User")).toBeDefined();
     });
@@ -145,6 +181,7 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
@@ -158,6 +195,7 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
@@ -176,14 +214,17 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
       expect(screen.getByText("420")).toBeDefined();
       expect(screen.getByText("Commits")).toBeDefined();
       expect(screen.getByText("38")).toBeDefined();
-      expect(screen.getByText("PRs fusionadas")).toBeDefined();
+      // English: verifyDetail.prsMerged = 'PRs merged'
+      expect(screen.getByText("PRs merged")).toBeDefined();
       expect(screen.getByText("15")).toBeDefined();
+      // English: verifyDetail.reviews = 'Reviews'
       expect(screen.getByText("Reviews")).toBeDefined();
     });
 
@@ -192,11 +233,14 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
-      expect(screen.getByText("Generado el 2026-03-22")).toBeDefined();
-      const viewBadge = screen.getByText("Ver insignia");
+      // English: verifyDetail.generatedOn = 'Generated on'
+      expect(screen.getByText("Generated on 2026-03-22")).toBeDefined();
+      // English: verifyDetail.viewBadge = 'View badge'
+      const viewBadge = screen.getByText("View badge");
       expect(viewBadge.closest("a")?.getAttribute("href")).toBe(
         "/u/testuser/badge.svg",
       );
@@ -207,6 +251,7 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
@@ -224,9 +269,11 @@ describe("VerifyPage", () => {
 
       const jsx = await VerifyPage({
         params: Promise.resolve({ hash: "a1b2c3d4e5f6a7b8" }),
+        searchParams: Promise.resolve({}),
       });
       render(jsx);
 
+      // English: verifyDetail.name = 'Name'
       expect(screen.queryByText("Name")).toBeNull();
     });
   });

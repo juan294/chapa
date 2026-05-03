@@ -6,18 +6,22 @@ const SOURCE = fs.readFileSync(
   path.resolve(__dirname, "page.tsx"),
   "utf-8",
 );
-const COPY_SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "../../lib/copy/public-flow.ts"),
+const EN_DICT = fs.readFileSync(
+  path.resolve(__dirname, "../../lib/i18n/dictionaries/en.ts"),
   "utf-8",
 );
 
 describe("Verify input page", () => {
   describe("metadata", () => {
-    it("exports metadata with title", () => {
-      expect(SOURCE).toContain('title: SPANISH_PUBLIC_COPY.verify.title');
+    it("exports generateMetadata (locale-aware, async)", () => {
+      expect(SOURCE).toContain("generateMetadata");
     });
 
-    it("includes description", () => {
+    it("uses getServerT for metadata title", () => {
+      expect(SOURCE).toContain("getServerT");
+    });
+
+    it("includes description in metadata", () => {
       expect(SOURCE).toContain("description:");
     });
 
@@ -26,9 +30,19 @@ describe("Verify input page", () => {
     });
   });
 
+  describe("dynamic rendering (i18n)", () => {
+    it("exports dynamic = 'force-dynamic'", () => {
+      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
+    });
+
+    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
+      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
+    });
+  });
+
   describe("default export", () => {
     it("exports a default function component", () => {
-      expect(SOURCE).toContain("export default function VerifyInputPage");
+      expect(SOURCE).toContain("export default async function VerifyInputPage");
     });
   });
 
@@ -37,9 +51,12 @@ describe("Verify input page", () => {
       expect(SOURCE).toContain("<h1");
     });
 
-    it("heading includes Spanish badge copy in complement color", () => {
+    it("heading includes complement color for verification CTA", () => {
       expect(SOURCE).toContain("text-complement");
-      expect(COPY_SOURCE).toContain("insignia");
+    });
+
+    it("verify page title copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("badge");
     });
   });
 
@@ -54,16 +71,16 @@ describe("Verify input page", () => {
   });
 
   describe("instructions", () => {
-    it("explains hash format (8, 16, or 32 characters)", () => {
-      expect(COPY_SOURCE).toContain("8, 16 o 32 caracteres");
+    it("hash format instructions are in the English dictionary", () => {
+      expect(EN_DICT).toContain("8, 16, or 32-character");
     });
 
-    it("tells user where to find the hash", () => {
-      expect(COPY_SOURCE).toContain("borde derecho");
+    it("hint about where to find the hash is in the English dictionary", () => {
+      expect(EN_DICT).toContain("right edge");
     });
 
-    it("uses centralized public-flow copy", () => {
-      expect(SOURCE).toContain("SPANISH_PUBLIC_COPY");
+    it("uses getServerT() for all page copy (i18n-integrated)", () => {
+      expect(SOURCE).toContain("getServerT");
     });
   });
 

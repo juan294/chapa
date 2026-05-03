@@ -6,6 +6,7 @@ import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { generateInsights } from "@/lib/dashboard/generate-insights";
 import { InsightCard } from "./InsightCard";
+import { useTranslation } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -28,9 +29,10 @@ export function CoachingInsights({
   diff,
   className,
 }: CoachingInsightsProps) {
+  const { t } = useTranslation();
   const insights = useMemo(
-    () => generateInsights(impact, trend, diff),
-    [impact, trend, diff],
+    () => generateInsights(impact, trend, diff, t),
+    [impact, trend, diff, t],
   );
 
   if (insights.length === 0) {
@@ -53,7 +55,7 @@ export function CoachingInsights({
           className="inline-block w-1.5 h-1.5 rounded-sm bg-amber"
           aria-hidden="true"
         />
-        Insights &amp; Coaching
+        {t('dashboard.insightsCoaching') as string}
       </h3>
 
       <div className="space-y-3">

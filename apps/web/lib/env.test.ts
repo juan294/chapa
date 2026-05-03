@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { getBaseUrl } from "./env";
+import { getBaseUrl, getAdminHandles } from "./env";
 
 describe("getBaseUrl", () => {
   afterEach(() => {
@@ -24,5 +24,21 @@ describe("getBaseUrl", () => {
   it("trims whitespace from env var", () => {
     vi.stubEnv("NEXT_PUBLIC_BASE_URL", "  https://custom.example.com  \n");
     expect(getBaseUrl()).toBe("https://custom.example.com");
+  });
+});
+
+describe("getAdminHandles", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns parsed list when ADMIN_HANDLES is set", () => {
+    vi.stubEnv("ADMIN_HANDLES", "alice,bob, carol ");
+    expect(getAdminHandles()).toEqual(["alice", "bob", "carol"]);
+  });
+
+  it("returns empty array when ADMIN_HANDLES is not set", () => {
+    vi.stubEnv("ADMIN_HANDLES", undefined);
+    expect(getAdminHandles()).toEqual([]);
   });
 });

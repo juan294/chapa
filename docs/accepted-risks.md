@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-04-04 | Audit: v40
+> Last reviewed: 2026-05-03 | Audit: v41
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -153,6 +153,24 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** Side effects are non-critical by design: the badge SVG is already returned to the requester before they run. Missing a single daily snapshot is acceptable — the next request or cron job (`/api/cron/warm-cache`) will fill the gap. A daily per-handle guard key (`sideeffects:done:{handle}:{date}`) prevents repeat work. This is intentional availability-first design; observability for this path is tracked as a follow-up improvement.
 - **Severity:** Low
 - **Accepted:** 2026-04-04
+
+---
+
+## Public-page i18n requires dynamic rendering (2026-05-02)
+
+- **Risk:** All translated public pages use `export const dynamic = 'force-dynamic'`, disabling ISR/static caching. First-byte time is per-request rather than served from CDN cache.
+- **Mitigation:** Short edge-cache via `Cache-Control: s-maxage=60, stale-while-revalidate=86400` per translated page. The most-cached endpoint (`/u/:handle/badge.svg`) is unaffected — it remains ISR-cached. Server render time is fast (<50ms) since locale resolution reads a single cookie header.
+- **Severity:** Low
+- **Accepted:** 2026-05-02
+
+---
+
+## useTranslation fallback locale is English, not app default (2026-05-03)
+
+- **Risk:** `useTranslation()` falls back to English (`'en'`) when called outside a `LanguageProvider`. The app default locale is Spanish (`'es'`). Any client component rendered outside the provider tree (e.g., in tests, Storybook, isolated embeds) will display English strings.
+- **Mitigation:** All public-facing pages wrap children in `LanguageProvider` via `layout.tsx`. Tests exercise English strings via the fallback intentionally. The fallback behavior is documented and logged with `console.warn`. No production path renders outside the provider.
+- **Severity:** Low
+- **Accepted:** 2026-05-03
 
 ---
 

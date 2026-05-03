@@ -8,12 +8,12 @@ afterEach(cleanup);
 describe("InfoTooltip", () => {
   it("renders trigger button", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    expect(screen.getByLabelText("More info")).toBeDefined();
+    expect(screen.getByLabelText("More information")).toBeDefined();
   });
 
   it("shows tooltip on click", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    const btn = screen.getByLabelText("More info");
+    const btn = screen.getByLabelText("More information");
     fireEvent.click(btn);
     expect(screen.getByRole("tooltip")).toBeDefined();
     expect(screen.getByText("Test content")).toBeDefined();
@@ -21,19 +21,19 @@ describe("InfoTooltip", () => {
 
   it("tooltip has correct id when visible", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    fireEvent.click(screen.getByLabelText("More info"));
+    fireEvent.click(screen.getByLabelText("More information"));
     expect(screen.getByRole("tooltip").id).toBe("test-tip");
   });
 
   it("button references tooltip via aria-describedby", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    const btn = screen.getByLabelText("More info");
+    const btn = screen.getByLabelText("More information");
     expect(btn.getAttribute("aria-describedby")).toBe("test-tip");
   });
 
   it("hides tooltip on second click", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    const btn = screen.getByLabelText("More info");
+    const btn = screen.getByLabelText("More information");
     fireEvent.click(btn);
     expect(screen.getByRole("tooltip")).toBeDefined();
     fireEvent.click(btn);
@@ -42,7 +42,7 @@ describe("InfoTooltip", () => {
 
   it("closes on Escape key", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    fireEvent.click(screen.getByLabelText("More info"));
+    fireEvent.click(screen.getByLabelText("More information"));
     expect(screen.getByRole("tooltip")).toBeDefined();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("tooltip")).toBeNull();
@@ -55,7 +55,7 @@ describe("InfoTooltip", () => {
         <button data-testid="outside">Outside</button>
       </div>,
     );
-    fireEvent.click(screen.getByLabelText("More info"));
+    fireEvent.click(screen.getByLabelText("More information"));
     expect(screen.getByRole("tooltip")).toBeDefined();
     fireEvent.mouseDown(screen.getByTestId("outside"));
     expect(screen.queryByRole("tooltip")).toBeNull();
@@ -70,7 +70,7 @@ describe("InfoTooltip", () => {
 
   it("renders tooltip with fixed positioning via portal", () => {
     render(<InfoTooltip id="test-tip" content="Test content" />);
-    fireEvent.click(screen.getByLabelText("More info"));
+    fireEvent.click(screen.getByLabelText("More information"));
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip.className).toContain("fixed");
     expect(tooltip.className).toContain("z-[99999]");

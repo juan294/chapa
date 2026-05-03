@@ -17,7 +17,8 @@ describe("SharePage error.tsx — error boundary", () => {
   });
 
   it("contains a retry/reset button", () => {
-    expect(SOURCE).toContain("COPY.tryAgain");
+    // Now uses t('errors.tryAgain') via useTranslation()
+    expect(SOURCE).toContain("errors.tryAgain");
   });
 
   it("calls reset on retry button click", () => {
@@ -25,7 +26,8 @@ describe("SharePage error.tsx — error boundary", () => {
   });
 
   it("contains a 'go home' link", () => {
-    expect(SOURCE).toContain("COPY.goHome");
+    // Now uses t('errors.goHome') via useTranslation()
+    expect(SOURCE).toContain("errors.goHome");
   });
 
   it("links to the root path", () => {
@@ -33,7 +35,8 @@ describe("SharePage error.tsx — error boundary", () => {
   });
 
   it("uses share-page-specific error copy (not the generic error)", () => {
-    expect(SOURCE).toContain("COPY.sharePage");
+    // Now uses t('errors.sharePage.*') via useTranslation()
+    expect(SOURCE).toContain("errors.sharePage");
   });
 
   it("uses design system background token", () => {

@@ -26,6 +26,9 @@ import {
   materializePublicProfile,
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { LocaleSync } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 const BASE_URL = getBaseUrl();
 
@@ -42,19 +45,23 @@ export async function generateMetadata({
     return { title: "Not Found" };
   }
 
+  // generateMetadata runs at ISR build time — avoid server-only APIs.
+  // Use English for metadata; client hydration via LocaleSync handles locale.
+  const t = getServerT("en");
+
   const pageUrl = `${BASE_URL}/u/${handle}`;
   // Daily cache buster forces social platforms to re-fetch the OG image
   const today = toDateString(new Date());
   const ogImageUrl = `${BASE_URL}/u/${handle}/og-image?v=${today}`;
   return {
-    title: `@${handle} — Developer Impact, Decoded`,
-    description: `View ${handle}'s developer impact score and badge on Chapa.`,
+    title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,
+    description: interpolate(t("sharePage.metadataDescription") as string, { handle }),
     openGraph: {
       type: "profile",
-      title: `@${handle} — Chapa Developer Impact, Decoded`,
+      title: `@${interpolate(t("sharePage.metadataOgTitle") as string, { handle })} Developer Impact, Decoded`,
       description: `View ${handle}'s developer impact and badge on Chapa.`,
       url: pageUrl,
-      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: `Chapa badge for ${handle}` }],
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: interpolate(t("sharePage.metadataOgImageAlt") as string, { handle }) }],
     },
     twitter: {
       card: "summary_large_image",
@@ -68,8 +75,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function SharePage({ params }: SharePageProps) {
+export default async function SharePage({ params, searchParams }: SharePageProps) {
   const { handle } = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
+  const queryLang = typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
 
   if (!isValidHandle(handle)) {
     notFound();
@@ -77,6 +86,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
   return (
     <main id="main-content" className="min-h-screen bg-bg">
+      <LocaleSync queryLang={queryLang} />
       <Suspense fallback={<BadgeSkeleton />}>
         <SharePageContent handle={handle} />
       </Suspense>
@@ -169,6 +179,13 @@ export async function SharePageContent({ handle }: { handle: string }) {
       : {}),
   };
 
+  // Server locale for server-rendered strings (h1, h2).
+  // getServerLocale reads cookies/accept-language — safe inside SharePageContent
+  // because this component runs dynamically (inside Suspense boundary).
+  // generateMetadata (ISR build time) uses English directly via getServerT("en").
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
+
   return (
     <>
       <SharePageShortcuts
@@ -188,12 +205,12 @@ export async function SharePageContent({ handle }: { handle: string }) {
 
       <div className="relative mx-auto max-w-4xl px-4 sm:px-6 pt-20 pb-16 sm:pt-24 sm:pb-24">
         <h1 className="sr-only">
-          @{handle} — Developer Impact, Decoded
+          {interpolate(t("sharePage.srH1") as string, { handle })}
         </h1>
 
         {/* ── Badge Section Title ──────────────────────────────── */}
         <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up motion-reduce:animate-none [animation-delay:150ms] text-balance">
-          Your Impact, Decoded
+          {t("sharePage.h2") as string}
         </h2>
 
         {/* ── Badge Preview ──────────────────────────────────── */}
@@ -202,7 +219,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
             {inlineSvg ? (
               <div
                 role="img"
-                aria-label={`Chapa badge for ${handle}`}
+                aria-label={interpolate(t("sharePage.badgeAriaLabel") as string, { handle })}
                 className="w-full rounded-xl overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
                 dangerouslySetInnerHTML={{ __html: inlineSvg }}
               />
@@ -213,7 +230,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
-                  alt={`Chapa badge for ${handle}`}
+                  alt={interpolate(t("sharePage.badgeAlt") as string, { handle })}
                   width={1200}
                   height={630}
                   fetchPriority="high"

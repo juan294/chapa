@@ -8,10 +8,10 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("ImpactBreakdown", () => {
-  // Issue #18 — "use client" should be removed (purely presentational)
-  describe("server component (#18)", () => {
-    it("does not have a 'use client' directive", () => {
-      expect(SOURCE).not.toMatch(/^["']use client["']/m);
+  // Issue #18 — now a client component (uses useTranslation hook for i18n)
+  describe("client component (i18n)", () => {
+    it("has 'use client' directive for useTranslation hook", () => {
+      expect(SOURCE).toMatch(/^["']use client["']/m);
     });
   });
 
@@ -146,8 +146,8 @@ describe("ImpactBreakdown", () => {
       expect(SOURCE).toContain('"stat-repos"');
     });
 
-    it("does not add 'use client' directive (server component preserved)", () => {
-      expect(SOURCE).not.toMatch(/^["']use client["']/m);
+    it("has 'use client' directive (component uses hooks)", () => {
+      expect(SOURCE).toMatch(/^["']use client["']/m);
     });
   });
 
@@ -327,8 +327,10 @@ describe("ImpactBreakdown", () => {
       expect(fnBody).toMatch(/filter|dimensions\.craft|craft\s*!=|craft\s*!==|hasCraft/);
     });
 
-    it("has craft entries in dimension labels, colors, and tooltips", () => {
-      expect(SOURCE).toContain('"Craft"');
+    it("has craft entries in dimension colors and tooltips", () => {
+      // Craft label is sourced via dynamic translation key: t(`dimensions.${key}.label`)
+      // The craft color CSS variable must be present in the DIMENSION_COLORS map
+      expect(SOURCE).toContain("dimensions.${key}.label");
       expect(SOURCE).toContain("var(--color-dimension-craft)");
     });
   });

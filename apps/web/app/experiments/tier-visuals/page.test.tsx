@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 // Mock matchMedia for reduced motion check (used in tier transition)
 Object.defineProperty(window, "matchMedia", {
@@ -18,6 +18,21 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 describe("tier-visuals experiment page", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(performance.now() + 1000);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it("renders without throwing", async () => {
     const { default: Page } = await import("./page");
     const { container } = render(<Page />);
@@ -33,5 +48,19 @@ describe("tier-visuals experiment page", () => {
     for (let i = 1; i < headings.length; i++) {
       expect(headings[i]!.tagName).toBe("H2");
     }
+  });
+
+  it("lets users select tiers and toggle autoplay", async () => {
+    const { default: Page } = await import("./page");
+    render(<Page />);
+
+    fireEvent.click(screen.getByRole("button", { name: "High" }));
+    expect(screen.getByRole("button", { name: "Auto-play off" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto-play off" }));
+    expect(screen.getByRole("button", { name: "Auto-cycling" })).toBeTruthy();
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(window.requestAnimationFrame).toHaveBeenCalled();
   });
 });

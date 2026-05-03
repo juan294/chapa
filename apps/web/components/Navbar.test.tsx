@@ -99,7 +99,8 @@ describe("Navbar", () => {
 
   describe("accessibility", () => {
     it("uses <nav> element with aria-label", () => {
-      expect(SOURCE).toContain('aria-label="Main navigation"');
+      // Now uses t('aria.mainNavigation') via getServerT()
+      expect(SOURCE).toContain("aria.mainNavigation");
     });
 
     it("uses NavLink component for nav links (supports aria-current)", () => {

@@ -2,23 +2,29 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { SPANISH_PUBLIC_COPY } from "@/lib/copy/public-flow";
+import { useTranslation } from "@/lib/i18n";
 
-interface Step {
-  label: string;
-  status: "pending" | "active" | "done" | "error";
-}
-
-const INITIAL_STEPS: Step[] = SPANISH_PUBLIC_COPY.generation.steps.map(
-  (step) => ({ ...step }),
-);
+type StepStatus = "pending" | "active" | "done" | "error";
 
 const STEP_DELAY_MS = 300;
 const REDIRECT_DELAY_MS = 800;
 
 export function GeneratingProgress({ handle }: { handle: string }) {
   const router = useRouter();
-  const [steps, setSteps] = useState<Step[]>(INITIAL_STEPS);
+  const { t } = useTranslation();
+
+  // Step labels derived from dictionary on each render (locale-aware)
+  const stepLabels = [
+    t('generation.step0') as string,
+    t('generation.step1') as string,
+    t('generation.step2') as string,
+    t('generation.step3') as string,
+  ];
+
+  // Step statuses stored as state (driven by API response)
+  const [stepStatuses, setStepStatuses] = useState<StepStatus[]>([
+    'done', 'active', 'pending', 'pending',
+  ]);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -27,8 +33,8 @@ export function GeneratingProgress({ handle }: { handle: string }) {
     const remaining = [1, 2, 3];
     remaining.forEach((idx, i) => {
       setTimeout(() => {
-        setSteps((prev) =>
-          prev.map((s, j) => (j === idx ? { ...s, status: "done" } : s)),
+        setStepStatuses((prev) =>
+          prev.map((s, j) => (j === idx ? 'done' : s)),
         );
         if (idx === remaining[remaining.length - 1]) {
           setDone(true);
@@ -50,11 +56,9 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         if (cancelled) return;
 
         if (!res.ok) {
-          setError(SPANISH_PUBLIC_COPY.generation.error);
-          setSteps((prev) =>
-            prev.map((s) =>
-              s.status === "active" ? { ...s, status: "error" } : s,
-            ),
+          setError(t('generation.error') as string);
+          setStepStatuses((prev) =>
+            prev.map((s) => (s === 'active' ? 'error' : s)),
           );
           return;
         }
@@ -62,11 +66,9 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         completeRemainingSteps();
       } catch {
         if (cancelled) return;
-        setError(SPANISH_PUBLIC_COPY.generation.error);
-        setSteps((prev) =>
-          prev.map((s) =>
-            s.status === "active" ? { ...s, status: "error" } : s,
-          ),
+        setError(t('generation.error') as string);
+        setStepStatuses((prev) =>
+          prev.map((s) => (s === 'active' ? 'error' : s)),
         );
       }
     }
@@ -76,6 +78,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completeRemainingSteps]);
 
   // Redirect after all steps complete
@@ -97,7 +100,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
             chapa generate
           </p>
           <h1 className="mt-2 font-heading text-lg font-bold tracking-tight text-text-primary">
-            {SPANISH_PUBLIC_COPY.generation.heading}{" "}
+            {t('generation.heading') as string}{" "}
             <span className="text-amber">@{handle}</span>
           </h1>
         </div>
@@ -108,79 +111,82 @@ export function GeneratingProgress({ handle }: { handle: string }) {
           aria-live="polite"
           className="space-y-3"
         >
-          {steps.map((step, i) => (
-            <div
-              key={step.label}
-              data-step={i}
-              data-status={step.status}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-3 font-heading text-sm transition-all duration-300 ${
-                step.status === "done"
-                  ? "border-terminal-green/20 bg-terminal-green/[0.06]"
-                  : step.status === "active"
-                    ? "border-amber/20 bg-amber/[0.06]"
-                    : step.status === "error"
-                      ? "border-terminal-red/20 bg-terminal-red/[0.06]"
-                      : "border-stroke bg-card/50"
-              }`}
-              style={{
-                animationDelay: `${i * 100}ms`,
-              }}
-            >
-              {/* Status icon */}
-              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                {step.status === "done" && (
-                  <svg
-                    className="h-4 w-4 text-terminal-green"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-                {step.status === "active" && (
-                  <span className="h-3 w-3 animate-pulse motion-reduce:animate-none rounded-full bg-amber" />
-                )}
-                {step.status === "error" && (
-                  <svg
-                    className="h-4 w-4 text-terminal-red"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                )}
-                {step.status === "pending" && (
-                  <span className="h-2 w-2 rounded-full bg-terminal-dim/40" />
-                )}
-              </span>
-
-              {/* Step label */}
-              <span
-                className={
-                  step.status === "done"
-                    ? "text-terminal-green"
-                    : step.status === "active"
-                      ? "text-amber"
-                      : step.status === "error"
-                        ? "text-terminal-red"
-                        : "text-terminal-dim"
-                }
+          {stepLabels.map((label, i) => {
+            const status = stepStatuses[i] ?? 'pending';
+            return (
+              <div
+                key={label}
+                data-step={i}
+                data-status={status}
+                className={`flex items-center gap-3 rounded-lg border px-4 py-3 font-heading text-sm transition-all duration-300 ${
+                  status === "done"
+                    ? "border-terminal-green/20 bg-terminal-green/[0.06]"
+                    : status === "active"
+                      ? "border-amber/20 bg-amber/[0.06]"
+                      : status === "error"
+                        ? "border-terminal-red/20 bg-terminal-red/[0.06]"
+                        : "border-stroke bg-card/50"
+                }`}
+                style={{
+                  animationDelay: `${i * 100}ms`,
+                }}
               >
-                {step.label}
-              </span>
-            </div>
-          ))}
+                {/* Status icon */}
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                  {status === "done" && (
+                    <svg
+                      className="h-4 w-4 text-terminal-green"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                  {status === "active" && (
+                    <span className="h-3 w-3 animate-pulse motion-reduce:animate-none rounded-full bg-amber" />
+                  )}
+                  {status === "error" && (
+                    <svg
+                      className="h-4 w-4 text-terminal-red"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  )}
+                  {status === "pending" && (
+                    <span className="h-2 w-2 rounded-full bg-terminal-dim/40" />
+                  )}
+                </span>
+
+                {/* Step label */}
+                <span
+                  className={
+                    status === "done"
+                      ? "text-terminal-green"
+                      : status === "active"
+                        ? "text-amber"
+                        : status === "error"
+                          ? "text-terminal-red"
+                          : "text-terminal-dim"
+                  }
+                >
+                  {label}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Error message */}
@@ -191,7 +197,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
               href={`/generating/${encodeURIComponent(handle)}`}
               className="mt-2 inline-block font-heading text-sm text-text-secondary underline underline-offset-4 hover:text-text-primary"
             >
-              {SPANISH_PUBLIC_COPY.generation.retry}
+              {t('generation.retry') as string}
             </a>
           </div>
         )}
@@ -199,7 +205,7 @@ export function GeneratingProgress({ handle }: { handle: string }) {
         {/* Redirect notice */}
         {done && (
           <p className="mt-6 animate-terminal-fade-in motion-reduce:animate-none font-heading text-xs text-text-secondary">
-            {SPANISH_PUBLIC_COPY.generation.redirect}
+            {t('generation.redirect') as string}
           </p>
         )}
       </div>

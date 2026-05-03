@@ -163,6 +163,7 @@ hover:border-amber/20 hover:text-text-primary
 - Logo: `Chapa_` with blinking cursor (`animate-cursor-blink`)
 - Nav links: `/` prefix in `text-amber/50`, label in `text-terminal-dim`
 - CTA: `/ login` text link (no button), hover to `text-amber`
+- **LanguageSwitcher**: globe icon button (`aria-label={t('aria.languageSwitcher')}`), shows `ES | EN` pill menu on click. Uses `aria-expanded`, `role="menu"`, `role="menuitem"`. Active locale highlighted with `text-amber font-semibold`. Closes on outside click via `useDropdownMenu`. Sits between ThemeToggle and login CTA in the nav bar.
 
 ### Terminal components
 

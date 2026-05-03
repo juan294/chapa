@@ -23,11 +23,11 @@ test.describe("Navigation — navbar and footer", () => {
   test("login link is visible when unauthenticated", async ({ page }) => {
     const loginLink = page.locator('nav a[href="/api/auth/login"]');
     await expect(loginLink).toBeVisible();
-    await expect(loginLink).toContainText("login");
+    await expect(loginLink).toContainText("acceder");
   });
 
   test("theme toggle button is present in navbar", async ({ page }) => {
-    const toggle = page.locator('nav button[aria-label*="Switch to"]');
+    const toggle = page.locator('nav button[aria-label*="Cambiar"]');
     await expect(toggle).toBeVisible();
   });
 

@@ -7,27 +7,30 @@ const source = fs.readFileSync(
   "utf-8",
 );
 
-describe("terms page — source structure", () => {
-  it("exports revalidate = 86400 for ISR", () => {
-    expect(source).toContain("export const revalidate = 86400");
+describe("terms page — i18n server component", () => {
+  it("exports dynamic = 'force-dynamic'", () => {
+    expect(source).toContain("export const dynamic = 'force-dynamic'");
   });
 
-  it("exports metadata with Terms of Service title", () => {
-    expect(source).toContain("export const metadata");
-    expect(source).toContain("Terms of Service");
+  it("exports generateMetadata", () => {
+    expect(source).toContain("export async function generateMetadata");
+  });
+
+  it("imports getServerT and getServerLocale from @/lib/i18n/server", () => {
+    expect(source).toContain('from "@/lib/i18n/server"');
+    expect(source).toContain('getServerT');
+    expect(source).toContain('getServerLocale');
   });
 
   it("renders a main content landmark", () => {
     expect(source).toContain('id="main-content"');
   });
 
-  it("contains Terms of Service heading text", () => {
-    expect(source).toContain("Terms of");
-    expect(source).toContain("Service");
+  it("does NOT use static metadata export", () => {
+    expect(source).not.toContain("export const metadata");
   });
 
-  it("includes section headings for legal content", () => {
-    expect(source).toContain("Acceptance of Terms");
-    expect(source).toContain("Limitation of Liability");
+  it("does NOT export revalidate", () => {
+    expect(source).not.toContain("export const revalidate");
   });
 });

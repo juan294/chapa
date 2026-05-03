@@ -3,6 +3,13 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { ImpactBreakdown, DataSources, getArchetypeProfile } from "./ImpactBreakdown";
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
+import { en } from "@/lib/i18n/dictionaries/en";
+import { resolveTranslation } from "@/lib/i18n/resolve";
+
+/** English translation function for tests */
+function tEn(key: string): string | string[] | Record<string, unknown>[] {
+  return resolveTranslation(key, en) as string | string[] | Record<string, unknown>[];
+}
 
 afterEach(cleanup);
 
@@ -42,7 +49,7 @@ const SAMPLE_STATS: StatsData = {
 
 describe("getArchetypeProfile", () => {
   it("returns profile with tip for Builder archetype", () => {
-    const result = getArchetypeProfile(SAMPLE_IMPACT);
+    const result = getArchetypeProfile(SAMPLE_IMPACT, tEn);
     expect(result).toContain("driven by output");
     // Builder's weakest is quality (42), so should include quality tip
     expect(result).toContain("Quality");
@@ -54,7 +61,7 @@ describe("getArchetypeProfile", () => {
       archetype: "Quality Champion",
       dimensions: { delivery: 30, quality: 90, consistency: 50, breadth: 40 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     expect(result).toContain("shaped by quality");
     // Weakest is delivery (30)
     expect(result).toContain("Delivery");
@@ -66,7 +73,7 @@ describe("getArchetypeProfile", () => {
       archetype: "Marathoner",
       dimensions: { delivery: 40, quality: 20, consistency: 92, breadth: 35 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     expect(result).toContain("defined by consistency");
   });
 
@@ -76,7 +83,7 @@ describe("getArchetypeProfile", () => {
       archetype: "Polymath",
       dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 88 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     expect(result).toContain("marked by reach");
   });
 
@@ -86,7 +93,7 @@ describe("getArchetypeProfile", () => {
       archetype: "Balanced",
       dimensions: { delivery: 70, quality: 68, consistency: 72, breadth: 66 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     expect(result).toContain("well-rounded");
     // Should NOT contain a dimension tip since Balanced skips tips
     expect(result).not.toContain("To strengthen");
@@ -98,7 +105,7 @@ describe("getArchetypeProfile", () => {
       archetype: "Emerging",
       dimensions: { delivery: 15, quality: 10, consistency: 12, breadth: 8 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     expect(result).toContain("still taking shape");
     expect(result).not.toContain("To strengthen");
   });
@@ -213,7 +220,7 @@ describe("getArchetypeProfile — Artificer archetype", () => {
       archetype: "Artificer",
       dimensions: { delivery: 40, quality: 35, consistency: 45, breadth: 30, craft: 92 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     expect(result).toContain("defined by craft");
     // Weakest is breadth (30)
     expect(result).toContain("Breadth");
@@ -228,7 +235,7 @@ describe("getArchetypeProfile — solo profile tips", () => {
       archetype: "Builder",
       dimensions: { delivery: 90, quality: 10, consistency: 70, breadth: 55 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     // Solo quality tip mentions PR descriptions and feature branches
     expect(result).toContain("PR descriptions");
     expect(result).toContain("feature branches");
@@ -241,7 +248,7 @@ describe("getArchetypeProfile — solo profile tips", () => {
       archetype: "Marathoner",
       dimensions: { delivery: 10, quality: 40, consistency: 90, breadth: 55 },
     };
-    const result = getArchetypeProfile(impact);
+    const result = getArchetypeProfile(impact, tEn);
     // Weakest is delivery (10), and there's no solo override for delivery
     expect(result).toContain("opening and merging more pull requests");
   });

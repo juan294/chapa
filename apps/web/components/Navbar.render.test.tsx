@@ -10,6 +10,10 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(async () => ({
     get: mockHeadersGet,
   })),
+  // readLocaleCookie uses cookies() — return empty jar (locale resolved via Accept-Language below)
+  cookies: vi.fn(async () => ({
+    get: vi.fn().mockReturnValue(undefined),
+  })),
 }));
 
 vi.mock("@/lib/auth/github", () => ({
@@ -68,6 +72,10 @@ vi.mock("./ThemeToggle", () => ({
   ThemeToggle: () => <div data-testid="theme-toggle">ThemeToggle</div>,
 }));
 
+vi.mock("./LanguageSwitcher", () => ({
+  LanguageSwitcher: () => <div data-testid="language-switcher">LanguageSwitcher</div>,
+}));
+
 import { Navbar } from "./Navbar";
 
 beforeEach(() => {
@@ -75,6 +83,8 @@ beforeEach(() => {
   mockReadSessionCookie.mockReset();
   mockIsAdminHandle.mockReset();
   mockHeadersGet.mockReset();
+  // Navbar renders in English — set Accept-Language so tests don't depend on DEFAULT_LOCALE
+  mockHeadersGet.mockReturnValue('en-US');
 });
 
 afterEach(() => {
@@ -214,6 +224,17 @@ describe("Navbar", () => {
       render(jsx);
 
       expect(screen.getByTestId("theme-toggle")).toBeDefined();
+    });
+  });
+
+  describe("language switcher", () => {
+    it("always renders LanguageSwitcher", async () => {
+      mockReadSessionCookie.mockReturnValue(null);
+
+      const jsx = await Navbar({});
+      render(jsx);
+
+      expect(screen.getByTestId("language-switcher")).toBeDefined();
     });
   });
 });

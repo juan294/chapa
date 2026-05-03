@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
+import { useTranslation } from "@/lib/i18n";
 
 interface SubMetric {
   label: string;
@@ -24,14 +25,6 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   consistency: "var(--color-dimension-consistency)",
   breadth: "var(--color-dimension-breadth)",
   craft: "var(--color-dimension-craft)",
-};
-
-const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
-  delivery: "Delivery",
-  quality: "Quality",
-  consistency: "Consistency",
-  breadth: "Breadth",
-  craft: "Craft",
 };
 
 function getSubMetrics(
@@ -222,6 +215,7 @@ export function SubMetricPanel({
   onClose,
   profileType = "collaborative",
 }: SubMetricPanelProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!isOpen) return;
 
@@ -239,7 +233,7 @@ export function SubMetricPanel({
 
   const subMetrics = getSubMetrics(dimension, stats, profileType);
   const color = DIMENSION_COLORS[dimension];
-  const label = DIMENSION_LABELS[dimension];
+  const label = t(`dimensions.${dimension}.label`) as string;
 
   return (
     <div
@@ -252,11 +246,11 @@ export function SubMetricPanel({
           className="font-heading text-sm uppercase tracking-wider text-text-secondary"
           style={{ color }}
         >
-          {label} Breakdown
+          {label} {t('dashboard.breakdown') as string}
         </h3>
         <button
           type="button"
-          aria-label="Close breakdown panel"
+          aria-label={t('aria.closeBreakdown') as string}
           onClick={onClose}
           className="rounded-full p-1 text-text-secondary transition-colors hover:text-text-primary"
         >

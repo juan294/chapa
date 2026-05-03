@@ -3,12 +3,14 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 /**
- * These tests verify that each archetype page includes:
- * 1. A structured "Key signals" section with PRIMARY/SECONDARY/SUPPORTING labels
- * 2. A link to the full scoring methodology at /about/scoring
+ * These tests verify that each archetype's key signals appear in the EN dictionary,
+ * and that the ArchetypePage component links to /about/scoring.
+ *
+ * Note: Content is now in the i18n dictionaries, not in the page.tsx wrappers.
  */
 
 const ARCHETYPE_DIR = join(__dirname);
+const DICT_PATH = join(__dirname, "../../../web/lib/i18n/dictionaries/en.ts");
 
 const ARCHETYPES = [
   {
@@ -37,25 +39,41 @@ const ARCHETYPES = [
   },
 ];
 
-describe("Archetype pages — scoring signals section", () => {
+describe("Archetype scoring signals — in EN dictionary", () => {
+  const dictContent = readFileSync(DICT_PATH, "utf-8");
+
   for (const archetype of ARCHETYPES) {
     describe(archetype.name, () => {
-      const filePath = join(ARCHETYPE_DIR, archetype.name, "page.tsx");
-      const content = readFileSync(filePath, "utf-8");
-
-      it("has a 'Key signals' heading", () => {
-        expect(content).toContain("Key signals");
-      });
-
       for (const signal of archetype.signals) {
-        it(`mentions signal: "${signal}"`, () => {
-          expect(content).toContain(signal);
+        it(`EN dictionary mentions signal: "${signal}"`, () => {
+          expect(dictContent).toContain(signal);
         });
       }
+    });
+  }
+});
 
-      it("links to /about/scoring", () => {
-        expect(content).toMatch(/href="\/about\/scoring"/);
-      });
+describe("ArchetypePage component — scoring links", () => {
+  const componentContent = readFileSync(
+    join(ARCHETYPE_DIR, "_components/ArchetypePage.tsx"),
+    "utf-8",
+  );
+
+  it("links to /about/scoring", () => {
+    expect(componentContent).toMatch(/href="\/about\/scoring"/);
+  });
+
+  it("links to /#features", () => {
+    expect(componentContent).toMatch(/href="\/#features"/);
+  });
+});
+
+describe("Archetype page wrappers — structural compliance", () => {
+  for (const archetype of ARCHETYPES) {
+    it(`${archetype.name}/page.tsx delegates to ArchetypePage`, () => {
+      const filePath = join(ARCHETYPE_DIR, archetype.name, "page.tsx");
+      const content = readFileSync(filePath, "utf-8");
+      expect(content).toContain("ArchetypePage");
     });
   }
 });

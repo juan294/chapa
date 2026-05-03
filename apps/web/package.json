@@ -1,6 +1,6 @@
 {
   "name": "@chapa/web",
-  "version": "2.9.1",
+  "version": "2.10.0",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -36,7 +36,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.1.5",
-    "eslint": "^9.39.0",
+    "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.4",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.21.0",

@@ -60,6 +60,10 @@ npx chapa-cli merge
 
 Supports `--insecure` for corporate networks with TLS interception and `--verbose` for diagnostics.
 
+### Bilingual UI (ES / EN)
+
+Chapa's interface is available in Spanish (default) and English. A language picker (globe icon, next to the theme toggle in the nav bar) saves your preference in a cookie. The default locale is auto-detected from your browser's `Accept-Language` header.
+
 ### Admin Dashboard (`/admin`)
 
 Admin-only dashboard with user management, agent fleet monitoring, feature flags, engagement controls, campaign management, and a command bar. Access controlled by the `ADMIN_HANDLES` environment variable.
@@ -99,12 +103,16 @@ chapa/
 │   └── lib/               # Business logic
 │       ├── auth/          # GitHub, Bitbucket, Codeberg OAuth + CLI token management
 │       ├── cache/         # Upstash Redis (6h TTL)
+│       ├── dashboard/     # Insight generation (CoachingInsights, DimensionCard, SubMetricPanel)
 │       ├── db/            # Supabase data access (users, platforms, snapshots, campaigns)
 │       ├── github/        # GraphQL client + stats aggregation + multi-platform merge
 │       ├── bitbucket/     # Bitbucket API client + stats aggregation
 │       ├── codeberg/      # Codeberg API client + stats aggregation
 │       ├── history/       # Lifetime metric snapshots (Supabase)
+│       ├── i18n/          # Locale detection, dictionaries (en/es), server + client translation
 │       ├── impact/        # Impact v6 scoring engine
+│       ├── insights/      # AI tool insights integration
+│       ├── profile/       # Profile materialisation and orchestration
 │       ├── render/        # React-to-SVG badge renderer
 │       ├── verification/  # HMAC-SHA256 badge signing
 │       ├── effects/       # Visual effects library
@@ -142,7 +150,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
 | Hosting | Vercel |
-| Testing | Vitest, 389+ test files, 6,950+ tests, TDD workflow |
+| Testing | Vitest, 440+ test files, 7,530+ tests, TDD workflow |
 
 ## Environment Variables
 

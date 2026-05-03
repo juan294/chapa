@@ -1,120 +1,113 @@
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { LocaleSync } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import type { Metadata } from "next";
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: "About",
-  description:
-    "Learn about Chapa — developer impact, decoded. Discover how the multi-dimension scoring model works and what data we analyze.",
-  openGraph: {
-    title: "About Chapa",
-    description:
-      "Learn about Chapa — developer impact, decoded. Multiple dimensions that show what kind of developer you are.",
-  },
-  twitter: {
-    card: "summary",
-    title: "About Chapa",
-    description:
-      "Learn about Chapa — developer impact, decoded.",
-  },
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}): Promise<Metadata> {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+  return {
+    title: t('about.index.metadataTitle') as string,
+    description: t('about.index.metadataDescription') as string,
+    openGraph: {
+      title: t('about.index.ogTitle') as string,
+      description: t('about.index.ogDescription') as string,
+    },
+    twitter: {
+      card: "summary",
+      title: t('about.index.twitterTitle') as string,
+      description: t('about.index.twitterDescription') as string,
+    },
+  };
+}
 
-export default function AboutPage() {
+export default async function AboutPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+
   return (
     <div className="min-h-screen bg-bg">
+      <LocaleSync queryLang={(await searchParams).lang} />
       <Navbar />
 
       <main id="main-content" className="relative mx-auto max-w-3xl px-6 pt-32 pb-24">
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">
-            About Chapa<span className="text-amber animate-cursor-blink">_</span>
+            {t('about.index.h1') as string}<span className="text-amber animate-cursor-blink">_</span>
           </h1>
 
           <div className="space-y-6 text-text-secondary leading-relaxed animate-fade-in-up [animation-delay:150ms]">
-            <p>
-              When AI writes most code, traditional volume metrics — commits,
-              lines of code (LOC), PR counts — become meaningless. What matters is <em>how</em>{" "}
-              you contribute, not <em>how much</em> code you produce.
-            </p>
+            {(t('about.index.intro') as string[]).map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
 
+            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
+              {t('about.index.sectionDimensions') as string}
+            </h2>
             <p>
-              Chapa generates a live, embeddable SVG badge that decodes your
-              developer impact from your linked platforms. It analyzes your
-              last 12 months across four core dimensions — plus an optional
-              fifth for AI tool mastery — to show what kind of developer you are.
+              {t('about.index.dimensionsBody') as string}
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              Dimensions
+              {t('about.index.sectionArchetypes') as string}
             </h2>
             <p>
-              <strong className="text-text-primary">Delivery</strong> — shipping meaningful changes
-              (PRs merged, issues closed).{" "}
-              <strong className="text-text-primary">Quality</strong> — engineering discipline
-              (code reviews on teams, PR hygiene and structured workflow when solo).{" "}
-              <strong className="text-text-primary">Consistency</strong> — reliable, sustained
-              contributions over time.{" "}
-              <strong className="text-text-primary">Breadth</strong> — cross-project influence and
-              diversity of work. Each dimension is scored 0-100 independently.
-            </p>
-
-            <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              Developer archetypes
-            </h2>
-            <p>
-              Your dimension profile shape determines your archetype:{" "}
+              {t('about.index.archetypesBodyBefore') as string}
               <Link href="/archetypes/builder" className="font-semibold text-archetype-builder hover:text-amber-light transition-colors">Builder</Link>,{" "}
               <Link href="/archetypes/guardian" className="font-semibold text-archetype-guardian hover:text-archetype-guardian/70 transition-colors">Quality Champion</Link>,{" "}
               <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">Marathoner</Link>,{" "}
               <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">Polymath</Link>,{" "}
               <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">Artificer</Link>,{" "}
               <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">Balanced</Link>, or{" "}
-              <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>. The
-              archetype is shown as the primary label on your badge, with a
-              composite score and tier as secondary context.
+              <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">Emerging</Link>
+              {t('about.index.archetypesBodyAfter') as string}
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              Privacy and fairness
+              {t('about.index.sectionPrivacy') as string}
             </h2>
             <p>
-              Chapa only requests access to public data from your linked platforms. Confidence
-              messaging is designed to surface patterns without making
-              accusations. The scoring model is built to reward genuine
-              contribution and resist gaming — volume alone does not
-              determine your score. Read the full details on our{" "}
+              {t('about.index.privacyBody') as string}{" "}
               <Link
                 href="/about/scoring"
                 className="text-amber hover:text-amber-light transition-colors"
               >
-                scoring methodology
-              </Link>{" "}
-              page. Every badge also carries a cryptographic
-              verification hash — learn how it works on our{" "}
+                {t('about.index.scoringLinkLabel') as string}
+              </Link>
+              {t('about.index.privacyBodyMiddle') as string}
               <Link
                 href="/about/verification"
                 className="text-amber hover:text-amber-light transition-colors"
               >
-                badge verification
-              </Link>{" "}
-              page.
+                {t('about.index.verificationLinkLabel') as string}
+              </Link>
+              {t('about.index.privacyBodyEnd') as string}
             </p>
 
             <h2 className="font-heading text-xl font-semibold text-text-primary tracking-tight pt-4">
-              Contact
+              {t('about.index.sectionContact') as string}
             </h2>
             <p>
-              Questions or feedback? Reach me at{" "}
+              {t('about.index.contactBody') as string}
               <a
-                href="mailto:support@chapa.thecreativetoken.com"
+                href={`mailto:${t('about.index.contactEmail') as string}`}
                 className="text-amber hover:text-amber-light transition-colors"
               >
-                support@chapa.thecreativetoken.com
+                {t('about.index.contactEmail') as string}
               </a>
-              .
+              {t('about.index.contactBodyEnd') as string}
             </p>
           </div>
         </div>

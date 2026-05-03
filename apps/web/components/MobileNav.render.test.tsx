@@ -10,6 +10,14 @@ vi.mock("next/navigation", () => ({
   usePathname: mockUsePathname,
 }));
 
+vi.mock("./LanguageSwitcher", () => ({
+  LanguageSwitcher: () => <div data-testid="language-switcher">LanguageSwitcher</div>,
+}));
+
+vi.mock("./ThemeToggle", () => ({
+  ThemeToggle: () => <div data-testid="theme-toggle">ThemeToggle</div>,
+}));
+
 import { MobileNav } from "./MobileNav";
 
 beforeEach(() => {
@@ -55,6 +63,12 @@ describe("MobileNav", () => {
     expect(screen.getByRole("navigation")).toBeDefined();
     fireEvent.click(screen.getByText(/home/i));
     expect(screen.queryByRole("navigation")).toBeNull();
+  });
+
+  it("renders LanguageSwitcher in drawer when open", () => {
+    render(<MobileNav links={LINKS} />);
+    fireEvent.click(screen.getByLabelText("Toggle navigation"));
+    expect(screen.getByTestId("language-switcher")).toBeDefined();
   });
 
   it("closes menu on Escape key", () => {

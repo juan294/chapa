@@ -24,7 +24,7 @@ describe("BadgeToolbar", () => {
     });
 
     it("has aria-label for accessibility", () => {
-      expect(SOURCE).toContain('aria-label="Refresh badge data"');
+      expect(SOURCE).toContain("t('aria.refreshBadge')");
     });
 
     it("shows loading state with animate-spin", () => {
@@ -114,7 +114,7 @@ describe("BadgeToolbar", () => {
 
   describe("a11y: share button aria-label (#335)", () => {
     it("has aria-label on the share dropdown button", () => {
-      expect(SOURCE).toContain('aria-label="Share badge"');
+      expect(SOURCE).toContain("t('aria.shareBadge')");
     });
   });
 
@@ -132,7 +132,7 @@ describe("BadgeToolbar", () => {
 
   describe("#520 — aria-label on share dropdown menu", () => {
     it("share dropdown menu has aria-label 'Share options'", () => {
-      expect(SOURCE).toContain('aria-label="Share options"');
+      expect(SOURCE).toContain("t('aria.shareOptions')");
     });
   });
 

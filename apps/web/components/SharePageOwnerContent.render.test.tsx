@@ -97,6 +97,8 @@ afterEach(() => {
 });
 
 describe("SharePageOwnerContent — render", () => {
+  // useTranslation falls back to English without LanguageProvider in all these tests
+
   it("shows public content while loading session", () => {
     mockUseSession.mockReturnValue({ session: null, loading: true, invalidate: vi.fn() });
 
@@ -111,7 +113,8 @@ describe("SharePageOwnerContent — render", () => {
     expect(container.innerHTML).not.toBe("");
     expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
-    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    // English: shareOwner.embedBadge = 'Embed this badge'
+    expect(screen.getByText("Embed this badge")).toBeTruthy();
   });
 
   it("shows public insight content and CTA when user is not the profile owner", () => {
@@ -129,13 +132,16 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
+    // English: shareVisitor.title = 'Want to see what your developer impact looks like?'
     expect(
-      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
+      screen.getByText("Want to see what your developer impact looks like?"),
     ).toBeTruthy();
     expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
-    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
-    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
+    // English: shareOwner.embedBadge = 'Embed this badge'
+    expect(screen.getByText("Embed this badge")).toBeTruthy();
+    // English: shareVisitor.cta = 'Discover your impact'
+    expect(screen.getByText("Discover your impact")).toBeTruthy();
   });
 
   it("shows visitor CTA when session fetch fails", () => {
@@ -149,8 +155,9 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
+    // English: shareVisitor.title
     expect(
-      screen.getByText("¿Quieres ver cómo se ve tu impacto como desarrollador?"),
+      screen.getByText("Want to see what your developer impact looks like?"),
     ).toBeTruthy();
     expect(screen.getByTestId("data-sources")).toBeTruthy();
   });
@@ -166,8 +173,10 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Descubre tu impacto")).toBeTruthy();
-    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    // English: shareVisitor.cta = 'Discover your impact'
+    expect(screen.getByText("Discover your impact")).toBeTruthy();
+    // English: shareOwner.embedBadge = 'Embed this badge'
+    expect(screen.getByText("Embed this badge")).toBeTruthy();
   });
 
   it("shows owner content when user matches the handle", () => {
@@ -187,8 +196,10 @@ describe("SharePageOwnerContent — render", () => {
 
     expect(screen.getByTestId("data-sources")).toBeTruthy();
     expect(screen.getByTestId("impact-dashboard")).toBeTruthy();
-    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
-    expect(screen.getByText("Desglose de impacto")).toBeTruthy();
+    // English: shareOwner.embedBadge = 'Embed this badge'
+    expect(screen.getByText("Embed this badge")).toBeTruthy();
+    // English: shareOwner.impactBreakdown = 'Impact breakdown'
+    expect(screen.getByText("Impact breakdown")).toBeTruthy();
   });
 
   it("renders embed snippets with correct handle", () => {
@@ -206,7 +217,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    // English: shareOwner.embedBadge = 'Embed this badge'
+    expect(screen.getByText("Embed this badge")).toBeTruthy();
 
     const copyButtons = screen.getAllByTestId("copy-button");
     expect(copyButtons.length).toBe(2);
@@ -233,8 +245,9 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
+    // English: shareOwner.emptyState = 'Impact data could not be loaded. Try again later.'
     expect(
-      screen.getByText("No se pudieron cargar los datos de impacto. Intentalo de nuevo mas tarde."),
+      screen.getByText("Impact data could not be loaded. Try again later."),
     ).toBeTruthy();
   });
 
@@ -253,7 +266,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Regenerar")).toBeTruthy();
+    // English: shareOwner.regenerate = 'Regenerate'
+    expect(screen.getByText("Regenerate")).toBeTruthy();
   });
 
   it("posts to refresh and shows success after a successful regenerate", async () => {
@@ -273,7 +287,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Regenerar"));
+    // English: shareOwner.regenerate = 'Regenerate'
+    fireEvent.click(screen.getByText("Regenerate"));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith("/api/refresh?handle=testuser", {
@@ -281,7 +296,8 @@ describe("SharePageOwnerContent — render", () => {
       });
     });
 
-    expect(screen.getByText("Listo")).toBeTruthy();
+    // English: shareOwner.ready = 'Ready'
+    expect(screen.getByText("Ready")).toBeTruthy();
   });
 
   it("reloads the page 800ms after a successful regenerate", async () => {
@@ -306,7 +322,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Regenerar"));
+    // English: shareOwner.regenerate = 'Regenerate'
+    fireEvent.click(screen.getByText("Regenerate"));
     await vi.advanceTimersByTimeAsync(0); // resolve fetch microtask
     await vi.advanceTimersByTimeAsync(800);
 
@@ -329,10 +346,12 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Regenerar"));
+    // English: shareOwner.regenerate = 'Regenerate'
+    fireEvent.click(screen.getByText("Regenerate"));
 
     expect(
-      await screen.findByText("La regeneracion fallo.", { exact: false }),
+      // English: shareOwner.regenerateError = 'Regeneration failed.'
+      await screen.findByText("Regeneration failed.", { exact: false }),
     ).toBeTruthy();
   });
 
@@ -352,12 +371,15 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Regenerar"));
+    // English: shareOwner.regenerate = 'Regenerate'
+    fireEvent.click(screen.getByText("Regenerate"));
 
     expect(
-      await screen.findByText("La regeneracion fallo.", { exact: false }),
+      // English: shareOwner.regenerateError = 'Regeneration failed.'
+      await screen.findByText("Regeneration failed.", { exact: false }),
     ).toBeTruthy();
-    const supportLink = screen.getByText("Contactar soporte");
+    // English: shareOwner.contactSupport = 'Contact support'
+    const supportLink = screen.getByText("Contact support");
     expect(supportLink.getAttribute("href")).toContain(
       "mailto:support@thecreativetoken.com",
     );
@@ -378,7 +400,8 @@ describe("SharePageOwnerContent — render", () => {
       />,
     );
 
-    expect(screen.getByText("Incrustar esta insignia")).toBeTruthy();
+    // English: shareOwner.embedBadge = 'Embed this badge'
+    expect(screen.getByText("Embed this badge")).toBeTruthy();
     expect(screen.queryByTestId("data-sources")).toBeNull();
   });
 });

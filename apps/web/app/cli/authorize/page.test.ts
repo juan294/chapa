@@ -16,19 +16,51 @@ describe("CliAuthorizePage", () => {
     it("does NOT have 'use client' directive (server component)", () => {
       expect(SOURCE).not.toMatch(/^["']use client["']/m);
     });
+
+    it("exports dynamic = force-dynamic", () => {
+      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
+    });
+
+    it("exports generateMetadata function", () => {
+      expect(SOURCE).toContain("export async function generateMetadata");
+    });
+  });
+
+  describe("i18n integration", () => {
+    it("imports getServerLocale from i18n/server", () => {
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).toContain("@/lib/i18n/server");
+    });
+
+    it("imports getServerT from i18n/server", () => {
+      expect(SOURCE).toContain("getServerT");
+    });
+
+    it("imports LocaleSync from @/lib/i18n", () => {
+      expect(SOURCE).toContain("LocaleSync");
+      expect(SOURCE).toContain("@/lib/i18n");
+    });
+
+    it("uses cliAuthorize.metadataTitle key in generateMetadata", () => {
+      expect(SOURCE).toContain("cliAuthorize.metadataTitle");
+    });
+
+    it("uses cliAuthorize.h1 key for missing-session heading", () => {
+      expect(SOURCE).toContain("cliAuthorize.h1");
+    });
+
+    it("uses cliAuthorize.errorMissingSession key", () => {
+      expect(SOURCE).toContain("cliAuthorize.errorMissingSession");
+    });
+
+    it("mounts LocaleSync in missing-session branch", () => {
+      expect(SOURCE).toContain("<LocaleSync");
+    });
   });
 
   describe("session parameter handling", () => {
     it("reads session from searchParams", () => {
       expect(SOURCE).toContain("params.session");
-    });
-
-    it("shows error when session parameter is missing", () => {
-      expect(SOURCE).toContain("Missing session parameter");
-    });
-
-    it("instructs user to run chapa login", () => {
-      expect(SOURCE).toContain("chapa login");
     });
   });
 
@@ -75,10 +107,6 @@ describe("CliAuthorizePage", () => {
 
     it("has an h1 heading", () => {
       expect(SOURCE).toContain("<h1");
-    });
-
-    it("heading says 'Authorize Chapa CLI'", () => {
-      expect(SOURCE).toContain("Authorize Chapa CLI");
     });
   });
 

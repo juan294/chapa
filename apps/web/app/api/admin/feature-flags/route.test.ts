@@ -16,6 +16,11 @@ vi.mock("@/lib/feature-flags", () => ({
     mockInvalidateFeatureFlagCache(...args),
 }));
 
+const mockRevalidateTag = vi.fn();
+vi.mock("next/cache", () => ({
+  revalidateTag: (...args: unknown[]) => mockRevalidateTag(...args),
+}));
+
 const mockRateLimit = vi.fn();
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
@@ -79,6 +84,12 @@ describe("PATCH /api/admin/feature-flags", () => {
       enabled: true,
     });
     expect(mockInvalidateFeatureFlagCache).toHaveBeenCalledWith("coverage_agent");
+    expect(mockRevalidateTag).toHaveBeenCalledWith("feature-flags", "seconds");
+  });
+
+  it("calls revalidateTag to bust Next.js data cache on success", async () => {
+    await PATCH(makeRequest({ key: "studio_enabled", enabled: false }));
+    expect(mockRevalidateTag).toHaveBeenCalledWith("feature-flags", "seconds");
   });
 
   it("updates config when provided", async () => {
@@ -136,6 +147,7 @@ describe("PATCH /api/admin/feature-flags", () => {
     const res = await PATCH(makeRequest({ key: "test", enabled: true }));
     expect(res.status).toBe(500);
     expect(mockInvalidateFeatureFlagCache).not.toHaveBeenCalled();
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
   });
 
   it("returns 504 when Supabase call times out", async () => {

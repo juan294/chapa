@@ -72,7 +72,7 @@ while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
     if ! validate_report_file \
       "${REPORT_FILE}" \
       "cc-rpi-update" \
-      "^(# |\`\`\`markdown|cc-rpi sync: already up to date as of )"; then
+      "^(# |\`\`\`markdown|cc-rpi sync: already up to date as of |The local cc-rpi)"; then
       RETRY_COUNT=$((RETRY_COUNT + 1))
       log_error "Attempt ${RETRY_COUNT} produced invalid report output. Retrying in 10s..."
       sleep 10

@@ -16,30 +16,66 @@ vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
 
+vi.mock("@/components/GlobalCommandBarLazy", () => ({
+  GlobalCommandBarLazy: () => null,
+}));
+
 vi.mock("@/components/LiteYouTubeEmbed", () => ({
   LiteYouTubeEmbed: () => <div data-testid="youtube-embed" />,
+}));
+
+vi.mock("@/lib/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+  return {
+    ...actual,
+    LocaleSync: () => null,
+  };
+});
+
+vi.mock("@/lib/i18n/server", async () => {
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  function deepGet(obj: Record<string, unknown>, key: string): unknown {
+    const parts = key.split(".");
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
+      current = (current as Record<string, unknown>)[part];
+      if (current === undefined) return key;
+    }
+    return current;
+  }
+  return {
+    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerT: vi.fn().mockImplementation(() => (key: string) =>
+      deepGet(en as unknown as Record<string, unknown>, key)
+    ),
+  };
+});
+
+vi.mock("./verify/VerifyForm", () => ({
+  VerifyForm: () => <div data-testid="verify-form" />,
 }));
 
 afterEach(cleanup);
 
 // ---------------------------------------------------------------------------
-// Privacy page
+// Privacy page (async server component)
 // ---------------------------------------------------------------------------
 describe("PrivacyPage render", () => {
   it("renders with navbar", async () => {
     const { default: PrivacyPage } = await import("./privacy/page");
-    render(<PrivacyPage />);
+    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Terms page
+// Terms page (async server component)
 // ---------------------------------------------------------------------------
 describe("TermsPage render", () => {
   it("renders with navbar", async () => {
     const { default: TermsPage } = await import("./terms/page");
-    render(<TermsPage />);
+    render(await TermsPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -50,21 +86,20 @@ describe("TermsPage render", () => {
 describe("ComingSoonPage render", () => {
   it("renders with Chapa heading", async () => {
     const { default: ComingSoonPage } = await import("./coming-soon/page");
-    render(<ComingSoonPage />);
+    const jsx = await ComingSoonPage({ searchParams: Promise.resolve({}) });
+    render(jsx);
     expect(screen.getByText(/Coming soon/)).toBeDefined();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Verify input page
+// Verify input page (server component — must await the async function)
 // ---------------------------------------------------------------------------
 describe("VerifyInputPage render", () => {
   it("renders with verify heading", async () => {
-    vi.doMock("./verify/VerifyForm", () => ({
-      VerifyForm: () => <div data-testid="verify-form" />,
-    }));
     const { default: VerifyInputPage } = await import("./verify/page");
-    render(<VerifyInputPage />);
+    const jsx = await VerifyInputPage({ searchParams: Promise.resolve({}) });
+    render(jsx);
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -168,7 +203,9 @@ describe("Error page renders", () => {
   it("renders SharePageError", async () => {
     const { default: SharePageError } = await import("./u/[handle]/error");
     render(<SharePageError error={makeError()} reset={noop} />);
-    expect(screen.getByText("Algo salió mal")).toBeDefined();
+    // useTranslation falls back to English without LanguageProvider
+    // English: errors.sharePage.title = 'Something went wrong'
+    expect(screen.getByText("Something went wrong")).toBeDefined();
   });
 
   it("renders VerifyError", async () => {

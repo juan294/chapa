@@ -9,7 +9,7 @@
       <mxGeometry x="180" y="45" width="640" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="frontend" value="Frontend (apps/web)" style="swimlane;startSize=26;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="40" y="80" width="880" height="100" as="geometry"/>
+      <mxGeometry x="40" y="80" width="880" height="155" as="geometry"/>
     </mxCell>
     <mxCell id="landing" value="Landing Page&#10;/" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="frontend">
       <mxGeometry x="20" y="38" width="155" height="45" as="geometry"/>
@@ -26,8 +26,17 @@
     <mxCell id="admin" value="Admin Panel&#10;/admin" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#d6b656;" vertex="1" parent="frontend">
       <mxGeometry x="700" y="38" width="160" height="45" as="geometry"/>
     </mxCell>
+    <mxCell id="nav-label" value="Navbar (all pages):" style="text;fontSize=9;fontColor=#92600a;fontStyle=2;" vertex="1" parent="frontend">
+      <mxGeometry x="10" y="90" width="140" height="14" as="geometry"/>
+    </mxCell>
+    <mxCell id="langswitch" value="LanguageSwitcher&#10;Globe icon · ES|EN pill&#10;chapa-locale cookie" style="rounded=1;whiteSpace=wrap;fillColor=#fffde0;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="frontend">
+      <mxGeometry x="10" y="104" width="210" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="themetoggle" value="ThemeToggle&#10;Light / Dark&#10;next-themes" style="rounded=1;whiteSpace=wrap;fillColor=#fffde0;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="frontend">
+      <mxGeometry x="240" y="104" width="180" height="40" as="geometry"/>
+    </mxCell>
     <mxCell id="oauth" value="OAuth &amp; Auth Layer" style="swimlane;startSize=26;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="40" y="200" width="880" height="140" as="geometry"/>
+      <mxGeometry x="40" y="255" width="880" height="140" as="geometry"/>
     </mxCell>
     <mxCell id="ghauth" value="GitHub OAuth" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;" vertex="1" parent="oauth">
       <mxGeometry x="20" y="35" width="180" height="45" as="geometry"/>
@@ -54,7 +63,7 @@
       <mxGeometry x="640" y="90" width="220" height="38" as="geometry"/>
     </mxCell>
     <mxCell id="api" value="API Routes (app/api/)" style="swimlane;startSize=26;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="40" y="360" width="880" height="180" as="geometry"/>
+      <mxGeometry x="40" y="415" width="880" height="180" as="geometry"/>
     </mxCell>
     <mxCell id="authep" value="Auth Endpoints&#10;/api/auth/*" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="api">
       <mxGeometry x="20" y="35" width="160" height="45" as="geometry"/>
@@ -81,7 +90,7 @@
       <mxGeometry x="630" y="98" width="230" height="45" as="geometry"/>
     </mxCell>
     <mxCell id="engine" value="Core Engine (lib/)" style="swimlane;startSize=26;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="40" y="560" width="880" height="215" as="geometry"/>
+      <mxGeometry x="40" y="615" width="880" height="265" as="geometry"/>
     </mxCell>
     <mxCell id="impact" value="Impact Engine&#10;(lib/impact/)&#10;v6 · cliff guard" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontStyle=1;fontSize=11;" vertex="1" parent="engine">
       <mxGeometry x="20" y="35" width="160" height="55" as="geometry"/>
@@ -113,8 +122,17 @@
     <mxCell id="emailcampaign" value="Email + Campaigns  ·  lib/email/  ·  lib/campaigns/  ·  Lease-based Send Claiming" style="rounded=1;whiteSpace=wrap;fillColor=#edf7ed;strokeColor=#82b366;fontSize=10;" vertex="1" parent="engine">
       <mxGeometry x="440" y="157" width="420" height="44" as="geometry"/>
     </mxCell>
+    <mxCell id="i18nmod" value="i18n System&#10;(lib/i18n/)&#10;detect · en/es dicts · cookie · server + client t()" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
+      <mxGeometry x="20" y="210" width="260" height="44" as="geometry"/>
+    </mxCell>
+    <mxCell id="dashmod" value="Dashboard Components&#10;(lib/dashboard/)&#10;generate-insights · DimensionCard · SubMetric" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
+      <mxGeometry x="300" y="210" width="260" height="44" as="geometry"/>
+    </mxCell>
+    <mxCell id="insightsmod" value="AI Tool Insights&#10;(lib/insights/)&#10;Claude Code · tool metrics · EMU integration" style="rounded=1;whiteSpace=wrap;fillColor=#fff8e6;strokeColor=#82b366;fontSize=9;" vertex="1" parent="engine">
+      <mxGeometry x="580" y="210" width="280" height="44" as="geometry"/>
+    </mxCell>
     <mxCell id="data" value="Data Layer" style="swimlane;startSize=26;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="40" y="800" width="420" height="270" as="geometry"/>
+      <mxGeometry x="40" y="910" width="420" height="270" as="geometry"/>
     </mxCell>
     <mxCell id="supadb" value="Supabase&#10;PostgreSQL" style="shape=cylinder3;whiteSpace=wrap;fillColor=#fff;strokeColor=#9673a6;size=12;fontSize=11;" vertex="1" parent="data">
       <mxGeometry x="30" y="35" width="140" height="70" as="geometry"/>
@@ -129,7 +147,7 @@
       <mxGeometry x="205" y="115" width="200" height="135" as="geometry"/>
     </mxCell>
     <mxCell id="cli" value="CLI (packages/cli/)" style="swimlane;startSize=26;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="500" y="800" width="420" height="120" as="geometry"/>
+      <mxGeometry x="500" y="910" width="420" height="120" as="geometry"/>
     </mxCell>
     <mxCell id="clipkg" value="npm Package&#10;GitHub Enterprise&#10;EMU Merge" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#82b366;fontSize=11;" vertex="1" parent="cli">
       <mxGeometry x="30" y="35" width="160" height="60" as="geometry"/>
@@ -138,7 +156,7 @@
       <mxGeometry x="230" y="35" width="160" height="60" as="geometry"/>
     </mxCell>
     <mxCell id="ext" value="External Services" style="swimlane;startSize=24;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;rounded=1;" vertex="1" parent="1">
-      <mxGeometry x="1020" y="80" width="240" height="500" as="geometry"/>
+      <mxGeometry x="1020" y="80" width="240" height="610" as="geometry"/>
     </mxCell>
     <mxCell id="ghapi_ext" value="GitHub API" style="rounded=1;whiteSpace=wrap;fillColor=#fff;strokeColor=#b85450;" vertex="1" parent="ext">
       <mxGeometry x="20" y="35" width="200" height="40" as="geometry"/>
@@ -173,7 +191,7 @@
     <mxCell id="e5" value="Platform APIs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;fontSize=9;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.15;entryDx=0;entryDy=0;" edge="1" parent="1" source="engine" target="ext">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="980" y="614"/>
+          <mxPoint x="980" y="681"/>
           <mxPoint x="980" y="155"/>
         </Array>
       </mxGeometry>
@@ -181,15 +199,15 @@
     <mxCell id="e6" value="Cache R/W" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;fontSize=9;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="engine" target="data">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="700" y="787"/>
-          <mxPoint x="355" y="787"/>
+          <mxPoint x="700" y="897"/>
+          <mxPoint x="355" y="897"/>
         </Array>
       </mxGeometry>
     </mxCell>
     <mxCell id="e7" value="Email" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.45;entryDx=0;entryDy=0;" edge="1" parent="1" source="api" target="ext">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="980" y="450"/>
+          <mxPoint x="980" y="505"/>
           <mxPoint x="980" y="305"/>
         </Array>
       </mxGeometry>
@@ -197,26 +215,26 @@
     <mxCell id="e8" value="Analytics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.55;entryDx=0;entryDy=0;" edge="1" parent="1" source="frontend" target="ext">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="960" y="130"/>
-          <mxPoint x="960" y="355"/>
+          <mxPoint x="960" y="158"/>
+          <mxPoint x="960" y="405"/>
         </Array>
       </mxGeometry>
     </mxCell>
     <mxCell id="e9" value="POST /api/supplemental&#10;(EMU stats → Redis + Supabase)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;dashed=1;fontSize=9;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="cli" target="engine">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="710" y="785"/>
-          <mxPoint x="940" y="785"/>
-          <mxPoint x="940" y="668"/>
+          <mxPoint x="710" y="895"/>
+          <mxPoint x="940" y="895"/>
+          <mxPoint x="940" y="723"/>
         </Array>
       </mxGeometry>
     </mxCell>
     <mxCell id="e10" value="dirty signal&#10;stats:dirty:&lt;handle&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;dashed=1;fontSize=9;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.85;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="cli" target="data">
       <mxGeometry relative="1" as="geometry">
         <Array as="points">
-          <mxPoint x="475" y="860"/>
-          <mxPoint x="475" y="1080"/>
-          <mxPoint x="397" y="1080"/>
+          <mxPoint x="475" y="970"/>
+          <mxPoint x="475" y="1190"/>
+          <mxPoint x="397" y="1190"/>
         </Array>
       </mxGeometry>
     </mxCell>
