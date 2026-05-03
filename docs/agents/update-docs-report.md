@@ -1,75 +1,46 @@
 # Documentation Update Report
-
-> Generated on 2026-04-27 | Branch: `chore/update-docs-v2.8.0` | Changes since `v2.7.2`
+> Generated on 2026-05-03 | Branch: `develop` | Changes since v2.9.1
 
 ## Summary
-
-- **3 documents updated** with content reflecting v2.8.0 work
-- **1 diagram refreshed** (architecture diagram updated in-place)
-- **0 version references corrected** in this pass (deferred to `/release`)
-- **0 inline doc blocks updated** (recent additions documented themselves correctly when they were created)
-- **0 items flagged `[NEEDS REVIEW]`**
+- 6 documents updated
+- 1 diagram flagged `[NEEDS REVIEW]`
+- 3 version references corrected
+- 0 inline doc blocks updated (no existing JSDoc found on changed modules)
+- 1 item flagged `[NEEDS REVIEW]`
 
 ## Changes by File
 
+### `CHANGELOG.md`
+Added missing `[Unreleased]` section with the full i18n feature summary (LanguageSwitcher, structured dictionaries, locale detection, cookie persistence, parity test, insignia→Chapa rename). Added `[2.9.1]` hotfix entry (Upstash OAuth state comparison fix) and `[2.9.0]` release entry (typed env getters, structured JSON logger, withErrorCapture on all 44 routes, share page perf improvements). Added compare links for all three new sections.
+
+### `README.md`
+- Updated test counts from "389+ files, 6,950+ tests" → "440+ files, 7,530+ tests"
+- Added **Bilingual UI (ES / EN)** to the Features section
+- Added `lib/dashboard/`, `lib/i18n/`, `lib/insights/`, `lib/profile/` to the project structure tree
+
 ### `CLAUDE.md`
+- Fixed cookie name: `locale` → `chapa-locale` (i18n section)
+- Fixed key count: `550+` → `650+` leaf keys per dictionary
+- Added three Code Ownership entries: `lib/i18n/`, `lib/dashboard/ + components/dashboard/`, `BadgeToolbar`
 
-Added two bullets to **Caching rules**:
+### `docs/user-manual.md`
+Added new **Language Switcher** section explaining the globe-icon picker, how to switch locales, and how the default is auto-detected from `Accept-Language`.
 
-- **Supplemental EMU stats** persistence layer (#825): documents the new `supplemental_stats` Supabase table, the Redis-as-hot-path / Supabase-as-fallback pattern in `getStats()`, and the fire-and-forget Redis rehydration on DB hit.
-- **Same-day refresh signal** (#826): documents the `stats:dirty:<handle>` Redis marker, how `materializeProfile` reads it, how `smoothScore` bypasses the same-day EMA lock when set, and how `runPublicProfileSideEffects` routes through `dbReplaceSnapshot` and clears the marker.
-
-Added one acceptance criterion under **Quality dimension**:
-
-- The cliff guard (#827): collaborative `computeQuality` returns `max(collaborativeFormula, soloFormula)` so users with strong solo signals don't drop sharply when crossing the 0.15 review-to-PR threshold.
+### `docs/runbooks/release-checklist.md`
+Added **Language switcher** row to the Preview Deployment Soak table: click globe icon → switch ES↔EN → confirm page re-renders in selected locale.
 
 ### `docs/impact-v6.md`
-
-Added a new subsection under **Score Recalculation** titled *"Same-day refresh after a CLI supplemental upload (#826)"*. It documents:
-
-1. Why the supplemental-upload path differs from the `/api/recalculate` path (it does not call recalculate directly).
-2. How `isStatsDirty()` is read in `materializeProfile` and threaded through as `inputsChanged`.
-3. How `smoothScore`'s `bypassSameDayLock` switches from "return today's value verbatim" to "apply EMA against today's already-smoothed value" so the new score lands without breaking the feedback-loop guard.
-4. How `runPublicProfileSideEffects` routes today's snapshot through `dbReplaceSnapshot`, bypasses the SETNX dedup guard, and clears the dirty marker after a successful write.
-5. Why the existing same-day lock behavior is preserved when the marker is absent.
-
-The cliff guard section (added in commit 3340092) was already present and correct from the #827 fix; no change.
-
-### `docs/cli-guide.md`
-
-Updated the **§6 Verifying it worked** section:
-
-- Replaced "Your badge should update on the next refresh (within 24 hours, or force-refresh if available)" with "Your badge updates on the **next page render**" and explained the same-day refresh marker.
-- Added a callout explaining that supplemental data is now persisted to Supabase, not Redis-only — a missed CLI day no longer drops EMU contributions silently.
+Corrected ASCII pipeline diagram: `"8 penalty flags"` → `"9 flag entries: 8 scored + 1 informational at 0 penalty"` to match the actual implementation in `lib/impact/utils.ts`.
 
 ### `docs/chapa-architecture.drawio`
+Added `<!-- [NEEDS REVIEW] -->` XML comment. The DrawIO diagram is missing `lib/i18n/` module, `LanguageSwitcher` component, `lib/dashboard/`, and `lib/insights/` swimlane nodes — last updated for v2.8.0. Requires the DrawIO desktop app to update properly.
 
-Refreshed in-place to reflect v2.8.0 scoring changes:
+## Flagged for Review
 
-- Expanded the **Data Layer** swimlane (height 120 → 270) to fit two new content blocks.
-- Added a **Supabase tables** block listing all tables, with `supplemental_stats   ← new (#825)` highlighted.
-- Added a **Redis keys** block listing all keys, with `stats:dirty:<handle>   ← new (#826)` highlighted.
-- Updated the existing CLI → Impact Engine edge (e9) label to: *"POST /api/supplemental (EMU stats → Redis + Supabase)"*.
-- Added a new CLI → Data Layer edge (e10) for the `stats:dirty:<handle>` signal that drives same-day refresh.
-- Updated cell descriptions on the cache module (now mentions `dirty-stats`), impact module (mentions cliff guard), DB CRUD module (mentions `supplemental`), and platforms module (mentions supplemental merge).
+| File | Issue |
+|------|-------|
+| `docs/chapa-architecture.drawio` | Missing: `lib/i18n/` module, `LanguageSwitcher` in Frontend swimlane, `lib/dashboard/`, `lib/insights/`. Open in DrawIO to add nodes. |
 
-Validated by re-exporting to PNG — XML is well-formed and the layout renders correctly. The `[NEEDS REVIEW]` flag has been removed.
+## Not Updated (checked, current)
 
-## Out of scope (deferred to `/release`)
-
-- `apps/web/package.json` version bump `2.7.2` → `2.8.0`
-- `CHANGELOG.md`: rename `[Unreleased]` → `[2.8.0] - 2026-04-27` and append the comparison link anchor
-- New CHANGELOG section content based on the change-analyst's categorized list
-
-## Lint
-
-`npx markdownlint` on the three changed markdown files reports **+9 line-length warnings** (MD013) on the lines I added — consistent with the existing one-bullet-per-line style throughout these files. No structural violations (MD022 / MD032) introduced. No reformat performed since MD013 is not enforced by the project's CI.
-
-## Discovery agents
-
-Four read-only agents informed this plan:
-
-- **change-analyst**: 119 commits since v2.7.2, 401 files changed (+21,997/-9,283). Categorized into scoring (#825/#826/#827), security (#807/#806/#793/#689), reliability (#792/#794/#799), observability, UX, localization. Two new migrations (023, 024). No breaking changes, no removed routes.
-- **doc-inventory**: catalogued ~30 user-facing markdown files, 51 plan files, 19 research files, 6 runbooks, 12+ agent-report files. Most don't need updates because they're either (a) historical artifacts (plans, research) or (b) auto-generated (agent reports). Inline JSDoc style: `@param`/`@returns`, file-level docblocks, formula explanations.
-- **diagram-analyzer**: 4 diagrams found (1 DrawIO, 3 ASCII). The DrawIO architecture diagram has been refreshed in this pass (see above). ASCII diagrams in `impact-v6.md`, `README.md`, and `scheduled-agents-admin-panel.md` are current.
-- **version-scanner**: authoritative version is `apps/web/package.json` (currently 2.7.2, target 2.8.0). All other version references are tool/CI pins and should not be touched. Cache version (`v2`) and HMAC payload version (`v2`) are intentionally pinned to schema versions, independent of app version.
+`docs/design-system.md` (LanguageSwitcher already documented), `docs/accepted-risks.md` (two i18n risks already added), `docs/svg-design.md`, `docs/how-it-works.md`, `docs/cli-guide.md`, `docs/badge-verification.md`, all deprecated impact specs (correctly archived), all research/plans docs (intentional historical snapshots), all other runbooks.

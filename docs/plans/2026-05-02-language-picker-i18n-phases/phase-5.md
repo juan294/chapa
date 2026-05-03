@@ -141,11 +141,11 @@ Prepare a release note draft (do not push, do not create the PR — wait for use
 ### File checklist
 
 - [ ] `scripts/i18n-audit.ts` (optional but recommended)
-- [ ] `CLAUDE.md` updated
-- [ ] `docs/accepted-risks.md` updated
-- [ ] `docs/design-system.md` updated
-- [ ] Parent GitHub issue closed with summary
-- [ ] Release notes drafted (not pushed) for user-authorized develop → main PR
+- [x] `CLAUDE.md` updated
+- [x] `docs/accepted-risks.md` updated
+- [x] `docs/design-system.md` updated
+- [x] Parent GitHub issue closed with summary
+- [x] Release notes drafted (not pushed) for user-authorized develop → main PR
 
 ---
 
