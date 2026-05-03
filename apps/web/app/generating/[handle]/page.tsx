@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { isValidHandle } from "@/lib/validation";
-import { getServerLocale, getServerT } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { GeneratingProgress } from "./GeneratingProgress";
 import type { Metadata } from "next";
 

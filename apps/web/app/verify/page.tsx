@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerLocale, getServerT } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { VerifyForm } from "./VerifyForm";
 
 export const dynamic = 'force-dynamic';

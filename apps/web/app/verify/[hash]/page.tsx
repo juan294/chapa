@@ -1,7 +1,7 @@
 import { getVerificationRecord } from "@/lib/verification/store";
 import { Navbar } from "@/components/Navbar";
 import { StatusCallout } from "@/components/StatusCallout";
-import { getServerLocale, getServerT } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import type { Translations } from "@/lib/i18n";
 import Link from "next/link";
 import type { Metadata } from "next";

@@ -21,8 +21,7 @@ vi.mock("./GeneratingProgress", () => ({
 }));
 
 // Mock getServerLocale + getServerT to return English without needing Next.js headers()
-vi.mock("@/lib/i18n", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+vi.mock("@/lib/i18n/server", async () => {
   const { en } = await import("@/lib/i18n/dictionaries/en");
   function deepGet(obj: Record<string, unknown>, key: string): unknown {
     const parts = key.split(".");
@@ -35,7 +34,6 @@ vi.mock("@/lib/i18n", async (importOriginal) => {
     return current;
   }
   return {
-    ...actual,
     getServerLocale: vi.fn().mockResolvedValue("en"),
     getServerT: vi.fn().mockImplementation(() => (key: string) =>
       deepGet(en as unknown as Record<string, unknown>, key)

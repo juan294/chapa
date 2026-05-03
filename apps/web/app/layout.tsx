@@ -7,7 +7,8 @@ import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvi
 import { getBaseUrl } from "@/lib/env";
 import { isStudioEnabled } from "@/lib/feature-flags";
 import { renderJsonLd } from "@/lib/jsonld";
-import { LanguageProvider, LangSync, getServerLocale } from "@/lib/i18n";
+import { LanguageProvider, LangSync } from "@/lib/i18n";
+import { getServerLocale } from "@/lib/i18n/server";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],

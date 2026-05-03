@@ -45,8 +45,11 @@ vi.mock("@/lib/jsonld", () => ({
 }));
 
 const mockGetServerLocale = vi.fn(async (): Promise<"en" | "es"> => "en");
-vi.mock("@/lib/i18n", () => ({
+vi.mock("@/lib/i18n/server", () => ({
   getServerLocale: () => mockGetServerLocale(),
+  getServerT: vi.fn().mockImplementation(() => (key: string) => key),
+}));
+vi.mock("@/lib/i18n", () => ({
   LanguageProvider: ({
     children,
     initialLocale,

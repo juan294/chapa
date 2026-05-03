@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getOptionalServerSessionFromHeaders } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { getServerLocale, getServerT } from "@/lib/i18n";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
 import { NavLink } from "./NavLink";
