@@ -28,6 +28,10 @@ export const en: Translations = {
     selectInsightsReport: 'Select Claude Code insights HTML report',
     unlinkBitbucket: 'Unlink Bitbucket account',
     unlinkCodeberg: 'Unlink Codeberg account',
+    languageSwitcher: 'Language switcher',
+    badgeTooltips: 'Badge element tooltips',
+    avatarOf: '{login}',
+    moreInfo: 'More information',
   },
   landing: {
     navLinks: [
@@ -175,6 +179,19 @@ export const en: Translations = {
     contactSupport: 'Contact support',
     badgeAlt: 'Chapa Badge',
     badgeAltOf: 'Chapa Badge of',
+    ariaBusy: 'Regenerating badge',
+  },
+  sharePage: {
+    metadataTitle: '{handle} — Developer Impact, Decoded',
+    metadataDescription: "See {handle}'s developer impact profile: archetype, impact score, and dimension breakdown.",
+    metadataOgTitle: '{handle} — Chapa',
+    metadataOgImageAlt: 'Chapa badge for {handle}',
+    badgeAriaLabel: 'Chapa badge for {handle}',
+    badgeAlt: 'Chapa badge for {handle}',
+    srH1: "{handle}'s developer impact",
+    h2: 'Your Impact, Decoded',
+    loadingAriaLabel: 'Loading',
+    loadingSrText: 'Loading...',
   },
   verify: {
     title: 'Verify a badge',
@@ -274,5 +291,81 @@ export const en: Translations = {
     verification: 'Cryptographic seal proving these scores haven’t been tampered with.',
     craft: 'AI Craft Score — measures your proficiency, effectiveness, and sophistication with AI coding tools like Claude Code.',
     github: 'Chapa analyzes public metrics from GitHub and other linked platforms. These platforms are not affiliated with or endorsing this project.',
+  },
+  legal: {
+    privacy: {
+      metadataTitle: 'Privacy Policy',
+      metadataDescription: 'Privacy Policy for Chapa. Learn how we handle your developer data, session storage, and analytics.',
+      metadataOgTitle: 'Privacy Policy — Chapa',
+      h1Before: 'Privacy ',
+      h1Highlight: 'Policy',
+      lastUpdated: 'Last updated: February 2026',
+      sections: [
+        {
+          heading: '1. Information We Collect',
+          body: 'When you sign in with GitHub, we receive your public profile information (username, display name, avatar URL) and a time-limited access token to fetch your public activity data. If you link additional platforms (Bitbucket, Codeberg), we receive similar public profile and activity data from those services.',
+        },
+        {
+          heading: '2. How We Use Your Information',
+          body: 'We use your development activity data solely to compute your Developer Impact Profile and generate your badge. We cache computed profiles for up to 24 hours to reduce API calls. We do not sell, share, or transfer your data to third parties.',
+        },
+        {
+          heading: '3. Data Storage',
+          body: 'Session data is stored in an encrypted HTTP-only cookie in your browser. Cached scores are stored in Upstash Redis with a 24-hour TTL and are automatically deleted after expiration.',
+        },
+        {
+          heading: '4. Analytics',
+          body: 'We use PostHog for basic, privacy-friendly analytics (page views and key events). No personal information is sent to analytics services.',
+        },
+        {
+          heading: '5. Your Rights',
+          body: "You can sign out at any time to clear your session. You can revoke Chapa's access to your GitHub account through your GitHub settings under \"Authorized OAuth Apps.\" You can also unlink Bitbucket or Codeberg accounts from your profile at any time.",
+        },
+        {
+          heading: '6. Contact',
+          body: 'For privacy-related inquiries, contact us at ',
+        },
+      ],
+      contactEmail: 'support@chapa.thecreativetoken.com',
+    },
+    terms: {
+      metadataTitle: 'Terms of Service',
+      metadataDescription: 'Terms of Service for Chapa. Understand the rules and guidelines for using the developer impact badge platform.',
+      metadataOgTitle: 'Terms of Service — Chapa',
+      h1Before: 'Terms of ',
+      h1Highlight: 'Service',
+      lastUpdated: 'Last updated: February 2026',
+      sections: [
+        {
+          heading: '1. Acceptance of Terms',
+          body: 'By accessing or using Chapa, you agree to be bound by these Terms of Service. If you do not agree, please do not use the service.',
+        },
+        {
+          heading: '2. Description of Service',
+          body: 'Chapa provides a developer impact scoring and badge generation service using publicly available data from linked developer platforms (GitHub, Bitbucket, Codeberg). The service is provided "as is" without warranties of any kind.',
+        },
+        {
+          heading: '3. Platform Data Usage',
+          body: 'Chapa accesses your public profile and activity data through the APIs of linked platforms (GitHub, Bitbucket, Codeberg). We only request read access to public information. We do not access private repositories or private profile data on any platform.',
+        },
+        {
+          heading: '4. User Conduct',
+          body: 'You agree not to misuse the service, including but not limited to: attempting to manipulate scores, abusing API rate limits, or using the service for any unlawful purpose.',
+        },
+        {
+          heading: '5. Limitation of Liability',
+          body: 'Chapa and its creators shall not be liable for any indirect, incidental, or consequential damages arising from the use of the service.',
+        },
+        {
+          heading: '6. Changes to Terms',
+          body: 'We reserve the right to modify these terms at any time. Continued use of the service after changes constitutes acceptance of the new terms.',
+        },
+        {
+          heading: '7. Contact',
+          body: 'For questions about these terms, contact us at ',
+        },
+      ],
+      contactEmail: 'support@chapa.thecreativetoken.com',
+    },
   },
 };

@@ -28,6 +28,10 @@ export const es: Translations = {
     selectInsightsReport: 'Seleccionar informe HTML de Claude Code Insights',
     unlinkBitbucket: 'Desvincular cuenta de Bitbucket',
     unlinkCodeberg: 'Desvincular cuenta de Codeberg',
+    languageSwitcher: 'Selector de idioma',
+    badgeTooltips: 'Tooltips de elementos de la insignia',
+    avatarOf: '{login}',
+    moreInfo: 'Más información',
   },
   landing: {
     navLinks: [
@@ -175,6 +179,19 @@ export const es: Translations = {
     contactSupport: 'Contactar soporte',
     badgeAlt: 'Insignia Chapa',
     badgeAltOf: 'Insignia Chapa de',
+    ariaBusy: 'Regenerando insignia',
+  },
+  sharePage: {
+    metadataTitle: '{handle} — Impacto de desarrollador, decodificado',
+    metadataDescription: 'Ve el perfil de impacto de {handle}: arquetipo, puntuación y desglose de dimensiones.',
+    metadataOgTitle: '{handle} — Chapa',
+    metadataOgImageAlt: 'Insignia Chapa de {handle}',
+    badgeAriaLabel: 'Insignia Chapa de {handle}',
+    badgeAlt: 'Insignia Chapa de {handle}',
+    srH1: 'Impacto de desarrollador de {handle}',
+    h2: 'Tu Impacto, Decodificado',
+    loadingAriaLabel: 'Cargando',
+    loadingSrText: 'Cargando...',
   },
   verify: {
     title: 'Verificar una insignia',
@@ -274,5 +291,81 @@ export const es: Translations = {
     verification: 'Sello criptográfico que prueba que estas puntuaciones no han sido manipuladas.',
     craft: 'Puntuación de Oficio IA: mide tu dominio, eficacia y sofisticación con herramientas de codificación IA como Claude Code.',
     github: 'Chapa analiza métricas públicas de GitHub y otras plataformas vinculadas. Estas plataformas no están afiliadas ni respaldan este proyecto.',
+  },
+  legal: {
+    privacy: {
+      metadataTitle: 'Política de privacidad',
+      metadataDescription: 'Política de privacidad de Chapa. Conoce cómo gestionamos tus datos de desarrollador, el almacenamiento de sesión y los análisis.',
+      metadataOgTitle: 'Política de privacidad — Chapa',
+      h1Before: 'Política de ',
+      h1Highlight: 'privacidad',
+      lastUpdated: 'Última actualización: febrero de 2026',
+      sections: [
+        {
+          heading: '1. Información que recopilamos',
+          body: 'Cuando inicias sesión con GitHub, recibimos tu información de perfil público (nombre de usuario, nombre de pantalla, URL del avatar) y un token de acceso temporal para obtener tus datos de actividad pública. Si vinculas plataformas adicionales (Bitbucket, Codeberg), recibimos datos similares de perfil público y actividad de esos servicios.',
+        },
+        {
+          heading: '2. Cómo usamos tu información',
+          body: 'Usamos tus datos de actividad de desarrollo exclusivamente para calcular tu Perfil de Impacto de Desarrollador y generar tu insignia. Almacenamos en caché los perfiles calculados hasta 24 horas para reducir las llamadas a la API. No vendemos, compartimos ni transferimos tus datos a terceros.',
+        },
+        {
+          heading: '3. Almacenamiento de datos',
+          body: 'Los datos de sesión se almacenan en una cookie cifrada HTTP-only en tu navegador. Las puntuaciones en caché se almacenan en Upstash Redis con un TTL de 24 horas y se eliminan automáticamente al expirar.',
+        },
+        {
+          heading: '4. Analítica',
+          body: 'Usamos PostHog para analítica básica y respetuosa con la privacidad (vistas de página y eventos clave). No se envía información personal a los servicios de analítica.',
+        },
+        {
+          heading: '5. Tus derechos',
+          body: 'Puedes cerrar sesión en cualquier momento para borrar tu sesión. Puedes revocar el acceso de Chapa a tu cuenta de GitHub desde la configuración de GitHub en "Authorized OAuth Apps." También puedes desvincular las cuentas de Bitbucket o Codeberg de tu perfil cuando quieras.',
+        },
+        {
+          heading: '6. Contacto',
+          body: 'Para consultas relacionadas con la privacidad, contáctanos en ',
+        },
+      ],
+      contactEmail: 'support@chapa.thecreativetoken.com',
+    },
+    terms: {
+      metadataTitle: 'Términos del servicio',
+      metadataDescription: 'Términos del servicio de Chapa. Conoce las reglas y directrices para usar la plataforma de insignias de impacto de desarrollador.',
+      metadataOgTitle: 'Términos del servicio — Chapa',
+      h1Before: 'Términos del ',
+      h1Highlight: 'servicio',
+      lastUpdated: 'Última actualización: febrero de 2026',
+      sections: [
+        {
+          heading: '1. Aceptación de los términos',
+          body: 'Al acceder o usar Chapa, aceptas quedar vinculado por estos Términos del servicio. Si no estás de acuerdo, no utilices el servicio.',
+        },
+        {
+          heading: '2. Descripción del servicio',
+          body: 'Chapa proporciona un servicio de puntuación de impacto de desarrollador y generación de insignias usando datos disponibles públicamente de las plataformas de desarrollo vinculadas (GitHub, Bitbucket, Codeberg). El servicio se ofrece "tal cual" sin garantías de ningún tipo.',
+        },
+        {
+          heading: '3. Uso de datos de plataforma',
+          body: 'Chapa accede a tu perfil público y datos de actividad a través de las APIs de las plataformas vinculadas (GitHub, Bitbucket, Codeberg). Solo solicitamos acceso de lectura a información pública. No accedemos a repositorios privados ni a datos de perfil privados en ninguna plataforma.',
+        },
+        {
+          heading: '4. Conducta del usuario',
+          body: 'Aceptas no hacer un uso indebido del servicio, incluyendo pero no limitándose a: intentar manipular las puntuaciones, abusar de los límites de la API o usar el servicio para cualquier propósito ilícito.',
+        },
+        {
+          heading: '5. Limitación de responsabilidad',
+          body: 'Chapa y sus creadores no serán responsables de ningún daño indirecto, incidental o consecuente derivado del uso del servicio.',
+        },
+        {
+          heading: '6. Cambios en los términos',
+          body: 'Nos reservamos el derecho de modificar estos términos en cualquier momento. El uso continuado del servicio tras los cambios implica la aceptación de los nuevos términos.',
+        },
+        {
+          heading: '7. Contacto',
+          body: 'Para preguntas sobre estos términos, contáctanos en ',
+        },
+      ],
+      contactEmail: 'support@chapa.thecreativetoken.com',
+    },
   },
 };
