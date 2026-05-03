@@ -7,3 +7,4 @@ export { LocaleSync } from './locale-sync';
 export { setLocaleAction } from './set-locale-action';
 export { LOCALE_COOKIE, SUPPORTED_LOCALES, DEFAULT_LOCALE } from './types';
 export type { Locale, Translations } from './types';
+export { interpolate } from './interpolate';

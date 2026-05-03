@@ -8,6 +8,7 @@ const {
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
   mockAfter,
+  mockGetServerLocale,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -16,6 +17,7 @@ const {
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockAfter: vi.fn(),
+  mockGetServerLocale: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -60,6 +62,18 @@ vi.mock("next/navigation", () => ({
     mockNotFound();
     throw new Error("NOT_FOUND");
   },
+}));
+
+vi.mock("@/lib/i18n/server", async () => {
+  const { getServerT } = await import("@/lib/i18n/server");
+  return {
+    getServerLocale: (...args: unknown[]) => mockGetServerLocale(...args),
+    getServerT,
+  };
+});
+
+vi.mock("@/lib/i18n", () => ({
+  LocaleSync: () => null,
 }));
 
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
@@ -128,6 +142,7 @@ describe("SharePage /u/[handle]", () => {
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
+    mockGetServerLocale.mockResolvedValue("en");
   });
 
   it("generates metadata with the daily OG cache buster", async () => {

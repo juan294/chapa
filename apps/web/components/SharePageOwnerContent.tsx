@@ -57,6 +57,7 @@ function EmptyImpactState({ handle }: { handle: string }) {
             onClick={handleRegenerate}
             disabled={status === "loading" || status === "success"}
             aria-busy={status === "loading"}
+            aria-label={status === "loading" ? (t('shareOwner.ariaBusy') as string) : undefined}
             className="inline-flex items-center gap-2 rounded-lg bg-amber px-4 py-2 text-sm font-semibold text-white transition-all motion-reduce:transition-none hover:bg-amber-light disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === "loading"
