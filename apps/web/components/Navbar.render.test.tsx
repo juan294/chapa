@@ -72,6 +72,10 @@ vi.mock("./ThemeToggle", () => ({
   ThemeToggle: () => <div data-testid="theme-toggle">ThemeToggle</div>,
 }));
 
+vi.mock("./LanguageSwitcher", () => ({
+  LanguageSwitcher: () => <div data-testid="language-switcher">LanguageSwitcher</div>,
+}));
+
 import { Navbar } from "./Navbar";
 
 beforeEach(() => {
@@ -218,6 +222,17 @@ describe("Navbar", () => {
       render(jsx);
 
       expect(screen.getByTestId("theme-toggle")).toBeDefined();
+    });
+  });
+
+  describe("language switcher", () => {
+    it("always renders LanguageSwitcher", async () => {
+      mockReadSessionCookie.mockReturnValue(null);
+
+      const jsx = await Navbar({});
+      render(jsx);
+
+      expect(screen.getByTestId("language-switcher")).toBeDefined();
     });
   });
 });

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useSession } from "@/hooks/useSession";
 import { useTranslation } from "@/lib/i18n";
 
@@ -30,8 +31,9 @@ export function NavbarClient() {
           </span>
         </Link>
 
-        {/* Right: Theme toggle + User or login */}
+        {/* Right: Language switcher + Theme toggle + User or login */}
         <div className="flex items-center gap-1 sm:gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
           {session ? (
             <UserMenu

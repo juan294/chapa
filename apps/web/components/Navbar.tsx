@@ -7,6 +7,7 @@ import { UserMenu } from "./UserMenu";
 import { MobileNav } from "./MobileNav";
 import { NavLink } from "./NavLink";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 interface NavLinkItem {
   label: string;
@@ -52,8 +53,9 @@ export async function Navbar({ navLinks }: NavbarProps) {
           <MobileNav links={navLinks} />
         )}
 
-        {/* Right: Theme toggle + User or login */}
+        {/* Right: Language switcher + Theme toggle + User or login */}
         <div className="flex items-center gap-1 sm:gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
           {session ? (
             <UserMenu
