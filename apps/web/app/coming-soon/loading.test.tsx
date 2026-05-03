@@ -16,16 +16,19 @@ describe("coming-soon loading.tsx — loading boundary", () => {
     expect(SOURCE).toContain('role="status"');
   });
 
-  it("has aria-label='Loading'", () => {
-    expect(SOURCE).toContain('aria-label="Loading"');
-  });
-
   it("contains a sr-only loading label", () => {
     expect(SOURCE).toContain("sr-only");
-    expect(SOURCE).toContain("Loading...");
   });
 
   it("uses animate-pulse for the loading indicator", () => {
     expect(SOURCE).toContain("animate-pulse");
+  });
+
+  it("uses useTranslation for i18n", () => {
+    expect(SOURCE).toContain("useTranslation");
+  });
+
+  it("uses common.loading key", () => {
+    expect(SOURCE).toContain("common.loading");
   });
 });

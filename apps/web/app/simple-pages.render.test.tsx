@@ -32,40 +32,28 @@ vi.mock("@/lib/i18n", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/i18n/server", () => ({
-  getServerLocale: vi.fn().mockResolvedValue("en"),
-  getServerT: vi.fn().mockReturnValue((key: string) => {
-    const simpleDict: Record<string, unknown> = {
-      "legal.privacy.h1Before": "Privacy ",
-      "legal.privacy.h1Highlight": "Policy",
-      "legal.privacy.lastUpdated": "Last updated: February 2026",
-      "legal.privacy.sections": [
-        { heading: "1. Information We Collect", body: "When you sign in..." },
-        { heading: "6. Contact", body: "Contact us at " },
-      ],
-      "legal.privacy.contactEmail": "support@chapa.thecreativetoken.com",
-      "legal.privacy.metadataTitle": "Privacy Policy",
-      "legal.privacy.metadataDescription": "...",
-      "legal.privacy.metadataOgTitle": "Privacy Policy — Chapa",
-      "legal.terms.h1Before": "Terms of ",
-      "legal.terms.h1Highlight": "Service",
-      "legal.terms.lastUpdated": "Last updated: February 2026",
-      "legal.terms.sections": [
-        { heading: "1. Acceptance of Terms", body: "By accessing..." },
-        { heading: "7. Contact", body: "Contact us at " },
-      ],
-      "legal.terms.contactEmail": "support@chapa.thecreativetoken.com",
-      "legal.terms.metadataTitle": "Terms of Service",
-      "legal.terms.metadataDescription": "...",
-      "legal.terms.metadataOgTitle": "Terms of Service — Chapa",
-      "verify.title": "Verify a badge",
-      "verify.description": "Verify the authenticity of any Chapa badge.",
-      "verify.headingBefore": "Verify a",
-      "verify.headingHighlight": "badge",
-      "verify.instructions": "Enter the verification hash.",
-    };
-    return simpleDict[key] ?? key;
-  }),
+vi.mock("@/lib/i18n/server", async () => {
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  function deepGet(obj: Record<string, unknown>, key: string): unknown {
+    const parts = key.split(".");
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
+      current = (current as Record<string, unknown>)[part];
+      if (current === undefined) return key;
+    }
+    return current;
+  }
+  return {
+    getServerLocale: vi.fn().mockResolvedValue("en"),
+    getServerT: vi.fn().mockImplementation(() => (key: string) =>
+      deepGet(en as unknown as Record<string, unknown>, key)
+    ),
+  };
+});
+
+vi.mock("./verify/VerifyForm", () => ({
+  VerifyForm: () => <div data-testid="verify-form" />,
 }));
 
 afterEach(cleanup);
@@ -98,7 +86,8 @@ describe("TermsPage render", () => {
 describe("ComingSoonPage render", () => {
   it("renders with Chapa heading", async () => {
     const { default: ComingSoonPage } = await import("./coming-soon/page");
-    render(<ComingSoonPage />);
+    const jsx = await ComingSoonPage({ searchParams: Promise.resolve({}) });
+    render(jsx);
     expect(screen.getByText(/Coming soon/)).toBeDefined();
   });
 });
@@ -108,9 +97,6 @@ describe("ComingSoonPage render", () => {
 // ---------------------------------------------------------------------------
 describe("VerifyInputPage render", () => {
   it("renders with verify heading", async () => {
-    vi.mock("./verify/VerifyForm", () => ({
-      VerifyForm: () => <div data-testid="verify-form" />,
-    }));
     const { default: VerifyInputPage } = await import("./verify/page");
     const jsx = await VerifyInputPage({ searchParams: Promise.resolve({}) });
     render(jsx);
