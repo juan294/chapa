@@ -28,6 +28,10 @@ export const es: Translations = {
     selectInsightsReport: 'Seleccionar informe HTML de Claude Code Insights',
     unlinkBitbucket: 'Desvincular cuenta de Bitbucket',
     unlinkCodeberg: 'Desvincular cuenta de Codeberg',
+    languageSwitcher: 'Selector de idioma',
+    badgeTooltips: 'Tooltips de elementos de la insignia',
+    avatarOf: '{login}',
+    moreInfo: 'Más información',
   },
   landing: {
     navLinks: [
