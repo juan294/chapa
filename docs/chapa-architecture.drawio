@@ -1,3 +1,4 @@
+<!-- [NEEDS REVIEW] Diagram may not reflect recent changes: lib/i18n/ module, LanguageSwitcher component, lib/dashboard/, and lib/insights/ are missing from the swimlanes. Last updated for v2.8.0. -->
 <mxGraphModel adaptiveColors="auto">
   <root>
     <mxCell id="0"/>
