@@ -1,31 +1,32 @@
 # Triage Report
-> Generated on 2026-05-02 | 4 reports processed | 4 action items
+> Generated on 2026-05-03 | 3 reports processed | 1 action item | 0 Dependabot PRs
 
 ## Agent Failures
-None — all agents ran successfully.
+| Agent | Error | Notes |
+|-------|-------|-------|
+| cc-rpi-update | FALSE FAILURE — validation regex rejected valid "already up to date" output | Fixed (see below) |
+| coverage-agent | INCOMPLETE — Claude emitted ScheduleWakeup-style message instead of analysis | No action, monitor next cycle |
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | cost-analyst-report.md | Cost Analyst | GREEN | 1 (revalidateTag P3) |
-| 2 | coverage-report.md | Coverage Agent | GREEN | 2 (flake fix, env branch) |
-| 3 | documentation-report.md | Documentation Agent | GREEN | 1 (CLAUDE.md note) |
-| 4 | cc-rpi-update-report.md | cc-rpi Update | OK | 0 |
+| 1 | coverage-report.md | Coverage Agent | INCOMPLETE | 0 |
+| 2 | cost-analyst-report.md | Cost Analyst | GREEN | 0 |
+| 3 | cc-rpi-update-report.md | cc-rpi Update | FALSE FAILURE | 1 (validation pattern fix) |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Fix BadgeToolbar @keyframes flake — synchronous MockImage callbacks | coverage | 0 (existing tests now reliable) | ✅ Done |
-| 2 | Cover `lib/env.ts` readList ternary branches | coverage | 2 (getAdminHandles suite) | ✅ Done |
-| 3 | Add `revalidateTag("feature-flags","seconds")` to admin route | cost-analyst | 2 (called + not-called on failure) | ✅ Done |
-| 4 | CLAUDE.md: note intentionally omitted env vars | documentation | 0 (docs only) | ✅ Done |
+| 1 | Fix `scripts/cc-rpi-update.sh` validation pattern to accept `^The local cc-rpi` first line | cc-rpi-update | 0 (shell script, no prod code) | ✅ Done |
+
+## Dependabot PRs
+None — no open Dependabot PRs.
 
 ## Verification
-- [x] All tests passing (7334/7334 — +3 new tests)
-- [x] Typecheck clean (0 errors)
-- [x] Lint clean (0 issues)
+- [x] No production code changed — shell script fix only
+- [x] Typecheck, lint, tests not applicable (shell-only change)
 - [x] Pushed to develop, CI running
 
 ## Skipped With Reason
@@ -34,4 +35,4 @@ None — all agents ran successfully.
 | Cost Analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) | Threshold-gated at >5K sends/campaign — not yet triggered |
 
 ## Carried Items
-None — all action items resolved. Cost-analyst P2-1 remains intentionally deferred until threshold is reached.
+- Coverage agent incomplete report (cycle 1 of 2 monitor window before escalating)

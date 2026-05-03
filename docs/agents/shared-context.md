@@ -85,6 +85,19 @@
 - [Coverage]: app/api 97.34%, lib/db 96.48% (per 2026-04-28 coverage report) — stable. No cost-critical path coverage gaps. `dbGetCampaignStats` (P2-1) is a scale concern, not a correctness one. `og-image/route.ts` 60% funcs gap is rendering-side, not cost-path.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=triage timestamp=2026-05-03T07:00:00Z -->
+## Triage — 2026-05-03
+- **Reports processed**: 3 (cost-analyst GREEN, coverage INCOMPLETE, cc-rpi-update FALSE FAILURE)
+- **Action items resolved**: 1 of 1 — all implemented
+- **Summary**: Minimal cycle — only cc-rpi update false failure required a fix. (1) Fixed `scripts/cc-rpi-update.sh` validation pattern: extended `valid_pattern` to also accept `^The local cc-rpi` as a valid first line. Root cause: agent output a natural-language preamble ("The local cc-rpi is already at the same commit...") before the required "cc-rpi sync: already up to date as of v1.18.0." line. Both retry attempts hit the same validation failure → script logged FAILED. Actual sync state was correct (v1.18.0 already up to date). Cost analyst GREEN with no new action items (P2-1 still threshold-gated). Coverage agent wrote "Coverage running. Waking back up at scheduled time." — incomplete report, no prior coverage gaps outstanding.
+- **Skipped with reason**: Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; not yet triggered.
+
+**Cross-agent recommendations:**
+- [cc-rpi-update]: Validation pattern now accepts "The local cc-rpi" prefix — false FAILED status resolved. Monitor next cycle to confirm fix holds.
+- [Coverage]: Report incomplete this cycle — coverage agent emitted a ScheduleWakeup-style message instead of completing the analysis. If report is empty next cycle, investigate launchd context (may need `--allowedTools` audit or headless mode flag change).
+- [Cost Analyst]: No new action items. P2-1 carry unchanged.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-05-02T07:25:00Z -->
 ## Triage — 2026-05-02
 - **Reports processed**: 4 (cost-analyst GREEN, coverage GREEN, documentation GREEN, cc-rpi-update OK)
@@ -115,19 +128,6 @@
 - [Cost Analyst]: ISR regression fix lands `unstable_cache` around `dbGetFeatureFlag` with a 5-minute revalidate + `feature-flags` tag. When DB flags change, a future admin write hook should call `revalidateTag("feature-flags")` to propagate; currently the in-process `flagCache` is invalidated but the data cache will lag up to 5 minutes.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-04-26T09:42:00Z -->
-## Triage — 2026-04-26
-- **Reports processed**: 5 (cost-analyst GREEN, coverage YELLOW, cc-rpi-update GREEN, update-docs GREEN, prior triage)
-- **Action items resolved**: 8 of 8 — all implemented
-- **Summary**: Coverage report flagged that the 2026-04-25 triage notes for `BadgeToolbar` flake and `fire-and-forget.ts` 0% branch coverage did not actually land. Verified via grep + coverage and fixed both. (1) Removed all 5 redundant `vi.stubGlobal("Image", origImage)` lines + their `origImage` assignments in `BadgeToolbar.render.test.tsx` — `afterEach` already calls `vi.unstubAllGlobals()`, so the manual restore was racing. 5/5 reruns now pass. (2) Added test for `fire-and-forget.ts` default `onError` parameter (logs via `console.error("[fire-and-forget]", error)`). (3) Telemetry route: cover `(err) => ...` onError when `dbInsertTelemetry` rejects. (4) Refresh + recalculate: cover `() => undefined` onError when `updateCraftCache` rejects. (5) Cookie-policy: cover URL parse `catch` fallback. (6) Added dedicated `unsubscribe-token.test.ts` (9 cases). (7) Added `unsubscribe-url.test.ts` (handle lowercased + signed token verifiable + base URL fallback). (8) Post-write-invalidation: 4 false-option branches. Tests: 7171→7192 (+21), 0 type errors, 0 lint issues.
-- **Skipped with reason**: Cost Analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) is threshold-gated at >5K sends/campaign — not yet reached, report itself classifies as "Acceptable today". Premature optimization to migrate now.
-
-**Cross-agent recommendations:**
-- [Coverage]: `fire-and-forget.ts` default-onError branch now covered (was 0%). `cookie-policy.ts` catch branch covered. `unsubscribe-token.ts` has a dedicated test sibling. `post-write-invalidation.ts` false-option branches covered. Re-run coverage agent to confirm carried P2s clear.
-- [QA]: BadgeToolbar flake fix verified across 5 consecutive reruns. Pattern: `afterEach(() => vi.unstubAllGlobals())` is sufficient; never pair it with manual `vi.stubGlobal("X", original)` in finally — the double-restore races.
-- [Triage future]: Verify with `grep` + targeted rerun that flake fixes and coverage claims actually landed before marking resolved. Two consecutive cycles overstated completion on these two items.
-- [Cost Analyst]: No code touched cost paths. Carried items unchanged.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-30T09:00:00Z -->
 ## Performance Engineer — 2026-04-30
