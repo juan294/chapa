@@ -9,16 +9,17 @@ const ARCHETYPE_DIRS = [
   "guardian",
   "marathoner",
   "polymath",
+  "artificer",
 ];
 
-describe("archetype pages — ISR", () => {
+describe("archetype pages — dynamic rendering", () => {
   for (const archetype of ARCHETYPE_DIRS) {
-    it(`${archetype}/page.tsx exports revalidate = 604800`, () => {
+    it(`${archetype}/page.tsx exports dynamic = 'force-dynamic'`, () => {
       const source = fs.readFileSync(
         path.resolve(__dirname, archetype, "page.tsx"),
         "utf-8",
       );
-      expect(source).toContain("export const revalidate = 604800");
+      expect(source).toContain("export const dynamic = 'force-dynamic'");
     });
   }
 });

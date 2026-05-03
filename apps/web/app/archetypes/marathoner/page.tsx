@@ -1,171 +1,18 @@
-export const revalidate = 604800;
+import { ArchetypePage } from '../_components/ArchetypePage';
+import type { Metadata } from 'next';
+import { getServerLocale, getServerT } from '@/lib/i18n/server';
 
-import { Navbar } from "@/components/Navbar";
-import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
-import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { MARATHONER_STATS, MARATHONER_IMPACT } from "@/lib/render/archetypeDemoData";
-import Link from "next/link";
-import type { Metadata } from "next";
+export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: "The Marathoner Archetype",
-  description:
-    "Marathoners show up every day. They value consistency over intensity, sustaining contributions across months rather than shipping in bursts.",
-};
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string>> }): Promise<Metadata> {
+  const locale = await getServerLocale((await searchParams).lang);
+  const t = getServerT(locale);
+  return {
+    title: t('archetypes.marathoner.metadataTitle') as string,
+    description: t('archetypes.marathoner.metadataDescription') as string,
+  };
+}
 
-const badgeSvg = renderBadgeSvg(MARATHONER_STATS, MARATHONER_IMPACT, {
-  includeBranding: true,
-  demoMode: true,
-});
-
-export default function MarathonerPage() {
-  return (
-    <div className="min-h-screen bg-bg text-text-primary">
-      <Navbar />
-      <main id="main-content" className="mx-auto max-w-3xl px-6 pt-32 pb-16">
-        <article className="animate-fade-in-up">
-          {/* Terminal command */}
-          <div className="flex items-center gap-2 mb-6 font-heading text-sm">
-            <span className="text-terminal-dim select-none">$</span>
-            <span className="text-text-secondary">chapa archetype marathoner</span>
-          </div>
-
-          <div className="pl-4 border-l border-stroke space-y-8">
-            {/* Header */}
-            <div>
-              <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-                The <span className="text-terminal-green">Marathoner</span>
-              </h1>
-              <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className="text-terminal-green">Consistency</span>
-              </p>
-            </div>
-
-            {/* Badge */}
-            {/* SAFETY: SVG is server-rendered by renderBadgeSvg() from hardcoded archetype demo data — no user input reaches this point. See lib/render/escape.ts for escaping. */}
-            <div
-              className="rounded-xl shadow-2xl shadow-black/30 overflow-hidden [&>svg]:w-full [&>svg]:h-auto"
-              role="img"
-              aria-label="Example Chapa badge for The Marathoner archetype"
-              dangerouslySetInnerHTML={{ __html: badgeSvg }}
-            />
-
-            {/* Essay */}
-            <div className="space-y-6 text-text-secondary text-sm leading-relaxed">
-              <p>
-                There&apos;s a particular kind of developer who doesn&apos;t chase heroic sprints
-                or all-night hackathons. They show up on Monday and commit. They show up on
-                Thursday and review. They show up the week after vacation and pick up right where
-                they left off. Marathoners understand something that most productivity advice
-                misses: the compound effect of steady, sustained effort over time is more powerful
-                than any burst of inspiration.
-              </p>
-
-              <p>
-                The Consistency dimension in Chapa measures exactly this. It looks at how often
-                you show up, how evenly your contributions spread across weeks, and how many
-                weeks you&apos;re active overall. The active days signal
-                uses a concave curve that rewards getting started generously &mdash; coding a few
-                days a week builds real momentum &mdash; while the climb from good to great
-                remains meaningful. You don&apos;t need to code every single day to score well.
-              </p>
-
-              <p>
-                Heatmap evenness carries significant weight, on par with active days. Chapa looks
-                at your year and evaluates how uniformly your contributions are distributed. A
-                developer who codes three days a week every week is more consistent than one who
-                codes every day for a month and then disappears. This isn&apos;t about punishing
-                time off &mdash; it&apos;s about recognizing that sustainable pace is itself a
-                skill.
-              </p>
-
-              <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
-                How Chapa identifies a Marathoner
-              </h2>
-
-              <p>
-                To earn the Marathoner archetype, your Consistency dimension must be strong and
-                your most dominant trait. The algorithm rewards developers who maintain a regular
-                cadence of contributions across weeks. It values showing up consistently over
-                raw daily output volume &mdash; a developer active most weeks will outscore one
-                who ships intensely but irregularly.
-              </p>
-
-              <h3 className="font-heading text-sm text-text-primary tracking-tight pt-2">
-                Key signals
-              </h3>
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">PRIMARY</span>
-                  <span className="text-text-secondary text-sm">Active days (concave curve) &mdash; how often you show up, with early momentum rewarded generously.</span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">CO-PRIMARY</span>
-                  <span className="text-text-secondary text-sm">Heatmap evenness &mdash; how uniformly contributions spread across weeks. Nearly as important as active days.</span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-36">SUPPORTING</span>
-                  <span className="text-text-secondary text-sm">Week coverage &mdash; fraction of weeks with at least one contribution.</span>
-                </div>
-              </div>
-
-              <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
-                What a Marathoner looks like in practice
-              </h2>
-
-              <p>
-                Marathoners are the backbone of long-running projects. They&apos;re the maintainer
-                who has committed to the same repo every week for two years. The engineer who never
-                has a &ldquo;catch-up Monday&rdquo; because they were never behind. The open-source
-                contributor whose green squares on GitHub form a nearly unbroken line across the
-                calendar.
-              </p>
-
-              <p>
-                Teams with Marathoners have a different feel. There&apos;s less panic before
-                deadlines because work has been flowing in steadily. There are fewer knowledge silos
-                because the Marathoner has touched the code recently enough to remember how it
-                works. Technical debt gets addressed in small increments instead of requiring
-                dedicated &ldquo;cleanup sprints&rdquo; that never quite happen.
-              </p>
-
-              <p>
-                The Marathoner&apos;s superpower isn&apos;t speed or brilliance. It&apos;s
-                reliability. In a world obsessed with 10x engineers and dramatic breakthroughs, the
-                Marathoner quietly delivers more total value by simply never stopping.
-              </p>
-
-              <h2 className="font-heading text-lg text-text-primary tracking-tight pt-2">
-                The Marathoner&apos;s radar shape
-              </h2>
-
-              <p>
-                On the Chapa radar chart, a Marathoner&apos;s shape extends strongly downward
-                (Consistency axis), forming a diamond that points toward the bottom. It&apos;s the
-                visual signature of someone who treats development as a practice, not a performance
-                &mdash; steady, deliberate, and always moving forward.
-              </p>
-            </div>
-
-            {/* Links */}
-            <div className="pt-4 flex flex-wrap items-center justify-between gap-4">
-              <Link
-                href="/#features"
-                className="font-heading text-sm text-amber hover:text-amber-light transition-colors"
-              >
-                &larr; Back to features
-              </Link>
-              <Link
-                href="/about/scoring"
-                className="font-heading text-sm text-text-secondary hover:text-amber transition-colors"
-              >
-                Full scoring methodology &rarr;
-              </Link>
-            </div>
-          </div>
-        </article>
-      </main>
-      <GlobalCommandBarLazy />
-    </div>
-  );
+export default async function MarathonerPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  return <ArchetypePage archetypeKey="marathoner" searchParams={searchParams} />;
 }
