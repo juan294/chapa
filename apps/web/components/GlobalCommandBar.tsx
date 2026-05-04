@@ -14,6 +14,7 @@ import {
 } from "@/components/terminal/command-registry";
 import type { OutputLine } from "@/components/terminal/command-registry";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
+import { useTranslation } from "@/lib/i18n";
 
 const OUTPUT_TIMEOUT_MS = 5000;
 
@@ -28,15 +29,21 @@ export function GlobalCommandBar({
 } = {}) {
   const router = useRouter();
   const { studioEnabled } = useClientFeatureFlags();
+  const { t } = useTranslation();
   const terminalRef = useRef<TerminalInputHandle>(null);
   const [partial, setPartial] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [outputLines, setOutputLines] = useState<OutputLine[]>([]);
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const descriptions = useMemo(() => {
+    const d = t("commands.descriptions") as unknown as Record<string, string>;
+    return typeof d === "object" && d !== null && !Array.isArray(d) ? d : {};
+  }, [t]);
+
   const commands = useMemo(
-    () => createNavigationCommands({ isAdmin, studioEnabled }),
-    [isAdmin, studioEnabled],
+    () => createNavigationCommands({ isAdmin, studioEnabled, descriptions }),
+    [isAdmin, studioEnabled, descriptions],
   );
 
   // Auto-clear output after timeout

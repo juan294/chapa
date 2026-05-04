@@ -37,6 +37,8 @@ export interface CommandDef {
   execute: (args: string[]) => CommandResult;
 }
 
+export type CommandDescriptions = Partial<Record<string, string>>;
+
 let lineCounter = 0;
 
 export function makeLine(
@@ -85,11 +87,14 @@ const SORT_FIELD_ALIASES: Record<string, string> = {
 };
 
 /** Admin-only commands for the admin dashboard. */
-export function createAdminCommands(): CommandDef[] {
+export function createAdminCommands(options?: {
+  descriptions?: CommandDescriptions;
+}): CommandDef[] {
+  const d = options?.descriptions ?? {};
   return [
     {
       name: "/admin",
-      description: "Navigate to admin dashboard",
+      description: d.admin ?? "Navigate to admin dashboard",
       execute: () => ({
         lines: [makeLine("system", "Opening admin dashboard...")],
         action: { type: "navigate", path: "/admin" },
@@ -97,7 +102,7 @@ export function createAdminCommands(): CommandDef[] {
     },
     {
       name: "/refresh",
-      description: "Refresh dashboard data",
+      description: d.refresh ?? "Refresh dashboard data",
       execute: () => ({
         lines: [makeLine("system", "Refreshing dashboard data...")],
         action: { type: "custom", event: "chapa:admin-refresh" },
@@ -105,7 +110,7 @@ export function createAdminCommands(): CommandDef[] {
     },
     {
       name: "/agents",
-      description: "Switch to agents tab",
+      description: d.agents ?? "Switch to agents tab",
       execute: () => ({
         lines: [makeLine("system", "Switching to agents tab...")],
         action: { type: "custom", event: "chapa:admin-tab", detail: { tab: "agents" } },
@@ -113,7 +118,7 @@ export function createAdminCommands(): CommandDef[] {
     },
     {
       name: "/users",
-      description: "Switch to users tab",
+      description: d.users ?? "Switch to users tab",
       execute: () => ({
         lines: [makeLine("system", "Switching to users tab...")],
         action: { type: "custom", event: "chapa:admin-tab", detail: { tab: "users" } },
@@ -121,7 +126,7 @@ export function createAdminCommands(): CommandDef[] {
     },
     {
       name: "/run",
-      description: "Run an agent manually",
+      description: d.run ?? "Run an agent manually",
       usage: "/run <agent_key>",
       execute: (args) => {
         const validAgents = ["coverage_agent", "security_scanner", "qa_agent"];
@@ -150,7 +155,7 @@ export function createAdminCommands(): CommandDef[] {
     },
     {
       name: "/sort",
-      description: "Sort table by field",
+      description: d.sort ?? "Sort table by field",
       usage: "/sort <field> [asc|desc]",
       execute: (args) => {
         if (args.length === 0) {
@@ -198,41 +203,43 @@ export function createAdminCommands(): CommandDef[] {
 export function createNavigationCommands(options?: {
   isAdmin?: boolean;
   studioEnabled?: boolean;
+  descriptions?: CommandDescriptions;
 }): CommandDef[] {
   const studioEnabled = options?.studioEnabled ?? isStudioEnabledSync();
   const isAdmin = options?.isAdmin ?? false;
+  const d = options?.descriptions ?? {};
 
   const helpLines: OutputLine[] = [
     makeLine("system", "Available commands:"),
-    makeLine("info", "  /help              List available commands"),
-    makeLine("info", "  /home              Go to home page"),
+    makeLine("info", `  /help              ${d.help ?? "List available commands"}`),
+    makeLine("info", `  /home              ${d.home ?? "Go to home page"}`),
     ...(studioEnabled
-      ? [makeLine("info", "  /studio            Open Creator Studio")]
+      ? [makeLine("info", `  /studio            ${d.studio ?? "Open Creator Studio"}`)]
       : []),
-    makeLine("info", "  /login             Sign in with GitHub"),
-    makeLine("info", "  /badge <handle>    View a developer badge"),
-    makeLine("info", "  /about             About Chapa"),
-    makeLine("info", "  /scoring           Scoring methodology"),
-    makeLine("info", "  /terms             Terms of Service"),
-    makeLine("info", "  /privacy           Privacy Policy"),
+    makeLine("info", `  /login             ${d.login ?? "Sign in with GitHub"}`),
+    makeLine("info", `  /badge <handle>    ${d.badge ?? "View a developer badge"}`),
+    makeLine("info", `  /about             ${d.about ?? "About Chapa"}`),
+    makeLine("info", `  /scoring           ${d.scoring ?? "Scoring methodology"}`),
+    makeLine("info", `  /terms             ${d.terms ?? "Terms of Service"}`),
+    makeLine("info", `  /privacy           ${d.privacy ?? "Privacy Policy"}`),
     makeLine("dim", ""),
     makeLine("system", "Archetypes:"),
-    makeLine("info", "  /builder           The Builder archetype"),
-    makeLine("info", "  /guardian           The Quality Champion archetype"),
-    makeLine("info", "  /marathoner        The Marathoner archetype"),
-    makeLine("info", "  /polymath          The Polymath archetype"),
-    makeLine("info", "  /balanced          The Balanced archetype"),
-    makeLine("info", "  /emerging          The Emerging archetype"),
+    makeLine("info", `  /builder           ${d.builder ?? "The Builder archetype"}`),
+    makeLine("info", `  /guardian           ${d.guardian ?? "The Quality Champion archetype"}`),
+    makeLine("info", `  /marathoner        ${d.marathoner ?? "The Marathoner archetype"}`),
+    makeLine("info", `  /polymath          ${d.polymath ?? "The Polymath archetype"}`),
+    makeLine("info", `  /balanced          ${d.balanced ?? "The Balanced archetype"}`),
+    makeLine("info", `  /emerging          ${d.emerging ?? "The Emerging archetype"}`),
     ...(isAdmin
       ? [
           makeLine("dim", ""),
           makeLine("system", "Admin:"),
-          makeLine("info", "  /admin             Navigate to admin dashboard"),
-          makeLine("info", "  /refresh           Refresh dashboard data"),
-          makeLine("info", "  /sort <field> [asc|desc]  Sort table by field"),
-          makeLine("info", "  /users             Switch to users tab"),
-          makeLine("info", "  /agents            Switch to agents tab"),
-          makeLine("info", "  /run <agent_key>   Run an agent manually"),
+          makeLine("info", `  /admin             ${d.admin ?? "Navigate to admin dashboard"}`),
+          makeLine("info", `  /refresh           ${d.refresh ?? "Refresh dashboard data"}`),
+          makeLine("info", `  /sort <field> [asc|desc]  ${d.sort ?? "Sort table by field"}`),
+          makeLine("info", `  /users             ${d.users ?? "Switch to users tab"}`),
+          makeLine("info", `  /agents            ${d.agents ?? "Switch to agents tab"}`),
+          makeLine("info", `  /run <agent_key>   ${d.run ?? "Run an agent manually"}`),
         ]
       : []),
   ];
@@ -240,12 +247,12 @@ export function createNavigationCommands(options?: {
   const commands: CommandDef[] = [
     {
       name: "/help",
-      description: "List available commands",
+      description: d.help ?? "List available commands",
       execute: () => ({ lines: helpLines }),
     },
     {
       name: "/home",
-      description: "Go to home page",
+      description: d.home ?? "Go to home page",
       execute: () => ({
         lines: [makeLine("system", "Going home...")],
         action: { type: "navigate", path: "/" },
@@ -255,7 +262,7 @@ export function createNavigationCommands(options?: {
       ? [
           {
             name: "/studio",
-            description: "Open Creator Studio",
+            description: d.studio ?? "Open Creator Studio",
             execute: () => ({
               lines: [makeLine("system", "Opening Creator Studio...")],
               action: { type: "navigate" as const, path: "/studio" },
@@ -265,7 +272,7 @@ export function createNavigationCommands(options?: {
       : []),
     {
       name: "/login",
-      description: "Sign in with GitHub",
+      description: d.login ?? "Sign in with GitHub",
       execute: () => ({
         lines: [makeLine("system", "Redirecting to GitHub login...")],
         action: { type: "navigate", path: "/api/auth/login" },
@@ -274,7 +281,7 @@ export function createNavigationCommands(options?: {
     {
       name: "/badge",
       aliases: ["/b"],
-      description: "View a developer badge",
+      description: d.badge ?? "View a developer badge",
       usage: "/badge <handle>",
       execute: (args) => {
         if (args.length === 0) {
@@ -291,7 +298,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/about",
-      description: "About Chapa",
+      description: d.about ?? "About Chapa",
       execute: () => ({
         lines: [makeLine("system", "Opening about page...")],
         action: { type: "navigate", path: "/about" },
@@ -299,7 +306,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/scoring",
-      description: "Scoring methodology",
+      description: d.scoring ?? "Scoring methodology",
       execute: () => ({
         lines: [makeLine("system", "Opening scoring methodology...")],
         action: { type: "navigate", path: "/about/scoring" },
@@ -307,7 +314,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/terms",
-      description: "Terms of Service",
+      description: d.terms ?? "Terms of Service",
       execute: () => ({
         lines: [makeLine("system", "Opening terms...")],
         action: { type: "navigate", path: "/terms" },
@@ -315,7 +322,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/privacy",
-      description: "Privacy Policy",
+      description: d.privacy ?? "Privacy Policy",
       execute: () => ({
         lines: [makeLine("system", "Opening privacy policy...")],
         action: { type: "navigate", path: "/privacy" },
@@ -323,7 +330,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/builder",
-      description: "The Builder archetype",
+      description: d.builder ?? "The Builder archetype",
       execute: () => ({
         lines: [makeLine("system", "Opening Builder archetype...")],
         action: { type: "navigate", path: "/archetypes/builder" },
@@ -331,7 +338,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/guardian",
-      description: "The Quality Champion archetype",
+      description: d.guardian ?? "The Quality Champion archetype",
       execute: () => ({
         lines: [makeLine("system", "Opening Quality Champion archetype...")],
         action: { type: "navigate", path: "/archetypes/guardian" },
@@ -339,7 +346,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/marathoner",
-      description: "The Marathoner archetype",
+      description: d.marathoner ?? "The Marathoner archetype",
       execute: () => ({
         lines: [makeLine("system", "Opening Marathoner archetype...")],
         action: { type: "navigate", path: "/archetypes/marathoner" },
@@ -347,7 +354,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/polymath",
-      description: "The Polymath archetype",
+      description: d.polymath ?? "The Polymath archetype",
       execute: () => ({
         lines: [makeLine("system", "Opening Polymath archetype...")],
         action: { type: "navigate", path: "/archetypes/polymath" },
@@ -355,7 +362,7 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/balanced",
-      description: "The Balanced archetype",
+      description: d.balanced ?? "The Balanced archetype",
       execute: () => ({
         lines: [makeLine("system", "Opening Balanced archetype...")],
         action: { type: "navigate", path: "/archetypes/balanced" },
@@ -363,13 +370,13 @@ export function createNavigationCommands(options?: {
     },
     {
       name: "/emerging",
-      description: "The Emerging archetype",
+      description: d.emerging ?? "The Emerging archetype",
       execute: () => ({
         lines: [makeLine("system", "Opening Emerging archetype...")],
         action: { type: "navigate", path: "/archetypes/emerging" },
       }),
     },
-    ...(isAdmin ? createAdminCommands() : []),
+    ...(isAdmin ? createAdminCommands({ descriptions: d }) : []),
   ];
 
   return commands;
