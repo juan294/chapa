@@ -640,3 +640,60 @@ describe("makeLine", () => {
     expect(line1.text).toBe("hello");
   });
 });
+
+describe("createNavigationCommands (localized descriptions)", () => {
+  it("uses provided description for /help", () => {
+    const commands = createNavigationCommands({
+      descriptions: { help: "Listar comandos disponibles" },
+    });
+    const help = commands.find((c) => c.name === "/help")!;
+    expect(help.description).toBe("Listar comandos disponibles");
+  });
+
+  it("uses provided description for /home", () => {
+    const commands = createNavigationCommands({
+      descriptions: { home: "Ir a la página de inicio" },
+    });
+    const home = commands.find((c) => c.name === "/home")!;
+    expect(home.description).toBe("Ir a la página de inicio");
+  });
+
+  it("uses provided description for /login", () => {
+    const commands = createNavigationCommands({
+      descriptions: { login: "Iniciar sesión con GitHub" },
+    });
+    const login = commands.find((c) => c.name === "/login")!;
+    expect(login.description).toBe("Iniciar sesión con GitHub");
+  });
+
+  it("falls back to English description when not provided", () => {
+    const commands = createNavigationCommands({ descriptions: {} });
+    const help = commands.find((c) => c.name === "/help")!;
+    expect(help.description).toBe("List available commands");
+  });
+
+  it("/help output uses provided description text", () => {
+    const commands = createNavigationCommands({
+      descriptions: { help: "Listar comandos disponibles" },
+    });
+    const result = executeCommand("/help", commands);
+    const allText = result.lines.map((l) => l.text).join("\n");
+    expect(allText).toContain("Listar comandos disponibles");
+  });
+});
+
+describe("createAdminCommands (localized descriptions)", () => {
+  it("uses provided description for /admin", () => {
+    const cmds = createAdminCommands({
+      descriptions: { admin: "Ir al panel de administración" },
+    });
+    const admin = cmds.find((c) => c.name === "/admin")!;
+    expect(admin.description).toBe("Ir al panel de administración");
+  });
+
+  it("falls back to English description for /sort when not provided", () => {
+    const cmds = createAdminCommands({ descriptions: {} });
+    const sort = cmds.find((c) => c.name === "/sort")!;
+    expect(sort.description).toBe("Sort table by field");
+  });
+});
