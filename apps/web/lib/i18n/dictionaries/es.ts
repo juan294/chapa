@@ -936,8 +936,8 @@ export const es: Translations = {
     download: 'Descargar',
     downloading: 'Descargando…',
     postOn: 'Publicar en',
-    shareOn: 'Compartir en',
-    copyLink: 'Copiar enlace',
+    shareOn: 'Compartir',
+    copyLink: 'Copiar',
     copied: '¡Copiado!',
   },
   insights: {
