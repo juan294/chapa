@@ -66,4 +66,10 @@ describe("getClientIp", () => {
     // x-real-ip alone is not trusted — "unknown" is returned
     expect(getClientIp(req)).toBe("unknown");
   });
+
+  it("returns 'unknown' when x-forwarded-for last hop is whitespace-only", () => {
+    // "10.0.0.1, " splits into ["10.0.0.1", " "] — last.trim() is "" → falls through
+    const req = makeRequest({ "x-forwarded-for": "10.0.0.1, " });
+    expect(getClientIp(req)).toBe("unknown");
+  });
 });
