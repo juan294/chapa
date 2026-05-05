@@ -204,3 +204,19 @@ describe("ScoringMethodologyPage render", () => {
     expect(screen.getByText("Help us improve this")).toBeDefined();
   });
 });
+
+describe("ScoringMethodologyPage generateMetadata", () => {
+  it("returns metadata with title and openGraph for the default locale", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
+    expect(meta.title).toBeTruthy();
+    expect(meta.openGraph).toBeDefined();
+    expect(meta.twitter).toBeDefined();
+  });
+
+  it("returns metadata when lang param is provided", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = await generateMetadata({ searchParams: Promise.resolve({ lang: "en" }) });
+    expect(meta.title).toBeTruthy();
+  });
+});

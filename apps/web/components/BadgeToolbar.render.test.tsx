@@ -1006,6 +1006,10 @@ describe("BadgeToolbar render", () => {
         expect(decodedSvg).not.toContain("@keyframes");
         expect(decodedSvg).not.toContain("<animate ");
         expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
+
+        // Flush React scheduler before tearing down globals — prevents
+        // setDownloadStatus("idle") from racing into the next test's stub setup.
+        await act(async () => {});
       } finally {
         vi.unstubAllGlobals();
       }
