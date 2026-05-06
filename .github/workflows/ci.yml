@@ -77,7 +77,13 @@ jobs:
               testCount: ${{ steps.test.outputs.test_count }},
               coveragePercent: parseFloat(c.lines.pct.toFixed(2)),
               passing: ${{ steps.test.outputs.tests_passed }},
-              failing: ${{ steps.test.outputs.tests_failed }}
+              failing: ${{ steps.test.outputs.tests_failed }},
+              source: {
+                provider: 'github-actions',
+                repository: '${{ github.repository }}',
+                runId: '${{ github.run_id }}',
+                workflowRef: '${{ github.workflow_ref }}'
+              }
             }));
           ")
 
