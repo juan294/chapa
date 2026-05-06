@@ -1,38 +1,40 @@
 # Triage Report
-> Generated on 2026-05-03 | 3 reports processed | 1 action item | 0 Dependabot PRs
+> Generated on 2026-05-06 | 3 reports processed | 3 action items | 0 Dependabot PRs
 
 ## Agent Failures
-| Agent | Error | Notes |
-|-------|-------|-------|
-| cc-rpi-update | FALSE FAILURE — validation regex rejected valid "already up to date" output | Fixed (see below) |
-| coverage-agent | INCOMPLETE — Claude emitted ScheduleWakeup-style message instead of analysis | No action, monitor next cycle |
+None — all agents ran successfully.
 
 ## Reports Reviewed
+
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | coverage-report.md | Coverage Agent | INCOMPLETE | 0 |
-| 2 | cost-analyst-report.md | Cost Analyst | GREEN | 0 |
-| 3 | cc-rpi-update-report.md | cc-rpi Update | FALSE FAILURE | 1 (validation pattern fix) |
+| 1 | `cc-rpi-update-report.md` | cc-rpi-update | ✅ OK | 0 — already at v1.18.0 |
+| 2 | `cost-analyst-report.md` | cost-analyst | ✅ GREEN | 0 — P2-1 threshold-gated (9th carry) |
+| 3 | `coverage-report.md` | coverage | 🟡 YELLOW → resolved | 3 — all P2 gaps closed |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
+
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Fix `scripts/cc-rpi-update.sh` validation pattern to accept `^The local cc-rpi` first line | cc-rpi-update | 0 (shell script, no prod code) | ✅ Done |
+| 1 | Add runtime `generateMetadata` tests for `artificer/page.tsx` and `emerging/page.tsx` in `archetypes-component.render.test.tsx` — source-string tests gave 0% v8 stmts | coverage | +2 | ✅ Done |
+| 2 | Add jsdom render test `cli/authorize/error.render.test.tsx` — component was at 0% stmts despite source-string test existing | coverage | +5 | ✅ Done |
+| 3 | Cover `param.startsWith('q=')` false branch in `detect.ts` (`es;charset=utf-8` case); add `/* v8 ignore next */` to 3 unreachable `?? ''` branches (forced by `noUncheckedIndexedAccess`) | coverage | +1 | ✅ Done |
+
+**Files changed:** `archetypes-component.render.test.tsx`, `error.render.test.tsx` (new), `detect.test.ts`, `detect.ts`  
+**Commit:** `34062680`  
+**Totals:** +104 insertions, +8 new tests (7567 total, all passing)
 
 ## Dependabot PRs
 None — no open Dependabot PRs.
 
 ## Verification
-- [x] No production code changed — shell script fix only
-- [x] Typecheck, lint, tests not applicable (shell-only change)
-- [x] Pushed to develop, CI running
-
-## Skipped With Reason
-| Item | Reason |
-|------|--------|
-| Cost Analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) | Threshold-gated at >5K sends/campaign — not yet triggered |
+- [x] All tests passing (7567/7567)
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] CI in progress (security/secret/dead-code scans GREEN; CI + bundle analysis running)
 
 ## Carried Items
-- Coverage agent incomplete report (cycle 1 of 2 monitor window before escalating)
+- **Cost-analyst P2-1** (`dbGetCampaignStats` GROUP BY RPC, `lib/db/campaigns.ts:734-751`) — threshold-gated at >5K sends/campaign. 9th consecutive carry. Do not implement until threshold is reached.
+- **BadgeToolbar flaky test** — 3 consecutive clean runs post May 5 fix. Monitor one more cycle before closing watch.
