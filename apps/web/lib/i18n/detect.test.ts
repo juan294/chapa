@@ -54,6 +54,11 @@ describe('pickFromAcceptLanguage', () => {
     // ",es" splits into ["", "es"] — empty token is filtered out, es is picked
     expect(pickFromAcceptLanguage(',es')).toBe('es');
   });
+
+  it('ignores non-q semicolon parameters and still picks the supported locale', () => {
+    // "es;charset=utf-8" — "charset=utf-8" does not start with "q=", q stays at 1.0
+    expect(pickFromAcceptLanguage('es;charset=utf-8')).toBe('es');
+  });
 });
 
 describe('pickFromNavigatorLanguages', () => {

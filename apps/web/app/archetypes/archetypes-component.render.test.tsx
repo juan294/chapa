@@ -326,4 +326,32 @@ describe("generateMetadata — locale-specific titles", () => {
     const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
     expect(meta.title).toBe("The Balanced Archetype");
   });
+
+  it("ArtificerPage returns correct English metadata", async () => {
+    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
+    vi.mocked(getServerLocale).mockResolvedValueOnce("en");
+    vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
+      if (key === "archetypes.artificer.metadataTitle") return "The Artificer Archetype";
+      if (key === "archetypes.artificer.metadataDescription") return "Artificers harness AI as a force multiplier.";
+      return key;
+    });
+    const { generateMetadata } = await import("./artificer/page");
+    const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
+    expect(meta.title).toBe("The Artificer Archetype");
+    expect(meta.description).toBe("Artificers harness AI as a force multiplier.");
+  });
+
+  it("EmergingPage returns correct English metadata", async () => {
+    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
+    vi.mocked(getServerLocale).mockResolvedValueOnce("en");
+    vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
+      if (key === "archetypes.emerging.metadataTitle") return "The Emerging Archetype";
+      if (key === "archetypes.emerging.metadataDescription") return "Emerging developers are building momentum.";
+      return key;
+    });
+    const { generateMetadata } = await import("./emerging/page");
+    const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
+    expect(meta.title).toBe("The Emerging Archetype");
+    expect(meta.description).toBe("Emerging developers are building momentum.");
+  });
 });
