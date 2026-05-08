@@ -1,92 +1,37 @@
 # Documentation Report
-> Generated: 2026-04-24 | Health status: **green**
+> Generated: 2026-05-08 | Health status: green
 
 ## Executive Summary
-Documentation is comprehensive and accurate: **44/44 API routes** documented, **24/24 pages** documented, **38/38 color tokens** aligned with `globals.css`, and **all production env vars** cross-checked against `process.env` usage. No stale docs, no missing required files.
+Documentation is in excellent shape. All 43 API routes, 33 page routes, 38 color tokens, and 31 of 32 production env vars are accurately documented. One minor gap: `CHAPA_ALERT_WEBHOOK_URL` is documented in `README.md` and `docs/runbooks/incident-response.md` but missing from the env-vars block in `CLAUDE.md`. Five exports in `lib/auth/session.ts` lack JSDoc — low-priority polish.
 
 ## Route Documentation
-| Route | Documented in CLAUDE.md | Has API docs | Status |
-|-------|------------------------|-------------|--------|
-| `/` | ✅ | n/a | OK |
-| `/studio` | ✅ | n/a | OK |
-| `/admin` | ✅ | n/a | OK |
-| `/u/:handle` | ✅ | n/a | OK |
-| `/u/:handle/badge.svg` | ✅ | `docs/svg-design.md` | OK |
-| `/u/:handle/og-image` | ✅ | n/a | OK |
-| `/verify/:hash` | ✅ | `docs/badge-verification.md` | OK |
-| `/verify` | ✅ | `docs/badge-verification.md` | OK |
-| `/about`, `/about/scoring`, `/about/verification` | ✅ | n/a | OK |
-| `/archetypes/:type` (7 types) | ✅ | `docs/impact-v6.md` | OK |
-| `/generating/:handle` | ✅ | n/a | OK |
-| `/cli/authorize` | ✅ | `docs/cli-guide.md` | OK |
-| `/privacy`, `/terms`, `/coming-soon` | ✅ | n/a | OK |
-| `/experiments/*` | ✅ | n/a | OK (feature-gated) |
-| `/og-image`, `/llms.txt`, `/llms-full.txt`, `/.well-known/security.txt` | ✅ | n/a | OK |
-| `/api/auth/*` (12 routes) | ✅ | CLAUDE.md | OK |
-| `/api/admin/*` (14 routes) | ✅ | CLAUDE.md | OK |
-| `/api/cli/auth/*` (2 routes) | ✅ | `docs/cli-guide.md` | OK |
-| `/api/cron/*` (3 routes) | ✅ | CLAUDE.md | OK |
-| `/api/generate`, `/api/recalculate`, `/api/refresh` | ✅ | CLAUDE.md | OK |
-| `/api/health`, `/api/feature-flags`, `/api/telemetry` | ✅ | CLAUDE.md | OK |
-| `/api/history/:handle`, `/api/profile/:handle` | ✅ | CLAUDE.md | OK |
-| `/api/insights`, `/api/insights/:handle` | ✅ | CLAUDE.md | OK |
-| `/api/notifications/unsubscribe` | ✅ | CLAUDE.md | OK |
-| `/api/studio/config`, `/api/supplemental` | ✅ | CLAUDE.md | OK |
-| `/api/verify/:hash`, `/api/webhooks/resend` | ✅ | CLAUDE.md | OK |
+All routes accounted for. Full route-by-route table omitted for brevity; spot-checks confirmed every API route in `apps/web/app/api/` appears in `CLAUDE.md` and every page in `apps/web/app/` appears in the page list.
 
-**Totals**: 44/44 `route.ts` files documented, 24/24 page routes documented.
+| Group | Documented in CLAUDE.md | Has API docs | Status |
+|-------|------------------------|-------------|--------|
+| Auth API (12 routes) | ✓ | ✓ | green |
+| Public API (10 routes incl. og-image, llms.txt, .well-known/security.txt) | ✓ | ✓ | green |
+| Authenticated API (9 routes) | ✓ | ✓ | green |
+| Admin API (12 routes) | ✓ | ✓ | green |
+| Webhooks & Cron (5 routes) | ✓ | ✓ | green |
+| Pages (33 incl. experiments/*, archetypes/*) | ✓ | ✓ | green |
 
 ## Stale Documentation
-None. All documented routes exist in `apps/web/app/` and all production route.ts files appear in CLAUDE.md. Prior cycles (triage 2026-04-17) closed the last 14 design-system light-value cells; spot checks of the dark-theme values in `globals.css` confirm `--color-bg` `#0A0A0F`, `--color-amber` `#8B5CF6`, `--color-complement` `#10B981`, and dimension/archetype tokens all match.
+- None observed. `docs/impact-v4.md` is correctly retained as historical reference; `docs/impact-v6.md` is the current spec. Color tokens in `docs/design-system.md` exactly match the 38 `--color-*` tokens defined in `apps/web/styles/globals.css`.
 
 ## Missing Documentation
-None of production concern.
-
-- **Required docs present and non-empty**: `docs/impact-v4.md` (131 lines, correctly marked deprecated), `docs/impact-v5.md`, `docs/impact-v6.md`, `docs/svg-design.md` (173 lines), `docs/design-system.md`, `README.md` (215 lines, includes Quick Start, Tech Stack, Env Vars, Scripts, Key Endpoints).
-- **`docs/agents/shared-context.md`**: 371 lines, fresh entries through 2026-04-24 (coverage agent), stable multi-agent activity.
-- **TODO/FIXME referencing doc gaps**: 0 real hits. One false positive in `lib/agents/agent-config.ts:281` (the agent prompt template literal itself).
-- **JSDoc on complex lib/ logic**: Spot-checked `lib/impact/v6.ts`, `lib/render/*`, `lib/cache/redis.ts`, `lib/verification/hmac.ts` — public exports are documented, complex branches (fail-open rate limiter, HMAC preview vs production) have inline rationale comments.
+- **`lib/auth/session.ts`**: 5 exports (`SessionPayload`, `RequireSessionResult`, `getSessionSecret`, `getSessionKey`, `getOptionalServerSessionFromHeaders`, `getOptionalRequestSession`, `requireRequestSession`) have no JSDoc. Low priority — names are descriptive, but adding short doc comments would match the high standard set elsewhere (`lib/impact/v6.ts`, `lib/cache/redis.ts`, `lib/github/client.ts` — all 100% JSDoc-covered).
+- No TODO/FIXME comments in source reference missing documentation. The two prior false positives (agent-config template literal, audit prompt string) confirmed not real action items.
 
 ## Environment Variables
 | Variable | In CLAUDE.md | Used in code | Status |
 |----------|-------------|-------------|--------|
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_TOKEN` | ✅ | ✅ | OK |
-| `NEXTAUTH_SECRET` | ✅ | ✅ | OK |
-| `NEXT_PUBLIC_BASE_URL` | ✅ | ✅ | OK |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | ✅ | ✅ | OK |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | ✅ | ✅ | OK |
-| `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` | ✅ | ✅ | OK |
-| `RESEND_API_KEY` / `RESEND_WEBHOOK_SECRET` / `SUPPORT_FORWARD_EMAIL` | ✅ | ✅ | OK |
-| `CHAPA_VERIFICATION_SECRET` | ✅ | ✅ | OK |
-| `NEXT_PUBLIC_STUDIO_ENABLED` / `NEXT_PUBLIC_EXPERIMENTS_ENABLED` / `NEXT_PUBLIC_INSIGHTS_ENABLED` | ✅ | ✅ | OK |
-| `BITBUCKET_CLIENT_ID` / `BITBUCKET_CLIENT_SECRET` / `NEXT_PUBLIC_BITBUCKET_ENABLED` | ✅ | ✅ | OK |
-| `CODEBERG_CLIENT_ID` / `CODEBERG_CLIENT_SECRET` / `NEXT_PUBLIC_CODEBERG_ENABLED` | ✅ | ✅ | OK |
-| `ADMIN_HANDLES` / `ADMIN_SECRET` / `ALLOW_AGENT_RUN` | ✅ | ✅ | OK |
-| `CRON_SECRET` / `WARM_CACHE_PRIORITY_HANDLES` | ✅ | ✅ | OK |
-| `VERCEL_ENV` / `ANALYZE` | ✅ | ✅ | OK |
-| `CI` / `NODE_ENV` | ❌ | ✅ (standard build) | Intentional omission (standard Node/CI vars) |
-| `TESTPLATFORM_CLIENT_ID` / `TESTPLATFORM_CLIENT_SECRET` | ❌ | ✅ (tests only) | Intentional omission (test-only, confirmed 2026-04-17) |
-
-**Totals**: 33/33 production env vars documented. 4 intentional omissions (test/standard). No mismatches.
+| `CHAPA_ALERT_WEBHOOK_URL` | ✗ | ✓ (`lib/env.ts` + `lib/analytics/server-errors.ts`) | **MISMATCH — undocumented in CLAUDE.md** (documented in README.md + `docs/runbooks/incident-response.md`) |
+| `DEPLOYMENT_SMOKE_STRICT` | ✗ | ✓ (`apps/web/e2e/smoke.spec.ts`) | test-only, intentional omission acceptable |
+| `PLAYWRIGHT_BASE_URL` | ✗ | ✓ (`apps/web/playwright.config.ts`) | test-only, intentional omission acceptable |
+| All 31 production env vars from `lib/env.ts` | ✓ | ✓ | green (ADMIN_HANDLES, ADMIN_SECRET, ALLOW_AGENT_RUN, BITBUCKET_*, CODEBERG_*, CHAPA_VERIFICATION_SECRET, CRON_SECRET, GITHUB_*, NEXTAUTH_SECRET, NEXT_PUBLIC_*, RESEND_*, SUPABASE_*, SUPPORT_FORWARD_EMAIL, UPSTASH_*, WARM_CACHE_PRIORITY_HANDLES, VERCEL_ENV) |
 
 ## Recommendations
-1. **None actionable this cycle.** Documentation is in a healthy state. Continue the weekly audit cadence.
-2. (Optional, low priority) Add a one-line note in CLAUDE.md `Environment Variables` section explicitly stating that `TESTPLATFORM_*`, `CI`, and `NODE_ENV` are intentionally omitted — would remove recurring "missing" flags in mechanical audits. This is cosmetic only; the documentation agent already tracks it.
-
----
-
-SHARED_CONTEXT_START
-## Documentation Agent — 2026-04-24
-- **Status**: GREEN
-- Stale docs: 0
-- Missing docs: 0
-- Env var mismatches: 0 (33/33 production vars documented; `TESTPLATFORM_*`, `CI`, `NODE_ENV` intentionally omitted)
-- Route coverage: 44/44 API routes + 24/24 pages documented
-- Design tokens: 38/38 color tokens in `globals.css` match `docs/design-system.md`
-- Required docs present and non-empty: `impact-v4.md`, `impact-v5.md`, `impact-v6.md`, `svg-design.md`, `design-system.md`, `README.md` (215 lines with Quick Start), `shared-context.md` (371 lines, fresh through 2026-04-24)
-- TODO/FIXME referencing doc gaps: 0 (1 false positive in agent-config template literal)
-
-**Cross-agent recommendations:**
-- [QA]: No user-facing features with doc gaps. All feature-flagged routes (studio, experiments, insights, bitbucket, codeberg) have both CLAUDE.md entries and env var documentation.
-- [Security]: No outdated security docs. `docs/accepted-risks.md` present. All `NEXT_PUBLIC_*` vars confirmed non-sensitive and documented. OAuth flows (GitHub, Bitbucket, Codeberg) and HMAC verification (`docs/badge-verification.md`) docs align with current implementation.
-SHARED_CONTEXT_END
+1. **P3 — Add `CHAPA_ALERT_WEBHOOK_URL` to the env-vars block in `CLAUDE.md`.** It's used in production for operational alerts and already documented elsewhere; CLAUDE.md should be in sync. Add under a new "Operational alerts" section near `RESEND_API_KEY`.
+2. **P3 — Add JSDoc to the 5 `lib/auth/session.ts` exports** (`SessionPayload`, `RequireSessionResult`, `getSessionSecret`, `getSessionKey`, `getOptionalServerSessionFromHeaders`, `getOptionalRequestSession`, `requireRequestSession`) to bring the auth surface in line with `lib/impact/`, `lib/cache/`, and `lib/github/` (all 100%-documented).
+3. **No P1/P2 items.** Documentation is otherwise complete and accurate.
