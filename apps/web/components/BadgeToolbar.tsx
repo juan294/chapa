@@ -12,6 +12,17 @@ interface BadgeToolbarProps {
   handle: string;
 }
 
+/** Remove CSS animations and SMIL animate elements for static PNG export. */
+export function stripBadgeAnimations(svgText: string): string {
+  let result = svgText;
+  result = result.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
+  result = result.replace(/animation[^;"]*/g, "");
+  result = result.replace(/<animate [^>]*\/>/g, "");
+  result = result.replace(/<animate [^>]*>[^<]*<\/animate>/g, "");
+  result = result.replace(/opacity="0"/g, 'opacity="1"');
+  return result;
+}
+
 export function BadgeToolbar({
   handle,
 }: BadgeToolbarProps) {
@@ -80,18 +91,7 @@ export function BadgeToolbar({
     try {
       const res = await fetch(`/u/${encodeURIComponent(handle)}/badge.svg`);
       if (!res.ok) throw new Error("fetch failed");
-      let svgText = await res.text();
-
-      // Strip all animations for static PNG rendering:
-      // 1. CSS @keyframes blocks
-      svgText = svgText.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
-      // 2. CSS animation properties in style attributes
-      svgText = svgText.replace(/animation[^;"]*/g, "");
-      // 3. SMIL <animate> elements (heatmap fade-in uses these)
-      svgText = svgText.replace(/<animate [^>]*\/>/g, "");
-      svgText = svgText.replace(/<animate [^>]*>[^<]*<\/animate>/g, "");
-      // 4. Set heatmap rects to fully visible (they start at opacity="0")
-      svgText = svgText.replace(/opacity="0"/g, 'opacity="1"');
+      const svgText = stripBadgeAnimations(await res.text());
 
       // Use data URI (more reliable than blob URL for SVG→canvas)
       const scale = 2;

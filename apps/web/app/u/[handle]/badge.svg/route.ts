@@ -26,6 +26,8 @@ import {
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
 
+export const maxDuration = 35;
+
 const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
 const BADGE_CACHE_DEADLINE_MS = 250;
 const BADGE_RATE_LIMIT_DEADLINE_MS = 150;

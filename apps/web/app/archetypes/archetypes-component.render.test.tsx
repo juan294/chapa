@@ -355,3 +355,37 @@ describe("generateMetadata — locale-specific titles", () => {
     expect(meta.description).toBe("Emerging developers are building momentum.");
   });
 });
+
+describe("Archetype pages — default export wrappers", () => {
+  const searchParams = Promise.resolve({});
+
+  // Each page's default export is a thin wrapper that calls ArchetypePage with
+  // the correct archetypeKey. We call the default export (exercising it for v8
+  // coverage), then resolve the returned ArchetypePage element via renderServerComponent
+  // so the DOM includes the mocked Navbar.
+
+  it.each([
+    ["BalancedPage", "balanced", () => import("./balanced/page")],
+    ["BuilderPage", "builder", () => import("./builder/page")],
+    ["GuardianPage", "guardian", () => import("./guardian/page")],
+    ["MarathonerPage", "marathoner", () => import("./marathoner/page")],
+    ["PolymathPage", "polymath", () => import("./polymath/page")],
+    ["ArtificerPage", "artificer", () => import("./artificer/page")],
+    ["EmergingPage", "emerging", () => import("./emerging/page")],
+  ] as const)(
+    "%s delegates to ArchetypePage with archetypeKey '%s'",
+    async (_name, key, importer) => {
+      const mod = await importer();
+      const PageComponent = (mod as { default: (p: { searchParams: Promise<Record<string, string>> }) => Promise<React.ReactElement> }).default;
+      // Call the page function — this exercises the default export for coverage
+      const element = await PageComponent({ searchParams });
+      // The returned element wraps ArchetypePage; call it to get renderable JSX
+      const ArchetypePageFn = element.type as (p: object) => Promise<React.ReactElement>;
+      const jsx = await ArchetypePageFn(element.props as object);
+      render(jsx);
+      expect(screen.getByTestId("navbar")).toBeDefined();
+      // Verify the element delegates with the right archetypeKey
+      expect((element.props as { archetypeKey: string }).archetypeKey).toBe(key);
+    },
+  );
+});

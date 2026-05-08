@@ -507,6 +507,61 @@ describe("captureServerEvent", () => {
   });
 });
 
+describe("sanitizeUnknown — branch coverage for nested property types", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+    vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://alerts.example.com/chapa");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("passes null, number, and boolean values through unchanged in nested properties", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await captureOperationalAlert({
+      signal: "health_degraded",
+      severity: "P2",
+      summary: "test",
+      properties: {
+        nullVal: null,
+        count: 42,
+        active: true,
+      },
+    });
+
+    const body = getCallBody();
+    const props = body.properties as Record<string, unknown>;
+    expect(props.nullVal).toBeNull();
+    expect(props.count).toBe(42);
+    expect(props.active).toBe(true);
+  });
+
+  it("sanitizes sensitive strings within nested arrays", async () => {
+    mockFetch.mockResolvedValue({ ok: true });
+    const { captureOperationalAlert } = await import("./server-errors");
+
+    await captureOperationalAlert({
+      signal: "health_degraded",
+      severity: "P2",
+      summary: "test",
+      properties: {
+        tokens: ["ghp_abcdefghijklmnopqrstuvwxyz1234567890", "safe-value"],
+      },
+    });
+
+    const body = getCallBody();
+    const tokens = (body.properties as Record<string, unknown[]>).tokens ?? [];
+    expect(tokens[0]).toBe("[REDACTED]");
+    expect(tokens[1]).toBe("safe-value");
+  });
+});
+
 describe("withErrorCapture", () => {
   beforeEach(() => {
     vi.resetModules();
