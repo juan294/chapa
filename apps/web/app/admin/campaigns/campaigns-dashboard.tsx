@@ -899,6 +899,7 @@ export function CampaignsDashboard() {
                   key={c.id}
                   role="button"
                   tabIndex={0}
+                  aria-label={`Campaign: ${c.name}`}
                   onClick={() => openDetail(c)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
