@@ -53,29 +53,26 @@
 - [Coverage]: `app/api` 97.5%, `lib/db` 96.5%, `lib/cache` 98.1% — stable. No cost-path coverage gaps found this cycle.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-05T03:00:00Z -->
-## Cost Analyst — 2026-05-05
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-09T03:00:00Z -->
+## Cost Analyst — 2026-05-09
 - **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$55–70/mo**. Unchanged.
-- Redis: **21+ distinct prefixes** audited. TTL coverage 18/21 (86%). 3 persistent singletons unchanged: `cron:warm-cache:offset`, `stats:badges_generated` (INCR), `stats:unique_badges` (HLL ~12 KB). Growth risk: LOW.
-- **All 5 commits since 2026-05-02 are i18n-only** — zero Redis writes, zero external API calls, zero Supabase queries. No new cost surface.
-- **P3 CLOSED**: `revalidateTag("feature-flags")` wired to PATCH `/api/admin/feature-flags` in May 2 triage. Monitor M6 retired.
-- **NEW MONITOR M7**: `config:` key TTL = 31536000s (1 year per user) — studio badge configs accumulate per user. LOW risk at current scale; watch if studio adoption grows.
-- **ISR constraint confirmed**: Archetype/about pages remain dynamic due to Navbar `await headers()` — architectural constraint, not regression. The `unstable_cache` fix (Apr 30) still reduces Redis RTTs on dynamic requests.
-- GitHub API: cache-first unchanged (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage. Only intentionally uncached: `/api/health` probe + `/api/refresh` (5/hr + auth).
-- Supabase: **11 tables + 2 views + 1 RPC** unchanged. Singleton lazy client at `lib/db/supabase.ts:11`. 0 N+1 patterns. No new tables or queries.
-- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. No new external surface.
-- Cron: **4 handlers** at maxDuration=300s unchanged. No edge routes. No oversized routes.
-- Timers: All `setTimeout` paired with `clearTimeout()`. No server-side `setInterval`. 0 resource leaks.
-- In-memory: `_inflight` Map bounded by 30s timeout + `.finally()` clear. `flagCache` bounded by feature flags table size (~5-20 entries).
-- **P1s: NONE. P2s: 1 active.**
-- **P2-1 CARRIED (7th cycle)**: `dbGetCampaignStats()` 4-query parallel count aggregation (`lib/db/campaigns.ts:734-751`). Move to `GROUP BY status` RPC at >5K sends/campaign. Not yet triggered.
-- **MONITOR M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog spike risk at high error rate (fire-and-forget, timeout-protected).
+- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
+- Redis: **15 production prefixes + 3 persistent singletons** confirmed (28 audited including ops/test-suite keys). TTL coverage 89%. Growth risk: LOW.
+- **P2 RESOLVED — Badge `maxDuration`**: closed in commit 6ffe5d01 (May 8 triage). `app/u/[handle]/badge.svg/route.ts:29` now declares `export const maxDuration = 35`. Cold-path badge renders no longer killed by Vercel 10s default. 3-cycle escalation cleared.
+- **Commits this cycle** (1e9e8965, 6ffe5d01, 67a36541): triage docs + badge maxDuration fix + a11y aria-label addition + flaky test rewrite (`stripBadgeAnimations` extracted as pure function) + new coverage tests for archetypes/sanitizeUnknown branches. **Zero new Redis writes, zero new external API calls, zero new Supabase queries.** No cost surface change.
+- **P2-1 CARRIED (cycle 11)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation (`lib/db/campaigns.ts:727-765`). Threshold-gated >5K sends/campaign. Not yet triggered.
+- **MONITOR M7 CARRIED**: `config:` TTL 31 536 000s (1 year per user). Verified at `app/api/studio/config/route.ts:73`. PUT replaces existing key — no per-write growth. Negligible at current scale.
+- GitHub API: cache-first unchanged. 100% fetch timeout coverage. `_inflight` Map bounded by 30s + `.finally()` clear (`lib/github/client.ts`).
+- Supabase: **11 tables** confirmed via grep on `from('...')` calls. Singleton lazy client at `lib/db/supabase.ts:14`. 0 N+1 patterns. No new tables.
+- Cron handlers: **3** (`warm-cache`, `sync-audience`, `process-campaigns`). All at maxDuration=300s. Prior memory of "4 cron handlers" was off — `bulk-recalculate` is admin, not cron. Updated count.
+- Feature flags: `unstable_cache(revalidate=300s)` at `lib/feature-flags.ts:84-94` confirmed in place. ISR regression remains resolved.
+- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated).**
+- **MONITORS M1–M5 CARRIED** unchanged.
 
 **Cross-agent recommendations:**
-- [Performance]: Navbar `await headers()` is the remaining barrier to ISR on archetype/about pages. If CDN cache-hit ratio for those pages is a goal, consider moving session reads out of the Navbar into per-page RSC boundaries.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Resend webhook 3-layer defense intact. `lib/env.ts` typed getters trim invisible chars on all env reads.
-- [Coverage]: `app/api` 97.5%, `lib/db` 96.5% — stable. No cost-path coverage gaps. Studio config cache path (`config:` 1-year TTL) has no dedicated test; low priority but worth one fixture.
+- [Performance]: Badge `maxDuration` P2 closed — your 3-cycle P2 can be retired. Sustained bundle +34.7% over 4 weeks may be increasing Vercel cold-start memory; recommend `ANALYZE=true pnpm run build` to identify culprit packages before next cost cycle for joint review.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Resend webhook 3-layer defense intact. Supabase singleton confirmed at `lib/db/supabase.ts:14`. No new cost-security conflicts.
+- [Coverage]: `app/api` 97.5%, `lib/db` 96.5%, `lib/cache` 98.1% — stable. No cost-path coverage gaps this cycle. Studio `config:` 1-year TTL path has no dedicated cost-regression test (low priority).
 <!-- ENTRY:END -->
 
 
@@ -282,21 +279,22 @@
 - [Triage]: P2 items: 7 archetype pages need runtime generateMetadata tests (not source-string), `cli/authorize/error.tsx` needs one test, `lib/i18n/detect.ts` needs one branch test. All are small one-test fixes.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-05-05T02:00:00Z -->
-## Coverage Agent — 2026-05-05
+<!-- ENTRY:START agent=coverage timestamp=2026-05-09T02:05:00Z -->
+## Coverage Agent — 2026-05-09
 - **Status**: GREEN
-- Overall coverage: **96.49% stmts** (8943/9268), 92.5% branches, 95.18% funcs, 97.49% lines
-- Test suite: 440 files, 7537 tests (+243 tests, +28 files vs 2026-05-01). Duration 113s with coverage.
-- Delta vs 2026-05-01: stmts +3.10pp, branches +2.58pp, funcs +4.29pp, lines +3.06pp — driven by i18n command-description and share-menu tests added in recent commits.
-- Critical paths GREEN: lib/impact 99.6%, lib/render 100%, lib/db 96.5%, app/api 97.5%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/bitbucket 97.7%, lib/codeberg 98.0%, lib/email 97.6%, lib/analytics 97.3%, lib/history 98.3%, lib/profile 100%, lib/insights 100%, lib/async 100%, lib/log 100%, lib/env 100%.
-- **P2 active**: `app/verify/page.tsx` 55.6% stmts/50% funcs (both render paths + `generateMetadata` untested); `app/about/scoring/page.tsx` 76.9% stmts; `app/about/verification/page.tsx` 78.6% stmts; `app/cli/authorize/page.tsx` 78.9% stmts/50% funcs; `lib/i18n/detect.ts` 68.8% branches; `app/archetypes/artificer` + `emerging` 0% stmts (shell pages, no tests).
-- **Flaky test — RECURRED**: `BadgeToolbar > strips @keyframes` failed in run 2 of 3. May 2 triage fix (synchronous MockImage callbacks) did not hold — now in 4th confirmed cycle.
-- **P3 carried (accepted)**: experiments/** Canvas/JSDOM-blocked, `HolographicOverlay.tsx` 50% stmts (Canvas), `ParticleBackground.tsx` 90.4% stmts/77.8% funcs (Canvas), `archetypeDemoData/demoData` 50% branches (TS overload signatures), `lib/env.ts` 87.5% branches (one ternary), `lib/http/client-ip.ts` 75% branches.
+- Overall coverage: **96.81% stmts / 92.62% branches / 95.81% funcs / 97.87% lines** (8973/9268 stmts).
+- Test suite: 445 files, 7581 tests. 3/3 runs clean (51s–139s). 0 flakes.
+- Delta vs 2026-05-07: stmts +0.06pp, branches +0.02pp, funcs +0.32pp, lines +0.09pp — stable. Test count +14 from 2026-05-08 triage (BadgeToolbar rewrite, archetype default-export wrappers, sanitizeUnknown branches).
+- Critical paths GREEN: lib/impact 99.6%, lib/render 100%, lib/db 96.5%, app/api 97.5%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/analytics 97.3%, lib/history 98.3%.
+- **All prior P2 gaps closed**: archetype default-export tests, `sanitizeUnknown` branches, `BadgeToolbar` flake — all confirmed resolved per 2026-05-08 triage.
+- **No new P2s**. All sub-80% files are P3 carries (Canvas/WebGL, lazy-wrapper, experiments-gated).
+- **Untested files: 5** — all benign (i18n dictionaries covered by parity test, barrel re-export, OAuth config helpers).
 
 **Cross-agent recommendations:**
-- [Security]: lib/analytics 97.3% stmts / 89.5% branches — SENSITIVE_PATTERNS redaction paths stable. `lib/http/client-ip.ts` 75% branches — one IP-extraction fallback untested; low risk but security-adjacent.
-- [QA]: `BadgeToolbar > strips @keyframes` is in its 4th confirmed flake cycle. Synchronous MockImage fix insufficient — recommend full rewrite using `vi.spyOn(Image.prototype)` or a proper fetch interceptor pattern.
-- [Triage]: New P2 items: verify page 55.6%, about/scoring 76.9%, about/verification 78.6%, cli/authorize 78.9% — all `generateMetadata` + locale-branch patterns, one-test fixes each. Flaky test requires escalation.
+- [Security]: `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branches were closed in 2026-05-08 triage — security-adjacent P2 retired. No new security-relevant gaps.
+- [QA]: `BadgeToolbar @keyframes` flake permanently retired via pure-function extraction. No new a11y or regression risk surfaced by coverage data.
+- [Performance]: No coverage gaps in performance-sensitive paths. Badge route `maxDuration=35` was added in 2026-05-08 triage.
+- [Cost Analyst]: No cost-path coverage gaps. `lib/cache` 98.1%, `lib/db` 96.5%, `app/api` 97.5% remain stable.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-04-24T07:03:08Z -->
