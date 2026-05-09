@@ -340,6 +340,7 @@ SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBL
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
+CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1 operational alerts (Discord/Slack/custom — optional; triggers on health_degraded, badge_5xx, oauth_callback_failure)
 
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)

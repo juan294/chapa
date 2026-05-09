@@ -15,6 +15,7 @@ vi.mock("next/cache", () => ({
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import {
   isStudioEnabled,
+  isStudioEnabledSync,
   isExperimentsEnabled,
   isAgentEnabled,
   isBitbucketEnabled,
@@ -389,6 +390,36 @@ describe("isInsightsEnabledSync", () => {
   it("handles whitespace", () => {
     vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", "  true  ");
     expect(isInsightsEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isStudioEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isStudioEnabledSync", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns false when env var not set", () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", undefined);
+    expect(isStudioEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "true");
+    expect(isStudioEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "false");
+    expect(isStudioEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "  true  ");
+    expect(isStudioEnabledSync()).toBe(true);
   });
 });
 

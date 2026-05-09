@@ -81,6 +81,19 @@
 
 
 
+<!-- ENTRY:START agent=triage timestamp=2026-05-09T07:30:00Z -->
+## Triage — 2026-05-09
+- **Reports processed**: 3 (cc-rpi-update GREEN, coverage GREEN, cost-analyst GREEN)
+- **Action items resolved**: 3 of 3 — all implemented
+- **Summary**: All overnight reports GREEN — no P2s, no failures, no Dependabot PRs. (1) Added `isStudioEnabledSync` describe block (4 tests) to `lib/feature-flags.test.ts` — only sync flag function without test coverage; mirrors existing `isBitbucketEnabledSync` pattern. (2) Added 2 tests to `lib/dashboard/generate-insights.test.ts`: identity-fallback path (default `t = (key) => key` parameter, never called in prior tests) and unknown-archetype lowercased-key fallback (`?? archetype.toLowerCase()` branch). (3) Added `CHAPA_ALERT_WEBHOOK_URL` to `CLAUDE.md` env-vars block — operationally critical P1 alert webhook (`lib/env.ts:59`), documented in README + runbook but missing from canonical project file. Final test count: 7587 (+6 vs last cycle). All 445 test files green.
+- **Skipped with reason**: Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; carry cycle 11. Bundle watch deferred (informational monitor, no action needed this cycle).
+
+**Cross-agent recommendations:**
+- [Coverage]: `lib/feature-flags.ts` now at 100% funcs. `lib/dashboard/generate-insights.ts` locale-fallback branches now covered. All modules at or above 94% stmts. No new gaps to watch.
+- [Cost Analyst]: No cost-path changes this cycle. P2-1 carry unchanged at cycle 11.
+- [Documentation]: `CHAPA_ALERT_WEBHOOK_URL` now in CLAUDE.md env-vars block — operationally complete.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-05-08T09:22:00Z -->
 ## Triage — 2026-05-08
 - **Reports processed**: 5 (cc-rpi-update, cost-analyst, coverage, performance, qa)
@@ -107,33 +120,6 @@
 - [Cost Analyst]: No cost-path changes this cycle. P2-1 carry unchanged at cycle 9.
 - [cc-rpi-update]: Validation preamble-agnostic fix from May 5 is holding — report shows correct "already up to date" status.
 <!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-05-03T07:00:00Z -->
-## Triage — 2026-05-03
-- **Reports processed**: 3 (cost-analyst GREEN, coverage INCOMPLETE, cc-rpi-update FALSE FAILURE)
-- **Action items resolved**: 1 of 1 — all implemented
-- **Summary**: Minimal cycle — only cc-rpi update false failure required a fix. (1) Fixed `scripts/cc-rpi-update.sh` validation pattern: extended `valid_pattern` to also accept `^The local cc-rpi` as a valid first line. Root cause: agent output a natural-language preamble ("The local cc-rpi is already at the same commit...") before the required "cc-rpi sync: already up to date as of v1.18.0." line. Both retry attempts hit the same validation failure → script logged FAILED. Actual sync state was correct (v1.18.0 already up to date). Cost analyst GREEN with no new action items (P2-1 still threshold-gated). Coverage agent wrote "Coverage running. Waking back up at scheduled time." — incomplete report, no prior coverage gaps outstanding.
-- **Skipped with reason**: Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; not yet triggered.
-
-**Cross-agent recommendations:**
-- [cc-rpi-update]: Validation pattern now accepts "The local cc-rpi" prefix — false FAILED status resolved. Monitor next cycle to confirm fix holds.
-- [Coverage]: Report incomplete this cycle — coverage agent emitted a ScheduleWakeup-style message instead of completing the analysis. If report is empty next cycle, investigate launchd context (may need `--allowedTools` audit or headless mode flag change).
-- [Cost Analyst]: No new action items. P2-1 carry unchanged.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-05-05T10:20:00Z -->
-## Triage — 2026-05-05
-- **Reports processed**: 3 (cc-rpi-update FALSE FAILURE again, coverage YELLOW, shared-context reference)
-- **Action items resolved**: 10 of 10 — all implemented
-- **Summary**: (1) Fixed cc-rpi validation for the 3rd consecutive false FAILED cycle: replaced brittle preamble first-line matching with a secondary `grep -q "cc-rpi sync: already up to date"` check anywhere in the file. Root cause: preamble text changed from "The local cc-rpi..." (May 3 fix) to "The cc-rpi blueprint HEAD is identical to..." — brittle regex kept failing. New approach is preamble-agnostic. (2) Fixed `BadgeToolbar > strips @keyframes` flaky test (4th cycle): isolated root cause to `setDownloadStatus("idle")` queuing a React state update that races into the next test's stub setup. Fix: `await act(async () => {})` before `vi.unstubAllGlobals()` in the test's finally block — drains React's concurrent scheduler. (3) Added 3 branch-coverage tests: `pickFromAcceptLanguage` malformed-q and empty-lang-token paths; `getClientIp` whitespace-only XFF last hop. (4) Added 5-test source-string suites for `archetypes/artificer/page.tsx` and `archetypes/emerging/page.tsx` (both 0% coverage). (5) Added `generateMetadata` runtime tests to `about/scoring`, `about/verification`, `verify`, and `cli/authorize` pages (+11 tests total). (6) Merged Dependabot PR #839 (jsdom + @supabase/supabase-js + posthog-js, 3× patch, CI green). Total: 10 files changed, 211 insertions.
-- **Skipped with reason**: P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; not yet triggered (8th carry cycle).
-
-**Cross-agent recommendations:**
-- [cc-rpi-update]: Validation is now preamble-agnostic — grep checks for success string anywhere in file. If false FAILEDs recur next cycle, the success string itself may be changing (investigate Claude output format).
-- [Coverage]: `BadgeToolbar @keyframes` flake fix uses `await act(async () => {})` scheduler drain. If it recurs, suspect the component's finally block or another async state update path.
-- [Cost Analyst]: No cost-path changes this cycle. P2-1 carry unchanged at cycle 8.
-<!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-30T09:00:00Z -->
 ## Performance Engineer — 2026-04-30
