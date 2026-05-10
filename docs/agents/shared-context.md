@@ -261,22 +261,23 @@
 - [Triage]: Two P2 items: (a) 7 archetype generateMetadata runtime tests — one shared test file covers all 7 pages. (b) `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branch coverage (security P2). Flaky test rewrite is the highest-urgency item.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-05-06T02:00:00Z -->
-## Coverage Agent — 2026-05-06
+<!-- ENTRY:START agent=coverage timestamp=2026-05-10T02:00:00Z -->
+## Coverage Agent — 2026-05-10
 - **Status**: GREEN
-- Overall coverage: **96.63% stmts** (8956/9268), 92.53% branches, 95.34% funcs, 97.65% lines
-- Test suite: 444 files, 7559 tests (+22 vs 2026-05-05). Duration 97s with coverage.
-- Delta vs 2026-05-05: stmts +0.14pp, branches +0.03pp, funcs +0.16pp, lines +0.16pp — stable growth.
-- Critical paths GREEN: lib/impact 99.6%, lib/render 100%, lib/db 96.5%, app/api 97.5%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/bitbucket 97.7%, lib/codeberg 98.0%, lib/email 97.6%, lib/analytics 97.3%, lib/history 98.3%, lib/profile 100%, lib/insights 100%, lib/async 100%, lib/log 100%, lib/env 100%.
-- **P2 RETIRED**: `app/verify/page.tsx` → 100% (was 55.6%), `app/about/scoring` → 100% (was 76.9%), `app/about/verification` → 100% (was 78.6%), `app/cli/authorize/page.tsx` → 100% (was 78.9%). All May 5 triage fixes confirmed.
-- **P2 active**: `app/archetypes/artificer/page.tsx` + `emerging/page.tsx` 0% stmts (source-string tests only, v8 requires runtime imports); 5 other archetype pages 80% stmts/50% funcs (`generateMetadata` untested as runtime); `app/cli/authorize/error.tsx` 0% stmts (no test); `lib/i18n/detect.ts` 75% branches (one branch still uncovered).
-- **Flaky tests: 0** — all 3 consecutive runs clean (7559/7559 each). `BadgeToolbar > strips @keyframes` did NOT recur — May 5 `await act(async () => {})` drain fix is holding. Monitor one more cycle before closing.
-- **P3 carried (accepted)**: experiments/** Canvas/JSDOM-blocked, `HolographicOverlay.tsx` 50% stmts, `ParticleBackground.tsx` 90.4%/77.8% funcs (Canvas), `GlobalCommandBarLazy`/`ClientInstrumentation`/`SharePageOwnerContentLazy` 60–67% stmts (next/dynamic lazy wrappers, no testable logic), archetypeDemoData/demoData 50% branches (TS overload signatures), `lib/i18n/lang-sync.tsx` 50% branches (SSR guard).
+- Overall coverage: **96.82% stmts / 92.66% branches / 95.86% funcs / 97.88% lines** (8974/9268 stmts).
+- Test suite: 445 files, 7587 tests. 3/3 runs clean (all 7587/7587). 0 flakes. Duration ~90s with coverage.
+- Delta vs 2026-05-09: stmts +0.01pp, branches +0.04pp, funcs +0.05pp, lines +0.01pp — flat, stable.
+- Test count +6 vs May 9 (isStudioEnabledSync block + generate-insights locale/archetype paths from May 9 triage).
+- Critical paths GREEN: lib/impact 99.6%/98.7%/100%, lib/render 100%/92.9%/100%, lib/db 96.5%/93.3%/100%, app/api 97.5%/94.2%/96.8%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/analytics 97.3%, lib/history 98.3%, packages/shared 100%.
+- **No new P2s**. All sub-80% files remain accepted P3 carries: Canvas/WebGL (HolographicOverlay, ParticleBackground, experiments Canvas pages), next/dynamic lazy wrappers (GlobalCommandBarLazy, ClientInstrumentation, SharePageOwnerContentLazy), experiments-gated error/loading (0% stmts, JSDOM-blocked), TS-overload branches (archetypeDemoData/demoData), SSR guard branch (lang-sync.tsx).
+- **Flaky tests: 0** — `BadgeToolbar @keyframes` permanently retired via pure-function extraction (May 8). 3 identical clean runs this cycle.
+- **Watch**: `lib/feature-flags.ts` 88.2% funcs — one path still uncovered post May-9 isStudioEnabledSync addition. No regression risk; low priority.
 
 **Cross-agent recommendations:**
-- [Security]: lib/analytics 97.3% stmts / 89.5% branches stable. SENSITIVE_PATTERNS redaction paths unchanged. No new security-relevant gaps.
-- [QA]: BadgeToolbar flake appears resolved — 3 clean runs. Recommend one more cycle of monitoring before dropping the watch.
-- [Triage]: P2 items: 7 archetype pages need runtime generateMetadata tests (not source-string), `cli/authorize/error.tsx` needs one test, `lib/i18n/detect.ts` needs one branch test. All are small one-test fixes.
+- [Security]: lib/analytics 97.3% stable — SENSITIVE_PATTERNS branches confirmed covered (retired P2). No security-relevant gaps.
+- [QA]: 0 flaky tests. BadgeToolbar permanently clean. No new regression risk from coverage data.
+- [Triage]: No P2 action items this cycle. Only watches: feature-flags.ts 88.2% funcs (low priority).
+- [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. No cost-path gaps.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage timestamp=2026-05-09T02:05:00Z -->
