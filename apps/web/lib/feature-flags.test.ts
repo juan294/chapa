@@ -209,6 +209,30 @@ describe("isAgentEnabled", () => {
     const result = await isAgentEnabled("nonexistent_agent");
     expect(result).toBe(false);
   });
+
+  it("returns false when master flag lookup times out", async () => {
+    vi.useFakeTimers();
+    vi.mocked(dbGetFeatureFlag).mockReturnValue(new Promise(() => {}));
+
+    const resultPromise = isAgentEnabled("coverage_agent");
+    await vi.advanceTimersByTimeAsync(501);
+
+    await expect(resultPromise).resolves.toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("returns false when agent flag lookup times out", async () => {
+    vi.useFakeTimers();
+    vi.mocked(dbGetFeatureFlag)
+      .mockResolvedValueOnce(makeFlag("automated_agents", true))
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const resultPromise = isAgentEnabled("coverage_agent");
+    await vi.advanceTimersByTimeAsync(501);
+
+    await expect(resultPromise).resolves.toBe(false);
+    vi.useRealTimers();
+  });
 });
 
 // ---------------------------------------------------------------------------

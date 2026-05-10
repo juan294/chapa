@@ -9,6 +9,29 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-10T03:00:00Z -->
+## Cost Analyst — 2026-05-10
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
+- Redis: **28 prefixes** (15 production + 3 persistent singletons + ops/test-suite). TTL coverage 25/28 (89%). Growth risk: LOW. Full re-audit — zero changes vs prior cycle.
+- **Commits this cycle** (30c4a5cc, 942b74fb, 36229c25): coverage May 10 docs + triage May 9 docs + CLAUDE.md env-var addition (isStudioEnabledSync tests, generate-insights locale/archetype tests). **Zero Redis writes, zero new external API calls, zero new Supabase queries.** No cost surface change.
+- **P2-1 CARRIED (cycle 12)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation (`lib/db/campaigns.ts:727-765`). Threshold-gated >5K sends/campaign. Not yet triggered.
+- **MONITOR M7 CARRIED**: `config:` TTL 31 536 000s (1 year per user). Verified at `app/api/studio/config/route.ts:73`. No per-write accumulation. Negligible at current scale.
+- **MONITOR M-bundle CARRIED**: Bundle +34.7% over 4 weeks from May 7 performance report. Source unknown. No chunk ≥500 KB; no immediate cold-start risk. Recommend `ANALYZE=true pnpm run build` before significant user growth.
+- Badge route `maxDuration=35` confirmed at `app/u/[handle]/badge.svg/route.ts:29`. P2 fully retired.
+- GitHub API: cache-first unchanged. 100% fetch timeout coverage. `_inflight` Map bounded by 30s + `.finally()` clear (`lib/github/client.ts:28-83`).
+- Supabase: **11 tables** confirmed, singleton lazy client at `lib/db/supabase.ts:14`. 0 N+1 patterns. No new tables.
+- ISR caching: `unstable_cache(revalidate=300s)` at `lib/feature-flags.ts:84-94` confirmed active. 13 pages CDN-eligible. No regression.
+- Coverage context: 7587 tests GREEN, 0 flakes, lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — stable.
+- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated).**
+- **MONITORS M1–M5, M7, M-bundle CARRIED** unchanged.
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle +34.7% over 4 weeks remains unresolved (informational monitor). `ANALYZE=true pnpm run build` recommended before next growth milestone. Badge `maxDuration` P2 fully retired — no action needed.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Resend webhook 3-layer defense intact. Supabase singleton at `lib/db/supabase.ts:14`. No new cost-security conflicts.
+- [Coverage]: `lib/cache` 98.1%, `lib/db` 96.5%, `app/api` 97.5% — stable. No cost-path coverage gaps this cycle.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-05-07T03:00:00Z -->
 ## Cost Analyst — 2026-05-07
 - **Status**: GREEN
@@ -28,29 +51,6 @@
 - [Performance]: Badge route `maxDuration` still missing — escalated to P2 (2nd cycle). Add `export const maxDuration = 35` at top of `app/u/[handle]/badge.svg/route.ts`. Without this, Vercel's 10s default kills badge generation on cold paths before the 30s internal timeout.
 - [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Resend webhook 3-layer defense intact. Supabase singleton confirmed at `lib/db/supabase.ts:14`.
 - [Coverage]: `app/api` 97.5%, `lib/db` 96.5%, `lib/cache` 98.1% — stable. No cost-path coverage gaps this cycle. Badge route cold-path (maxDuration gap) has no specific test; low priority to add.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-06T03:00:00Z -->
-## Cost Analyst — 2026-05-06
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
-- Redis: **28 distinct prefixes** audited (full re-audit this cycle). TTL coverage 25/28 (89%). 3 persistent singletons unchanged: `cron:warm-cache:offset`, `stats:badges_generated` (INCR counter), `stats:unique_badges` (HLL ~12 KB). Growth risk: LOW.
-- **All 5 recent commits are i18n-only** (1396fda5, 25573aba, 8f6fe87a) — zero Redis writes, zero external API calls, zero Supabase queries. i18n uses browser cookies only (`chapa-locale`). No new cost surface.
-- **P2-1 CARRIED (9th cycle)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation (`lib/db/campaigns.ts:734-751`). Threshold-gated at >5K sends/campaign. Not yet triggered.
-- **MONITOR M7 CARRIED**: `config:` key TTL = 1yr per user — studio configs accumulate ~200–400 bytes/user. Negligible at current scale.
-- GitHub API: cache-first unchanged (6h fresh + 7d stale + in-flight dedup). 100% timeout coverage. Only intentionally uncached: `/api/health` probe + `/api/refresh` (5/hr + auth).
-- Supabase: **11 tables** confirmed, singleton lazy client at `lib/db/supabase.ts:11`. 0 N+1 patterns. `dbGetLatestSnapshotBatch()` confirmed single `IN()` query for cron. No new tables or queries.
-- External APIs: GitHub / Bitbucket / Codeberg / Resend / PostHog — all cached or rate-limited, all with explicit timeouts. Bitbucket and Codeberg `clearTimeout` confirmed in finally blocks.
-- Cron: 3 cron routes at maxDuration=300s. Badge route has no `maxDuration` (new finding — defaults to Vercel 10s, but GitHub INFLIGHT_TIMEOUT_MS=30s). No edge routes.
-- Timers: All `setTimeout` paired with `clearTimeout()` in finally blocks. No server-side `setInterval`. 0 resource leaks.
-- In-memory: `_inflight` Map bounded by 30s timeout + `.finally()` clear. `inflightBadgeRenders` Map cleared in finally. `flagCache` bounded ~5–20 entries.
-- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated).**
-- **MONITORS M1–M5 CARRIED**: avatar cache (~300 MB @10K users), OG image cache (~200 MB @1K active/day), HLL (~12 KB), `metrics_snapshots` row growth (~3.65M rows/year @10K — cleanup wired), `withErrorCapture` PostHog spike risk (fire-and-forget, timeout-protected).
-
-**Cross-agent recommendations:**
-- [Performance]: Badge route (`app/u/[handle]/badge.svg/route.ts`) has no `export const maxDuration`. Vercel Pro defaults to 10s. The GitHub API `INFLIGHT_TIMEOUT_MS=30s` could trip at 10s on cold paths. Recommend adding `export const maxDuration = 30`.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Resend webhook 3-layer defense intact. `lib/env.ts` typed getters trim invisible chars on all env reads.
-- [Coverage]: `app/api` 97.5%, `lib/db` 96.5%, `lib/cache` 98.1% — stable. No cost-path coverage gaps found this cycle.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-05-09T03:00:00Z -->
@@ -77,6 +77,18 @@
 
 
 
+
+<!-- ENTRY:START agent=triage timestamp=2026-05-10T12:05:00Z -->
+## Triage — 2026-05-10
+- **Reports processed**: 3 (cc-rpi-update GREEN, coverage GREEN, cost-analyst GREEN)
+- **Action items resolved**: 2 of 2 — all implemented
+- **Summary**: All overnight reports GREEN — no P2s, no failures, no Dependabot PRs. (1) Added 2 timeout-path tests for `isAgentEnabled` to `lib/feature-flags.test.ts`: master-flag-timeout and agent-flag-timeout — both `.catch(() => null)` callbacks in `isAgentEnabled` (lines 192, 198) were uncovered anonymous functions; now covered. Final test count: 7589 (+2 vs last cycle). All 445 test files green. (2) Bundle analysis (`ANALYZE=true pnpm run build`) deferred — opens browser windows non-headlessly; noted as informational monitor.
+- **Skipped with reason**: (a) Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; carry cycle 12. (b) Bundle `ANALYZE=true` run — informational monitor only, no chunk ≥500 KB.
+
+**Cross-agent recommendations:**
+- [Coverage]: `lib/feature-flags.ts` `isAgentEnabled` timeout paths now covered. All anonymous `.catch` callbacks tested. Feature-flags module fully covered.
+- [Cost Analyst]: No cost-path changes this cycle. P2-1 carry unchanged at cycle 12.
+<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-05-09T07:30:00Z -->
 ## Triage — 2026-05-09
@@ -105,18 +117,6 @@
 - [Cost Analyst]: No cost-path changes this cycle. P2-1 carry unchanged at cycle 10.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-05-06T06:41:00Z -->
-## Triage — 2026-05-06
-- **Reports processed**: 3 (cc-rpi-update OK, cost-analyst GREEN, coverage YELLOW→resolved)
-- **Action items resolved**: 3 of 3 — all implemented
-- **Summary**: (1) Added runtime `generateMetadata` tests for `artificer/page.tsx` and `emerging/page.tsx` in `archetypes-component.render.test.tsx` — both were at 0% v8 coverage because only source-string tests existed. (2) Added jsdom render test `cli/authorize/error.render.test.tsx` — component was at 0% stmts despite a source-string test existing. (3) Fixed `lib/i18n/detect.ts` branches from 75% → 100%: added 1 test for the reachable `param.startsWith('q=')` false path (non-q semicolon param like `charset=utf-8`), and added `/* v8 ignore next */` to 3 unreachable `?? ''` branches forced by `noUncheckedIndexedAccess`. Total: 4 files changed, +104 insertions, +8 new tests. cc-rpi at v1.18.0 (no action). Cost-analyst GREEN (P2-1 still threshold-gated, 9th carry cycle).
-- **Skipped with reason**: Cost-analyst P2-1 (`dbGetCampaignStats` GROUP BY RPC) — threshold-gated at >5K sends/campaign; not yet triggered.
-
-**Cross-agent recommendations:**
-- [Coverage]: 3 P2 gaps closed this cycle. `app/archetypes` and `cli/authorize/error.tsx` should now report 100%. `lib/i18n/detect.ts` should report 100% branches. Monitor for new P2s next cycle.
-- [Cost Analyst]: No cost-path changes this cycle. P2-1 carry unchanged at cycle 9.
-- [cc-rpi-update]: Validation preamble-agnostic fix from May 5 is holding — report shows correct "already up to date" status.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=performance timestamp=2026-04-30T09:00:00Z -->
 ## Performance Engineer — 2026-04-30
