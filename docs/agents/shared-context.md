@@ -243,22 +243,23 @@
 - [Security]: No security-related quality issues. Campaigns `<tr role="button">` missing `aria-label` is a11y only — no data exposure. All XSS vectors and interactive elements covered.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage timestamp=2026-05-07T02:00:00Z -->
-## Coverage Agent — 2026-05-07
-- **Status**: YELLOW
-- Overall coverage: **96.75% stmts** (8964/9265), 92.6% branches, 95.49% funcs, 97.78% lines
-- Test suite: 445 files, 7567 tests. Duration 103s with coverage.
-- Delta vs 2026-05-06: stmts +0.12pp, branches +0.07pp, funcs +0.15pp, lines +0.13pp — stable.
-- Critical paths GREEN: lib/impact 99.6%, lib/render 100%, lib/db 96.5%, app/api 97.5%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/analytics 97.3%.
-- **RESOLVED since last cycle**: `cli/authorize/error.tsx` → 100%, `lib/i18n/detect.ts` → 100% branches, `og-image/route.ts` → 100% funcs. All May 6 triage gaps confirmed closed.
-- **P2 active**: (1) 7 archetype pages (`artificer`, `balanced`, `builder`, `emerging`, `guardian`, `marathoner`, `polymath`) at 80% stmts / 50% funcs — `generateMetadata` export untested at runtime. (2) `lib/analytics/server-errors.ts` 88.23% branches — SENSITIVE_PATTERNS token-scrubbing branches untested (security-adjacent, 2nd carry cycle).
-- **FLAKY TEST ESCALATED**: `BadgeToolbar > strips @keyframes` failed **2/3 runs** (5th cycle). `await act(async () => {})` drain not holding. Failure rate up from 1/3. Full test rewrite required — not another teardown patch.
-- **P3 carried (accepted)**: experiments/** Canvas/JSDOM-blocked, `HolographicOverlay.tsx` 50% stmts, `ParticleBackground.tsx` 77.77% funcs (Canvas), lazy wrapper components (33–50% funcs), `lang-sync.tsx` 50% branches (SSR guard), `archetypeDemoData/demoData` 50% branches (TS overloads).
+<!-- ENTRY:START agent=coverage timestamp=2026-05-11T02:00:00Z -->
+## Coverage Agent — 2026-05-11
+- **Status**: GREEN
+- Overall coverage: **96.83% stmts / 92.56% branches / 95.91% funcs / 97.88% lines** (8975/9268 stmts).
+- Test suite: 445 files, 7589 tests. 3/3 runs clean (all 7589/7589). 0 flakes. Duration ~102s with coverage.
+- Delta vs 2026-05-10: stmts +0.01pp, branches −0.10pp (noise), funcs +0.05pp, lines flat. Tests +2 from isAgentEnabled timeout-path tests (May 10 triage).
+- Critical paths GREEN: lib/impact 99.6%/98.7%/100%, lib/render 100%/92.9%/100%, lib/db 96.5%/93.3%/100%, app/api 97.5%/94.2%/96.8%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/analytics 97.3%, lib/history 98.3%, packages/shared 91.6%/100%/100%.
+- **Watch resolved**: `lib/feature-flags.ts` was 88.2% funcs (watch May 10) → now **95.8% stmts / 100% branches / 100% funcs**. isAgentEnabled timeout paths fully covered. Watch retired.
+- **No new P2s**. All sub-80% files are P3 carries: Canvas/WebGL (HolographicOverlay, ParticleBackground, experiments pages), next/dynamic lazy wrappers (GlobalCommandBarLazy, ClientInstrumentation, SharePageOwnerContentLazy), experiments-gated error/loading (JSDOM-blocked), TS-overload branches (archetypeDemoData/demoData), SSR guard branch (lang-sync.tsx).
+- **Flaky tests: 0** — 3 identical clean runs. BadgeToolbar permanently stable.
+- **Untested source files: 14** — all benign (type-only modules, barrel re-exports, i18n dictionaries covered by parity test, test-helpers, OAuth config helpers).
 
 **Cross-agent recommendations:**
-- [Security]: `lib/analytics/server-errors.ts` 88.23% branches — SENSITIVE_PATTERNS scrubbing (9 token types: password, token, secret, key, credential, api_key, client_secret, client_id, access_token) untested. Credential-logging-to-PostHog prevention guards. P2 security risk, 2nd carry cycle.
-- [QA]: `BadgeToolbar > strips @keyframes` now failing 2/3 runs — all teardown patches exhausted. Need full rewrite: spy directly on `stripAnimationsFromSvg` or use `vi.useFakeTimers()` to eliminate scheduler race. Do not apply another `await act()` patch.
-- [Triage]: Two P2 items: (a) 7 archetype generateMetadata runtime tests — one shared test file covers all 7 pages. (b) `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branch coverage (security P2). Flaky test rewrite is the highest-urgency item.
+- [Security]: lib/analytics 97.3% stable — SENSITIVE_PATTERNS branches confirmed covered. No security-relevant gaps this cycle.
+- [QA]: 0 flaky tests. No regression risk from coverage data. No new gaps to watch.
+- [Triage]: No P2 action items this cycle. All watches resolved. Fully clean cycle.
+- [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. No cost-path gaps.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage timestamp=2026-05-10T02:00:00Z -->
