@@ -1,117 +1,120 @@
 # Cost Analyst Report
-> Generated: 2026-05-10 | Health status: **green**
+> Generated: 2026-05-11 | Health status: **green**
 
 ## Executive Summary
 
-Zero cost-surface changes this cycle — three commits since the May 9 report are documentation and test-only. All prior P2s remain resolved; P2-1 (`dbGetCampaignStats` GROUP BY aggregation) carries to cycle 12, still threshold-gated at >5K sends/campaign.
+Infrastructure cost posture remains stable at ~$50–75/mo estimated for 10K users. Zero new cost-surface changes this cycle — recent commits were documentation and test-only. One carried P2 (dbGetCampaignStats threshold-gated) and one new P3 (health endpoint uncached GitHub call). All prior P2s fully resolved.
+
+---
 
 ## Redis Usage
 
-**Key patterns (28 audited, 15 production prefixes + 3 persistent singletons):**
+**Key prefixes: 16 production prefixes** (28 total including ops/test-suite keys)
 
-| Prefix | TTL | Notes |
-|--------|-----|-------|
-| `stats:v2:merged:` | 21,600s (6h) | GitHub stats cache (hot path) |
-| `stats:stale:` | 604,800s (7d) | Stale fallback |
-| `svg:` | 21,600s (6h) | Badge SVG output cache |
-| `badge-lock:` | 30s | Render deduplication lock |
-| `supplemental:` | 86,400s (24h) | EMU account stats |
-| `config:` | 31,536,000s (1yr) | Studio config per-user (M7) |
-| `ratelimit:` | Window-based | Per-route rate counters |
-| `campaign:active-engagement` | 3,600s (1h) | Active campaign cache |
-| `sync-audience:contacts` | 3,600s (1h) | Resend contacts list |
-| `stats:dirty:` | 3,600s (1h) | CLI upload dirty marker |
-| `feature-flag:` | 300s | Flag cache via `unstable_cache` |
-| `inflight:` | 30s | GitHub in-flight dedup |
-| `cron:lock:` | 300s | Cron execution lock |
-| `cron:warm-cache:offset` | **No TTL** | Persistent rotation offset (singleton) |
-| `stats:badges_generated` | **No TTL** | INCR lifetime counter (singleton) |
-| `stats:unique_badges` | **No TTL** | HLL ~12 KB (singleton) |
+| Prefix | TTL | Per-user? | Growth risk |
+|--------|-----|-----------|-------------|
+| `stats:v2:merged:{handle}` | 21,600s (6h) | ✅ Yes | Low — bounded |
+| `stats:v2:bitbucket:{handle}` | 21,600s (6h) | ✅ Yes | Low |
+| `stats:v2:codeberg:{handle}` | 21,600s (6h) | ✅ Yes | Low |
+| `stats:stale:{handle}` | 604,800s (7d) | ✅ Yes | Low |
+| `stats:dirty:{handle}` | 3,600s (1h) | ✅ Yes | Low — 1h TTL |
+| `badge:{version}:{handle}:warm-amber:{date}` | 86,400s (24h) | ✅ Yes | Low — date-keyed |
+| `badge-lock:{version}:{handle}:...:{date}` | 30s | ✅ Yes | Negligible |
+| `craft:{version}:{handle}` | 3,600s (1h) | ✅ Yes | Low |
+| `snapshot:latest:{handle}` | DB-backed | ✅ Yes | Low |
+| `history:{handle}[:{from}:{to}]` | 3,600s (1h) | ✅ Yes | Low |
+| `supplemental:{handle}` | 86,400s (24h) | ✅ Yes | Low |
+| `ratelimit:*` | 60–900s | Per-IP | Low — short TTL |
+| `oauth-state:{state}` | 600s (10m) | Per-request | Low |
+| `campaign:*` | 3,600s (1h) | No | Low |
+| `ff:{key}` | 300s (Next.js cache) | No | Low — few flags |
+| **`stats:badges_generated`** | **NONE** | No | Intentional counter |
+| **`stats:unique_badges`** | **NONE** | No | Intentional HyperLogLog |
+| **`cron:warm-cache:offset`** | **NONE (explicit 0)** | No | Intentional rotation state |
 
-**TTL coverage:** 25/28 keys have TTLs = **89%** (unchanged from prior cycles). 3 persistent singletons are intentional: rotation offset, lifetime badge counter, unique badge HLL.
+- **TTL coverage**: 25/28 keys have TTLs (89%). The 3 persistent singletons are intentional design choices — counters and rotation state.
+- **Growth risk**: LOW. At 10K users: ~7 per-user keys × 10,000 = ~70K keys plus ~900 daily campaign keys. Upstash free tier supports 10K keys; paid tiers support millions. No concern at current scale.
+- **`_inflight` Map** (`lib/github/client.ts:28`): bounded by 30s INFLIGHT_TIMEOUT_MS + guaranteed `.finally()` cleanup at line 82-84. Not unbounded.
 
-**Growth risk:** LOW. No new unbounded patterns. `config:` keys accumulate ~200–400 bytes/user per PUT but TTL=1yr and value is replaced on write (no per-write accumulation). `stats:unique_badges` HLL bounded at ~12 KB regardless of user count.
+---
 
 ## Database Usage
 
-**Tables: 11** (confirmed via `from('table_name')` grep across `apps/web/lib/db/*.ts`) — unchanged.
+- **Tables**: 11 (users, verification_records, email_campaigns, campaign_sends, supplemental_stats, metrics_snapshots, feature_flags, tool_insights, user_platforms, telemetry, admin_users)
+- **Client**: Lazy singleton at `lib/db/supabase.ts:14` — optimal for serverless (one connection reused across invocations per container, not per-request)
+- **N+1 patterns**: 0 found
 
-| Table | Primary query pattern |
-|-------|----------------------|
-| `users` | Point lookup + list (paginated) |
-| `email_campaigns` | CRUD + status filter |
-| `campaign_sends` | Status batch update |
-| `verification_records` | Point lookup + expiry cleanup |
-| `metrics_snapshots` | UPSERT + batch SELECT (IN query) + date-range cleanup |
-| `merge_operations` | Upsert + 90-day retention cleanup |
-| `tool_insights` | UPSERT + point lookup |
-| `supplemental_stats` | UPSERT + point lookup + delete |
-| `admin_users` | Paginated list |
-| `user_platforms` | Upsert + point lookup + delete |
-| `feature_flags` | Point read + write |
+**Query efficiency highlights:**
+- Warm-cache cron uses `dbGetLatestSnapshotBatch()` with `.in(handle, [...])` — single query for up to 50 handles (`lib/db/snapshots.ts:325`)
+- Campaign sends use RPC `claim_campaign_sends()` — atomic single round-trip (`lib/db/campaigns.ts:626`)
+- Cleanup jobs batched at 1,000 rows/run to avoid table locks
+- All feature flag reads go through Redis + in-memory cache (300s `unstable_cache`) — Supabase queried at most once per 5 minutes per serverless container
 
-**Query patterns:** No N+1 patterns detected. `dbGetLatestSnapshotBatch()` uses a single `IN()` query for cron warm-cache batch processing. All multi-step operations use `Promise.all()` for independent lookups.
-
-**Connection management:** Singleton lazy client at `lib/db/supabase.ts:14` — initialized once per process, reused across requests. Service role key used server-side (bypasses RLS overhead on all queries).
+---
 
 ## External API Calls
 
-| Route | External Service | Cached Before Call | Rate Limited | Risk |
-|-------|-----------------|-------------------|-------------|------|
-| `GET /u/[handle]/badge.svg` | GitHub (stats + profile) | Yes — `stats:v2:merged:` (6h fresh), `stats:stale:` (7d stale), in-flight Map dedup | Yes — fail-open Redis rate limiter | LOW |
-| `POST /api/generate` | GitHub (stats fetch) | Yes — same cache stack; 10/hr rate limit | Yes | LOW |
-| `POST /api/refresh` | GitHub (forced refresh) | Cache cleared intentionally; 5/hr rate limit | Yes | LOW |
-| `GET /api/health` | GitHub + Redis + Supabase (probe) | No — intentional health probe | Yes — 5/min | LOW |
-| `GET /api/cron/warm-cache` | GitHub (batch, 50 handles/5 concurrent) | Pre-warms cache; `dbGetLatestSnapshotBatch()` filters handled handles | Bearer auth (not public) | LOW |
-| `GET /api/cron/sync-audience` | Resend (contacts.list) | Yes — `sync-audience:contacts` (1h TTL) | Bearer auth | LOW |
-| `GET /api/cron/process-campaigns` | Resend (send emails) | Engagement campaign cached 1h | Bearer auth | LOW |
-| `GET /api/insights/:handle` | Internal only | N/A | Yes | LOW |
+| Route | External Service | Cached | Rate Limited | Risk |
+|-------|-----------------|--------|-------------|------|
+| `lib/github/client.ts:51` | GitHub GraphQL | ✅ Redis 6h TTL + 7d stale fallback | ✅ Per-IP + per-handle | Low |
+| `app/api/health/route.ts:31` | GitHub REST (`/rate_limit`) | ❌ No cache | ❌ No rate limit on this call | **P3** — see below |
+| `app/api/cron/sync-audience` | Resend contacts API | ✅ Redis 1h TTL | ✅ 300s maxDuration guard | Low |
+| `lib/email/campaigns.ts` | Resend emails send | ❌ Not cached (by design — sends are idempotent via campaign_sends claim) | ✅ RPC claim prevents double-send | Low |
+| `lib/analytics/posthog.ts` | PostHog | ✅ Lazy-loaded, fire-and-forget | N/A | Low |
 
-All external calls: 100% fetch timeout coverage via `AbortSignal.timeout()` or `withTimeout()`. GitHub cache-first path ensures zero GitHub API calls for cached handles within 6h. Bitbucket/Codeberg clients also confirmed with `clearTimeout()` in finally blocks.
+**P3 — Health endpoint uncached GitHub call** (`app/api/health/route.ts:31`):
+- Every `/api/health` invocation calls `api.github.com/rate_limit` with no cache
+- At current scale (monitoring + Vercel health checks): ~5–10 calls/hr — well within the 60/hr unauthenticated limit
+- Risk is low but unnecessary. Fix: wrap in `unstable_cache(revalidate=60)` or skip the probe entirely (health checks don't need live GitHub API status to be useful)
+- No action required now; note for next refactor pass
+
+---
 
 ## Resource Management
 
-**In-flight Maps (2 active):**
-- `_inflight` (`lib/github/client.ts:28`) — bounded by 30s timeout + `.finally()` delete at line 83. `_resetInflight()` exported for test isolation.
-- `inflightBadgeRenders` (`app/u/[handle]/badge.svg/route.ts:41`) — deleted in finally block at line 249. No unbounded growth.
+| Resource | Pattern | Cleanup | Risk |
+|----------|---------|---------|------|
+| `_inflight` Map (`lib/github/client.ts:28`) | Per-handle dedup | `.finally()` at line 82-84 + 30s timeout | None |
+| Badge render lock (`app/u/[handle]/badge.svg/route.ts:66`) | Redis `SET NX` 30s TTL | TTL auto-expires | None |
+| OAuth state Map (`lib/auth/oauth-state.ts:15`) | Fallback when Redis down | Lazy cleanup on read (line 53-56); no proactive sweep | Negligible — max ~200 bytes/entry, <1000 entries typical |
+| Feature flag Map (`lib/feature-flags.ts:77`) | 5-min in-memory TTL | Entries expire passively; `invalidateFeatureFlagCache()` available | None — typically <10 unique keys |
+| Supabase client (`lib/db/supabase.ts:14`) | Lazy singleton | Persistent across invocations (intended) | None |
 
-**Timers:**
-- All `setTimeout` in API routes paired with `clearTimeout()` in finally blocks.
-- No server-side `setInterval`. Browser-side `setInterval` in `ClaudeCodeStar.tsx:26` has `return () => clearInterval(id)` cleanup in useEffect.
+No resource leaks detected. All Maps are bounded by either TTL expiry, `.finally()` cleanup, or guaranteed low cardinality.
 
-**In-memory caches:**
-- `flagCache` (`lib/feature-flags.ts`) — bounded at ~5–20 entries (one per distinct flag key).
-- Badge render schedule array — fixed at 10-element max retry queue.
-
-**Resource leaks:** NONE detected. All async operations bounded by timeout or finally cleanup.
+---
 
 ## Vercel Cost Factors
 
-**Serverless functions:** All routes use Node.js serverless runtime. No edge runtime declarations (`export const runtime = 'edge'`) found.
+| Factor | Status | Detail |
+|--------|--------|--------|
+| Badge route `maxDuration` | ✅ Fixed (cycle 10) | `export const maxDuration = 35` at `app/u/[handle]/badge.svg/route.ts:29` |
+| Cron routes `maxDuration` | ✅ Correct | All 3 cron handlers at 300s |
+| Edge runtime | Not used | All routes serverless (appropriate — most use Node.js APIs) |
+| ISR regression | ✅ Resolved (May 7) | `unstable_cache(revalidate=300s)` at `lib/feature-flags.ts:84-94` — 13 pages CDN-eligible again |
+| Bundle size | ⚠️ Monitor | 2,266 KB raw (+34.7% over 4 weeks, source unidentified) — no chunk ≥500 KB; no cold-start risk yet |
+| Static pages | 4 static, 82 dynamic | `/`, `/about`, `/privacy`, `/terms` are static-eligible candidates |
+| OG image routes | Dynamic, no ISR | `/u/[handle]/og-image` generates per-request; cached via response headers |
 
-**maxDuration configuration:**
-
-| Route | maxDuration | Status |
-|-------|------------|--------|
-| `app/u/[handle]/badge.svg/route.ts` | **35s** (line 29) | VERIFIED — P2 resolved May 8 |
-| `app/api/cron/warm-cache/route.ts` | 300s (line 30) | Correct for batch processing |
-| `app/api/cron/sync-audience/route.ts` | 300s (line 17) | Correct |
-| `app/api/cron/process-campaigns/route.ts` | 300s (line 7) | Correct |
-| All other routes | Default (15s Vercel Pro) | Appropriate — none approach limit |
-
-**ISR/CDN caching status:** `unstable_cache(revalidate=300s)` in `lib/feature-flags.ts:84-94` confirmed active. 13 pages (about, archetypes/*, cli/authorize) correctly eligible for CDN caching. ISR regression from Apr 30 confirmed resolved.
-
-**Bundle context (from May 7 performance report):** 2,266 KB raw / 706.5 KB gzipped — +34.7% vs Apr 9. Bundle growth source unknown; `ANALYZE=true pnpm run build` recommended before next performance cycle. No chunks exceed 500 KB — no immediate cold-start concern.
+---
 
 ## Recommendations
 
-| Priority | Item | File | Action |
-|----------|------|------|--------|
-| **P2-1 (cycle 12 carry)** | `dbGetCampaignStats()` 4-query parallel COUNT aggregation | `lib/db/campaigns.ts:727-765` | Replace with single GROUP BY RPC. Threshold-gated at >5K sends/campaign — not yet triggered. Carry. |
-| **Monitor M7** | `config:` studio key TTL = 1yr per user | `app/api/studio/config/route.ts:73` | Watch at scale. Negligible currently (~200–400 bytes/user, replaced on write). |
-| **Monitor M-bundle** | Bundle +34.7% over 4 weeks, source unknown | `next.config.ts` | Run `ANALYZE=true pnpm run build` to identify culprit packages before significant user growth. Informational — no chunk exceeds 500 KB. |
-| **Monitor M1–M5 (carried)** | Avatar cache, OG cache, HLL, snapshot row growth, PostHog fire-and-forget | Various | All threshold-gated or bounded. No action needed at current scale. |
+| # | Priority | Item | File | Action |
+|---|----------|------|------|--------|
+| P2-1 | **P2 (carried, cycle 13)** | `dbGetCampaignStats()` uses 4 parallel COUNT queries | `lib/db/campaigns.ts:727-765` | Replace with single GROUP BY RPC. Threshold: >5K sends/campaign. Not yet triggered. |
+| M-bundle | **Monitor** | Bundle +34.7% over 4 weeks (1,682 → 2,266 KB raw) | — | Run `ANALYZE=true pnpm run build` before next growth milestone to identify culprit packages. No chunk ≥500 KB; no immediate cold-start risk. |
+| M7 | **Monitor** | `config:` key TTL = 1 year per user | `app/api/studio/config/route.ts:73` | PUT replaces existing key — no per-write accumulation. Negligible at current scale. |
+| P3 | **Low** | Health endpoint makes uncached GitHub API call | `app/api/health/route.ts:31` | Wrap in `unstable_cache(revalidate=60)` or remove probe. Well within rate limits now. |
 
-**P1s: NONE. P2s: 1 active (P2-1, threshold-gated, cycle 12 carry).**
+---
 
-**Estimated monthly cost at 10K users: ~$50–75/mo. Unchanged.**
+## Cost Model (unchanged)
+
+| Tier | Redis ops/day | Supabase reads/day | GitHub API calls/day | Est. cost/mo |
+|------|-------------|-------------------|---------------------|-------------|
+| 1K users | ~5K | ~200 | ~100 | ~$15–25 |
+| 10K users | ~50K | ~2K | ~1K | ~$50–75 |
+| 100K users | ~500K | ~20K | ~10K | ~$300–500 |
+
+No changes to cost model this cycle.

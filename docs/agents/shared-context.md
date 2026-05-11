@@ -9,6 +9,28 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-11T03:00:00Z -->
+## Cost Analyst — 2026-05-11
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
+- Redis: **16 production prefixes + 3 persistent singletons** (25/28 keys with TTLs, 89%). Growth risk: LOW. Full re-audit — zero changes vs prior cycle.
+- **Commits this cycle** (4153973a, d1dee082): coverage May 11 docs + isAgentEnabled timeout-path tests. **Zero Redis writes, zero new external API calls, zero new Supabase queries.** No cost surface change.
+- **P2-1 CARRIED (cycle 13)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation (`lib/db/campaigns.ts:727-765`). Threshold-gated >5K sends/campaign. Not yet triggered.
+- **NEW P3**: Health endpoint at `app/api/health/route.ts:31` calls `api.github.com/rate_limit` with no cache on every invocation. At current scale (~5-10 calls/hr) stays within the 60/hr unauthenticated limit. Fix: `unstable_cache(revalidate=60)` or remove probe. No action required now.
+- **MONITOR M7 CARRIED**: `config:` TTL 31,536,000s (1 year per user). PUT replaces existing key — no per-write accumulation. Negligible at current scale.
+- **MONITOR M-bundle CARRIED**: Bundle +34.7% over 4 weeks (1,682 → 2,266 KB raw). No chunk ≥500 KB. Recommend `ANALYZE=true pnpm run build` before next growth milestone.
+- GitHub API: cache-first unchanged (6h primary + 7d stale fallback). 100% fetch timeout coverage. `_inflight` Map bounded by 30s + `.finally()` clear (`lib/github/client.ts:28-84`).
+- Supabase: **11 tables** confirmed, singleton lazy client at `lib/db/supabase.ts:14`. 0 N+1 patterns. `dbGetLatestSnapshotBatch()` uses `.in()` — no per-handle queries.
+- ISR caching: `unstable_cache(revalidate=300s)` at `lib/feature-flags.ts:84-94` confirmed active. 13 pages CDN-eligible. No regression.
+- Coverage context: 7589 tests GREEN, 0 flakes, lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — stable.
+- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated). P3s: 1 new (health endpoint probe).**
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle +34.7% over 4 weeks still unresolved (informational monitor). `ANALYZE=true pnpm run build` before next growth milestone. No chunks ≥500 KB; no cold-start risk yet.
+- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Health endpoint P3 (uncached GitHub probe) is not a security risk — rate limits are GitHub's own protection.
+- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — stable. No cost-path coverage gaps this cycle.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-05-10T03:00:00Z -->
 ## Cost Analyst — 2026-05-10
 - **Status**: GREEN
@@ -32,26 +54,6 @@
 - [Coverage]: `lib/cache` 98.1%, `lib/db` 96.5%, `app/api` 97.5% — stable. No cost-path coverage gaps this cycle.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-05-07T03:00:00Z -->
-## Cost Analyst — 2026-05-07
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
-- Redis: **28 distinct prefixes**, TTL coverage 25/28 (89%). 3 persistent singletons unchanged. Growth risk: LOW. Full re-audit — zero changes vs prior cycle.
-- **Commits this cycle** (3d344cda, 1ff1c9e2, 34062680, 6e496747, ba1b1568): CI metadata fix + test additions + Dependabot patch bump (jsdom 29.1.0→29.1.1, @supabase/supabase-js 2.105.0→2.105.1, posthog-js 1.372.3→1.372.6). Zero Redis writes, zero new external API calls, zero new Supabase queries. posthog-js bump removed ~28 protobufjs transitive deps — slight bundle consolidation.
-- **P2 ESCALATED (2nd cycle) — Badge route `maxDuration`**: `app/u/[handle]/badge.svg/route.ts` still has no `export const maxDuration`. Vercel defaults to 10s; internal `INFLIGHT_TIMEOUT_MS=30s` exceeds this — cold-path badge fetches silently killed. Fix: `export const maxDuration = 35;`.
-- **P2-1 CARRIED (10th cycle)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation (`lib/db/campaigns.ts:727-765`). Threshold-gated at >5K sends/campaign. Not triggered.
-- **MONITOR M7 CARRIED**: `config:` key TTL = 1yr per user (`/api/studio/config/route.ts:73`). Negligible at current scale.
-- GitHub API: cache-first unchanged. 100% timeout coverage. `_inflight` Map bounded by 30s + `.finally()` clear (`lib/github/client.ts:28-84`).
-- Supabase: **11 tables** confirmed, singleton lazy client at `lib/db/supabase.ts:14`. 0 N+1 patterns. No new tables.
-- Feature flags: `unstable_cache` revalidate=300s confirmed in place (`lib/feature-flags.ts:84-93`). No regression.
-- **P1s: NONE. P2s: 2 active (badge maxDuration escalated, P2-1 threshold-gated).**
-- **MONITORS M1–M5 CARRIED** unchanged.
-
-**Cross-agent recommendations:**
-- [Performance]: Badge route `maxDuration` still missing — escalated to P2 (2nd cycle). Add `export const maxDuration = 35` at top of `app/u/[handle]/badge.svg/route.ts`. Without this, Vercel's 10s default kills badge generation on cold paths before the 30s internal timeout.
-- [Security]: Fetch timeouts 100%. Fail-open rate limiter intact. Resend webhook 3-layer defense intact. Supabase singleton confirmed at `lib/db/supabase.ts:14`.
-- [Coverage]: `app/api` 97.5%, `lib/db` 96.5%, `lib/cache` 98.1% — stable. No cost-path coverage gaps this cycle. Badge route cold-path (maxDuration gap) has no specific test; low priority to add.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-05-09T03:00:00Z -->
 ## Cost Analyst — 2026-05-09
