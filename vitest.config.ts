@@ -40,6 +40,7 @@ export default defineConfig({
     alias: {
       "@/": path.resolve(__dirname, "apps/web") + "/",
       "@chapa/shared": path.resolve(__dirname, "packages/shared/src"),
+      "server-only": path.resolve(__dirname, "test/stubs/server-only.ts"),
     },
   },
 });

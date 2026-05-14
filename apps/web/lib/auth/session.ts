@@ -25,10 +25,12 @@ function getRawSessionSecret(): string | null {
   return sessionSecret || null;
 }
 
+/** Return the configured session signing secret, or null when it is unset. */
 export function getSessionSecret(): string | null {
   return getRawSessionSecret();
 }
 
+/** Return the validated session signing key used for HMAC cookie operations. */
 export function getSessionKey(): Buffer {
   const sessionSecret = getRawSessionSecret();
   if (!sessionSecret) {
@@ -45,6 +47,7 @@ function parseSessionCookie(
   return readSessionCookie(cookieHeader, sessionSecret);
 }
 
+/** Read an optional session from a server header store such as next/headers. */
 export function getOptionalServerSessionFromHeaders(
   headerStore: CookieHeaderSource,
   sessionSecret?: string | null,
@@ -52,6 +55,7 @@ export function getOptionalServerSessionFromHeaders(
   return parseSessionCookie(headerStore.get("cookie"), sessionSecret);
 }
 
+/** Read an optional session from a Fetch API request without creating a response. */
 export function getOptionalRequestSession(
   request: Pick<Request, "headers">,
   sessionSecret?: string | null,
@@ -59,6 +63,7 @@ export function getOptionalRequestSession(
   return parseSessionCookie(request.headers.get("cookie"), sessionSecret);
 }
 
+/** Require a valid request session, returning a JSON error response on failure. */
 export function requireRequestSession(
   request: Request,
 ): RequireSessionResult {

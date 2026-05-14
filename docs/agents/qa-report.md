@@ -1,80 +1,73 @@
 # QA Report
-> Generated: 2026-05-06 | Health status: green
+> Generated: 2026-05-13 | Health status: green
 
 ## Executive Summary
-All 7,567 tests pass across 445 files with zero TypeScript errors, zero lint issues, and zero accessibility violations in production components. The codebase remains in excellent health with one low-severity a11y finding (campaigns table `<tr role="button">` missing `aria-label`).
+All 7,589 tests pass across 445 files with zero failures, zero TypeScript errors, and zero lint issues. Accessibility posture remains clean — the one previously flagged `<tr role="button">` a11y gap in the admin campaigns table is now confirmed resolved with `aria-label` in place.
 
 ## Test Results
-- Total: **7,567** tests across **445** files
-- Passed: **7,567** | Failed: **0** | Skipped: **0**
-- Duration: 94.77s (full suite with environment setup)
-- Note: Test-harness noise (`[ERROR] test-agent produced invalid report output`) observed in runner — these are internal agent-utils self-tests, not production failures. All 445 test files passed cleanly.
+- Total: 7,589 tests across 445 files
+- Passed: 7,589 | Failed: 0 | Skipped: 0
+- Duration: ~43s (transform + setup + tests)
+- Flaky tests: 0 (stable across multiple coverage runs per coverage agent)
 
 ## TypeScript
-Clean — `tsc --noEmit` passed across both workspace projects (`packages/shared` and `apps/web`) with zero errors.
+Clean — `pnpm run typecheck` passed with 0 errors across both `packages/shared` and `apps/web`.
 
 ## Linting
-Clean — `eslint .` exited with no warnings or errors.
+Clean — ESLint produced no warnings or errors.
 
 ## Accessibility
 
-### `<img>` alt attributes
-All `<img>` tags in production components have `alt` attributes:
-- `apps/web/app/u/[handle]/page.tsx:233` — `alt={interpolate(t("sharePage.badgeAlt"), { handle })}` ✓
-- `apps/web/components/LiteYouTubeEmbed.tsx:45` — `alt={title}` ✓
+**Images:** All `<img>` tags have `alt` attributes. Checked:
+- `apps/web/app/u/[handle]/page.tsx:231` — badge fallback `<img>` has `alt={interpolate(t("sharePage.badgeAlt"), { handle })}` ✓
+- `apps/web/components/LiteYouTubeEmbed.tsx:45` — thumbnail `<img>` has `alt={title}` ✓
+- `apps/web/components/SharePageOwnerContent.tsx:109` — embed snippet string literal (not a rendered image) ✓
 
-### Focus indicators
-`focus-visible` styles are present and comprehensive:
-- Global rule: `apps/web/styles/globals.css:455` — `*:focus-visible` with ring styles
-- Production components: `BadgeOverlay.tsx`, `BadgeToolbar.tsx`, `LanguageSwitcher.tsx`, `InfoTooltip.tsx`, `VerifyForm.tsx` all use `focus-visible:ring-*` utilities ✓
+**Focus indicators:** `*:focus-visible` global rule defined in `apps/web/styles/globals.css:455`. Component-level `focus-visible:` Tailwind utilities present in `BadgeToolbar.tsx`, `BadgeOverlay.tsx`, `InfoTooltip.tsx`, `LanguageSwitcher.tsx`. Coverage confirmed by static tests in `BadgeToolbar.test.tsx:165-171` and `InfoTooltip.test.tsx:59-60`. ✓
 
-### Interactive elements — ARIA labels
-All `role="button"` elements with `tabIndex={0}` checked:
-- `apps/web/components/dashboard/ActivityHeatmap.tsx:560` — has `aria-label` with contribution count and date ✓
-- `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` — `<tr role="button" tabIndex={0}>` **missing `aria-label`** (P2). The row represents a campaign record and is keyboard-navigable but not labelled for screen readers. The campaigns dashboard is admin-only, reducing end-user impact.
+**`prefers-reduced-motion`:** Two `@media (prefers-reduced-motion: reduce)` blocks in `globals.css:381,472`. `StudioClient.tsx:31,37` checks the media query at runtime. Static test at `StudioClient.test.tsx:122`. ✓
 
-All `<button>` elements in production (non-experiment) code have visible text content or are wrapped with accessible text — no unlabelled icon-only buttons found in core paths.
+**Interactive elements / ARIA:** No `<div onClick>` or `<span onClick>` without `role` or `aria-label` in production pages outside experiments. Key verifications:
+- `apps/web/app/studio/QuickControls.tsx:109` — expandable category header is a `<button type="button" aria-expanded={isExpanded}>` ✓
+- `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` — `<tr role="button" tabIndex={0} aria-label={\`Campaign: ${c.name}\`}>` ✓ (previously flagged gap, now resolved)
+- Admin-only surfaces (`agents-dashboard.tsx`, `engagement-dashboard.tsx`, `agent-card.tsx`) use `<button>` elements throughout ✓
 
-### Heading hierarchy
-Heading structure is correct across all audited production pages:
-- Page-level `<h1>` present in all main pages
-- `<h2>` and `<h3>` follow without skipping levels in production routes
-- Experiment pages (`/experiments/*`) have minor h2-before-h1 patterns in some sub-sections but these are gated by feature flag and not user-facing by default
+**Heading hierarchy:** Spot-checked public pages:
+- `/u/[handle]` — `h1.sr-only` → `h2` ✓
+- `/about` — `h1` → `h2` ✓
+- `/about/scoring` — `h1` → `h2` → `h3` ✓
+- `/about/verification` — `h1` → `h2` (two independent `h2` sections) ✓
+- `/archetypes/*` — `h1` → `h2` → `h3` ✓
+- No skipped levels detected across any audited page.
 
-### Error boundaries and states
-- **Error boundaries**: 13 `error.tsx` files (one per route segment)
-- **Loading states**: 13 `loading.tsx` files covering all major routes
-- **Empty states**: Present in share page, admin dashboard, and campaign list components
+**Error/loading/empty states:** 13 `error.tsx` boundaries and 13 `loading.tsx` files present across route segments. `global-error.tsx` handles root-level crashes. Multiple empty-state patterns verified via search.
 
 ## Design System Compliance
-No violations found in production components. Spot-checks confirmed:
-- All production `.tsx` components outside `lib/render/` and `experiments/` use semantic tokens (`bg-bg`, `text-text-primary`, `bg-amber`, `border-stroke`, etc.)
-- No hardcoded hex colors found in `apps/web/components/` or core `apps/web/app/` routes
-- Known accepted exceptions (per prior QA cycles): `global-error.tsx` hardcoded hex (no theme provider available), `apple-icon.tsx` / `icon.tsx` static assets, `experiments/**` Canvas/WebGL raw hex arrays — all confirmed intentional
+No hardcoded hex values found in `className` or `style` props of production components. All color usage goes through semantic tokens (`bg-bg`, `text-text-primary`, `bg-card`, `border-stroke`, `text-amber`, etc.) or dimension/archetype tokens.
 
-## CI Workflow
-Pending unstaged change to `.github/workflows/ci.yml`: adds `source` metadata block (`provider`, `repository`, `runId`, `workflowRef`) to the coverage reporting step. No functional impact on test execution. Low risk.
+Previously documented accepted exceptions remain unchanged:
+- `apps/web/app/global-error.tsx` — intentional (error recovery page, no theme context available)
+- `apps/web/app/apple-icon.tsx`, `apps/web/app/icon.tsx` — static PNG generation assets
+- `apps/web/app/experiments/**` — Canvas/WebGL demos, accepted P3
 
 ## Recommendations
 
-| # | Priority | Finding | File | Action |
-|---|----------|---------|------|--------|
-| 1 | P2 | `<tr role="button">` in campaigns table missing `aria-label` | `app/admin/campaigns/campaigns-dashboard.tsx:900` | Add `aria-label={c.name}` or `aria-label={\`Campaign: ${c.name}\`}` to the `<tr>` |
-| 2 | P3 | Coverage agent flags 7 archetype pages with 0–80% stmt coverage due to `generateMetadata` not being runtime-tested | `app/archetypes/artificer`, `emerging` + 5 others | Add runtime import tests per coverage agent P2 items (carried from prior cycle) |
-| 3 | P3 | `app/cli/authorize/error.tsx` at 0% stmt coverage | `app/cli/authorize/error.tsx` | Add one jsdom render test |
-| 4 | P3 | `lib/i18n/detect.ts` at ~75% branch coverage | `apps/web/lib/i18n/detect.ts` | One test for non-q semicolon param path (per triage May 6) |
+No P1 or P2 items. All previously flagged issues resolved.
+
+1. **(P3 carry)** `lib/auth/session.ts` — 5 exported functions lack JSDoc (flagged by documentation agent 2026-05-08). Low-priority polish; no functional impact.
+2. **(P3 monitor)** Bundle size +34.7% over 4 weeks (2,266 KB raw / 706 KB gzipped). No single chunk ≥500 KB. Run `ANALYZE=true pnpm run build` interactively to identify source before next growth milestone.
 
 ---
 
 SHARED_CONTEXT_START
-## QA Agent — 2026-05-06
+## QA Agent — 2026-05-13
 - **Status**: GREEN
-- Tests: 7567 passed / 0 failed / 7567 total (445 files)
+- Tests: 7589/7589 passed (445 files), 0 failed, 0 skipped
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 1 low-severity (campaigns `<tr role="button">` missing `aria-label`, admin-only)
+- A11y issues: 0 — campaigns `<tr role="button" aria-label>` gap confirmed resolved; all `<img>` have alt; focus-visible global + 4 component-level; prefers-reduced-motion in globals.css + StudioClient; heading hierarchy clean across all audited pages; 13 error boundaries, 13 loading states
 
 **Cross-agent recommendations:**
-- [Coverage]: All prior P2 gaps (verify, about/scoring, about/verification, cli/authorize pages) confirmed resolved per coverage agent 2026-05-06 entry. Remaining P2s: 7 archetype pages `generateMetadata` runtime tests, `cli/authorize/error.tsx` 0% stmts, `lib/i18n/detect.ts` ~75% branches.
-- [Security]: No security-related quality issues. All interactive elements have keyboard handlers. XSS vectors in SVG pipeline unchanged (all covered). Campaigns table `<tr role="button">` missing `aria-label` is a11y, not security.
+- [Coverage]: All paths clean. No new untested areas discovered this cycle. Coverage agent May 13 confirms stable 96.84% stmts, 0 flakes.
+- [Security]: No security-related quality issues. All XSS escape paths covered. CORS mutation guard enforced by static test. Interactive elements all accessible via keyboard.
 SHARED_CONTEXT_END

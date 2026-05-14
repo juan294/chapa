@@ -1,34 +1,51 @@
 # Triage Report
-> Generated on 2026-05-10 | 3 reports processed | 2 action items | 0 Dependabot PRs
+> Generated on 2026-05-14 | 6 reports processed | 4 action items | 2 Dependabot PRs
 
 ## Agent Failures
-None — all agents ran successfully.
+| Agent | Error | Log File |
+|-------|-------|----------|
+| cost-analyst | Report contains quota message instead of findings | `logs/cost-analyst-2026-05-14.log` empty |
+| coverage | Report contains quota message instead of findings | `logs/coverage-agent-2026-05-14.log` empty |
+| cc-rpi-update | Report says sync failed after 2 attempts | `logs/cc-rpi-update.error.log` empty/stale |
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi | GREEN | 0 — already synced at v1.18.0 |
-| 2 | `coverage-report.md` | Coverage | GREEN | 1 — timeout-path tests for `isAgentEnabled` |
-| 3 | `cost-analyst-report.md` | Cost Analyst | GREEN | 1 — bundle analysis noted (informational) |
+| 1 | `cost-analyst-report.md` | Cost Analyst | RED | 1 -- failed report documented |
+| 2 | `coverage-report.md` | Coverage | RED | 1 -- failed report documented |
+| 3 | `cc-rpi-update-report.md` | cc-rpi-update | RED | 1 -- failed report documented |
+| 4 | `performance-report.md` | Performance | YELLOW | 1 -- bundle-growth monitor carried |
+| 5 | `security-report.md` | Security | GREEN | 2 -- FORCE RLS migration; server-only Supabase module boundary |
+| 6 | `qa-report.md` | QA | GREEN | 1 -- JSDoc polish for auth session exports |
 
-## Overall Status: GREEN
+## Overall Status: YELLOW
+
+Core app verification is green. Overall triage is YELLOW because three scheduled agent reports failed due quota/agent-run output, and one Dependabot PR still needs a one-attempt lint fix pass after the triage commit is pushed.
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Added 2 timeout-path tests for `isAgentEnabled` in `lib/feature-flags.test.ts` — both `.catch(() => null)` callbacks at lines 192 and 198 were uncovered anonymous functions; triggered via `vi.useFakeTimers()` + 501ms advance | coverage | +2 | DONE |
-| 2 | Bundle analysis (`ANALYZE=true pnpm run build`) noted as informational monitor — deferred (opens browser windows non-headlessly; no chunk ≥500 KB, no immediate risk) | cost-analyst | — | NOTED |
+| 1 | Added `025_force_supplemental_stats_rls.sql` so `supplemental_stats` has `FORCE ROW LEVEL SECURITY` | security | n/a | DONE |
+| 2 | Added `import "server-only"` to `apps/web/lib/db/supabase.ts`, declared `server-only`, and added a Vitest no-op alias for tests | security | n/a | DONE |
+| 3 | Added JSDoc to the five exported helpers in `apps/web/lib/auth/session.ts` | qa | n/a | DONE |
+| 4 | Carried the bundle-size monitor: 2,266 KB raw, flat vs May 7, no chunk >=500 KB | performance | n/a | NOTED |
 
 ## Dependabot PRs
-None — no open Dependabot PRs.
+| # | PR | Update Type | Disposition | Notes |
+|---|----|----|----|----|
+| 840 | `chore(deps): bump the production group with 12 updates` | non-major group: patch + minor | auto-merge after triage CI green | CI green |
+| 841 | `chore(deps-dev): bump the dev-and-types group with 2 updates` | patch group | attempt-fix after triage CI green | Typecheck/tests pass; lint job fails |
 
 ## Verification
-- [x] All tests passing (7589/7589, 445 files, 0 failures)
-- [x] Typecheck clean
-- [x] Lint clean
-- [ ] CI green (pending push)
+- [x] `supabase db reset`
+- [x] `supplemental_stats` catalog check: `relforcerowsecurity = true`
+- [x] `pnpm run test` -- 7,589 tests passing
+- [x] `pnpm run typecheck`
+- [x] `pnpm run lint`
+- [x] `pnpm run validate:migrations`
+- [ ] CI green
 
 ## Carried Items
-- **Cost P2-1 (cycle 12):** `dbGetCampaignStats()` 4-query parallel COUNT at `lib/db/campaigns.ts:727-765` — threshold-gated at >5K sends/campaign. Not yet triggered. Concrete justification for carry.
-- **Monitor M-bundle:** Bundle +34.7% over 4 weeks, source unknown. Run `ANALYZE=true pnpm run build` before significant user growth to identify culprit. No chunk ≥500 KB; no immediate cold-start concern.
-- **Monitor M7:** `config:` key TTL=1yr per user at `app/api/studio/config/route.ts:73` — negligible at current scale.
+- **Bundle monitor:** Total client JS is 2,266 KB raw across 78 chunks, flat vs 2026-05-07 but still +34.7% over four weeks. No chunk is >=500 KB. Run `ANALYZE=true pnpm run build` interactively before the next growth milestone.
+- **Dependabot PR #841:** Needs one lint-fix attempt after the triage commit is pushed and green.
+- **Agent run reliability:** cost-analyst, coverage, and cc-rpi-update produced failed/quota reports this cycle. Re-run when usage resets or agent capacity is available.

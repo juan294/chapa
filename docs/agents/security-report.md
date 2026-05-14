@@ -1,98 +1,98 @@
 # Security Report
-> Generated: 2026-04-27 | Health status: green
+> Generated: 2026-05-11 | Health status: green
 
 ## Executive Summary
-Security posture is clean across all eight audit dimensions: 0 dependency vulnerabilities, no hardcoded secrets, full XSS escaping in the SVG pipeline, RLS enforced on all 10 Supabase tables, and no copyleft license conflicts. Two intentional CORS wildcards remain on read-only public endpoints (`/api/verify/[hash]`, `/api/profile/[handle]`) — both rate-limited and signature-verified by design.
+
+All critical security controls are healthy: zero dependency vulnerabilities, no hardcoded secrets, full SVG XSS escaping, clean CORS isolation, and RLS enabled on all 11 production tables. Two low-severity informational findings are documented below — neither requires immediate action.
 
 ## Dependency Vulnerabilities
-`pnpm audit` returned 0 advisories across 644 production dependencies (0 devDependencies in audit scope).
 
 | Severity | Package | Issue | Fix |
 |----------|---------|-------|-----|
-| — | — | None | — |
+| — | — | `pnpm audit` reports **0 vulnerabilities** (critical: 0, high: 0, moderate: 0, low: 0) | N/A |
+
+## Unused Dependencies (Attack Surface Reduction)
+
+`npx knip --production` returned **0 findings**. No unused production dependencies or dead exports detected.
 
 ## Code Findings
 
-### Hardcoded secrets — CLEAN
-- Pattern scan for `sk_live`, `ghp_`, `gho_`, `ghs_`, `github_pat_`, `AKIA…`, `AIza…` returned 22 file matches; **0 are secrets**. All hits are either:
-  - Test fixtures (`*.test.ts`, `lib/test-helpers/platform-auth-fixtures.ts`)
-  - Token-shape regexes in `lib/analytics/server-errors.ts:20-23` (used for redacting tokens before PostHog logging)
-  - Documentation comments in `lib/auth/cli-token.ts:88`
+**LOW — Architecture disclosure via client chunk** (`/apps/web/.next/static/chunks/05qnm9t_53wk5.js`)
+- The string `SUPABASE_SERVICE_ROLE_KEY` appears in a client-accessible JS chunk because `lib/db/supabase.ts` was pulled into a shared Next.js bundle. The actual key value is **not present** — confirmed by 0 JWT-prefix (`eyJ`) matches in the chunk. In browsers, `process.env.SUPABASE_SERVICE_ROLE_KEY` resolves to `undefined`. This is a bundling artifact that reveals server architecture but poses no exploit risk at current threat model.
+- Risk: informational architecture disclosure. Not exploitable without additional access.
+- Remediation (optional): add `lib/db/supabase.ts` to `serverExternalPackages` in `next.config.ts` or ensure all imports flow through server-only boundaries (`"server-only"` package).
 
-### SVG XSS — CLEAN
-All 9 user-input entry points to the SVG pipeline are escaped via `escapeXml()`:
-- `apps/web/lib/render/BadgeSvg.tsx:40-42` — `handle`, `displayName`
-- `apps/web/lib/render/BadgeSvg.tsx:155` — avatar data URI
-- `apps/web/lib/render/BadgeSvg.tsx:179` — archetype text
-- `apps/web/lib/render/BadgeSvg.tsx:236` — tier label
-- `apps/web/lib/render/VerificationStrip.ts:13-14` — verification hash + date
-- `apps/web/app/u/[handle]/badge.svg/route.ts:50` — handle param
+**LOW — `supplemental_stats` table missing `FORCE ROW LEVEL SECURITY`** (`supabase/migrations/024_create_supplemental_stats.sql`)
+- The table has `ENABLE ROW LEVEL SECURITY` and an explicit deny-all anon policy, but migration 018 (`018_fix_tool_insights_rls.sql`) which added `FORCE ROW LEVEL SECURITY` to 9 other tables predates this table's creation. `FORCE ROW LEVEL SECURITY` ensures the restriction applies even to table owners.
+- Risk: negligible — app uses only the service role key (which bypasses RLS by design), and the deny-all anon policy already blocks all anon access.
+- Remediation: add `ALTER TABLE supplemental_stats FORCE ROW LEVEL SECURITY;` in a new migration for defense-in-depth consistency.
 
-### NEXT_PUBLIC_* leakage — CLEAN
-Grep across `apps/web/{app,lib,components}` for `NEXT_PUBLIC_*(secret|service_role|client_secret|webhook_secret|admin_secret|cron_secret|password|private_key)` returned **0 real matches** (one false positive in agent-config template literal at `lib/agents/agent-config.ts:91`). `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `RESEND_WEBHOOK_SECRET`, `CHAPA_VERIFICATION_SECRET`, `BITBUCKET_CLIENT_SECRET`, `CODEBERG_CLIENT_SECRET`, `ADMIN_SECRET`, and `CRON_SECRET` are server-side only.
+**RESOLVED — `SENSITIVE_PATTERNS` branch coverage** (noted P2 in Apr-20 report)
+- Coverage agent May 11 confirms `lib/analytics` at 97.3% stable. All 9 SENSITIVE_PATTERNS token-scrubbing branches are now covered by tests. P2 closed.
 
-### CORS — INTENTIONAL WILDCARDS
-| Route | CORS | Method | Notes |
-|-------|------|--------|-------|
-| `/api/profile/[handle]/route.ts:9,105` | `*` | GET | Read-only public profile, rate-limited (60/60s) |
-| `/api/verify/[hash]/route.ts:23,33,42,58,76` | `*` | GET | HMAC-verified badge data, rate-limited (30/60s) |
+## SVG XSS Audit
 
-All 17 mutation routes (POST/PUT/PATCH/DELETE) have **no CORS headers** — same-origin only. Acceptable design.
+All user-controlled input in the SVG pipeline is escaped via `escapeXml()` (`lib/render/escape.ts`) which covers all 5 XML special characters (`&`, `<`, `>`, `'`, `"`):
 
-### Supabase RLS — ENABLED ON ALL TABLES
-Audit of `supabase/migrations/*.sql` confirms `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` on every table:
+| Field | Escape applied |
+|-------|----------------|
+| `stats.handle` | `escapeXml()` at `BadgeSvg.tsx:40` |
+| `stats.displayName` | `escapeXml()` at `BadgeSvg.tsx:42` |
+| `avatarDataUri` | `escapeXml()` at `BadgeSvg.tsx:155` |
+| `archetypeText` | `escapeXml()` at `BadgeSvg.tsx:179` |
+| `impact.tier` | `escapeXml()` at `BadgeSvg.tsx:236` |
+| `verificationHash` | `escapeXml()` at `VerificationStrip.ts:13` |
+| `verificationDate` | `escapeXml()` at `VerificationStrip.ts:14` |
 
-| Table | Migration | RLS | FORCE |
-|-------|-----------|-----|-------|
-| users | 002, 018 | ✅ | ✅ |
-| metrics_snapshots | 002, 018 | ✅ | ✅ |
-| verification_records | 002, 018 | ✅ | ✅ |
-| feature_flags | 003, 018 | ✅ | ✅ |
-| merge_operations | 007, 018 | ✅ | ✅ |
-| user_platforms | 010, 018 | ✅ | ✅ |
-| tool_insights | 015, 018 | ✅ | ✅ |
-| email_campaigns | 016, 018 | ✅ | ✅ |
-| campaign_sends | 016, 018 | ✅ | ✅ |
-| supplemental_stats | 024 | ✅ | (table-level deny-all anon) |
+Admin `renderMarkdown()` (`app/admin/agents/cross-agent-insights.tsx:12`) correctly calls `escapeHtml()` **before** applying markdown formatting — safe against XSS in agent content.
 
-Views `latest_snapshots` and `admin_users` use `security_invoker = true`.
+All 12 `dangerouslySetInnerHTML` usages in production code audited: SVG is server-rendered output (trusted), admin markdown is sanitized pre-render, inline CSS strings are static constants. No unsafe injection vectors found.
+
+## CORS Audit
+
+| Route | CORS | Justification |
+|-------|------|---------------|
+| `/api/verify/[hash]` | `Access-Control-Allow-Origin: *` | Read-only, 30 req/60s rate limit. Intentional — badge verification is a public API. |
+| `/api/profile/[handle]` | `Access-Control-Allow-Origin: *` | Read-only, 60 req/60s rate limit. Intentional — public profile API. |
+| All POST/PUT/PATCH/DELETE routes | No CORS headers | Enforced by `cors-mutation-guard.test.ts` static analysis test. |
+
+The mutation guard test (`app/api/cors-mutation-guard.test.ts`) runs at CI and statically asserts that no mutation route exports a wildcard CORS origin alongside mutating HTTP methods.
+
+## Supabase RLS Audit
+
+All 11 production tables have `ENABLE ROW LEVEL SECURITY` with explicit deny-all anon policies. 10 of 11 additionally have `FORCE ROW LEVEL SECURITY`:
+
+| Table | ENABLE RLS | FORCE RLS | Deny-anon policy |
+|-------|-----------|-----------|-----------------|
+| `users` | ✓ (002) | ✓ (018) | ✓ (008) |
+| `metrics_snapshots` | ✓ (002) | ✓ (018) | ✓ (008) |
+| `verification_records` | ✓ (002) | ✓ (018) | ✓ (008) |
+| `feature_flags` | ✓ (003) | ✓ (018) | ✓ (008, SELECT still allowed) |
+| `merge_operations` | ✓ (007) | ✓ (018) | ✓ (008) |
+| `user_platforms` | ✓ (010) | ✓ (018) | ✓ (010) |
+| `tool_insights` | ✓ (015) | ✓ (018) | ✓ (018) |
+| `email_campaigns` | ✓ (016) | ✓ (018) | ✓ (016) |
+| `campaign_sends` | ✓ (016) | ✓ (018) | ✓ (016) |
+| `supplemental_stats` | ✓ (024) | ✗ | ✓ (024) |
+| 2 views | — | — | `security_invoker = true` (014) |
+
+## Secret Leak Check
+
+- `NEXT_PUBLIC_*` vars are all non-sensitive (PostHog key/host, feature flags, base URL). No server secrets exposed via `NEXT_PUBLIC_` prefix.
+- Direct `process.env.SECRET_NAME` access in `app/` routes: none found outside `lib/env.ts` — all env reads centralized with `.trim()`.
+- Client chunk inspection: only `SUPABASE_SERVICE_ROLE_KEY` name found (not value) — see Code Findings above.
 
 ## License Compliance
-No GPL or AGPL dependencies. Copyleft-adjacent packages reviewed:
 
-| Package | License | Risk | Verdict |
-|---------|---------|------|---------|
-| `@resvg/resvg-js` | MPL-2.0 | File-level copyleft only | OK — not modified, used as-is |
-| `@resvg/resvg-js-darwin-arm64` | MPL-2.0 | File-level copyleft only | OK — binary distribution |
-| `dompurify` | MPL-2.0 OR Apache-2.0 | Dual-licensed | OK — Apache-2.0 elected by default |
-| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0-or-later | Dynamic linking | OK — sharp loads libvips dynamically; no static linking, no source modification |
+`license-checker --production` returned **no copyleft violations**.
 
-**All clear.** No copyleft violations.
+- No GPL, AGPL, or LGPL dependencies found.
+- MPL-2.0 packages (`@resvg/resvg-js`, `lightningcss`) and dual Apache-2.0/MPL-2.0 (`dompurify`) noted from prior audit — all accepted. MPL-2.0 requires source-availability for modifications to the MPL'd files only; no modifications made. No compliance action required.
 
 ## Recommendations
-1. **Knip false positives (LOW)** — `pnpm knip --production` flags 8 unused deps (`@resvg/resvg-js`, `@vercel/analytics`, `@vercel/speed-insights`, `canvas-confetti`, `next-themes`, `posthog-js`, `resend`, `svix`). All are actively used — same false-positive set as the 2026-04-20 audit. No action; document if not already.
-2. **CORS wildcard surveillance (INFO)** — The two `*` CORS routes are intentional, but worth a recurring audit to confirm no mutation handler ever ships with `Access-Control-Allow-Origin: *`. Already enforced by convention; consider an ESLint custom rule or test assertion to make it mechanical.
-3. **`apps/web/lib/analytics/server-errors.ts` SENSITIVE_PATTERNS** — Apr 20 P2 (token-redaction branch coverage) is now resolved per Apr 27 coverage report (lib/analytics 97.26% stmts / 89.09% branches). No further action.
 
----
-
-## Shared Context Entry
-
-<!-- ENTRY:START agent=security timestamp=2026-04-27T09:00:00Z -->
-## Security Scanner — 2026-04-27
-- **Status**: GREEN
-- Vulnerabilities: 0 critical, 0 high, 0 moderate, 0 low — `pnpm audit` clean across 644 prod deps
-- Secret leaks: none — 22 grep matches all in tests, redaction regexes (`server-errors.ts:20-23`), or doc comments
-- License issues: none — 2× MPL-2.0 + 1× dual MPL/Apache + 1× LGPL-3.0 (sharp libvips, dynamic linking). No GPL/AGPL.
-- XSS: 9 user-input entry points to SVG, all escaped via `escapeXml()` (BadgeSvg.tsx, VerificationStrip.ts, badge.svg/route.ts)
-- CORS: 2 wildcard routes (`/api/profile/[handle]`, `/api/verify/[hash]`) — read-only, rate-limited, intentional. 17 mutation routes have no CORS.
-- RLS: all 10 Supabase tables ENABLE + FORCE ROW LEVEL SECURITY (migrations 002, 003, 007, 010, 015, 016, 018, 024). 2 views use `security_invoker = true`.
-- NEXT_PUBLIC_* leak check: clean — 1 false positive in `lib/agents/agent-config.ts:91` (template literal).
-- Knip `--production`: 8 false positives unchanged from 2026-04-20 — all confirmed in active use.
-
-**Cross-agent recommendations:**
-- [Coverage]: Apr 20 P2 on `lib/analytics/server-errors.ts` SENSITIVE_PATTERNS branches is resolved (97.26% stmts / 89.09% branches per Apr 27 coverage). No new security-relevant gaps.
-- [QA]: No new security UX issues. Consider adding an ESLint rule or test assertion that no POST/PUT/PATCH/DELETE handler ships with `Access-Control-Allow-Origin: *` — currently enforced by convention.
-- [Cost Analyst]: No cost-security conflict. Fail-open rate limiter (`redis.ts:127-149`) intact. 100% fetch timeout coverage.
-- [Performance]: Knip false positives unchanged — no bundle changes recommended. Do not remove the 8 flagged deps.
-<!-- ENTRY:END -->
+| Priority | Action | Location |
+|----------|--------|---------|
+| P3 | Add `ALTER TABLE supplemental_stats FORCE ROW LEVEL SECURITY;` in new migration for defense-in-depth consistency | New migration after 024 |
+| P3 | Consider marking `lib/db/supabase.ts` as server-only to prevent the module name from appearing in client bundles | `lib/db/supabase.ts` — add `import "server-only"` at top |
+| Monitor | Verify `supplemental_stats` FORCE RLS gap is added in next schema maintenance window | Low urgency — anon deny-all policy already in place |
