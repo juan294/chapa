@@ -6,7 +6,7 @@ import {
   useClientFeatureFlags,
 } from "./ClientFeatureFlagsProvider";
 
-vi.mock("@/lib/feature-flags", () => ({
+vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => true),
 }));
 
