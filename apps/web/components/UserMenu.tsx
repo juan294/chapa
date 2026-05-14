@@ -44,6 +44,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
   const { studioEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
+  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -53,41 +54,44 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [bbStatus, setBbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(null);
+  } | null>(() => platformStatusCache.bitbucket);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkLoading, setUnlinkLoading] = useState(false);
 
   const [cbStatus, setCbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(null);
+  } | null>(() => platformStatusCache.codeberg);
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
 
   // Insights import — file picker triggered directly from menu
   const insightsFileRef = useRef<HTMLInputElement>(null);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleToastDismiss = useCallback(() => setToast(null), []);
   const [toast, setToast] = useState<{
     message: string;
     detail?: string;
     type: "loading" | "success" | "error" | "info";
   } | null>(null);
+  const handleToastDismiss = useCallback(() => setToast(null), []);
 
   // Insights cooldown — read last-submitted timestamp from localStorage on mount
   const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
-  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(null);
-  useEffect(() => {
-    const stored = localStorage.getItem(insightsStorageKey);
-    if (stored) {
+  const [insightsNow, setInsightsNow] = useState(() => Date.now());
+  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = window.localStorage.getItem(insightsStorageKey);
+    if (!stored) return null;
+    try {
       const date = new Date(stored);
-      if (!isNaN(date.getTime())) setInsightsLastSubmitted(date);
+      return Number.isNaN(date.getTime()) ? null : date;
+    } catch {
+      return null;
     }
-  }, [insightsStorageKey]);
+  });
   const insightsCooldownActive =
     insightsLastSubmitted !== null &&
-    Date.now() - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
+    insightsNow - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
   const insightsTooltip =
     insightsCooldownActive && insightsLastSubmitted
       ? `${t('userMenu.insightsCooldownPrefix') as string}${new Date(insightsLastSubmitted.getTime() + INSIGHTS_COOLDOWN_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
@@ -130,6 +134,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       const now = new Date();
       localStorage.setItem(insightsStorageKey, now.toISOString());
       setInsightsLastSubmitted(now);
+      setInsightsNow(now.getTime());
 
       if (recalcRes.ok) {
         const recalcData = await recalcRes.json();
@@ -173,8 +178,6 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
   useEffect(() => {
     if (platformStatusCache.fetched) {
-      if (platformStatusCache.bitbucket) setBbStatus(platformStatusCache.bitbucket);
-      if (platformStatusCache.codeberg) setCbStatus(platformStatusCache.codeberg);
       return;
     }
     // Server returns { enabled: false } if flag is off — no client-side
