@@ -85,7 +85,8 @@
 ## Triage -- 2026-05-14
 - **Reports processed**: 6 (cost-analyst RED, coverage RED, cc-rpi-update RED, performance YELLOW, security GREEN, qa GREEN)
 - **Action items resolved**: 4 -- FORCE RLS migration for `supplemental_stats`, server-only Supabase boundary with test alias, auth session JSDoc, bundle monitor carried.
-- **Summary**: App hardening and documentation fixes completed; local tests/typecheck/lint/migration validation are green. Three agent reports failed due quota/agent-run output and are documented for re-run.
+- **Dependabot**: PR #843 production group merged after updating with `develop`; PR #842 dev/types group merged after React lint-rule fixes and production-base merge. Both CI green.
+- **Summary**: App hardening, documentation fixes, and active Dependabot follow-up completed. Three agent reports failed due quota/agent-run output and are documented for re-run.
 
 **Cross-agent recommendations:**
 - [Security]: `supplemental_stats` now matches the FORCE RLS posture of the other app tables, and `lib/db/supabase.ts` is guarded by `server-only`.

@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-05-14 | 6 reports processed | 4 action items | 2 Dependabot PRs
+> Generated on 2026-05-14 | 6 reports processed | 4 action items | 2 active Dependabot PRs resolved
 
 ## Agent Failures
 | Agent | Error | Log File |
@@ -20,7 +20,7 @@
 
 ## Overall Status: YELLOW
 
-Core app verification is green. Overall triage is YELLOW because three scheduled agent reports failed due quota/agent-run output, and one Dependabot PR still needs a one-attempt lint fix pass after the triage commit is pushed.
+Core app verification and CI are green. Overall triage is YELLOW because three scheduled agent reports failed due quota/agent-run output and need to be re-run when agent capacity is available.
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
@@ -33,8 +33,8 @@ Core app verification is green. Overall triage is YELLOW because three scheduled
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 840 | `chore(deps): bump the production group with 12 updates` | non-major group: patch + minor | auto-merge after triage CI green | CI green |
-| 841 | `chore(deps-dev): bump the dev-and-types group with 2 updates` | patch group | attempt-fix after triage CI green | Typecheck/tests pass; lint job fails |
+| 843 | `chore(deps): bump the production group across 1 directory with 13 updates` | non-major group: patch + minor | MERGED | Updated with `develop`, added Knip ignore for the Vitest-only `server-only` stub, CI green |
+| 842 | `chore(deps-dev): bump the dev-and-types group across 1 directory with 4 updates` | patch/minor dev group | MERGED | Fixed updated React lint findings, merged production dependency base, CI green |
 
 ## Verification
 - [x] `supabase db reset`
@@ -43,9 +43,10 @@ Core app verification is green. Overall triage is YELLOW because three scheduled
 - [x] `pnpm run typecheck`
 - [x] `pnpm run lint`
 - [x] `pnpm run validate:migrations`
-- [ ] CI green
+- [x] CI green on the triage fix commits and both merged Dependabot PRs
+- [x] PR #843 CI green and merged
+- [x] PR #842 CI green and merged
 
 ## Carried Items
 - **Bundle monitor:** Total client JS is 2,266 KB raw across 78 chunks, flat vs 2026-05-07 but still +34.7% over four weeks. No chunk is >=500 KB. Run `ANALYZE=true pnpm run build` interactively before the next growth milestone.
-- **Dependabot PR #841:** Needs one lint-fix attempt after the triage commit is pushed and green.
 - **Agent run reliability:** cost-analyst, coverage, and cc-rpi-update produced failed/quota reports this cycle. Re-run when usage resets or agent capacity is available.
