@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import type { AdminUser, SortField, SortDir, PaginatedResponse } from "./admin-types";
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ export function useAdminDashboard(): AdminDashboardState {
   }, [page, sortField, sortDir, deferredSearch]);
 
   useEffect(() => {
-    fetchUsers();
+    fireAndForget(() => fetchUsers(), () => undefined);
   }, [fetchUsers]);
 
   // Listen for /refresh command from GlobalCommandBar

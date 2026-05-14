@@ -53,7 +53,7 @@ export function EngagementDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchFlags();
+    fireAndForget(fetchFlags, () => undefined);
   }, [fetchFlags]);
 
   useEffect(() => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Campaign } from "@/lib/db/campaigns";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { formatDate } from "../admin-types";
 
 // ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ export function CampaignsDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchCampaigns();
+    fireAndForget(fetchCampaigns, () => undefined);
   }, [fetchCampaigns]);
 
   // -------------------------------------------------------------------------
