@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": ["du"],
-  "ignore": ["vitest.setup.ts"],
+  "ignore": ["vitest.setup.ts", "test/stubs/server-only.ts"],
   "workspaces": {
     ".": {
       "entry": ["scripts/**/*.ts"],
