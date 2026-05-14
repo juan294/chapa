@@ -2,10 +2,10 @@
  * Feature flags — DB-backed with env-var fallback.
  *
  * Two API styles:
- * - **Sync** (`isStudioEnabledSync`): env-var fallback for tests and code
+ * - **Sync** (`feature-flags-sync.ts`): env-var fallback for client code
  *   running outside the hydrated client feature-flag provider.
- * - **Async** (`isStudioEnabled`): checks Supabase first, falls back to
- *   env var — for server components and API routes.
+ * - **Async** (this module): checks Supabase first, falls back to env vars
+ *   for server components and API routes.
  *
  * Client navigation surfaces should use `ClientFeatureFlagsProvider`, which
  * receives the DB-backed server value from the root layout.
@@ -15,56 +15,21 @@ import { unstable_cache } from "next/cache";
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import { withTimeout } from "./async/with-timeout";
 import {
-  getStudioEnabledEnv,
-  getBitbucketEnabledEnv,
-  getCodebergEnabledEnv,
   getExperimentsEnabledEnv,
-  getInsightsEnabledEnv,
 } from "@/lib/env";
+import {
+  isStudioEnabledSync,
+  isBitbucketEnabledSync,
+  isCodebergEnabledSync,
+  isInsightsEnabledSync,
+} from "./feature-flags-sync";
 
-// ---------------------------------------------------------------------------
-// Sync (env-var only) — for client components
-// ---------------------------------------------------------------------------
-
-/**
- * Synchronously check whether Creator Studio is enabled (env-var fallback).
- * Client navigation should prefer `useClientFeatureFlags()`.
- *
- * @returns `true` if `NEXT_PUBLIC_STUDIO_ENABLED` is `"true"`
- */
-export function isStudioEnabledSync(): boolean {
-  return getStudioEnabledEnv() === "true";
-}
-
-/**
- * Synchronously check whether Bitbucket integration is enabled (env-var only).
- * Use in client components where `await` is not available.
- *
- * @returns `true` if `NEXT_PUBLIC_BITBUCKET_ENABLED` is `"true"`
- */
-export function isBitbucketEnabledSync(): boolean {
-  return getBitbucketEnabledEnv() === "true";
-}
-
-/**
- * Synchronously check whether Codeberg integration is enabled (env-var only).
- * Use in client components where `await` is not available.
- *
- * @returns `true` if `NEXT_PUBLIC_CODEBERG_ENABLED` is `"true"`
- */
-export function isCodebergEnabledSync(): boolean {
-  return getCodebergEnabledEnv() === "true";
-}
-
-/**
- * Synchronously check whether AI Insights integration is enabled (env-var only).
- * Use in client components where `await` is not available.
- *
- * @returns `true` if `NEXT_PUBLIC_INSIGHTS_ENABLED` is `"true"`
- */
-export function isInsightsEnabledSync(): boolean {
-  return getInsightsEnabledEnv() === "true";
-}
+export {
+  isStudioEnabledSync,
+  isBitbucketEnabledSync,
+  isCodebergEnabledSync,
+  isInsightsEnabledSync,
+};
 
 // ---------------------------------------------------------------------------
 // Async (DB-backed + env-var fallback) — for server components / API routes
@@ -123,7 +88,7 @@ export function invalidateFeatureFlagCache(key?: string): void {
 export async function isStudioEnabled(): Promise<boolean> {
   return checkFlag(
     "studio_enabled",
-    getStudioEnabledEnv(),
+    isStudioEnabledSync() ? "true" : undefined,
   );
 }
 
@@ -149,7 +114,7 @@ export async function isExperimentsEnabled(): Promise<boolean> {
 export async function isBitbucketEnabled(): Promise<boolean> {
   return checkFlag(
     "bitbucket_integration",
-    getBitbucketEnabledEnv(),
+    isBitbucketEnabledSync() ? "true" : undefined,
   );
 }
 
@@ -162,7 +127,7 @@ export async function isBitbucketEnabled(): Promise<boolean> {
 export async function isCodebergEnabled(): Promise<boolean> {
   return checkFlag(
     "codeberg_integration",
-    getCodebergEnabledEnv(),
+    isCodebergEnabledSync() ? "true" : undefined,
   );
 }
 
@@ -175,7 +140,7 @@ export async function isCodebergEnabled(): Promise<boolean> {
 export async function isInsightsEnabled(): Promise<boolean> {
   return checkFlag(
     "insights_integration",
-    getInsightsEnabledEnv(),
+    isInsightsEnabledSync() ? "true" : undefined,
   );
 }
 

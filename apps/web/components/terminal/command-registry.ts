@@ -1,4 +1,4 @@
-import { isStudioEnabledSync } from "../../lib/feature-flags";
+import { isStudioEnabledSync } from "../../lib/feature-flags-sync";
 
 export type OutputLineType =
   | "info"
