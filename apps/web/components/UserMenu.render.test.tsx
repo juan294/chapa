@@ -20,7 +20,7 @@ vi.mock("next/link", () => ({
     <a href={href} {...props}>{children}</a>,
 }));
 
-vi.mock("@/lib/feature-flags", () => ({
+vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
 }));
@@ -150,7 +150,7 @@ describe("UserMenu — all buttons have explicit type attribute", () => {
     dropdownOpen = true;
 
     // Enable conditional sections so every button renders
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     clearPlatformStatusCache();
@@ -383,7 +383,7 @@ describe("UserMenu — Creator Studio conditional rendering", () => {
   });
 
   it("shows Creator Studio when feature flag is on", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isStudioEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);
@@ -406,7 +406,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("shows insights import when feature flag is on", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);
@@ -414,7 +414,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("insights label has a hidden file input", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);
@@ -425,7 +425,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("insights button triggers file input on click", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);
@@ -436,7 +436,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("shows error toast for oversized files (>10MB)", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);
@@ -458,7 +458,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("shows loading toast during processing", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     // Delay the fetch to keep it in loading state
@@ -484,7 +484,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("shows error toast when upload fails", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
@@ -510,7 +510,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("shows success toast with craft score after successful upload + recalculate", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -549,7 +549,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("shows success with fallback when recalculate fails", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -586,7 +586,7 @@ describe("UserMenu — insights import", () => {
   });
 
   it("does nothing when no file is selected", async () => {
-    const featureFlags = await import("@/lib/feature-flags");
+    const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
     render(<UserMenu {...baseProps} />);

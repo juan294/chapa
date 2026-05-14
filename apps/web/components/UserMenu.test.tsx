@@ -23,7 +23,7 @@ vi.mock("next/link", () => ({
     <a href={href} {...props}>{children}</a>,
 }));
 
-vi.mock("@/lib/feature-flags", () => ({
+vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
 }));
@@ -34,7 +34,7 @@ vi.mock("@/hooks/useSession", () => ({
 }));
 
 // Static import gets the mocked module (vi.mock is hoisted)
-import * as featureFlags from "@/lib/feature-flags";
+import * as featureFlags from "@/lib/feature-flags-sync";
 
 let dropdownOpen = false;
 const setIsOpenMock = vi.fn((updater: boolean | ((prev: boolean) => boolean)) => {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isInsightsEnabledSync } from "@/lib/feature-flags";
+import { isInsightsEnabledSync } from "@/lib/feature-flags-sync";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";

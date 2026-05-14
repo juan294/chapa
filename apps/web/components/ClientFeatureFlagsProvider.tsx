@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
 
 interface ClientFeatureFlags {
   studioEnabled: boolean;

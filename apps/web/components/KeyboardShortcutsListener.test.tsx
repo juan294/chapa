@@ -38,7 +38,7 @@ vi.mock("@/lib/keyboard/shortcuts", () => ({
   ShortcutScope: {},
 }));
 
-vi.mock("@/lib/feature-flags", () => ({
+vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => true),
 }));
 
@@ -73,7 +73,7 @@ import {
   KeyboardShortcutsListener,
   useKeyboardShortcutsContext,
 } from "./KeyboardShortcutsListener";
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
 import { useEffect } from "react";
 
 /* ------------------------------------------------------------------ */
