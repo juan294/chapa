@@ -1,52 +1,51 @@
 # Triage Report
-> Generated on 2026-05-14 | 6 reports processed | 4 action items | 2 active Dependabot PRs resolved
+> Generated on 2026-05-22 | 7 reports processed | 4 action items implemented | 2 Dependabot PRs
 
 ## Agent Failures
-| Agent | Error | Log File |
-|-------|-------|----------|
-| cost-analyst | Report contains quota message instead of findings | `logs/cost-analyst-2026-05-14.log` empty |
-| coverage | Report contains quota message instead of findings | `logs/coverage-agent-2026-05-14.log` empty |
-| cc-rpi-update | Report says sync failed after 2 attempts | `logs/cc-rpi-update.error.log` empty/stale |
+None — all agents ran successfully this cycle.
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cost-analyst-report.md` | Cost Analyst | RED | 1 -- failed report documented |
-| 2 | `coverage-report.md` | Coverage | RED | 1 -- failed report documented |
-| 3 | `cc-rpi-update-report.md` | cc-rpi-update | RED | 1 -- failed report documented |
-| 4 | `performance-report.md` | Performance | YELLOW | 1 -- bundle-growth monitor carried |
-| 5 | `security-report.md` | Security | GREEN | 2 -- FORCE RLS migration; server-only Supabase module boundary |
-| 6 | `qa-report.md` | QA | GREEN | 1 -- JSDoc polish for auth session exports |
+| 1 | `cc-rpi-update-report.md` | cc-rpi | GREEN | 0 — already up to date at v1.18.0 |
+| 2 | `cost-analyst-report.md` | cost-analyst | GREEN | 1 — add threshold comment to `lib/db/campaigns.ts` |
+| 3 | `coverage-report.md` | coverage | YELLOW | 1 — fix flaky `engagement-dashboard` test race |
+| 4 | `documentation-report.md` | documentation | GREEN | 1 — add JSDoc to private helpers in `lib/auth/session.ts` |
+| 5 | `performance-report.md` | performance | YELLOW | 0 actionable — bundle P2 deferred (requires interactive browser run) |
+| 6 | `qa-report.md` | qa | GREEN | 0 — all carries pre-resolved in code |
+| 7 | `security-report.md` | security | GREEN | 0 — LGPL-3.0 entry already in `docs/accepted-risks.md` |
 
-## Overall Status: YELLOW
-
-Core app verification and CI are green. Overall triage is YELLOW because three scheduled agent reports failed due quota/agent-run output and need to be re-run when agent capacity is available.
+## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Added `025_force_supplemental_stats_rls.sql` so `supplemental_stats` has `FORCE ROW LEVEL SECURITY` | security | n/a | DONE |
-| 2 | Added `import "server-only"` to `apps/web/lib/db/supabase.ts`, declared `server-only`, and added a Vitest no-op alias for tests | security | n/a | DONE |
-| 3 | Added JSDoc to the five exported helpers in `apps/web/lib/auth/session.ts` | qa | n/a | DONE |
-| 4 | Carried the bundle-size monitor: 2,266 KB raw, flat vs May 7, no chunk >=500 KB | performance | n/a | NOTED |
+| 1 | Fix flaky `engagement-dashboard.test.tsx:265` — replace synchronous `getByText` with `findByText` to await async re-render after non-ok campaigns fetch | coverage | Fix is in the test itself | ✅ Done |
+| 2 | Add JSDoc to private helpers in `apps/web/lib/auth/session.ts` (`assertSessionSecretLength`, `getRawSessionSecret`, `parseSessionCookie`) | documentation | n/a | ✅ Done |
+| 3 | Add GROUP BY migration threshold comment to `apps/web/lib/db/campaigns.ts:727` (5K-send trigger for P2-1) | cost-analyst | n/a | ✅ Done |
+| 4 | Fix `SharePageOwnerContent.render.test.tsx` timer leak — add `vi.clearAllTimers()` to `afterEach` to cancel dangling 800ms reload timer before JSDOM teardown (discovered during Dependabot merge CI) | coverage | Fix is in the test itself | ✅ Done |
+| 5 | Pre-resolved: `aria-label` on campaigns `<tr>` (already `aria-label={"Campaign: ${c.name}"}` at line 903) | qa | n/a | ✅ Already done |
+| 6 | Pre-resolved: LGPL-3.0 entry in `docs/accepted-risks.md` (already present at lines 89–95) | security | n/a | ✅ Already done |
 
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 843 | `chore(deps): bump the production group across 1 directory with 13 updates` | non-major group: patch + minor | MERGED | Updated with `develop`, added Knip ignore for the Vitest-only `server-only` stub, CI green |
-| 842 | `chore(deps-dev): bump the dev-and-types group across 1 directory with 4 updates` | patch/minor dev group | MERGED | Fixed updated React lint findings, merged production dependency base, CI green |
+| #844 | bump production group with 4 updates | minor/patch | ✅ Merged | CI all green, squash merge |
+| #845 | bump @types/node 25.7.0→25.8.0 | minor (dev) | ↩ Closed by Dependabot | Conflicts after #844 lockfile merge; Dependabot reopened as #846 |
+| #846 | bump dev-and-types group (4 updates) | minor (dev) | ⏳ Pending E2E | All checks passing, E2E in progress at report time |
 
 ## Verification
-- [x] `supabase db reset`
-- [x] `supplemental_stats` catalog check: `relforcerowsecurity = true`
-- [x] `pnpm run test` -- 7,589 tests passing
-- [x] `pnpm run typecheck`
-- [x] `pnpm run lint`
-- [x] `pnpm run validate:migrations`
-- [x] CI green on the triage fix commits and both merged Dependabot PRs
-- [x] PR #843 CI green and merged
-- [x] PR #842 CI green and merged
+- [x] All tests passing (7589/7589)
+- [x] Typecheck clean
+- [x] Lint clean
+- [x] CI green on develop
+
+## Deferred Items
+| Item | Reason | Carry Cycle |
+|------|--------|-------------|
+| Performance P2 — bundle analyzer | Requires interactive browser session (`ANALYZE=true pnpm run build` opens non-headless windows). Bundle flat 7 consecutive cycles; no chunk ≥500 KB; no cold-start regression. | 8 |
+| Cost P2-1 — `dbGetCampaignStats` GROUP BY RPC | Threshold-gated at >5K sends/campaign; not yet triggered. Threshold comment added to code. | 22 |
+| Cost P3 — health endpoint GitHub probe caching | ~5–10 calls/hr, well inside 60/hr limit. Low priority. | 10 |
 
 ## Carried Items
-- **Bundle monitor:** Total client JS is 2,266 KB raw across 78 chunks, flat vs 2026-05-07 but still +34.7% over four weeks. No chunk is >=500 KB. Run `ANALYZE=true pnpm run build` interactively before the next growth milestone.
-- **Agent run reliability:** cost-analyst, coverage, and cc-rpi-update produced failed/quota reports this cycle. Re-run when usage resets or agent capacity is available.
+None new this cycle. All carries are documented in the Deferred Items table above.
