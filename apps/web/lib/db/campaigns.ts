@@ -721,6 +721,10 @@ export async function dbMarkSendsFailed(
 /**
  * Aggregate send status counts for a campaign via bounded count queries.
  *
+ * Uses 4 parallel COUNT queries (one per status). This is efficient at normal
+ * volumes; if a campaign exceeds ~5,000 sends, replace with a single GROUP BY
+ * RPC to avoid the extra round-trips (tracked as cost P2-1).
+ *
  * @param id - Campaign UUID
  * @returns Counts of sent, pending, and failed sends (defaults to 0)
  */

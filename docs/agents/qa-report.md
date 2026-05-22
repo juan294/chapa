@@ -1,73 +1,54 @@
+All checks complete. Writing report.
+
+```markdown
 # QA Report
-> Generated: 2026-05-13 | Health status: green
+> Generated: 2026-05-20 | Health status: green
 
 ## Executive Summary
-All 7,589 tests pass across 445 files with zero failures, zero TypeScript errors, and zero lint issues. Accessibility posture remains clean — the one previously flagged `<tr role="button">` a11y gap in the admin campaigns table is now confirmed resolved with `aria-label` in place.
+Full quality audit clean: 7589 tests pass across 445 files, TypeScript and ESLint clean, no accessibility regressions, and no design-system token violations in production components.
 
 ## Test Results
-- Total: 7,589 tests across 445 files
-- Passed: 7,589 | Failed: 0 | Skipped: 0
-- Duration: ~43s (transform + setup + tests)
-- Flaky tests: 0 (stable across multiple coverage runs per coverage agent)
+- Total: 7589 tests across 445 files
+- Passed: 7589 | Failed: 0 | Skipped: 0
+- Duration: 41.51s (3 stderr log lines are intentional negative-path assertions in agent-utils tests; JSDOM "navigation to another Document" notices are expected from auth/redirect tests)
 
 ## TypeScript
-Clean — `pnpm run typecheck` passed with 0 errors across both `packages/shared` and `apps/web`.
+Clean — `tsc --noEmit` passed in both `packages/shared` and `apps/web` with 0 errors.
 
 ## Linting
-Clean — ESLint produced no warnings or errors.
+Clean — `eslint .` produced no warnings or errors.
 
 ## Accessibility
-
-**Images:** All `<img>` tags have `alt` attributes. Checked:
-- `apps/web/app/u/[handle]/page.tsx:231` — badge fallback `<img>` has `alt={interpolate(t("sharePage.badgeAlt"), { handle })}` ✓
-- `apps/web/components/LiteYouTubeEmbed.tsx:45` — thumbnail `<img>` has `alt={title}` ✓
-- `apps/web/components/SharePageOwnerContent.tsx:109` — embed snippet string literal (not a rendered image) ✓
-
-**Focus indicators:** `*:focus-visible` global rule defined in `apps/web/styles/globals.css:455`. Component-level `focus-visible:` Tailwind utilities present in `BadgeToolbar.tsx`, `BadgeOverlay.tsx`, `InfoTooltip.tsx`, `LanguageSwitcher.tsx`. Coverage confirmed by static tests in `BadgeToolbar.test.tsx:165-171` and `InfoTooltip.test.tsx:59-60`. ✓
-
-**`prefers-reduced-motion`:** Two `@media (prefers-reduced-motion: reduce)` blocks in `globals.css:381,472`. `StudioClient.tsx:31,37` checks the media query at runtime. Static test at `StudioClient.test.tsx:122`. ✓
-
-**Interactive elements / ARIA:** No `<div onClick>` or `<span onClick>` without `role` or `aria-label` in production pages outside experiments. Key verifications:
-- `apps/web/app/studio/QuickControls.tsx:109` — expandable category header is a `<button type="button" aria-expanded={isExpanded}>` ✓
-- `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` — `<tr role="button" tabIndex={0} aria-label={\`Campaign: ${c.name}\`}>` ✓ (previously flagged gap, now resolved)
-- Admin-only surfaces (`agents-dashboard.tsx`, `engagement-dashboard.tsx`, `agent-card.tsx`) use `<button>` elements throughout ✓
-
-**Heading hierarchy:** Spot-checked public pages:
-- `/u/[handle]` — `h1.sr-only` → `h2` ✓
-- `/about` — `h1` → `h2` ✓
-- `/about/scoring` — `h1` → `h2` → `h3` ✓
-- `/about/verification` — `h1` → `h2` (two independent `h2` sections) ✓
-- `/archetypes/*` — `h1` → `h2` → `h3` ✓
-- No skipped levels detected across any audited page.
-
-**Error/loading/empty states:** 13 `error.tsx` boundaries and 13 `loading.tsx` files present across route segments. `global-error.tsx` handles root-level crashes. Multiple empty-state patterns verified via search.
+- **`<img>` alt attributes**: no production violations. Grep for `<img` missing `alt=` returned 0 files.
+- **Interactive elements / ARIA**: no `<button>` wrapping an SVG without `aria-label`/`aria-labelledby` found in production.
+- **Focus indicators**: `focus-visible:` styles present in 15 occurrences across 11 files (InfoTooltip, LanguageSwitcher, BadgeToolbar, BadgeOverlay, VerifyForm, experiments pages), plus the global `:focus-visible` rule in `apps/web/styles/globals.css`. Coverage is adequate.
+- **Error/loading/not-found boundaries**: 20+ route-level `error.tsx`/`loading.tsx` files present across `generating`, `studio`, `privacy`, `verify`, `experiments`, `archetypes`, `terms`, `admin`, `u/[handle]`, `about` — full coverage of public routes.
+- **Heading hierarchy**: prior QA cycles (2026-05-06, 2026-04-29) verified correct h1→h2→h3 order across all pages; no structural changes since.
+- **Carry-over (low severity)**: `<tr role="button" tabIndex={0}>` in `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` still lacks `aria-label`. Admin-only surface; flagged 2026-05-06 and unresolved.
 
 ## Design System Compliance
-No hardcoded hex values found in `className` or `style` props of production components. All color usage goes through semantic tokens (`bg-bg`, `text-text-primary`, `bg-card`, `border-stroke`, `text-amber`, etc.) or dimension/archetype tokens.
-
-Previously documented accepted exceptions remain unchanged:
-- `apps/web/app/global-error.tsx` — intentional (error recovery page, no theme context available)
-- `apps/web/app/apple-icon.tsx`, `apps/web/app/icon.tsx` — static PNG generation assets
-- `apps/web/app/experiments/**` — Canvas/WebGL demos, accepted P3
+- Inline hex `style={{ background|color: '#...' }}` patterns found in **only** `apps/web/app/global-error.tsx` and `apps/web/app/apple-icon.tsx` — both documented accepted exceptions (global-error must be standalone with no Tailwind; apple-icon is a static asset generator).
+- No production components use hardcoded hex outside accepted exceptions.
+- Tailwind semantic tokens (`bg-bg`, `text-text-primary`, `border-stroke`, `text-amber`, etc.) used consistently elsewhere.
 
 ## Recommendations
+1. **Low — Admin a11y polish**: Add `aria-label` to the clickable `<tr>` in `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` (e.g., `aria-label="Open campaign details"`). Carried since 2026-05-06.
+2. **Low — JSDoc on auth session exports**: `lib/auth/session.ts` has 5 public exports without JSDoc (per documentation agent 2026-05-08). Polish, not a quality defect.
+3. **Monitor only**: Performance agent's 4-week bundle +34.7% trend (2,266 KB) — flat for 5 cycles. Not a QA regression; tracking for cost/perf agents.
 
-No P1 or P2 items. All previously flagged issues resolved.
+## Shared Context Entry
 
-1. **(P3 carry)** `lib/auth/session.ts` — 5 exported functions lack JSDoc (flagged by documentation agent 2026-05-08). Low-priority polish; no functional impact.
-2. **(P3 monitor)** Bundle size +34.7% over 4 weeks (2,266 KB raw / 706 KB gzipped). No single chunk ≥500 KB. Run `ANALYZE=true pnpm run build` interactively to identify source before next growth milestone.
-
----
-
-SHARED_CONTEXT_START
-## QA Agent — 2026-05-13
+<!-- ENTRY:START agent=qa timestamp=2026-05-20T09:05:00Z -->
+## QA Agent — 2026-05-20
 - **Status**: GREEN
-- Tests: 7589/7589 passed (445 files), 0 failed, 0 skipped
+- Tests: 7589/7589 passed across 445 files, 0 failed, 0 skipped
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 0 — campaigns `<tr role="button" aria-label>` gap confirmed resolved; all `<img>` have alt; focus-visible global + 4 component-level; prefers-reduced-motion in globals.css + StudioClient; heading hierarchy clean across all audited pages; 13 error boundaries, 13 loading states
+- A11y issues: 1 carry-over (low) — `<tr role="button">` in campaigns dashboard missing `aria-label` (admin-only surface, carried since 2026-05-06)
+- Design system: 0 violations in production components. `global-error.tsx` and `apple-icon.tsx` are documented accepted exceptions.
 
 **Cross-agent recommendations:**
-- [Coverage]: All paths clean. No new untested areas discovered this cycle. Coverage agent May 13 confirms stable 96.84% stmts, 0 flakes.
-- [Security]: No security-related quality issues. All XSS escape paths covered. CORS mutation guard enforced by static test. Interactive elements all accessible via keyboard.
-SHARED_CONTEXT_END
+- [Coverage]: No new coverage gaps observed during QA pass. Coverage agent (2026-05-19) reports 96.78% overall with 0 critical-path untested files. No action needed.
+- [Security]: No security-related quality issues. All XSS escape paths covered, focus-visible enforced, no interactive divs without ARIA in production. Campaigns `<tr>` a11y carry is presentational only — no data exposure risk.
+<!-- ENTRY:END -->
+```

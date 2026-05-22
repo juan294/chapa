@@ -13,6 +13,7 @@ type CookieHeaderSource = {
   get(name: string): string | null;
 };
 
+/** Throws if the secret is shorter than the minimum required length; returns it otherwise. */
 function assertSessionSecretLength(secret: string): string {
   if (secret.length < MIN_SESSION_SECRET_LENGTH) {
     throw new Error("NEXTAUTH_SECRET must be set and at least 32 chars");
@@ -20,6 +21,7 @@ function assertSessionSecretLength(secret: string): string {
   return secret;
 }
 
+/** Reads NEXTAUTH_SECRET from the environment; returns null when unset or empty. */
 function getRawSessionSecret(): string | null {
   const sessionSecret = getNextauthSecret();
   return sessionSecret || null;
@@ -39,6 +41,7 @@ export function getSessionKey(): Buffer {
   return Buffer.from(assertSessionSecretLength(sessionSecret), "utf8");
 }
 
+/** Decodes and verifies the session cookie; returns null when the header is absent or the signature is invalid. */
 function parseSessionCookie(
   cookieHeader: string | null,
   sessionSecret: string | null = getSessionSecret(),
