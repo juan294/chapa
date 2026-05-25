@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { pingRedis, rateLimit } from "@/lib/cache/redis";
 import { getGithubToken } from "@/lib/env";
 import { isAdminHandle } from "@/lib/auth/admin";
@@ -53,6 +54,12 @@ async function pingGitHub(): Promise<{
   }
 }
 
+// Cache the GitHub rate_limit probe for 60 s so concurrent health probes
+// share a single outbound call instead of each hitting GitHub separately.
+const cachedPingGitHub = unstable_cache(pingGitHub, ["health-github-probe"], {
+  revalidate: 60,
+});
+
 /**
  * GET /api/health
  *
@@ -72,7 +79,7 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
   const [redisStatus, supabaseStatus, githubResult] = await Promise.all([
     pingRedis(),
     pingSupabase(),
-    pingGitHub(),
+    cachedPingGitHub(),
   ]);
   const session = getOptionalRequestSession(request);
   const isAdmin = session ? isAdminHandle(session.login) : false;

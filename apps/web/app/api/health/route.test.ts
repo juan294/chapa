@@ -27,6 +27,12 @@ vi.mock("@/lib/analytics/server-errors", () => ({
   withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
+// unstable_cache requires a Next.js incremental cache that doesn't exist in
+// vitest. Pass-through so the wrapped function still calls the mocked fetch.
+vi.mock("next/cache", () => ({
+  unstable_cache: <Args extends unknown[], R>(fn: (...args: Args) => R) => fn,
+}));
+
 // GitHub API is probed via global fetch — mock at module level
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -276,6 +282,18 @@ describe("GET /api/health", () => {
       expect(response.status).toBe(200);
       expect(body.dependencies.github).toBe("ok");
       expect(body.dependencies.githubRateLimit).toBeUndefined();
+    });
+
+    it("caches the GitHub probe via unstable_cache to avoid redundant API calls", async () => {
+      const source = await import("node:fs").then((fs) =>
+        fs.promises.readFile(
+          new URL("./route.ts", import.meta.url).pathname,
+          "utf8",
+        ),
+      );
+      expect(source).toMatch(/unstable_cache\(/);
+      expect(source).toMatch(/health-github-probe/);
+      expect(source).toMatch(/revalidate:\s*60/);
     });
 
     it("includes githubRateLimit details for admin sessions", async () => {
