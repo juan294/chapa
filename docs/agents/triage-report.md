@@ -1,51 +1,45 @@
 # Triage Report
-> Generated on 2026-05-22 | 7 reports processed | 4 action items implemented | 2 Dependabot PRs
+> Generated on 2026-05-25 | 5 reports processed | 2 code fixes | 1 Dependabot PR
 
 ## Agent Failures
-None — all agents ran successfully this cycle.
+| Agent | Error | Log File |
+|-------|-------|----------|
+| Coverage | "Not logged in · Please run /login" — agent could not authenticate; no coverage data produced | `logs/coverage.error.log` |
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi | GREEN | 0 — already up to date at v1.18.0 |
-| 2 | `cost-analyst-report.md` | cost-analyst | GREEN | 1 — add threshold comment to `lib/db/campaigns.ts` |
-| 3 | `coverage-report.md` | coverage | YELLOW | 1 — fix flaky `engagement-dashboard` test race |
-| 4 | `documentation-report.md` | documentation | GREEN | 1 — add JSDoc to private helpers in `lib/auth/session.ts` |
-| 5 | `performance-report.md` | performance | YELLOW | 0 actionable — bundle P2 deferred (requires interactive browser run) |
-| 6 | `qa-report.md` | qa | GREEN | 0 — all carries pre-resolved in code |
-| 7 | `security-report.md` | security | GREEN | 0 — LGPL-3.0 entry already in `docs/accepted-risks.md` |
+| 1 | `cc-rpi-update-report.md` | cc-rpi-update | GREEN | None — already at v1.18.0 |
+| 2 | `cost-analyst-report.md` | cost-analyst | GREEN | P3: cache health endpoint GitHub probe |
+| 3 | `coverage-report.md` | coverage | FAILED | Agent login failure — re-run required |
+| 4 | `security-report.md` | security | YELLOW | P2: patch brace-expansion CVE |
+| 5 | `documentation-report.md` | documentation | GREEN | Low (3rd cycle carry): design-system table gaps — already resolved in prior cycle |
 
-## Overall Status: GREEN
+## Overall Status: YELLOW → GREEN
+
+Security YELLOW cleared by bumping `brace-expansion` override. Coverage agent failure noted but not a code issue.
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Fix flaky `engagement-dashboard.test.tsx:265` — replace synchronous `getByText` with `findByText` to await async re-render after non-ok campaigns fetch | coverage | Fix is in the test itself | ✅ Done |
-| 2 | Add JSDoc to private helpers in `apps/web/lib/auth/session.ts` (`assertSessionSecretLength`, `getRawSessionSecret`, `parseSessionCookie`) | documentation | n/a | ✅ Done |
-| 3 | Add GROUP BY migration threshold comment to `apps/web/lib/db/campaigns.ts:727` (5K-send trigger for P2-1) | cost-analyst | n/a | ✅ Done |
-| 4 | Fix `SharePageOwnerContent.render.test.tsx` timer leak — add `vi.clearAllTimers()` to `afterEach` to cancel dangling 800ms reload timer before JSDOM teardown (discovered during Dependabot merge CI) | coverage | Fix is in the test itself | ✅ Done |
-| 5 | Pre-resolved: `aria-label` on campaigns `<tr>` (already `aria-label={"Campaign: ${c.name}"}` at line 903) | qa | n/a | ✅ Already done |
-| 6 | Pre-resolved: LGPL-3.0 entry in `docs/accepted-risks.md` (already present at lines 89–95) | security | n/a | ✅ Already done |
+| 1 | Bump `brace-expansion` pnpm override `>=5.0.5→>=5.0.6` (GHSA-jxxr-4gwj-5jf2, moderate) | security-report | — | ✅ Done, `pnpm audit` 0 vulns |
+| 2 | Wrap `pingGitHub` in `unstable_cache(revalidate=60)` at `app/api/health/route.ts` | cost-analyst-report | ✅ 1 new test (caches the GitHub probe via unstable_cache) | ✅ Done |
+| 3 | Design-system light-value table gaps | documentation-report | — | ✅ Already resolved — light values present in `docs/design-system.md` |
 
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
-|---|----|----|----|----|
-| #844 | bump production group with 4 updates | minor/patch | ✅ Merged | CI all green, squash merge |
-| #845 | bump @types/node 25.7.0→25.8.0 | minor (dev) | ↩ Closed by Dependabot | Conflicts after #844 lockfile merge; Dependabot reopened as #846 |
-| #846 | bump dev-and-types group (4 updates) | minor (dev) | ⏳ Pending E2E | All checks passing, E2E in progress at report time |
+|---|----|-------------|-------------|-------|
+| #847 | chore(deps): bump the production group with 5 updates | grouped production (minor/patch) | ✅ Merged | All CI green — squash-merged, branch deleted |
 
 ## Verification
-- [x] All tests passing (7589/7589)
+- [x] All tests passing (7590 tests, 445 files)
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] CI green on develop
-
-## Deferred Items
-| Item | Reason | Carry Cycle |
-|------|--------|-------------|
-| Performance P2 — bundle analyzer | Requires interactive browser session (`ANALYZE=true pnpm run build` opens non-headless windows). Bundle flat 7 consecutive cycles; no chunk ≥500 KB; no cold-start regression. | 8 |
-| Cost P2-1 — `dbGetCampaignStats` GROUP BY RPC | Threshold-gated at >5K sends/campaign; not yet triggered. Threshold comment added to code. | 22 |
-| Cost P3 — health endpoint GitHub probe caching | ~5–10 calls/hr, well inside 60/hr limit. Low priority. | 10 |
+- [x] CI running on `dc0b7261`
 
 ## Carried Items
-None new this cycle. All carries are documented in the Deferred Items table above.
+| Item | Reason | Carry Cycle |
+|------|--------|-------------|
+| Coverage agent login failure | Re-run manually when credentials available. Baseline: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% | — |
+| Cost P2-1 — `dbGetCampaignStats` GROUP BY RPC | Threshold-gated at >5K sends/campaign; not yet triggered. Source comment at `lib/db/campaigns.ts:722-726` | 25 |
+| Bundle monitor | 2,266 KB raw / 706 KB gzipped, flat 9+ cycles. `ANALYZE=true pnpm run build` needs interactive run | 10+ |
