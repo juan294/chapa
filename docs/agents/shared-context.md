@@ -503,3 +503,28 @@
 - [QA]: No new security UX issues. CORS wildcard remains scoped to read-only endpoints; mutation guard static test in place.
 - [Triage]: One P2 — bump `brace-expansion` transitive to ≥5.0.6 (eslint > minimatch path). Dev tooling, no production exposure, but moderate CVE should be cleared via `pnpm.overrides` or `pnpm up --depth Infinity brace-expansion`.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-05-26T01:03:40Z -->
+## Cost Analyst — 2026-05-26
+- **Status**: GREEN
+- Redis key growth risk: LOW
+- Uncached external calls: 0 (all external calls cached or write-through)
+- Resource leak risks: 0
+- Estimated monthly cost at 10K users: **~$50–75/mo**, unchanged.
+- **Commits this cycle**: 1 cost-surface change since 2026-05-24 entry — `dc0b7261` cached `/api/health` GitHub probe via `unstable_cache(revalidate=60)`. P3 (cycle 11) RESOLVED.
+- Redis: 16 production prefixes + 3 persistent singletons (25/28 with TTLs, 89%). `cacheSet` defaults to 21,600s. `cacheIncr` race-safe.
+- Supabase: 11 tables, 11/11 FORCE RLS. Singleton lazy client at `lib/db/supabase.ts:14` guarded by `import "server-only"` (line 8).
+- Feature-flags ISR: `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94` active — 13 pages CDN-eligible.
+- Badge `maxDuration=35` at `app/u/[handle]/badge.svg/route.ts:29` — 11th cycle hold.
+- **P2-1 CARRIED (cycle 26)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation. Threshold comment at `lib/db/campaigns.ts:720-726`. Replace with GROUP BY RPC when campaigns exceed ~5K sends. Not yet triggered.
+- **MONITOR M-bundle CARRIED**: Bundle 2,266 KB raw / 706 KB gzipped (flat 8/8 cycles per perf 2026-05-14). 4-week +34.7% trend stable but unresolved. `ANALYZE=true pnpm run build` still needs interactive run.
+- **MONITOR M-config-TTL CARRIED**: `config:` TTL 31,536,000s (1y per user). PUT replaces — no accumulation.
+- GitHub API cache-first unchanged (6h primary + 7d stale fallback). 100% fetch timeout coverage. `_inflight` dedup Map bounded.
+- Coverage context (May 24): 7589 tests GREEN across 3 clean runs, 0 flakes. lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable.
+- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated). P3s: 0 (health probe P3 resolved).**
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle flat 8/8 cycles. 4-week +34.7% trend stable but unresolved; `ANALYZE=true pnpm run build` still needs interactive run to localize source. Carry-only.
+- [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. Health endpoint GitHub probe now cached at 60s — reduces outbound dependency.
+- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per May 24. New `/api/health` cache wrapper covered by the 2 new tests in `route.test.ts` (commit `dc0b7261`). No cost-path coverage gaps.
+<!-- ENTRY:END -->
