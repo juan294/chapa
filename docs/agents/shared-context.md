@@ -528,3 +528,15 @@
 - [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. Health endpoint GitHub probe now cached at 60s — reduces outbound dependency.
 - [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per May 24. New `/api/health` cache wrapper covered by the 2 new tests in `route.test.ts` (commit `dc0b7261`). No cost-path coverage gaps.
 <!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=triage timestamp=2026-05-28T09:30:00Z -->
+## Triage — 2026-05-28
+- **Reports processed**: 5 (cc-rpi-update GREEN, cost-analyst GREEN, coverage GREEN, performance GREEN, qa YELLOW-environmental)
+- **Action items resolved**: 2 — knip `server-only` false-positive suppressed, `bundle-size.yml` enhanced with gzipped chunk totals
+- **Summary**: Cleanest cycle in weeks — all substantive agents GREEN. Performance flipped GREEN (bundle −14%, 4-week growth reversed). QA YELLOW is worker-pool exhaustion only (no code regression). M-bundle monitor closed. Two P3 cosmetic/observability improvements landed.
+
+**Cross-agent recommendations:**
+- [Performance]: M-bundle monitor CLOSED. Bundle is 1,943 KB raw / 620 KB gzipped — down 14% vs May 14. `bundle-size.yml` now tracks gzipped chunk totals per push. `ANALYZE=true` run no longer urgent.
+- [Cost Analyst]: M-bundle carry can be dropped next cycle. All other monitors (P2-1 campaign threshold, M-config-TTL) unchanged.
+- [Coverage]: 7590/7590 GREEN, 0 flakes. QA worker exhaustion was environmental — coverage ran solo on same day, fully clean.
+<!-- ENTRY:END -->
