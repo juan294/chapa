@@ -78,11 +78,6 @@
 - [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. No cost-path coverage gaps. Coverage agent's new P2 (`engagement-dashboard` flake) is admin-only UI, not cost-surface.
 <!-- ENTRY:END -->
 
-
-
-
-
-
 <!-- ENTRY:START agent=triage timestamp=2026-05-14T08:00:20Z -->
 ## Triage -- 2026-05-14
 - **Reports processed**: 6 (cost-analyst RED, coverage RED, cc-rpi-update RED, performance YELLOW, security GREEN, qa GREEN)
@@ -134,29 +129,6 @@
 - [Documentation]: `CHAPA_ALERT_WEBHOOK_URL` now in CLAUDE.md env-vars block — operationally complete.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-04-30T09:00:00Z -->
-## Performance Engineer — 2026-04-30
-- **Status**: YELLOW
-- Build: Next.js 16.2.4 (Turbopack), compiled 6.6s, 0 TypeScript errors. 64 pages, 84 routes (5 static, rest dynamic).
-- Total client JS: **1,876.9 KB raw / 598.1 KB gzipped** — +194.9 KB (+11.6%) vs 2026-04-09 (1,682 KB). 68 chunks, no chunk >500 KB.
-- Largest chunks: 227.1 KB (Next.js framework), 175.3 KB (PostHog lazy), 125.9 KB (React DOM/RSC), 110.0 KB (core-js). All vendor/framework.
-- Knip `--production`: **8 false positives** confirmed in use (stable from prior cycles). No new unused production exports.
-- `"use client"` audit: 94 non-test files. All appropriate — error boundaries, interactive UI, Canvas/WebGL, hooks. No misplaced directives.
-- Dynamic imports: GlobalCommandBar, PostHog, ShortcutCheatSheet, admin sub-dashboards, Studio effects — all `next/dynamic`. Good code-splitting.
-- Font loading: optimal (`next/font/google`, `display: "swap"`, Latin subset). No external font requests.
-- CLS risks: **none** — all `<Image>` have explicit dims. Badge `<img>` fallback has `1200×630`. `LiteYouTubeEmbed <img>` inside `aspect-video` container — no CLS.
-- Badge SVG caching: `s-maxage=21600, stale-while-revalidate=86400` (success), `s-maxage=300, stale-while-revalidate=600` (error). Correct.
-- Turbopack NFT warning: **RESOLVED** — `svg-to-png.ts` now uses `import.meta.url` + `dirname(fileURLToPath(...))`. Zero warnings in build.
-- **NEW YELLOW P1 — ISR regression**: Root layout (`app/layout.tsx:71`) calls `isStudioEnabled()` → `dbGetFeatureFlag()` → `cacheGet()` → Upstash Redis with `no-store`. This defeats ISR on 13 pages: `/about`, `/about/scoring`, `/about/verification`, `/archetypes/*` (7), `/_not-found`, `/cli/authorize`, `/admin`. Pages with `revalidate=604800`/`86400` are being server-rendered on every request. Fix: wrap `dbGetFeatureFlag` in `unstable_cache()`, or move `isStudioEnabled` out of root layout.
-- **NEW YELLOW P2 — bundle growth**: +194.9 KB vs Apr 9. All recent commits are server-only — growth predates visible log. Run `ANALYZE=true pnpm run build` to identify source.
-
-**Cross-agent recommendations:**
-- [Coverage]: No new performance-coverage gaps. `og-image/route.ts` 60% funcs remains the only critical-path gap (6th cycle carry).
-- [Security]: ISR regression means archetype/about pages no longer serve from CDN — slightly more origin exposure. Existing rate limiting on those pages still intact.
-- [QA]: ISR regression may affect LCP on archetype pages (now server-rendered every request instead of CDN-cached). Consider a load-time smoke test.
-- [Cost Analyst]: ISR regression likely increased Vercel serverless invocations for 7 archetype pages (should be CDN-cached for 7 days) — quantify in next cost cycle.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance timestamp=2026-05-07T09:00:00Z -->
 ## Performance Engineer — 2026-05-07
 - **Status**: YELLOW
@@ -176,7 +148,6 @@
 - [QA]: No CLS regressions. ISR regression confirmed resolved — archetype/about pages should now hit CDN cache. If LCP regression was observed on those pages after Apr 30, it should be recovered.
 - [Coverage]: No new performance-coverage gaps. Badge cold-path (maxDuration gap) has no specific test — low priority to add.
 <!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=documentation timestamp=2026-04-17T10:00:00Z -->
 ## Documentation Agent — 2026-04-17
@@ -311,19 +282,6 @@
 - [Security]: No outdated security docs. `docs/accepted-risks.md` present. All `NEXT_PUBLIC_*` vars confirmed non-sensitive and documented. OAuth flows (GitHub, Bitbucket, Codeberg) and HMAC verification (`docs/badge-verification.md`) docs align with current implementation.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent timestamp=2026-05-13T09:00:00Z -->
-## QA Agent — 2026-05-13
-- **Status**: GREEN
-- Tests: 7589/7589 passed (445 files), 0 failed, 0 skipped
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0 — campaigns `<tr role="button" aria-label>` gap confirmed resolved; all `<img>` have alt; focus-visible global + 4 component-level; prefers-reduced-motion in globals.css + StudioClient; heading hierarchy clean across all audited pages; 13 error boundaries, 13 loading states
-
-**Cross-agent recommendations:**
-- [Coverage]: All paths clean. No new untested areas discovered. Coverage agent May 13 confirms stable 96.84% stmts, 0 flakes.
-- [Security]: No security-related quality issues. All XSS escape paths covered. CORS mutation guard enforced by static test. Interactive elements fully keyboard-accessible.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance_agent timestamp=2026-04-30T07:09:55Z -->
 ## Performance Engineer — 2026-04-30
 - **Status**: YELLOW
@@ -340,7 +298,6 @@
 - [QA]: `/about/scoring` embeds `LiteYouTubeEmbed` — not a CLS risk (`aspect-video` container). No rendering regressions observed.
 - [Cost Analyst]: ISR regression likely increased Vercel serverless invocations for 7+ pages that should be CDN-cached. Archetype pages (revalidate=604800) hitting origin every request instead of being CDN-cached for a week is a cost regression worth quantifying.
 <!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-05-06T07:05:49Z -->
 ## QA Agent — 2026-05-06
@@ -418,19 +375,6 @@
 - [QA]: engagement-dashboard race fixed and verified — no remaining known flakes. Watch for the same `getByText`-after-async pattern in other admin dashboard tests.
 - [Triage]: No P2 action items this cycle. Only carry-watch (lib/github/client.ts inflight-dedup edges, low priority). Clean cycle.
 - [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. No cost-path coverage gaps.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost_analyst timestamp=2026-05-21T01:01:59Z -->
-## Cost Analyst — 2026-05-21
-- **Status**: GREEN
-- Redis key growth risk: low
-- Uncached external calls: 1 (health probe, ~5–10/hr unauth — inside limits)
-- Resource leak risks: 0
-
-**Cross-agent recommendations:**
-- [Performance]: Bundle flat 6/6 cycles — good cold-start memory signal. 4-week +34.7% trend stable but unresolved; `ANALYZE=true pnpm run build` still needs interactive run to localize source.
-- [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. Health endpoint uncached GitHub probe is not a security risk — GitHub's own rate limits provide secondary protection.
-- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per May 19 coverage entry. No cost-path coverage gaps.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-05-22T06:00:00Z -->
@@ -527,4 +471,69 @@
 - [Performance]: Bundle flat 8/8 cycles. 4-week +34.7% trend stable but unresolved; `ANALYZE=true pnpm run build` still needs interactive run to localize source. Carry-only.
 - [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. Health endpoint GitHub probe now cached at 60s — reduces outbound dependency.
 - [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per May 24. New `/api/health` cache wrapper covered by the 2 new tests in `route.test.ts` (commit `dc0b7261`). No cost-path coverage gaps.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-05-27T08:58:36Z -->
+## QA Agent — 2026-05-27
+- **Status**: YELLOW
+- Tests: 5483 passed / 8 failed / 5491 reached (host worker exhaustion; coverage 2026-05-24 baseline 7589/7589 GREEN unaffected)
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0
+
+**Cross-agent recommendations:**
+- [Coverage]: vitest worker-pool exhaustion recurred this cycle on a host running multiple concurrent vitest jobs (same environmental pattern noted 2026-05-22/23/24). Recommend serializing or rate-limiting agent vitest runs on shared hosts so QA + coverage don't collide.
+- [Security]: No new security-related quality issues. All XSS escape paths still covered, no hardcoded hex in production components, all `<img>` have `alt`, all interactive elements have ARIA labels.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-05-28T00:03:41Z -->
+## Coverage Agent — 2026-05-28
+- **Status**: GREEN
+- Overall coverage: 96.78% stmts / 92.65% branches / 95.77% funcs / 97.89% lines (8980/9278 stmts). +1 stmt vs 2026-05-24 (within v8 noise).
+- Test suite: 445 files, 7590 tests (+1 vs 2026-05-24). 3/3 clean (7590/7590). 0 flakes. Durations 30s / 21s / 25s.
+- Critical paths GREEN: lib/impact 99.6%/98.7%/100%, lib/render 100%/92.9%/100%, lib/db 96.5%/93.3%/100%, app/api 97.5%/94.2%/96.8%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/analytics 97.3%, lib/history 98.3%, lib/i18n 100%, lib/verification 100%, lib/dashboard 100%, lib/insights 100%, lib/profile 100%, lib/bitbucket 97.7%, lib/codeberg 98.0%, lib/email 97.6%.
+- **Untested source files in critical paths: 0/75**.
+- **No new P2s**. 10 sub-80% files all P3 carries: Canvas/WebGL (HolographicOverlay, heatmap-wave, metallic-shimmer), next/dynamic lazy wrappers (ClientInstrumentation, GlobalCommandBarLazy, SharePageOwnerContentLazy), experiments error/loading (JSDOM-blocked, flag-gated), packages/shared JSON config files (false positive — src/ TS at 100%).
+- **Watch (carry)**: lib/github/client.ts 93.1% funcs — 2 inflight-dedup edges uncovered. Low priority.
+- **Flaky tests: 0** confirmed across 3 runs. Prior 2026-05-22 engagement-dashboard race fix holding (no recurrence). Worker-pool exhaustion noted by QA 2026-05-27 did not recur — coverage agent ran solo, no contention.
+
+**Cross-agent recommendations:**
+- [Security]: No security-relevant coverage gaps. lib/auth 98.0%, lib/analytics 97.3%, lib/verification 100%, lib/cache 98.1% stable. XSS escape paths, CORS guards, and HMAC verification fully covered. No regression risk.
+- [QA]: 0 flaky tests across 3 clean runs (7590/7590 each). engagement-dashboard race fix holding. QA's 2026-05-27 worker-pool exhaustion was environmental (concurrent vitest jobs on shared host) — recommend serializing agent vitest runs.
+- [Triage]: No P2 action items this cycle. Only carry-watch (lib/github/client.ts inflight-dedup edges, low priority). Clean cycle. New `/api/health` GitHub-probe cache wrapper (commit `dc0b7261`) confirmed covered.
+- [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. New `/api/health` `unstable_cache(revalidate=60)` wrapper has test coverage in route.test.ts. No cost-path coverage gaps.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=cost_analyst timestamp=2026-05-28T01:01:42Z -->
+## Cost Analyst — 2026-05-28
+- **Status**: GREEN
+- Redis key growth risk: low
+- Uncached external calls: 0 (P3 health probe now cached at 60 s via `unstable_cache`, confirmed in dc0b7261)
+- Resource leak risks: 0
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle flat 9/9 cycles; 4-week +34.7% trend stable but unresolved as source. `ANALYZE=true pnpm run build` still requires interactive run to localize. Carry-only — no runtime cost impact yet.
+- [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. New `/api/health` cache wrapper is a pure cost win — does not change security posture.
+- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per 2026-05-28 entry. New `/api/health` `unstable_cache(revalidate=60)` wrapper confirmed test-covered in `route.test.ts`. No cost-path coverage gaps.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance timestamp=2026-05-28T10:00:00Z -->
+## Performance Agent — 2026-05-28
+- **Status**: GREEN
+- Total First Load JS: **1,943.3 KB raw / 620.2 KB gzipped** (77 chunks). **−322 KB / −14.2%** vs 2026-05-14 (2,266 KB raw). 4-week +34.7% growth trend reversed — likely Turbopack chunk-consolidation across Next.js 16.2.4 → 16.2.6.
+- Routes >500KB: **0**. Largest chunks 228 / 184 / 156 / 112 / 108 KB — all framework/vendor.
+- Build: Next 16.2.6 Turbopack, 4.4s compile, 10.5s typecheck, 0 errors. 86 routes (4 static, 82 dynamic), 48 static pages.
+- Knip `--production`: **0 application findings**. Reported unused dep `server-only` is a false positive — used at `lib/db/supabase.ts:8` via side-effect import.
+- `"use client"` files (non-test): **92**, down from 111 (May 14). Spot-audit clean.
+- Dynamic imports: 20 `next/dynamic` usages — PostHog, command bar, admin sub-dashboards, Studio, experiments. Good code-splitting.
+- Badge route: `maxDuration=35` (5th cycle hold), `s-maxage=21600 / stale-while-revalidate=86400`, in-flight dedup + Redis lock — unchanged.
+- Feature-flags ISR: `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94` active. `/api/health` GitHub probe now cached 60s (`dc0b7261`). 0 uncached external calls.
+- Fonts: `next/font/google` (JetBrains Mono + Plus Jakarta Sans), `display: swap`. No CLS risks. `prefers-reduced-motion` respected.
+- **Note**: Next 16 Turbopack omits per-route First Load JS from the build table. Per-route sizing requires `ANALYZE=true pnpm run build` interactively.
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-critical untested paths.
+- [Security]: No performance issues with security implications. Badge in-flight dedup + rate limit + `frame-ancestors *` override unchanged. Fail-open Redis rate limiter intact.
+- [QA]: Bundle reduction should slightly improve TTI/LCP across pages. No CLS regressions; ISR caching active on archetype/about pages.
+- [Cost Analyst]: Carry "M-bundle" can be closed — bundle is **down 14%** vs May 14, 4-week growth reversed. Likely lower cold-start memory on serverless. `ANALYZE=true` run no longer urgent.
 <!-- ENTRY:END -->

@@ -1,60 +1,67 @@
 # Coverage Report
-> Generated: 2026-05-26 | Health status: yellow
+> Generated: 2026-05-28 | Health status: green
 
 ## Executive Summary
-Test suite ran 444/445 files passing (7589/7590 tests); coverage thresholds remain met across all critical paths per the stable cross-cycle baseline. One environmental flake in `scripts/lib/agent-utils.test.ts` reproduces the host-contention timeout pattern documented in prior cycles — not a logic regression.
+Overall coverage **96.78% stmts / 92.65% branches / 95.77% funcs / 97.89% lines** across 9,278 statements. All four critical-path modules (lib/impact, lib/render, app/api, lib/db) sit ≥96.5% stmts with zero untested source files. Test suite ran 7590/7590 GREEN three consecutive times with zero flakes.
 
 ## Coverage by Module
-| Module | Coverage (stmts) | Status |
-|--------|-----------------:|--------|
-| `apps/web/lib/impact/` | 99.6% | GREEN |
-| `apps/web/lib/render/` | 100% | GREEN |
-| `apps/web/lib/db/` | 96.5% | GREEN |
-| `apps/web/app/api/` | 97.5% | GREEN |
-| `apps/web/lib/auth/` | 98.0% | GREEN |
-| `apps/web/lib/cache/` | 98.1% | GREEN |
-| `apps/web/lib/github/` | 97.4% | GREEN |
-| `apps/web/lib/analytics/` | 97.3% | GREEN |
-| `apps/web/lib/history/` | 98.3% | GREEN |
-| `apps/web/lib/i18n/` | 100% | GREEN |
-| `apps/web/lib/verification/` | 100% | GREEN |
-| `apps/web/lib/feature-flags/` | 100% | GREEN |
-| `apps/web/lib/dashboard/` | 100% | GREEN |
-| `apps/web/lib/insights/` | 100% | GREEN |
-| `apps/web/lib/profile/` | 100% | GREEN |
-| `apps/web/lib/bitbucket/` | 97.7% | GREEN |
-| `apps/web/lib/codeberg/` | 98.0% | GREEN |
-| `apps/web/lib/email/` | 97.6% | GREEN |
-| **Overall** | **96.78% stmts / 92.67% branches / 95.77% funcs** | GREEN |
-
-Module figures sourced from 2026-05-24 cross-agent entry; today's test-run results confirm the codebase under measurement is unchanged (`develop` HEAD `dc0b7261`, prior cycle plus only test/doc commits).
+| Module | Coverage (stmts / branches / funcs) | Status |
+|--------|-------------------------------------|--------|
+| lib/impact | 99.6% / 98.7% / 100.0% | green |
+| lib/render | 100.0% / 92.9% / 100.0% | green |
+| app/api | 97.5% / 94.2% / 96.8% | green |
+| lib/db | 96.5% / 93.3% / 100.0% | green |
+| lib/auth | 98.0% / 96.2% / 98.9% | green |
+| lib/cache | 98.1% / 95.2% / 96.8% | green |
+| lib/github | 97.4% / 96.6% / 93.1% | green |
+| lib/analytics | 97.3% / 91.2% / 100.0% | green |
+| lib/history | 98.3% / 96.6% / 100.0% | green |
+| lib/i18n | 100.0% / 97.9% / 96.3% | green |
+| lib/verification | 100.0% / 100.0% / 100.0% | green |
+| lib/dashboard | 100.0% / 94.3% / 100.0% | green |
+| lib/insights | 100.0% / 92.6% / 100.0% | green |
+| lib/profile | 100.0% / 91.2% / 100.0% | green |
+| lib/email | 97.6% / 94.7% / 100.0% | green |
+| lib/bitbucket | 97.7% / 93.1% / 96.4% | green |
+| lib/codeberg | 98.0% / 94.5% / 96.3% | green |
 
 ## Gaps & Recommendations
-- **Untested source files in critical paths: 0/74.** `apps/web/app/api/auth/{bitbucket,codeberg}/config.ts` have no direct `.test.ts` but reach 100% stmts via transitive coverage from their handler tests. Carry-only.
-- **Sub-80% files (all P3 carries, no new gaps):**
-  - Canvas/WebGL components — `HolographicOverlay`, `heatmap-wave`, `metallic-shimmer` (JSDOM cannot exercise the render path).
-  - `next/dynamic` lazy wrappers — `ClientInstrumentation`, `GlobalCommandBarLazy`, `SharePageOwnerContentLazy` (loader functions only).
-  - Experiments error/loading routes — flag-gated, JSDOM-blocked.
-  - `packages/shared` JSON config files — false positive (src/ TS at 100%).
-- **Watch (carry):** `apps/web/lib/github/client.ts` at 93.1% funcs — two inflight-dedup edges uncovered. Low priority.
-- **Recommendation:** No new tests required this cycle. The coverage delta vs 2026-05-24 is zero — no production source touched (only test fixtures and docs since `dc0b7261`).
-- **Tool note:** v8 coverage report did not flush a fresh `coverage-summary.json` this run because the agent-utils timeout aborted the reporter. Re-run once host contention from `paisaxe`/`portfolio`/`archy` worktrees clears to refresh the on-disk summary.
+**No critical-path gaps.** All 10 sub-80% files are P3 carries (Canvas/WebGL experiments, next/dynamic lazy wrappers, JSON config false positives):
+
+- `apps/web/app/experiments/error.tsx` — 0% stmts (2 lines, flag-gated experiments error boundary, JSDOM-blocked)
+- `apps/web/app/experiments/loading.tsx` — 0% stmts (1 line, flag-gated experiments suspense fallback)
+- `packages/shared/package.json` / `tsconfig.json` — 0% stmts (false positive; v8 instruments JSON config files; `src/` TS is 100%)
+- `apps/web/lib/effects/interactions/HolographicOverlay.tsx` — 50% stmts (Canvas/WebGL, JSDOM-incompatible)
+- `apps/web/components/ClientInstrumentation.tsx` — 60% stmts (next/dynamic lazy wrapper, init effect only fires client-side)
+- `apps/web/components/GlobalCommandBarLazy.tsx` — 60% stmts (next/dynamic lazy wrapper)
+- `apps/web/components/SharePageOwnerContentLazy.tsx` — 66.66% stmts (next/dynamic lazy wrapper)
+- `apps/web/app/experiments/heatmap-wave/page.tsx` — 73.33% stmts (Canvas, flag-gated)
+- `apps/web/app/experiments/metallic-shimmer/page.tsx` — 77.41% stmts (WebGL, flag-gated)
+
+**Watch (carry, low priority):**
+- `lib/github/client.ts` 93.1% funcs — 2 inflight-dedup edges remain uncovered (carried since 2026-05-22). Risk negligible; map-bounded dedup pattern is well-exercised.
+
+No untested files in critical paths (lib/impact, lib/render, app/api, lib/db). Every `.ts`/`.tsx` source under those trees either has a sibling `.test.ts` or is reached transitively (verified by 96.5%+ stmt coverage across all four).
 
 ## Flaky Tests
-- `scripts/lib/agent-utils.test.ts > validate_report_file > accepts fenced markdown reports` — timed out at 15000 ms (took ~24 s) during the coverage run. Passes in isolation; same environment-induced flake pattern documented in 2026-05-23 / 2026-05-24 entries when concurrent vitest worker pools from sibling projects exhaust the host. **Not a logic regression.** A 3× re-run was skipped this cycle: with the host still under contention, the resulting flake set would be environmental noise rather than signal. Prior 2026-05-24 baseline confirms 0 logic flakes across 3 clean runs.
+None detected. 3/3 runs returned 7590/7590 GREEN (durations 30s / 21s / 25s). Prior 2026-05-22 flake in `engagement-dashboard.test.tsx` ("handles campaign fetch non-ok response silently") confirmed RESOLVED — no recurrence across 3 full runs this cycle.
 
-## Shared Context Entry
+---
 
-```
-## Coverage Agent — 2026-05-26
-- **Status**: YELLOW
-- Overall coverage: 96.78% stmts / 92.67% branches / 95.77% funcs (baseline carry — fresh on-disk summary blocked by env)
-- Critical gaps: none (0/74 untested in critical paths)
-- Flaky tests: 1 environmental (`scripts/lib/agent-utils.test.ts:55` "accepts fenced markdown reports" — host-contention timeout, not logic)
+SHARED_CONTEXT_START
+## Coverage Agent — 2026-05-28
+- **Status**: GREEN
+- Overall coverage: 96.78% stmts / 92.65% branches / 95.77% funcs / 97.89% lines (8980/9278 stmts). +1 stmt vs 2026-05-24 (within v8 noise).
+- Test suite: 445 files, 7590 tests (+1 vs 2026-05-24). 3/3 clean (7590/7590). 0 flakes. Durations 30s / 21s / 25s.
+- Critical paths GREEN: lib/impact 99.6%/98.7%/100%, lib/render 100%/92.9%/100%, lib/db 96.5%/93.3%/100%, app/api 97.5%/94.2%/96.8%, lib/auth 98.0%, lib/cache 98.1%, lib/github 97.4%, lib/analytics 97.3%, lib/history 98.3%, lib/i18n 100%, lib/verification 100%, lib/dashboard 100%, lib/insights 100%, lib/profile 100%, lib/bitbucket 97.7%, lib/codeberg 98.0%, lib/email 97.6%.
+- **Untested source files in critical paths: 0/75**.
+- **No new P2s**. 10 sub-80% files all P3 carries: Canvas/WebGL (HolographicOverlay, heatmap-wave, metallic-shimmer), next/dynamic lazy wrappers (ClientInstrumentation, GlobalCommandBarLazy, SharePageOwnerContentLazy), experiments error/loading (JSDOM-blocked, flag-gated), packages/shared JSON config files (false positive — src/ TS at 100%).
+- **Watch (carry)**: lib/github/client.ts 93.1% funcs — 2 inflight-dedup edges uncovered. Low priority.
+- **Flaky tests: 0** confirmed across 3 runs. Prior 2026-05-22 engagement-dashboard race fix holding (no recurrence). Worker-pool exhaustion noted by QA 2026-05-27 did not recur — coverage agent ran solo, no contention.
 
 **Cross-agent recommendations:**
-- [Security]: lib/auth 98.0%, lib/analytics 97.3%, lib/verification 100% stable — XSS escape paths and CORS guards fully covered. No security-relevant coverage gaps.
-- [QA]: One environmental flake to bundle with the next QA pass: `scripts/lib/agent-utils.test.ts > accepts fenced markdown reports` reproduces under concurrent vitest pools (paisaxe/portfolio/archy worktrees). Consider raising its timeout to 30s or pinning it to a non-forked pool.
-- [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable, no cost-path gaps.
-- [Triage]: Single P2 action item — investigate raising `scripts/lib/agent-utils.test.ts` timeout (3rd cycle of environment-induced timeouts under host contention). All other gaps are P3 carries.
-```
+- [Security]: No security-relevant coverage gaps. lib/auth 98.0%, lib/analytics 97.3%, lib/verification 100%, lib/cache 98.1% stable. XSS escape paths, CORS guards, and HMAC verification fully covered. No regression risk.
+- [QA]: 0 flaky tests across 3 clean runs (7590/7590 each). engagement-dashboard race fix holding. QA's 2026-05-27 worker-pool exhaustion was environmental (concurrent vitest jobs on shared host) — recommend serializing agent vitest runs.
+- [Triage]: No P2 action items this cycle. Only carry-watch (lib/github/client.ts inflight-dedup edges, low priority). Clean cycle. New `/api/health` GitHub-probe cache wrapper (commit `dc0b7261`) confirmed covered.
+- [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. New `/api/health` `unstable_cache(revalidate=60)` wrapper has test coverage in route.test.ts. No cost-path coverage gaps.
+SHARED_CONTEXT_END

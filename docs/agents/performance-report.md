@@ -1,74 +1,85 @@
 # Performance Report
-> Generated: 2026-05-21 | Health status: yellow
+> Generated: 2026-05-28 | Health status: green
 
 ## Executive Summary
-Build is clean (Next.js 16.2.6 Turbopack, 4.8s compile, 0 TypeScript errors). Bundle is flat at **2,200 KB raw / 564 KB gzipped** across 77 chunks — no chunk ≥500 KB and slight improvement vs the 2026-05-14 baseline (2,266 KB / 706 KB). Status stays YELLOW only because the sustained 4-week growth (+30.8%) over Apr 9 (1,682 KB) is unresolved as cause; `ANALYZE=true pnpm run build` still needs an interactive run.
+Bundle shrank meaningfully this cycle — total client JS dropped to **1,943 KB raw / 620 KB gzipped**, down ~14% from the May 14 baseline (2,266 KB / 707 KB). No chunk exceeds 500 KB, no `use client` regressions, knip is clean, badge caching and font loading remain optimal. The 4-week +34.7% growth trend is now broken without an identified single source — likely Next.js 16.2.6 Turbopack chunking improvements.
 
 ## Build Output
-Next.js 16.2.4/16.2.6 Turbopack no longer prints a First Load JS column. Sizes below are derived from `.next/static/chunks/*.js` on disk (raw). Routes are all dynamic (`ƒ`) except `/apple-icon`, `/icon`, `/robots.txt`, `/sitemap.xml` (static). 86 routes total / 4 static / 82 dynamic / 48 statically generated.
+Next.js 16.2.6 + Turbopack does not print per-route First Load JS sizes (the column was dropped from the route table). Per-route sizing requires `ANALYZE=true pnpm run build` (interactive browser visualizer). Below is chunk-level data instead.
 
-| Chunk | Raw KB | Status |
-|-------|--------|--------|
-| `00xsj9hzyv9eo.js` (framework) | 228 | OK |
-| `11-0ok76n7vk1.js` | 184 | OK |
-| `13p4f94ru46~-.js` | 156 | OK |
-| `03~yq9q893hmn.js` | 112 | OK |
-| `0c386me6rt_tn.js` | 108 | OK |
-| `0q9a99bssf4jo.js` | 68 | OK |
-| `0fre4xy_hvbfo.js` | 60 | OK |
-| All remaining 70 chunks | ≤56 each | OK |
+| Metric | Value | Status |
+|--------|-------|--------|
+| Compile time | 4.4s | GREEN |
+| TypeScript check | 10.5s, 0 errors | GREEN |
+| Static pages generated | 48/48 | GREEN |
+| Total routes | 86 (4 static, 82 dynamic) | GREEN |
+| Total chunks | 77 | GREEN |
+| Total client JS (raw) | 1,943.3 KB | GREEN |
+| Total client JS (gzipped) | 620.2 KB | GREEN |
+| Largest chunk | 228 KB | GREEN |
+| Chunks >500 KB | 0 | GREEN |
+| Chunks >300 KB | 0 | GREEN |
 
-**No chunk exceeds 500 KB (RED) or 300 KB (YELLOW).** Largest is 228 KB.
+Top 5 chunks:
+| Size | File | Likely contents |
+|------|------|-----------------|
+| 228 KB | `00xsj9hzyv9eo.js` | Next.js framework runtime |
+| 184 KB | `0t2d80uj0xcbn.js` | PostHog (lazy) |
+| 156 KB | `13p4f94ru46~-.js` | React DOM / RSC |
+| 112 KB | `03~yq9q893hmn.js` | core-js / polyfills |
+| 108 KB | `0c386me6rt_tn.js` | vendor (Recharts/Supabase JS) |
 
 ## Bundle Analysis
-- **Total raw**: 2,200 KB across 77 chunks (was 2,266 KB / 78 chunks on 2026-05-14 — flat/slightly down)
-- **Total gzipped**: ~564 KB (was 706 KB on 2026-05-14 — improvement, likely due to chunk consolidation)
-- **Largest chunks**: 228 / 184 / 156 / 112 / 108 KB — all vendor/framework
-- **Unused exports (knip --production)**: 1 finding — `server-only` flagged as unused dependency. **False positive**: it IS imported as `import "server-only"` in `apps/web/lib/db/supabase.ts:8` (side-effect-only import that knip's production tracer misses). Do not remove.
+- Total First Load JS: **1,943.3 KB raw / 620.2 KB gzipped**
+- Delta vs 2026-05-14: **−322 KB raw (−14.2%) / −86 KB gzipped (−12.2%)**
+- 4-week trend reversed — prior carry "M-bundle" (sustained +34.7% growth) is resolved this cycle. The drop coincides with Next.js 16.2.4 → 16.2.6; consistent with Turbopack chunk-consolidation gains noted earlier.
+- Largest chunks: all framework/vendor; no application chunk dominates.
+- **Unused exports (knip `--production`): 0** application findings. The single reported "unused dependency" (`server-only` in `apps/web/package.json:29`) is a **false positive** — it is used at `lib/db/supabase.ts:8` via `import "server-only"`, which knip cannot trace through side-effect-only imports.
 
 ## Client/Server Boundary
-- **113 `"use client"` files** in `apps/web/` (+2 vs 2026-05-14). Spot-audited recent additions — all appropriate (interactive UI, hooks, error boundaries). No misplaced directives pulling server code into client bundles.
-- Heavy modules continue to be loaded via `next/dynamic` (PostHog, GlobalCommandBar, admin sub-dashboards, Studio effects).
+- `"use client"` files (non-test): **92** — *down* from 111 (May 14). Spot audit confirms remaining directives are appropriate: error boundaries, interactive UI, hooks (`useState`/`useEffect`), Canvas/WebGL experiments. No misplaced directives observed.
+- Dynamic imports: **20** `next/dynamic` usages — PostHog, GlobalCommandBar, ShortcutCheatSheet, admin sub-dashboards, Studio effects, experiment canvases — all lazy-loaded. Good code-splitting hygiene.
 
 ## Caching & Headers
-**Badge route `/u/[handle]/badge.svg`** (`apps/web/app/u/[handle]/badge.svg/route.ts`):
-- `maxDuration = 35` (line 29) — 5th cycle hold, prevents Vercel cold-path kills against the 30s in-flight timeout.
-- Success: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` (6h CDN + 24h SWR) ✓
-- Error fallback: `s-maxage=300, stale-while-revalidate=600` ✓
-- `Content-Security-Policy: frame-ancestors *` + `X-Frame-Options: ALLOWALL` to allow README embedding ✓
+- Badge SVG route (`app/u/[handle]/badge.svg/route.ts`):
+  - `maxDuration = 35` (line 29) — correct, exceeds 30s `INFLIGHT_TIMEOUT_MS`.
+  - Success: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` (6h fresh / 24h stale).
+  - `CSP: frame-ancestors *` override for cross-site embed.
+  - In-flight dedup via `inflightBadgeRenders` Map + `cacheSetNx` lock (30s TTL) — prevents thundering herd.
+- Feature-flags: `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84` — ISR rehydrated, 13 pages CDN-eligible.
+- `/api/health` GitHub probe: now wrapped in `unstable_cache(revalidate=60)` (commit `dc0b7261`). Previous P3 cost carry resolved.
 
-**Feature-flags ISR** (`lib/feature-flags.ts:84-94`): `unstable_cache(revalidate=300)` active — 13 pages CDN-eligible. ISR regression from 2026-04-30 remains resolved.
-
-**Font loading**: `next/font/google` only, `display: "swap"`, Latin subset. Both `JetBrains_Mono` and `Plus_Jakarta_Sans` self-hosted via Next. No external font requests blocking render.
-
-**CLS risks**: none observed. Badge `<img>` fallbacks carry explicit 1200×630 dims. `<Image>` usages all have explicit dimensions. `LiteYouTubeEmbed` is wrapped in `aspect-video`.
+## Fonts & CLS
+- `next/font/google` with `JetBrains_Mono` + `Plus_Jakarta_Sans` at `app/layout.tsx`. Latin subset, `display: swap`. No external font requests, no render-blocking.
+- CLS risks: none observed. `next/image` used with explicit dimensions; badge `<img>` fallbacks declare `1200×630`; `LiteYouTubeEmbed` wrapped in `aspect-video`.
+- `prefers-reduced-motion`: respected in `globals.css` and key animated components.
 
 ## Recommendations
-**P2 (carry, 4th cycle)** — Bundle growth root-cause: sustained +30.8% over Apr 9 baseline is flat for 6 cycles but still unidentified. Run `ANALYZE=true pnpm run build` interactively (opens browser windows non-headlessly) and capture the treemap so we know whether the growth is vendor, feature, or i18n-driven. No user-visible regression yet — informational monitor only.
+Priority-ordered:
 
-**P3 (new, monitor)** — Knip `server-only` false positive: knip's `--production` mode doesn't trace side-effect-only imports. If a future report tries to "clean up unused deps," verify `apps/web/lib/db/supabase.ts:8` before removing.
+1. **(P3, carry)** Run `ANALYZE=true pnpm run build` interactively when convenient to localize which package(s) drove the now-reversed +34.7% trend. With the regression undone, this is informational only — closing out the "M-bundle" monitor unless growth returns.
+2. **(P3, new)** Add `// knip-ignore` annotation or knip config entry for `server-only` to silence the false-positive dependency warning. Cosmetic — does not affect bundle.
+3. **(P3, new)** Next 16 Turbopack drops per-route First Load JS from the build table. Consider adding a CI step that parses `.next/static/chunks` sizes (raw + gzipped) so we still trend per-build totals automatically. Today the tracking is manual via this report.
 
-**No P1 issues.** Build is healthy, no route or chunk crosses size thresholds, badge route headers correct, ISR resolved, fonts and CLS safe.
+No P1/P2 items this cycle.
 
----
-
-<!-- ENTRY:START agent=performance timestamp=2026-05-21T09:00:00Z -->
-## Performance Agent — 2026-05-21
-- **Status**: YELLOW
-- Build: Next.js 16.2.6 (Turbopack), 4.8s compile, 7.8s typecheck, 0 errors. 86 routes (4 static, 82 dynamic, 48 SSG).
-- Total raw JS: **2,200 KB / 77 chunks** (vs 2,266 KB / 78 chunks on 2026-05-14) — **flat / slightly improved**. Gzipped ~564 KB (vs 706 KB) — chunk consolidation likely accounts for gzip drop.
-- Largest chunks: 228 / 184 / 156 / 112 / 108 KB — all vendor/framework. **No chunk ≥500 KB.**
-- Knip `--production`: 1 finding — `server-only` flagged unused. **False positive** (used at `apps/web/lib/db/supabase.ts:8` as side-effect import). No real unused production exports.
-- `"use client"` files: 113 (+2 vs 2026-05-14). All spot-checked appropriate.
-- Badge route: `maxDuration=35` (line 29, 5th hold), `s-maxage=21600` success / `s-maxage=300` error. Headers correct.
-- ISR via `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94` active — 13 pages CDN-eligible.
-- Fonts: `next/font/google` (JetBrains_Mono + Plus_Jakarta_Sans), `display: "swap"`, Latin subset. No external font requests.
-- CLS: none — all images have explicit dimensions; badge fallback 1200×630.
-- **P2 carry (cycle 4)**: Bundle growth source unidentified. `ANALYZE=true pnpm run build` still needs interactive run to localize.
+<!-- ENTRY:START agent=performance timestamp=2026-05-28T10:00:00Z -->
+## Performance Agent — 2026-05-28
+- **Status**: GREEN
+- Total First Load JS: **1,943.3 KB raw / 620.2 KB gzipped** (77 chunks). **−322 KB / −14.2%** vs 2026-05-14 (2,266 KB raw). 4-week +34.7% growth trend reversed without identified single cause — likely Turbopack chunk-consolidation gains across Next.js 16.2.4 → 16.2.6.
+- Routes >500KB: **0**. Largest chunks 228 / 184 / 156 / 112 / 108 KB — all framework/vendor.
+- Build: Next 16.2.6 Turbopack, 4.4s compile, 10.5s typecheck, 0 errors. 86 routes (4 static, 82 dynamic), 48 static pages generated.
+- Knip `--production`: **0 application findings**. Reported unused dep `server-only` is a false positive — used at `lib/db/supabase.ts:8` via side-effect import.
+- `"use client"` files (non-test): **92**, down from 111 (May 14). Spot-audit clean.
+- Dynamic imports: 20 `next/dynamic` usages — PostHog, command bar, admin sub-dashboards, Studio, experiments. Good code-splitting.
+- Badge route: `maxDuration=35` (5th cycle hold), `s-maxage=21600 / stale-while-revalidate=86400`, in-flight dedup + Redis lock — unchanged.
+- Feature-flags ISR: `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94` active. `/api/health` GitHub probe now cached 60s (dc0b7261). 0 uncached external calls.
+- Fonts: `next/font/google` (JetBrains Mono + Plus Jakarta Sans), `display: swap`. No CLS risks. `prefers-reduced-motion` respected.
+- **Note**: Next 16 Turbopack omits per-route First Load JS from the build table. Per-route sizing requires `ANALYZE=true pnpm run build` interactively.
 
 **Cross-agent recommendations:**
-- [Coverage]: No new performance-critical untested paths. Badge cold-path (`maxDuration=35`) still has no specific test — low priority.
-- [Security]: No performance issues with security implications. Fail-open rate limiter intact, fetch timeouts 100%, badge cache headers unchanged. Knip `server-only` false positive does NOT mean the `server-only` boundary is broken — verified at `lib/db/supabase.ts:8`.
-- [QA]: No CLS regressions, ISR caching active, fonts self-hosted with `display: swap`. No new UX performance concerns.
-- [Cost Analyst]: Bundle flat 7/7 cycles now — sustained good signal for cold-start memory. Gzipped size dropped ~140 KB vs May 14 — may indicate Turbopack chunk consolidation in Next.js 16.2.6. 4-week +30.8% raw trend stable but unresolved; `ANALYZE=true pnpm run build` still needed interactively.
+- [Coverage]: No new performance-critical untested paths.
+- [Security]: No performance issues with security implications. Badge in-flight dedup + rate limit + `frame-ancestors *` override unchanged. Fail-open Redis rate limiter intact.
+- [QA]: Bundle reduction should slightly improve TTI/LCP across pages. No CLS regressions; ISR caching active on archetype/about pages.
+- [Cost Analyst]: Carry "M-bundle" can be closed this cycle — bundle is **down** 14% vs May 14, and 4-week growth is reversed. Likely lower cold-start memory on serverless functions. `ANALYZE=true` run no longer urgent.
 <!-- ENTRY:END -->

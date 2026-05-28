@@ -1,54 +1,53 @@
-All checks complete. Writing report.
-
 ```markdown
 # QA Report
-> Generated: 2026-05-20 | Health status: green
+> Generated: 2026-05-27 | Health status: yellow
 
 ## Executive Summary
-Full quality audit clean: 7589 tests pass across 445 files, TypeScript and ESLint clean, no accessibility regressions, and no design-system token violations in production components.
+TypeScript and ESLint are fully clean across both workspace projects. The vitest run was unable to complete cleanly on this host due to worker-pool exhaustion from concurrent vitest jobs spawned by parallel agents (same environmental pattern logged by coverage 2026-05-23/24) — the most recent clean run on 2026-05-24 confirmed 7589/7589 tests GREEN, so no test logic regression is indicated. Accessibility, error-state coverage, and design-system compliance remain clean.
 
 ## Test Results
-- Total: 7589 tests across 445 files
-- Passed: 7589 | Failed: 0 | Skipped: 0
-- Duration: 41.51s (3 stderr log lines are intentional negative-path assertions in agent-utils tests; JSDOM "navigation to another Document" notices are expected from auth/redirect tests)
+- Total: 7589 tests across 445 files (per coverage agent 2026-05-24 clean baseline)
+- This cycle: **environmentally degraded** — 2 of 2 attempts hit `[vitest-pool-runner]: Timeout waiting for worker to respond` from host contention with other concurrent vitest jobs.
+  - Attempt 1 (`pnpm vitest run`): aborted — 445 errors, 0 test files completed, 3032s.
+  - Attempt 2 (`VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=1 pnpm vitest run`): partial — 336/338 reached files passed (107 worker-spawn errors); 5483/5491 reached tests passed; 8 failures were all `Failed to start forks worker` (environmental, not assertion failures).
+  - Worker exhaustion is documented in shared context (coverage 2026-05-22/23/24) as host-level contention from parallel agent jobs, not a regression.
 
 ## TypeScript
-Clean — `tsc --noEmit` passed in both `packages/shared` and `apps/web` with 0 errors.
+Clean. `pnpm -r run typecheck` → `packages/shared`: Done, `apps/web`: Done. 0 errors.
 
 ## Linting
-Clean — `eslint .` produced no warnings or errors.
+Clean. `pnpm run lint` (`eslint .` on `@chapa/web`) exited 0 with no warnings or errors.
 
 ## Accessibility
-- **`<img>` alt attributes**: no production violations. Grep for `<img` missing `alt=` returned 0 files.
-- **Interactive elements / ARIA**: no `<button>` wrapping an SVG without `aria-label`/`aria-labelledby` found in production.
-- **Focus indicators**: `focus-visible:` styles present in 15 occurrences across 11 files (InfoTooltip, LanguageSwitcher, BadgeToolbar, BadgeOverlay, VerifyForm, experiments pages), plus the global `:focus-visible` rule in `apps/web/styles/globals.css`. Coverage is adequate.
-- **Error/loading/not-found boundaries**: 20+ route-level `error.tsx`/`loading.tsx` files present across `generating`, `studio`, `privacy`, `verify`, `experiments`, `archetypes`, `terms`, `admin`, `u/[handle]`, `about` — full coverage of public routes.
-- **Heading hierarchy**: prior QA cycles (2026-05-06, 2026-04-29) verified correct h1→h2→h3 order across all pages; no structural changes since.
-- **Carry-over (low severity)**: `<tr role="button" tabIndex={0}>` in `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` still lacks `aria-label`. Admin-only surface; flagged 2026-05-06 and unresolved.
+- `<img>` missing `alt`: **0 production violations**. Only matches are mock components in `*.test.tsx` files (UserMenu.test, BadgeContent.test/render, UserMenu.render.test) and an escaped HTML string inside a code-snippet preview (`SharePageOwnerContent.tsx:109,180`) — not a rendered `<img>`. All real `<img>` and `next/image` usages include `alt`.
+- Heading hierarchy: No skipped levels detected in page components (consistent with QA 2026-05-06 finding).
+- Interactive elements missing ARIA: **0 detected** via multiline grep for `<button|div|span|tr>` with `onClick|role="button"` lacking `aria-label`/`aria-labelledby` across `apps/web` components/app trees. Prior cycle's admin campaigns `<tr role="button">` issue not reproduced.
+- Focus indicators: `focus-visible` styles present across 8 files (globals.css + 4 production components + tests) — covered.
+- Error / loading states: 29 files matched (`error.tsx`/`loading.tsx`/`ErrorBoundary`) across `app/**`, including archetypes, terms, privacy, studio, admin, cli/authorize, generating, u/[handle], experiments, verify, coming-soon — comprehensive coverage of all major routes.
 
 ## Design System Compliance
-- Inline hex `style={{ background|color: '#...' }}` patterns found in **only** `apps/web/app/global-error.tsx` and `apps/web/app/apple-icon.tsx` — both documented accepted exceptions (global-error must be standalone with no Tailwind; apple-icon is a static asset generator).
-- No production components use hardcoded hex outside accepted exceptions.
-- Tailwind semantic tokens (`bg-bg`, `text-text-primary`, `border-stroke`, `text-amber`, etc.) used consistently elsewhere.
+- Hardcoded hex in `apps/web/components/**/*.tsx`: **0 violations**.
+- Hardcoded hex in `apps/web/app/**/*.tsx`: 9 files, all previously accepted exceptions:
+  - `experiments/{hexmap,tier-visuals,text-effects,particles,aurora,metallic-shimmer}/page.tsx` — Canvas/WebGL accepted P3.
+  - `icon.tsx`, `apple-icon.tsx` — static favicon assets, accepted.
+  - `global-error.tsx` — documented intentional hardcoding (root error boundary outside `<body>`/Tailwind).
+- No new violations introduced this cycle.
 
 ## Recommendations
-1. **Low — Admin a11y polish**: Add `aria-label` to the clickable `<tr>` in `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:900` (e.g., `aria-label="Open campaign details"`). Carried since 2026-05-06.
-2. **Low — JSDoc on auth session exports**: `lib/auth/session.ts` has 5 public exports without JSDoc (per documentation agent 2026-05-08). Polish, not a quality defect.
-3. **Monitor only**: Performance agent's 4-week bundle +34.7% trend (2,266 KB) — flat for 5 cycles. Not a QA regression; tracking for cost/perf agents.
+1. **(Low) Re-run the test suite when host vitest contention clears.** Worker-pool exhaustion is environmental; coverage agent's 2026-05-24 clean run (7589/7589, 3/3 GREEN) is the most recent authoritative signal. No code-level action required.
+2. **(Low) Watch for the same admin-dashboard `getByText`-after-async pattern** that caused the resolved `engagement-dashboard` flake — preventive linting or test-author guidance could help. No new instances detected this cycle.
+3. **(Info) All prior P2/P3 a11y and design-system items remain resolved.** No new findings to triage.
+```
 
-## Shared Context Entry
-
-<!-- ENTRY:START agent=qa timestamp=2026-05-20T09:05:00Z -->
-## QA Agent — 2026-05-20
-- **Status**: GREEN
-- Tests: 7589/7589 passed across 445 files, 0 failed, 0 skipped
+SHARED_CONTEXT_START
+## QA Agent — 2026-05-27
+- **Status**: YELLOW
+- Tests: 5483 passed / 8 failed / 5491 reached (host worker exhaustion; coverage 2026-05-24 baseline 7589/7589 GREEN unaffected)
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 1 carry-over (low) — `<tr role="button">` in campaigns dashboard missing `aria-label` (admin-only surface, carried since 2026-05-06)
-- Design system: 0 violations in production components. `global-error.tsx` and `apple-icon.tsx` are documented accepted exceptions.
+- A11y issues: 0
 
 **Cross-agent recommendations:**
-- [Coverage]: No new coverage gaps observed during QA pass. Coverage agent (2026-05-19) reports 96.78% overall with 0 critical-path untested files. No action needed.
-- [Security]: No security-related quality issues. All XSS escape paths covered, focus-visible enforced, no interactive divs without ARIA in production. Campaigns `<tr>` a11y carry is presentational only — no data exposure risk.
-<!-- ENTRY:END -->
-```
+- [Coverage]: vitest worker-pool exhaustion recurred this cycle on a host running multiple concurrent vitest jobs (same environmental pattern noted 2026-05-22/23/24). Recommend serializing or rate-limiting agent vitest runs on shared hosts so QA + coverage don't collide.
+- [Security]: No new security-related quality issues. All XSS escape paths still covered, no hardcoded hex in production components, all `<img>` have `alt`, all interactive elements have ARIA labels.
+SHARED_CONTEXT_END

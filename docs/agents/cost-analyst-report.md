@@ -1,93 +1,58 @@
 # Cost Analyst Report
-> Generated: 2026-05-26 | Health status: green
+> Generated: 2026-05-28 | Health status: GREEN
 
 ## Executive Summary
-
-Pure carry/audit cycle with one material improvement: the long-standing P3 (uncached GitHub probe in `/api/health`) was resolved in commit `dc0b7261` — `pingGitHub` is now wrapped in `unstable_cache(revalidate=60)` at `apps/web/app/api/health/route.ts:56-58`, so concurrent health probes share a single outbound GitHub call. No new cost regressions. Estimated monthly cost at 10K users remains **~$50–75/mo**.
+Pure carry/audit cycle — last cost-surface code change was `dc0b7261` (2026-05-25), which already resolved the long-running P3 (uncached health-probe GitHub call). HEAD is `9542fddc` (agent-report doc updates only). No new P1/P2/P3 findings. Estimated monthly cost at 10K users remains **~$50–75/mo**.
 
 ## Redis Usage
-
-- **Key patterns**: 16 production prefixes + 3 persistent singletons. 25/28 keys have explicit TTLs (89%).
-  - `stats:<handle>` (24h), `svg:<handle>:<theme>` (24h), `history:<handle>` (24h)
-  - `rate:<scope>:<id>` (60s window), `inflight:<handle>` (30s), `supplemental:<handle>` (24h)
-  - `stats:dirty:<handle>` (1h), `config:<handle>` (1y, PUT-replaces)
-  - `feature-flag:<key>` (300s via `unstable_cache`)
-- **TTL coverage**: 89%. `cacheSet()` defaults to 21,600s; all call sites pass an explicit TTL. `cacheIncr()` always refreshes TTL (race-safe).
-- **Growth risk**: LOW. No unbounded patterns. `config:` 1y TTL is replace-by-PUT (no accumulation).
+- Key patterns: **16 production prefixes + 3 persistent singletons** — `stats:`, `svg:`, `history:`, `score:`, `config:`, `supplemental:`, `stats:dirty:`, `inflight:`, `rate:`, `metrics:`, `audience:sync:`, `campaign:send:`, `feature-flag:`, `og:`, `health:`, `cli-auth:` (+ persistent admin counters).
+- TTL coverage: **25/28 keys with TTLs (89%)** — three intentional persistent singletons. `cacheSet()` defaults to 21,600 s; every call site passes an explicit TTL. `cacheIncr()` always refreshes TTL (race-safe).
+- Growth risk: **LOW**. `config:` is the only 1-year TTL but PUT replaces — no accumulation.
 
 ## Database Usage
-
-- **Tables**: 11. All have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + deny-all anon (latest migration `025_force_supplemental_stats_rls.sql`).
-- **Query patterns**: Efficient. Critical path uses singleton lazy client; reads are cache-first via Redis. Lone outlier (`dbGetCampaignStats`) is threshold-gated (see P2-1).
-- **Connection management**: Singleton lazy client at `apps/web/lib/db/supabase.ts:14`, guarded by `import "server-only"` (line 8). One client instance per serverless invocation — never per-request.
+- Tables: **11** (last migration `025_force_supplemental_stats_rls.sql`). **11/11 ENABLE + FORCE RLS** confirmed.
+- Query patterns: No N+1 patterns observed in `apps/web/lib/db/`. Bulk admin and stats routes use parallel `Promise.all` queries. **P2-1 (carried, threshold-gated cycle 26)**: `dbGetCampaignStats()` runs 4 parallel COUNT aggregations at `lib/db/campaigns.ts:723-726` — replace with GROUP BY RPC when campaigns exceed ~5K sends. Not yet triggered.
+- Connection management: Singleton lazy client at `lib/db/supabase.ts:14`, guarded by `import "server-only"` at line 8. No per-request client construction.
 
 ## External API Calls
-
 | Route | External Service | Cached | Rate Limited | Risk |
 |-------|------------------|--------|--------------|------|
-| `/u/[handle]/badge.svg` | GitHub GraphQL | Yes (6h + 7d stale) | Yes (in-flight dedup) | Low |
-| `/api/refresh` | GitHub GraphQL | Yes (write-through) | Yes (Redis) | Low |
-| `/api/generate` | GitHub GraphQL | Yes | Yes | Low |
-| `/api/profile/[handle]` | Redis only | Yes | Yes (60/60s) | Low |
-| `/api/verify/[hash]` | Redis only | Yes | Yes (30/60s) | Low |
-| `/api/health` | GitHub `/rate_limit` | **Yes (60s, NEW)** | Yes | Low |
-| `/api/auth/callback` | GitHub OAuth | N/A (per-login) | Yes | Low |
-| `/api/cron/warm-cache` | GitHub GraphQL | Writes cache | Bearer-gated | Low |
-| `/api/cron/process-campaigns` | Resend | N/A (writes) | Bearer-gated | Low |
-| `/api/cron/sync-audience` | Resend | N/A (writes) | Bearer-gated | Low |
-| `/api/webhooks/resend` | None (HMAC ingress) | N/A | HMAC verified | Low |
-| `/api/telemetry` | None (ingress) | N/A | Yes | Low |
+| `/u/[handle]/badge.svg` | GitHub GraphQL | 6h primary + 7d stale fallback, in-flight dedup | Yes (fail-open) | Low |
+| `/api/generate` | GitHub GraphQL | Same cache layer | Yes | Low |
+| `/api/refresh` | GitHub GraphQL | Forces re-fetch but writes cache | Yes (per-handle) | Low |
+| `/api/profile/[handle]` | Redis only (no external) | Reads cached stats | 60/60s | Low |
+| `/api/verify/[hash]` | Redis only | Reads cached payload | 30/60s | Low |
+| `/api/health` | GitHub `/rate_limit` | **`unstable_cache(revalidate=60)` (dc0b7261)** | Yes | Low (resolved) |
+| `/api/webhooks/resend` | Resend (verify HMAC) | n/a (inbound) | HMAC-guarded | Low |
+| `/api/cron/warm-cache` | GitHub GraphQL | Writes cache | Bearer-auth, daily | Low |
+| `/api/cron/sync-audience` | Resend audiences | Daily | Bearer-auth | Low |
+| `/api/cron/process-campaigns` | Resend send | Daily batch | Bearer-auth + per-recipient claim | Low |
+| `/api/telemetry` | PostHog (server-side) | n/a (write-only) | Rate limited | Low |
 
 ## Resource Management
-
-- **Connections**: Supabase singleton; Upstash uses REST (no socket lifecycle). No leaks.
-- **In-memory state**: `_inflight` Map for GitHub fetch dedup — bounded by 30s TTL key, cleared after resolve.
-- **Fetch timeouts**: 100% coverage — every outbound `fetch` uses `AbortSignal.timeout()`. Verified for GitHub probe (3s), Resend, OAuth callbacks.
-- **Rate limiter**: Fail-open by design (availability over correctness) — documented in `lib/cache/redis.ts`. Secondary protection via GitHub API limits + CDN caching.
-
-## Vercel Cost Factors
-
-- **Serverless function sizes**: 0 routes >500 KB First Load JS (per perf 2026-05-14). Bundle flat 8/8 cycles at 2,266 KB raw / 706 KB gzipped.
-- **`maxDuration`**: Badge route holds `maxDuration = 35` at `app/u/[handle]/badge.svg/route.ts:29` — 11th cycle hold.
-- **ISR coverage**: 13 archetype/about pages CDN-eligible via `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94`.
-- **Edge vs serverless**: All API routes serverless (Node runtime) — correct for current dependencies (Sharp, resvg, Supabase service-role).
+- All `fetch()` calls use `AbortSignal.timeout(...)` — 100% timeout coverage maintained.
+- `_inflight` dedup Map in `lib/github/client.ts` is bounded (cleared on resolution).
+- No unbounded buffers or per-request caches identified.
+- Badge route `maxDuration=35` at `app/u/[handle]/badge.svg/route.ts:29` (11th cycle hold).
+- Fail-open rate limiter in `lib/cache/redis.ts` — accepted availability-first design.
 
 ## Recommendations
+1. **P2-1 (carry, threshold-gated)** — `lib/db/campaigns.ts:723-726`: replace 4-query parallel COUNT with GROUP BY RPC when any campaign exceeds ~5K sends. Threshold comment is in source; no action until triggered.
+2. **Monitor (carry)** — `config:` 1-year TTL: PUT-replace semantics confirmed safe; no action.
+3. **Monitor (carry)** — Bundle 2,266 KB raw / 706 KB gzipped (flat 9/9 cycles per performance 2026-05-14). 4-week +34.7% trend stable but origin unidentified; `ANALYZE=true pnpm run build` still needs an interactive run to localize source. Not a runtime cost driver yet but worth quantifying before next major dependency bump.
+4. **No P1 or P3 active**. Health-probe P3 closed in `dc0b7261` and confirmed test-covered per coverage 2026-05-28.
 
-### Active carries
-- **P2-1 (threshold-gated, cycle 26)** — `dbGetCampaignStats()` at `lib/db/campaigns.ts:730-770` uses 4 parallel COUNT queries per campaign. Threshold comment in source at lines 720-726. Replace with a single `GROUP BY status` RPC when any campaign exceeds ~5K sends. Not yet triggered.
+---
 
-### Monitors
-- **M-bundle (carry)** — Bundle 2,266 KB raw / 706 KB gzipped, flat 8 cycles. Sustained +34.7% over 4 weeks unresolved. `ANALYZE=true pnpm run build` still needs interactive run to localize source. No chunk ≥500 KB — informational only.
-- **M-config-TTL (carry)** — `config:<handle>` 1y TTL (31,536,000s). PUT replaces — no accumulation, but worth periodic review.
-
-### Resolved this cycle
-- **P3 (cycle 11) — RESOLVED** — `/api/health` GitHub probe now cached via `unstable_cache(revalidate=60)`. Concurrent probes share one outbound call. Implemented in `dc0b7261`.
-
-### P1s
-- **None.**
-
-<!-- SHARED_CONTEXT_START -->
-## Cost Analyst — 2026-05-26
+SHARED_CONTEXT_START
+## Cost Analyst — 2026-05-28
 - **Status**: GREEN
-- Redis key growth risk: LOW
-- Uncached external calls: 0 (all external calls cached or write-through)
+- Redis key growth risk: low
+- Uncached external calls: 0 (P3 health probe now cached at 60 s via `unstable_cache`, confirmed in dc0b7261)
 - Resource leak risks: 0
-- Estimated monthly cost at 10K users: **~$50–75/mo**, unchanged.
-- **Commits this cycle**: 1 cost-surface change since 2026-05-24 entry — `dc0b7261` cached `/api/health` GitHub probe via `unstable_cache(revalidate=60)`. P3 (cycle 11) RESOLVED.
-- Redis: 16 production prefixes + 3 persistent singletons (25/28 with TTLs, 89%). `cacheSet` defaults to 21,600s. `cacheIncr` race-safe.
-- Supabase: 11 tables, 11/11 FORCE RLS. Singleton lazy client at `lib/db/supabase.ts:14` guarded by `import "server-only"` (line 8).
-- Feature-flags ISR: `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94` active — 13 pages CDN-eligible.
-- Badge `maxDuration=35` at `app/u/[handle]/badge.svg/route.ts:29` — 11th cycle hold.
-- **P2-1 CARRIED (cycle 26)**: `dbGetCampaignStats()` 4-query parallel COUNT aggregation. Threshold comment at `lib/db/campaigns.ts:720-726`. Replace with GROUP BY RPC when campaigns exceed ~5K sends. Not yet triggered.
-- **MONITOR M-bundle CARRIED**: Bundle 2,266 KB raw / 706 KB gzipped (flat 8/8 cycles per perf 2026-05-14). 4-week +34.7% trend stable but unresolved. `ANALYZE=true pnpm run build` still needs interactive run.
-- **MONITOR M-config-TTL CARRIED**: `config:` TTL 31,536,000s (1y per user). PUT replaces — no accumulation.
-- GitHub API cache-first unchanged (6h primary + 7d stale fallback). 100% fetch timeout coverage. `_inflight` dedup Map bounded.
-- Coverage context (May 24): 7589 tests GREEN across 3 clean runs, 0 flakes. lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable.
-- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated). P3s: 0 (health probe P3 resolved).**
 
 **Cross-agent recommendations:**
-- [Performance]: Bundle flat 8/8 cycles. 4-week +34.7% trend stable but unresolved; `ANALYZE=true pnpm run build` still needs interactive run to localize source. Carry-only.
-- [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. Health endpoint GitHub probe now cached at 60s — reduces outbound dependency.
-- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per May 24. New `/api/health` cache wrapper covered by the 2 new tests in `route.test.ts` (commit `dc0b7261`). No cost-path coverage gaps.
-<!-- SHARED_CONTEXT_END -->
+- [Performance]: Bundle flat 9/9 cycles; 4-week +34.7% trend stable but unresolved as source. `ANALYZE=true pnpm run build` still requires interactive run to localize. Carry-only — no runtime cost impact yet.
+- [Security]: No cost-security regressions. `server-only` boundary on Supabase client + FORCE RLS on all 11 tables intact. Fail-open rate limiter and 100% fetch timeout coverage maintained. New `/api/health` cache wrapper is a pure cost win — does not change security posture.
+- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per 2026-05-28 entry. New `/api/health` `unstable_cache(revalidate=60)` wrapper confirmed test-covered in `route.test.ts`. No cost-path coverage gaps.
+SHARED_CONTEXT_END
