@@ -84,21 +84,38 @@ jobs:
         run: |
           echo "## Bundle Size Report" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Directory | Size |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-----------|------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Directory | Raw | Gzipped |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|-----|---------|" >> "$GITHUB_STEP_SUMMARY"
 
           if [ -d ".next/static" ]; then
             STATIC_SIZE=$(du -sh .next/static | cut -f1)
-            echo "| \`.next/static\` | $STATIC_SIZE |" >> "$GITHUB_STEP_SUMMARY"
+            STATIC_BYTES=$(du -sb .next/static | cut -f1)
+            echo "| \`.next/static\` | $STATIC_SIZE | — |" >> "$GITHUB_STEP_SUMMARY"
           fi
 
           if [ -d ".next/server" ]; then
             SERVER_SIZE=$(du -sh .next/server | cut -f1)
-            echo "| \`.next/server\` | $SERVER_SIZE |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| \`.next/server\` | $SERVER_SIZE | — |" >> "$GITHUB_STEP_SUMMARY"
           fi
 
           TOTAL_SIZE=$(du -sh .next | cut -f1)
-          echo "| **Total \`.next\`** | **$TOTAL_SIZE** |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Total \`.next\`** | **$TOTAL_SIZE** | — |" >> "$GITHUB_STEP_SUMMARY"
+
+          # Compute gzipped total for client JS chunks (individually compressed — matches HTTP/2 delivery)
+          if [ -d ".next/static/chunks" ]; then
+            GZIP_TOTAL=0
+            while IFS= read -r f; do
+              SIZE=$(gzip -c "$f" | wc -c)
+              GZIP_TOTAL=$((GZIP_TOTAL + SIZE))
+            done < <(find .next/static/chunks -name "*.js" -type f)
+            GZIP_KB=$((GZIP_TOTAL / 1024))
+            RAW_CHUNKS_BYTES=$(find .next/static/chunks -name "*.js" -type f | xargs wc -c 2>/dev/null | tail -1 | awk '{print $1}')
+            RAW_CHUNKS_KB=$((RAW_CHUNKS_BYTES / 1024))
+            echo "| \`.next/static/chunks\` JS | ${RAW_CHUNKS_KB} KB | **${GZIP_KB} KB** |" >> "$GITHUB_STEP_SUMMARY"
+            echo "chunks_raw_kb=${RAW_CHUNKS_KB}" >> "$GITHUB_OUTPUT"
+            echo "chunks_gzip_kb=${GZIP_KB}" >> "$GITHUB_OUTPUT"
+          fi
+
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           echo "### Largest JS bundles" >> "$GITHUB_STEP_SUMMARY"
@@ -118,18 +135,25 @@ jobs:
             const staticSize = '${{ steps.bundle.outputs.static_size }}';
             const serverSize = '${{ steps.bundle.outputs.server_size }}';
             const totalSize = '${{ steps.bundle.outputs.total_size }}';
+            const chunksRawKb = '${{ steps.bundle.outputs.chunks_raw_kb }}';
+            const chunksGzipKb = '${{ steps.bundle.outputs.chunks_gzip_kb }}';
+
+            const chunksRow = chunksRawKb
+              ? `| \`.next/static/chunks\` JS | ${chunksRawKb} KB | **${chunksGzipKb} KB** |`
+              : '';
 
             const body = [
               '## Bundle Size Report',
               '',
-              '| Directory | Size |',
-              '|-----------|------|',
-              `| \`.next/static\` | ${staticSize} |`,
-              `| \`.next/server\` | ${serverSize} |`,
-              `| **Total \`.next\`** | **${totalSize}** |`,
+              '| Directory | Raw | Gzipped |',
+              '|-----------|-----|---------|',
+              `| \`.next/static\` | ${staticSize} | — |`,
+              `| \`.next/server\` | ${serverSize} | — |`,
+              `| **Total \`.next\`** | **${totalSize}** | — |`,
+              chunksRow,
               '',
               `> Measured at commit ${context.sha.substring(0, 7)}`,
-            ].join('\n');
+            ].filter(Boolean).join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,

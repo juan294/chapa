@@ -25,6 +25,7 @@
       "project": ["**/*.{ts,tsx}"],
       "ignoreDependencies": [
         "postcss",
+        "server-only",
         "tsx",
         "@resvg/resvg-js",
         "@vercel/analytics",
