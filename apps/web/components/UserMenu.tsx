@@ -79,7 +79,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
   const [insightsNow, setInsightsNow] = useState(() => Date.now());
   const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(() => {
-    if (typeof window === "undefined") return null;
+    if (typeof window === "undefined" || !window.localStorage) return null;
     const stored = window.localStorage.getItem(insightsStorageKey);
     if (!stored) return null;
     try {

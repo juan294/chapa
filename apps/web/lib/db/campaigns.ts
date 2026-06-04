@@ -260,6 +260,7 @@ export const CampaignRowSchema = {
   parse: parseCampaignRow,
 };
 
+/** Thin schema wrapper used by `mapSendRow` to parse raw DB rows. */
 export const CampaignSendRowSchema = {
   parse: parseCampaignSendRow,
 };
@@ -274,6 +275,7 @@ const CLAIM_CLEAR_FIELDS = {
 // Row mapping
 // ---------------------------------------------------------------------------
 
+/** Parse a raw `email_campaigns` DB row into a typed `Campaign` object. */
 export function mapCampaignRow(row: unknown): Campaign {
   const parsed = CampaignRowSchema.parse(row);
   return {
@@ -297,6 +299,7 @@ export function mapCampaignRow(row: unknown): Campaign {
   };
 }
 
+/** Parse a raw `campaign_sends` DB row into a typed `CampaignSend` object. */
 export function mapSendRow(row: unknown): CampaignSend {
   const parsed = CampaignSendRowSchema.parse(row);
   return {
@@ -314,6 +317,13 @@ export function mapSendRow(row: unknown): CampaignSend {
 // Campaign CRUD
 // ---------------------------------------------------------------------------
 
+/**
+ * List all campaigns, optionally filtered by status and/or type.
+ *
+ * @param status - Optional status filter (e.g. "draft", "sent")
+ * @param type - Optional type filter ("announcement" | "engagement")
+ * @returns Campaigns ordered by creation date descending; empty array on error
+ */
 export async function dbGetCampaigns(
   status?: Campaign["status"],
   type?: CampaignType,
@@ -350,6 +360,11 @@ export async function dbGetCampaigns(
   }
 }
 
+/**
+ * Fetch a single campaign by UUID.
+ *
+ * @returns The campaign, or `null` if not found or DB is unavailable
+ */
 export async function dbGetCampaign(id: string): Promise<Campaign | null> {
   const db = getSupabase();
   if (!db) return null;
@@ -535,6 +550,11 @@ export async function dbGetActiveEngagementCampaign(): Promise<Campaign | null> 
   }
 }
 
+/**
+ * Delete a campaign by UUID. Only draft campaigns can be deleted.
+ *
+ * @returns `true` on success, `false` if the delete failed or DB is unavailable
+ */
 export async function dbDeleteCampaign(id: string): Promise<boolean> {
   const db = getSupabase();
   if (!db) return false;
@@ -559,6 +579,12 @@ export async function dbDeleteCampaign(id: string): Promise<boolean> {
 // Campaign sends
 // ---------------------------------------------------------------------------
 
+/**
+ * Upsert `campaign_sends` rows for each recipient. Uses `onConflict: campaign_id,handle`
+ * so re-running the same recipient list is idempotent.
+ *
+ * @returns Number of recipients provided; 0 on error
+ */
 export async function dbCreateCampaignSends(
   campaignId: string,
   recipients: { handle: string; email: string }[],
@@ -589,6 +615,12 @@ export async function dbCreateCampaignSends(
   }
 }
 
+/**
+ * Fetch up to `limit` unclaimed pending sends for a campaign.
+ *
+ * Unlike `dbClaimPendingSends`, this does not set a lease — use it for
+ * read-only inspection or non-concurrent processing.
+ */
 export async function dbGetPendingSends(
   campaignId: string,
   limit: number,
@@ -623,6 +655,20 @@ export async function dbGetPendingSends(
   }
 }
 
+/**
+ * Atomically claim up to `limit` pending sends for exclusive processing.
+ *
+ * Delegates to the `claim_campaign_sends` Postgres RPC, which sets each
+ * returned row's `status → "processing"`, `lease_token`, and `lease_expires_at`
+ * in a single statement — preventing two concurrent workers from picking the
+ * same batch. The caller must complete processing before `leaseExpiresAt` and
+ * then call `dbMarkSendsSent` / `dbMarkSendsFailed` with the same `leaseToken`
+ * to release the lease. Expired leases are automatically re-claimable by the
+ * next cron invocation.
+ *
+ * @param leaseToken - Opaque token that ties this batch to the claiming worker
+ * @param leaseExpiresAt - ISO-8601 timestamp after which the claim expires
+ */
 export async function dbClaimPendingSends(
   campaignId: string,
   limit: number,
@@ -658,6 +704,16 @@ export async function dbClaimPendingSends(
   }
 }
 
+/**
+ * Mark the given send IDs as "sent" and clear their lease fields.
+ *
+ * Only updates rows whose `status` is currently "processing". When
+ * `leaseToken` is provided the update is also scoped to rows whose
+ * `lease_token` matches — preventing a worker from accidentally acknowledging
+ * a batch claimed by a different concurrent worker.
+ *
+ * @param leaseToken - If provided, scopes the update to rows with this lease
+ */
 export async function dbMarkSendsSent(
   ids: string[],
   leaseToken?: string,
@@ -688,6 +744,16 @@ export async function dbMarkSendsSent(
   }
 }
 
+/**
+ * Mark the given send IDs as "failed" and clear their lease fields.
+ *
+ * Only updates rows whose `status` is currently "processing". When
+ * `leaseToken` is provided the update is also scoped to rows whose
+ * `lease_token` matches — same lease-isolation guarantee as `dbMarkSendsSent`.
+ *
+ * @param errorMsg - Human-readable failure reason stored in the `error` column
+ * @param leaseToken - If provided, scopes the update to rows with this lease
+ */
 export async function dbMarkSendsFailed(
   ids: string[],
   errorMsg: string,
