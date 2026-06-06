@@ -1,3 +1,3 @@
-cc-rpi HEAD equals the recorded `lastSyncCommit` (`250d6e21`) and nothing changed since the last sync. Per Phase 1, I stop here without modifying files (preserving idempotency).
+cc-rpi HEAD (`250d6e2`, v1.18.0) matches the recorded `lastSyncCommit` exactly — no commits or file changes since the last sync. Per the idempotency rule, I'm making no file changes (bumping only the date would create spurious diffs).
 
 cc-rpi sync: already up to date as of v1.18.0.

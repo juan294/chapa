@@ -1,59 +1,78 @@
 # Documentation Report
-> Generated: 2026-05-29 | Branch: `develop` | Health status: **green**
+> Generated: 2026-06-05 | Branch: `develop` | HEAD: `e275ae6c` | Health status: **green**
 
 ## Executive Summary
-Documentation is accurate and complete: 44/44 API routes + 6 special routes + all page routes are documented in CLAUDE.md, all 38 color tokens match `globals.css` exactly, and 100% of production env vars are documented. The only finding is a low-priority polish item — a few campaign-send DB helpers with non-trivial lease/concurrency semantics lack JSDoc.
+Documentation is fully in sync with the codebase: 44/44 API routes + 6 special routes + 34 page files documented in CLAUDE.md, 38/38 design-system color tokens match `globals.css` exactly, and all environment variables route through `lib/env.ts` and appear in CLAUDE.md with zero mismatches. No stale docs, one trivial false-positive TODO, and the prior `lib/db/campaigns.ts` JSDoc gap is now resolved.
 
 ## Route Documentation
+| Route | Documented in CLAUDE.md | Has API docs | Status |
+|-------|------------------------|-------------|--------|
+| `/api/auth/*` (login, callback, session, logout) | ✅ | ✅ | OK |
+| `/api/auth/bitbucket/*` (callback, connect, disconnect, status) | ✅ | ✅ | OK |
+| `/api/auth/codeberg/*` (callback, connect, disconnect, status) | ✅ | ✅ | OK |
+| `/api/verify/:hash`, `/api/profile/:handle`, `/api/history/:handle` | ✅ | ✅ | OK |
+| `/api/health`, `/api/feature-flags`, `/api/telemetry` | ✅ | ✅ | OK |
+| `/api/supplemental`, `/api/studio/config`, `/api/refresh`, `/api/generate`, `/api/recalculate` | ✅ | ✅ | OK |
+| `/api/insights`, `/api/insights/:handle` | ✅ | ✅ | OK |
+| `/api/cli/auth/poll`, `/api/cli/auth/approve` | ✅ | ✅ | OK |
+| `/api/admin/*` (users, stats, agents/run, agents-summary, bulk-recalculate, feature-flags, engagement-flags) | ✅ | ✅ | OK |
+| `/api/admin/campaigns`, `/api/admin/campaigns/:id` (+ preview, send, test) | ✅ | ✅ | OK |
+| `/api/notifications/unsubscribe` | ✅ | ✅ | OK |
+| `/api/webhooks/resend` | ✅ | ✅ | OK |
+| `/api/cron/*` (warm-cache, sync-audience, process-campaigns) | ✅ | ✅ | OK |
+| `/u/:handle/badge.svg`, `/u/:handle/og-image`, `/og-image` | ✅ | ✅ | OK |
+| `/llms.txt`, `/llms-full.txt`, `/.well-known/security.txt` | ✅ | ✅ | OK |
+| Page routes (landing, studio, admin, share, verify, about/*, archetypes/*, experiments/*, cli/authorize, generating, legal) | ✅ | n/a | OK |
 
-| Route group | Documented in CLAUDE.md | Has API/page docs | Status |
-|-------------|------------------------|-------------------|--------|
-| Pages (`/`, `/studio`, `/admin`, `/u/:handle`, `/about/*`, `/archetypes/:type`, `/cli/authorize`, `/privacy`, `/terms`, `/coming-soon`, `/verify`, `/verify/:hash`, `/generating/:handle`, `/experiments/*`) | ✅ all | ✅ | ✅ |
-| Auth API (`/api/auth/*` incl. GitHub, Bitbucket, Codeberg) | ✅ all 14 | ✅ | ✅ |
-| Public API (`/api/verify`, `/api/profile`, `/api/history`, `/api/health`, `/api/feature-flags`, og-image, llms.txt, llms-full.txt, security.txt) | ✅ all | ✅ | ✅ |
-| Authenticated API (`/api/supplemental`, `/api/studio/config`, `/api/refresh`, `/api/generate`, `/api/recalculate`, `/api/insights*`, `/api/cli/auth/*`) | ✅ all | ✅ | ✅ |
-| Admin API (`/api/admin/*` incl. campaigns CRUD, agents, stats, users, feature-flags, engagement-flags, bulk-recalculate) | ✅ all 12 | ✅ | ✅ |
-| Webhooks & Cron (`/api/webhooks/resend`, `/api/cron/*`, `/api/telemetry`, `/api/notifications/unsubscribe`) | ✅ all | ✅ | ✅ |
-| Special routes (`badge.svg`, `u/:handle/og-image`, `og-image`, `llms*.txt`, `.well-known/security.txt`) | ✅ all | ✅ | ✅ |
-
-**Result:** 44 API route files + 6 special route files + 34 page files (counting `/experiments/*` as a group) — all accounted for in CLAUDE.md. No undocumented routes; no documented-but-missing routes.
+**Coverage: 44/44 API routes + 6 special `route.ts` files + 34 page files — 100% documented.** A scripted diff of every filesystem route path against CLAUDE.md returned 0 missing entries. HEAD advanced `2d7eb73c → e275ae6c` since the last cycle via a JSDoc-only commit (`8e00aa18`) and a deps bump (`e275ae6c`) — no routes added or removed.
 
 ## Stale Documentation
-None. Specifically verified:
-- **Color tokens:** All 38 `--color-*` tokens in `docs/design-system.md` match `apps/web/styles/globals.css` exactly (38/38, no drift, no orphans in either direction).
-- **Required docs:** all present and non-empty — `impact-v4.md` (131 lines, correctly marked deprecated), `impact-v5.md` (152), `impact-v6.md` (287, current spec truth), `svg-design.md` (173), `README.md` (224), `design-system.md` (236), `shared-context.md` (548).
-- **Env var doc:** CLAUDE.md's env block matches `lib/env.ts` usage. The grep-detected stragglers (`CI`, `NODE_ENV`, `ANALYZE`, `DEPLOYMENT_SMOKE_STRICT`, `PLAYWRIGHT_BASE_URL`) are standard build/test vars already noted as intentional omissions.
+None. Specifically verified current:
+- **Design system** — all 38 `--color-*` tokens in `docs/design-system.md` match `apps/web/styles/globals.css` exactly (38 in each, no orphans either direction).
+- **Required spec docs** — all present and non-empty:
+  - `docs/impact-v4.md` (131 lines, correctly marked deprecated)
+  - `docs/impact-v5.md` (152 lines)
+  - `docs/impact-v6.md` (287 lines, current spec truth)
+  - `docs/svg-design.md` (173 lines)
+  - `docs/design-system.md` (236 lines)
+  - `README.md` (224 lines, Quick Start with prerequisites/install/env/dev at L75)
+- **Environment variables** — CLAUDE.md env block matches every var consumed via `lib/env.ts`.
+- **Shared context** — `docs/agents/shared-context.md` (546 lines) has entries through 2026-06-05 (coverage agent 02:05Z today). Recent and active.
 
 ## Missing Documentation
-- **[Low] Campaign-send DB helpers lack JSDoc** — `apps/web/lib/db/campaigns.ts` has several exported functions without JSDoc: `dbClaimPendingSends`, `dbCreateCampaignSends`, `dbGetPendingSends`, `dbMarkSendsSent`, `dbMarkSendsFailed`, `dbDeleteCampaign`, `dbGetCampaigns`, `dbGetCampaign`, plus the `mapCampaignRow`/`mapSendRow`/`CampaignSendRowSchema` mappers. Most are self-evident CRUD, but `dbClaimPendingSends` (`campaigns.ts:626`) wraps the `claim_campaign_sends` RPC with **lease-token/lease-expiry concurrency semantics** that are non-obvious and worth a doc comment; `dbMarkSendsSent`/`dbMarkSendsFailed` also accept an optional `leaseToken` whose contract is undocumented. The campaign subsystem is admin-only and well covered by tests (lib/db 96.5%), so this is polish, not a correctness risk.
-- No missing route, feature, or env-var documentation found.
+None blocking. JSDoc spot-check across critical-path lib modules:
+- `lib/impact/v6.ts` — 9/9 exports documented
+- `lib/cache/redis.ts` — 13/13 documented
+- `lib/github/client.ts` — 2/2 documented
+- `lib/auth/session.ts` — 8 doc comments across 5 exports (single-line JSDoc style)
+- `lib/db/campaigns.ts` — **14/14 exports documented** — the prior-cycle gap (campaign-send helpers `dbClaimPendingSends`/`dbMarkSendsSent`/`dbMarkSendsFailed` lease-token concurrency semantics) is **RESOLVED** in commit `8e00aa18`.
 
 ## Environment Variables
-
 | Variable | In CLAUDE.md | Used in code | Status |
-|----------|-------------|--------------|--------|
-| GITHUB_CLIENT_ID / _SECRET / GITHUB_TOKEN | ✅ | ✅ `lib/env.ts` | ✅ |
-| NEXTAUTH_SECRET, NEXT_PUBLIC_BASE_URL | ✅ | ✅ | ✅ |
-| UPSTASH_REDIS_REST_URL / _TOKEN | ✅ | ✅ | ✅ |
-| SUPABASE_URL / SERVICE_ROLE_KEY | ✅ | ✅ | ✅ |
-| NEXT_PUBLIC_POSTHOG_KEY / _HOST | ✅ | ✅ | ✅ |
-| CHAPA_ALERT_WEBHOOK_URL, CHAPA_VERIFICATION_SECRET | ✅ | ✅ | ✅ |
-| RESEND_API_KEY / _WEBHOOK_SECRET, SUPPORT_FORWARD_EMAIL | ✅ | ✅ | ✅ |
-| BITBUCKET_CLIENT_ID/_SECRET, NEXT_PUBLIC_BITBUCKET_ENABLED | ✅ | ✅ | ✅ |
-| CODEBERG_CLIENT_ID/_SECRET, NEXT_PUBLIC_CODEBERG_ENABLED | ✅ | ✅ | ✅ |
-| NEXT_PUBLIC_STUDIO/_EXPERIMENTS/_INSIGHTS_ENABLED | ✅ | ✅ | ✅ |
-| ADMIN_HANDLES, ADMIN_SECRET, ALLOW_AGENT_RUN | ✅ | ✅ | ✅ |
-| CRON_SECRET, WARM_CACHE_PRIORITY_HANDLES, VERCEL_ENV, ANALYZE | ✅ | ✅ | ✅ |
-| CI, NODE_ENV | omitted (intentional) | ✅ build var | ✅ |
-| DEPLOYMENT_SMOKE_STRICT, PLAYWRIGHT_BASE_URL | omitted (test-only) | ✅ tests | ✅ |
+|----------|-------------|-------------|--------|
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `GITHUB_TOKEN` | ✅ | ✅ `env.ts` | OK |
+| `NEXTAUTH_SECRET` | ✅ | ✅ | OK |
+| `NEXT_PUBLIC_BASE_URL` | ✅ | ✅ | OK |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | ✅ | ✅ | OK |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | ✅ | ✅ | OK |
+| `NEXT_PUBLIC_POSTHOG_KEY` / `_HOST` | ✅ | ✅ | OK |
+| `CHAPA_ALERT_WEBHOOK_URL` | ✅ | ✅ | OK |
+| `RESEND_API_KEY` / `RESEND_WEBHOOK_SECRET` / `SUPPORT_FORWARD_EMAIL` | ✅ | ✅ | OK |
+| `CHAPA_VERIFICATION_SECRET` | ✅ | ✅ | OK |
+| `CRON_SECRET` / `WARM_CACHE_PRIORITY_HANDLES` | ✅ | ✅ | OK |
+| `BITBUCKET_CLIENT_ID` / `_SECRET` / `NEXT_PUBLIC_BITBUCKET_ENABLED` | ✅ | ✅ | OK |
+| `CODEBERG_CLIENT_ID` / `_SECRET` / `NEXT_PUBLIC_CODEBERG_ENABLED` | ✅ | ✅ | OK |
+| `NEXT_PUBLIC_STUDIO_ENABLED` / `_EXPERIMENTS_ENABLED` / `_INSIGHTS_ENABLED` | ✅ | ✅ | OK |
+| `ADMIN_HANDLES` / `ADMIN_SECRET` / `ALLOW_AGENT_RUN` | ✅ | ✅ | OK |
+| `VERCEL_ENV` / `ANALYZE` | ✅ | ✅ | OK |
+| `NODE_ENV` | ✅ (intentionally noted as standard) | ✅ | OK |
+| `CI`, `DEPLOYMENT_SMOKE_STRICT`, `PLAYWRIGHT_BASE_URL` | n/a (test/build-only) | test only | OK — intentional omission |
 
-**Result:** 0 mismatches. Every production env var read in code is documented; every undocumented var is a standard build or test-only var explicitly called out as an intentional omission.
+**No mismatches.** All app config flows through `lib/env.ts` (ESLint `no-restricted-syntax` forbids scattered `process.env` reads). Extraneous vars surfaced by a raw grep (`KV_REST_API_*`, `RESEND_BASE_URL`, `SUPABASE_SECRET_KEY`, `__NEXT_*`, `VERCEL_*`) originate from the `.next/` build cache and Next.js/Vercel framework internals — not application code.
 
-## Other Checks
-- **TODO/FIXME referencing missing docs:** 1 grep hit (`lib/agents/agent-config.ts:281`) is a **false positive** — it is this audit prompt's own text embedded in the agent config template, not a real code TODO.
-- **shared-context.md recency:** healthy — latest entry `2026-05-29T03:00:00Z` (cost-analyst), with entries spanning May 28–29 across cost, coverage, performance, qa, triage agents.
-- **README setup instructions:** present — "Quick Start" (`README.md:75`) covers install deps, copy/fill env vars, and `pnpm run dev` on port 3001; "Environment Variables" section at line 155.
+## TODO/FIXME Doc-Gap Scan
+1 match, a **false positive**: `lib/agents/agent-config.ts:281` contains this audit prompt's own template text ("Look for TODO/FIXME comments that reference missing documentation"). No real doc-gap markers in source.
 
 ## Recommendations
-1. **[Low]** Add JSDoc to the campaign-send helpers in `apps/web/lib/db/campaigns.ts`, prioritizing `dbClaimPendingSends` and the `leaseToken` parameter on `dbMarkSendsSent`/`dbMarkSendsFailed` — document the lease-claim/expiry contract so the concurrency model is discoverable without reading the `claim_campaign_sends` RPC. The simpler CRUD mappers can follow opportunistically.
-2. No other action required — route, env-var, design-token, and required-doc coverage are all at 100%.
+1. **No action required this cycle.** All documentation surfaces are accurate, complete, and current.
+2. *(Optional, low priority)* Consider a lightweight CI check that diffs `apps/web/app/**/route.ts` paths against CLAUDE.md so route-doc drift is caught automatically rather than by the weekly audit — purely preventative; coverage is currently 100%.
