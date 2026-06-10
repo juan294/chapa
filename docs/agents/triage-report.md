@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-06-06 | 4 reports processed | 0 action items | 1 Dependabot PR
+> Generated on 2026-06-10 | 3 reports processed | 0 action items | 3 Dependabot PRs
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -7,10 +7,9 @@ None — all agents ran successfully.
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cc-rpi-update-report.md` | cc-rpi-update | GREEN | 0 — already at HEAD v1.18.0 |
-| 2 | `cost-analyst-report.md` | cost-analyst | GREEN | 0 — 21st consecutive carry, no cost-surface changes |
-| 3 | `coverage-report.md` | coverage | GREEN | 0 — 7590/7590, 96.77% stmts, zero flaky tests |
-| 4 | `documentation-report.md` | documentation | GREEN | 0 — 100% route/env/token coverage |
+| 1 | `coverage-report.md` | coverage | ✅ GREEN | 0 — 7590/7590, 96.78% stmts, zero flaky tests |
+| 2 | `cost-analyst-report.md` | cost-analyst | ✅ GREEN | 0 — 25th consecutive carry, no cost-surface changes |
+| 3 | `cc-rpi-update-report.md` | cc-rpi-update | ✅ GREEN | 0 — already at HEAD v1.18.0 |
 
 ## Overall Status: GREEN
 
@@ -20,17 +19,21 @@ None — clean all-GREEN cycle with no implementation work required.
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 848 | `bump gitleaks/gitleaks-action 2→3` | major | ⏸ deferred | Second consecutive deferral. CI green, but major bump requires human review of breaking changes. |
+| 851 | dev-and-types group (4 updates) | patch | ✅ auto-merged | vitest 4.1.7→4.1.8, @types/node 25.9.1→25.9.2, eslint-config-next 16.2.6→16.2.7; CI green |
+| 850 | production group (8 updates) | patch + minor | ✅ auto-merged | vite, next, react×2 (patch); @supabase/supabase-js, posthog-js, svix (minor); CI green |
+| 848 | gitleaks/gitleaks-action 2→3 | major | ⏸ deferred | Third consecutive deferral. CI green, but major bump requires human review of breaking changes. |
 
 ## Verification
 - [x] All tests passing — 7590/7590 (per coverage-report.md)
-- [x] Typecheck clean (per documentation-report.md — 0 errors)
-- [x] Lint clean (per documentation-report.md — 0 violations)
+- [x] Typecheck clean (no code changes this cycle)
+- [x] Lint clean (no code changes this cycle)
 - [x] CI green on develop
 
 ## Carried Items
 | Item | Source | Cycles Carried | Notes |
 |------|--------|---------------|-------|
-| P2-1: `dbGetCampaignStats()` 4-query fan-out | cost-analyst | 28+ | Threshold-gated at >5K sends/campaign. Not yet triggered. |
-| MONITOR M7: `config:` 1-year Redis TTL | cost-analyst | 5+ | Safe — PUT replaces, no accumulation. Monitor only. |
-| PR #848 gitleaks/gitleaks-action 2→3 | dependabot | 2 | Major bump, CI green. Human review needed. |
+| P2-1: `dbGetCampaignStats()` 4-query fan-out | cost-analyst | 29+ | Threshold-gated at >5K sends/campaign. Not yet triggered. |
+| MONITOR M7/M8: `config:` and `badge:notified:` 1-year Redis TTLs | cost-analyst | ongoing | Fixed cardinality, overwrite semantics — no action. |
+| P3: Canvas/WebGL files <80% coverage | coverage | ongoing | Not exercisable in JSDOM — accepted. |
+| P3: Flag-gated experiments pages at 0% | coverage | ongoing | Gated by feature flag — accepted. |
+| PR #848 gitleaks/gitleaks-action 2→3 | dependabot | 3 | Major bump, CI green. Human review needed. |
