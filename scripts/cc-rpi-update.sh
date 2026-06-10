@@ -66,7 +66,7 @@ log_info "Blueprint: ${CC_RPI_PATH}"
 
 while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
   if claude -p "${PROMPT}" \
-    --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git *)" \
+    --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git add*),Bash(git commit*),Bash(git diff*),Bash(git log*),Bash(git status*)" \
     --output-format text \
     > "${REPORT_FILE}" 2>&1; then
     # Primary validation: first non-empty line matches a known report opener.
