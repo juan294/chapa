@@ -1,51 +1,51 @@
 # Performance Report
-> Generated: 2026-06-04 | Health status: **green**
+> Generated: 2026-06-11 | Health status: green
 
 ## Executive Summary
-Bundle is flat and healthy at **1,943 KB raw / 620 KB gzipped** across 77 chunks — no chunk exceeds 500 KB, knip reports zero unused exports, and all caching/font/CLS characteristics are optimal. HEAD is pinned at `2d7eb73c` (no code change since the 2026-05-28 cycle), so this is a confirmatory clean cycle.
+First confirmatory cycle on the new HEAD `5ef06c09` after dep bumps #850/#851 (next 16.2.6→16.2.9, posthog-js 1.376.6→1.384.0, react 19.2.7): total First Load JS is **1,949.3 KB raw / 622.6 KB gzipped (77 chunks)** — effectively flat vs the 2026-06-04 baseline (+6.0 KB raw / +2.4 KB gzip, +0.3%). Zero routes over 500 KB, knip clean, caching and font posture unchanged.
+
+> **Operational note**: local `node_modules` was stale at the start of this run — `apps/web/package.json` declared `next ^16.2.9` but 16.2.6 was installed (no `pnpm install` after the Dependabot merges). The first build measured the wrong stack; ran `pnpm install` and rebuilt on 16.2.9 before sizing. All numbers below reflect the deployed stack.
 
 ## Build Output
-Next.js 16.2.6 (Turbopack) compiled in 5.0s, TypeScript in 6.9s, 0 errors. 87 routes (5 static, 82 dynamic), 48 static pages generated. **Turbopack omits per-route First Load JS from the build table** — per-route sizing requires `ANALYZE=true pnpm run build` interactively. Sizing below is derived directly from `.next/static/chunks`.
 
-| Route / Asset | Size (First Load JS) | Status |
-|---------------|---------------------|--------|
-| Total client JS (all routes) | 1,943 KB raw / 620 KB gzipped | GREEN (flat vs 05-28) |
-| Largest shared chunk | 227.1 KB raw / 70.9 KB gz | GREEN (<300 KB) |
-| 2nd largest chunk | 183.2 KB raw / 59.7 KB gz | GREEN |
-| 3rd largest chunk | 153.3 KB raw / 51.2 KB gz | GREEN |
-| 4th largest chunk | 110.0 KB raw / 38.6 KB gz | GREEN |
-| 5th largest chunk | 107.2 KB raw / 28.5 KB gz | GREEN |
-| All remaining 72 chunks | ≤ 64.3 KB raw each | GREEN |
+Build: **Next.js 16.2.9 (Turbopack)** — compiled in 2.8s, TypeScript 6.6s, **0 errors**. 89 routes (4 static ○, 85 dynamic ƒ), 48 static pages generated.
 
-No route or chunk exceeds the 500 KB threshold (none even exceeds 300 KB).
+Next 16 Turbopack omits per-route First Load JS from the build table, so per-route sizing is unavailable from build output; sizes below are byte-accurate measurements of `.next/static/chunks`.
+
+| Route / Chunk | Size (First Load JS) | Status |
+|-------|---------------------|--------|
+| All 89 routes | shared chunk pool, largest chunk 227.1 KB | GREEN |
+| Largest chunk `0qmgkw5s…` | 227.1 KB raw | GREEN |
+| `1ln_wl_f…` | 189.2 KB raw | GREEN |
+| `0006cyfs…` | 153.3 KB raw | GREEN |
+| `0cz1d0mv…` | 110.0 KB raw | GREEN |
+| `43e11u3p…` | 107.2 KB raw | GREEN |
+
+**Routes >500 KB: 0. Chunks >300 KB: 0.** All top chunks are framework/vendor.
 
 ## Bundle Analysis
-- **Total First Load JS**: 1,943.29 KB raw / 620.17 KB gzipped (77 chunks)
-- **Largest chunks** (raw): 227.1 KB, 183.2 KB, 153.3 KB, 110.0 KB, 107.2 KB — all framework/vendor, none app-specific oversized
-- **Trend**: Flat vs 2026-05-28 (1,943.3 KB raw / 620.2 KB gzipped, 77 chunks). The earlier 4-week +34.7% growth trend was reversed on 05-28 (−14% vs 05-14) via Turbopack chunk consolidation in Next 16.2.6; that reduction holds. M-bundle monitor stays **closed**.
-- **Unused exports**: **none** — `knip --production` returns 0 findings (exit 0, empty output). The prior `server-only` false positive remains suppressed.
+- Total First Load JS: **1,949.3 KB raw / 622.6 KB gzipped** across **77 chunks** (vs 1,943.3 / 620.2 / 77 on 2026-06-04 — +0.3%, attributable to next 16.2.9 + posthog-js 1.384.0)
+- Largest chunks: 227.1 / 189.2 / 153.3 / 110.0 / 107.2 / 64.2 / 58.4 / 53.4 KB — all framework/vendor
+- Unused exports: **none** — `npx knip --production` exits 0 with no findings (the `server-only` false positive remains suppressed)
 
 ## Client/Server Boundary
-- 112 non-test `"use client"` files (anchored grep). All appropriate on spot-audit — interactive UI, error boundaries, experiments, hooks. The delta vs the 92 reported on 05-28 is grep-methodology only; HEAD is unchanged at `2d7eb73c`, so no actual directives were added.
-- Key public pages confirmed **server components**: `/` (`app/page.tsx`), `/about`, `/u/[handle]`, `/archetypes/builder` — all render server-side, keeping server code out of client bundles.
-- No `"use client"` pulled too high in the tree.
+- `"use client"` files (non-test, anchored at line start): **105**. Spot audit clean — no server code pulled into client bundles.
+- Key public pages confirmed server components: `/` (`app/page.tsx`), `/about`, `/u/[handle]`, archetype pages.
+- Dynamic imports: `next/dynamic` in **7 files** — PostHog provider, command bar, admin sub-dashboards, Studio, experiments. Code-splitting posture unchanged.
+- No unnecessary directives found that should move deeper this cycle.
 
 ## Caching & Headers
-- **Badge route** (`app/u/[handle]/badge.svg/route.ts`):
-  - `export const maxDuration = 35` (line 29) — 6th cycle hold; exceeds the 30s `INFLIGHT_TIMEOUT_MS` so cold-path renders complete on Vercel.
-  - Success: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` (6h fresh / 24h stale) — matches spec.
-  - Error: `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` (5m fresh / 10m stale) — short cache prevents pinning a transient failure.
-  - In-flight dedup + Redis lock prevent thundering-herd on cold badges.
-- **Feature-flags**: `unstable_cache(revalidate=300)` at `lib/feature-flags.ts:84-94` active — archetype/about pages remain CDN-eligible (ISR).
-- **/api/health**: GitHub probe cached 60s via `unstable_cache` — 0 uncached external calls.
+- Badge route (`app/u/[handle]/badge.svg/route.ts`): `maxDuration = 35` (line 29, 7th cycle hold). Success: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` (line 45). Error: `s-maxage=300, stale-while-revalidate=600` (line 205). In-flight dedup + Redis lock unchanged.
+- Feature-flags ISR: `unstable_cache(revalidate=300)` active (`lib/feature-flags.ts`).
+- `/api/health` GitHub probe cached 60s via `unstable_cache`.
+- 0 uncached external calls (per cost-analyst 2026-06-11, confirmed).
 
-## Font Loading
-- `next/font/google` for both JetBrains Mono and Plus Jakarta Sans (`app/layout.tsx:2`), both `display: "swap"` (lines 17, 24). **No external `fonts.googleapis`/`fonts.gstatic` `<link>` tags** — fonts self-hosted and non-render-blocking.
-
-## CLS Risks
-- **None**. Avatars/user images use `next/image` (9 usages) with explicit dimensions. All raw `<img>` matches are in test files or escaped display strings (`SharePageOwnerContent.tsx:180` renders the literal text `<img ` as an embed-snippet example, not a real element).
-- `prefers-reduced-motion: reduce` honored (`globals.css:381, 472`).
+## Fonts & CLS
+- Fonts: `next/font/google` only (JetBrains Mono + Plus Jakarta Sans), `display: "swap"` in `app/layout.tsx:17,24`. **0 external font requests** (`fonts.googleapis`/`fonts.gstatic`/`@import url`: no matches).
+- CLS risks: **none**. Badge fallback `<img>` on `/u/[handle]` has explicit `width={1200} height={630}` + `BadgeSkeleton` placeholder (`app/u/[handle]/page.tsx:231-238`). `LiteYouTubeEmbed` thumbnail fills a fixed-size container (`h-full w-full object-cover`). All other images use `next/image` with dimensions.
+- `prefers-reduced-motion` respected (`motion-reduce:animate-none` on animated share-page elements).
 
 ## Recommendations
-1. **None blocking** — performance posture is GREEN across every dimension this cycle.
-2. **(Informational, carry)** `ANALYZE=true pnpm run build` for per-package attribution remains optional only; bundle is flat and well under threshold, so this is not urgent. Per-route First Load JS is no longer printed by Turbopack — the `bundle-size.yml` CI workflow (gzipped chunk totals per push) is the standing regression guard.
+1. **None blocking.** Bundle flat through the Next 16.2.9 / posthog-js bumps — cost-analyst's request to confirm bundle totals post-bump is satisfied.
+2. (Hygiene) Run `pnpm install` after Dependabot merges land on `develop` — local `node_modules` had drifted 3 patch versions behind the lockfile, which silently invalidates any local perf/build measurement. Consider this a standing check at the top of agent build runs.
+3. (Carry, informational) Per-route First Load JS remains unavailable under Turbopack; `ANALYZE=true pnpm run build` interactive run remains optional, not urgent — chunk totals are flat and well under thresholds.

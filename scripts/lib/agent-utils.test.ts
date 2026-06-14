@@ -41,9 +41,40 @@ function runValidation(
   }
 }
 
+function runLockCommand(script: string): { success: boolean; output: string } {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "agent-utils-lock-test-"));
+  const lockName = `test-lock-${process.pid}-${Date.now()}`;
+
+  try {
+    const output = execFileSync(
+      "bash",
+      [
+        "-lc",
+        `export CHAPA_AGENT_LOCK_DIR="${tempDir}"; source "${agentUtilsPath}"; LOCK_NAME="${lockName}"; ${script}`,
+      ],
+      {
+        cwd: projectRoot,
+        encoding: "utf8",
+      },
+    );
+
+    return { success: true, output };
+  } catch (error) {
+    const output =
+      error instanceof Error && "stderr" in error
+        ? String((error as { stderr?: string }).stderr ?? "")
+        : "";
+
+    return { success: false, output };
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 afterEach(() => {
   delete process.env.CHAPA_PRODUCTION_URL;
   delete process.env.CHAPA_API_BASE;
+  delete process.env.CHAPA_AGENT_LOCK_DIR;
 });
 
 describe("validate_report_file", () => {
@@ -75,5 +106,24 @@ describe("validate_report_file", () => {
       "^(# |```markdown|cc-rpi sync: already up to date as of )",
     );
     expect(result.success).toBe(true);
+  });
+});
+
+describe("agent locks", () => {
+  it("acquires and releases named locks", () => {
+    const result = runLockCommand(
+      'acquire_agent_lock "${LOCK_NAME}" "test-agent" 1; test -d "${CHAPA_AGENT_LOCK_DIR}/${LOCK_NAME}"; release_agent_lock "${LOCK_NAME}"; test ! -e "${CHAPA_AGENT_LOCK_DIR}/${LOCK_NAME}"',
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("times out when a named lock is already held", () => {
+    const result = runLockCommand(
+      'mkdir "${CHAPA_AGENT_LOCK_DIR}/${LOCK_NAME}"; acquire_agent_lock "${LOCK_NAME}" "test-agent" 0',
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("Timed out waiting for test-agent lock");
   });
 });

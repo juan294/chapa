@@ -36,6 +36,9 @@ log_info "Running Claude headless mode..."
 
 # Run Claude in headless mode
 cd "${CHAPA_DIR}"
+acquire_agent_lock "vitest-heavy-agent" "qa-agent"
+trap 'release_agent_lock "vitest-heavy-agent"' EXIT
+
 claude -p "${PROMPT}" \
   --allowedTools "Read,Glob,Grep,Bash" \
   --output-format text \
@@ -43,6 +46,9 @@ claude -p "${PROMPT}" \
     log_error "Claude execution failed. Check ${LOG_FILE}"
     exit 1
   }
+
+release_agent_lock "vitest-heavy-agent"
+trap - EXIT
 
 log_info "Report written to ${OUTPUT_FILE}"
 

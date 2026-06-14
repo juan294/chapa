@@ -1,45 +1,42 @@
 # Cost Analyst Report
-> Generated: 2026-06-10 | Health status: green
+> Generated: 2026-06-14 | Health status: green
 
 ## Executive Summary
-Infrastructure cost surface is unchanged from the prior cycle — estimated **~$50–75/mo at 10K users** holds. Code HEAD is `48206b13` (a triage agent-report markdown commit); the last executable cost-relevant change was `8e00aa18`, so this is the 25th consecutive carry/audit cycle with zero new cost risk. All Redis keys are bounded, all 10 base tables enforce RLS, and there are zero uncached external API calls.
+Infrastructure cost surface is unchanged for the 29th consecutive cycle — HEAD pinned at `5ef06c09` with no executable app-code change since the 2026-06-10 dependency bumps. Estimated monthly cost at 10K users remains **~$50–75/mo**; all per-user/per-entity Redis keys are TTL-bounded, all 10 Supabase base tables enforce FORCE RLS, and there are zero uncached external API calls.
 
 ## Redis Usage
-- **Key patterns** (per-entity, all TTL'd unless noted):
-  - `stats:<handle>`, `svg:<handle>:<theme>`, `history:<handle>`, `supplemental:<handle>`, `craft:*`, `snapshot:*`, `avatar:*` — all written via `cacheSet` with explicit positive TTL constants.
-  - `ratelimit:*` — INCR + EXPIRE fixed-window; EXPIRE set on first increment (`redis.ts:188-189`).
-  - `config:<login>` — TTL 31,536,000s (1y), PUT overwrites (`studio/config/route.ts:73`); fixed cardinality.
-  - `badge:notified:<handle>` — TTL 1y, overwrite semantics (`lib/email/notifications.ts:106`); fixed cardinality.
-  - **Persistent (TTL-0) singletons — 3 only, all fixed-cardinality:** `stats:badges_generated` (counter), `stats:unique_badges` (HyperLogLog, ~12KB fixed), `cron:warm-cache:offset` (rotation cursor).
-- **TTL coverage**: 24 non-test `cacheSet` call sites; **23/24 carry an explicit positive TTL**. The single TTL-0 write is the bounded warm-cache rotation cursor (`warm-cache/route.ts:145`, `cacheSet(ROTATION_KEY, nextOffset, 0)`) — intentional and fixed-cardinality. `cacheIncr` refreshes TTL unconditionally after INCRBY (race-safe, `redis.ts:382-386`). `cacheReserveQuota` refreshes TTL in-pipeline (`redis.ts:221`). Effective TTL coverage on growth-bearing keys: **100%**.
-- **Growth risk**: **LOW**. No per-user/per-entity key can accumulate unbounded — every variable-cardinality key has a TTL; the only persistent keys are fixed-cardinality singletons.
+- **Key patterns** (all bounded except fixed-cardinality singletons):
+  - `stats:<handle>`, `svg:<handle>:<theme>`, `history:<handle>`, `supplemental:<handle>`, `config:<login>`, `badge:notified:<handle>`, `craft:*`, `avatar:*`, `og:*`, `stale:*`, `ratelimit:*`, `stats:dirty:<handle>` — all per-user/per-entity with explicit positive TTLs.
+  - **3 persistent TTL-0 singletons only** (fixed cardinality, no per-user accumulation): `stats:badges_generated` (counter, `redis.ts:259`), `stats:unique_badges` (HyperLogLog ~12 KB fixed, `redis.ts:260`), `cron:warm-cache:offset` (rotation cursor, `warm-cache/route.ts:145` — the only intentional TTL-0 `cacheSet`).
+- **TTL coverage**: `cacheSet` default TTL 21,600s with `ttlSeconds > 0` guard (`redis.ts:69,75-76`). **24 non-test `cacheSet` call sites; 23/24 carry an explicit positive TTL** — the lone exception is the bounded rotation cursor. `cacheIncr` refreshes TTL unconditionally after `INCRBY` (`redis.ts:382-386`); `cacheReserveQuota` refreshes TTL in-pipeline (`redis.ts:221`). Effective TTL coverage of growth-prone keys: **100%**.
+- **Growth risk: LOW.** Two 1-year-TTL keys exist — `config:<login>` (31,536,000s, `studio/config/route.ts:73`) and `badge:notified:<handle>` (`MARKER_TTL = 31_536_000`, `notifications.ts:18,106`) — both overwrite-in-place with fixed cardinality (one row per user), so no unbounded accumulation. Redis client configured `retry: { retries: 0 }` (`redis.ts:36`) — no retry storms inflating command counts.
 
 ## Database Usage
-- **Tables**: **10 base tables** (`users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `tool_insights`, `email_campaigns`, `campaign_sends`, `user_platforms`, `supplemental_stats`). 25 migrations, latest `025_force_supplemental_stats_rls.sql`.
-- **RLS**: **10/10 ENABLE + 10/10 FORCE** row-level security (raw grep: 12 ENABLE = 10 tables + 2 view/re-enable lines; 10 FORCE). Deny-all-anon policies intact.
-- **Query patterns**: No N+1 in `lib/db/`. The one fan-out is `dbGetCampaignStats()` — 4 parallel COUNT queries (sent/pending/processing/failed, `campaigns.ts:805-818`), bounded and threshold-gated (P2-1 below).
-- **Connection management**: **Lazy singleton** service-role client (`lib/db/supabase.ts:13-34`), `import "server-only"` (line 8), `auth.persistSession: false`. One client reused across all server invocations.
+- **Tables**: **10 base tables** — `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `tool_insights`, `email_campaigns`, `campaign_sends`, `user_platforms`, `supplemental_stats` (25 migrations, latest `025_force_supplemental_stats_rls.sql`).
+- **RLS**: **10/10 ENABLE + FORCE** (raw grep: 12 ENABLE = 10 tables + 2 re-enables; 10 FORCE). Deny-all-anon policies in migrations 008 + 018.
+- **Query patterns**: No N+1 in `lib/db/`. The only multi-round-trip path is `dbGetCampaignStats()` (4 parallel COUNT queries, `campaigns.ts:815-820`) — efficient at normal volumes, threshold-gated (see P2-1).
+- **Connection management**: Lazy service-role **singleton** (`lib/db/supabase.ts:14-34`), `import "server-only"` boundary at line 8, `auth.persistSession: false`. Supabase-js is an HTTP REST client (no socket pool to leak). Health ping wrapped in `withTimeout`.
 
 ## External API Calls
-| Route | External Service | Cached | Rate Limited | Risk |
-|-------|-----------------|--------|-------------|------|
-| `/u/[handle]/badge.svg` | GitHub | Yes — cache-first, 6h s-maxage + 7d stale; in-flight dedup + Redis lock | Yes | Low |
-| `/api/profile/[handle]` | GitHub | Yes — same cache-first path | Yes (60/60s) | Low |
-| `/api/refresh` | GitHub | Yes — writes through cache | Yes | Low |
-| `/api/health` | GitHub probe | Yes — `unstable_cache` 60s | Yes | Low |
+| Route / Module | External Service | Cached | Rate Limited | Risk |
+|----------------|-----------------|--------|-------------|------|
+| `/u/[handle]/badge.svg` | GitHub GraphQL | Yes — Redis cache-first (6h + 7d SWR), in-flight dedup + Redis lock | Yes | Low |
+| `/api/profile/[handle]` | GitHub (cache read) | Yes — serves cached stats | Yes (60/60s) | Low |
+| `/api/health` | GitHub probe | Yes — `unstable_cache` 60s (`health/route.ts:59`) | Yes | Low |
 | `/api/feature-flags` | Supabase | Yes — ISR `unstable_cache` 300s | n/a | Low |
-| `/api/cron/sync-audience`, campaigns | Resend | n/a (cron, batched) | n/a | Low |
-| telemetry / events | PostHog | Batched fire-and-forget | n/a | Low |
+| Resend (email send/webhook) | Resend API | n/a (transactional) | Daily send quota via `cacheReserveQuota` | Low |
+| PostHog (telemetry) | PostHog | Batched fire-and-forget | n/a | Low |
+| OAuth callbacks (GitHub/Bitbucket/Codeberg) | Provider token endpoints | n/a (auth flow) | Yes (login limiter) | Low |
 
-- **Uncached external calls: 0.** Every GitHub-touching route reads cache first. Server fetches carry `AbortSignal.timeout` (GitHub 15s, Resend 5s, OAuth providers) — 100% timeout coverage. PostHog is batched/non-blocking.
+- **Uncached external calls: 0.** Every server-side `fetch` to an external service carries an `AbortSignal.timeout` (8 modules: GitHub queries, Resend, GitHub/Bitbucket/Codeberg OAuth, health probe, avatar, server-error reporter) — no hung sockets billing serverless wall-time.
 
 ## Resource Management
-- No unclosed connections — Redis and Supabase are lazy singletons reused across invocations; no per-request client construction.
-- No unbounded in-memory buffers. Badge SVG / OG-image generation is bounded per-request and cached to Redis.
-- Badge route `maxDuration=35` (`badge.svg/route.ts:29`); success `s-maxage=21600 / SWR=86400`, error `s-maxage=300 / SWR=600` — caps serverless execution and shields origin via CDN.
-- HyperLogLog for unique counts (fixed ~12KB) instead of a growing set — bounded by design.
+- No unclosed connections: Redis and Supabase are both lazy singletons reused across invocations; neither holds a persistent socket pool.
+- No unbounded in-memory buffers: badge/OG rendering produces a single SVG/PNG per request; the HyperLogLog unique-badge structure is fixed at ~12 KB regardless of user count.
+- Badge route `maxDuration = 35` (`badge.svg/route.ts:29`) caps worst-case serverless execution; success responses `s-maxage=21600 / SWR=86400`, error responses `s-maxage=300 / SWR=600` keep CDN absorbing repeat traffic.
+- **Resource leak risks: 0.**
 
 ## Recommendations
-- **P2-1 (carried, threshold-gated)**: `dbGetCampaignStats()` issues 4 parallel COUNT round-trips. Replace with a single `GROUP BY` RPC if any campaign exceeds ~5,000 sends (`campaigns.ts:790-792`). Not yet triggered — no action this cycle.
-- **MONITOR M7/M8 (carried, informational)**: `config:<login>` and `badge:notified:<handle>` carry 1-year TTLs. Both use overwrite semantics with fixed cardinality (one key per handle), so no per-user accumulation. No action.
-- **No P1s. 1 P2 (threshold-gated). 0 P3s.** Cost posture: **GREEN**.
+1. **P2-1 (carried, threshold-gated — no action yet):** Replace the 4-query parallel COUNT in `dbGetCampaignStats()` (`campaigns.ts:797-835`) with a single `GROUP BY` RPC if any campaign exceeds ~5,000 sends. Documented inline at `campaigns.ts:790-792`. Not triggered at current volume.
+2. **MONITOR M7/M8 (carried — no action):** `config:<login>` and `badge:notified:<handle>` 1-year TTL keys — overwrite semantics, fixed cardinality. Continue to treat as no-growth; revisit only if key semantics change to append.
+3. **No new P1/P2/P3 items.** Cost posture is optimal and stable.
