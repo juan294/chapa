@@ -31,7 +31,7 @@ None — no open Dependabot PRs.
 - [x] All tests passing — `pnpm run test` passed 7,594/7,594 tests across 445 files
 - [x] Typecheck clean — `pnpm run typecheck`
 - [x] Lint clean — `pnpm run lint`
-- [ ] CI green
+- [x] CI green — GitHub Actions run 27489854487 passed
 
 ## Carried Items
 | Item | Source | Notes |
