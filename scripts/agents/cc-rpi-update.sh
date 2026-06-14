@@ -42,6 +42,7 @@ log_info "Running Claude CLI for cc-rpi update..."
 
 if "$CLAUDE_BIN" -p "$PROMPT" \
   --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git *),Bash(gh *),Bash(pnpm *)" \
+  --permission-mode bypassPermissions \
   --output-format text \
   > "${REPORT_FILE}" 2>"${LOGS_DIR}/${AGENT_NAME}.error.log"; then
 
