@@ -25,7 +25,7 @@ overrides:
   '@typescript-eslint/visitor-keys': '>=8.58.0'
   '@typescript-eslint/project-service': '>=8.58.0'
   '@typescript-eslint/tsconfig-utils': '>=8.58.0'
-  svix: 1.92.2
+  svix: 1.95.2
   postcss: '>=8.5.10'
 
 importers:
@@ -96,8 +96,8 @@ importers:
         specifier: ^0.0.1
         version: 0.0.1
       svix:
-        specifier: 1.92.2
-        version: 1.92.2
+        specifier: 1.95.2
+        version: 1.95.2
     devDependencies:
       '@next/bundle-analyzer':
         specifier: ^16.2.9
@@ -2818,8 +2818,8 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  svix@1.92.2:
-    resolution: {integrity: sha512-ZmuA3UVvlnF9EgxlzmPtF7CKjQb64Z6OFlyfdDfU0sdcC7dJa+3aOYX5B9mA+RS6ch1AxBa4UP/l6KmqfGtWBQ==}
+  svix@1.95.2:
+    resolution: {integrity: sha512-i2gDtqABKQritWlFOxQHr+Oa63PBQ3q1oUhwhNwJgH+Xi0NjgWz5o6nd+8EwgNFGrH6UOe3wjKZtbZmjVn9r8w==}
 
   symbol-tree@3.2.4:
     resolution: {integrity: sha512-9QNk5KwDF+Bvz+PyObkmSYjI5ksVUYtjW7AU22r2NKcfLJcXp96hkDWU3+XndOsUb+AQ9QhfzfCT2O+CNWT5Tw==}
@@ -5755,7 +5755,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svix@1.92.2:
+  svix@1.95.2:
     dependencies:
       standardwebhooks: 1.0.0
 
