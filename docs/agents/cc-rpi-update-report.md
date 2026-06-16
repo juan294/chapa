@@ -1,3 +1,3 @@
-cc-rpi sync: already up to date as of v1.19.0.
+cc-rpi HEAD (`f7e59e07`, v1.20.0) matches the recorded `lastSyncCommit` exactly — no new blueprint commits since the last sync.
 
-The blueprint HEAD (`7b9a231`, tag `v1.19.0`) matches `lastSyncCommit` in `.claude/cc-rpi-sync.json`, and `git pull --rebase` reported "Already up to date." No commands, skills, rules, AGENTS.md, CLAUDE.md, or settings changes were needed. No commit made.
+cc-rpi sync: already up to date as of v1.20.0.

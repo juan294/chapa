@@ -1,33 +1,27 @@
 # Security Report
-> Generated: 2026-06-01 | Health status: green
+> Generated: 2026-06-15 | Health status: yellow
 
 ## Executive Summary
-All automated and manual security checks pass: `pnpm audit` reports zero vulnerabilities, no secrets leak to the client, all 10 Supabase tables enforce FORCE RLS with deny-all-anon policies, and every user-controlled SVG field is escaped. No blockers, no warnings.
+Application code is clean — no secret leaks, all SVG user input escaped, RLS forced on all 10 tables, CORS wildcards scoped to read-only rate-limited GETs, and no strong copyleft. The single concern is two **dev-only** `esbuild` advisories (1 high, 1 low) reaching the tree transitively through `vite`/`vitest`; neither code path is exercised by the Node/Vercel production deployment, but the high-severity advisory should be cleared with a one-line override.
 
 ## Dependency Vulnerabilities
 | Severity | Package | Issue | Fix |
 |----------|---------|-------|-----|
-| — | — | No known vulnerabilities (`pnpm audit` clean) | None required |
+| High | esbuild 0.28.0 (`.>vite>esbuild`, dev-only) | GHSA-gv7w-rqvm-qjhr (CVE) — missing binary integrity check in the **Deno** module enables RCE via attacker-controlled `NPM_CONFIG_REGISTRY`. Not reachable from this Node/Vercel build (no Deno runtime). | Add `"esbuild": ">=0.28.1"` to `pnpm.overrides`, then `pnpm install` |
+| Low | esbuild 0.28.0 (`.>vite>esbuild`, dev-only) | GHSA-g7r4-m6w7-qqqr — arbitrary file read when running the esbuild dev server on **Windows**. Not used (vitest, macOS/Linux CI). | Same override `>=0.28.1` clears both |
 
-The prior moderate `brace-expansion` CVE (GHSA-jxxr-4gwj-5jf2) was cleared in the 2026-05-25 cycle via override bump to `>=5.0.6`. Audit now fully clean.
+`pnpm audit`: **1 high, 1 low** — both the same `esbuild` package, both dev-tooling transitive deps with no production exposure. `npx knip --production`: **0 unused dependencies** (no attack-surface bloat).
 
 ## Code Findings
-- **[INFO] Hardcoded secrets — none.** Source scan across `apps/web/lib`, `apps/web/app`, and `packages` found no secret literals. All env reads go through `lib/env.ts` with `.trim()`.
-- **[INFO] Client secret leakage — none.** No `NEXT_PUBLIC_*` variable carries a `SECRET`/`KEY`/`TOKEN`/`PASSWORD` value; `SUPABASE_SERVICE_ROLE_KEY` and `NEXTAUTH_SECRET` never appear in any `NEXT_PUBLIC_*` binding. Server-only Supabase boundary holds (`lib/db/supabase.ts:8` `import "server-only"`).
-- **[INFO] SVG XSS — all entry points escaped.** 7 user-controlled fields routed through `escapeXml()` (`lib/render/escape.ts`): `handle`, `displayName` (`BadgeSvg.tsx:40,42`), `avatarDataUri` (`:155`), `archetypeText` (`:179`), `tier` (`:236`), plus `hash` and `date` in `VerificationStrip.ts:13-14`. 37 escape call-sites total across the render pipeline.
-- **[INFO] CORS — wildcard scoped to read-only GETs.** `Access-Control-Allow-Origin: *` appears only on `/api/verify/[hash]` (rate-limited 30/60s) and `/api/profile/[handle]` (rate-limited 60/60s). `cors-mutation-guard.test.ts` statically enforces no wildcard on mutation routes.
-- **[INFO] RLS — 10/10 tables ENABLE + FORCE.** Base tables: `users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `tool_insights`, `email_campaigns`, `campaign_sends`, `user_platforms`, `supplemental_stats`. ENABLE via migrations 002 + per-table create migrations; FORCE via 018 (9 tables) + 025 (`supplemental_stats`). Deny-all-anon policies in 008 + 018. Service-role-only access bypasses RLS server-side as designed.
-- **[INFO] Unused dependencies — none.** `npx knip --production` returned zero findings (reduced attack surface).
+- **[GREEN] Secret leaks — none.** No real API keys/tokens/passwords in source. Only matches are test fixtures (`platform-auth-fixtures.ts`: `test-bb-client-secret`, `test-cb-client-secret`) — obvious mocks, not credentials.
+- **[GREEN] NEXT_PUBLIC leak — none.** No `SUPABASE_SERVICE_ROLE_KEY` or `NEXTAUTH_SECRET` appears under any `NEXT_PUBLIC_*` binding. The only `NEXT_PUBLIC_*` secret-shaped name is `NEXT_PUBLIC_POSTHOG_KEY`, which is a PostHog **publishable** client key (intended to ship to the browser). All server config flows through `lib/env.ts` with `.trim()`.
+- **[GREEN] SVG XSS — all entry points escaped.** `lib/render/BadgeSvg.tsx` routes every user-controlled field through `escapeXml()` (`lib/render/escape.ts`): `handle` (:40), `displayName` (:42), `avatarDataUri` (:155), `archetypeText` (:179), `tier` (:236); `VerificationStrip.ts` escapes hash/date. `escapeXml` covers all five XML metacharacters (`& < > ' "`).
+- **[GREEN] CORS — scoped wildcards only.** `Access-Control-Allow-Origin: *` is set on exactly two routes: `/api/profile/[handle]` and `/api/verify/[hash]` — both read-only, rate-limited GETs. `cors-mutation-guard.test.ts` statically enforces that no mutation route emits a wildcard.
+- **[GREEN] RLS — 10/10 tables.** All base tables (`users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `tool_insights`, `email_campaigns`, `campaign_sends`, `user_platforms`, `supplemental_stats`) have both `ENABLE` and `FORCE ROW LEVEL SECURITY`, with deny-all-anon policies (migrations 008/018, FORCE via 018 + 025).
 
 ## License Compliance
-All clear — no GPL/AGPL. Weak-copyleft dependencies are documented in `docs/accepted-risks.md`:
-- `@resvg/resvg-js`, `lightningcss` — MPL-2.0 (file-level copyleft, used unmodified via public API; lightningcss is build-time only)
-- `@img/sharp-libvips-darwin-arm64` — LGPL-3.0 (dynamically linked, re-linking requirement satisfied)
-- `sharp` itself is now Apache-2.0 (allowlisted) as of 0.34.5
-
-No source modifications to any copyleft package; no compliance action required.
+**All clear** — no GPL/AGPL/strong-copyleft dependencies. Present weak-copyleft deps are MPL-2.0 (`lightningcss` build tooling, `axe-core` dev a11y testing) — file-level copyleft with no source modification, already covered in `docs/accepted-risks.md`. No LGPL packages currently installed (`sharp` now ships Apache-2.0).
 
 ## Recommendations
-1. **No action required this cycle.** Posture is GREEN across all eight audit dimensions.
-2. Maintain the `cors-mutation-guard.test.ts` invariant and `server-only` Supabase boundary on any new API/data routes.
-3. Continue routing all new user-controlled SVG/markup fields through `escapeXml()` / `escapeHtml()`.
+1. **(High, low-effort)** Add `"esbuild": ">=0.28.1"` to the existing `pnpm.overrides` block in `package.json` (alongside `brace-expansion`, `minimatch`, etc.) and run `pnpm install` to clear both esbuild advisories. Dev-only, zero production exposure, but clears the audit to GREEN.
+2. **(Nice-to-have)** Route `PostHogProvider.tsx:8-9` reads of `NEXT_PUBLIC_POSTHOG_KEY/HOST` through `lib/env.ts` for consistency (access-pattern only — both vars are non-sensitive publishable values; no security gap).
