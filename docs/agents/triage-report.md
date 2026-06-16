@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-06-14 | 6 reports processed | 4 action items | 0 Dependabot PRs
+> Generated on 2026-06-16 | 4 reports processed | 2 action items | 1 Dependabot PR
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -7,31 +7,29 @@ None — all agents ran successfully.
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `cost-analyst-report.md` | cost-analyst | GREEN | 0 — cost surface unchanged, no new P1/P2/P3 items |
-| 2 | `performance-report.md` | performance | GREEN | 1 — add dependency-state check before build measurements |
-| 3 | `coverage-report.md` | coverage | GREEN | 1 — serialize shared-host vitest-heavy agent runs |
-| 4 | `documentation-report.md` | documentation | GREEN | 2 — JSDoc item already resolved; clarify client `NEXT_PUBLIC_*` env audit rule |
-| 5 | `cc-rpi-update-report.md` | cc-rpi-update | GREEN | 0 — already up to date at v1.19.0 |
-| 6 | `qa-report.md` | qa | GREEN | 0 — all quality gates clean |
+| 1 | `cost-analyst-report.md` | cost-analyst | GREEN | 0 (P2-1 + M7/M8 threshold-gated carries) |
+| 2 | `coverage-report.md` | coverage | GREEN | 0 (7,594/7,594 tests, 96.78% stmts, 0 flaky) |
+| 3 | `security-report.md` | security | YELLOW | 1 — esbuild advisory override |
+| 4 | `cc-rpi-update-report.md` | cc-rpi-update | GREEN | 0 (already at v1.20.0) |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
 | # | Item | Source Report | Tests Added | Status |
 |---|------|--------------|-------------|--------|
-| 1 | Updated `performance_agent` prompt to run `pnpm install --frozen-lockfile` before `pnpm run build` so stale `node_modules` cannot invalidate bundle measurements. | performance | `agent-config.test.ts` prompt assertion | Done |
-| 2 | Added shared `acquire_agent_lock` / `release_agent_lock` helpers using atomic `mkdir` locks. | coverage | `agent-utils.test.ts` lock acquire/release and timeout tests | Done |
-| 3 | Wrapped coverage and QA scheduled Claude runs in the shared `vitest-heavy-agent` lock to avoid concurrent full-suite runs on the same host. | coverage / qa | Covered by lock utility tests | Done |
-| 4 | Updated `documentation_agent` prompt so direct `NEXT_PUBLIC_*` reads in client components are not flagged when used for Next.js build-time inlining. Confirmed `getSessionSecret` JSDoc was already present. | documentation | `agent-config.test.ts` prompt assertion | Done |
+| 1 | Added `"esbuild": ">=0.28.1"` to `pnpm.overrides` — clears GHSA-gv7w-rqvm-qjhr (high) and GHSA-g7r4-m6w7-qqqr (low). Both dev-only via vite/vitest, zero production exposure. Resolves to esbuild@0.28.1 in lockfile. | security-report.md | N/A (dep override) | ✅ Done |
+| 2 | Removed stale `"svix": "1.92.2"` exact pin from `pnpm.overrides`. `apps/web/package.json` already specified `^1.95.2`; the pin was blocking the upgrade. Lockfile now resolves svix@1.95.2. | Dependabot PR #854 | N/A (dep upgrade) | ✅ Done |
 
 ## Dependabot PRs
-None — no open Dependabot PRs.
+| # | PR | Update Type | Disposition | Notes |
+|---|-----|------------|-------------|-------|
+| 854 | svix 1.92.2→1.95.2 | minor | Closed as superseded | Stale `"svix": "1.92.2"` exact pin in `pnpm.overrides` was blocking upgrade; resolved directly in develop via commit 89109bf1 |
 
 ## Verification
-- [x] All tests passing — `pnpm run test` passed 7,594/7,594 tests across 445 files
-- [x] Typecheck clean — `pnpm run typecheck`
-- [x] Lint clean — `pnpm run lint`
-- [x] CI green — GitHub Actions run 27489854487 passed
+- [x] All tests passing — 7,594/7,594
+- [x] Typecheck clean
+- [x] Lint clean
+- [ ] CI green (monitoring in background)
 
 ## Carried Items
 | Item | Source | Notes |
