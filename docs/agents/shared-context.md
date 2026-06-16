@@ -28,6 +28,19 @@
 - [Coverage]: lib/cache 98.13%, lib/db 96.48%, app/api 97.48% — all stable per coverage 2026-06-14. No cost-path coverage gaps.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=triage timestamp=2026-06-16T16:11:00Z -->
+## Triage — 2026-06-16
+- **Reports processed**: 4 (cost-analyst GREEN, coverage GREEN, security YELLOW, cc-rpi GREEN)
+- **Action items resolved**: 2 — removed stale `"svix": "1.92.2"` exact pin from `pnpm.overrides` (was blocking the intended `^1.95.2` upgrade in `apps/web/package.json`); added `"esbuild": ">=0.28.1"` override to clear GHSA-gv7w-rqvm-qjhr (high) and GHSA-g7r4-m6w7-qqqr (low) dev-only advisories. `pnpm audit` clean after install.
+- **Dependabot**: PR #854 (svix patch 1.92.2→1.95.2) — closed as superseded; lockfile now resolves svix@1.95.2 directly after removing the conflicting override.
+- **Summary**: Security cleared to GREEN. 7,594/7,594 tests, typecheck clean, lint clean.
+
+**Cross-agent recommendations:**
+- [Security]: `pnpm audit` should now be clean (0 advisories). esbuild@0.28.1 in lockfile. svix@1.95.2 in lockfile. Re-verify next cycle.
+- [Cost Analyst]: svix override removal has no cost-surface impact. esbuild is dev-only. P2-1 and M7/M8 carries unchanged.
+- [Coverage]: No coverage changes. 7,594 tests still passing at same coverage metrics.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-06-14T05:45:55Z -->
 ## Triage — 2026-06-14
 - **Reports processed**: 6 (cost-analyst GREEN, performance GREEN, coverage GREEN, documentation GREEN, cc-rpi-update GREEN, qa GREEN)
@@ -93,43 +106,6 @@
 - [Cost Analyst]: All GREEN. Cost surface unchanged. P2-1 (threshold-gated `dbGetCampaignStats()`) and MONITOR M7/M8 carries unchanged.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-06T10:00:00Z -->
-## Triage — 2026-06-06
-- **Reports processed**: 4 (cc-rpi GREEN, cost-analyst GREEN, coverage GREEN, documentation GREEN)
-- **Action items resolved**: 0 — all reports GREEN with no new action items
-- **Dependabot**: PR #848 gitleaks/gitleaks-action 2→3 (major) deferred — second consecutive deferral, requires human review of breaking changes.
-- **Summary**: Clean all-GREEN cycle. 7590/7590 tests, 96.77% coverage, zero cost regressions, docs 100% current. HEAD still at `e275ae6c` (21st consecutive carry).
-
-**Cross-agent recommendations:**
-- [QA]: Coverage stable at 7590/7590, 96.77% stmts. All prior P3 carries (Canvas/WebGL, flag-gated, lazy wrappers) remain accepted.
-- [Security]: No regressions. RLS 10/10 FORCE, `pnpm audit` clean, SVG escape intact. PR #848 (gitleaks major) awaiting human review.
-- [Cost Analyst]: All GREEN. No cost-surface changes. Carries P2-1 (threshold-gated) and MONITOR M7 unchanged.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-04T10:15:00Z -->
-## Triage — 2026-06-04
-- **Reports processed**: 7 (cc-rpi GREEN, cost-analyst GREEN, coverage GREEN, documentation GREEN, performance GREEN, qa GREEN, security GREEN)
-- **Action items resolved**: 3 — (1) JSDoc added to 8 campaign-send DB helpers in `lib/db/campaigns.ts` (including lease-token concurrency semantics); (2) `vitest.setup.ts` localStorage polyfill for Node.js 26 compatibility (fixes 119 test regressions across 2 files); (3) `UserMenu.tsx` null-safe `window.localStorage` check.
-- **Dependabot**: PR #849 production group (6 updates, CI green) auto-merged; PR #848 gitleaks/gitleaks-action 2→3 (major) deferred for human review.
-- **Summary**: All GREEN cycle. Documentation polish applied. Node.js 26 compatibility regression fixed (localStorage undefined in vitest JSDOM). 7590/7590 tests passing.
-
-**Cross-agent recommendations:**
-- [QA]: Node.js 26 breaks JSDOM localStorage unless polyfilled — `vitest.setup.ts` now has the fix. Re-run QA agent to confirm 7590/7590.
-- [Security]: No regressions. JSDoc additions are doc-only; UserMenu localStorage null-check is purely defensive.
-- [Cost Analyst]: No cost-surface changes. Carries unchanged: P2-1 (threshold-gated) and MONITOR M7.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-05-25T13:02:00Z -->
-## Triage — 2026-05-25
-- **Reports processed**: 5 (cc-rpi-update GREEN, cost-analyst GREEN, coverage FAILED, security YELLOW, documentation GREEN)
-- **Action items resolved**: 2 code fixes + 1 noted agent failure + 1 Dependabot auto-merge
-- **Summary**: Security YELLOW cleared — `brace-expansion` override bumped `>=5.0.5→>=5.0.6` (GHSA-jxxr-4gwj-5jf2, moderate, dev-only); `pnpm audit` now reports 0 vulnerabilities. Cost P3 carry resolved — wrapped `pingGitHub` with `unstable_cache(revalidate=60)` in `/api/health/route.ts` so concurrent probes share one GitHub call. Documentation low-priority items already resolved in prior cycle (light-value columns present in `docs/design-system.md`). Coverage agent login failure noted — no code fix possible; re-run manually. Dependabot PR #847 (production group, 5 updates, all CI green) auto-merged.
-
-**Cross-agent recommendations:**
-- [Coverage]: Coverage agent failed with "Not logged in" — re-run required. Prior coverage baseline: 7590 tests (+1 from this cycle), lib/cache 98.1%, lib/db 96.5%, app/api 97.5%.
-- [Security]: `brace-expansion` CVE cleared. `pnpm audit` now 0 vulnerabilities. All other security posture unchanged (RLS 11/11, CORS guard, SVG escape, server-only boundary).
-- [Cost Analyst]: Health endpoint GitHub probe now cached at 60 s via `unstable_cache`. P3 carry resolved. P2-1 (`dbGetCampaignStats` GROUP BY RPC) remains threshold-gated at cycle 25 — no change.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation timestamp=2026-06-05T10:00:00Z -->
 ## Documentation Agent — 2026-06-05
