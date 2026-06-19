@@ -11,15 +11,14 @@ const {
   mockFetchReceivedEmail,
   mockForwardEmail,
   mockRateLimit,
-  mockCacheSetNx,
-  mockCacheGet,
+  mockCacheSetNxStatus,
 } = vi.hoisted(() => ({
   mockVerifyWebhookSignature: vi.fn(),
   mockFetchReceivedEmail: vi.fn(),
   mockForwardEmail: vi.fn(),
   mockRateLimit: vi.fn(),
-  mockCacheSetNx: vi.fn(),
-  mockCacheGet: vi.fn(),
+  // BE-L2: route now uses cacheSetNxStatus (not cacheSetNx + cacheGet)
+  mockCacheSetNxStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/email/resend", () => ({
@@ -30,8 +29,7 @@ vi.mock("@/lib/email/resend", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
-  cacheSetNx: mockCacheSetNx,
-  cacheGet: mockCacheGet,
+  cacheSetNxStatus: mockCacheSetNxStatus,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -93,8 +91,8 @@ function makeEmailReceivedPayload(emailId: string): string {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
-  mockCacheSetNx.mockResolvedValue(true);
-  mockCacheGet.mockResolvedValue(null);
+  // Default: key newly acquired — first delivery
+  mockCacheSetNxStatus.mockResolvedValue("acquired");
 });
 
 // ---------------------------------------------------------------------------
@@ -220,8 +218,8 @@ describe("POST /api/webhooks/resend", () => {
 
   it("returns 200 and skips forwarding when the svix event was already processed", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
-    mockCacheSetNx.mockResolvedValueOnce(false);
-    mockCacheGet.mockResolvedValueOnce(1);
+    // BE-L2: cacheSetNxStatus returns "exists" → already processed
+    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
 
     const req = makeRequest(emailReceivedPayload, validHeaders);
 
@@ -235,10 +233,10 @@ describe("POST /api/webhooks/resend", () => {
     expect(mockForwardEmail).not.toHaveBeenCalled();
   });
 
-  it("fails open when dedupe storage is unavailable", async () => {
+  it("BE-L2: skip-forwards when Redis is unavailable (avoids silently dropping support emails)", async () => {
     mockVerifyWebhookSignature.mockReturnValueOnce(true);
-    mockCacheSetNx.mockResolvedValueOnce(false);
-    mockCacheGet.mockResolvedValueOnce(null);
+    // "unavailable" → Redis is down; chosen behaviour: skip-forward (process)
+    mockCacheSetNxStatus.mockResolvedValueOnce("unavailable");
     mockFetchReceivedEmail.mockResolvedValueOnce(sampleEmail);
     mockForwardEmail.mockResolvedValueOnce({ id: "fwd_123" });
 
@@ -249,8 +247,23 @@ describe("POST /api/webhooks/resend", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("forwarded");
+    // Must NOT return "already_processed" — that would silently drop the email
+    expect(body.status).not.toBe("already_processed");
     expect(mockFetchReceivedEmail).toHaveBeenCalledOnce();
     expect(mockForwardEmail).toHaveBeenCalledOnce();
+  });
+
+  it("BE-L2: does NOT duplicate-forward when Redis confirms the event is known (exists)", async () => {
+    mockVerifyWebhookSignature.mockReturnValueOnce(true);
+    mockCacheSetNxStatus.mockResolvedValueOnce("exists");
+
+    const req = makeRequest(emailReceivedPayload, validHeaders);
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(mockFetchReceivedEmail).not.toHaveBeenCalled();
+    expect(mockForwardEmail).not.toHaveBeenCalled();
   });
 
   it("passes correct params to forwardEmail", async () => {
@@ -338,6 +351,7 @@ describe("POST /api/webhooks/resend — rate limiting", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+    mockCacheSetNxStatus.mockResolvedValue("acquired");
   });
 
   it("returns 429 when rate limited", async () => {
