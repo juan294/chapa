@@ -141,6 +141,8 @@ Credentials saved to ~/.chapa/credentials.json
 
 Your credentials are stored locally at `~/.chapa/credentials.json` with restricted file permissions (readable only by you). The token expires after 90 days — just run `chapa login` again to refresh.
 
+> **Device binding (v0.3.0+):** The first poll during `chapa login` returns a `device_code` that the CLI echoes on all subsequent polls. This binds the authorization session to the initiating device and prevents session hijacking if the session ID is intercepted. Legacy CLI versions that do not echo the `device_code` continue to work — the binding step is backward-compatible.
+
 ### Log out (when needed)
 
 To clear your credentials later (e.g., switching accounts or revoking access):

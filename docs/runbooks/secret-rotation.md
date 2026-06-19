@@ -72,6 +72,48 @@ Rotate secrets immediately if any of the following happen:
 
 **Impact:** Scheduled cron jobs (`/api/cron/*`) will fail until the new deployment is live.
 
+## BITBUCKET_CLIENT_SECRET
+
+1. Go to your Bitbucket workspace settings → **OAuth consumers** →
+   select the Chapa consumer.
+2. Click **Edit** → **Regenerate secret**.
+3. Copy the new secret.
+4. Update in Vercel: **Project Settings → Environment Variables →
+   BITBUCKET_CLIENT_SECRET** (Production scope).
+5. Redeploy.
+
+**Impact:** Active Bitbucket-linked sessions are unaffected (the secret is only
+used during the OAuth code-exchange flow). New Bitbucket connect attempts will
+use the new secret.
+
+## CODEBERG_CLIENT_SECRET
+
+1. Go to your Codeberg account → **Settings → Applications →
+   OAuth2 Applications** → select the Chapa app.
+2. Click **Regenerate client secret**.
+3. Copy the new secret.
+4. Update in Vercel: **Project Settings → Environment Variables →
+   CODEBERG_CLIENT_SECRET** (Production scope).
+5. Redeploy.
+
+**Impact:** Active Codeberg-linked sessions are unaffected. New Codeberg connect
+attempts will use the new secret.
+
+## GITLAB_CLIENT_SECRET
+
+1. Go to your GitLab account (or the GitLab group, if using a group application)
+   → **Applications** → select the Chapa app.
+2. Click **Renew secret**.
+3. Copy the new secret immediately (it is shown only once).
+4. Update in Vercel: **Project Settings → Environment Variables →
+   GITLAB_CLIENT_SECRET** (Production scope).
+5. Redeploy.
+
+**Impact:** Active GitLab-linked sessions may break if the stored refresh token
+becomes invalid after the secret rotation (GitLab ties refresh token validity to
+the application secret). Affected users will need to re-connect their GitLab
+account via the User Menu.
+
 ## After Any Rotation
 
 1. Verify the affected endpoint works:

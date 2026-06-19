@@ -89,7 +89,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/recalculate` Recalculate impact scores
 - GET `/api/insights/:handle` AI tool insights for a user
 - POST `/api/insights` Submit tool insights data
-- GET `/api/cli/auth/poll` CLI device auth polling
+- GET `/api/cli/auth/poll` CLI device auth polling (RFC 8628-style: first poll issues + returns a `device_code`; subsequent polls from the CLI should echo it to bind the session to the initiating device; legacy CLIs that omit it still work)
 - POST `/api/cli/auth/approve` CLI device auth approval
 
 ### Admin API
@@ -140,17 +140,18 @@ Shared types live in: `packages/shared/src/types.ts`
 ## Badge branding
 Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg, GitLab).
 - Personal badges show only logos for platforms the user has connected
-- Demo badges show all 3 platform logos
+- Demo badges show all 4 platform logos (GitHub, Bitbucket, Codeberg, GitLab)
 - Branding is behind a flag: `includeBranding`
 - Branding is isolated in `apps/web/lib/render/BadgeBranding.tsx`
 - Avatar placeholder (when no user photo) shows the Chapa shield icon
 
 ## Caching rules
 - Cache computed stats + impact per user/day (TTL 24h)
-- Cache SVG output per user/day + theme (TTL 24h)
+- Cache SVG output per user/day + theme (TTL 24h + per-handle jitter of 0–2h to spread UTC-midnight recompute spikes)
 - **Lifetime metrics**: `MetricsSnapshot` records stored in Supabase `metrics_snapshots` table — permanent history. Max 1 snapshot per user per day (UNIQUE constraint on handle+date). Captured automatically by cron warm-cache, badge route `after()`, and refresh endpoint.
 - **Supplemental EMU stats**: durably stored in Supabase `supplemental_stats` table (one row per `target_handle`). Redis (`supplemental:<handle>`, 24h TTL) is the hot read path; on miss, `getStats()` falls back to Supabase and rehydrates Redis via fire-and-forget. A missed CLI upload day no longer drops EMU data from scores.
 - **Same-day refresh signal**: a CLI supplemental upload sets `stats:dirty:<handle>` in Redis (1h TTL). `materializeProfile` reads the marker and the smoothing policy bypasses the same-day EMA lock so the user sees the new score immediately; `runPublicProfileSideEffects` then routes today's snapshot through `dbReplaceSnapshot` (UPSERT) and clears the marker. Default behavior (no dirty marker) preserves the existing feedback-loop protection.
+- **Feature flags**: Async DB-backed flag reads live in `apps/web/lib/feature-flags.ts` (server-only). Synchronous client-safe helpers (`isStudioEnabledSync`, etc.) live in `apps/web/lib/feature-flags-sync.ts` — use the sync module in client components and middleware; use the async module in server actions and API routes.
 - **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`
@@ -158,6 +159,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 ## Code ownership areas
 - OAuth: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
 - GitHub data: `apps/web/lib/github/*`, `apps/web/lib/cache/*`
+- Platform integrations: `apps/web/lib/bitbucket/*`, `apps/web/lib/codeberg/*`, `apps/web/lib/gitlab/*`
 - Impact scoring: `apps/web/lib/impact/*`, types in `packages/shared`
 - SVG rendering: `apps/web/lib/render/*`, `apps/web/app/u/[handle]/badge.svg/route.ts`
 - Share page: `apps/web/app/u/[handle]/page.tsx`, `apps/web/components/*`
@@ -211,6 +213,7 @@ The app supports two locales: `es` (Spanish, default) and `en` (English). All pu
 ### Architecture
 - **Dictionaries**: `apps/web/lib/i18n/dictionaries/en.ts` and `es.ts` — both must be kept in sync (650+ leaf keys each). Run `pnpm run test` to verify key parity via `dictionaries/parity.test.ts`.
 - **Locale detection**: `apps/web/lib/i18n/detect.ts` — reads the `chapa-locale` cookie first, then `Accept-Language` header, falls back to `DEFAULT_LOCALE` ('es').
+- **Static rendering**: The root layout renders statically at `DEFAULT_LOCALE` (`es`) and ships only the active locale's dictionary to the client. Non-default locale dictionaries are loaded client-side on demand (after hydration) when the `chapa-locale` cookie indicates a different locale. This keeps content pages CDN-cacheable (ISR) at the cost of a brief locale flash for non-default-locale users.
 - **Server components**: `import { getServerT } from '@/lib/i18n/server'` — pass the `locale` from params/cookies.
 - **Client components**: `import { useTranslation } from '@/lib/i18n'` — returns `{ locale, t, setLocale }`. Always wraps in `LanguageProvider` on any real page.
 - **Key resolution**: `t('section.key')` returns a string (or subtree for intermediate keys). Leaf keys always return `string` — cast with `as string` when TypeScript needs it for HTML attrs.
@@ -302,6 +305,13 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 - All PRs must have CI green before merging. Run the full test suite locally before pushing.
 - After merging to develop, if production deployment is the goal, immediately create a PR from develop → main.
 
+### CI Gates (enforced in CI, must pass locally too)
+- **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
+- **`no-process-env` ESLint rule**: direct `process.env` access is banned outside `apps/web/lib/env.ts` (allowlisted). All env reads go through the centralized env module.
+- **`packages/shared` import boundary**: application code may not import from `packages/shared` via relative paths — use the workspace alias (`@chapa/shared`).
+- **Bundle-size budget**: the largest JS chunk must stay under 500 KB (checked in CI via build output analysis).
+- **Coverage thresholds**: configured in `vitest.config.ts` — CI fails if coverage drops below defined per-module thresholds.
+
 ## Test Conventions
 
 - **File placement:** Tests live next to source files: `impact.ts` → `impact.test.ts`
@@ -344,7 +354,7 @@ SUPABASE_SERVICE_ROLE_KEY= # Service role key (server-side only, never NEXT_PUBL
 
 NEXT_PUBLIC_POSTHOG_KEY=   # PostHog analytics
 NEXT_PUBLIC_POSTHOG_HOST=  # PostHog ingestion host
-CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1 operational alerts (Discord/Slack/custom — optional; triggers on health_degraded, badge_5xx, oauth_callback_failure)
+CHAPA_ALERT_WEBHOOK_URL=   # Webhook URL for P1 operational alerts (Discord/Slack/custom — optional; triggers on health_degraded, badge_5xx, oauth_callback_failure, cron_failure, warm_cache_high_failure_rate, warm_cache_ceiling_approached)
 
 RESEND_API_KEY=            # Resend email service (optional — email features degrade gracefully)
 RESEND_WEBHOOK_SECRET=     # Resend webhook HMAC secret (optional — webhook verification)

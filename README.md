@@ -8,7 +8,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-Generate a **live, embeddable, animated SVG badge** that showcases your developer impact from GitHub, Bitbucket, and Codeberg activity — with multi-dimensional scoring, verification, and one-click sharing.
+Generate a **live, embeddable, animated SVG badge** that showcases your developer impact from GitHub, Bitbucket, Codeberg, and GitLab activity — with multi-dimensional scoring, verification, and one-click sharing.
 
 <a href="https://chapa.thecreativetoken.com/u/juan294">
   <img src="https://chapa.thecreativetoken.com/u/juan294/badge.svg" alt="juan294's Chapa Impact Badge" width="100%" />
@@ -31,7 +31,7 @@ Chapa analyzes your last 12 months of activity across connected platforms and ge
 
 ### Multi-Platform Support
 
-Connect GitHub (primary), Bitbucket, and Codeberg to aggregate your impact across platforms. Stats are merged automatically — repos are summed, social metrics take the max to avoid double-counting mirrors.
+Connect GitHub (primary), Bitbucket, Codeberg, and GitLab to aggregate your impact across platforms. Stats are merged automatically — repos are summed, social metrics take the max to avoid double-counting mirrors.
 
 ### Embeddable Badge (`/u/:handle/badge.svg`)
 
@@ -108,6 +108,7 @@ chapa/
 │       ├── github/        # GraphQL client + stats aggregation + multi-platform merge
 │       ├── bitbucket/     # Bitbucket API client + stats aggregation
 │       ├── codeberg/      # Codeberg API client + stats aggregation
+│       ├── gitlab/        # GitLab API client + stats aggregation
 │       ├── history/       # Lifetime metric snapshots (Supabase)
 │       ├── i18n/          # Locale detection, dictionaries (en/es), server + client translation
 │       ├── impact/        # Impact v6 scoring engine
@@ -145,7 +146,7 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | Styling | Tailwind CSS v4 (dark theme, purple accent) |
 | Caching | Upstash Redis |
 | Database | Supabase (PostgreSQL) |
-| Data | GitHub GraphQL API, Bitbucket REST API, Codeberg/Gitea API |
+| Data | GitHub GraphQL API, Bitbucket REST API, Codeberg/Gitea API, GitLab REST API |
 | Analytics | PostHog |
 | Email | Resend |
 | CLI | Node.js, tsup, device auth flow |
@@ -172,6 +173,9 @@ An internal **confidence score** (50–100) reflects data completeness and gentl
 | `BITBUCKET_CLIENT_SECRET` | No | Bitbucket OAuth consumer secret |
 | `CODEBERG_CLIENT_ID` | No | Codeberg OAuth app client ID |
 | `CODEBERG_CLIENT_SECRET` | No | Codeberg OAuth app secret |
+| `GITLAB_CLIENT_ID` | No | GitLab OAuth app client ID |
+| `GITLAB_CLIENT_SECRET` | No | GitLab OAuth app secret |
+| `NEXT_PUBLIC_GITLAB_ENABLED` | No | Set to `"true"` to enable GitLab link/unlink in User Menu |
 | `CHAPA_VERIFICATION_SECRET` | No | Required in production for `/api/verify`; when unset outside production, verification is disabled |
 | `ADMIN_HANDLES` | No | Comma-separated admin GitHub handles |
 | `CRON_SECRET` | No | Required anywhere `/api/cron/*` should run; cron routes return 503 when it is unset |

@@ -103,9 +103,21 @@ curl -I https://chapa.thecreativetoken.com/u/<known-handle>/badge.svg
 
 If anything is wrong: **roll back immediately** (see `docs/runbooks/rollback.md`), then investigate on `develop`.
 
-## Notes on the Current Backlog Gap
+## Notes on the Release Gap
 
-As of April 2026, `develop` is approximately 41 commits ahead of `main`. Before the next release:
+The commit distance between `develop` and `main` grows with each development
+cycle. Before any release, check the current gap with:
+
+```bash
+git log main..develop --oneline | wc -l
+```
+
+Before the next release:
+
 1. Run the full checklist above against a fresh preview deployment.
-2. Prioritize `pnpm run test && pnpm run typecheck` — these catch most regressions automatically.
-3. Manually test the badge SVG and OAuth flows — these are the highest-impact user paths.
+2. Prioritize `pnpm run test && pnpm run typecheck` — these catch most
+   regressions automatically.
+3. Manually test the badge SVG and OAuth flows — these are the highest-impact
+   user paths.
+4. Confirm all new CI gates pass (`check:circular`, `no-process-env` lint rule,
+   bundle-size budget, coverage thresholds).
