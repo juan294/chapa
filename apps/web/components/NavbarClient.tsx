@@ -4,8 +4,15 @@ import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { NavLink } from "./NavLink";
+import { MobileNav } from "./MobileNav";
 import { useSession } from "@/hooks/useSession";
 import { useTranslation } from "@/lib/i18n";
+
+interface NavLinkItem {
+  label: string;
+  href: string;
+}
 
 /**
  * Client-side Navbar variant for ISR-compatible pages.
@@ -17,7 +24,7 @@ import { useTranslation } from "@/lib/i18n";
  * to serve the page via ISR (Incremental Static Regeneration).
  */
 
-export function NavbarClient() {
+export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   const { session } = useSession();
   const { t } = useTranslation();
 
@@ -30,6 +37,25 @@ export function NavbarClient() {
             Chapa<span className="text-amber animate-cursor-blink">_</span>
           </span>
         </Link>
+
+        {/* Center: Command hints (desktop) */}
+        {navLinks && navLinks.length > 0 && (
+          <div className="hidden md:flex items-center gap-4 font-heading text-xs text-terminal-dim">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.label}
+                href={link.href}
+                label={link.label}
+                className="transition-colors hover:text-text-secondary"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Mobile nav toggle */}
+        {navLinks && navLinks.length > 0 && (
+          <MobileNav links={navLinks} />
+        )}
 
         {/* Right: Language switcher + Theme toggle + User or login */}
         <div className="flex items-center gap-1 sm:gap-2">

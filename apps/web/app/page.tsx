@@ -103,6 +103,8 @@ export default async function Home({
   // the user's cookie locale on hydration — same pattern as the share page.
   const t = getServerT(DEFAULT_LOCALE);
 
+  const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
+
   const hero = t('landing.hero') as unknown as Record<string, string | string[]>;
   const heroTitle = hero.title as string;
   const heroHighlight = hero.highlight as string;
@@ -132,7 +134,7 @@ export default async function Home({
     <div className="bg-bg min-h-screen text-text-primary">
       <LocaleSync queryLang={lang} />
       {errorMessage && <ErrorBanner message={errorMessage} />}
-      <NavbarClient />
+      <NavbarClient navLinks={navLinks} />
 
       <main id="main-content">
         {/* ── Terminal session ─────────────────────────────── */}
