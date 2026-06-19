@@ -9,6 +9,22 @@
 > 4. Maximum 3 entries per agent type — remove the oldest when adding a new one
 > 5. Be specific with findings — numbers, file paths, and actionable items
 
+<!-- ENTRY:START agent=documentation timestamp=2026-06-19T10:00:00Z -->
+## Documentation Agent — 2026-06-19
+- **Status**: GREEN
+- Stale docs: 0 | Missing docs: 0 | Env var mismatches: 0
+- Route coverage: **84 filesystem files (34 page.tsx + 50 route.ts) — 100% documented in CLAUDE.md**. No undocumented routes, no documented-but-missing routes. HEAD advanced `5ef06c09 → b6cb414d` since last cycle via dependency bumps, triage fixes, and agent report chores only — no route/API/env changes.
+- Design system: **38/38 `--color-*` tokens** in `docs/design-system.md` match `apps/web/styles/globals.css` exactly. Zero drift, zero orphans.
+- Env vars: **all 32 production vars documented** (100%). All app config flows through `lib/env.ts`. `ANALYZE` correctly absent from env.ts (consumed by next.config.ts). Zero undocumented vars, zero documented-but-unused vars.
+- JSDoc: `lib/impact/v6.ts` 9/9, `lib/cache/redis.ts` 15/17 (gaps on `RateLimitResult` interface and `CacheSetNxStatus` type — self-explanatory, P3), `lib/db/campaigns.ts` 16/22 (gaps on 6 type/interface exports + CampaignRowSchema — all functions fully documented, P3), `lib/auth/session.ts` 7/7, `lib/github/client.ts` 2/2.
+- Required docs all present/non-empty: `impact-v4.md` (131, deprecated), `impact-v5.md` (152), `impact-v6.md` (287, current truth), `svg-design.md` (173).
+- TODO/FIXME doc-gap scan: 1 false positive (`lib/agents/agent-config.ts:8` = this prompt's own template text). No real gaps.
+
+**Cross-agent recommendations:**
+- [QA]: No documentation-related UX issues. All user-facing routes documented; no doc changes affect runtime behavior. 84 routes fully covered.
+- [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars confirmed non-sensitive; `server-only` Supabase boundary and admin-auth routes documented in CLAUDE.md. No undocumented exports with security surface.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-06-19T03:00:00Z -->
 ## Cost Analyst — 2026-06-19
 - **Status**: GREEN
@@ -183,21 +199,6 @@
 - [Security]: No outdated security docs. `docs/accepted-risks.md` present. All `NEXT_PUBLIC_*` vars confirmed non-sensitive and documented. OAuth flows (GitHub, Bitbucket, Codeberg) and HMAC verification (`docs/badge-verification.md`) docs align with current implementation.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=documentation timestamp=2026-05-29T10:00:00Z -->
-## Documentation Agent — 2026-05-29
-- **Status**: GREEN
-- Route coverage: **44/44 API routes + 6 special routes + 34 page files documented** (100%). Cross-checked every `route.ts`/`page.tsx` in `apps/web/app/` against CLAUDE.md — no undocumented routes, no documented-but-missing routes. New-since-prior: none (HEAD `2d7eb73c`).
-- Design system: **38/38 `--color-*` tokens** in `docs/design-system.md` exactly match `apps/web/styles/globals.css`. Zero drift, zero orphans either direction.
-- Env vars: **all production vars documented** (100%). Verified against `lib/env.ts` + `process.env.*` grep. `CI`/`NODE_ENV`/`ANALYZE`/`DEPLOYMENT_SMOKE_STRICT`/`PLAYWRIGHT_BASE_URL` are standard build/test vars (intentional omissions). `CHAPA_ALERT_WEBHOOK_URL` now in CLAUDE.md env block (prior 05-08 gap RESOLVED).
-- Required docs: all present/non-empty — `impact-v4.md` (131, deprecated), `impact-v5.md` (152), `impact-v6.md` (287, current truth), `svg-design.md` (173), `README.md` (224, Quick Start at L75), `design-system.md` (236), `shared-context.md` (548).
-- JSDoc: `lib/impact/v6.ts` 9/9, `lib/cache/redis.ts` 13/13, `lib/github/client.ts` 2/2, `lib/auth/session.ts` now documented (prior gap resolved). **NEW low-priority gap**: `lib/db/campaigns.ts` — several campaign-send helpers lack JSDoc; notably `dbClaimPendingSends` (`campaigns.ts:626`) has non-obvious lease-token/expiry concurrency semantics worth documenting; `dbMarkSendsSent`/`dbMarkSendsFailed` optional `leaseToken` contract undocumented.
-- TODO/FIXME doc-gap scan: 1 false positive (`lib/agents/agent-config.ts:281` = this prompt's own template text).
-- Report written to `docs/agents/documentation-report.md`. Stale docs: 0. Missing docs: 1 (low). Env mismatches: 0.
-
-**Cross-agent recommendations:**
-- [QA]: No documentation-related UX issues. All user-facing routes documented. No doc changes affect runtime behavior.
-- [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars confirmed non-sensitive; `server-only` Supabase boundary and admin-auth routes all documented in CLAUDE.md. Campaign-send lease helpers (admin-only) are the only undocumented exports — no security exposure.
-<!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-05-22T07:26:10Z -->
 ## Documentation Agent — 2026-05-22
