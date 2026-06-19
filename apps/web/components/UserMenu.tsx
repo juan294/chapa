@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isInsightsEnabledSync } from "@/lib/feature-flags-sync";
+import {
+  isInsightsEnabledSync,
+  isBitbucketEnabledSync,
+  isCodebergEnabledSync,
+  isGitlabEnabledSync,
+} from "@/lib/feature-flags-sync";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
@@ -85,20 +90,34 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   } | null>(null);
   const handleToastDismiss = useCallback(() => setToast(null), []);
 
-  // Insights cooldown — read last-submitted timestamp from localStorage on mount
+  // Insights cooldown — read last-submitted timestamp from localStorage.
+  // State is seeded with deterministic defaults (0 / null) so the initial
+  // server and client renders match; the real values are populated in a
+  // mount-time effect below to avoid hydration mismatches and the use of
+  // Date.now()/localStorage inside a useState initializer (#892).
   const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-  const [insightsNow, setInsightsNow] = useState(() => Date.now());
-  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(() => {
-    if (typeof window === "undefined" || !window.localStorage) return null;
+  const [insightsNow, setInsightsNow] = useState(0);
+  const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(null);
+
+  useEffect(() => {
+    // Read the cooldown timestamp from localStorage and capture "now" AFTER
+    // mount so the initial server/client render stays deterministic (#892):
+    // we never call Date.now() or touch localStorage inside a useState
+    // initializer. Setting state here is the intended client-only hydration of
+    // browser-derived values; the rule below is a false positive for that case.
+    setInsightsNow(Date.now()); // eslint-disable-line react-hooks/set-state-in-effect
+    if (typeof window === "undefined" || !window.localStorage) return;
     const stored = window.localStorage.getItem(insightsStorageKey);
-    if (!stored) return null;
+    if (!stored) return;
     try {
       const date = new Date(stored);
-      return Number.isNaN(date.getTime()) ? null : date;
+      if (!Number.isNaN(date.getTime())) {
+        setInsightsLastSubmitted(date);
+      }
     } catch {
-      return null;
+      // Ignore malformed stored values — cooldown stays inactive.
     }
-  });
+  }, [insightsStorageKey]);
   const insightsCooldownActive =
     insightsLastSubmitted !== null &&
     insightsNow - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
@@ -190,8 +209,11 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     if (platformStatusCache.fetched) {
       return;
     }
-    // Server returns { enabled: false } if flag is off — no client-side
-    // sync flag checks needed. Fixes #632.
+    // Only probe the status endpoint for platforms whose public feature flag is
+    // enabled. When an integration is flag-gated OFF we skip the network call
+    // entirely instead of relying on the server to answer `{ enabled: false }`,
+    // avoiding wasted requests on every mount (#885). The server still has the
+    // final say for enabled platforms.
     function fetchPlatformStatus(
       platform: "bitbucket" | "codeberg" | "gitlab",
       setter: typeof setBbStatus,
@@ -210,61 +232,69 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         () => undefined,
       ); // Graceful — menu works without status
     }
-    fetchPlatformStatus("bitbucket", setBbStatus);
-    fetchPlatformStatus("codeberg", setCbStatus);
-    fetchPlatformStatus("gitlab", setGlStatus);
+    if (isBitbucketEnabledSync()) fetchPlatformStatus("bitbucket", setBbStatus);
+    if (isCodebergEnabledSync()) fetchPlatformStatus("codeberg", setCbStatus);
+    if (isGitlabEnabledSync()) fetchPlatformStatus("gitlab", setGlStatus);
     platformStatusCache.fetched = true;
   }, []);
 
-  async function handleUnlinkBitbucket() {
-    setUnlinkLoading(true);
-    try {
-      const res = await fetch("/api/auth/bitbucket/disconnect", { method: "POST" });
-      if (res.ok) {
-        clearPlatformStatusCache();
-        setBbStatus({ linked: false, remoteLogin: null });
-        setShowUnlinkConfirm(false);
-        router.refresh();
+  // Shared unlink flow — collapses the three near-identical platform disconnect
+  // handlers into one parametrized helper (#884). Each named handler below
+  // supplies only its platform-specific endpoint and state setters; the fetch,
+  // success transition (cache clear + router refresh), graceful-failure, and
+  // loading-state bookkeeping live here once.
+  type PlatformStatusSetter = typeof setBbStatus;
+  const unlinkPlatform = useCallback(
+    async (config: {
+      endpoint: string;
+      setLoading: (loading: boolean) => void;
+      setStatus: PlatformStatusSetter;
+      setShowConfirm: (show: boolean) => void;
+    }) => {
+      const { endpoint, setLoading, setStatus, setShowConfirm } = config;
+      setLoading(true);
+      try {
+        const res = await fetch(endpoint, { method: "POST" });
+        if (res.ok) {
+          clearPlatformStatusCache();
+          setStatus({ linked: false, remoteLogin: null });
+          setShowConfirm(false);
+          router.refresh();
+        }
+      } catch {
+        // Graceful failure — user can try again
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // Graceful failure — user can try again
-    } finally {
-      setUnlinkLoading(false);
-    }
+    },
+    [router],
+  );
+
+  async function handleUnlinkBitbucket() {
+    await unlinkPlatform({
+      endpoint: "/api/auth/bitbucket/disconnect",
+      setLoading: setUnlinkLoading,
+      setStatus: setBbStatus,
+      setShowConfirm: setShowUnlinkConfirm,
+    });
   }
 
   async function handleUnlinkCodeberg() {
-    setCbUnlinkLoading(true);
-    try {
-      const res = await fetch("/api/auth/codeberg/disconnect", { method: "POST" });
-      if (res.ok) {
-        clearPlatformStatusCache();
-        setCbStatus({ linked: false, remoteLogin: null });
-        setShowCbUnlinkConfirm(false);
-        router.refresh();
-      }
-    } catch {
-      // Graceful failure
-    } finally {
-      setCbUnlinkLoading(false);
-    }
+    await unlinkPlatform({
+      endpoint: "/api/auth/codeberg/disconnect",
+      setLoading: setCbUnlinkLoading,
+      setStatus: setCbStatus,
+      setShowConfirm: setShowCbUnlinkConfirm,
+    });
   }
 
   async function handleUnlinkGitlab() {
-    setGlUnlinkLoading(true);
-    try {
-      const res = await fetch("/api/auth/gitlab/disconnect", { method: "POST" });
-      if (res.ok) {
-        clearPlatformStatusCache();
-        setGlStatus({ linked: false, remoteLogin: null });
-        setShowGlUnlinkConfirm(false);
-        router.refresh();
-      }
-    } catch {
-      // Graceful failure
-    } finally {
-      setGlUnlinkLoading(false);
-    }
+    await unlinkPlatform({
+      endpoint: "/api/auth/gitlab/disconnect",
+      setLoading: setGlUnlinkLoading,
+      setStatus: setGlStatus,
+      setShowConfirm: setShowGlUnlinkConfirm,
+    });
   }
 
   async function handleSignOut() {

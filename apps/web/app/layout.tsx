@@ -9,6 +9,12 @@ import { isStudioEnabled } from "@/lib/feature-flags";
 import { renderJsonLd } from "@/lib/jsonld";
 import { LanguageProvider, LangSync } from "@/lib/i18n";
 import { getServerLocale } from "@/lib/i18n/server";
+// Server-only dictionary imports: this is a server component, so these never
+// ship in the client JS bundle. Only the ACTIVE locale's dictionary is passed
+// to the client LanguageProvider (serialized into the RSC payload), so the
+// inactive locale's strings never reach the client (#862).
+import { en } from "@/lib/i18n/dictionaries/en";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -73,6 +79,8 @@ export default async function RootLayout({
 }) {
   const studioEnabled = await isStudioEnabled();
   const locale = await getServerLocale();
+  // Pass ONLY the active locale's dictionary to the client provider.
+  const dictionary = locale === "es" ? es : en;
 
   return (
     <html
@@ -127,7 +135,7 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider>
-          <LanguageProvider initialLocale={locale}>
+          <LanguageProvider initialLocale={locale} dictionary={dictionary}>
             <LangSync />
             <ClientFeatureFlagsProvider studioEnabled={studioEnabled}>
               {children}
