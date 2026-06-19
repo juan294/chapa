@@ -19,6 +19,7 @@ import {
   type CommandAction,
 } from "@/components/terminal/command-registry";
 import { useKeyboardShortcutsContext } from "@/components/KeyboardShortcutsListener";
+import { useTranslation } from "@/lib/i18n";
 
 export interface StudioClientProps {
   initialConfig: BadgeConfig;
@@ -55,6 +56,7 @@ export function StudioClient({
   impact,
   handle = "",
 }: StudioClientProps) {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<BadgeConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -63,10 +65,10 @@ export function StudioClient({
   const reducedMotion = useReducedMotion();
   const hasTrackedOpen = useRef(false);
 
-  // Terminal state
+  // Terminal state — seed lines use t() so they follow the user's locale
   const [lines, setLines] = useState<OutputLine[]>([
-    makeLine("system", "Creator Studio — customize your badge"),
-    makeLine("dim", "Type /help for commands or use Quick Controls."),
+    makeLine("system", t('studio.terminalWelcome') as string),
+    makeLine("dim", t('studio.terminalHint') as string),
   ]);
   const [history, setHistory] = useState<string[]>([]);
   const [partial, setPartial] = useState("");

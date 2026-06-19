@@ -6,6 +6,8 @@ import type { HeatmapDay } from "@chapa/shared";
 import { computeActivityInsights } from "./activity-insights";
 import { formatIsoDate } from "@/lib/utils/date";
 import { seededRandom } from "@/lib/utils/prng";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -132,6 +134,7 @@ export function ActivityHeatmap({
   activeDays,
   dimensions,
 }: ActivityHeatmapProps) {
+  const { t } = useTranslation();
   const insights = useMemo(
     () => computeActivityInsights(heatmapData),
     [heatmapData]
@@ -145,7 +148,7 @@ export function ActivityHeatmap({
 
   return (
     <section
-      aria-label="Contribution activity"
+      aria-label={t('aria.contributionActivity') as string}
       className="animate-fade-in-up"
       style={{ animationDelay: "2000ms" }}
     >
@@ -234,6 +237,7 @@ function StreakCard({
   longest: number;
   last7: boolean[];
 }) {
+  const { t } = useTranslation();
   return (
     <div className={CARD_CLASS}>
       <div className="flex items-center gap-3">
@@ -250,7 +254,7 @@ function StreakCard({
         </div>
         <div
           className="flex gap-1 items-center"
-          aria-label="Last 7 days activity"
+          aria-label={t('aria.last7DaysActivity') as string}
           role="img"
         >
           {last7.map((active, i) => (
@@ -462,6 +466,7 @@ function DotTimeline({
   peakDate: string;
   activeDays: number;
 }) {
+  const { t } = useTranslation();
   const maxCount = useMemo(
     () => Math.max(1, ...data.map((d) => d.count)),
     [data]
@@ -559,7 +564,7 @@ function DotTimeline({
                     <div
                       role="button"
                       tabIndex={0}
-                      aria-label={`${day.count} contribution${day.count !== 1 ? "s" : ""} on ${formatIsoDate(day.date)}`}
+                      aria-label={interpolate(t('aria.contributionOnDate') as string, { count: String(day.count), date: formatIsoDate(day.date) })}
                       className="rounded-full transition-transform duration-150 hover:scale-125 cursor-pointer"
                       style={{
                         width: size,
@@ -571,7 +576,7 @@ function DotTimeline({
                           ? 0.3 + (day.count / maxCount) * 0.7
                           : 1,
                         border: day.count === 0
-                          ? "1px solid rgba(139,92,246,0.15)"
+                          ? "1px solid var(--color-stroke)"
                           : "none",
                         boxShadow: isPeak
                           ? "0 0 0 2px var(--color-amber)"

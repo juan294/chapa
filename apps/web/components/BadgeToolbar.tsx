@@ -7,6 +7,7 @@ import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { useSession } from "@/hooks/useSession";
 import { useTranslation } from "@/lib/i18n";
+import { Toast } from "@/components/Toast";
 
 interface BadgeToolbarProps {
   handle: string;
@@ -63,6 +64,8 @@ export function BadgeToolbar({
   }
 
   const [copied, setCopied] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const shareUrl = `https://chapa.thecreativetoken.com/u/${handle}`;
   const tweetText = encodeURIComponent(
@@ -79,11 +82,9 @@ export function BadgeToolbar({
       setShareOpen(false);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard API may be blocked */
+      setErrorToast(t('badgeToolbar.failed') as string);
     }
-  }, [shareUrl, setShareOpen]);
-
-  const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
+  }, [shareUrl, setShareOpen, t]);
 
   const handleDownload = useCallback(async () => {
     setDownloadStatus("loading");
@@ -127,7 +128,8 @@ export function BadgeToolbar({
         img.src = dataUri;
       });
     } catch {
-      // Fallback: download SVG directly if PNG conversion fails
+      // Fallback: download SVG directly if PNG conversion fails; surface info toast
+      setErrorToast(t('badgeToolbar.failed') as string);
       const a = document.createElement("a");
       a.href = `/u/${encodeURIComponent(handle)}/badge.svg`;
       a.download = `chapa-${handle}.svg`;
@@ -139,7 +141,7 @@ export function BadgeToolbar({
         setDownloadStatus("idle");
       }
     }
-  }, [handle]);
+  }, [handle, t]);
 
   const btnClass =
     "inline-flex items-center justify-center gap-1.5 rounded-lg min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] focus-visible:text-text-primary focus-visible:bg-amber/[0.06] transition-colors";
@@ -337,6 +339,14 @@ export function BadgeToolbar({
         {downloadStatus === "loading" ? t('badgeToolbar.downloading') as string : t('badgeToolbar.download') as string}
       </button>
 
+      {errorToast && (
+        <Toast
+          message={errorToast}
+          type="error"
+          duration={4000}
+          onDismiss={() => setErrorToast(null)}
+        />
+      )}
     </div>
   );
 }

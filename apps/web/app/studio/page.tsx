@@ -13,6 +13,7 @@ import type { BadgeConfig, StatsData } from "@chapa/shared";
 import { DEFAULT_BADGE_CONFIG } from "@chapa/shared";
 import { getSessionGitHubToken } from "@/lib/auth/github-session-token";
 import { KeyboardShortcutsListener } from "@/components/KeyboardShortcutsListener";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 
 function buildEmptyStats(session: {
   login: string;
@@ -48,11 +49,14 @@ function buildEmptyStats(session: {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Creator Studio — Chapa",
-  description:
-    "Customize your developer impact badge with visual effects, animations, and interactions.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
+  return {
+    title: t('studio.metadataTitle') as string,
+    description: t('studio.metadataDescription') as string,
+  };
+}
 
 export default async function StudioPage() {
   // Feature flag gate — redirect when studio is disabled
@@ -82,12 +86,15 @@ export default async function StudioPage() {
   const impact = computeImpactV6(effectiveStats);
   const initialConfig = savedConfig ?? DEFAULT_BADGE_CONFIG;
 
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
+
   return (
     <main id="main-content" className="min-h-screen bg-bg">
       <Navbar
         navLinks={[
-          { label: "Studio", href: "/studio" },
-          { label: "Your Badge", href: `/u/${session.login}` },
+          { label: t('studio.navLinkStudio') as string, href: "/studio" },
+          { label: t('studio.navLinkYourBadge') as string, href: `/u/${session.login}` },
         ]}
       />
 

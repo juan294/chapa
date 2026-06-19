@@ -84,7 +84,7 @@ export async function ArchetypePage({ archetypeKey, searchParams }: Props) {
                 {t(`${ns}.h1Before`) as string}<span className={accentClass}>{t(`${ns}.h1Highlight`) as string}</span>
               </h1>
               <p className="text-text-secondary text-sm mt-2 font-heading">
-                Dominant dimension: <span className={accentClass}>{t(`${ns}.dominantDimension`) as string}</span>
+                {t('archetypes.dominantDimensionLabel') as string} <span className={accentClass}>{t(`${ns}.dominantDimension`) as string}</span>
               </p>
             </div>
             <div

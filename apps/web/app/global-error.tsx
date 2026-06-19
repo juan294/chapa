@@ -41,7 +41,8 @@ export default function GlobalError({
               margin: 0,
             }}
           >
-            Something went wrong
+            {/* Bilingual: global-error replaces root layout — i18n provider unavailable */}
+            Algo salió mal / Something went wrong
           </h1>
           <p
             style={{
@@ -50,7 +51,7 @@ export default function GlobalError({
               color: "#6B6F7B",
             }}
           >
-            A critical error occurred. Please try again.
+            Ocurrió un error crítico. Por favor, inténtalo de nuevo. / A critical error occurred. Please try again.
           </p>
           <div
             style={{
@@ -73,7 +74,7 @@ export default function GlobalError({
                 cursor: "pointer",
               }}
             >
-              Try again
+              Intentar de nuevo / Try again
             </button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- global-error replaces root layout; next/link may not be available */}
             <a
@@ -89,7 +90,7 @@ export default function GlobalError({
                 cursor: "pointer",
               }}
             >
-              Go home
+              Volver al inicio / Go home
             </a>
           </div>
         </main>

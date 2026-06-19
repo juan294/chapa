@@ -38,6 +38,13 @@ export const es: Translations = {
     shareOptions: 'Opciones para compartir',
     downloadBadge: 'Descargar Chapa como PNG',
     closeBreakdown: 'Cerrar panel de desglose',
+    contributionActivity: 'Actividad de contribución',
+    last7DaysActivity: 'Actividad de los últimos 7 días',
+    contributionOnDate: '{count} contribución(es) el {date}',
+    keyStatistics: 'Estadísticas clave',
+    toggleBreakdown: 'Alternar desglose de {label}',
+    keyboardShortcuts: 'Atajos de teclado',
+    closeKeyboardShortcuts: 'Cerrar atajos de teclado',
   },
   landing: {
     navLinks: [
@@ -247,7 +254,9 @@ export const es: Translations = {
     dimensions: 'Dimensiones',
     keyMetrics: 'Métricas clave',
     prsMerged: 'PRs fusionadas',
-    reviews: 'Reviews',
+    reviews: 'Revisiones',
+    commits: 'Commits',
+    hashLabel: 'Hash',
     generatedOn: 'Generado el',
     viewBadge: 'Ver Chapa',
     notFoundTitle: 'No encontrado',
@@ -302,6 +311,7 @@ export const es: Translations = {
     github: "Chapa analiza métricas públicas de GitHub y otras plataformas vinculadas. Estas plataformas no están afiliadas ni respaldan este proyecto.",
   },
   archetypes: {
+    dominantDimensionLabel: 'Dimensión dominante:',
     builder: {
       metadataTitle: 'El arquetipo Builder',
       metadataDescription: 'Los Builder son el motor de entrega de cada equipo. Convierten ideas en pull requests fusionadas, cierran issues y hacen avanzar los proyectos.',
@@ -811,7 +821,7 @@ export const es: Translations = {
       ctaHeading: 'Ayúdanos a mejorar esto',
       ctaBody: 'Creemos que la metodología de puntuación debe ser una conversación, no una caja negra. Si tienes ideas sobre cómo hacerla más justa, más precisa o más transparente — queremos escucharte.',
       ctaTwitter: 'Contáctanos en Twitter (@juang294)',
-      ctaEmail: 'Email support@chapa.thecreativetoken.com',
+      ctaEmail: 'Escríbenos a support@chapa.thecreativetoken.com',
     },
     verification: {
       metadataTitle: 'Verificación de Chapa',
@@ -894,6 +904,19 @@ export const es: Translations = {
       ctaBody: 'Cada Chapa tiene un hash de verificación. Pégalo para ver los datos autenticados detrás de cualquier Chapa.',
       ctaButton: 'Verificar una Chapa',
     },
+  },
+  notFound: {
+    title: 'Página no encontrada',
+    description: 'La página que buscas no existe o ha sido movida.',
+    cta: 'Volver al inicio',
+  },
+  studio: {
+    metadataTitle: 'Creator Studio — Chapa',
+    metadataDescription: 'Personaliza tu Chapa de impacto con efectos visuales, animaciones e interacciones.',
+    navLinkStudio: 'Studio',
+    navLinkYourBadge: 'Tu Chapa',
+    terminalWelcome: 'Creator Studio — personaliza tu Chapa',
+    terminalHint: 'Escribe /help para ver los comandos o usa los Controles Rápidos.',
   },
   dashboard: {
     performanceDimensions: 'Dimensiones de rendimiento',

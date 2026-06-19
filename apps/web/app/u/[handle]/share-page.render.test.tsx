@@ -203,14 +203,14 @@ describe("Phase 4d — Share page i18n", () => {
     });
   });
 
-  describe("generateMetadata — en locale", () => {
-    it("uses interpolated handle in OG image alt", async () => {
+  describe("generateMetadata — es locale (social cards use primary locale)", () => {
+    it("uses interpolated handle in OG image alt (Spanish)", async () => {
       const metadata = await generateMetadata({
         params: Promise.resolve({ handle: "testuser" }),
       });
 
       const images = metadata.openGraph?.images as Array<{ alt?: string }>;
-      expect(images[0]?.alt).toBe("Chapa badge for testuser");
+      expect(images[0]?.alt).toBe("Chapa de testuser");
     });
 
     it("uses handle in title", async () => {

@@ -99,7 +99,7 @@ export function StatsGrid({ stats, diff }: StatsGridProps) {
   ];
 
   return (
-    <section aria-label="Key statistics">
+    <section aria-label={t('aria.keyStatistics') as string}>
       <h3 className="font-heading text-xs uppercase tracking-wider text-text-secondary mb-4">
         {t('dashboard.keyNumbers') as string}
       </h3>

@@ -38,6 +38,13 @@ export const en: Translations = {
     shareOptions: 'Share options',
     downloadBadge: 'Download badge as PNG',
     closeBreakdown: 'Close breakdown panel',
+    contributionActivity: 'Contribution activity',
+    last7DaysActivity: 'Last 7 days activity',
+    contributionOnDate: '{count} contribution(s) on {date}',
+    keyStatistics: 'Key statistics',
+    toggleBreakdown: 'Toggle {label} breakdown',
+    keyboardShortcuts: 'Keyboard shortcuts',
+    closeKeyboardShortcuts: 'Close keyboard shortcuts',
   },
   landing: {
     navLinks: [
@@ -248,6 +255,8 @@ export const en: Translations = {
     keyMetrics: 'Key metrics',
     prsMerged: 'PRs merged',
     reviews: 'Reviews',
+    commits: 'Commits',
+    hashLabel: 'Hash',
     generatedOn: 'Generated on',
     viewBadge: 'View badge',
     notFoundTitle: 'Not found',
@@ -302,6 +311,7 @@ export const en: Translations = {
     github: "Chapa analyzes public metrics from GitHub and other linked platforms. These platforms are not affiliated with or endorsing this project.",
   },
   archetypes: {
+    dominantDimensionLabel: 'Dominant dimension:',
     builder: {
       metadataTitle: "The Builder Archetype",
       metadataDescription: "Builders are the shipping engine of every team. They turn ideas into merged pull requests, close issues, and move codebases forward.",
@@ -894,6 +904,19 @@ export const en: Translations = {
       ctaBody: 'Every Chapa badge has a verification hash. Paste it in to see the authenticated data behind any badge.',
       ctaButton: 'Verify a Badge',
     },
+  },
+  notFound: {
+    title: 'Page not found',
+    description: "The page you're looking for doesn't exist or has been moved.",
+    cta: 'Go home',
+  },
+  studio: {
+    metadataTitle: 'Creator Studio — Chapa',
+    metadataDescription: 'Customize your developer impact badge with visual effects, animations, and interactions.',
+    navLinkStudio: 'Studio',
+    navLinkYourBadge: 'Your Badge',
+    terminalWelcome: 'Creator Studio — customize your badge',
+    terminalHint: 'Type /help for commands or use Quick Controls.',
   },
   dashboard: {
     performanceDimensions: 'Performance Dimensions',

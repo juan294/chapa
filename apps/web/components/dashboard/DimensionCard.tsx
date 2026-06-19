@@ -10,6 +10,7 @@ import { DeltaIndicator } from "./DeltaIndicator";
 import { SubMetricPanel } from "./SubMetricPanel";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -210,7 +211,7 @@ export function DimensionCard({
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
-        aria-label={`Toggle ${label} breakdown`}
+        aria-label={interpolate(t('aria.toggleBreakdown') as string, { label })}
         onClick={toggle}
         onKeyDown={handleKeyDown}
         className="flex w-full cursor-pointer items-center justify-between p-4 pt-3 text-left"

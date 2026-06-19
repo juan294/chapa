@@ -117,8 +117,8 @@ export function Toast({
 
   return createPortal(
     <div
-      role="status"
-      aria-live="polite"
+      role={type === "error" ? "alert" : "status"}
+      aria-live={type === "error" ? "assertive" : "polite"}
       className={`
         fixed top-5 right-5 z-[9998] flex items-start gap-3
         rounded-xl bg-card px-4 py-3
