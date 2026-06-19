@@ -41,6 +41,37 @@ describe("renderBadgeBranding", () => {
     expect(svg).toContain("M11.955.49");    // Codeberg
   });
 
+  it("renders GitLab logo when gitlab is in platforms", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, ["github", "gitlab"]);
+    expect(svg).toContain("m23.6004");
+  });
+
+  it("renders all 4 logos when all platforms provided", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, [
+      "github",
+      "bitbucket",
+      "codeberg",
+      "gitlab",
+    ]);
+    expect(svg).toContain("M12 0C5.37");    // GitHub
+    expect(svg).toContain("M.778 1.211");   // Bitbucket
+    expect(svg).toContain("M11.955.49");    // Codeberg
+    expect(svg).toContain("m23.6004");      // GitLab
+  });
+
+  it("sorts gitlab last in canonical order (after codeberg)", () => {
+    const svg = renderBadgeBranding(60, 585, 1140, [
+      "gitlab",
+      "codeberg",
+      "github",
+    ]);
+    const ghIdx = svg.indexOf("M12 0C5.37");
+    const cbIdx = svg.indexOf("M11.955.49");
+    const glIdx = svg.indexOf("m23.6004");
+    expect(ghIdx).toBeLessThan(cbIdx);
+    expect(cbIdx).toBeLessThan(glIdx);
+  });
+
   it("renders only GitHub logo when only github provided", () => {
     const svg = renderBadgeBranding(60, 585, 1140, ["github"]);
     expect(svg).toContain("M12 0C5.37");

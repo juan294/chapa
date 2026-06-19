@@ -8,6 +8,7 @@ import {
   getStudioEnabledEnv,
   getBitbucketEnabledEnv,
   getCodebergEnabledEnv,
+  getGitlabEnabledEnv,
   getInsightsEnabledEnv,
 } from "@/lib/env";
 
@@ -39,6 +40,16 @@ export function isBitbucketEnabledSync(): boolean {
  */
 export function isCodebergEnabledSync(): boolean {
   return getCodebergEnabledEnv() === "true";
+}
+
+/**
+ * Synchronously check whether GitLab integration is enabled (env-var only).
+ * Use in client components where `await` is not available.
+ *
+ * @returns `true` if `NEXT_PUBLIC_GITLAB_ENABLED` is `"true"`
+ */
+export function isGitlabEnabledSync(): boolean {
+  return getGitlabEnabledEnv() === "true";
 }
 
 /**

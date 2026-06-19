@@ -1,0 +1,265 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  bucketEventsByDate,
+  parseDiffStat,
+  fetchGitlabContributionData,
+} from "./queries";
+import type { GitlabEvent } from "./types";
+
+// ---------------------------------------------------------------------------
+// bucketEventsByDate (pure)
+// ---------------------------------------------------------------------------
+
+describe("bucketEventsByDate", () => {
+  it("counts push events by their commit_count", () => {
+    const events: GitlabEvent[] = [
+      { created_at: "2026-06-10T09:00:00Z", action_name: "pushed to", push_data: { commit_count: 3 } },
+      { created_at: "2026-06-10T15:00:00Z", action_name: "pushed to", push_data: { commit_count: 2 } },
+    ];
+    expect(bucketEventsByDate(events)).toEqual([{ date: "2026-06-10", count: 5 }]);
+  });
+
+  it("counts non-push contribution events as 1 each", () => {
+    const events: GitlabEvent[] = [
+      { created_at: "2026-06-11T09:00:00Z", action_name: "opened" },
+      { created_at: "2026-06-11T10:00:00Z", action_name: "commented on" },
+    ];
+    expect(bucketEventsByDate(events)).toEqual([{ date: "2026-06-11", count: 2 }]);
+  });
+
+  it("groups multiple days and sorts ascending", () => {
+    const events: GitlabEvent[] = [
+      { created_at: "2026-06-12T09:00:00Z", action_name: "opened" },
+      { created_at: "2026-06-10T09:00:00Z", push_data: { commit_count: 4 } },
+    ];
+    expect(bucketEventsByDate(events)).toEqual([
+      { date: "2026-06-10", count: 4 },
+      { date: "2026-06-12", count: 1 },
+    ]);
+  });
+
+  it("returns empty array for no events", () => {
+    expect(bucketEventsByDate([])).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseDiffStat (pure)
+// ---------------------------------------------------------------------------
+
+describe("parseDiffStat", () => {
+  it("counts added and removed lines, ignoring +++/--- file headers", () => {
+    const diff =
+      "--- a/file.ts\n+++ b/file.ts\n@@ -1,2 +1,3 @@\n-old line\n+new line 1\n+new line 2\n context";
+    const stat = parseDiffStat([{ diff }]);
+    expect(stat.additions).toBe(2);
+    expect(stat.deletions).toBe(1);
+    expect(stat.changed_files).toBe(1);
+  });
+
+  it("sums across multiple changed files", () => {
+    const stat = parseDiffStat([
+      { diff: "+a\n+b" },
+      { diff: "-c" },
+    ]);
+    expect(stat.additions).toBe(2);
+    expect(stat.deletions).toBe(1);
+    expect(stat.changed_files).toBe(2);
+  });
+
+  it("returns zeros for an empty change set", () => {
+    expect(parseDiffStat([])).toEqual({ additions: 0, deletions: 0, changed_files: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchGitlabContributionData (integration, mocked fetch)
+// ---------------------------------------------------------------------------
+
+const PROFILE = { displayName: "GL User", avatarUrl: "https://gitlab.com/a/1" };
+
+/** Route a fetch mock by URL substring. */
+function routeFetch(routes: { match: string; status?: number; body: unknown }[]) {
+  return vi.fn((url: string) => {
+    const route = routes.find((r) => url.includes(r.match));
+    if (!route) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    }
+    const status = route.status ?? 200;
+    return Promise.resolve({
+      ok: status >= 200 && status < 300,
+      status,
+      json: () => Promise.resolve(route.body),
+    });
+  });
+}
+
+describe("fetchGitlabContributionData", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns null when the events endpoint returns 401 (auth failure)", async () => {
+    vi.stubGlobal("fetch", routeFetch([{ match: "/events", status: 401, body: {} }]));
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("aggregates events, MRs, diffstats, reviews, issues and projects", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        {
+          match: "/users/42/events",
+          body: [
+            { created_at: "2026-06-10T09:00:00Z", push_data: { commit_count: 3 } },
+            { created_at: "2026-06-11T09:00:00Z", action_name: "opened" },
+          ],
+        },
+        // merged MRs authored by user
+        {
+          match: "merge_requests?author_username=gluser",
+          body: [{ id: 1, iid: 7, project_id: 100, state: "merged", merged_at: "x", author: { username: "gluser" } }],
+        },
+        // per-MR diffstat
+        {
+          match: "/merge_requests/7/changes",
+          body: { changes: [{ diff: "+a\n+b\n-c" }] },
+        },
+        // reviewed MRs (by reviewer) authored by someone else
+        {
+          match: "merge_requests?reviewer_username=gluser",
+          body: [{ id: 2, iid: 9, project_id: 200, state: "merged", merged_at: "x", author: { username: "other" } }],
+        },
+        // approvals — user approved
+        {
+          match: "/merge_requests/9/approvals",
+          body: { approved_by: [{ user: { username: "gluser" } }] },
+        },
+        // closed issues
+        {
+          match: "/issues",
+          body: [{ id: 1 }, { id: 2 }],
+        },
+        // user projects
+        {
+          match: "/users/42/projects",
+          body: [
+            { id: 100, path_with_namespace: "gluser/repo", star_count: 12, forks_count: 4, namespace: { path: "gluser" } },
+          ],
+        },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(result!.heatmap).toEqual([
+      { date: "2026-06-10", count: 3 },
+      { date: "2026-06-11", count: 1 },
+    ]);
+    expect(result!.mergedPRs).toEqual([{ additions: 2, deletions: 1, changed_files: 1 }]);
+    expect(result!.reviewsCount).toBe(1);
+    expect(result!.closedIssues).toBe(2);
+    expect(result!.repos).toHaveLength(1);
+    expect(result!.repos[0]).toMatchObject({
+      fullName: "gluser/repo",
+      commitCount: 1,
+      isOwned: true,
+      starsCount: 12,
+      forksCount: 4,
+      watchersCount: 0,
+    });
+  });
+
+  it("contributes a zero diffstat when an MR's changes fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/users/42/events", body: [] },
+        {
+          match: "merge_requests?author_username=gluser",
+          body: [{ id: 1, iid: 7, project_id: 100, state: "merged", merged_at: "x", author: { username: "gluser" } }],
+        },
+        { match: "/merge_requests/7/changes", status: 500, body: {} },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result!.mergedPRs).toEqual([{ additions: 0, deletions: 0, changed_files: 0 }]);
+  });
+
+  it("counts 0 reviews when the approvals endpoint is Premium-gated (403)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/users/42/events", body: [] },
+        { match: "author_username=gluser", body: [] },
+        {
+          match: "merge_requests?reviewer_username=gluser",
+          body: [{ id: 2, iid: 9, project_id: 200, state: "merged", merged_at: "x", author: { username: "other" } }],
+        },
+        { match: "/merge_requests/9/approvals", status: 403, body: {} },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result!.reviewsCount).toBe(0);
+  });
+
+  it("returns null when the events endpoint returns 403 (auth failure)", async () => {
+    vi.stubGlobal("fetch", routeFetch([{ match: "/events", status: 403, body: {} }]));
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("stops events pagination at a short page (does not request the next page)", async () => {
+    const fullPage = Array.from({ length: 100 }, () => ({
+      created_at: "2026-06-10T09:00:00Z",
+      action_name: "opened",
+    }));
+    let eventsCalls = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/events")) {
+        eventsCalls++;
+        const page = new URL(url).searchParams.get("page");
+        // page 1 is full (100) → keep going; page 2 is short (2) → stop.
+        const body = page === "1" ? fullPage : fullPage.slice(0, 2);
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(eventsCalls).toBe(2); // page 1 (full) + page 2 (short) → stops, no page 3
+  });
+
+  it("caps events pagination at MAX_PAGES when every page is full", async () => {
+    const fullPage = Array.from({ length: 100 }, () => ({
+      created_at: "2026-06-10T09:00:00Z",
+      action_name: "opened",
+    }));
+    let eventsCalls = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/events")) {
+        eventsCalls++;
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(fullPage) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(eventsCalls).toBe(5); // MAX_PAGES hard cap — never unbounded
+  });
+});

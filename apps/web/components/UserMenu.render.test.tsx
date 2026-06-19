@@ -206,6 +206,9 @@ describe("UserMenu — platform status caching", () => {
       if (urlStr.includes("/api/auth/codeberg/status")) {
         return Promise.resolve(new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })));
       }
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })));
+      }
       return Promise.resolve(new Response("{}"));
     });
   });
@@ -221,13 +224,14 @@ describe("UserMenu — platform status caching", () => {
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/status");
       expect(fetchSpy).toHaveBeenCalledWith("/api/auth/codeberg/status");
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/gitlab/status");
     });
   });
 
   it("does NOT re-fetch on second mount (uses cache)", async () => {
     const { unmount } = render(<UserMenu {...baseProps} />);
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
     });
 
     unmount();
@@ -242,7 +246,7 @@ describe("UserMenu — platform status caching", () => {
   it("re-fetches after cache is cleared (e.g. after unlink)", async () => {
     const { unmount } = render(<UserMenu {...baseProps} />);
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
     });
 
     unmount();
@@ -252,7 +256,7 @@ describe("UserMenu — platform status caching", () => {
 
     render(<UserMenu {...baseProps} />);
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
     });
   });
 });

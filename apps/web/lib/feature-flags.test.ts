@@ -24,6 +24,8 @@ import {
   isCodebergEnabledSync,
   isInsightsEnabled,
   isInsightsEnabledSync,
+  isGitlabEnabled,
+  isGitlabEnabledSync,
   invalidateFeatureFlagCache,
   _resetFlagCache,
 } from "./feature-flags";
@@ -383,6 +385,82 @@ describe("isCodebergEnabled", () => {
     vi.stubEnv("NEXT_PUBLIC_CODEBERG_ENABLED", undefined);
 
     const result = await isCodebergEnabled();
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isGitlabEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isGitlabEnabledSync", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns false when env var not set", () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", undefined);
+    expect(isGitlabEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "true");
+    expect(isGitlabEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "false");
+    expect(isGitlabEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "  true  ");
+    expect(isGitlabEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isGitlabEnabled (async, DB-backed)
+// ---------------------------------------------------------------------------
+
+describe("isGitlabEnabled", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("gitlab_integration", true),
+    );
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when DB flag is disabled", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("gitlab_integration", false),
+    );
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("falls back to env var when DB unavailable", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "true");
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when both DB and env var are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", undefined);
+
+    const result = await isGitlabEnabled();
     expect(result).toBe(false);
   });
 });

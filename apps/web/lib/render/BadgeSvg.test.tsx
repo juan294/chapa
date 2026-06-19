@@ -468,13 +468,21 @@ describe("renderBadgeSvg", () => {
       expect(svg).toContain("M11.955.49");   // Codeberg
     });
 
-    it("shows all 3 platform logos in demo mode regardless of linkedPlatforms", () => {
+    it("shows GitHub + GitLab logos when gitlab is linked", () => {
+      const svg = renderBadgeSvg(makeStats({ linkedPlatforms: ["gitlab"] }), makeImpact());
+      expect(svg).toContain("M12 0C5.37");   // GitHub
+      expect(svg).toContain("m23.6004");     // GitLab
+      expect(svg).not.toContain("M.778 1.211"); // No Bitbucket
+    });
+
+    it("shows all 4 platform logos in demo mode regardless of linkedPlatforms", () => {
       const svg = renderBadgeSvg(makeStats({ linkedPlatforms: undefined }), makeImpact(), {
         demoMode: true,
       });
       expect(svg).toContain("M12 0C5.37");   // GitHub
       expect(svg).toContain("M.778 1.211");  // Bitbucket
       expect(svg).toContain("M11.955.49");   // Codeberg
+      expect(svg).toContain("m23.6004");     // GitLab
     });
   });
 

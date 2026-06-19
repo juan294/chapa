@@ -261,6 +261,56 @@ describe("UserMenu — Codeberg integration", () => {
   });
 });
 
+describe("UserMenu — GitLab integration", () => {
+  it("fetches GitLab status on mount (server decides if enabled)", () => {
+    expect(SOURCE).toContain("fetchPlatformStatus");
+    expect(SOURCE).toContain('"gitlab"');
+  });
+
+  it("renders Link GitLab item when status is loaded", () => {
+    expect(SOURCE).toContain("glStatus");
+    expect(SOURCE).toContain("userMenu.linkGitlab");
+    expect(SOURCE).toContain('href="/api/auth/gitlab/connect"');
+  });
+
+  it("renders GitLab linked state with remoteLogin and Unlink button", () => {
+    expect(SOURCE).toContain("glStatus.remoteLogin");
+    expect(SOURCE).toContain("/api/auth/gitlab/disconnect");
+    expect(SOURCE).toContain("showGlUnlinkConfirm");
+  });
+
+  it("uses inline GitLab SVG logo (no icon library)", () => {
+    // The GitLab tanuki logo path is distinctive
+    expect(SOURCE).toContain("m23.6004");
+    expect(SOURCE).toContain("GitlabIcon");
+  });
+
+  it("GitLab section appears after Codeberg and before Admin Panel", () => {
+    const codebergIdx = SOURCE.indexOf("userMenu.linkCodeberg");
+    const gitlabIdx = SOURCE.indexOf("userMenu.linkGitlab");
+    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
+    expect(codebergIdx).toBeLessThan(gitlabIdx);
+    expect(gitlabIdx).toBeLessThan(adminIdx);
+  });
+
+  it("GitLab unlink opens confirmation dialog instead of directly unlinking", () => {
+    expect(SOURCE).toContain("setShowGlUnlinkConfirm(true)");
+    expect(SOURCE).toContain("open={showGlUnlinkConfirm}");
+  });
+
+  it("ConfirmDialog has correct props for GitLab unlink", () => {
+    expect(SOURCE).toContain("userMenu.confirmUnlinkGitlabTitle");
+    expect(SOURCE).toContain("handleUnlinkGitlab");
+    expect(SOURCE).toContain("glUnlinkLoading");
+  });
+
+  it("GitLab unlink handler calls disconnect endpoint", () => {
+    expect(SOURCE).toContain("/api/auth/gitlab/disconnect");
+    expect(SOURCE).toContain("setGlStatus");
+    expect(SOURCE).toContain("setGlUnlinkLoading");
+  });
+});
+
 describe("UserMenu — #520 aria-label on dropdown menu", () => {
   it("dropdown menu has aria-label 'User menu options'", () => {
     expect(SOURCE).toContain("aria.userMenuOptions");
@@ -274,6 +324,10 @@ describe("UserMenu — #521 distinguishing aria-labels on Unlink buttons", () =>
 
   it("Codeberg Unlink button has aria-label 'Unlink Codeberg account'", () => {
     expect(SOURCE).toContain("aria.unlinkCodeberg");
+  });
+
+  it("GitLab Unlink button has aria-label 'Unlink GitLab account'", () => {
+    expect(SOURCE).toContain("aria.unlinkGitlab");
   });
 });
 

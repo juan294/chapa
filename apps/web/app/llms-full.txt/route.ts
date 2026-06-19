@@ -6,7 +6,7 @@ This is the extended documentation for AI models and LLM crawlers. For a concise
 
 ## Overview
 
-Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Each badge includes a cryptographic verification hash (HMAC-SHA256) proving the data hasn't been tampered with.
+Chapa is a free, open web application that generates live, embeddable SVG badges showcasing a developer's impact from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). Unlike simple commit counters or streak trackers, Chapa analyzes 12 months of data across four core dimensions — plus an optional fifth Craft dimension — to produce a nuanced developer impact profile. Each badge includes a cryptographic verification hash (HMAC-SHA256) proving the data hasn't been tampered with.
 
 ## Scoring Model: Impact v6
 
@@ -97,7 +97,7 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS, Upstash Redis for cac
 
 ## Related Topics
 
-developer metrics, multi-platform developer badge, developer impact score, GitHub profile badge, Bitbucket developer metrics, Codeberg developer metrics, developer portfolio badge, developer stats SVG, open source contribution metrics, code review metrics, developer archetype classification, developer activity analysis, developer impact measurement, engineering metrics, developer productivity tools, README badges, contribution visualization.
+developer metrics, multi-platform developer badge, developer impact score, GitHub profile badge, Bitbucket developer metrics, Codeberg developer metrics, GitLab developer metrics, developer portfolio badge, developer stats SVG, open source contribution metrics, code review metrics, developer archetype classification, developer activity analysis, developer impact measurement, engineering metrics, developer productivity tools, README badges, contribution visualization.
 
 ## Contact
 

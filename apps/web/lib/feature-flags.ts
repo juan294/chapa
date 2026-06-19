@@ -21,6 +21,7 @@ import {
   isStudioEnabledSync,
   isBitbucketEnabledSync,
   isCodebergEnabledSync,
+  isGitlabEnabledSync,
   isInsightsEnabledSync,
 } from "./feature-flags-sync";
 
@@ -28,6 +29,7 @@ export {
   isStudioEnabledSync,
   isBitbucketEnabledSync,
   isCodebergEnabledSync,
+  isGitlabEnabledSync,
   isInsightsEnabledSync,
 };
 
@@ -128,6 +130,19 @@ export async function isCodebergEnabled(): Promise<boolean> {
   return checkFlag(
     "codeberg_integration",
     isCodebergEnabledSync() ? "true" : undefined,
+  );
+}
+
+/**
+ * Check whether GitLab integration is enabled (DB-backed, env-var fallback).
+ * Use in server components and API routes.
+ *
+ * @returns `true` if the `gitlab_integration` flag is on in DB or `NEXT_PUBLIC_GITLAB_ENABLED` is `"true"`
+ */
+export async function isGitlabEnabled(): Promise<boolean> {
+  return checkFlag(
+    "gitlab_integration",
+    isGitlabEnabledSync() ? "true" : undefined,
   );
 }
 

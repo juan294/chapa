@@ -173,6 +173,25 @@ export function getCodebergEnabledEnv(): string | undefined {
 }
 
 // ---------------------------------------------------------------------------
+// GitLab
+// ---------------------------------------------------------------------------
+
+/** GitLab OAuth app client ID. */
+export function getGitlabClientId(): string | undefined {
+  return readTrimmed("GITLAB_CLIENT_ID");
+}
+
+/** GitLab OAuth app client secret. */
+export function getGitlabClientSecret(): string | undefined {
+  return readTrimmed("GITLAB_CLIENT_SECRET");
+}
+
+/** Raw `NEXT_PUBLIC_GITLAB_ENABLED` value — `"true"` when GitLab integration is on. */
+export function getGitlabEnabledEnv(): string | undefined {
+  return readTrimmed("NEXT_PUBLIC_GITLAB_ENABLED");
+}
+
+// ---------------------------------------------------------------------------
 // Cron
 // ---------------------------------------------------------------------------
 

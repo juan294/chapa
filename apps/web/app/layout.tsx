@@ -101,7 +101,7 @@ export default async function RootLayout({
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Web",
               keywords:
-                "developer metrics, developer impact score, GitHub profile badge, Bitbucket badge, Codeberg badge, developer stats SVG, code review metrics, developer archetype, contribution analytics, open source metrics, multi-platform developer badge",
+                "developer metrics, developer impact score, GitHub profile badge, Bitbucket badge, Codeberg badge, GitLab badge, developer stats SVG, code review metrics, developer archetype, contribution analytics, open source metrics, multi-platform developer badge",
               offers: {
                 "@type": "Offer",
                 price: "0",

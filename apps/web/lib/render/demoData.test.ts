@@ -90,13 +90,14 @@ describe("DEMO_STATS heatmap data mapping", () => {
 
 describe("DEMO_STATS linked platforms", () => {
   it("includes linkedPlatforms array", () => {
-    expect(DEMO_STATS.linkedPlatforms).toEqual(["bitbucket", "codeberg"]);
+    expect(DEMO_STATS.linkedPlatforms).toEqual(["bitbucket", "codeberg", "gitlab"]);
   });
 
   it("includes linkedPlatformLogins", () => {
     expect(DEMO_STATS.linkedPlatformLogins).toEqual({
       bitbucket: "developer",
       codeberg: "developer",
+      gitlab: "developer",
     });
   });
 });

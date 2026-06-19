@@ -83,14 +83,20 @@ const PLATFORM_DISPLAY: Record<Platform, { label: string; svgPath: string; viewB
     svgPath: "M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z",
     viewBox: "0 0 24 24",
   },
+  gitlab: {
+    label: "GitLab",
+    svgPath: "m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0539.8585.8585 0 0 0-.3362.405L.4332 9.5065l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.0301.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.462-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z",
+    viewBox: "0 0 24 24",
+  },
 };
 
-// URL builders per platform. GitHub uses the main handle; Bitbucket/Codeberg
+// URL builders per platform. GitHub uses the main handle; Bitbucket/Codeberg/GitLab
 // use the platform-specific username from linkedPlatformLogins.
 const PLATFORM_URLS: Partial<Record<Platform, (username: string) => string>> = {
   github: (username) => `https://github.com/${username}`,
   bitbucket: (username) => `https://bitbucket.org/${username}`,
   codeberg: (username) => `https://codeberg.org/${username}`,
+  gitlab: (username) => `https://gitlab.com/${username}`,
 };
 
 interface DataSourcesProps {

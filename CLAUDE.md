@@ -64,6 +64,10 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/auth/codeberg/connect` Codeberg OAuth connect (link account)
 - POST `/api/auth/codeberg/disconnect` Codeberg account unlink
 - GET `/api/auth/codeberg/status` Codeberg connection status
+- GET `/api/auth/gitlab/callback` GitLab OAuth callback (token exchange)
+- GET `/api/auth/gitlab/connect` GitLab OAuth connect (link account)
+- POST `/api/auth/gitlab/disconnect` GitLab account unlink
+- GET `/api/auth/gitlab/status` GitLab connection status
 
 ### Public API
 - GET `/api/verify/:hash` Badge verification endpoint
@@ -134,7 +138,7 @@ Shared types live in: `packages/shared/src/types.ts`
 - All colors and fonts are defined in `apps/web/styles/globals.css` via Tailwind v4 `@theme`.
 
 ## Badge branding
-Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg).
+Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logos (GitHub, Bitbucket, Codeberg, GitLab).
 - Personal badges show only logos for platforms the user has connected
 - Demo badges show all 3 platform logos
 - Branding is behind a flag: `includeBranding`
@@ -361,6 +365,10 @@ NEXT_PUBLIC_BITBUCKET_ENABLED= # Set to "true" to enable Bitbucket link/unlink i
 CODEBERG_CLIENT_ID=              # Codeberg OAuth app client ID (optional — Codeberg integration disabled without it)
 CODEBERG_CLIENT_SECRET=          # Codeberg OAuth app secret (optional — server-side only)
 NEXT_PUBLIC_CODEBERG_ENABLED=    # Set to "true" to enable Codeberg link/unlink in User Menu (optional, disabled by default)
+
+GITLAB_CLIENT_ID=                # GitLab OAuth app client ID (optional — GitLab integration disabled without it)
+GITLAB_CLIENT_SECRET=            # GitLab OAuth app secret (optional — server-side only)
+NEXT_PUBLIC_GITLAB_ENABLED=      # Set to "true" to enable GitLab link/unlink in User Menu (optional, disabled by default)
 
 ADMIN_HANDLES=                 # Comma-separated GitHub handles allowed to access /admin (server-side only, optional)
 ADMIN_SECRET=                  # Bearer token for /api/admin/stats endpoint (optional)

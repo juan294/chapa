@@ -13,9 +13,11 @@ const {
   mockDbGetSupplemental,
   mockIsBitbucketEnabled,
   mockIsCodebergEnabled,
+  mockIsGitlabEnabled,
   mockDbGetLinkedPlatform,
   mockFetchBitbucketIfLinked,
   mockFetchCodebergIfLinked,
+  mockFetchGitlabIfLinked,
 } = vi.hoisted(() => ({
   mockFetchStatsData: vi.fn(),
   mockCacheGet: vi.fn(),
@@ -26,9 +28,11 @@ const {
   mockDbGetSupplemental: vi.fn(),
   mockIsBitbucketEnabled: vi.fn(),
   mockIsCodebergEnabled: vi.fn(),
+  mockIsGitlabEnabled: vi.fn(),
   mockDbGetLinkedPlatform: vi.fn(),
   mockFetchBitbucketIfLinked: vi.fn(),
   mockFetchCodebergIfLinked: vi.fn(),
+  mockFetchGitlabIfLinked: vi.fn(),
 }));
 
 vi.mock("./stats", () => ({
@@ -51,6 +55,7 @@ vi.mock("@/lib/db/supplemental", () => ({
 vi.mock("@/lib/feature-flags", () => ({
   isBitbucketEnabled: mockIsBitbucketEnabled,
   isCodebergEnabled: mockIsCodebergEnabled,
+  isGitlabEnabled: mockIsGitlabEnabled,
 }));
 
 vi.mock("@/lib/db/user-platforms", () => ({
@@ -63,6 +68,10 @@ vi.mock("@/lib/bitbucket/client", () => ({
 
 vi.mock("@/lib/codeberg/client", () => ({
   fetchCodebergIfLinked: mockFetchCodebergIfLinked,
+}));
+
+vi.mock("@/lib/gitlab/client", () => ({
+  fetchGitlabIfLinked: mockFetchGitlabIfLinked,
 }));
 
 import { getStats, _resetInflight } from "./client";
@@ -105,8 +114,10 @@ describe("getStats", () => {
     mockCacheSet.mockResolvedValue(undefined);
     mockFetchBitbucketIfLinked.mockResolvedValue(null);
     mockFetchCodebergIfLinked.mockResolvedValue(null);
+    mockFetchGitlabIfLinked.mockResolvedValue(null);
     mockIsBitbucketEnabled.mockResolvedValue(false);
     mockIsCodebergEnabled.mockResolvedValue(false);
+    mockIsGitlabEnabled.mockResolvedValue(false);
     mockDbGetLinkedPlatform.mockResolvedValue(null);
     mockDbGetSupplemental.mockResolvedValue(null);
     _resetInflight();
@@ -1113,6 +1124,140 @@ describe("getStats", () => {
 
       expect(result!.commitsTotal).toBe(50); // GitHub-only
       expect(result!.linkedPlatforms).toEqual(["codeberg"]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // GitLab integration (orchestration — token refresh tested in gitlab/client.test.ts)
+  // -----------------------------------------------------------------------
+
+  describe("GitLab integration", () => {
+    it("fetches and merges GitLab data when platform is linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const gl = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // merged
+        .mockResolvedValueOnce(null) // stale
+        .mockResolvedValueOnce(null); // supplemental
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchGitlabIfLinked.mockResolvedValue(gl);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "gl-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+
+      expect(result).not.toBeNull();
+      expect(result!.commitsTotal).toBe(75); // 50 + 25
+    });
+
+    it("sets linkedPlatforms to ['gitlab'] when only GitLab linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const gl = makeStats({ commitsTotal: 25 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchGitlabIfLinked.mockResolvedValue(gl);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "gl-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+      expect(result!.linkedPlatforms).toEqual(["gitlab"]);
+    });
+
+    it("includes GitLab in linkedPlatforms when linked in DB but stats fetch returns null (fixes #632)", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchGitlabIfLinked.mockResolvedValue(null); // fetch failed
+      mockIsGitlabEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockResolvedValue({
+        remoteLogin: "gl-user",
+        tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+      });
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(50); // GitHub-only
+      expect(result!.linkedPlatforms).toEqual(["gitlab"]);
+      expect(result!.linkedPlatformLogins).toEqual({ gitlab: "gl-user" });
+    });
+
+    it("sets linkedPlatforms to ['bitbucket', 'codeberg', 'gitlab'] when all three linked", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 20 });
+      const cb = makeStats({ commitsTotal: 15 });
+      const gl = makeStats({ commitsTotal: 10 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchBitbucketIfLinked.mockResolvedValue(bb);
+      mockFetchCodebergIfLinked.mockResolvedValue(cb);
+      mockFetchGitlabIfLinked.mockResolvedValue(gl);
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          const login = { bitbucket: "bb-user", codeberg: "cb-user", gitlab: "gl-user" }[platform];
+          return login
+            ? Promise.resolve({
+                remoteLogin: login,
+                tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+              })
+            : Promise.resolve(null);
+        },
+      );
+
+      const result = await getStats("test-user");
+
+      expect(result!.commitsTotal).toBe(95); // 50 + 20 + 15 + 10
+      expect(result!.linkedPlatforms).toEqual(["bitbucket", "codeberg", "gitlab"]);
+      expect(result!.linkedPlatformLogins).toEqual({
+        bitbucket: "bb-user",
+        codeberg: "cb-user",
+        gitlab: "gl-user",
+      });
+    });
+
+    it("GitLab error does not block Bitbucket/Codeberg fetch", async () => {
+      const github = makeStats({ commitsTotal: 50 });
+      const bb = makeStats({ commitsTotal: 20 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockFetchStatsData.mockResolvedValue(github);
+      mockFetchBitbucketIfLinked.mockResolvedValue(bb);
+      mockFetchGitlabIfLinked.mockRejectedValue(new Error("GL API down"));
+      mockIsGitlabEnabled.mockResolvedValue(true);
+      mockDbGetLinkedPlatform.mockImplementation(
+        (_handle: string, platform: string) => {
+          const login = platform === "bitbucket" ? "bb-user" : "gl-user";
+          return Promise.resolve({
+            remoteLogin: login,
+            tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+          });
+        },
+      );
+
+      const result = await getStats("test-user");
+
+      expect(result).not.toBeNull();
+      expect(result!.commitsTotal).toBe(70); // 50 + 20 (GitLab errored out)
+      expect(result!.linkedPlatforms).toEqual(["bitbucket", "gitlab"]);
     });
   });
 });

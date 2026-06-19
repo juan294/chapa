@@ -113,7 +113,7 @@ export function renderBadgeSvg(
 
   // Platform branding (footer)
   const brandingPlatforms: Platform[] = demoMode
-    ? ["github", "bitbucket", "codeberg"]
+    ? ["github", "bitbucket", "codeberg", "gitlab"]
     : ["github" as Platform, ...(stats.linkedPlatforms?.filter((p): p is Platform => p !== "github") ?? [])];
   const brandingSvg = includeBranding
     ? renderBadgeBranding(PAD, footerY, W - PAD, brandingPlatforms)
