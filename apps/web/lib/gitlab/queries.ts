@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";
+import { fetchWithRetry, sanitizeLogBody } from "@/lib/utils/fetch-retry";
 
 const GL_API = "https://gitlab.com/api/v4";
 const FETCH_TIMEOUT_MS = 30_000;
@@ -16,6 +17,8 @@ const MAX_REPOS = 50;
 const MAX_PRS = 100;
 const MAX_PAGES = 5;
 const PAGE_SIZE = 100;
+/** Maximum per-MR approver lookups in fetchReviewsCount (BE-L1 / #886). */
+const MAX_APPROVER_LOOKUPS = 10;
 
 interface UserProfile {
   displayName: string;
@@ -79,7 +82,9 @@ export async function fetchGitlabContributionData(
     const heatmap = bucketEventsByDate(events);
 
     // 2. Merged MRs authored by the user (global scope — no per-project loop).
-    const mrs = await fetchMergedMRs(username, accessToken, controller.signal);
+    // BE-H1: fetchMergedMRs returns null on 429/5xx — treat as empty to keep
+    // the rest of the data (events heatmap is already collected).
+    const mrs = (await fetchMergedMRs(username, accessToken, controller.signal)) ?? [];
 
     // 3. Per-MR diffstat + per-project merged-MR counts.
     // mrs is already capped at MAX_PRS by fetchMergedMRs.
@@ -114,11 +119,8 @@ export async function fetchGitlabContributionData(
     );
 
     // 6. Owned/member projects for social metrics + depth proxy.
-    const projects = await fetchUserProjects(
-      userId,
-      accessToken,
-      controller.signal,
-    );
+    const projects =
+      (await fetchUserProjects(userId, accessToken, controller.signal)) ?? [];
     const repos = projects.map((p) => {
       const isOwned = p.namespace?.path === username;
       return {
@@ -152,13 +154,25 @@ export async function fetchGitlabContributionData(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Fetch a paginated GitLab API endpoint. Stops at a short page or MAX_PAGES. */
+/**
+ * Fetch a paginated GitLab API endpoint. Stops at a short page or MAX_PAGES.
+ *
+ * BE-H1 (#859): 429 or 5xx mid-pagination returns `null` (signals failure to
+ * the caller so it can fall back to stale cache). 401/403 also return `null`.
+ * Genuine 2xx with data returns the accumulated items array.
+ *
+ * BE-M3 (#880): Uses `fetchWithRetry` for a single bounded jittered retry on
+ * transient 5xx before giving up.
+ *
+ * BE-M5 (#881): Validates that the response body is an array; non-array bodies
+ * (malformed / unexpected shape) return `null` rather than throwing.
+ */
 async function fetchPaginated<T>(
   path: string,
   token: string,
   signal: AbortSignal,
   maxItems?: number,
-): Promise<T[]> {
+): Promise<T[] | null> {
   const items: T[] = [];
   let page = 1;
 
@@ -166,13 +180,39 @@ async function fetchPaginated<T>(
     const separator = path.includes("?") ? "&" : "?";
     const url = `${GL_API}${path}${separator}page=${page}&per_page=${PAGE_SIZE}`;
 
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal,
     });
-    if (!res.ok) return items;
 
-    const data = (await res.json()) as T[];
+    if (!res.ok) {
+      // BE-H1: 401/403 (auth) + 429 (rate-limit) + 5xx (server error) → null
+      if (
+        res.status === 401 ||
+        res.status === 403 ||
+        res.status === 429 ||
+        res.status >= 500
+      ) {
+        const rawBody = await res.text().catch(() => "");
+        if (rawBody) {
+          // BE-M4: log only status + truncated, sanitized snippet
+          console.error(`[gitlab] HTTP ${res.status} on ${path}: ${sanitizeLogBody(rawBody)}`);
+        }
+        return null;
+      }
+      // Other non-ok (unlikely) — stop pagination with what we have
+      return items;
+    }
+
+    const json: unknown = await res.json();
+
+    // BE-M5: shape guard — must be an array
+    if (!Array.isArray(json)) {
+      console.error(`[gitlab] Unexpected non-array response on ${path}`);
+      return null;
+    }
+
+    const data = json as T[];
     items.push(...data);
 
     if (data.length < PAGE_SIZE) break;
@@ -183,7 +223,17 @@ async function fetchPaginated<T>(
   return maxItems ? items.slice(0, maxItems) : items;
 }
 
-/** Fetch contribution events within the scoring window. Returns null on auth failure. */
+/**
+ * Fetch contribution events within the scoring window.
+ *
+ * BE-H1 (#859): Returns null on auth failure (401/403), rate-limit (429),
+ * or server error (5xx). A null return causes the caller to abort and return
+ * null for the entire contribution data fetch.
+ *
+ * BE-M3 (#880): Uses fetchWithRetry for a single jittered retry on 5xx.
+ *
+ * BE-M5 (#881): Validates array shape; non-array body returns null.
+ */
 async function fetchEvents(
   userId: number,
   token: string,
@@ -198,15 +248,39 @@ async function fetchEvents(
 
   while (page <= MAX_PAGES) {
     const url = `${GL_API}/users/${userId}/events?after=${after}&page=${page}&per_page=${PAGE_SIZE}`;
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal,
     });
 
-    if (res.status === 401 || res.status === 403) return null;
-    if (!res.ok) return items;
+    if (!res.ok) {
+      // BE-H1: auth, rate-limit, or server error → signal failure
+      if (
+        res.status === 401 ||
+        res.status === 403 ||
+        res.status === 429 ||
+        res.status >= 500
+      ) {
+        const rawBody = await res.text().catch(() => "");
+        if (rawBody) {
+          console.error(
+            `[gitlab] HTTP ${res.status} on /events for user ${userId}: ${sanitizeLogBody(rawBody)}`,
+          );
+        }
+        return null;
+      }
+      return items;
+    }
 
-    const data = (await res.json()) as GitlabEvent[];
+    const json: unknown = await res.json();
+
+    // BE-M5: shape guard
+    if (!Array.isArray(json)) {
+      console.error(`[gitlab] Unexpected non-array events response for user ${userId}`);
+      return null;
+    }
+
+    const data = json as GitlabEvent[];
     items.push(...data);
     if (data.length < PAGE_SIZE) break;
     page++;
@@ -215,12 +289,12 @@ async function fetchEvents(
   return items;
 }
 
-/** Fetch merged MRs authored by the user (global scope). */
+/** Fetch merged MRs authored by the user (global scope). Returns null on error. */
 async function fetchMergedMRs(
   username: string,
   token: string,
   signal: AbortSignal,
-): Promise<GitlabMergeRequest[]> {
+): Promise<GitlabMergeRequest[] | null> {
   return fetchPaginated<GitlabMergeRequest>(
     `/merge_requests?author_username=${encodeURIComponent(username)}&state=merged&scope=all`,
     token,
@@ -248,23 +322,35 @@ async function fetchMrDiffStat(
   return parseDiffStat(data.changes ?? []);
 }
 
-/** Count others' MRs the user approved. 0 when approvals are Premium-gated. */
+/**
+ * Count others' MRs the user approved. 0 when approvals are Premium-gated.
+ *
+ * BE-L1 (#886): Caps the number of per-MR approver lookups at
+ * MAX_APPROVER_LOOKUPS to prevent O(n) unbounded API calls.
+ */
 async function fetchReviewsCount(
   username: string,
   token: string,
   signal: AbortSignal,
 ): Promise<number> {
-  const mrs = await fetchPaginated<GitlabMergeRequest>(
-    `/merge_requests?reviewer_username=${encodeURIComponent(username)}&scope=all&state=merged`,
-    token,
-    signal,
-    MAX_PRS,
-  );
+  const mrs =
+    (await fetchPaginated<GitlabMergeRequest>(
+      `/merge_requests?reviewer_username=${encodeURIComponent(username)}&scope=all&state=merged`,
+      token,
+      signal,
+      MAX_PRS,
+    )) ?? [];
 
   let count = 0;
+  let lookups = 0;
+
   for (const mr of mrs) {
     // Skip self-authored MRs (self-reviews don't count).
     if (mr.author?.username === username) continue;
+
+    // BE-L1: cap per-MR approver lookups
+    if (lookups >= MAX_APPROVER_LOOKUPS) break;
+    lookups++;
 
     const approvedBy = await fetchApprovers(
       mr.project_id,
@@ -303,20 +389,21 @@ async function fetchClosedIssuesCount(
   token: string,
   signal: AbortSignal,
 ): Promise<number> {
-  const issues = await fetchPaginated<{ id: number }>(
-    `/issues?author_username=${encodeURIComponent(username)}&state=closed&scope=all`,
-    token,
-    signal,
-  );
+  const issues =
+    (await fetchPaginated<{ id: number }>(
+      `/issues?author_username=${encodeURIComponent(username)}&state=closed&scope=all`,
+      token,
+      signal,
+    )) ?? [];
   return issues.length;
 }
 
-/** Fetch the user's projects (paginated, capped at MAX_REPOS). */
+/** Fetch the user's projects (paginated, capped at MAX_REPOS). Returns null on error. */
 async function fetchUserProjects(
   userId: number,
   token: string,
   signal: AbortSignal,
-): Promise<GitlabProject[]> {
+): Promise<GitlabProject[] | null> {
   return fetchPaginated<GitlabProject>(
     `/users/${userId}/projects`,
     token,

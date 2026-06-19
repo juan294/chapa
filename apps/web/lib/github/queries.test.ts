@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchContributionData } from "./queries";
+import { _setRetryDelayFn } from "@/lib/utils/fetch-retry";
 
 describe("fetchContributionData", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Skip retry delays so tests don't hang
+    _setRetryDelayFn(() => Promise.resolve());
   });
 
   afterEach(() => {
@@ -390,6 +393,120 @@ describe("fetchContributionData", () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("[github] GraphQL HTTP 500"),
     );
+    consoleSpy.mockRestore();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M4 (#870): Log body truncation (≤200 chars) + control-char stripping
+  // ---------------------------------------------------------------------------
+
+  it("BE-M4: truncates long error bodies in log to ≤200 chars", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const longBody = "a".repeat(500);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: () => Promise.resolve(longBody),
+      }),
+    );
+
+    await fetchContributionData("testuser", "token");
+
+    const logged = consoleSpy.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("[github]"),
+    );
+    expect(logged).toBeDefined();
+    const loggedStr = logged![0] as string;
+    // The body snippet embedded in the log line must be ≤200 chars
+    // Overall log line = prefix + status + snippet, but snippet ≤200
+    expect(loggedStr.length).toBeLessThanOrEqual(350);
+    consoleSpy.mockRestore();
+  });
+
+  it("BE-M4: strips control characters from the logged body snippet", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const adversarialBody = "err\x00\x01\x1b[31mRED\x1b[0m\nmore";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: () => Promise.resolve(adversarialBody),
+      }),
+    );
+
+    await fetchContributionData("testuser", "token");
+
+    const logged = consoleSpy.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("[github]"),
+    );
+    expect(logged).toBeDefined();
+    const loggedStr = logged![0] as string;
+    expect(loggedStr).not.toMatch(/\x1b/);
+    expect(loggedStr).not.toMatch(/\x00/);
+    consoleSpy.mockRestore();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M3 (#880): Retry on transient 5xx for GitHub GraphQL (idempotent read)
+  // ---------------------------------------------------------------------------
+
+  it("BE-M3: retries a transient 5xx and succeeds on the second attempt", async () => {
+    let callCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 503,
+            text: () => Promise.resolve("Service Unavailable"),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              data: {
+                user: {
+                  login: "testuser",
+                  name: "Test",
+                  avatarUrl: "https://example.com/avatar.png",
+                  contributionsCollection: {
+                    contributionCalendar: { totalContributions: 5, weeks: [] },
+                    pullRequestContributions: { totalCount: 0, nodes: [] },
+                    pullRequestReviewContributions: { totalCount: 0 },
+                    issueContributions: { totalCount: 0 },
+                  },
+                  repositories: { totalCount: 0, nodes: [] },
+                },
+              },
+            }),
+        });
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).not.toBeNull();
+    expect(callCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("BE-M3: persistent 5xx returns null after max attempts", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: () => Promise.resolve("Service Unavailable"),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).toBeNull();
     consoleSpy.mockRestore();
   });
 

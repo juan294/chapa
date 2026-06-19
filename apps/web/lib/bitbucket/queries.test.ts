@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fetchBitbucketContributionData } from "./queries";
+import { _setRetryDelayFn } from "@/lib/utils/fetch-retry";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,6 +95,8 @@ describe("fetchBitbucketContributionData", () => {
     fetchCalls = [];
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-07-01T00:00:00.000Z"));
+    // Skip retry delays so tests using fake timers don't hang
+    _setRetryDelayFn(() => Promise.resolve());
   });
 
   afterEach(() => {
@@ -668,6 +671,95 @@ describe("fetchBitbucketContributionData", () => {
     expect(result).not.toBeNull();
     // Comment-only activities are not counted as review activities
     expect(result!.reviewActivities).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-H1 (#859): fetchPaginatedWithStatus — 429/5xx → null (authFailed=true treated as null)
+  // ---------------------------------------------------------------------------
+
+  it("BE-H1: returns null when workspace fetch returns 429", async () => {
+    mockFetch(async () => ({ status: 429, json: async () => ({}) }));
+
+    const result = await fetchBitbucketContributionData("bbuser", "tok", {
+      displayName: "BB", avatarUrl: "",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("BE-H1: returns null when workspace fetch returns 503", async () => {
+    mockFetch(async () => ({ status: 503, json: async () => ({}) }));
+
+    const result = await fetchBitbucketContributionData("bbuser", "tok", {
+      displayName: "BB", avatarUrl: "",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("BE-H1: 200 with data still succeeds (unchanged path)", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        return { status: 200, json: async () => paginated([makeWorkspace("ws1")]) };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData("bbuser", "tok", {
+      displayName: "BB", avatarUrl: "",
+    });
+    expect(result).not.toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M3 (#880): Jittered retry on transient 5xx
+  // ---------------------------------------------------------------------------
+
+  it("BE-M3: retries a transient 5xx and succeeds on second attempt", async () => {
+    let wsCalls = 0;
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        wsCalls++;
+        if (wsCalls === 1) {
+          return { status: 503, json: async () => ({}) };
+        }
+        return { status: 200, json: async () => paginated([makeWorkspace("ws1")]) };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData("bbuser", "tok", {
+      displayName: "BB", avatarUrl: "",
+    });
+    expect(result).not.toBeNull();
+    expect(wsCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  it("BE-M3: persistent 5xx returns null after max attempts", async () => {
+    mockFetch(async () => ({ status: 503, json: async () => ({}) }));
+
+    const result = await fetchBitbucketContributionData("bbuser", "tok", {
+      displayName: "BB", avatarUrl: "",
+    });
+    expect(result).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M5 (#881): Shape guard — malformed paginated body
+  // ---------------------------------------------------------------------------
+
+  it("BE-M5: malformed workspace body (no values field) is treated as null without throwing", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/user/permissions/workspaces")) {
+        // Missing `values` field — invalid shape
+        return { status: 200, json: async () => ({ bad: "shape" }) };
+      }
+      return { status: 200, json: async () => paginated([]) };
+    });
+
+    const result = await fetchBitbucketContributionData("bbuser", "tok", {
+      displayName: "BB", avatarUrl: "",
+    });
+    // No throw — graceful empty or null result
+    expect(result === null || (result !== null && result.repos.length === 0)).toBe(true);
   });
 
   it("handles changes_requested by a different user (not collected)", async () => {
