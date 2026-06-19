@@ -17,6 +17,19 @@ import { dbUpsertLinkedPlatform, dbDeleteLinkedPlatform, dbGetLinkedPlatforms } 
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
+import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
+
+/**
+ * Invalidate the same-day rendered badge SVG cache so a newly linked or
+ * unlinked platform's logo appears on the badge immediately, rather than
+ * waiting for the date-keyed cache to roll over (#856). The stats caches are
+ * invalidated separately; this covers the rendered artifact that the badge.svg
+ * route and the share page both read.
+ */
+function invalidateBadgeSvgCache(handle: string): void {
+  void cacheDel(buildBadgeSvgCacheKey(handle, toDateString(new Date())));
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -219,10 +232,11 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
       );
     }
 
-    // 10. Invalidate stats cache
+    // 10. Invalidate stats cache + the rendered badge so the new logo shows now
     const lh = handle.toLowerCase();
     void cacheDel(`stats:v2:merged:${lh}`);
     void cacheDel(`stats:v2:${config.platform}:${lh}`);
+    invalidateBadgeSvgCache(handle);
 
     // 11. Clear state cookie and redirect to share page
     const response = NextResponse.redirect(
@@ -265,11 +279,12 @@ export function createDisconnectHandler(config: PlatformOAuthConfig) {
     // 4. Delete linked platform
     const success = await dbDeleteLinkedPlatform(handle, config.platform);
 
-    // 5. Invalidate stats cache + supplemental EMU data
+    // 5. Invalidate stats cache + supplemental EMU data + the rendered badge
     const lh = handle.toLowerCase();
     void cacheDel(`stats:v2:merged:${lh}`);
     void cacheDel(`stats:v2:${config.platform}:${lh}`);
     void cacheDel(`supplemental:${lh}`);
+    invalidateBadgeSvgCache(handle);
 
     // 6. Return result
     return NextResponse.json({ success });

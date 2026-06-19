@@ -422,6 +422,14 @@ describe("createCallbackHandler", () => {
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
   });
 
+  it("invalidates the rendered badge SVG cache on success (#856)", async () => {
+    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      expect.stringMatching(/^badge:.*:testuser:warm-amber:/),
+    );
+  });
+
   it("clears CSRF state cookie on success", async () => {
     const res = await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
 
@@ -519,6 +527,14 @@ describe("createDisconnectHandler", () => {
     await POST(makeRequest());
 
     expect(mockCacheDel).toHaveBeenCalledWith("supplemental:testuser");
+  });
+
+  it("invalidates the rendered badge SVG cache on disconnect (#856)", async () => {
+    await POST(makeRequest());
+
+    expect(mockCacheDel).toHaveBeenCalledWith(
+      expect.stringMatching(/^badge:.*:testuser:warm-amber:/),
+    );
   });
 
   it("returns { success: false } when DB delete fails", async () => {
