@@ -1,18 +1,15 @@
-import { Navbar } from "@/components/Navbar";
+import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { LocaleSync } from "@/lib/i18n";
 import type { Metadata } from "next";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const dynamic = 'force-static';
 
-export async function generateMetadata({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string>>;
-}): Promise<Metadata> {
-  const locale = await getServerLocale((await searchParams).lang);
-  const t = getServerT(locale);
+export function generateMetadata(): Metadata {
+  const t = getServerT(DEFAULT_LOCALE);
   return {
     title: t('legal.privacy.metadataTitle') as string,
     description: t('legal.privacy.metadataDescription') as string,
@@ -23,20 +20,14 @@ export async function generateMetadata({
   };
 }
 
-export default async function PrivacyPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string>>;
-}) {
-  const resolvedParams = await searchParams;
-  const locale = await getServerLocale(resolvedParams.lang);
-  const t = getServerT(locale);
+export default async function PrivacyPage() {
+  const t = getServerT(DEFAULT_LOCALE);
   const sections = t('legal.privacy.sections') as Array<{ heading: string; body: string }>;
 
   return (
     <div className="min-h-screen bg-bg">
-      <Navbar />
-      <LocaleSync queryLang={resolvedParams.lang} />
+      <NavbarClient />
+      <LocaleSync />
       <main id="main-content" className="relative mx-auto max-w-3xl px-6 pt-32 pb-24">
         <div className="relative">
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mb-8 animate-fade-in-up">

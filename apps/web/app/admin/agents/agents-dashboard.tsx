@@ -7,6 +7,7 @@ import { AgentTogglesTable } from "./agent-toggles-table";
 import { AgentStatusGrid } from "./agent-status-grid";
 import { CrossAgentInsights } from "./cross-agent-insights";
 import { TerminalDisplay } from "./terminal-display";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 
 export function AgentsDashboard() {
   const [data, setData] = useState<AgentsDashboardData | null>(null);
@@ -33,8 +34,24 @@ export function AgentsDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    fireAndForget(fetchData, () => undefined);
   }, [fetchData]);
+
+  const handleRun = useCallback(async (agentKey: string) => {
+    try {
+      const res = await fetch("/api/admin/agents/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentKey }),
+      });
+      if (res.ok) {
+        setRunningAgent(agentKey);
+        setShowTerminal(true);
+      }
+    } catch {
+      // Network error
+    }
+  }, []);
 
   // Listen for events from command bar
   useEffect(() => {
@@ -60,22 +77,6 @@ export function AgentsDashboard() {
     },
     [fetchData],
   );
-
-  const handleRun = useCallback(async (agentKey: string) => {
-    try {
-      const res = await fetch("/api/admin/agents/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentKey }),
-      });
-      if (res.ok) {
-        setRunningAgent(agentKey);
-        setShowTerminal(true);
-      }
-    } catch {
-      // Network error
-    }
-  }, []);
 
   const handleStop = useCallback(
     async (agentKey: string) => {

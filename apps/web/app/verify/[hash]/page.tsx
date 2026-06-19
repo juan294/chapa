@@ -182,7 +182,7 @@ function VerifiedCard({
             <p className="font-heading text-sm font-bold text-text-primary">
               {record.commitsTotal}
             </p>
-            <p className="text-xs text-text-secondary">Commits</p>
+            <p className="text-xs text-text-secondary">{t('verifyDetail.commits') as string}</p>
           </div>
           <div className="rounded-lg border border-stroke bg-bg px-3 py-2 text-center">
             <p className="font-heading text-sm font-bold text-text-primary">
@@ -224,7 +224,7 @@ function NotFoundCard({ hash, t }: { hash: string; t: TFunc }) {
       description={t('verifyDetail.notFoundDescription') as string}
     >
       <div className="rounded-lg border border-stroke bg-bg px-4 py-3">
-        <p className="text-xs text-text-secondary">Hash</p>
+        <p className="text-xs text-text-secondary">{t('verifyDetail.hashLabel') as string}</p>
         <p className="font-heading text-lg tracking-widest text-text-secondary">
           {hash}
         </p>

@@ -131,6 +131,41 @@ export const CODEBERG_CLEAR_COOKIE =
   "chapa_cb_oauth_state=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
 
 // ---------------------------------------------------------------------------
+// GitLab-specific fixtures
+// ---------------------------------------------------------------------------
+
+export const GITLAB_ENV_VARS = {
+  GITLAB_CLIENT_ID: "test-gl-client-id",
+  GITLAB_CLIENT_SECRET: "test-gl-client-secret",
+  NEXT_PUBLIC_BASE_URL: "https://chapa.thecreativetoken.com",
+} as const;
+
+export const GITLAB_TOKEN_RESPONSE = {
+  access_token: "gl_access_123",
+  token_type: "bearer",
+  expires_in: 7200,
+  refresh_token: "gl_refresh_456",
+};
+
+export const GITLAB_USER = {
+  id: 4242,
+  login: "gl-user",
+  full_name: "GL User",
+  avatar_url: "https://gitlab.com/avatars/4242",
+};
+
+export const GITLAB_STATE_COOKIE = {
+  state: "random-csrf-state",
+  cookie: "chapa_gl_oauth_state=random-csrf-state; HttpOnly; SameSite=Lax; Path=/; Max-Age=600",
+};
+
+export const GITLAB_AUTH_URL =
+  "https://gitlab.com/oauth/authorize?client_id=test-gl-client-id&state=random-csrf-state";
+
+export const GITLAB_CLEAR_COOKIE =
+  "chapa_gl_oauth_state=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
+
+// ---------------------------------------------------------------------------
 // Env var helpers
 // ---------------------------------------------------------------------------
 

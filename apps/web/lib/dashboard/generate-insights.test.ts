@@ -268,4 +268,29 @@ describe("generateInsights", () => {
     expect(craftTip!.dimension).toBe("craft");
     expect(craftTip!.body).toBeTruthy();
   });
+
+  it("uses identity fallback when no translation function is provided", () => {
+    // Exercises the default t = (key) => key parameter path.
+    // With the identity function, t(key) returns the key itself, so headlines
+    // and bodies contain raw translation keys rather than translated strings.
+    const insights = generateInsights(mockImpact, null, null);
+    expect(insights.length).toBeGreaterThan(0);
+    const archetype = insights.find((i) => i.id === "tip-archetype");
+    expect(archetype).toBeDefined();
+    expect(archetype!.archetypeName).toBe("Builder");
+    // Headline uses the key as a template string with no matching placeholders
+    expect(typeof archetype!.headline).toBe("string");
+  });
+
+  it("falls back to lowercased archetype key for unknown archetype types", () => {
+    // Exercises the `?? archetype.toLowerCase()` branch in toArchetypeKey
+    const unknownImpact = {
+      ...mockImpact,
+      archetype: "Unknown" as unknown as ImpactV6Result["archetype"],
+    };
+    const insights = generateInsights(unknownImpact, null, null, tEn);
+    const archetype = insights.find((i) => i.id === "tip-archetype");
+    expect(archetype).toBeDefined();
+    expect(archetype!.archetypeName).toBe("Unknown");
+  });
 });

@@ -6,6 +6,7 @@
  */
 
 import { Resvg } from "@resvg/resvg-js";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -33,6 +34,35 @@ export function getFontPaths(): string[] {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const fontsDir = join(moduleDir, "fonts");
   return FONT_FILES.map((f) => join(fontsDir, f));
+}
+
+/**
+ * PE-L3: Font buffers read once at module scope.
+ *
+ * resvg-js accepts pre-loaded `fontBuffers` (Buffer[]) in addition to
+ * `fontFiles` (string[]). Loading the four TTF files at module initialisation
+ * time means each cold-start pays the disk read once, not on every
+ * OG-image cache miss. The buffers are reused across all calls to `svgToPng`.
+ *
+ * Falls back to `undefined` if any read fails so the module still loads in
+ * environments where the font files are absent (e.g. unit-test sandboxes);
+ * `svgToPng` falls back to `fontFiles` paths in that case.
+ */
+let _fontBuffers: Buffer[] | undefined;
+try {
+  _fontBuffers = getFontPaths().map((p) => readFileSync(p));
+} catch {
+  _fontBuffers = undefined;
+}
+
+/**
+ * Return the cached font buffers for use with resvg's `fontBuffers` option.
+ * Returns `undefined` if the fonts could not be read at module load time.
+ *
+ * @internal exported for tests only
+ */
+export function getFontBuffers(): Buffer[] | undefined {
+  return _fontBuffers;
 }
 
 /**
@@ -65,18 +95,22 @@ export function stripSvgAnimations(svg: string): string {
  * renders correctly in serverless environments where these fonts are
  * not installed (e.g. Vercel).
  *
+ * PE-L3: Font buffers are read once at module scope and reused across
+ * all renders, eliminating repeated disk reads per OG-image cache miss.
+ * Falls back to `fontFiles` paths if buffer loading failed at startup.
+ *
  * @param svg - Complete SVG markup string
  * @param width - Target PNG width in pixels (default: 1200)
  * @returns PNG image as a Uint8Array buffer
  */
 export function svgToPng(svg: string, width = 1200): Uint8Array {
   const staticSvg = stripSvgAnimations(svg);
+  const fontConfig = _fontBuffers
+    ? { loadSystemFonts: false, fontBuffers: _fontBuffers }
+    : { loadSystemFonts: false, fontFiles: getFontPaths() };
   const resvg = new Resvg(staticSvg, {
     fitTo: { mode: "width", value: width },
-    font: {
-      loadSystemFonts: false,
-      fontFiles: getFontPaths(),
-    },
+    font: fontConfig,
   });
   const rendered = resvg.render();
   return rendered.asPng();

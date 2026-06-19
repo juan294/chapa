@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-06-19
+
+### Added
+- **GitLab as a connectable source (#855)**: link gitlab.com accounts (OAuth connect / callback / disconnect / status via the shared platform factory); GitLab MR, commit, and review data merge into Impact v6 scoring; GitLab logo appears in badge branding for connected users. New env vars `GITLAB_CLIENT_ID`, `GITLAB_CLIENT_SECRET`, `NEXT_PUBLIC_GITLAB_ENABLED`; migration `026_seed_integration_flags.sql` seeds the integration feature-flag rows (DB value overrides env)
+- **CLI device-code binding (#869)**: `/api/cli/auth/poll` issues an RFC 8628-style `device_code` on the first poll and binds the session to the initiating device; fully backward-compatible with existing CLI binaries (legacy clients that don't echo it keep working)
+- **CI gates**: per-route bundle-size budget (`scripts/check-bundle-size.sh`), Vitest coverage thresholds, madge circular-dependency check, a `no-process-env` ESLint rule (env access funneled through `lib/env.ts`), and a `packages/shared` import boundary
+- **Operational alerting**: warm-cache cron emits P2 alerts on high handle-failure rate (#751) and when the per-run handle ceiling is approached (#773)
+
+### Fixed
+- **Score integrity (#859)**: GitLab/Bitbucket/Codeberg pagination now treats `429`/`5xx` mid-fetch as a failure (falls back to cached data) instead of caching truncated results as a successful empty response
+- **Auth hardening**: structural bearer-token pre-check stops GitHub-API amplification via bogus tokens (#860); supplemental ownership check runs before the rate-limit increment (#890); IP rate-limiting precedes auth resolution on `/api/recalculate` and `/api/insights`; `getClientIp` fails safe instead of collapsing headerless requests into one bucket (#868); centralized handle-ownership gate (#896); session cookies carry an `iat` and expire server-side (#889)
+- **Performance**: badge and OG routes read the response cache before rate-limiting (#882, #775); render-lock losers serve a stale badge immediately instead of polling (#757); enriched login stats are backfilled into the cache (#761); badge fonts load once at module scope (#893); per-handle cache TTL jitter spreads the UTC-midnight recompute (#776); webhook dedup uses an atomic set-if-absent status (#887)
+- **i18n leaks**: archetype "Dominant dimension" label (#864), share-page social metadata (#865), public dashboard aria-labels (#866), verify page (#876), 404 page (#877), scoring CTA (#878), Studio (#769), and the mixed-language archetype connector (#875) are now localized
+- **Content pages** (`/`, `/about*`, `/archetypes/*`, `/privacy`, `/terms`, `/verify`) are now statically rendered / ISR and CDN-cacheable instead of `force-dynamic` (#861, #874)
+
+### Changed
+- **i18n client payload roughly halved (#862)**: only the active locale's dictionary ships in the client bundle; the other locale is loaded on demand. The root layout renders statically at `DEFAULT_LOCALE`, with the user's locale applied client-side from the cookie
+- `lib/db/campaigns.ts` split by responsibility (crud / sends / types); sync feature-flag helpers extracted to `lib/feature-flags-sync.ts`
+- External-platform reads use bounded, jittered retries; upstream error bodies are truncated and sanitized in logs
+- `.worktrees/` excluded from TypeScript / ESLint / build scope
+
+### Security
+- Forced `undici >= 7.28.0` via pnpm override, resolving transitive advisories pulled in through `jsdom` (#863)
+- Gitleaks GitHub Action upgraded to v3
+
 ## [2.10.0] - 2026-05-03
 
 ### Added
@@ -473,7 +498,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.9.1...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/juan294/chapa/compare/v2.10.0...v2.11.0
+[2.10.0]: https://github.com/juan294/chapa/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/juan294/chapa/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/juan294/chapa/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/juan294/chapa/compare/v2.7.2...v2.8.0

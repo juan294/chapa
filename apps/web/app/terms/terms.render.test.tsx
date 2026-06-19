@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
 vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
+}));
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
 }));
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: () => null,
@@ -12,7 +15,6 @@ vi.mock("@/lib/i18n", () => ({
   LocaleSync: () => null,
 }));
 vi.mock("@/lib/i18n/server", () => ({
-  getServerLocale: vi.fn().mockResolvedValue("en"),
   getServerT: vi.fn().mockReturnValue((key: string) => {
     const dict: Record<string, unknown> = {
       "legal.terms.h1Before": "Terms of ",
@@ -39,74 +41,47 @@ vi.mock("@/lib/i18n/server", () => ({
 }));
 
 import TermsPage from "./page";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
 
 afterEach(cleanup);
 
 describe("TermsPage", () => {
-  beforeEach(() => {
-    vi.mocked(getServerLocale).mockResolvedValue("en");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      const dict: Record<string, unknown> = {
-        "legal.terms.h1Before": "Terms of ",
-        "legal.terms.h1Highlight": "Service",
-        "legal.terms.lastUpdated": "Last updated: February 2026",
-        "legal.terms.sections": [
-          {
-            heading: "1. Acceptance of Terms",
-            body: "By accessing or using Chapa...",
-          },
-          {
-            heading: "7. Contact",
-            body: "For questions about these terms, contact us at ",
-          },
-        ],
-        "legal.terms.contactEmail": "support@chapa.thecreativetoken.com",
-        "legal.terms.metadataTitle": "Terms of Service",
-        "legal.terms.metadataDescription": "...",
-        "legal.terms.metadataOgTitle": "Terms of Service — Chapa",
-      };
-      return (dict[key] ?? key) as unknown as string;
-    });
-  });
-
   it("renders navbar", async () => {
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders h1 highlight in English", async () => {
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByText("Service")).toBeDefined();
   });
 
   it("renders h1 contains Terms text", async () => {
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain(
       "Terms"
     );
   });
 
   it("renders last-updated note", async () => {
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByText("Last updated: February 2026")).toBeDefined();
   });
 
   it("renders section heading", async () => {
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByText("1. Acceptance of Terms")).toBeDefined();
   });
 
   it("renders contact email link on last section", async () => {
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     const link = screen.getByRole("link");
     expect(link.getAttribute("href")).toBe(
       "mailto:support@chapa.thecreativetoken.com"
     );
   });
 
-  it("renders in Spanish when locale is es", async () => {
-    vi.mocked(getServerLocale).mockResolvedValue("es");
+  it("renders with different getServerT mock (locale swap simulation)", async () => {
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       const dict: Record<string, unknown> = {
         "legal.terms.h1Before": "Términos del ",
@@ -131,7 +106,7 @@ describe("TermsPage", () => {
     });
 
     render(
-      await TermsPage({ searchParams: Promise.resolve({ lang: "es" }) })
+      await TermsPage()
     );
     expect(screen.getByText("Servicio")).toBeDefined();
     expect(
@@ -144,8 +119,7 @@ describe("TermsPage", () => {
 });
 
 describe("TermsPage generateMetadata", () => {
-  it("returns English metadata by default", async () => {
-    vi.mocked(getServerLocale).mockResolvedValue("en");
+  it("returns metadata with title and description (synchronous, no locale param)", async () => {
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       const dict: Record<string, unknown> = {
         "legal.terms.metadataTitle": "Terms of Service",
@@ -156,29 +130,10 @@ describe("TermsPage generateMetadata", () => {
       return (dict[key] ?? key) as unknown as string;
     });
 
+    // generateMetadata is synchronous (no async, no locale param)
     const { generateMetadata } = await import("./page");
-    const metadata = await generateMetadata({
-      searchParams: Promise.resolve({}),
-    });
+    const metadata = generateMetadata();
     expect(metadata.title).toBe("Terms of Service");
     expect(metadata.description).toContain("Terms of Service for Chapa");
-  });
-
-  it("returns Spanish metadata when locale is es", async () => {
-    vi.mocked(getServerLocale).mockResolvedValue("es");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      const dict: Record<string, unknown> = {
-        "legal.terms.metadataTitle": "Términos del Servicio",
-        "legal.terms.metadataDescription": "Términos del Servicio de Chapa.",
-        "legal.terms.metadataOgTitle": "Términos del Servicio — Chapa",
-      };
-      return (dict[key] ?? key) as unknown as string;
-    });
-
-    const { generateMetadata } = await import("./page");
-    const metadata = await generateMetadata({
-      searchParams: Promise.resolve({ lang: "es" }),
-    });
-    expect(metadata.title).toBe("Términos del Servicio");
   });
 });

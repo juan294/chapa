@@ -264,16 +264,38 @@ describe("GET /u/[handle]/badge.svg", () => {
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });
 
+    it("PE-M1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
+      // SVG cache hit — rate limiter must NOT be called (it's deferred to the miss branch)
+      const CACHED_SVG = '<svg xmlns="http://www.w3.org/2000/svg">CACHED</svg>';
+      mockCacheGet.mockResolvedValue(CACHED_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      expect(res.status).toBe(200);
+      expect(mockRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("PE-M1: rate limiter is still called on a cache miss", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      await GET(req, ctx);
+
+      expect(mockRateLimit).toHaveBeenCalledOnce();
+    });
+
     it("writes the rendered SVG to cache on cache miss", async () => {
       mockCacheGet.mockResolvedValue(null);
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       await GET(req, ctx);
 
+      // TTL is base 24h + per-handle jitter of 0-2h (PE-S1)
       expect(mockCacheSet).toHaveBeenCalledWith(
         expect.stringMatching(new RegExp(`^badge:${CACHE_VERSION}:testuser:warm-amber:`)),
         FAKE_SVG,
-        86400,
+        expect.toSatisfy((ttl: number) => ttl >= 86400 && ttl <= 86400 + 7200),
       );
     });
 
@@ -304,13 +326,31 @@ describe("GET /u/[handle]/badge.svg", () => {
     it("reuses cached SVG after another request already holds the render lock", async () => {
       mockCacheSetNx.mockResolvedValue(false);
       mockCacheGet
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(FAKE_SVG);
+        .mockResolvedValueOnce(null)   // today's SVG cache miss
+        .mockResolvedValueOnce(FAKE_SVG); // stale (yesterday) or poll hit
 
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
       const res = await GET(req, ctx);
 
       expect(await res.text()).toBe(FAKE_SVG);
+      expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
+      expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
+    });
+
+    it("PE-M2: lock-loser returns yesterday's stale SVG promptly without long polling", async () => {
+      const STALE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">STALE</svg>';
+      // Lock is held by another instance
+      mockCacheSetNx.mockResolvedValue(false);
+      mockCacheGet
+        .mockResolvedValueOnce(null)       // today's SVG cache miss
+        .mockResolvedValueOnce(STALE_SVG); // yesterday's stale key — return promptly
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      // Should serve stale SVG immediately (no polling delay, no render)
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(STALE_SVG);
       expect(mockMaterializePublicProfile).not.toHaveBeenCalled();
       expect(mockRenderBadgeSvg).not.toHaveBeenCalled();
     });

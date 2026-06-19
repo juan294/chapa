@@ -12,6 +12,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
@@ -64,7 +68,7 @@ afterEach(cleanup);
 describe("PrivacyPage render", () => {
   it("renders with navbar", async () => {
     const { default: PrivacyPage } = await import("./privacy/page");
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+    render(await PrivacyPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -75,7 +79,7 @@ describe("PrivacyPage render", () => {
 describe("TermsPage render", () => {
   it("renders with navbar", async () => {
     const { default: TermsPage } = await import("./terms/page");
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -98,7 +102,7 @@ describe("ComingSoonPage render", () => {
 describe("VerifyInputPage render", () => {
   it("renders with verify heading", async () => {
     const { default: VerifyInputPage } = await import("./verify/page");
-    const jsx = await VerifyInputPage({ searchParams: Promise.resolve({}) });
+    const jsx = await VerifyInputPage();
     render(jsx);
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
@@ -109,26 +113,27 @@ describe("VerifyInputPage render", () => {
 // ---------------------------------------------------------------------------
 describe("Loading page renders", () => {
   it("renders PrivacyLoading", async () => {
+    // Async server component (#884): await the call before rendering.
     const { default: PrivacyLoading } = await import("./privacy/loading");
-    render(<PrivacyLoading />);
+    render(await PrivacyLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders TermsLoading", async () => {
     const { default: TermsLoading } = await import("./terms/loading");
-    render(<TermsLoading />);
+    render(await TermsLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders ComingSoonLoading", async () => {
     const { default: ComingSoonLoading } = await import("./coming-soon/loading");
-    render(<ComingSoonLoading />);
+    render(await ComingSoonLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders CliAuthorizeLoading", async () => {
     const { default: CliAuthorizeLoading } = await import("./cli/authorize/loading");
-    render(<CliAuthorizeLoading />);
+    render(await CliAuthorizeLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
@@ -140,7 +145,7 @@ describe("Loading page renders", () => {
 
   it("renders ArchetypesLoading", async () => {
     const { default: ArchetypesLoading } = await import("./archetypes/loading");
-    render(<ArchetypesLoading />);
+    render(await ArchetypesLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 

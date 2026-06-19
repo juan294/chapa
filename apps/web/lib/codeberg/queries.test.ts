@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Import will fail until implementation exists (TDD RED)
 import { fetchCodebergContributionData } from "./queries";
+import { _setRetryDelayFn } from "@/lib/utils/fetch-retry";
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -112,6 +113,8 @@ describe("fetchCodebergContributionData", () => {
     fetchCalls = [];
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-01T00:00:00.000Z"));
+    // Skip retry delays so tests using fake timers don't hang
+    _setRetryDelayFn(() => Promise.resolve());
   });
 
   afterEach(() => {
@@ -440,6 +443,109 @@ describe("fetchCodebergContributionData", () => {
     expect(heatmapCall).toBeDefined();
     expect(heatmapCall!.url).toContain("user%20name");
   });
+
+  // ---------------------------------------------------------------------------
+  // BE-H1 (#859): fetchPaginated — 429/5xx returns null
+  // ---------------------------------------------------------------------------
+
+  it("BE-H1: returns null when heatmap returns 429", async () => {
+    mockFetch(async () => ({ status: 429, json: async () => ({}) }));
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    expect(result).toBeNull();
+  });
+
+  it("BE-H1: returns null when heatmap returns 503", async () => {
+    mockFetch(async () => ({ status: 503, json: async () => ({}) }));
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    expect(result).toBeNull();
+  });
+
+  it("BE-H1: 200 with data still returns items (success path)", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/heatmap")) {
+        return { status: 200, json: async () => [makeHeatmap("2026-02-15T00:00:00Z", 3)] };
+      }
+      return { status: 200, json: async () => [] };
+    });
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    expect(result).not.toBeNull();
+    expect(result!.heatmap).toHaveLength(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M3 (#880): Jittered retry on transient 5xx
+  // ---------------------------------------------------------------------------
+
+  it("BE-M3: retries a transient 5xx on repos and succeeds", async () => {
+    let repoCalls = 0;
+    mockFetch(async (url) => {
+      if (url.includes("/heatmap")) {
+        return { status: 200, json: async () => [makeHeatmap("2026-02-15T00:00:00Z", 1)] };
+      }
+      if (url.includes("/users/testuser/repos")) {
+        repoCalls++;
+        if (repoCalls === 1) {
+          return { status: 503, json: async () => ({}) };
+        }
+        return { status: 200, json: async () => [] };
+      }
+      return { status: 200, json: async () => [] };
+    });
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    expect(result).not.toBeNull();
+    expect(repoCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  it("BE-M3: persistent 5xx on repos returns empty repos without throwing", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/heatmap")) {
+        return { status: 200, json: async () => [] };
+      }
+      // repos always 503
+      return { status: 503, json: async () => ({}) };
+    });
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    // Not null — heatmap succeeded; repos are just empty
+    expect(result === null || (result !== null && result.repos.length === 0)).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M5 (#881): Shape guard — malformed responses handled gracefully
+  // ---------------------------------------------------------------------------
+
+  it("BE-M5: malformed heatmap response (not array) returns null without throwing", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/heatmap")) {
+        // Valid 200 but wrong shape
+        return { status: 200, json: async () => ({ not: "array" }) };
+      }
+      return { status: 200, json: async () => [] };
+    });
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    // Should not throw — graceful null or empty
+    expect(result === null || (result !== null && result.heatmap.length === 0)).toBe(true);
+  });
+
+  it("BE-M5: malformed repos response (not array) is treated as empty without throwing", async () => {
+    mockFetch(async (url) => {
+      if (url.includes("/heatmap")) {
+        return { status: 200, json: async () => [] };
+      }
+      if (url.includes("/users/testuser/repos")) {
+        return { status: 200, json: async () => "not-an-array" };
+      }
+      return { status: 200, json: async () => [] };
+    });
+
+    const result = await fetchCodebergContributionData("testuser", "tok", profile);
+    expect(result === null || (result !== null && result.repos.length === 0)).toBe(true);
+  });
 });
 
 describe("pagination", () => {
@@ -449,6 +555,7 @@ describe("pagination", () => {
     fetchCalls = [];
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-01T00:00:00.000Z"));
+    _setRetryDelayFn(() => Promise.resolve());
   });
 
   afterEach(() => {

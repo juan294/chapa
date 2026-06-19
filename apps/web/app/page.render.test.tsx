@@ -52,6 +52,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/lib/auth/error-messages", () => ({
   getOAuthErrorMessage: vi.fn((err?: string) => (err ? `Error: ${err}` : undefined)),
 }));

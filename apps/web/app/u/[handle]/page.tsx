@@ -46,8 +46,9 @@ export async function generateMetadata({
   }
 
   // generateMetadata runs at ISR build time — avoid server-only APIs.
-  // Use English for metadata; client hydration via LocaleSync handles locale.
-  const t = getServerT("en");
+  // Use the primary audience locale (es) for social metadata so Spanish users
+  // get localised social cards. Client hydration via LocaleSync handles runtime locale.
+  const t = getServerT("es");
 
   const pageUrl = `${BASE_URL}/u/${handle}`;
   // Daily cache buster forces social platforms to re-fetch the OG image
@@ -58,15 +59,15 @@ export async function generateMetadata({
     description: interpolate(t("sharePage.metadataDescription") as string, { handle }),
     openGraph: {
       type: "profile",
-      title: `@${interpolate(t("sharePage.metadataOgTitle") as string, { handle })} Developer Impact, Decoded`,
-      description: `View ${handle}'s developer impact and badge on Chapa.`,
+      title: `@${interpolate(t("sharePage.metadataOgTitle") as string, { handle })}`,
+      description: interpolate(t("sharePage.metadataDescription") as string, { handle }),
       url: pageUrl,
       images: [{ url: ogImageUrl, width: 1200, height: 630, alt: interpolate(t("sharePage.metadataOgImageAlt") as string, { handle }) }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `@${handle} — Chapa Developer Impact, Decoded`,
-      description: `What does your developer DNA look like? Discover your impact score, archetype, and coding patterns.`,
+      title: `@${interpolate(t("sharePage.metadataTitle") as string, { handle })}`,
+      description: interpolate(t("sharePage.metadataDescription") as string, { handle }),
       images: [ogImageUrl],
     },
     alternates: {
@@ -154,7 +155,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
     const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
     after(() => {
       if (svgToCache) {
-        void writeBadgeSvgCache(svgCacheKey, svgToCache);
+        void writeBadgeSvgCache(svgCacheKey, svgToCache, handle);
       }
       return runPublicProfileSideEffects(handle, materialized, { verification });
     });

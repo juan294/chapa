@@ -52,8 +52,22 @@ describe("AGENTS config", () => {
     expect(AGENTS.performance_agent!.schedule).toMatch(/weekly/i);
   });
 
+  it("performance_agent verifies installed dependencies before measuring builds", () => {
+    const prompt = AGENTS.performance_agent!.defaultPrompt;
+
+    expect(prompt).toContain("pnpm install --frozen-lockfile");
+    expect(prompt).toContain("before measuring build output");
+  });
+
   it("documentation_agent runs weekly", () => {
     expect(AGENTS.documentation_agent!.schedule).toMatch(/weekly/i);
+  });
+
+  it("documentation_agent allows direct NEXT_PUBLIC env reads in client components", () => {
+    const prompt = AGENTS.documentation_agent!.defaultPrompt;
+
+    expect(prompt).toContain("Do not flag direct NEXT_PUBLIC_* reads in client components");
+    expect(prompt).toContain("build-time inlining");
   });
 
   it("cost_analyst runs daily", () => {

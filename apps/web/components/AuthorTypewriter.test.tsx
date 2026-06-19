@@ -50,10 +50,10 @@ describe("AuthorTypewriter", () => {
       expect(SOURCE).toContain('aria-hidden="true"');
     });
 
-    it("outer wrapper has role=presentation for onClick semantics (#423)", () => {
-      // The outer div has onClick={e => e.stopPropagation()} which requires
-      // a role attribute to satisfy a11y linting (no static element with handlers)
-      expect(SOURCE).toContain('role="presentation"');
+    it("outer wrapper does not carry role=presentation alongside interactive handlers (#891)", () => {
+      // UX-L3: role="presentation" contradicts onClick/onKeyDown handlers.
+      // Removed the conflicting role — the div has no semantic role.
+      expect(SOURCE).not.toContain('role="presentation"');
     });
   });
 

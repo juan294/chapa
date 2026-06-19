@@ -1,142 +1,147 @@
 # Performance Report
-> Generated: 2026-04-30 | Health status: yellow
+> Generated: 2026-06-18 | Health status: green | HEAD: `63b18ac1`
 
 ## Executive Summary
 
-Build succeeds cleanly (Next.js 16.2.4, 0 TypeScript errors, no chunks exceed 500 KB), but two YELLOW issues require attention: total bundle size grew +194.9 KB (+11.6%) since the April 9 report, and the root layout's Redis feature-flag fetch is silently defeating ISR on archetype and about pages (7 pages expected to be statically cached are being server-rendered on every request).
+Bundle is flat at 1,950 KB raw / 623 KB gzipped (77 chunks), up <1 KB from the prior cycle (2026-06-11), confirming no regression from the CI-only pnpm/action-setup@v4→@v5 change. Zero routes exceed 500 KB, build is clean, caching and font loading are correct. One low-priority observation: knip.json references the v5 schema but v6.17.1 is installed — this may produce noisier output (test files now appear in the "unused files" category).
 
 ## Build Output
 
-Turbopack does not emit per-route First Load JS sizes in its build table. Route-level data below is derived from chunk analysis.
+Build: **Next.js 16.2.9** (Turbopack) | Compile: 4.4s | TypeCheck: 8.7s | Errors: 0
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| Compiled in | 6.6s | GREEN |
-| TypeScript errors | 0 | GREEN |
-| Total pages | 64 static definitions, 84 routes | GREEN |
-| Pages rendered static (○) | 5 (`/apple-icon`, `/coming-soon`, `/icon`, `/robots.txt`, `/sitemap.xml`) | ⚠️ YELLOW — see ISR regression |
-| Pages rendered dynamic (ƒ) | All others, including `/about`, `/archetypes/*` which should be ISR | ⚠️ YELLOW |
-| Largest JS chunk | 227.1 KB (Next.js framework) | GREEN |
-| Chunks >500 KB | **0** | GREEN |
-| Chunks >300 KB | **0** | GREEN |
+| Metric | Value |
+|--------|-------|
+| Routes total | 89 (4 static, 85 dynamic) |
+| Static pages generated | 48 |
+| Chunks | 77 |
+| Compilation errors | 0 |
+| TypeScript errors | 0 |
+
+> **Note**: Turbopack omits per-route First Load JS from the build table. Route-level sizing requires `ANALYZE=true pnpm run build` (interactive, browser-driven). All sizes below are from `.next/static/chunks` byte totals.
+
+### Largest Chunks (raw)
+
+| Chunk | Size | Status |
+|-------|------|--------|
+| `0qmgkw5s78uqn.js` | 228 KB | OK |
+| `2cz6l19i7nua_.js` | 192 KB | OK |
+| `02frlnv1h55df.js` | 156 KB | OK |
+| `0cz1d0mv5g_q7.js` | 112 KB | OK |
+| `43e11u3pk0euw.js` | 108 KB | OK |
+| *(remaining 72 chunks)* | ≤68 KB each | OK |
+
+All chunks are framework/vendor bundles. None exceed 300 KB raw.
 
 ## Bundle Analysis
 
-| Category | Raw | Gzipped |
-|----------|-----|---------|
-| Total JS (68 chunks) | **1,876.9 KB** (+194.9 KB vs Apr 9) | **598.1 KB** |
-| CSS (1 file) | 103.4 KB | 15.4 KB |
+| Metric | This Cycle | Prior Cycle (2026-06-11) | Delta |
+|--------|-----------|--------------------------|-------|
+| Total raw | **1,950 KB** | 1,949.3 KB | +0.7 KB (+0.04%) |
+| Total gzipped | **623 KB** | 622.6 KB | +0.4 KB (+0.06%) |
+| Chunk count | **77** | 77 | flat |
+| Routes >500 KB | **0** | 0 | — |
+| Routes >300 KB | **0** | 0 | — |
 
-**Top chunks by size:**
+**Verdict**: Bundle is effectively flat. M-bundle monitor stays closed (11th consecutive flat cycle since reversal on 2026-05-28).
 
-| Chunk (raw size) | Gzipped | Identified as | Status |
-|-----------------|---------|---------------|--------|
-| 0p9-7_b0ehkp..js (227.1 KB) | 70.7 KB | Next.js framework | GREEN |
-| 0vtr_ue7_86de.js (175.3 KB) | 57.1 KB | PostHog analytics (lazy-loaded) | GREEN |
-| 073dy37cyju-4.js (125.9 KB) | 33.7 KB | React DOM / RSC flight protocol | GREEN |
-| 03~yq9q893hmn.js (110.0 KB) | 38.5 KB | Core-js polyfills | GREEN |
-| 05bbsl_.fzfk..js (63.7 KB) | 17.5 KB | App code | GREEN |
-| 0jzrw17xs9ipi.js (63.3 KB) | 18.7 KB | App code / RSC | GREEN |
-| 11cnqbx.2k2ly.js (60.3 KB) | 20.4 KB | App code | GREEN |
-| 0h8du~3h4.wb9.js (58.4 KB) | 18.3 KB | App code | GREEN |
+### Knip — Unused Exports
 
-**Bundle delta vs 2026-04-09 (1,682 KB → 1,876.9 KB, +194.9 KB / +11.6%):**
-- Vendor/framework chunks (top 4): unchanged (-16.7 KB net)
-- Application code chunks: grew from ~1,027 KB to ~1,239 KB (+212 KB)
-- All recent commits (env.ts, JSON logger, withErrorCapture) are server-only — they should contribute 0 to client bundles. The growth predates the last 5 commits and likely reflects feature additions over the 3-week gap between April 9 and April 30.
-
-**Unused exports (knip):**
-- `--production` mode: 8 false positives confirmed in use (same as prior 3 cycles, verified via grep).
-- Default mode (from `apps/web/`): 86 unused TypeScript `interface`/`type` exports. These are erased at compile time — zero bundle impact. A `knip.json` config would suppress the test-file false positives and produce a cleaner signal.
-
-## ISR Regression (NEW — YELLOW)
-
-**Affected pages:** `/about`, `/about/scoring`, `/about/verification`, `/archetypes/builder`, `/archetypes/guardian`, `/archetypes/marathoner`, `/archetypes/polymath`, `/archetypes/emerging`, `/archetypes/balanced`, `/archetypes/artificer`, `/_not-found`, `/cli/authorize`, `/admin`
-
-**Root cause:** `app/layout.tsx:71` calls `isStudioEnabled()` → `dbGetFeatureFlag()` → `cacheGet()` → Upstash Redis HTTP (`https://delicate-muskrat-42024.upstash.io/pipeline` with `no-store`). Next.js detects this `no-store` fetch during static generation and marks the entire layout — and every page that inherits it — as dynamic.
-
-Build log confirms:
 ```
-[cache] cacheGet failed: Dynamic server usage: Route /archetypes/artificer couldn't be rendered
-statically because it used no-store fetch https://delicate-muskrat-42024.upstash.io/pipeline
+Unused files (440)     ← all test files (.test.ts/.test.tsx); false positive in --production mode
+Unused exports (91)    ← private helpers + internal functions
+Unused exported types (21) ← DX/documentation types
 ```
 
-**Impact:** `/archetypes/*` should be statically cached for 7 days (`revalidate = 604800`); `/about*` for 24 hours (`revalidate = 86400`). Instead they're server-rendered on every request, adding a Redis + Supabase round-trip to every page load.
+**Assessment**: The 440 "unused files" are the entire test suite — correctly excluded by `--production` from entry-point reachability but still matched by the `**/*.{ts,tsx}` project glob. The 7,594 tests pass cleanly; this is a presentation artifact. The 91 exports and 21 types are the same pattern as prior cycles: underscore-prefix private helpers (e.g., `_computeEffectiveness`, `_computeSophistication`), internal types used for documentation (`SessionUser`, `CampaignStatus`), and functions used within their own module (`buildPayload`, `computeHash` in HMAC). **No production bloat identified.**
 
-**Fix options (in order of preference):**
-1. Wrap the `dbGetFeatureFlag` Redis call with Next.js `unstable_cache()` so it participates in ISR rather than blocking it.
-2. Move `isStudioEnabled()` out of the root layout server component into a separate Suspense boundary or async child component, keeping the main layout statically renderable.
-3. Use the in-process TTL cache (`flagCache` already exists in `lib/feature-flags.ts`) for the layout call, skipping Redis entirely for the ISR-sensitive path.
+**Low-priority note**: `knip.json` references the v5 schema (`https://unpkg.com/knip@5/schema.json`) but v6.17.1 is installed. Prior cycles reported 0 output from `knip --production`; this cycle v6 surfaces test-file "unused" entries. Consider updating the schema ref to v6 or adding `"ignoreFiles": ["**/*.test.{ts,tsx}"]` to restore the cleaner output.
 
 ## Client/Server Boundary
 
-All 94 non-test `"use client"` files are appropriate:
-- Error boundaries (required by Next.js)
-- Interactive UI: terminal input, command bar, badge customization, user menu, theme toggle
-- Canvas/WebGL experiments (browser-only APIs)
-- React hooks: `useSession`, `useTrendData`, `useKeyboardShortcuts`
+`"use client"` directives (non-test, anchored): **105 files**
 
-**Dynamic imports (code-split correctly):**
-- `GlobalCommandBarLazy` — `next/dynamic` with `ssr: false` ✓
-- PostHog analytics — `next/dynamic` with `ssr: false` ✓  
-- `ShortcutCheatSheet` — `next/dynamic` with `ssr: false` ✓
-- Admin sub-dashboards (Agents, Engagement, Campaigns) — `next/dynamic` ✓
-- Studio effects (Aurora, ParticleCanvas, GradientBorder, HolographicOverlay) — `next/dynamic` ✓
+Spot audit of key public routes — all confirmed server components (no `"use client"` at top level):
 
-**Previous finding resolved:** Landing page previously flagged for synchronous `GlobalCommandBar` import. Confirmed: `LandingTerminal` re-exports `GlobalCommandBarLazy` (already lazy). Finding was incorrect — no action needed.
+| Route | File | Status |
+|-------|------|--------|
+| `/` | `app/page.tsx` | Server (`force-dynamic`) ✅ |
+| `/about` | `app/about/page.tsx` | Server ✅ |
+| `/u/[handle]` | `app/u/[handle]/page.tsx` | Server (`revalidate=3600`) ✅ |
+| `/archetypes/builder` | `app/archetypes/builder/page.tsx` | Server ✅ |
+
+Client components are correctly pushed to leaf level: error boundaries, loading states, Studio interactive components, experiments pages (flag-gated), admin sub-dashboards.
+
+### Dynamic Imports (code-splitting)
+
+17 dynamic `import()` / `next/dynamic` usages covering:
+- `PostHogProvider` — analytics, lazy-loaded
+- `GlobalCommandBar` — heavy interactive, lazy via `GlobalCommandBarLazy.tsx`
+- `SharePageOwnerContent` — owner-only panel, lazy via `SharePageOwnerContentLazy.tsx`
+- Admin sub-dashboards: `AgentsDashboard`, `EngagementDashboard`, `CampaignsDashboard`
+- Studio effects: `AuroraBackground`, `ParticleCanvas`, `GradientBorder`, `HolographicOverlay`
+- `canvas-confetti` — celebration effect, lazy at call site (`lib/effects/celebrations/confetti.ts`)
+- `ShortcutCheatSheet`, `InsightsParser` — lazy on demand
+
+Code-splitting posture is good. No heavy synchronous imports on the critical render path.
 
 ## Caching & Headers
 
-**Badge SVG route (`/u/[handle]/badge.svg`):**
-- Success: `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` ✓
-- Error fallback: `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` ✓
-- CSP: `frame-ancestors *` (intentional — embeddable asset) ✓
+### Badge SVG Route (`/u/[handle]/badge.svg`)
 
-**API routes:** All mutation routes have `no-store`. Admin endpoints have `no-store`. Correct.
+| Header | Value |
+|--------|-------|
+| `Cache-Control` (success) | `public, s-maxage=21600, stale-while-revalidate=86400` |
+| `Cache-Control` (error) | `public, s-maxage=300, stale-while-revalidate=600` |
+| `maxDuration` | 35s (8th cycle hold) |
+| In-flight dedup | Redis lock — prevents duplicate GitHub API calls |
 
-**Turbopack NFT warning:** **RESOLVED** — `svg-to-png.ts` now uses `dirname(fileURLToPath(import.meta.url))` for module-relative font path resolution. Zero warnings in current build.
+- Success path: 6h CDN fresh / 24h SWR — badges served from CDN edge without origin hits
+- Error path: 5min CDN / 10min SWR — short window forces retry on transient failures
+
+### Other Routes
+
+| Route / Pattern | Caching Strategy |
+|-----------------|-----------------|
+| `/api/feature-flags` | ISR `unstable_cache(revalidate=300)` — 5min server-side |
+| `/api/health` GitHub probe | `unstable_cache` 60s |
+| `/u/[handle]` share page | ISR `revalidate=3600` — 1h |
+| Archetype / About pages | ISR (Next.js static generation) |
+| All external GitHub calls | Cache-first (6h + 7d SWR) with Redis lock |
+| PostHog | Batched fire-and-forget |
+| Resend | Event-driven + daily quota guard |
+
+**Uncached external calls: 0.**
 
 ## Font Loading
 
-- `JetBrains Mono`: `next/font/google`, `display: "swap"`, Latin subset ✓
-- `Plus Jakarta Sans`: `next/font/google`, `display: "swap"`, Latin subset ✓
-- No external font requests, no render-blocking font URLs ✓
+| Font | Source | Class | `display` |
+|------|--------|-------|-----------|
+| JetBrains Mono | `next/font/google` | `font-heading` | `swap` |
+| Plus Jakarta Sans | `next/font/google` | `font-body` | `swap` |
 
-## CLS Risks
+- Zero external font requests in HTML — fonts preloaded by Next.js font optimization
+- `display: swap` on both — no render-blocking, FOUT handled gracefully
+- No Google Fonts `<link>` tags in `<head>`
 
-| Element | Location | Dimensions | Risk |
-|---------|----------|-----------|------|
-| `<Image>` (avatar) | `AdminUserTable.tsx:34` | `width={28} height={28}` | None ✓ |
-| `<Image>` (avatar) | `UserMenu.tsx:267,308` | `width={32/40} height={32/40}` | None ✓ |
-| `<Image>` (badge) | `BadgeContent.tsx:121` | `width={32} height={32}` | None ✓ |
-| `<img>` (badge fallback) | `u/[handle]/page.tsx:186` | `width={1200} height={630}` | None ✓ |
-| `<img>` (YouTube thumbnail) | `LiteYouTubeEmbed.tsx:45` | CSS `h-full w-full` inside `aspect-video` | None ✓ — container reserves space via `aspect-ratio: 16/9` |
+## CLS Risk Audit
 
-No CLS risks found.
+| Element | Location | Dimensions | Status |
+|---------|----------|-----------|--------|
+| Badge `<img>` fallback | `app/u/[handle]/page.tsx:231` | `width={1200} height={630}` | ✅ |
+| LiteYouTubeEmbed thumbnail | `components/LiteYouTubeEmbed.tsx:45` | CSS `h-full w-full` in fixed container | ✅ |
+| Badge skeleton | `components/BadgeSkeleton.tsx` | Fixed dimensions, shown before fallback | ✅ |
+
+No CLS risks identified. `prefers-reduced-motion` respected across all animated components.
 
 ## Recommendations
 
-| Priority | Item | Impact |
+| Priority | Item | Action |
 |----------|------|--------|
-| **P1** | **Fix ISR regression** — wrap `dbGetFeatureFlag` in `unstable_cache()` or move out of root layout. 7 pages hitting Redis on every request instead of serving from CDN cache. | Latency + Supabase/Redis cost |
-| **P2** | **Investigate +194.9 KB bundle growth** — run `ANALYZE=true pnpm run build` to identify which client-side modules grew since April 9. All recent commits are server-only, so growth predates the visible log. | User-facing load time |
-| **P3** | Add `knip.json` config to suppress 404 test-file false positives and get a clean unused-code signal | DX / hygiene |
+| P3 | Update knip.json schema to v6 | Change `"$schema"` to `https://unpkg.com/knip@6/schema.json`; optionally add `"ignoreFiles": ["**/*.test.{ts,tsx}"]` to restore clean `--production` output |
+| P3 | Per-route bundle analysis | Run `ANALYZE=true pnpm run build` interactively to get route-level First Load JS breakdown; informational only, bundle is flat |
+
+**No P1 or P2 items. Bundle growth rate: flat (11 consecutive cycles). Caching, fonts, and CLS all clean.**
 
 ---
 
-SHARED_CONTEXT_START
-## Performance Engineer — 2026-04-30
-- **Status**: YELLOW
-- Total First Load JS: 1,876.9 KB raw / 598.1 KB gzipped (+194.9 KB / +11.6% vs Apr 9)
-- Chunks >500 KB: **0**
-- Unused exports (production): 8 confirmed false positives (stable)
-- Turbopack NFT warning: RESOLVED
-- **NEW YELLOW**: ISR regression — root layout `no-store` Redis call forces 13 pages dynamic (should be static/ISR)
-- **NEW YELLOW**: Bundle +194.9 KB growth since Apr 9 — origin unknown (all recent commits are server-only)
-
-**Cross-agent recommendations:**
-- [Coverage]: No new performance-coverage gaps. `og-image/route.ts` 60% funcs remains the only critical-path gap (6th cycle).
-- [Security]: ISR regression means archetype/about pages no longer serve from CDN cache — DDoS surface slightly increased. Rate limiting on these pages already present via Redis, but fixing ISR would reduce origin exposure.
-- [QA]: `/about/scoring` embeds `LiteYouTubeEmbed` — not a CLS risk (`aspect-video` container). No rendering regressions observed.
-- [Cost Analyst]: ISR regression likely increased Vercel serverless invocations for 7+ pages that should be CDN-cached. Archetype pages (revalidate=604800) hitting origin every request instead of being CDN-cached for a week is a cost regression worth quantifying.
-SHARED_CONTEXT_END
+*Cross-agent context entry appended to `docs/agents/shared-context.md`.*

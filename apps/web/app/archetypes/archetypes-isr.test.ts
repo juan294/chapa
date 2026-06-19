@@ -12,14 +12,23 @@ const ARCHETYPE_DIRS = [
   "artificer",
 ];
 
-describe("archetype pages — dynamic rendering", () => {
+describe("archetype pages — static/ISR rendering", () => {
   for (const archetype of ARCHETYPE_DIRS) {
-    it(`${archetype}/page.tsx exports dynamic = 'force-dynamic'`, () => {
+    it(`${archetype}/page.tsx exports dynamic = 'force-static' (not force-dynamic)`, () => {
       const source = fs.readFileSync(
         path.resolve(__dirname, archetype, "page.tsx"),
         "utf-8",
       );
-      expect(source).toContain("export const dynamic = 'force-dynamic'");
+      expect(source).not.toContain("export const dynamic = 'force-dynamic'");
+    });
+
+    it(`${archetype}/page.tsx exports revalidate and force-static`, () => {
+      const source = fs.readFileSync(
+        path.resolve(__dirname, archetype, "page.tsx"),
+        "utf-8",
+      );
+      expect(source).toContain("export const revalidate");
+      expect(source).toContain("export const dynamic = 'force-static'");
     });
   }
 });

@@ -3,10 +3,11 @@ import { mergeStats } from "./merge";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
 import { dbGetSupplemental } from "@/lib/db/supplemental";
-import { isBitbucketEnabled, isCodebergEnabled } from "@/lib/feature-flags";
+import { isBitbucketEnabled, isCodebergEnabled, isGitlabEnabled } from "@/lib/feature-flags";
 import { dbGetLinkedPlatform } from "@/lib/db/user-platforms";
 import { fetchBitbucketIfLinked } from "@/lib/bitbucket/client";
 import { fetchCodebergIfLinked } from "@/lib/codeberg/client";
+import { fetchGitlabIfLinked } from "@/lib/gitlab/client";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { withTimeout } from "@/lib/async/with-timeout";
 import type { StatsData, SupplementalStats, Platform } from "@chapa/shared";
@@ -33,11 +34,11 @@ export function _resetInflight(): void {
 }
 
 /**
- * Get StatsData for a user — cache-first, then GitHub + Bitbucket.
+ * Get StatsData for a user — cache-first, then GitHub + linked platforms.
  * Returns cached data if available (within 6h).
  * Falls back to live fetch on cache miss.
  * If the API fails (e.g. rate limit 403), returns stale cached data (7d TTL) if available.
- * If Bitbucket is linked, fetches and merges Bitbucket data.
+ * If Bitbucket / Codeberg / GitLab are linked, fetches and merges their data.
  * If supplemental data exists (e.g. from an EMU upload), merges it into the result.
  *
  * Concurrent calls for the same handle are deduplicated — only one GitHub API
@@ -55,7 +56,7 @@ export async function getStats(
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
-  if (cached) return _enrichWithLogins(cached, handle);
+  if (cached) return _enrichWithLogins(cached, handle, cacheKey);
 
   // Public callers can share an authenticated fetch. Authenticated callers
   // must not reuse a weaker public fetch.
@@ -89,10 +90,17 @@ export async function getStats(
 /**
  * Enrich cached stats with linkedPlatformLogins if missing.
  * Handles pre-deploy cached data that has linkedPlatforms but no logins.
+ *
+ * PE-L2: When enrichment produces logins, write the enriched stats back to
+ * the stats cache key so subsequent hits skip the N DB reads entirely.
+ * The write is fire-and-forget — it must not block the response.
+ *
+ * @param cacheKey - The Redis key to backfill on enrichment (omit to skip backfill)
  */
 async function _enrichWithLogins(
   stats: StatsData,
   handle: string,
+  cacheKey?: string,
 ): Promise<StatsData> {
   const platforms = stats.linkedPlatforms;
   if (!platforms || platforms.length === 0 || stats.linkedPlatformLogins) {
@@ -107,9 +115,22 @@ async function _enrichWithLogins(
     if (results[i]) logins[p] = results[i].remoteLogin;
   });
 
-  return Object.keys(logins).length > 0
-    ? { ...stats, linkedPlatformLogins: logins }
-    : stats;
+  if (Object.keys(logins).length === 0) {
+    return stats;
+  }
+
+  const enriched = { ...stats, linkedPlatformLogins: logins };
+
+  // PE-L2: Backfill the enriched stats into the cache so subsequent hits
+  // return pre-enriched data and skip the DB reads. Fire-and-forget.
+  if (cacheKey) {
+    fireAndForget(
+      () => cacheSet(cacheKey, enriched, CACHE_TTL),
+      () => undefined,
+    );
+  }
+
+  return enriched;
 }
 
 /** Internal: fetch from GitHub, merge Bitbucket + Codeberg + supplemental, cache. */
@@ -135,14 +156,16 @@ async function _fetchAndCache(
     return null;
   }
 
-  // Fetch Bitbucket + Codeberg in parallel — error in one must not block the other
-  const [bbResult, cbResult] = await Promise.allSettled([
+  // Fetch Bitbucket + Codeberg + GitLab in parallel — error in one must not block the others
+  const [bbResult, cbResult, glResult] = await Promise.allSettled([
     fetchBitbucketIfLinked(handle, lowerHandle),
     fetchCodebergIfLinked(handle, lowerHandle),
+    fetchGitlabIfLinked(handle, lowerHandle),
   ]);
 
   const bbStats = bbResult.status === "fulfilled" ? bbResult.value : null;
   const cbStats = cbResult.status === "fulfilled" ? cbResult.value : null;
+  const glStats = glResult.status === "fulfilled" ? glResult.value : null;
 
   // Merge Bitbucket into primary (markAsSupplemental: false — linked platform, not EMU)
   let stats: StatsData = bbStats
@@ -152,6 +175,11 @@ async function _fetchAndCache(
   // Merge Codeberg into current stats
   if (cbStats) {
     stats = mergeStats(stats, cbStats, { markAsSupplemental: false });
+  }
+
+  // Merge GitLab into current stats
+  if (glStats) {
+    stats = mergeStats(stats, glStats, { markAsSupplemental: false });
   }
 
   // Check for supplemental data (e.g. EMU account). Redis is the hot path
@@ -178,28 +206,34 @@ async function _fetchAndCache(
   // Build linkedPlatforms from DB link status (source of truth), not stats fetch
   // success. Platforms appear in Data Sources even when their stats fetch
   // temporarily fails (expired token, API error). Fixes #632.
-  const [bbDbLink, cbDbLink] = await Promise.all([
+  const [bbDbLink, cbDbLink, glDbLink] = await Promise.all([
     bbStats ? null : isBitbucketEnabled().then((ok) =>
       ok ? dbGetLinkedPlatform(handle, "bitbucket") : null,
     ),
     cbStats ? null : isCodebergEnabled().then((ok) =>
       ok ? dbGetLinkedPlatform(handle, "codeberg") : null,
     ),
+    glStats ? null : isGitlabEnabled().then((ok) =>
+      ok ? dbGetLinkedPlatform(handle, "gitlab") : null,
+    ),
   ]);
 
   const linkedPlatforms: Platform[] = [];
   if (bbStats || bbDbLink) linkedPlatforms.push("bitbucket");
   if (cbStats || cbDbLink) linkedPlatforms.push("codeberg");
+  if (glStats || glDbLink) linkedPlatforms.push("gitlab");
 
   if (linkedPlatforms.length > 0) {
-    // bbDbLink/cbDbLink already have remoteLogin; only re-fetch for stats-path
-    const [bbLogin, cbLogin] = await Promise.all([
+    // bbDbLink/cbDbLink/glDbLink already have remoteLogin; only re-fetch for stats-path
+    const [bbLogin, cbLogin, glLogin] = await Promise.all([
       bbDbLink ?? (bbStats ? dbGetLinkedPlatform(handle, "bitbucket") : null),
       cbDbLink ?? (cbStats ? dbGetLinkedPlatform(handle, "codeberg") : null),
+      glDbLink ?? (glStats ? dbGetLinkedPlatform(handle, "gitlab") : null),
     ]);
     const linkedPlatformLogins: Record<string, string> = {};
     if (bbLogin) linkedPlatformLogins.bitbucket = bbLogin.remoteLogin;
     if (cbLogin) linkedPlatformLogins.codeberg = cbLogin.remoteLogin;
+    if (glLogin) linkedPlatformLogins.gitlab = glLogin.remoteLogin;
 
     stats = {
       ...stats,

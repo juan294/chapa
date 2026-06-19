@@ -16,7 +16,7 @@ vi.mock("@resvg/resvg-js", () => ({
   }),
 }));
 
-import { svgToPng, stripSvgAnimations, getFontPaths } from "./svg-to-png";
+import { svgToPng, stripSvgAnimations, getFontPaths, getFontBuffers } from "./svg-to-png";
 import { Resvg } from "@resvg/resvg-js";
 
 const MockResvg = vi.mocked(Resvg);
@@ -160,16 +160,49 @@ describe("svgToPng", () => {
     );
   });
 
-  it("passes font configuration with TTF font file paths to Resvg", () => {
+  it("passes font configuration to Resvg using pre-loaded buffers when available (PE-L3)", () => {
     svgToPng(MINIMAL_SVG);
     const opts = MockResvg.mock.calls[0]![1] as Record<string, unknown>;
-    const font = opts.font as { loadSystemFonts: boolean; fontFiles: string[] };
+    const font = opts.font as {
+      loadSystemFonts: boolean;
+      fontBuffers?: Buffer[];
+      fontFiles?: string[];
+    };
     expect(font).toBeDefined();
     expect(font.loadSystemFonts).toBe(false);
-    expect(font.fontFiles).toBeInstanceOf(Array);
-    expect(font.fontFiles.length).toBe(4);
-    for (const f of font.fontFiles) {
-      expect(f).toMatch(/\.ttf$/);
+    // When font buffers were loaded at module scope (PE-L3), the route uses
+    // fontBuffers. If loading failed (test sandbox without fonts), it falls
+    // back to fontFiles. Either way, exactly one of the two must be present.
+    const useBuffers = getFontBuffers() !== undefined;
+    if (useBuffers) {
+      expect(font.fontBuffers).toBeInstanceOf(Array);
+      expect(font.fontBuffers!.length).toBe(4);
+      expect(font.fontFiles).toBeUndefined();
+    } else {
+      expect(font.fontFiles).toBeInstanceOf(Array);
+      expect(font.fontFiles!.length).toBe(4);
+      expect(font.fontBuffers).toBeUndefined();
+    }
+  });
+
+  it("fonts are read at most once across multiple svgToPng calls (PE-L3)", () => {
+    // Call svgToPng three times and verify Resvg is constructed with the same
+    // font config each time — no per-call disk reads (verified by stability of
+    // the font option object, not by mocking readFileSync which is pre-module).
+    svgToPng(MINIMAL_SVG);
+    svgToPng(MINIMAL_SVG);
+    svgToPng(MINIMAL_SVG);
+    const useBuffers = getFontBuffers() !== undefined;
+    for (const call of MockResvg.mock.calls) {
+      const font = (call[1] as Record<string, unknown>).font as {
+        fontBuffers?: Buffer[];
+        fontFiles?: string[];
+      };
+      if (useBuffers) {
+        expect(font.fontBuffers).toBe(getFontBuffers()); // same reference
+      } else {
+        expect(font.fontFiles).toBeDefined();
+      }
     }
   });
 

@@ -4,7 +4,7 @@ const LLMS_TXT = `# Chapa — Developer Impact Badge
 
 ## What is Chapa?
 
-Chapa is a free developer tool that generates a live, embeddable SVG badge showcasing a developer's Impact Score from their development activity across linked platforms (GitHub, Bitbucket, Codeberg). It analyzes the last 12 months of commits, pull requests, code reviews, and issues to produce a transparent, data-driven developer impact rating. Think of it as a developer stats badge that goes beyond commit counts.
+Chapa is a free developer tool that generates a live, embeddable SVG badge showcasing a developer's Impact Score from their development activity across linked platforms (GitHub, Bitbucket, Codeberg, GitLab). It analyzes the last 12 months of commits, pull requests, code reviews, and issues to produce a transparent, data-driven developer impact rating. Think of it as a developer stats badge that goes beyond commit counts.
 
 For full technical details, see: https://chapa.thecreativetoken.com/llms-full.txt
 
@@ -30,7 +30,7 @@ For full technical details, see: https://chapa.thecreativetoken.com/llms-full.tx
 ## How to Use
 
 1. Sign in with GitHub at https://chapa.thecreativetoken.com
-2. Chapa computes your Impact v6 Profile from public platform data (GitHub, Bitbucket, Codeberg).
+2. Chapa computes your Impact v6 Profile from public platform data (GitHub, Bitbucket, Codeberg, GitLab).
 3. Embed the badge in your README, portfolio, resume, or LinkedIn:
 
 Markdown:
@@ -45,7 +45,7 @@ HTML:
 
 ## Related Keywords
 
-developer metrics, multi-platform developer badge, developer impact score, GitHub profile badge, Bitbucket developer metrics, Codeberg developer metrics, developer portfolio badge, developer stats SVG, open source contribution metrics, code review metrics, developer archetype, developer activity analysis, developer impact measurement.
+developer metrics, multi-platform developer badge, developer impact score, GitHub profile badge, Bitbucket developer metrics, Codeberg developer metrics, GitLab developer metrics, developer portfolio badge, developer stats SVG, open source contribution metrics, code review metrics, developer archetype, developer activity analysis, developer impact measurement.
 
 ## Target Audience
 

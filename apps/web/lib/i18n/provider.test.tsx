@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, cleanup } from '@testing-library/react';
 import { useContext } from 'react';
 import { LanguageContext, LanguageProvider } from './provider';
+import { es } from './dictionaries/es';
+import type { Translations } from './types';
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(() => ({ refresh: vi.fn() })),
@@ -97,5 +99,46 @@ describe('LanguageProvider', () => {
       </LanguageProvider>
     );
     expect(screen.getByTestId('locale').textContent).toBe('es');
+  });
+
+  describe('dictionary prop (#862 — ship active locale only)', () => {
+    function TranslateConsumer() {
+      const ctx = useContext(LanguageContext);
+      if (!ctx) return <div data-testid="no-ctx">no context</div>;
+      return <span data-testid="title">{ctx.t('meta.defaultTitle') as string}</span>;
+    }
+
+    it('resolves translations from the provided dictionary prop', () => {
+      render(
+        <LanguageProvider initialLocale="es" dictionary={es}>
+          <TranslateConsumer />
+        </LanguageProvider>
+      );
+      expect(screen.getByTestId('title').textContent).toBe(
+        'Chapa — Impacto de desarrollador, decodificado'
+      );
+    });
+
+    it('falls back to the bundled English dictionary when no dictionary prop is given', () => {
+      // This is the test-only path; production always supplies the dictionary.
+      render(
+        <LanguageProvider initialLocale="es">
+          <TranslateConsumer />
+        </LanguageProvider>
+      );
+      expect(screen.getByTestId('title').textContent).toBe(
+        'Chapa — Developer Impact, Decoded'
+      );
+    });
+
+    it('uses whatever dictionary is passed regardless of locale label', () => {
+      const custom: Translations = { meta: { defaultTitle: 'Custom Title' } };
+      render(
+        <LanguageProvider initialLocale="en" dictionary={custom}>
+          <TranslateConsumer />
+        </LanguageProvider>
+      );
+      expect(screen.getByTestId('title').textContent).toBe('Custom Title');
+    });
   });
 });

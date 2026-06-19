@@ -8,6 +8,8 @@ source "${SCRIPT_DIR}/lib/agent-utils.sh"
 AGENT_KEY="coverage_agent"
 OUTPUT_FILE="${CHAPA_DIR}/docs/agents/coverage-report.md"
 LOG_FILE="${LOGS_DIR}/coverage-agent-$(date '+%Y-%m-%d').log"
+CLAUDE_MAX_ATTEMPTS=3
+CLAUDE_RETRY_DELAY_SECONDS=30
 
 log_info "=== Coverage Agent starting ==="
 
@@ -34,15 +36,38 @@ fi
 
 log_info "Running Claude headless mode..."
 
-# Run Claude in headless mode
+# Run Claude in headless mode. Write to a temp file first so transient API
+# failures never replace the last valid report with an error stub.
 cd "${CHAPA_DIR}"
-claude -p "${PROMPT}" \
-  --allowedTools "Read,Glob,Grep,Bash" \
-  --output-format text \
-  > "${OUTPUT_FILE}" 2>>"${LOG_FILE}" || {
-    log_error "Claude execution failed. Check ${LOG_FILE}"
-    exit 1
-  }
+acquire_agent_lock "vitest-heavy-agent" "coverage-agent"
+trap 'release_agent_lock "vitest-heavy-agent"' EXIT
+
+TMP_OUTPUT=$(mktemp)
+claude_ok=false
+for attempt in $(seq 1 "${CLAUDE_MAX_ATTEMPTS}"); do
+  if claude -p "${PROMPT}" \
+    --allowedTools "Read,Glob,Grep,Bash" \
+    --output-format text \
+    > "${TMP_OUTPUT}" 2>>"${LOG_FILE}" && validate_report_file "${TMP_OUTPUT}" "coverage-agent"; then
+    claude_ok=true
+    break
+  fi
+
+  if [ "${attempt}" -lt "${CLAUDE_MAX_ATTEMPTS}" ]; then
+    log_warn "Claude execution failed; retrying after ${CLAUDE_RETRY_DELAY_SECONDS}s"
+    sleep "${CLAUDE_RETRY_DELAY_SECONDS}"
+  fi
+done
+
+if [ "${claude_ok}" != "true" ]; then
+  rm -f "${TMP_OUTPUT}"
+  log_error "Claude execution failed after ${CLAUDE_MAX_ATTEMPTS} attempts. Check ${LOG_FILE}"
+  exit 1
+fi
+
+mv "${TMP_OUTPUT}" "${OUTPUT_FILE}"
+release_agent_lock "vitest-heavy-agent"
+trap - EXIT
 
 log_info "Report written to ${OUTPUT_FILE}"
 

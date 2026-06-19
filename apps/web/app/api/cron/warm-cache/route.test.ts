@@ -19,6 +19,7 @@ const {
   mockGetAvatarBase64,
   mockCaptureServerError,
   mockCaptureServerEvent,
+  mockCaptureOperationalAlert,
 } = vi.hoisted(() => ({
   mockVerifyCronSecret: vi.fn(),
   mockDbGetUsers: vi.fn(),
@@ -36,6 +37,7 @@ const {
   mockGetAvatarBase64: vi.fn(),
   mockCaptureServerError: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
+  mockCaptureOperationalAlert: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/cron", () => ({
@@ -90,6 +92,7 @@ vi.mock("@/lib/render/avatar", () => ({
 vi.mock("@/lib/analytics/server-errors", () => ({
   captureServerError: (...args: unknown[]) => mockCaptureServerError(...args),
   captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
+  captureOperationalAlert: (...args: unknown[]) => mockCaptureOperationalAlert(...args),
   withErrorCapture: (_route: unknown, handler: unknown) => handler,
 }));
 
@@ -153,6 +156,7 @@ describe("GET /api/cron/warm-cache", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc");
     mockCaptureServerError.mockResolvedValue(undefined);
     mockCaptureServerEvent.mockResolvedValue(undefined);
+    mockCaptureOperationalAlert.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -460,5 +464,144 @@ describe("GET /api/cron/warm-cache", () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  // DO-L1 (#751): P2 alert when all handles fail
+  describe("DO-L1: failure-rate operational alert", () => {
+    it("emits a P2 operational alert when all processed handles fail", async () => {
+      // Both alice and bob fail (materialize returns null)
+      mockMaterializeOrchestratedProfile.mockResolvedValue(null);
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_high_failure_rate",
+          severity: "P2",
+          route: "/api/cron/warm-cache",
+        }),
+      );
+    });
+
+    it("emits a P2 operational alert when more than 50% of handles fail", async () => {
+      // 3 users: alice and bob fail, charlie succeeds — 66% failure rate
+      mockDbGetUsers.mockResolvedValue([user("alice"), user("bob"), user("charlie")]);
+      mockMaterializeOrchestratedProfile
+        .mockResolvedValueOnce(null)           // alice fails
+        .mockResolvedValueOnce(null)           // bob fails
+        .mockResolvedValueOnce(FAKE_MATERIALIZED); // charlie succeeds
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_high_failure_rate",
+          severity: "P2",
+        }),
+      );
+    });
+
+    it("does NOT emit a failure-rate alert when fewer than 50% of handles fail", async () => {
+      // 1 out of 2 fails = exactly 50% — threshold is >50%, so no alert
+      mockMaterializeOrchestratedProfile
+        .mockResolvedValueOnce(null)           // alice fails
+        .mockResolvedValueOnce(FAKE_MATERIALIZED); // bob succeeds
+
+      await GET(makeRequest());
+
+      const alertCalls = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+        ([opts]) => opts.signal === "warm_cache_high_failure_rate",
+      );
+      expect(alertCalls).toHaveLength(0);
+    });
+
+    it("does NOT emit a failure-rate alert when all handles succeed", async () => {
+      // Default mock: both alice and bob succeed
+      await GET(makeRequest());
+
+      const alertCalls = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+        ([opts]) => opts.signal === "warm_cache_high_failure_rate",
+      );
+      expect(alertCalls).toHaveLength(0);
+    });
+
+    it("includes failure count and processedCount in alert properties", async () => {
+      mockMaterializeOrchestratedProfile.mockResolvedValue(null);
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            failed: 2,
+            processedCount: 2,
+          }),
+        }),
+      );
+    });
+  });
+
+  // DO-S1 (#773): P2 alert when active handles approach or exceed the per-run ceiling
+  describe("DO-S1: warm-cache ceiling operational alert", () => {
+    it("emits a P2 ceiling alert when active handle count exceeds MAX_HANDLES", async () => {
+      // 60 users > MAX_HANDLES (50) — ceiling alert should fire
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_ceiling_approached",
+          severity: "P2",
+          route: "/api/cron/warm-cache",
+        }),
+      );
+    });
+
+    it("emits a ceiling alert when handle count equals MAX_HANDLES (at-limit boundary)", async () => {
+      // Exactly 50 users = at the ceiling — should alert
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 50 }, (_, index) => user(`user${index}`)),
+      );
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_ceiling_approached",
+          severity: "P2",
+        }),
+      );
+    });
+
+    it("does NOT emit a ceiling alert when active handles are well below MAX_HANDLES", async () => {
+      // Default: 2 users (alice, bob) — well below the ceiling
+      await GET(makeRequest());
+
+      const ceilingAlerts = (mockCaptureOperationalAlert.mock.calls as Array<[{ signal: string }]>).filter(
+        ([opts]) => opts.signal === "warm_cache_ceiling_approached",
+      );
+      expect(ceilingAlerts).toHaveLength(0);
+    });
+
+    it("includes totalUsers and ceiling in ceiling alert properties", async () => {
+      mockDbGetUsers.mockResolvedValue(
+        Array.from({ length: 60 }, (_, index) => user(`user${index}`)),
+      );
+
+      await GET(makeRequest());
+
+      expect(mockCaptureOperationalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          signal: "warm_cache_ceiling_approached",
+          properties: expect.objectContaining({
+            totalUsers: 60,
+            ceiling: 50,
+          }),
+        }),
+      );
+    });
   });
 });

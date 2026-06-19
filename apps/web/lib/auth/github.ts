@@ -316,7 +316,10 @@ export function decryptToken(
 
 const COOKIE_NAME = "chapa_session";
 
-interface SessionPayload {
+/** Session Max-Age in seconds — must match the Max-Age set in createSessionCookie. */
+const SESSION_MAX_AGE_SECONDS = 86400; // 24 hours
+
+export interface SessionPayload {
   login: string;
   name: string | null;
   avatar_url: string;
@@ -324,11 +327,24 @@ interface SessionPayload {
 }
 
 /**
+ * Internal storage shape for the encrypted session cookie.
+ * Includes the issued-at timestamp (SE-L1 #889) for server-side expiry hardening.
+ * `iat` is stripped before the payload is returned to callers.
+ */
+interface StoredSessionPayload extends SessionPayload {
+  /** Unix timestamp (seconds) when the session was issued. Used for server-side expiry.
+   *  Optional for backward-compat: sessions created before SE-L1 hardening won't have it;
+   *  they are treated as still-valid during the transition window to avoid breaking
+   *  existing authenticated users. */
+  iat?: number;
+}
+
+/**
  * Encrypt a session payload into a `Set-Cookie` header value.
  *
- * Serializes the payload to JSON, encrypts it via {@link encryptToken}
- * (AES-256-GCM), and wraps it in cookie flags: HttpOnly, Secure (when HTTPS),
- * SameSite=Lax, Path=/, Max-Age=86400 (24 hours).
+ * Serializes the payload to JSON (with an embedded `iat` for SE-L1 server-side
+ * expiry), encrypts it via {@link encryptToken} (AES-256-GCM), and wraps it in
+ * cookie flags: HttpOnly, Secure (when HTTPS), SameSite=Lax, Path=/, Max-Age=86400.
  *
  * @param payload - Session data containing login, name, avatar_url, and an
  *   optional legacy OAuth token during cookie-shape migration
@@ -339,18 +355,25 @@ export function createSessionCookie(
   payload: SessionPayload,
   secret: string,
 ): string {
-  const json = JSON.stringify(payload);
+  // SE-L1 (#889): Embed iat (issued-at) so readSessionCookie can enforce server-side expiry.
+  const stored: StoredSessionPayload = {
+    ...payload,
+    iat: Math.floor(Date.now() / 1000),
+  };
+  const json = JSON.stringify(stored);
   const encrypted = encryptToken(json, secret);
-  return `${COOKIE_NAME}=${encrypted}; ${cookieFlags()}; Max-Age=86400`;
+  return `${COOKIE_NAME}=${encrypted}; ${cookieFlags()}; Max-Age=${SESSION_MAX_AGE_SECONDS}`;
 }
 
-function isValidSessionPayload(value: unknown): value is SessionPayload {
+function isValidSessionPayload(value: unknown): value is StoredSessionPayload {
   if (typeof value !== "object" || value === null) return false;
   const obj = value as Record<string, unknown>;
   if (typeof obj.login !== "string") return false;
   if (obj.token !== undefined && typeof obj.token !== "string") return false;
   if (obj.name !== null && typeof obj.name !== "string") return false;
   if (typeof obj.avatar_url !== "string") return false;
+  // iat is optional for backward-compat (sessions without iat are still valid)
+  if (obj.iat !== undefined && typeof obj.iat !== "number") return false;
   return true;
 }
 
@@ -358,12 +381,20 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
  * Read and decrypt the `chapa_session` cookie from a raw `Cookie` header.
  *
  * Extracts the session cookie by name, decrypts it via {@link decryptToken}
- * (AES-256-GCM), parses the resulting JSON, and validates the payload shape
- * before returning. Any failure at any stage (missing cookie, decryption error,
- * malformed JSON, invalid payload shape) returns `null` — never throws.
+ * (AES-256-GCM), parses the resulting JSON, validates the payload shape, and
+ * enforces server-side expiry via the embedded `iat` timestamp (SE-L1 #889).
  *
- * The session payload contains the user's login handle, display name,
- * avatar URL, and may contain a legacy GitHub token from older cookies.
+ * SE-L1 expiry: sessions with `iat` older than 86400 seconds are rejected even
+ * if the HTTP cookie Max-Age has not yet expired (e.g., after a server-side
+ * secret rotation or when the browser clock is skewed). Sessions without an `iat`
+ * (created before this hardening) are treated as still valid for backward-compat —
+ * they will naturally expire when the browser discards the cookie per Max-Age.
+ *
+ * Any failure at any stage (missing cookie, decryption error, malformed JSON,
+ * invalid payload shape, expired iat) returns `null` — never throws.
+ *
+ * The `iat` field is stripped from the returned payload — callers receive only
+ * the public session shape (login, name, avatar_url, token?).
  *
  * **Cookie flags:** `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` (when
  * served over HTTPS). Max-Age is 86400 (24 hours), set at creation time by
@@ -373,8 +404,8 @@ function isValidSessionPayload(value: unknown): value is SessionPayload {
  *   or `null` if no cookies are present.
  * @param secret - The secret used to decrypt the session (same secret passed
  *   to {@link createSessionCookie} / {@link encryptToken}).
- * @returns The decrypted {@link SessionPayload}; or `null` if the cookie is
- *   absent, cannot be decrypted, or fails shape validation.
+ * @returns The decrypted {@link SessionPayload} (without iat); or `null` if the
+ *   cookie is absent, cannot be decrypted, fails shape validation, or is expired.
  *
  * @example
  * ```ts
@@ -402,7 +433,22 @@ export function readSessionCookie(
   try {
     const parsed: unknown = JSON.parse(json);
     if (!isValidSessionPayload(parsed)) return null;
-    return parsed;
+
+    // SE-L1 (#889): Server-side expiry via iat.
+    // Only enforce when iat is present — missing iat is treated as still-valid
+    // for backward-compat with sessions created before this hardening.
+    if (parsed.iat !== undefined) {
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const ageSeconds = nowSeconds - parsed.iat;
+      if (ageSeconds > SESSION_MAX_AGE_SECONDS) {
+        return null;
+      }
+    }
+
+    // Strip internal iat field before returning to callers.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { iat: _iat, ...publicPayload } = parsed;
+    return publicPayload as SessionPayload;
   } catch {
     return null;
   }

@@ -155,7 +155,7 @@ describe("SharePage /u/[handle]", () => {
         url: "https://chapa.thecreativetoken.com/u/testuser/og-image?v=2026-04-17",
         width: 1200,
         height: 630,
-        alt: "Chapa badge for testuser",
+        alt: "Chapa de testuser",
       },
     ]);
   });

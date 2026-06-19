@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Campaign } from "@/lib/db/campaigns";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { formatDate } from "../admin-types";
 
 // ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ export function CampaignsDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchCampaigns();
+    fireAndForget(fetchCampaigns, () => undefined);
   }, [fetchCampaigns]);
 
   // -------------------------------------------------------------------------
@@ -899,6 +900,7 @@ export function CampaignsDashboard() {
                   key={c.id}
                   role="button"
                   tabIndex={0}
+                  aria-label={`Campaign: ${c.name}`}
                   onClick={() => openDetail(c)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {

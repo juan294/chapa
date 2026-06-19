@@ -21,7 +21,7 @@ This document explains Chapa's Impact v6 Profile calculation, security model, ve
 
 ## What Chapa Measures
 
-Chapa analyzes a developer's **last 12 months** (365 days) of activity across connected platforms (GitHub, Bitbucket, Codeberg) and produces a **multi-dimensional Impact v6 Profile** — four core dimension scores (0-100 each) plus an optional fifth Craft dimension, a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
+Chapa analyzes a developer's **last 12 months** (365 days) of activity across connected platforms (GitHub, Bitbucket, Codeberg, GitLab) and produces a **multi-dimensional Impact v6 Profile** — four core dimension scores (0-100 each) plus an optional fifth Craft dimension, a developer archetype label, a composite score (0-100), and a tier. An internal **Confidence** rating (50-100) adjusts the final score behind the scenes. The profile reflects the quality and breadth of contributions, not just volume.
 
 ### Signals we track
 
@@ -210,6 +210,8 @@ The adjusted score maps to a tier:
 
 **Codeberg (optional):** Users can link their Codeberg account via OAuth. Chapa fetches repository data, commits, PRs, stars, forks, and watchers from the Codeberg/Gitea API.
 
+**GitLab (optional):** Users can link their GitLab account via OAuth. Chapa fetches repository data, commits, merge requests, issues, stars, forks, and watchers from the GitLab REST API. GitLab access tokens are short-lived; the server automatically refreshes them using the stored refresh token.
+
 When multiple platforms are connected, stats are merged automatically (see [Multi-Platform Integration](#multi-platform-integration)).
 
 ### Verification modes
@@ -236,7 +238,7 @@ When multiple platforms are connected, stats are merged automatically (see [Mult
 
 ## Multi-Platform Integration
 
-Chapa supports linking Bitbucket and Codeberg accounts alongside your primary GitHub account. When platforms are connected, their stats are merged before scoring.
+Chapa supports linking Bitbucket, Codeberg, and GitLab accounts alongside your primary GitHub account. When platforms are connected, their stats are merged before scoring.
 
 ### Merge strategy
 
@@ -250,16 +252,16 @@ Chapa supports linking Bitbucket and Codeberg accounts alongside your primary Gi
 
 ### Token refresh resilience
 
-Platform tokens (Bitbucket expires every 2 hours, Codeberg varies) are automatically refreshed when expired. If a refresh fails:
+Platform tokens (Bitbucket expires every 2 hours, Codeberg varies, GitLab access tokens are short-lived and refreshed via a refresh token on each expiry) are automatically refreshed when expired. If a refresh fails:
 
 - **Token revoked** (HTTP 400 + `invalid_grant`): the platform link is removed — the user must re-connect
-- **Transient failure** (network error, timeout, server error): the link is preserved and stats are skipped for this request — the next request will retry
+- **Transient failure** (network error, timeout, 429/5xx server error): the link is preserved and stats are skipped for this request — the next request will retry
 
-This prevents accidental unlinking from temporary outages.
+This prevents accidental unlinking from temporary outages. Platform queries treat HTTP 429 (rate-limited) and 5xx responses as transient failures and do not unlink the account.
 
 ### Platform branding
 
-The badge footer dynamically shows logos for connected platforms. Personal badges show only the user's connected platforms; demo badges show all three.
+The badge footer dynamically shows logos for connected platforms. Personal badges show only the user's connected platforms; demo badges show all four (GitHub, Bitbucket, Codeberg, GitLab).
 
 ---
 

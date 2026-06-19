@@ -97,12 +97,13 @@ describe("Studio page (server component)", () => {
   });
 
   describe("metadata", () => {
-    it("exports metadata", () => {
-      expect(SOURCE).toContain("metadata");
+    it("exports generateMetadata", () => {
+      expect(SOURCE).toContain("generateMetadata");
     });
 
-    it("has title", () => {
-      expect(SOURCE).toContain("Creator Studio");
+    it("uses i18n key for title (studio.metadataTitle)", () => {
+      // Title is loaded from i18n — not hardcoded
+      expect(SOURCE).toContain("studio.metadataTitle");
     });
   });
 

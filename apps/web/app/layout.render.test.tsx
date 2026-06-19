@@ -35,18 +35,17 @@ vi.mock("@/lib/env", () => ({
   getBaseUrl: () => "https://chapa.example",
 }));
 
-const mockIsStudioEnabled = vi.fn(async () => true);
-vi.mock("@/lib/feature-flags", () => ({
-  isStudioEnabled: () => mockIsStudioEnabled(),
+const mockIsStudioEnabledSync = vi.fn(() => true);
+vi.mock("@/lib/feature-flags-sync", () => ({
+  isStudioEnabledSync: () => mockIsStudioEnabledSync(),
 }));
 
 vi.mock("@/lib/jsonld", () => ({
   renderJsonLd: vi.fn(() => '{"@type":"SoftwareApplication"}'),
 }));
 
-const mockGetServerLocale = vi.fn(async (): Promise<"en" | "es"> => "en");
 vi.mock("@/lib/i18n/server", () => ({
-  getServerLocale: () => mockGetServerLocale(),
+  getServerLocale: vi.fn().mockResolvedValue("es"),
   getServerT: vi.fn().mockImplementation(() => (key: string) => key),
 }));
 vi.mock("@/lib/i18n", () => ({
@@ -67,8 +66,7 @@ vi.mock("@/lib/i18n", () => ({
 describe("RootLayout render", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIsStudioEnabled.mockResolvedValue(true);
-    mockGetServerLocale.mockImplementation(async () => "en");
+    mockIsStudioEnabledSync.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -93,23 +91,15 @@ describe("RootLayout render", () => {
     expect(screen.getByTestId("instrumentation")).toBeTruthy();
   });
 
-  it('renders with lang="es" when locale resolves to es', async () => {
-    mockGetServerLocale.mockImplementation(async () => "es");
-
+  it('renders with lang=DEFAULT_LOCALE ("es") at build time for ISR compatibility', async () => {
+    // The layout uses DEFAULT_LOCALE at build time instead of getServerLocale()
+    // to avoid cookies()/headers() calls that would force every page into dynamic rendering.
+    // Client-side locale detection (LangSync + LanguageProvider) handles actual user locale.
     const { default: RootLayout } = await import("./layout");
     const element = await RootLayout({ children: <span>test</span> });
 
-    // The html element is the root — check its lang prop
+    // html lang is always DEFAULT_LOCALE ("es") at build time
     expect(element.props.lang).toBe("es");
-  });
-
-  it('renders with lang="en" when no cookie and no relevant Accept-Language', async () => {
-    mockGetServerLocale.mockImplementation(async () => "en");
-
-    const { default: RootLayout } = await import("./layout");
-    const element = await RootLayout({ children: <span>test</span> });
-
-    expect(element.props.lang).toBe("en");
   });
 
   it("wraps children in LanguageProvider", async () => {
@@ -124,13 +114,12 @@ describe("RootLayout render", () => {
     expect(screen.getByTestId("language-provider")).toBeTruthy();
   });
 
-  it("LanguageProvider receives the resolved locale as initialLocale", async () => {
-    mockGetServerLocale.mockImplementation(async () => "es");
-
+  it("LanguageProvider receives DEFAULT_LOCALE as initialLocale (ISR-safe build-time default)", async () => {
     const { default: RootLayout } = await import("./layout");
 
     render(await RootLayout({ children: <span>content</span> }));
 
+    // Always "es" (DEFAULT_LOCALE) at build time — client-side hydration handles actual locale
     expect(
       screen.getByTestId("language-provider").getAttribute("data-locale"),
     ).toBe("es");

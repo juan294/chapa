@@ -1,73 +1,74 @@
+```markdown
 # QA Report
-> Generated: 2026-04-29 | Health status: green
+> Generated: 2026-06-17 | Health status: green
 
 ## Executive Summary
-All 7,272 tests pass across 409 files with zero type errors, zero lint issues, and zero accessibility violations. The only open item is the `og-image/route.ts` 60% function coverage gap entering its 5th carry cycle — everything else is clean.
+All 7,594 tests pass across 445 files with zero failures; TypeScript, ESLint, accessibility, and design system checks are fully clean. No action items this cycle.
 
 ## Test Results
-- Total: 7,272 tests across 409 files
-- Passed: 7,272 | Failed: 0 | Skipped: 0
-- Duration: ~47s
-- Flaky tests: 0 (BadgeToolbar `@keyframes` flake confirmed resolved for 5+ cycles)
+- Total: 7,594 tests across 445 files
+- Passed: 7,594 | Failed: 0 | Skipped: 0
+
+Console noise (expected, not failures):
+- Two intentional `[ERROR] test-agent` fixture assertions (agent-config tests verify error-path behavior)
+- `Not implemented: navigation to another Document` warnings from flag-gated experiments pages (JSDOM limitation, 0% coverage accepted P3 carry per coverage agent)
 
 ## TypeScript
-Clean — 0 errors across `packages/shared` and `apps/web`.
+Clean — `tsc --noEmit` passes in both `packages/shared` and `apps/web` with no errors.
 
 ## Linting
-Clean — 0 ESLint errors or warnings.
+Clean — ESLint reports zero errors and zero warnings.
 
 ## Accessibility
 
-**`<img>` alt attributes**: No bare `<img>` tags missing `alt` in any `.tsx`/`.jsx` source file.
+**Images missing alt:** 0 — no `<img` tags without `alt=` found across all `.tsx` files.
 
-**Focus indicators**: `focus-visible` styles confirmed in `styles/globals.css` (global baseline) and production components: `VerifyForm.tsx`, `BadgeToolbar.tsx`, `InfoTooltip.tsx`, `BadgeOverlay.tsx`. `prefers-reduced-motion` respected in `globals.css`, `StudioClient.tsx`, `AuthorTypewriter.tsx`, `ClaudeCodeStar.tsx`.
+**Focus indicators:** `focus-visible` present in `apps/web/styles/globals.css` (3 occurrences) and 4+ production components (`InfoTooltip.tsx`, `BadgeToolbar.tsx`, `BadgeOverlay.tsx`, `VerifyForm.tsx`). 22 total occurrences across 13 source files.
 
-**ARIA labels**: `aria-label` / `aria-labelledby` present across all interactive components (`GlobalCommandBar.tsx`, `UserMenu.tsx`, `BadgeToolbar.tsx`, `ThemeToggle.tsx`, `BadgeOverlay.tsx`, `ActivityHeatmap.tsx`, `StatsGrid.tsx`, `InsightCard.tsx`, and others).
+**ARIA labels:** 100+ `aria-label` instances in `apps/web/app/**`. No interactive elements (`<button>`, `role="button"`, `onClick`) found missing ARIA labeling.
 
-**Heading hierarchy**: All production pages use h1→h2→h3 in correct order. `SectionHeading` (h2) and `SubHeading` (h3) in `app/about/scoring/page.tsx` are component definitions that render correctly after the page's h1 at line 101 — no skip. The `app/u/[handle]/page.tsx` h1 is `sr-only` with visible h2 below — semantically correct. Admin dashboard uses `sr-only` h1 at `app/admin/page.tsx:25` with rendered h2 sections in the client component.
+**Heading hierarchy:** Correct in all key production pages:
+- `/u/[handle]`: h1 (sr-only) → h2
+- `/about`: h1 → h2
+- `/about/scoring`: h1 → h2 (SectionHeading helper) → h3 (SubHeading helper) — helper components defined before render but render in correct DOM order
+- `/about/verification`: h1 → h2
+- `/archetypes`: h1 → h2 → h3
 
-**Error boundaries**: 14 `error.tsx` files covering all routes (`about`, `admin`, `archetypes`, `cli/authorize`, `coming-soon`, `experiments`, `generating`, `privacy`, `studio`, `terms`, `u/[handle]`, `verify`, `global-error.tsx`).
-
-**Loading/empty states**: `BadgeSkeleton.tsx`, multiple `loading.tsx` files, and `isLoading` guards confirmed in `UserMenu.tsx`, `AdminDashboardClient.tsx`, `campaigns-dashboard.tsx`, `engagement-dashboard.tsx`.
+No skipped heading levels found in non-experiment pages.
 
 ## Design System Compliance
+0 violations in production components. All inline `style={{}}` usages reference CSS custom properties, not hardcoded hex values:
 
-**Production components**: 0 violations. All UI components use semantic tokens (`bg-bg`, `text-text-primary`, `text-amber`, `border-stroke`, etc.).
+- `ActivityHeatmap.tsx`: `DIMENSION_COLORS` maps to `var(--color-dimension-*)` tokens
+- `InsightCard.tsx`: `resolveArchetypeColor()` returns `var(--color-archetype-*)` tokens with `var(--color-amber)` fallback; `dimColor` resolves via same `DIMENSION_COLORS` map
+- `SubMetricPanel.tsx`: `color` resolved from a `DIMENSION_COLORS` map using `var(--color-dimension-*)` tokens
 
-**Accepted exceptions** (unchanged from prior cycles):
-- `app/global-error.tsx` — hardcoded hex intentional and documented in the file (CSS custom properties not available when the global error boundary replaces the root layout).
-- `app/apple-icon.tsx`, `app/icon.tsx` — static icon assets, correctly hardcoded per prior QA/performance approval.
-- `app/experiments/**` — Canvas/WebGL requires raw hex arrays; accepted P3.
+No `className` uses hardcoded `bg-[#...]`, `text-[#...]`, or `border-[#...]` Tailwind JIT syntax in production components.
 
-**Sparkline `color` prop**: `Sparkline.tsx` receives color as a string prop from callers. Callers pass CSS variable values resolved at the call site (e.g., dimension colors). Test fixtures use literal hex for assertions — this is test infrastructure, not a component violation.
-
-## Coverage Gaps (from Coverage Agent 2026-04-29)
-
-| File | Stmts | Funcs | Status |
-|------|-------|-------|--------|
-| `app/u/[handle]/og-image/route.ts` | 94.3% | **60%** | P2 — 5th carry cycle |
-| `lib/cache/dirty-stats.ts` | 83.33% | **75%** | P2 — small, one test closes it |
-| `lib/effects/interactions/HolographicOverlay.tsx` | 50% | 75% | P3 candidate (Canvas) |
+**Accepted exceptions (unchanged from prior cycles):**
+- `app/global-error.tsx`: hardcoded hex intentional (renders outside ThemeProvider — CSS variables unavailable)
+- `app/apple-icon.tsx`, `app/icon.tsx`: static asset generation, not UI components
+- `app/experiments/**`: Canvas/WebGL contexts where CSS variables cannot be applied; flag-gated, P3 carry
 
 ## Recommendations
+No new action items this cycle. All prior P3 carries remain accepted:
 
-1. **[P2 — Escalated]** Cover `app/u/[handle]/og-image/route.ts` lines 77 and 97 (`route.ts:77,97`). Add two test fixtures: (a) `fetch()` rejection simulating avatar timeout, (b) missing-avatar SVG fallback path. This is the only actionable critical-path gap and has been carried for 5 cycles.
-
-2. **[P2 — Quick win]** Add one test for `lib/cache/dirty-stats.ts:33` — the clear-marker function is a single call, trivially testable in isolation.
-
-3. **[Info]** `HolographicOverlay.tsx` at 50% stmts is Canvas-blocked in JSDOM — consider formally downgrading to accepted P3 to remove it from the active P2 list.
+1. **[P3 carry]** `app/experiments/` error/loading pages — 0% coverage due to JSDOM `navigation to another Document` (flag-gated, no production exposure)
+2. **[P3 carry]** Canvas/WebGL experiment components (`HolographicOverlay`, `heatmap-wave`, `metallic-shimmer`) — below 80% coverage; flag-gated
+3. **[P3 carry]** `next/dynamic` lazy wrappers (`ClientInstrumentation`, `GlobalCommandBarLazy`, `SharePageOwnerContentLazy`) — 60–67% coverage; lazy wrapper pattern inherently not directly testable
 
 ---
 
 SHARED_CONTEXT_START
-## QA Agent — 2026-04-29
+## QA Agent — 2026-06-17
 - **Status**: GREEN
-- Tests: 7272/7272 passed across 409 files, 0 failed, 0 skipped
+- Tests: 7594/7594 passed across 445 files, 0 failed, 0 skipped
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 0 — all `<img>` have alt, focus-visible in globals.css + 4 production components, prefers-reduced-motion respected, aria-label present in 20+ components, heading hierarchy correct in all pages, 14 error boundaries, multiple loading states
+- A11y issues: 0 — all `<img>` have alt, focus-visible in globals.css + 4 production components, heading hierarchy correct in all pages, 100+ aria-label instances, 0 interactive elements missing ARIA
 
 **Cross-agent recommendations:**
-- [Coverage]: `og-image/route.ts` 60% funcs (lines 77, 97) is the only critical-path gap — entering 5th carry cycle, triage must address this sprint. `dirty-stats.ts` 75% funcs is a one-test fix.
-- [Security]: No new security-related quality issues. All XSS vectors covered via escapeXml(), interactive elements fully accessible. global-error.tsx hardcoded hex is intentional and does not touch any server secrets.
+- [Coverage]: No new coverage gaps. Design system inline styles all use CSS variables. P3 carries (experiments, Canvas/WebGL, lazy wrappers) unchanged.
+- [Security]: No security-related quality issues. All `<img>` tags have alt text (no phishing-vector omissions). No hardcoded hex colors expose token leakage risk. global-error.tsx hardcoded hex is outside ThemeProvider — does not touch server secrets.
 SHARED_CONTEXT_END
+```

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { SHORTCUTS, groupByScope } from "@/lib/keyboard/shortcuts";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
+import { useTranslation } from "@/lib/i18n";
 
 const SCOPE_LABELS: Record<string, string> = {
   navigation: "Navigation",
@@ -18,6 +19,7 @@ interface ShortcutCheatSheetProps {
 export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const { studioEnabled } = useClientFeatureFlags();
+  const { t } = useTranslation();
 
   // Close on Escape (capture phase to avoid conflicts with other handlers)
   useEffect(() => {
@@ -90,7 +92,7 @@ export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard shortcuts"
+        aria-label={t('aria.keyboardShortcuts') as string}
         className="relative w-full max-w-lg rounded-2xl border border-stroke bg-card p-6 shadow-xl shadow-amber/5 animate-scale-in"
       >
         {/* Header */}
@@ -101,7 +103,7 @@ export function ShortcutCheatSheet({ open, onClose }: ShortcutCheatSheetProps) {
           <button
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-amber/10 hover:text-text-primary"
-            aria-label="Close keyboard shortcuts"
+            aria-label={t('aria.closeKeyboardShortcuts') as string}
           >
             <svg
               className="h-4 w-4"

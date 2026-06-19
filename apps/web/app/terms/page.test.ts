@@ -8,18 +8,20 @@ const source = fs.readFileSync(
 );
 
 describe("terms page — i18n server component", () => {
-  it("exports dynamic = 'force-dynamic'", () => {
-    expect(source).toContain("export const dynamic = 'force-dynamic'");
+  it("is static/ISR with force-static directive", () => {
+    expect(source).not.toContain("export const dynamic = 'force-dynamic'");
+    expect(source).toContain("export const revalidate");
   });
 
   it("exports generateMetadata", () => {
-    expect(source).toContain("export async function generateMetadata");
+    expect(source).toContain("generateMetadata");
   });
 
-  it("imports getServerT and getServerLocale from @/lib/i18n/server", () => {
+  it("uses DEFAULT_LOCALE and getServerT (no getServerLocale)", () => {
     expect(source).toContain('from "@/lib/i18n/server"');
     expect(source).toContain('getServerT');
-    expect(source).toContain('getServerLocale');
+    expect(source).not.toContain('getServerLocale');
+    expect(source).toContain('DEFAULT_LOCALE');
   });
 
   it("renders a main content landmark", () => {
@@ -28,9 +30,5 @@ describe("terms page — i18n server component", () => {
 
   it("does NOT use static metadata export", () => {
     expect(source).not.toContain("export const metadata");
-  });
-
-  it("does NOT export revalidate", () => {
-    expect(source).not.toContain("export const revalidate");
   });
 });

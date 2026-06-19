@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
-import { BadgeToolbar } from "./BadgeToolbar";
+import { BadgeToolbar, stripBadgeAnimations } from "./BadgeToolbar";
 import type { SessionUser } from "@/hooks/useSession";
 
 const mockRouterRefresh = vi.fn();
@@ -955,60 +955,36 @@ describe("BadgeToolbar render", () => {
     });
   });
 
-  describe("download strips SVG animations", () => {
-    it("strips @keyframes, animation properties, and SMIL animate elements", async () => {
-      const svgWithAnimations = `<svg>
-        <style>@keyframes fade{from{opacity:0}to{opacity:1}}
-        .cell{animation: fade 0.3s ease;}
-        </style>
-        <rect opacity="0" />
-        <animate attributeName="opacity" from="0" to="1" />
-      </svg>`;
+  describe("stripBadgeAnimations", () => {
+    it("removes @keyframes blocks", () => {
+      const input = `<svg><style>@keyframes fade{from{opacity:0}to{opacity:1}}</style></svg>`;
+      expect(stripBadgeAnimations(input)).not.toContain("@keyframes");
+    });
 
-      let capturedSrc = "";
-      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve(svgWithAnimations),
-      } as Response));
+    it("removes animation properties", () => {
+      const input = `<svg><rect style="animation: fade 0.3s ease;"/></svg>`;
+      expect(stripBadgeAnimations(input)).not.toContain("animation");
+    });
 
-      // Fire onerror synchronously in the src setter so no pending microtask
-      // can bleed into subsequent tests. This eliminates the intermittent race
-      // where a prior test's queueMicrotask fires during this test's setup.
-      class MockImage {
-        width = 0;
-        height = 0;
-        onload: ((e: Event) => void) | null = null;
-        onerror: ((e: Event) => void) | null = null;
-        private _src = "";
-        get src() { return this._src; }
-        set src(val: string) {
-          this._src = val;
-          capturedSrc = val;
-          // Synchronous — onerror is already set before src is assigned (line 124 of component)
-          this.onerror?.(new Event("error"));
-        }
-      }
-      vi.stubGlobal("Image", MockImage);
+    it("removes self-closing SMIL animate elements", () => {
+      const input = `<svg><animate attributeName="opacity" from="0" to="1" /></svg>`;
+      expect(stripBadgeAnimations(input)).not.toContain("<animate ");
+    });
 
-      try {
-        render(
-          <BadgeToolbar handle="testuser" />,
-        );
+    it("removes block SMIL animate elements", () => {
+      const input = `<svg><animate attributeName="opacity">content</animate></svg>`;
+      expect(stripBadgeAnimations(input)).not.toContain("<animate ");
+    });
 
-        fireEvent.click(screen.getByLabelText("Download badge as PNG"));
+    it("replaces opacity=\"0\" with opacity=\"1\"", () => {
+      const input = `<svg><rect opacity="0" /></svg>`;
+      expect(stripBadgeAnimations(input)).toContain('opacity="1"');
+      expect(stripBadgeAnimations(input)).not.toContain('opacity="0"');
+    });
 
-        await waitFor(() => {
-          expect(capturedSrc).not.toBe("");
-        }, { timeout: 2000 });
-
-        // The data URI src should have animations stripped
-        const decodedSvg = decodeURIComponent(capturedSrc.replace("data:image/svg+xml;charset=utf-8,", ""));
-        expect(decodedSvg).not.toContain("@keyframes");
-        expect(decodedSvg).not.toContain("<animate ");
-        expect(decodedSvg).toContain('opacity="1"'); // opacity="0" replaced
-      } finally {
-        vi.unstubAllGlobals();
-      }
+    it("leaves non-animated SVG unchanged apart from opacity replacement", () => {
+      const input = `<svg><rect width="100" height="100" fill="red"/></svg>`;
+      expect(stripBadgeAnimations(input)).toBe(input);
     });
   });
 

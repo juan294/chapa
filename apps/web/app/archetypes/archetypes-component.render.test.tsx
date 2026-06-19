@@ -29,6 +29,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
@@ -176,154 +180,186 @@ async function renderServerComponent<T extends object>(
   render(jsx);
 }
 
-const mockSearchParams = Promise.resolve({ lang: "en" });
-
 describe("Archetype pages — component render (i18n)", () => {
   it("renders BuilderPage with English heading", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "builder", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "builder" });
     expect(screen.getByText("Builder")).toBeDefined();
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders GuardianPage with Quality Champion heading", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "guardian", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "guardian" });
     expect(screen.getByText("Quality Champion")).toBeDefined();
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders MarathonerPage with Marathoner heading", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "marathoner", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "marathoner" });
     expect(screen.getByText("Marathoner")).toBeDefined();
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders PolymathPage", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "polymath", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "polymath" });
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders BalancedPage", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "balanced", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "balanced" });
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders EmergingPage", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "emerging", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "emerging" });
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders ArtificerPage", async () => {
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "artificer", searchParams: mockSearchParams });
+    await renderServerComponent(ArchetypePage, { archetypeKey: "artificer" });
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
 
-describe("Archetype pages — Spanish locale", () => {
-  it("renders BuilderPage with Spanish locale via lang=es", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValueOnce("es");
-    vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
-      const mocks: Record<string, string | string[] | Array<{ tier: string; description: string }>> = {
-        "archetypes.builder.terminalCommand": "chapa archetype builder",
-        "archetypes.builder.h1Before": "El ",
-        "archetypes.builder.h1Highlight": "Builder",
-        "archetypes.builder.dominantDimension": "Entrega",
-        "archetypes.builder.badgeAriaLabel": "Ejemplo de Chapa para el arquetipo Builder",
-        "archetypes.builder.essay": ["Parrafo uno del Builder.", "Parrafo dos del Builder."],
-        "archetypes.builder.sectionIdentifies": "Como Chapa identifica a un Builder",
-        "archetypes.builder.keySignalsHeading": "Senales clave",
-        "archetypes.builder.keySignals": [{ tier: "PRIMARIA", description: "Pull requests fusionadas." }],
-        "archetypes.builder.keySignalsSolo": "archetypes.builder.keySignalsSolo",
-        "archetypes.builder.keySignalsSoloHeading": "archetypes.builder.keySignalsSoloHeading",
-        "archetypes.builder.sectionPractice": "Como se ve un Builder en la practica",
-        "archetypes.builder.sectionRadar": "La forma del radar del Builder",
-        "archetypes.builder.backLink": "Volver a funciones",
-        "archetypes.builder.methodologyLink": "Metodologia completa",
-      };
-      return mocks[key] ?? key;
-    });
-    const spSearchParams = Promise.resolve({ lang: "es" });
+describe("Archetype pages — DEFAULT_LOCALE rendering (server renders es, client syncs to user locale)", () => {
+  it("renders BuilderPage using DEFAULT_LOCALE (getServerT always called with es)", async () => {
+    // Since ArchetypePage now always uses DEFAULT_LOCALE, getServerT is always called with 'es'.
+    // The module-level mock already returns the right mocked values.
     const { ArchetypePage } = await import("./_components/ArchetypePage");
-    await renderServerComponent(ArchetypePage, { archetypeKey: "builder", searchParams: spSearchParams });
-    // The h1Highlight key is still "Builder" (brand name) in Spanish
+    await renderServerComponent(ArchetypePage, { archetypeKey: "builder" });
+    // The h1Highlight key is still "Builder" (brand name)
     expect(screen.getByText("Builder")).toBeDefined();
+    expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
-  it("renders MarathonerPage metadata in Spanish", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValueOnce("es");
+  it("MarathonerPage generateMetadata returns build-time (DEFAULT_LOCALE) metadata", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.marathoner.metadataTitle") return "El arquetipo Marathoner";
       if (key === "archetypes.marathoner.metadataDescription") return "Los Marathoner aparecen cada dia.";
       return key;
     });
     const { generateMetadata } = await import("./marathoner/page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({ lang: "es" }) });
+    const meta = generateMetadata();
     expect(meta.title).toBe("El arquetipo Marathoner");
     expect(meta.description).toBe("Los Marathoner aparecen cada dia.");
   });
 
-  it("renders PolymathPage metadata in Spanish", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValueOnce("es");
+  it("PolymathPage generateMetadata returns build-time (DEFAULT_LOCALE) metadata", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.polymath.metadataTitle") return "El arquetipo Polymath";
       if (key === "archetypes.polymath.metadataDescription") return "Los Polymath extienden su impacto.";
       return key;
     });
     const { generateMetadata } = await import("./polymath/page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({ lang: "es" }) });
+    const meta = generateMetadata();
     expect(meta.title).toBe("El arquetipo Polymath");
     expect(meta.description).toBe("Los Polymath extienden su impacto.");
   });
 });
 
-describe("generateMetadata — locale-specific titles", () => {
-  it("BuilderPage returns English metadata by default", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValueOnce("en");
+describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request locale)", () => {
+  it("BuilderPage returns DEFAULT_LOCALE (es) metadata at build time", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
-      if (key === "archetypes.builder.metadataTitle") return "The Builder Archetype";
-      if (key === "archetypes.builder.metadataDescription") return "Builders are the shipping engine.";
+      if (key === "archetypes.builder.metadataTitle") return "El arquetipo Builder";
+      if (key === "archetypes.builder.metadataDescription") return "Los Builder son el motor.";
       return key;
     });
     const { generateMetadata } = await import("./builder/page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
-    expect(meta.title).toBe("The Builder Archetype");
-    expect(meta.description).toBe("Builders are the shipping engine.");
+    const meta = generateMetadata();
+    expect(meta.title).toBe("El arquetipo Builder");
+    expect(meta.description).toBe("Los Builder son el motor.");
   });
 
-  it("GuardianPage returns Spanish metadata for lang=es", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValueOnce("es");
+  it("GuardianPage generates metadata synchronously (no async locale fetch)", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.guardian.metadataTitle") return "El arquetipo Quality Champion";
       if (key === "archetypes.guardian.metadataDescription") return "Los Quality Champion lideran la disciplina.";
       return key;
     });
     const { generateMetadata } = await import("./guardian/page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({ lang: "es" }) });
+    const meta = generateMetadata();
     expect(meta.title).toBe("El arquetipo Quality Champion");
     expect(meta.description).toBe("Los Quality Champion lideran la disciplina.");
   });
 
-  it("BalancedPage returns correct English metadata", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValueOnce("en");
+  it("BalancedPage generates metadata synchronously", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
-      if (key === "archetypes.balanced.metadataTitle") return "The Balanced Archetype";
-      if (key === "archetypes.balanced.metadataDescription") return "Balanced developers score well across all four dimensions.";
+      if (key === "archetypes.balanced.metadataTitle") return "El arquetipo Balanced";
+      if (key === "archetypes.balanced.metadataDescription") return "Los Balanced obtienen puntuaciones equilibradas.";
       return key;
     });
     const { generateMetadata } = await import("./balanced/page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
-    expect(meta.title).toBe("The Balanced Archetype");
+    const meta = generateMetadata();
+    expect(meta.title).toBe("El arquetipo Balanced");
   });
+
+  it("ArtificerPage generates metadata synchronously", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
+    vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
+      if (key === "archetypes.artificer.metadataTitle") return "El arquetipo Artificer";
+      if (key === "archetypes.artificer.metadataDescription") return "Los Artificer aprovechan la IA.";
+      return key;
+    });
+    const { generateMetadata } = await import("./artificer/page");
+    const meta = generateMetadata();
+    expect(meta.title).toBe("El arquetipo Artificer");
+    expect(meta.description).toBe("Los Artificer aprovechan la IA.");
+  });
+
+  it("EmergingPage generates metadata synchronously", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
+    vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
+      if (key === "archetypes.emerging.metadataTitle") return "El arquetipo Emerging";
+      if (key === "archetypes.emerging.metadataDescription") return "Los Emerging estan construyendo impulso.";
+      return key;
+    });
+    const { generateMetadata } = await import("./emerging/page");
+    const meta = generateMetadata();
+    expect(meta.title).toBe("El arquetipo Emerging");
+    expect(meta.description).toBe("Los Emerging estan construyendo impulso.");
+  });
+});
+
+describe("Archetype pages — default export wrappers", () => {
+
+  // Each page's default export is a thin wrapper that calls ArchetypePage with
+  // the correct archetypeKey. We call the default export (exercising it for v8
+  // coverage), then resolve the returned ArchetypePage element via renderServerComponent
+  // so the DOM includes the mocked Navbar.
+
+  it.each([
+    ["BalancedPage", "balanced", () => import("./balanced/page")],
+    ["BuilderPage", "builder", () => import("./builder/page")],
+    ["GuardianPage", "guardian", () => import("./guardian/page")],
+    ["MarathonerPage", "marathoner", () => import("./marathoner/page")],
+    ["PolymathPage", "polymath", () => import("./polymath/page")],
+    ["ArtificerPage", "artificer", () => import("./artificer/page")],
+    ["EmergingPage", "emerging", () => import("./emerging/page")],
+  ] as const)(
+    "%s delegates to ArchetypePage with archetypeKey '%s'",
+    async (_name, key, importer) => {
+      const mod = await importer();
+      const PageComponent = (mod as { default: () => Promise<React.ReactElement> }).default;
+      // Call the page function — this exercises the default export for coverage
+      const element = await PageComponent();
+      // The returned element wraps ArchetypePage; call it to get renderable JSX
+      const ArchetypePageFn = element.type as (p: object) => Promise<React.ReactElement>;
+      const jsx = await ArchetypePageFn(element.props as object);
+      render(jsx);
+      expect(screen.getByTestId("navbar")).toBeDefined();
+      // Verify the element delegates with the right archetypeKey
+      expect((element.props as { archetypeKey: string }).archetypeKey).toBe(key);
+    },
+  );
 });

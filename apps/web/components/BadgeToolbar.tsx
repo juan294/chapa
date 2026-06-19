@@ -7,9 +7,21 @@ import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { useSession } from "@/hooks/useSession";
 import { useTranslation } from "@/lib/i18n";
+import { Toast } from "@/components/Toast";
 
 interface BadgeToolbarProps {
   handle: string;
+}
+
+/** Remove CSS animations and SMIL animate elements for static PNG export. */
+export function stripBadgeAnimations(svgText: string): string {
+  let result = svgText;
+  result = result.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
+  result = result.replace(/animation[^;"]*/g, "");
+  result = result.replace(/<animate [^>]*\/>/g, "");
+  result = result.replace(/<animate [^>]*>[^<]*<\/animate>/g, "");
+  result = result.replace(/opacity="0"/g, 'opacity="1"');
+  return result;
 }
 
 export function BadgeToolbar({
@@ -52,6 +64,8 @@ export function BadgeToolbar({
   }
 
   const [copied, setCopied] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const shareUrl = `https://chapa.thecreativetoken.com/u/${handle}`;
   const tweetText = encodeURIComponent(
@@ -68,11 +82,9 @@ export function BadgeToolbar({
       setShareOpen(false);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard API may be blocked */
+      setErrorToast(t('badgeToolbar.failed') as string);
     }
-  }, [shareUrl, setShareOpen]);
-
-  const [downloadStatus, setDownloadStatus] = useState<"idle" | "loading">("idle");
+  }, [shareUrl, setShareOpen, t]);
 
   const handleDownload = useCallback(async () => {
     setDownloadStatus("loading");
@@ -80,18 +92,7 @@ export function BadgeToolbar({
     try {
       const res = await fetch(`/u/${encodeURIComponent(handle)}/badge.svg`);
       if (!res.ok) throw new Error("fetch failed");
-      let svgText = await res.text();
-
-      // Strip all animations for static PNG rendering:
-      // 1. CSS @keyframes blocks
-      svgText = svgText.replace(/@keyframes[^}]*\{[^}]*\{[^}]*\}[^}]*\}/g, "");
-      // 2. CSS animation properties in style attributes
-      svgText = svgText.replace(/animation[^;"]*/g, "");
-      // 3. SMIL <animate> elements (heatmap fade-in uses these)
-      svgText = svgText.replace(/<animate [^>]*\/>/g, "");
-      svgText = svgText.replace(/<animate [^>]*>[^<]*<\/animate>/g, "");
-      // 4. Set heatmap rects to fully visible (they start at opacity="0")
-      svgText = svgText.replace(/opacity="0"/g, 'opacity="1"');
+      const svgText = stripBadgeAnimations(await res.text());
 
       // Use data URI (more reliable than blob URL for SVG→canvas)
       const scale = 2;
@@ -127,7 +128,8 @@ export function BadgeToolbar({
         img.src = dataUri;
       });
     } catch {
-      // Fallback: download SVG directly if PNG conversion fails
+      // Fallback: download SVG directly if PNG conversion fails; surface info toast
+      setErrorToast(t('badgeToolbar.failed') as string);
       const a = document.createElement("a");
       a.href = `/u/${encodeURIComponent(handle)}/badge.svg`;
       a.download = `chapa-${handle}.svg`;
@@ -139,7 +141,7 @@ export function BadgeToolbar({
         setDownloadStatus("idle");
       }
     }
-  }, [handle]);
+  }, [handle, t]);
 
   const btnClass =
     "inline-flex items-center justify-center gap-1.5 rounded-lg min-h-[44px] min-w-[44px] px-2 sm:px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-amber/[0.06] focus-visible:text-text-primary focus-visible:bg-amber/[0.06] transition-colors";
@@ -337,6 +339,14 @@ export function BadgeToolbar({
         {downloadStatus === "loading" ? t('badgeToolbar.downloading') as string : t('badgeToolbar.download') as string}
       </button>
 
+      {errorToast && (
+        <Toast
+          message={errorToast}
+          type="error"
+          duration={4000}
+          onDismiss={() => setErrorToast(null)}
+        />
+      )}
     </div>
   );
 }

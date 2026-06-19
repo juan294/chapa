@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/headers", () => ({
   headers: mocks.headers,
+  cookies: vi.fn().mockReturnValue({ get: () => undefined }),
 }));
 
 vi.mock("next/navigation", () => ({

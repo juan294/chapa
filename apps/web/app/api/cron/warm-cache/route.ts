@@ -17,6 +17,7 @@ import { processInBatches } from "@/lib/async/process-in-batches";
 import {
   captureServerError,
   captureServerEvent,
+  captureOperationalAlert,
   withErrorCapture,
 } from "@/lib/analytics/server-errors";
 import { getRequestId } from "@/lib/log";
@@ -162,6 +163,35 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     ...warmResults.filter((r) => !r.warmed).map((r) => ({ handle: r.handle, reason: "warm returned false" })),
   ];
   const failed = failures.length;
+  const processedCount = toWarm.length;
+
+  // DO-L1 (#751): P2 alert when failure rate exceeds 50% of processed handles.
+  // A cron run where every handle silently fails returns HTTP 200 with a non-empty
+  // failures[] array — without this alert, the on-call team would not be paged.
+  if (processedCount > 0 && failed > processedCount / 2) {
+    void captureOperationalAlert({
+      signal: "warm_cache_high_failure_rate",
+      severity: "P2",
+      summary: `warm-cache: ${failed}/${processedCount} handles failed (>${Math.round((failed / processedCount) * 100)}% failure rate)`,
+      route: "/api/cron/warm-cache",
+      properties: { failed, processedCount },
+    });
+  }
+
+  // DO-S1 (#773): P2 alert when total active users are at or above the per-run ceiling.
+  // When allHandles.length >= MAX_HANDLES, only a subset is warmed per run and cache
+  // staleness risk grows with each new user beyond the ceiling. Alert early so the team
+  // can act before staleness spreads. (Full fix — staggered crons / tiered freshness —
+  // is tracked as a follow-up infra task.)
+  if (allHandles.length >= MAX_HANDLES) {
+    void captureOperationalAlert({
+      signal: "warm_cache_ceiling_approached",
+      severity: "P2",
+      summary: `warm-cache ceiling: ${allHandles.length} active users vs ${MAX_HANDLES}/run — some handles may not be warmed each cycle`,
+      route: "/api/cron/warm-cache",
+      properties: { totalUsers: allHandles.length, ceiling: MAX_HANDLES },
+    });
+  }
 
   // Clean expired verification records from Supabase (fire-and-forget safe)
   let expiredVerificationsDeleted = 0;
@@ -206,7 +236,7 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
       expiredVerificationsDeleted,
       expiredMergeOpsDeleted,
       expiredSnapshotsDeleted,
-      processedCount: toWarm.length,
+      processedCount,
       processedSample: toWarm.slice(0, 10),
       rotation: {
         offset,

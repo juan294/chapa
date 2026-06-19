@@ -156,12 +156,19 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## Public-page i18n requires dynamic rendering (2026-05-02)
+## ~~Public-page i18n requires dynamic rendering (2026-05-02)~~ — Resolved
 
-- **Risk:** All translated public pages use `export const dynamic = 'force-dynamic'`, disabling ISR/static caching. First-byte time is per-request rather than served from CDN cache.
-- **Mitigation:** Short edge-cache via `Cache-Control: s-maxage=60, stale-while-revalidate=86400` per translated page. The most-cached endpoint (`/u/:handle/badge.svg`) is unaffected — it remains ISR-cached. Server render time is fast (<50ms) since locale resolution reads a single cookie header.
+- **Risk:** All translated public pages used `export const dynamic = 'force-dynamic'`, disabling ISR/static caching. First-byte time was per-request rather than served from CDN cache.
+- **Resolution:** Content pages now use `force-static` / ISR (v2.11.0). Pages are statically rendered at `DEFAULT_LOCALE` (`es`) at build/revalidation time and served from CDN. Non-default-locale users (English) receive the `es`-rendered HTML from the CDN; their locale is applied client-side on mount from the `chapa-locale` cookie (brief locale flash acceptable — see new risk below).
+- **Severity:** None (resolved)
+- **Accepted:** 2026-05-02 | **Updated:** 2026-06-19
+
+## Static content pages render at DEFAULT\_LOCALE; non-default locale applied client-side (2026-06-19)
+
+- **Risk:** Content pages (about, archetypes, privacy, terms, etc.) are CDN-cached at `DEFAULT_LOCALE` (`es`). A user whose `chapa-locale` cookie is `en` receives Spanish server-rendered HTML and sees a brief locale flash on mount as the client applies the English dictionary.
+- **Mitigation:** Intentional tradeoff to keep content pages CDN-cacheable (ISR). The flash is short (<100 ms on fast connections) and affects only users who have explicitly switched to English. Full per-locale SSR would require per-locale route segments (e.g., `/en/about`) — a significant routing change deferred to a future milestone. The badge SVG endpoint (`/u/:handle/badge.svg`) and share page are unaffected.
 - **Severity:** Low
-- **Accepted:** 2026-05-02
+- **Accepted:** 2026-06-19
 
 ---
 

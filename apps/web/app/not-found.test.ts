@@ -16,8 +16,9 @@ describe("not-found page — source structure", () => {
     expect(source).toContain("404");
   });
 
-  it("renders a descriptive message", () => {
-    expect(source).toContain("Page not found");
+  it("renders a descriptive message via i18n key (notFound.title)", () => {
+    // Message is now loaded from i18n — not hardcoded
+    expect(source).toContain("notFound.title");
   });
 
   it("has a link back to home", () => {

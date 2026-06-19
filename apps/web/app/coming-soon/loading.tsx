@@ -1,15 +1,14 @@
-"use client";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 
-import { useTranslation } from "@/lib/i18n";
-
-export default function ComingSoonLoading() {
-  const { t } = useTranslation();
+export default async function ComingSoonLoading() {
+  const t = getServerT(await getServerLocale());
+  const loading = t("common.loading") as string;
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg px-6" role="status" aria-label={t('common.loading') as string}>
-      <span className="sr-only">{t('common.loading') as string}</span>
+    <main className="flex min-h-screen items-center justify-center bg-bg px-6" role="status" aria-label={loading}>
+      <span className="sr-only">{loading}</span>
       <div className="w-full max-w-md text-center">
         <div className="mx-auto mb-6 h-8 w-8 animate-pulse rounded-full bg-amber/20" />
-        <p className="font-heading text-sm text-text-secondary">{t('common.loading') as string}</p>
+        <p className="font-heading text-sm text-text-secondary">{loading}</p>
       </div>
     </main>
   );

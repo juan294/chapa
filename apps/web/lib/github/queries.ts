@@ -1,6 +1,7 @@
 import type { RawContributionData } from "@chapa/shared";
 import { CONTRIBUTION_QUERY, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { getGithubToken } from "@/lib/env";
+import { fetchWithRetry, sanitizeLogBody } from "@/lib/utils/fetch-retry";
 
 // Re-export for consumers that import from this module
 export type { RawContributionData };
@@ -43,7 +44,7 @@ export async function fetchContributionData(
   }
 
   try {
-    const res = await fetch("https://api.github.com/graphql", {
+    const res = await fetchWithRetry("https://api.github.com/graphql", {
       method: "POST",
       headers,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -60,8 +61,9 @@ export async function fetchContributionData(
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "(unreadable)");
-      console.error(`[github] GraphQL HTTP ${res.status} for ${login}: ${body}`);
+      const rawBody = await res.text().catch(() => "(unreadable)");
+      const snippet = sanitizeLogBody(rawBody);
+      console.error(`[github] GraphQL HTTP ${res.status} for ${login}: ${snippet}`);
       return null;
     }
 

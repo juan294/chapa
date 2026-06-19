@@ -24,6 +24,7 @@ CHAPA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOGS_DIR="${CHAPA_DIR}/logs"
 SHARED_CONTEXT_FILE="${CHAPA_DIR}/docs/agents/shared-context.md"
 API_BASE="${CHAPA_API_BASE:-http://localhost:3001}"
+CHAPA_AGENT_LOCK_DIR="${CHAPA_AGENT_LOCK_DIR:-${TMPDIR:-/tmp}/chapa-agent-locks}"
 
 mkdir -p "${LOGS_DIR}"
 
@@ -34,6 +35,51 @@ mkdir -p "${LOGS_DIR}"
 log_info()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  $*"; }
 log_warn()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN]  $*" >&2; }
 log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2; }
+
+# ---------------------------------------------------------------------------
+# Agent locks
+# ---------------------------------------------------------------------------
+
+# acquire_agent_lock <lock_name> <agent_label> [timeout_seconds]
+# Uses mkdir as an atomic cross-process lock. This keeps test-heavy agents from
+# running concurrent Vitest suites on the same host and exhausting workers/fds.
+acquire_agent_lock() {
+  local lock_name="$1"
+  local agent_label="$2"
+  local timeout_seconds="${3:-7200}"
+  local lock_path="${CHAPA_AGENT_LOCK_DIR}/${lock_name}"
+  local started_at
+  started_at=$(date +%s)
+
+  mkdir -p "${CHAPA_AGENT_LOCK_DIR}"
+
+  while ! mkdir "${lock_path}" 2>/dev/null; do
+    local now elapsed
+    now=$(date +%s)
+    elapsed=$((now - started_at))
+
+    if [ "${elapsed}" -ge "${timeout_seconds}" ]; then
+      log_error "Timed out waiting for ${agent_label} lock: ${lock_path}"
+      return 1
+    fi
+
+    sleep 1
+  done
+
+  printf '%s\n' "$$" > "${lock_path}/pid"
+  log_info "Acquired ${agent_label} lock: ${lock_path}"
+}
+
+# release_agent_lock <lock_name>
+release_agent_lock() {
+  local lock_name="$1"
+  local lock_path="${CHAPA_AGENT_LOCK_DIR}/${lock_name}"
+
+  if [ -d "${lock_path}" ]; then
+    rm -rf "${lock_path}"
+    log_info "Released agent lock: ${lock_path}"
+  fi
+}
 
 # ---------------------------------------------------------------------------
 # Report validation

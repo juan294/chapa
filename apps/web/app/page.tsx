@@ -1,11 +1,13 @@
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const dynamic = 'force-static';
 
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { Navbar } from "@/components/Navbar";
+import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
@@ -32,6 +34,14 @@ function CodebergIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
+    </svg>
+  );
+}
+
+function GitlabIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0539.8585.8585 0 0 0-.3362.405L.4332 9.5065l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.0301.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.462-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z" />
     </svg>
   );
 }
@@ -89,10 +99,12 @@ export default async function Home({
 }) {
   const { error, lang } = await searchParams;
   const errorMessage = getOAuthErrorMessage(error);
-  const locale = await getServerLocale(lang);
-  const t = getServerT(locale);
+  // Render at DEFAULT_LOCALE (es) at build time; client LocaleSync swaps to
+  // the user's cookie locale on hydration — same pattern as the share page.
+  const t = getServerT(DEFAULT_LOCALE);
 
   const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
+
   const hero = t('landing.hero') as unknown as Record<string, string | string[]>;
   const heroTitle = hero.title as string;
   const heroHighlight = hero.highlight as string;
@@ -122,7 +134,7 @@ export default async function Home({
     <div className="bg-bg min-h-screen text-text-primary">
       <LocaleSync queryLang={lang} />
       {errorMessage && <ErrorBanner message={errorMessage} />}
-      <Navbar navLinks={navLinks} />
+      <NavbarClient navLinks={navLinks} />
 
       <main id="main-content">
         {/* ── Terminal session ─────────────────────────────── */}
@@ -251,7 +263,7 @@ export default async function Home({
                         <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
                         <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
                         <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
-                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> o{" "}
+                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {t('common.orConnector') as string}{" "}
                         <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link> — {feature.descriptionAfter}
                       </>
                     )}
@@ -296,7 +308,7 @@ export default async function Home({
                   <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
                   <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
                   <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
-                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> o{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {t('common.orConnector') as string}{" "}
                   <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link>.
                 </p>
                 {dimensions.map((dim) => (
@@ -474,6 +486,9 @@ export default async function Home({
                 </a>
                 <a href="https://codeberg.org" target="_blank" rel="noopener noreferrer" aria-label="Codeberg" title="Codeberg" className="hover:text-amber transition-colors">
                   <CodebergIcon className="w-3.5 h-3.5" />
+                </a>
+                <a href="https://gitlab.com" target="_blank" rel="noopener noreferrer" aria-label="GitLab" title="GitLab" className="hover:text-amber transition-colors">
+                  <GitlabIcon className="w-3.5 h-3.5" />
                 </a>
                 <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" aria-label="Claude Code" title="Claude Code" className="font-heading text-xs leading-none hover:text-amber transition-colors">
                   <ClaudeCodeStar />

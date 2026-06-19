@@ -4,6 +4,7 @@ import { cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
+import { assertHandleOwnership } from "@/lib/auth/assert-handle-ownership";
 import type { SupplementalStats } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
@@ -43,23 +44,23 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
     return NextResponse.json({ error: "Invalid stats shape" }, { status: 400 });
   }
 
-  // 3b. Rate limit: 10 requests per targetHandle per 24 hours
+  // 4. SE-L2 (#890) + BE-S1 (#896): Verify token ownership BEFORE consuming the
+  // per-handle rate-limit quota. An attacker cannot exhaust another handle's bucket
+  // by sending their own valid token with a different targetHandle.
+  // Rate-limit key is now derived from the authenticated handle, not targetHandle.
+  const auth = await resolveRequestAuth(request);
+  const ownershipError = assertHandleOwnership(auth, targetHandle);
+  if (ownershipError) return ownershipError;
+
+  // 4b. Rate limit: 10 requests per targetHandle per 24 hours
+  // Keyed on the validated targetHandle — ownership check above ensures the caller
+  // is the owner, so this is effectively keyed on the authenticated handle.
   const rl = await rateLimit(`ratelimit:supplemental:${targetHandle}`, 10, 86400);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests for this handle. Please try again later." },
       { status: 429, headers: { "Retry-After": "86400" } },
     );
-  }
-
-  // 4. Verify token ownership via shared auth resolver
-  const auth = await resolveRequestAuth(request);
-  if (!auth) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-  }
-
-  if (auth.handle.toLowerCase() !== targetHandle.toLowerCase()) {
-    return NextResponse.json({ error: "Token does not match targetHandle" }, { status: 403 });
   }
 
   // 5. Store in Redis (hot read path) AND Supabase (durable). Redis has a

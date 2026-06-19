@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { isInsightsEnabledSync } from "@/lib/feature-flags";
+import {
+  isInsightsEnabledSync,
+  isBitbucketEnabledSync,
+  isCodebergEnabledSync,
+  isGitlabEnabledSync,
+} from "@/lib/feature-flags-sync";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
@@ -20,10 +25,12 @@ const platformStatusCache: {
   fetched: boolean;
   bitbucket: { linked: boolean; remoteLogin: string | null } | null;
   codeberg: { linked: boolean; remoteLogin: string | null } | null;
+  gitlab: { linked: boolean; remoteLogin: string | null } | null;
 } = {
   fetched: false,
   bitbucket: null,
   codeberg: null,
+  gitlab: null,
 };
 
 /** Clear the platform status cache — call after link/unlink actions */
@@ -31,6 +38,7 @@ export function clearPlatformStatusCache() {
   platformStatusCache.fetched = false;
   platformStatusCache.bitbucket = null;
   platformStatusCache.codeberg = null;
+  platformStatusCache.gitlab = null;
 }
 
 interface UserMenuProps {
@@ -44,6 +52,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
   const { studioEnabled } = useClientFeatureFlags();
   const { t } = useTranslation();
+  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { isOpen: open, setIsOpen: setOpen } = useDropdownMenu(menuRef);
@@ -53,41 +62,65 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [bbStatus, setBbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(null);
+  } | null>(() => platformStatusCache.bitbucket);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkLoading, setUnlinkLoading] = useState(false);
 
   const [cbStatus, setCbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(null);
+  } | null>(() => platformStatusCache.codeberg);
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
+
+  const [glStatus, setGlStatus] = useState<{
+    linked: boolean;
+    remoteLogin: string | null;
+  } | null>(() => platformStatusCache.gitlab);
+  const [showGlUnlinkConfirm, setShowGlUnlinkConfirm] = useState(false);
+  const [glUnlinkLoading, setGlUnlinkLoading] = useState(false);
 
   // Insights import — file picker triggered directly from menu
   const insightsFileRef = useRef<HTMLInputElement>(null);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleToastDismiss = useCallback(() => setToast(null), []);
   const [toast, setToast] = useState<{
     message: string;
     detail?: string;
     type: "loading" | "success" | "error" | "info";
   } | null>(null);
+  const handleToastDismiss = useCallback(() => setToast(null), []);
 
-  // Insights cooldown — read last-submitted timestamp from localStorage on mount
+  // Insights cooldown — read last-submitted timestamp from localStorage.
+  // State is seeded with deterministic defaults (0 / null) so the initial
+  // server and client renders match; the real values are populated in a
+  // mount-time effect below to avoid hydration mismatches and the use of
+  // Date.now()/localStorage inside a useState initializer (#892).
   const INSIGHTS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-  const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
+  const [insightsNow, setInsightsNow] = useState(0);
   const [insightsLastSubmitted, setInsightsLastSubmitted] = useState<Date | null>(null);
+
   useEffect(() => {
-    const stored = localStorage.getItem(insightsStorageKey);
-    if (stored) {
+    // Read the cooldown timestamp from localStorage and capture "now" AFTER
+    // mount so the initial server/client render stays deterministic (#892):
+    // we never call Date.now() or touch localStorage inside a useState
+    // initializer. Setting state here is the intended client-only hydration of
+    // browser-derived values; the rule below is a false positive for that case.
+    setInsightsNow(Date.now()); // eslint-disable-line react-hooks/set-state-in-effect
+    if (typeof window === "undefined" || !window.localStorage) return;
+    const stored = window.localStorage.getItem(insightsStorageKey);
+    if (!stored) return;
+    try {
       const date = new Date(stored);
-      if (!isNaN(date.getTime())) setInsightsLastSubmitted(date);
+      if (!Number.isNaN(date.getTime())) {
+        setInsightsLastSubmitted(date);
+      }
+    } catch {
+      // Ignore malformed stored values — cooldown stays inactive.
     }
   }, [insightsStorageKey]);
   const insightsCooldownActive =
     insightsLastSubmitted !== null &&
-    Date.now() - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
+    insightsNow - insightsLastSubmitted.getTime() < INSIGHTS_COOLDOWN_MS;
   const insightsTooltip =
     insightsCooldownActive && insightsLastSubmitted
       ? `${t('userMenu.insightsCooldownPrefix') as string}${new Date(insightsLastSubmitted.getTime() + INSIGHTS_COOLDOWN_MS).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
@@ -130,6 +163,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       const now = new Date();
       localStorage.setItem(insightsStorageKey, now.toISOString());
       setInsightsLastSubmitted(now);
+      setInsightsNow(now.getTime());
 
       if (recalcRes.ok) {
         const recalcData = await recalcRes.json();
@@ -173,14 +207,15 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
 
   useEffect(() => {
     if (platformStatusCache.fetched) {
-      if (platformStatusCache.bitbucket) setBbStatus(platformStatusCache.bitbucket);
-      if (platformStatusCache.codeberg) setCbStatus(platformStatusCache.codeberg);
       return;
     }
-    // Server returns { enabled: false } if flag is off — no client-side
-    // sync flag checks needed. Fixes #632.
+    // Only probe the status endpoint for platforms whose public feature flag is
+    // enabled. When an integration is flag-gated OFF we skip the network call
+    // entirely instead of relying on the server to answer `{ enabled: false }`,
+    // avoiding wasted requests on every mount (#885). The server still has the
+    // final say for enabled platforms.
     function fetchPlatformStatus(
-      platform: "bitbucket" | "codeberg",
+      platform: "bitbucket" | "codeberg" | "gitlab",
       setter: typeof setBbStatus,
     ) {
       fireAndForget(
@@ -197,43 +232,69 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         () => undefined,
       ); // Graceful — menu works without status
     }
-    fetchPlatformStatus("bitbucket", setBbStatus);
-    fetchPlatformStatus("codeberg", setCbStatus);
+    if (isBitbucketEnabledSync()) fetchPlatformStatus("bitbucket", setBbStatus);
+    if (isCodebergEnabledSync()) fetchPlatformStatus("codeberg", setCbStatus);
+    if (isGitlabEnabledSync()) fetchPlatformStatus("gitlab", setGlStatus);
     platformStatusCache.fetched = true;
   }, []);
 
-  async function handleUnlinkBitbucket() {
-    setUnlinkLoading(true);
-    try {
-      const res = await fetch("/api/auth/bitbucket/disconnect", { method: "POST" });
-      if (res.ok) {
-        clearPlatformStatusCache();
-        setBbStatus({ linked: false, remoteLogin: null });
-        setShowUnlinkConfirm(false);
-        router.refresh();
+  // Shared unlink flow — collapses the three near-identical platform disconnect
+  // handlers into one parametrized helper (#884). Each named handler below
+  // supplies only its platform-specific endpoint and state setters; the fetch,
+  // success transition (cache clear + router refresh), graceful-failure, and
+  // loading-state bookkeeping live here once.
+  type PlatformStatusSetter = typeof setBbStatus;
+  const unlinkPlatform = useCallback(
+    async (config: {
+      endpoint: string;
+      setLoading: (loading: boolean) => void;
+      setStatus: PlatformStatusSetter;
+      setShowConfirm: (show: boolean) => void;
+    }) => {
+      const { endpoint, setLoading, setStatus, setShowConfirm } = config;
+      setLoading(true);
+      try {
+        const res = await fetch(endpoint, { method: "POST" });
+        if (res.ok) {
+          clearPlatformStatusCache();
+          setStatus({ linked: false, remoteLogin: null });
+          setShowConfirm(false);
+          router.refresh();
+        }
+      } catch {
+        // Graceful failure — user can try again
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // Graceful failure — user can try again
-    } finally {
-      setUnlinkLoading(false);
-    }
+    },
+    [router],
+  );
+
+  async function handleUnlinkBitbucket() {
+    await unlinkPlatform({
+      endpoint: "/api/auth/bitbucket/disconnect",
+      setLoading: setUnlinkLoading,
+      setStatus: setBbStatus,
+      setShowConfirm: setShowUnlinkConfirm,
+    });
   }
 
   async function handleUnlinkCodeberg() {
-    setCbUnlinkLoading(true);
-    try {
-      const res = await fetch("/api/auth/codeberg/disconnect", { method: "POST" });
-      if (res.ok) {
-        clearPlatformStatusCache();
-        setCbStatus({ linked: false, remoteLogin: null });
-        setShowCbUnlinkConfirm(false);
-        router.refresh();
-      }
-    } catch {
-      // Graceful failure
-    } finally {
-      setCbUnlinkLoading(false);
-    }
+    await unlinkPlatform({
+      endpoint: "/api/auth/codeberg/disconnect",
+      setLoading: setCbUnlinkLoading,
+      setStatus: setCbStatus,
+      setShowConfirm: setShowCbUnlinkConfirm,
+    });
+  }
+
+  async function handleUnlinkGitlab() {
+    await unlinkPlatform({
+      endpoint: "/api/auth/gitlab/disconnect",
+      setLoading: setGlUnlinkLoading,
+      setStatus: setGlStatus,
+      setShowConfirm: setShowGlUnlinkConfirm,
+    });
   }
 
   async function handleSignOut() {
@@ -467,6 +528,37 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 </a>
               )
             )}
+            {glStatus && (
+              glStatus.linked ? (
+                <div className="flex items-center justify-between rounded-xl px-3 py-2.5">
+                  <a
+                    href={`https://gitlab.com/${glStatus.remoteLogin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 transition-colors hover:text-amber"
+                  >
+                    <GitlabIcon />
+                    <span className="text-sm text-text-primary">{glStatus.remoteLogin}</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowGlUnlinkConfirm(true)}
+                    aria-label={t('aria.unlinkGitlab') as string}
+                    className="text-xs text-text-secondary transition-colors hover:text-terminal-red"
+                  >
+                    {t('userMenu.unlinkBtn') as string}
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/gitlab/connect"
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
+                >
+                  <GitlabIcon />
+                  {t('userMenu.linkGitlab') as string}
+                </a>
+              )
+            )}
             {isAdmin && (
               <Link
                 href="/admin"
@@ -609,6 +701,17 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         onConfirm={handleUnlinkCodeberg}
         onCancel={() => setShowCbUnlinkConfirm(false)}
       />
+      <ConfirmDialog
+        open={showGlUnlinkConfirm}
+        title={t('userMenu.confirmUnlinkGitlabTitle') as string}
+        description={t('userMenu.confirmUnlinkGitlabBody') as string}
+        confirmLabel={t('userMenu.confirmBtn') as string}
+        cancelLabel={t('userMenu.cancelBtn') as string}
+        variant="destructive"
+        loading={glUnlinkLoading}
+        onConfirm={handleUnlinkGitlab}
+        onCancel={() => setShowGlUnlinkConfirm(false)}
+      />
       {toast && (
         <Toast
           message={toast.message}
@@ -626,6 +729,14 @@ function CodebergIcon() {
   return (
     <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
+    </svg>
+  );
+}
+
+function GitlabIcon() {
+  return (
+    <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0539.8585.8585 0 0 0-.3362.405L.4332 9.5065l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.0301.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.462-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z" />
     </svg>
   );
 }

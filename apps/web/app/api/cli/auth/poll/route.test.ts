@@ -7,6 +7,7 @@ import { NextRequest } from "next/server";
 
 vi.mock("@/lib/cache/redis", () => ({
   cacheGet: vi.fn(),
+  cacheSet: vi.fn().mockResolvedValue(true),
   cacheDel: vi.fn(),
   rateLimit: vi.fn().mockResolvedValue({ allowed: true, current: 1, limit: 120 }),
 }));
@@ -16,12 +17,13 @@ vi.mock("@/lib/auth/cli-token", () => ({
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
+  NO_TRUSTED_IP: "unknown",
   getClientIp: (req: Request) =>
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown",
 }));
 
 import { GET } from "./route";
-import { cacheGet, cacheDel, rateLimit } from "@/lib/cache/redis";
+import { cacheGet, cacheSet, cacheDel, rateLimit } from "@/lib/cache/redis";
 import { generateCliToken } from "@/lib/auth/cli-token";
 
 // ---------------------------------------------------------------------------
@@ -30,9 +32,10 @@ import { generateCliToken } from "@/lib/auth/cli-token";
 
 const VALID_UUID = "1feae8e3-6bc0-47da-84aa-0e24e2510454";
 
-function makeRequest(session?: string, ip?: string): NextRequest {
+function makeRequest(session?: string, ip?: string, deviceCode?: string): NextRequest {
   const url = new URL("https://chapa.thecreativetoken.com/api/cli/auth/poll");
   if (session !== undefined) url.searchParams.set("session", session);
+  if (deviceCode !== undefined) url.searchParams.set("device_code", deviceCode);
   const headers: Record<string, string> = {};
   if (ip) headers["x-forwarded-for"] = ip;
   return new NextRequest(url.toString(), { headers });
@@ -226,6 +229,202 @@ describe("GET /api/cli/auth/poll", () => {
 });
 
 // ---------------------------------------------------------------------------
+// BE-M2 (#869): RFC 8628-style device_code split
+// ---------------------------------------------------------------------------
+
+describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks(); // reset implementations too (prevents bleed from "cacheDel throws" test)
+    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
+    vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(cacheDel).mockResolvedValue(undefined);
+  });
+
+  it("returns pending + device_code on first poll (session not found in Redis)", async () => {
+    // First poll: no device_code sent, session not in Redis yet
+    vi.mocked(cacheGet).mockResolvedValue(null);
+
+    const res = await GET(makeRequest(VALID_UUID));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
+    // device_code must be returned so an updated CLI can echo it on later polls
+    expect(typeof body.device_code).toBe("string");
+    expect(body.device_code.length).toBeGreaterThanOrEqual(32);
+  });
+
+  it("device_code returned on first poll is high-entropy (≥32 hex chars)", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(null);
+
+    const res = await GET(makeRequest(VALID_UUID));
+    const body = await res.json();
+
+    // device_code must be sufficiently random — at least 32 hex chars (128 bits)
+    expect(/^[a-f0-9]{32,}$/.test(body.device_code)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Updated-CLI path: once a client echoes the correct device_code, the session
+  // becomes "confirmed" and device_code is enforced from then on.
+  // -------------------------------------------------------------------------
+
+  it("confirms the session (persists deviceCodeConfirmed) when a poll echoes the correct device_code", async () => {
+    const deviceCode = "correct-device-code-abc123def456xxx";
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode,
+      // not yet confirmed
+    });
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, deviceCode));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
+    // The session must be re-persisted with deviceCodeConfirmed: true so future
+    // polls without the code are rejected.
+    expect(cacheSet).toHaveBeenCalledWith(
+      `cli:device:${VALID_UUID}`,
+      expect.objectContaining({ deviceCode, deviceCodeConfirmed: true }),
+      expect.any(Number),
+    );
+  });
+
+  it("returns pending when device_code matches the stored one", async () => {
+    const deviceCode = "correct-device-code-abc123def456xxx";
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode,
+    });
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, deviceCode));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
+  });
+
+  it("issues token when device_code matches and session is approved", async () => {
+    const deviceCode = "correct-device-code-abc123def456xxx";
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "approved",
+      handle: "octocat",
+      deviceCode,
+    });
+    vi.mocked(generateCliToken).mockReturnValue("cli-token.signature");
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, deviceCode));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("approved");
+    expect(body.token).toBe("cli-token.signature");
+  });
+
+  it("(a) a client that presented device_code must keep presenting the correct one — wrong code is rejected", async () => {
+    // Session already confirmed (client proved possession earlier).
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode: "correct-device-code-abc123def456",
+      deviceCodeConfirmed: true,
+    });
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, "wrong-device-code"));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/device_code/i);
+  });
+
+  it("(a) a confirmed client that stops presenting device_code is rejected (no downgrade)", async () => {
+    // Once confirmed, omitting the code must NOT silently downgrade to sessionId-only.
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode: "correct-device-code-abc123def456",
+      deviceCodeConfirmed: true,
+    });
+
+    const res = await GET(makeRequest(VALID_UUID));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/device_code/i);
+  });
+
+  // -------------------------------------------------------------------------
+  // (b) Legacy-CLI path: a client that NEVER presents device_code keeps working
+  // via sessionId only — must NOT 401. This is the critical backward-compat path.
+  // -------------------------------------------------------------------------
+
+  it("(b) legacy client that never presents device_code still succeeds (pending) — no 401", async () => {
+    // Unconfirmed session (device_code was offered but never echoed back).
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode: "offered-but-never-echoed-abc123",
+      // deviceCodeConfirmed is absent/false
+    });
+
+    const res = await GET(makeRequest(VALID_UUID));
+
+    // Legacy CLI: no device_code param → must fall back to sessionId-only.
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
+  });
+
+  it("(b) legacy client gets its token when approved without ever presenting device_code — no 401", async () => {
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "approved",
+      handle: "octocat",
+      deviceCode: "offered-but-never-echoed-abc123",
+      // deviceCodeConfirmed is absent/false
+    });
+    vi.mocked(generateCliToken).mockReturnValue("cli-token.signature");
+
+    const res = await GET(makeRequest(VALID_UUID));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("approved");
+    expect(body.token).toBe("cli-token.signature");
+  });
+
+  it("(b) legacy session with no deviceCode at all (pre-hardening) still works without device_code", async () => {
+    // Sessions created before this hardening (e.g. by the approve route) have no deviceCode.
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "approved",
+      handle: "octocat",
+    });
+    vi.mocked(generateCliToken).mockReturnValue("cli-token.signature");
+
+    const res = await GET(makeRequest(VALID_UUID));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("approved");
+    expect(body.token).toBe("cli-token.signature");
+  });
+
+  it("unconfirmed session: a WRONG device_code is still rejected (active possession claim must be correct)", async () => {
+    // If a client DOES present a device_code, it must be the right one — even before
+    // confirmation. A wrong code is an active claim of possession and is rejected.
+    vi.mocked(cacheGet).mockResolvedValue({
+      status: "pending",
+      deviceCode: "correct-device-code-abc123def456",
+      // not confirmed yet
+    });
+
+    const res = await GET(makeRequest(VALID_UUID, undefined, "wrong-device-code"));
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/device_code/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Rate limiting
 // ---------------------------------------------------------------------------
 
@@ -284,13 +483,17 @@ describe("GET /api/cli/auth/poll — rate limiting", () => {
     );
   });
 
-  it("uses 'unknown' when x-forwarded-for is absent", async () => {
+  it("applies a strict global cap (not shared per-unknown bucket) when IP is unknown (BE-M1)", async () => {
+    // When no trusted IP header is present, the route must NOT use the regular
+    // 600/300s per-IP bucket (which would collapse all no-IP clients into one
+    // shared bucket, defeating rate-limiting). Instead it applies a separate
+    // stricter global cap with a tighter limit and the key suffix ":no-ip".
     await GET(makeRequest(VALID_UUID));
 
     expect(rateLimit).toHaveBeenNthCalledWith(
       2,
-      "ratelimit:cli-poll-ip:unknown",
-      600,
+      "ratelimit:cli-poll-ip:no-ip",
+      50,
       300,
     );
   });

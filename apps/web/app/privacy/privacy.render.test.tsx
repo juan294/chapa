@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
 vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
+}));
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
 }));
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: () => null,
@@ -12,7 +15,6 @@ vi.mock("@/lib/i18n", () => ({
   LocaleSync: () => null,
 }));
 vi.mock("@/lib/i18n/server", () => ({
-  getServerLocale: vi.fn().mockResolvedValue("en"),
   getServerT: vi.fn().mockReturnValue((key: string) => {
     const dict: Record<string, unknown> = {
       "legal.privacy.h1Before": "Privacy ",
@@ -43,77 +45,49 @@ vi.mock("@/lib/i18n/server", () => ({
 }));
 
 import PrivacyPage from "./page";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
 
 afterEach(cleanup);
 
 describe("PrivacyPage", () => {
-  beforeEach(() => {
-    vi.mocked(getServerLocale).mockResolvedValue("en");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      const dict: Record<string, unknown> = {
-        "legal.privacy.h1Before": "Privacy ",
-        "legal.privacy.h1Highlight": "Policy",
-        "legal.privacy.lastUpdated": "Last updated: February 2026",
-        "legal.privacy.sections": [
-          {
-            heading: "1. Information We Collect",
-            body: "When you sign in with GitHub, we receive...",
-          },
-          {
-            heading: "6. Contact",
-            body: "For privacy-related inquiries, contact us at ",
-          },
-        ],
-        "legal.privacy.contactEmail": "support@chapa.thecreativetoken.com",
-        "legal.privacy.metadataTitle": "Privacy Policy",
-        "legal.privacy.metadataDescription": "...",
-        "legal.privacy.metadataOgTitle": "Privacy Policy — Chapa",
-      };
-      return (dict[key] ?? key) as unknown as string;
-    });
-  });
-
   it("renders navbar", async () => {
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+    render(await PrivacyPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
-  it("renders h1 highlight in English", async () => {
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+  it("renders h1 highlight", async () => {
+    render(await PrivacyPage());
     expect(screen.getByText("Policy")).toBeDefined();
   });
 
-  it("renders h1 before text in English", async () => {
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
-    // h1Before is rendered as a text node — check the full heading text
+  it("renders h1 before text", async () => {
+    render(await PrivacyPage());
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain(
       "Privacy"
     );
   });
 
   it("renders last-updated note", async () => {
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+    render(await PrivacyPage());
     expect(
       screen.getByText("Last updated: February 2026")
     ).toBeDefined();
   });
 
   it("renders section heading", async () => {
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+    render(await PrivacyPage());
     expect(screen.getByText("1. Information We Collect")).toBeDefined();
   });
 
   it("renders contact email link on last section", async () => {
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+    render(await PrivacyPage());
     const link = screen.getByRole("link");
     expect(link.getAttribute("href")).toBe(
       "mailto:support@chapa.thecreativetoken.com"
     );
   });
 
-  it("renders in Spanish when locale is es", async () => {
-    vi.mocked(getServerLocale).mockResolvedValue("es");
+  it("renders with different getServerT mock (locale swap simulation)", async () => {
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       const dict: Record<string, unknown> = {
         "legal.privacy.h1Before": "Política de ",
@@ -138,7 +112,7 @@ describe("PrivacyPage", () => {
     });
 
     render(
-      await PrivacyPage({ searchParams: Promise.resolve({ lang: "es" }) })
+      await PrivacyPage()
     );
     expect(screen.getByText("Privacidad")).toBeDefined();
     expect(
@@ -151,8 +125,7 @@ describe("PrivacyPage", () => {
 });
 
 describe("PrivacyPage generateMetadata", () => {
-  it("returns English metadata by default", async () => {
-    vi.mocked(getServerLocale).mockResolvedValue("en");
+  it("returns metadata with title and description (synchronous, no locale param)", async () => {
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       const dict: Record<string, unknown> = {
         "legal.privacy.metadataTitle": "Privacy Policy",
@@ -163,30 +136,10 @@ describe("PrivacyPage generateMetadata", () => {
       return (dict[key] ?? key) as unknown as string;
     });
 
+    // generateMetadata is synchronous (no async, no locale param)
     const { generateMetadata } = await import("./page");
-    const metadata = await generateMetadata({
-      searchParams: Promise.resolve({}),
-    });
+    const metadata = generateMetadata();
     expect(metadata.title).toBe("Privacy Policy");
     expect(metadata.description).toContain("Privacy Policy for Chapa");
-  });
-
-  it("returns Spanish metadata when locale is es", async () => {
-    vi.mocked(getServerLocale).mockResolvedValue("es");
-    vi.mocked(getServerT).mockReturnValue((key: string) => {
-      const dict: Record<string, unknown> = {
-        "legal.privacy.metadataTitle": "Política de Privacidad",
-        "legal.privacy.metadataDescription":
-          "Política de Privacidad de Chapa.",
-        "legal.privacy.metadataOgTitle": "Política de Privacidad — Chapa",
-      };
-      return (dict[key] ?? key) as unknown as string;
-    });
-
-    const { generateMetadata } = await import("./page");
-    const metadata = await generateMetadata({
-      searchParams: Promise.resolve({ lang: "es" }),
-    });
-    expect(metadata.title).toBe("Política de Privacidad");
   });
 });

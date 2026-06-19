@@ -208,14 +208,15 @@ SHARED_CONTEXT_END`,
 Analyze build output, bundle sizes, and performance characteristics. Produce a markdown report.
 
 Steps:
-1. Run \`pnpm run build\` and capture the output. Parse the route table for First Load JS sizes.
-2. Flag any route or chunk exceeding 500KB First Load JS.
-3. Check for unnecessary "use client" directives that pull server code into client bundles.
-4. Run \`npx knip\` to detect unused exports that bloat the bundle.
-5. Check for render-blocking resources: large synchronous imports, missing dynamic imports for heavy components.
-6. Analyze the badge SVG route (\`/u/[handle]/badge.svg\`) for response time characteristics — check caching headers.
-7. Check font loading: verify \`next/font\` is used (no external font requests that block render).
-8. Look for CLS risks: images without explicit dimensions, dynamic content above the fold.
+1. Run \`pnpm install --frozen-lockfile\` before measuring build output so local \`node_modules\` matches \`pnpm-lock.yaml\`. If install fails because the lockfile is stale, report it instead of measuring a stale dependency tree.
+2. Run \`pnpm run build\` and capture the output. Parse the route table for First Load JS sizes.
+3. Flag any route or chunk exceeding 500KB First Load JS.
+4. Check for unnecessary "use client" directives that pull server code into client bundles.
+5. Run \`npx knip\` to detect unused exports that bloat the bundle.
+6. Check for render-blocking resources: large synchronous imports, missing dynamic imports for heavy components.
+7. Analyze the badge SVG route (\`/u/[handle]/badge.svg\`) for response time characteristics — check caching headers.
+8. Check font loading: verify \`next/font\` is used (no external font requests that block render).
+9. Look for CLS risks: images without explicit dimensions, dynamic content above the fold.
 
 Output format:
 \`\`\`markdown
@@ -276,7 +277,7 @@ Steps:
 3. Check docs/impact-v4.md and docs/svg-design.md exist and are non-empty.
 4. Verify all API routes in apps/web/app/api/ have at least a brief description somewhere in docs.
 5. Check for exported functions in lib/ that lack JSDoc comments on complex logic.
-6. Compare environment variables listed in CLAUDE.md with actual usage in the codebase (grep for process.env.).
+6. Compare environment variables listed in CLAUDE.md with actual usage in the codebase (grep for process.env.). Do not flag direct NEXT_PUBLIC_* reads in client components; Next.js client components may require direct public env access for build-time inlining. Server modules should use lib/env accessors.
 7. Check that docs/agents/shared-context.md exists and has recent entries.
 8. Look for TODO/FIXME comments that reference missing documentation.
 9. Verify README.md exists and has basic setup instructions.

@@ -46,6 +46,7 @@
   ],
   "exclude": [
     "node_modules",
-    "node_modules.nosync"
+    "node_modules.nosync",
+    ".worktrees"
   ]
 }

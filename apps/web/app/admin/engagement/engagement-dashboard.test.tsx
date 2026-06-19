@@ -253,12 +253,9 @@ describe("EngagementDashboard", () => {
     render(<EngagementDashboard />);
 
     // Should still render without crashing — error is silently caught
-    await waitFor(() => {
-      expect(screen.getByText(/engagement/)).toBeDefined();
-    });
-    // No campaign card should be shown
+    // findByText awaits the async re-render after the rejected fetch settles
     expect(
-      screen.getByText(/No engagement template created yet/),
+      await screen.findByText(/No engagement template created yet/),
     ).toBeDefined();
   });
 
@@ -276,12 +273,9 @@ describe("EngagementDashboard", () => {
 
     render(<EngagementDashboard />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/engagement/)).toBeDefined();
-    });
-    // No campaign template shown
+    // findByText awaits the async re-render after the non-ok response settles
     expect(
-      screen.getByText(/No engagement template created yet/),
+      await screen.findByText(/No engagement template created yet/),
     ).toBeDefined();
   });
 

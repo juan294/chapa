@@ -9,7 +9,7 @@ const SOURCE = fs.readFileSync(
 
 describe("coming-soon loading.tsx — loading boundary", () => {
   it("exports a default function", () => {
-    expect(SOURCE).toContain("export default function");
+    expect(SOURCE).toMatch(/export default (async )?function/);
   });
 
   it("has role='status' for accessibility", () => {
@@ -24,8 +24,8 @@ describe("coming-soon loading.tsx — loading boundary", () => {
     expect(SOURCE).toContain("animate-pulse");
   });
 
-  it("uses useTranslation for i18n", () => {
-    expect(SOURCE).toContain("useTranslation");
+  it("uses server-side i18n (getServerT)", () => {
+    expect(SOURCE).toContain("getServerT");
   });
 
   it("uses common.loading key", () => {

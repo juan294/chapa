@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { isInsightsEnabled } from "@/lib/feature-flags";
 import {
   isValidInsightsUpload,
@@ -17,11 +18,28 @@ import { log } from "@/lib/log";
 /**
  * POST /api/insights — Upload an insights report and compute craft score.
  * Auth: Bearer token (CLI token or GitHub PAT) or session cookie.
- * Rate limited: 10 requests/handle/24h.
+ * Rate limited: 10 req/IP/hour (before auth) + 10 req/handle/24h (after auth).
+ *
+ * BE-H2 (#860): IP rate-limit runs BEFORE resolveRequestAuth to prevent
+ * unauthenticated callers from triggering outbound GitHub calls.
  */
 export const POST = withErrorCapture("/api/insights", async (request: NextRequest) => {
   if (!(await isInsightsEnabled())) {
     return NextResponse.json({ error: "Feature not available" }, { status: 403 });
+  }
+
+  // BE-H2 (#860): IP rate-limit BEFORE auth.
+  const ip = getClientIp(request);
+  const ipRlKey =
+    ip === NO_TRUSTED_IP
+      ? "ratelimit:insights-ip:no-ip"
+      : `ratelimit:insights-ip:${ip}`;
+  const ipRl = await rateLimit(ipRlKey, 10, 3600);
+  if (!ipRl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "3600" } },
+    );
   }
 
   const auth = await resolveRequestAuth(request);

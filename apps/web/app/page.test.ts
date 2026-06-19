@@ -22,19 +22,17 @@ describe("Landing page (server component)", () => {
     });
   });
 
-  describe("dynamic rendering (i18n requires per-request locale)", () => {
-    it("exports dynamic = 'force-dynamic' (replaces revalidate)", () => {
-      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
-    });
-
-    it("does NOT export revalidate (incompatible with force-dynamic)", () => {
-      expect(SOURCE).not.toContain("export const revalidate");
+  describe("static/ISR rendering (no per-request APIs)", () => {
+    it("is static/ISR with force-static directive", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
+      expect(SOURCE).toContain("export const revalidate");
+      expect(SOURCE).toContain("export const dynamic = 'force-static'");
     });
   });
 
   describe("rendering", () => {
-    it("renders Navbar", () => {
-      expect(SOURCE).toContain("Navbar");
+    it("renders NavbarClient (ISR-compatible, no headers() call)", () => {
+      expect(SOURCE).toContain("NavbarClient");
     });
 
     it("renders main content area", () => {
@@ -90,8 +88,9 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("getServerT");
     });
 
-    it("uses getServerLocale() for locale resolution", () => {
-      expect(SOURCE).toContain("getServerLocale");
+    it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
+      expect(SOURCE).not.toContain("getServerLocale");
+      expect(SOURCE).toContain("DEFAULT_LOCALE");
     });
 
     it("renders LocaleSync for sticky lang override", () => {

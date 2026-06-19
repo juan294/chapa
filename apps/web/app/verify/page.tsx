@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
-import { Navbar } from "@/components/Navbar";
+import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { VerifyForm } from "./VerifyForm";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const dynamic = 'force-static';
 
-export async function generateMetadata({
-  searchParams,
-}: {
-  searchParams: Promise<{ lang?: string }>;
-}): Promise<Metadata> {
-  const { lang } = await searchParams;
-  const locale = await getServerLocale(lang);
-  const t = getServerT(locale);
+export function generateMetadata(): Metadata {
+  const t = getServerT(DEFAULT_LOCALE);
   return {
     title: t('verify.title') as string,
     description: t('verify.description') as string,
@@ -21,19 +17,13 @@ export async function generateMetadata({
   };
 }
 
-export default async function VerifyInputPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ lang?: string }>;
-}) {
-  const { lang } = await searchParams;
-  const locale = await getServerLocale(lang);
-  const t = getServerT(locale);
+export default async function VerifyInputPage() {
+  const t = getServerT(DEFAULT_LOCALE);
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">
-      <LocaleSync queryLang={lang} />
-      <Navbar />
+      <LocaleSync />
+      <NavbarClient />
       <main id="main-content" className="mx-auto max-w-2xl px-6 pt-32 pb-16">
         <div className="animate-fade-in-up">
           {/* Terminal command line */}

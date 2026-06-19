@@ -133,6 +133,26 @@ describe("GET /u/[handle]/og-image", () => {
     expect(mockCacheGet).toHaveBeenCalledWith("og-image:v2:testuser:2026-02-14");
   });
 
+  it("PE-L1: warm-cache hit skips the rate-limit round-trip entirely", async () => {
+    // Cache hit — rate limiter must NOT be called (deferred to miss branch only)
+    mockCacheGet.mockResolvedValue(FAKE_PNG_BASE64);
+
+    const [req, ctx] = makeRequest("testuser");
+    const res = await GET(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("PE-L1: rate limiter is still called on a cache miss", async () => {
+    mockCacheGet.mockResolvedValue(null);
+
+    const [req, ctx] = makeRequest("testuser");
+    await GET(req, ctx);
+
+    expect(mockRateLimit).toHaveBeenCalledOnce();
+  });
+
   it("renders the OG image from displayImpact, not rawImpact", async () => {
     const [req, ctx] = makeRequest("testuser");
     const res = await GET(req, ctx);

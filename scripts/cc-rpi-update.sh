@@ -66,17 +66,23 @@ log_info "Blueprint: ${CC_RPI_PATH}"
 
 while [ ${RETRY_COUNT} -lt ${MAX_RETRIES} ]; do
   if claude -p "${PROMPT}" \
-    --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git *)" \
+    --allowedTools "Read,Write,Edit,Glob,Grep,Bash(git add*),Bash(git commit*),Bash(git diff*),Bash(git log*),Bash(git status*)" \
     --output-format text \
     > "${REPORT_FILE}" 2>&1; then
+    # Primary validation: first non-empty line matches a known report opener.
+    # Secondary validation: the explicit success string appears anywhere in the
+    # file — handles LLM preamble variants ("The local cc-rpi…", "The cc-rpi
+    # blueprint HEAD…", etc.) that precede the required status line.
     if ! validate_report_file \
       "${REPORT_FILE}" \
       "cc-rpi-update" \
-      "^(# |\`\`\`markdown|cc-rpi sync: already up to date as of |The local cc-rpi)"; then
-      RETRY_COUNT=$((RETRY_COUNT + 1))
-      log_error "Attempt ${RETRY_COUNT} produced invalid report output. Retrying in 10s..."
-      sleep 10
-      continue
+      "^(# |\`\`\`markdown|cc-rpi sync: already up to date as of )"; then
+      if ! grep -q "cc-rpi sync: already up to date as of" "${REPORT_FILE}"; then
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        log_error "Attempt ${RETRY_COUNT} produced invalid report output. Retrying in 10s..."
+        sleep 10
+        continue
+      fi
     fi
     log_info "Report written to ${REPORT_FILE}"
     log_info "=== cc-rpi Blueprint Sync complete ==="

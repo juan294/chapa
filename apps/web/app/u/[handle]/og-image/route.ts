@@ -31,18 +31,7 @@ export async function GET(
 ) {
   const { handle } = await params;
 
-  const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:og:${ip}`, 30, 60);
-  if (!rl.allowed) {
-    return new NextResponse("Too many requests. Please try again later.", {
-      status: 429,
-      headers: {
-        "Content-Type": "text/plain",
-        "Retry-After": "60",
-      },
-    });
-  }
-
+  // Validate handle before any cache/rate-limit work
   if (!isValidHandle(handle)) {
     return new NextResponse("Invalid handle", { status: 400 });
   }
@@ -50,7 +39,8 @@ export async function GET(
   const today = toDateString(new Date());
   const ogCacheKey = `og-image:v2:${handle}:${today}`;
 
-  // Try cached PNG first
+  // PE-L1: Cache-first — serve warm-cache PNG without the rate-limit round-trip.
+  // Rate limiting is deferred to the cache-MISS branch (expensive path only).
   try {
     const cachedBase64 = await cacheGet<string>(ogCacheKey);
     if (cachedBase64) {
@@ -65,6 +55,19 @@ export async function GET(
     }
   } catch {
     // Redis error — fall through to generation
+  }
+
+  // Cache miss: apply rate limit before triggering the expensive render path.
+  const ip = getClientIp(request);
+  const rl = await rateLimit(`ratelimit:og:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return new NextResponse("Too many requests. Please try again later.", {
+      status: 429,
+      headers: {
+        "Content-Type": "text/plain",
+        "Retry-After": "60",
+      },
+    });
   }
 
   try {

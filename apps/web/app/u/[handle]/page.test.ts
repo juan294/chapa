@@ -98,8 +98,9 @@ describe("SharePage", () => {
   });
 
   describe("Twitter meta description", () => {
-    it("uses curiosity-driven description for Twitter cards", () => {
-      expect(SOURCE).toContain("What does your developer DNA look like");
+    it("uses i18n key for Twitter card description (sharePage.metadataDescription)", () => {
+      // Description is now loaded from i18n — not hardcoded
+      expect(SOURCE).toContain("sharePage.metadataDescription");
     });
   });
 

@@ -23,9 +23,14 @@ vi.mock("next/link", () => ({
     <a href={href} {...props}>{children}</a>,
 }));
 
-vi.mock("@/lib/feature-flags", () => ({
+vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => false),
   isInsightsEnabledSync: vi.fn(() => false),
+  // Platform flags default to enabled so existing status-fetch tests behave as
+  // before; the gating test (#885) overrides these to false.
+  isBitbucketEnabledSync: vi.fn(() => true),
+  isCodebergEnabledSync: vi.fn(() => true),
+  isGitlabEnabledSync: vi.fn(() => true),
 }));
 
 const mockClearSessionCache = vi.hoisted(() => vi.fn());
@@ -34,7 +39,7 @@ vi.mock("@/hooks/useSession", () => ({
 }));
 
 // Static import gets the mocked module (vi.mock is hoisted)
-import * as featureFlags from "@/lib/feature-flags";
+import * as featureFlags from "@/lib/feature-flags-sync";
 
 let dropdownOpen = false;
 const setIsOpenMock = vi.fn((updater: boolean | ((prev: boolean) => boolean)) => {
@@ -261,6 +266,56 @@ describe("UserMenu — Codeberg integration", () => {
   });
 });
 
+describe("UserMenu — GitLab integration", () => {
+  it("fetches GitLab status on mount (server decides if enabled)", () => {
+    expect(SOURCE).toContain("fetchPlatformStatus");
+    expect(SOURCE).toContain('"gitlab"');
+  });
+
+  it("renders Link GitLab item when status is loaded", () => {
+    expect(SOURCE).toContain("glStatus");
+    expect(SOURCE).toContain("userMenu.linkGitlab");
+    expect(SOURCE).toContain('href="/api/auth/gitlab/connect"');
+  });
+
+  it("renders GitLab linked state with remoteLogin and Unlink button", () => {
+    expect(SOURCE).toContain("glStatus.remoteLogin");
+    expect(SOURCE).toContain("/api/auth/gitlab/disconnect");
+    expect(SOURCE).toContain("showGlUnlinkConfirm");
+  });
+
+  it("uses inline GitLab SVG logo (no icon library)", () => {
+    // The GitLab tanuki logo path is distinctive
+    expect(SOURCE).toContain("m23.6004");
+    expect(SOURCE).toContain("GitlabIcon");
+  });
+
+  it("GitLab section appears after Codeberg and before Admin Panel", () => {
+    const codebergIdx = SOURCE.indexOf("userMenu.linkCodeberg");
+    const gitlabIdx = SOURCE.indexOf("userMenu.linkGitlab");
+    const adminIdx = SOURCE.indexOf("userMenu.adminPanel");
+    expect(codebergIdx).toBeLessThan(gitlabIdx);
+    expect(gitlabIdx).toBeLessThan(adminIdx);
+  });
+
+  it("GitLab unlink opens confirmation dialog instead of directly unlinking", () => {
+    expect(SOURCE).toContain("setShowGlUnlinkConfirm(true)");
+    expect(SOURCE).toContain("open={showGlUnlinkConfirm}");
+  });
+
+  it("ConfirmDialog has correct props for GitLab unlink", () => {
+    expect(SOURCE).toContain("userMenu.confirmUnlinkGitlabTitle");
+    expect(SOURCE).toContain("handleUnlinkGitlab");
+    expect(SOURCE).toContain("glUnlinkLoading");
+  });
+
+  it("GitLab unlink handler calls disconnect endpoint", () => {
+    expect(SOURCE).toContain("/api/auth/gitlab/disconnect");
+    expect(SOURCE).toContain("setGlStatus");
+    expect(SOURCE).toContain("setGlUnlinkLoading");
+  });
+});
+
 describe("UserMenu — #520 aria-label on dropdown menu", () => {
   it("dropdown menu has aria-label 'User menu options'", () => {
     expect(SOURCE).toContain("aria.userMenuOptions");
@@ -274,6 +329,10 @@ describe("UserMenu — #521 distinguishing aria-labels on Unlink buttons", () =>
 
   it("Codeberg Unlink button has aria-label 'Unlink Codeberg account'", () => {
     expect(SOURCE).toContain("aria.unlinkCodeberg");
+  });
+
+  it("GitLab Unlink button has aria-label 'Unlink GitLab account'", () => {
+    expect(SOURCE).toContain("aria.unlinkGitlab");
   });
 });
 
@@ -314,20 +373,23 @@ describe("UserMenu — page refresh after unlink", () => {
     expect(SOURCE).toContain("next/navigation");
   });
 
-  it("calls router.refresh() after successful Bitbucket unlink", () => {
-    // Extract the handleUnlinkBitbucket function body
-    const fnStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
-    const fnEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
+  it("calls router.refresh() after a successful unlink (shared helper)", () => {
+    // The unlink flow is collapsed into the shared unlinkPlatform helper (#884),
+    // which performs the success transition (cache clear + router.refresh()).
+    const fnStart = SOURCE.indexOf("const unlinkPlatform");
+    const fnEnd = SOURCE.indexOf("async function handleUnlinkBitbucket");
     const fnBody = SOURCE.slice(fnStart, fnEnd);
     expect(fnBody).toContain("router.refresh()");
   });
 
-  it("calls router.refresh() after successful Codeberg unlink", () => {
-    // Extract the handleUnlinkCodeberg function body
-    const fnStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
-    const fnEnd = SOURCE.indexOf("const fallbackLetter");
-    const fnBody = SOURCE.slice(fnStart, fnEnd);
-    expect(fnBody).toContain("router.refresh()");
+  it("Bitbucket and Codeberg handlers delegate to the shared unlink helper", () => {
+    const bbStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
+    const bbEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    expect(SOURCE.slice(bbStart, bbEnd)).toContain("unlinkPlatform({");
+
+    const cbStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
+    const cbEnd = SOURCE.indexOf("async function handleUnlinkGitlab");
+    expect(SOURCE.slice(cbStart, cbEnd)).toContain("unlinkPlatform({");
   });
 });
 
@@ -349,17 +411,12 @@ describe("UserMenu — platform status cache", () => {
     expect(SOURCE).toContain("platformStatusCache.fetched");
   });
 
-  it("unlink handlers invalidate the cache", () => {
-    // Both unlink handlers should call clearPlatformStatusCache
-    const bbUnlinkStart = SOURCE.indexOf("async function handleUnlinkBitbucket");
-    const bbUnlinkEnd = SOURCE.indexOf("async function handleUnlinkCodeberg");
-    const bbBody = SOURCE.slice(bbUnlinkStart, bbUnlinkEnd);
-    expect(bbBody).toContain("clearPlatformStatusCache()");
-
-    const cbUnlinkStart = SOURCE.indexOf("async function handleUnlinkCodeberg");
-    const cbUnlinkEnd = SOURCE.indexOf("const fallbackLetter");
-    const cbBody = SOURCE.slice(cbUnlinkStart, cbUnlinkEnd);
-    expect(cbBody).toContain("clearPlatformStatusCache()");
+  it("unlink flow invalidates the cache (shared helper)", () => {
+    // The shared unlinkPlatform helper invalidates the cache on success (#884).
+    const helperStart = SOURCE.indexOf("const unlinkPlatform");
+    const helperEnd = SOURCE.indexOf("async function handleUnlinkBitbucket");
+    const helperBody = SOURCE.slice(helperStart, helperEnd);
+    expect(helperBody).toContain("clearPlatformStatusCache()");
   });
 
   it("exports a clearPlatformStatusCache function for external invalidation", () => {
@@ -589,6 +646,71 @@ describe("UserMenu — status fetch on mount (runtime)", () => {
       expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/status");
       expect(fetchSpy).toHaveBeenCalledWith("/api/auth/codeberg/status");
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// #885 — platform status fetches gated behind public feature flags
+// A flag-gated-off platform must NOT fire its status fetch on mount.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("UserMenu — platform fetch gated by feature flag (runtime, #885)", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+    // All three platform integrations disabled via their public flags.
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(false);
+    vi.mocked(featureFlags.isGitlabEnabledSync).mockReturnValue(false);
+
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response("{}")),
+    );
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    clearPlatformStatusCache();
+    // Restore defaults for subsequent suites.
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isCodebergEnabledSync).mockReturnValue(true);
+    vi.mocked(featureFlags.isGitlabEnabledSync).mockReturnValue(true);
+  });
+
+  it("does not fetch any platform status when all platform flags are disabled", async () => {
+    render(<UserMenu {...baseProps} />);
+
+    // Allow any effects to settle.
+    await new Promise((r) => setTimeout(r, 50));
+
+    const statusCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) =>
+        typeof url === "string" && url.includes("/api/auth/") && url.includes("/status"),
+    );
+    expect(statusCalls.length).toBe(0);
+  });
+
+  it("fetches only the enabled platform's status", async () => {
+    vi.mocked(featureFlags.isBitbucketEnabledSync).mockReturnValue(true);
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/status");
+    });
+
+    const cbCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) =>
+        typeof url === "string" && url.includes("/api/auth/codeberg/status"),
+    );
+    const glCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) =>
+        typeof url === "string" && url.includes("/api/auth/gitlab/status"),
+    );
+    expect(cbCalls.length).toBe(0);
+    expect(glCalls.length).toBe(0);
   });
 });
 

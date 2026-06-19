@@ -477,6 +477,58 @@ Repeat the same sort command to toggle between ascending and descending order.
 
 ---
 
+## Connecting Additional Platforms
+
+Chapa supports linking Bitbucket, Codeberg, and GitLab accounts to aggregate your
+activity alongside GitHub. Each platform must be enabled via its feature flag before
+the link/unlink controls appear in the User Menu.
+
+### Connecting Bitbucket
+
+Requires `NEXT_PUBLIC_BITBUCKET_ENABLED=true` and a configured Bitbucket OAuth consumer.
+
+1. Open the **User Menu** (click your avatar in the top-right nav bar).
+2. Click **"Connect Bitbucket"**.
+3. You are redirected to Bitbucket's OAuth authorization page — approve the connection.
+4. Chapa stores your Bitbucket OAuth token and begins merging Bitbucket stats
+   on the next badge refresh.
+
+To unlink: open the User Menu and click **"Disconnect Bitbucket"**. Your Bitbucket
+stats are removed from future refreshes (cached data expires within 24 hours).
+
+### Connecting Codeberg
+
+Requires `NEXT_PUBLIC_CODEBERG_ENABLED=true` and a configured Codeberg OAuth app.
+
+1. Open the **User Menu** (click your avatar in the top-right nav bar).
+2. Click **"Connect Codeberg"**.
+3. You are redirected to Codeberg's OAuth authorization page — approve the connection.
+4. Chapa stores your Codeberg OAuth token and begins merging Codeberg stats
+   on the next badge refresh.
+
+To unlink: open the User Menu and click **"Disconnect Codeberg"**.
+
+### Connecting GitLab
+
+Requires `NEXT_PUBLIC_GITLAB_ENABLED=true` and a configured GitLab OAuth application.
+
+1. Open the **User Menu** (click your avatar in the top-right nav bar).
+2. Click **"Connect GitLab"**.
+3. You are redirected to GitLab's OAuth authorization page — approve the connection.
+4. Chapa stores your GitLab OAuth token (and refresh token). GitLab access
+   tokens are short-lived; the server refreshes them automatically so the
+   connection remains active.
+5. On the next badge refresh, GitLab merge requests, commits, issues, stars,
+   and forks are merged with your other platform stats.
+
+To unlink: open the User Menu and click **"Disconnect GitLab"**.
+
+> **Note:** After connecting a new platform, force-refresh your badge by visiting
+> `/u/<handle>` and clicking **Refresh**, or run `POST /api/refresh?handle=<handle>`
+> if you have an authenticated session.
+
+---
+
 ## Language Switcher
 
 Chapa's interface is available in **Spanish** (default) and **English**.

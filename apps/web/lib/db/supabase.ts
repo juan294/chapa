@@ -5,6 +5,7 @@
  * Returns null when env vars are missing for graceful degradation.
  */
 
+import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { withTimeout } from "@/lib/async/with-timeout";
 import { getSupabaseUrl, getSupabaseServiceRoleKey } from "@/lib/env";

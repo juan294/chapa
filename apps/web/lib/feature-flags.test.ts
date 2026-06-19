@@ -15,6 +15,7 @@ vi.mock("next/cache", () => ({
 import { dbGetFeatureFlag } from "./db/feature-flags";
 import {
   isStudioEnabled,
+  isStudioEnabledSync,
   isExperimentsEnabled,
   isAgentEnabled,
   isBitbucketEnabled,
@@ -23,6 +24,8 @@ import {
   isCodebergEnabledSync,
   isInsightsEnabled,
   isInsightsEnabledSync,
+  isGitlabEnabled,
+  isGitlabEnabledSync,
   invalidateFeatureFlagCache,
   _resetFlagCache,
 } from "./feature-flags";
@@ -208,6 +211,30 @@ describe("isAgentEnabled", () => {
     const result = await isAgentEnabled("nonexistent_agent");
     expect(result).toBe(false);
   });
+
+  it("returns false when master flag lookup times out", async () => {
+    vi.useFakeTimers();
+    vi.mocked(dbGetFeatureFlag).mockReturnValue(new Promise(() => {}));
+
+    const resultPromise = isAgentEnabled("coverage_agent");
+    await vi.advanceTimersByTimeAsync(501);
+
+    await expect(resultPromise).resolves.toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("returns false when agent flag lookup times out", async () => {
+    vi.useFakeTimers();
+    vi.mocked(dbGetFeatureFlag)
+      .mockResolvedValueOnce(makeFlag("automated_agents", true))
+      .mockReturnValueOnce(new Promise(() => {}));
+
+    const resultPromise = isAgentEnabled("coverage_agent");
+    await vi.advanceTimersByTimeAsync(501);
+
+    await expect(resultPromise).resolves.toBe(false);
+    vi.useRealTimers();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -363,6 +390,82 @@ describe("isCodebergEnabled", () => {
 });
 
 // ---------------------------------------------------------------------------
+// isGitlabEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isGitlabEnabledSync", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns false when env var not set", () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", undefined);
+    expect(isGitlabEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "true");
+    expect(isGitlabEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "false");
+    expect(isGitlabEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "  true  ");
+    expect(isGitlabEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isGitlabEnabled (async, DB-backed)
+// ---------------------------------------------------------------------------
+
+describe("isGitlabEnabled", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    _resetFlagCache();
+  });
+
+  it("returns DB flag value when available", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("gitlab_integration", true),
+    );
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when DB flag is disabled", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(
+      makeFlag("gitlab_integration", false),
+    );
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(false);
+  });
+
+  it("falls back to env var when DB unavailable", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", "true");
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(true);
+  });
+
+  it("returns false when both DB and env var are absent", async () => {
+    vi.mocked(dbGetFeatureFlag).mockResolvedValue(null);
+    vi.stubEnv("NEXT_PUBLIC_GITLAB_ENABLED", undefined);
+
+    const result = await isGitlabEnabled();
+    expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isInsightsEnabledSync
 // ---------------------------------------------------------------------------
 
@@ -389,6 +492,36 @@ describe("isInsightsEnabledSync", () => {
   it("handles whitespace", () => {
     vi.stubEnv("NEXT_PUBLIC_INSIGHTS_ENABLED", "  true  ");
     expect(isInsightsEnabledSync()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isStudioEnabledSync
+// ---------------------------------------------------------------------------
+
+describe("isStudioEnabledSync", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns false when env var not set", () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", undefined);
+    expect(isStudioEnabledSync()).toBe(false);
+  });
+
+  it('returns true when env var is "true"', () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "true");
+    expect(isStudioEnabledSync()).toBe(true);
+  });
+
+  it('returns false when env var is "false"', () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "false");
+    expect(isStudioEnabledSync()).toBe(false);
+  });
+
+  it("handles whitespace", () => {
+    vi.stubEnv("NEXT_PUBLIC_STUDIO_ENABLED", "  true  ");
+    expect(isStudioEnabledSync()).toBe(true);
   });
 });
 

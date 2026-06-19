@@ -27,6 +27,17 @@ export default defineConfig({
         "**/node_modules.nosync/**",
         "**/__fixtures__/**",
         "**/fonts/**",
+        // Type-only modules: no runtime behaviour to measure
+        "packages/shared/src/types.ts",
+        "packages/shared/src/stats-schema.ts",
+        // i18n dictionaries: pure data, no branching logic
+        "apps/web/lib/i18n/dictionaries/**",
+        // Index re-exports: just re-export other modules
+        "packages/shared/src/index.ts",
+        "apps/web/lib/*/index.ts",
+        // Test helpers and stubs
+        "test/**",
+        "apps/web/test/**",
       ],
       thresholds: {
         statements: 75,
@@ -40,6 +51,7 @@ export default defineConfig({
     alias: {
       "@/": path.resolve(__dirname, "apps/web") + "/",
       "@chapa/shared": path.resolve(__dirname, "packages/shared/src"),
+      "server-only": path.resolve(__dirname, "test/stubs/server-only.ts"),
     },
   },
 });

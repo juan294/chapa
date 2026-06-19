@@ -63,9 +63,11 @@ describe("AuthorTypewriter", () => {
       expect(container.querySelector(".test-class")).not.toBeNull();
     });
 
-    it("outer wrapper has role=presentation", () => {
-      render(<AuthorTypewriter />);
-      expect(screen.getByRole("presentation")).toBeDefined();
+    it("outer wrapper has no role attribute (UX-L3: removed conflicting role)", () => {
+      const { container } = render(<AuthorTypewriter />);
+      const wrapper = container.firstElementChild as HTMLElement;
+      expect(wrapper).not.toBeNull();
+      expect(wrapper.getAttribute("role")).toBeNull();
     });
   });
 
@@ -162,7 +164,7 @@ describe("AuthorTypewriter", () => {
   describe("className prop", () => {
     it("renders without className when not provided", () => {
       const { container } = render(<AuthorTypewriter />);
-      const wrapper = container.querySelector("[role='presentation']");
+      const wrapper = container.firstElementChild as HTMLElement;
       expect(wrapper).not.toBeNull();
       // Should have base classes but no extra className
       expect(wrapper!.className).toContain("group");
@@ -170,7 +172,7 @@ describe("AuthorTypewriter", () => {
 
     it("appends className to wrapper", () => {
       const { container } = render(<AuthorTypewriter className="extra" />);
-      const wrapper = container.querySelector("[role='presentation']");
+      const wrapper = container.firstElementChild as HTMLElement;
       expect(wrapper!.className).toContain("extra");
     });
   });
@@ -188,13 +190,14 @@ describe("AuthorTypewriter", () => {
   describe("click/keydown propagation", () => {
     it("stops click propagation on wrapper via React synthetic events", () => {
       const outerHandler = vi.fn();
-      render(
+      const { container } = render(
         <div onClick={outerHandler}>
           <AuthorTypewriter />
         </div>,
       );
 
-      const wrapper = screen.getByRole("presentation");
+      // container.firstElementChild is the outer div; its first child is the AuthorTypewriter root
+      const wrapper = container.firstElementChild!.firstElementChild as HTMLElement;
       fireEvent.click(wrapper);
 
       expect(outerHandler).not.toHaveBeenCalled();
@@ -202,39 +205,39 @@ describe("AuthorTypewriter", () => {
 
     it("stops keydown propagation for Enter key", () => {
       const outerKeyDown = vi.fn();
-      render(
+      const { container } = render(
         <div onKeyDown={outerKeyDown}>
           <AuthorTypewriter />
         </div>,
       );
 
-      const wrapper = screen.getByRole("presentation");
+      const wrapper = container.firstElementChild!.firstElementChild as HTMLElement;
       fireEvent.keyDown(wrapper, { key: "Enter" });
       expect(outerKeyDown).not.toHaveBeenCalled();
     });
 
     it("stops keydown propagation for Space key", () => {
       const outerKeyDown = vi.fn();
-      render(
+      const { container } = render(
         <div onKeyDown={outerKeyDown}>
           <AuthorTypewriter />
         </div>,
       );
 
-      const wrapper = screen.getByRole("presentation");
+      const wrapper = container.firstElementChild!.firstElementChild as HTMLElement;
       fireEvent.keyDown(wrapper, { key: " " });
       expect(outerKeyDown).not.toHaveBeenCalled();
     });
 
     it("does not stop keydown propagation for other keys", () => {
       const outerKeyDown = vi.fn();
-      render(
+      const { container } = render(
         <div onKeyDown={outerKeyDown}>
           <AuthorTypewriter />
         </div>,
       );
 
-      const wrapper = screen.getByRole("presentation");
+      const wrapper = container.firstElementChild!.firstElementChild as HTMLElement;
       fireEvent.keyDown(wrapper, { key: "Tab" });
       expect(outerKeyDown).toHaveBeenCalled();
     });

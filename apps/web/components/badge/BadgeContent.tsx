@@ -174,17 +174,17 @@ export function BadgeContent({
                     key={scale}
                     points={`70,${70 - 55 * scale} ${70 + 55 * scale},70 70,${70 + 55 * scale} ${70 - 55 * scale},70`}
                     fill="none"
-                    stroke="rgba(139,92,246,0.12)"
+                    stroke="var(--color-stroke)"
                     strokeWidth="1"
                   />
                 ))}
                 {/* Axes */}
-                <line x1="70" y1="15" x2="70" y2="125" stroke="rgba(139,92,246,0.08)" strokeWidth="1" />
-                <line x1="15" y1="70" x2="125" y2="70" stroke="rgba(139,92,246,0.08)" strokeWidth="1" />
+                <line x1="70" y1="15" x2="70" y2="125" stroke="var(--color-stroke)" strokeWidth="1" />
+                <line x1="15" y1="70" x2="125" y2="70" stroke="var(--color-stroke)" strokeWidth="1" />
                 {/* Data polygon */}
                 <polygon
                   points={`70,${70 - (impact.dimensions.delivery / 100) * 55} ${70 + (impact.dimensions.quality / 100) * 55},70 70,${70 + (impact.dimensions.consistency / 100) * 55} ${70 - (impact.dimensions.breadth / 100) * 55},70`}
-                  fill="rgba(139,92,246,0.20)"
+                  fill="var(--color-purple-tint)"
                   stroke={WARM_AMBER.accent}
                   strokeWidth="1.5"
                 />

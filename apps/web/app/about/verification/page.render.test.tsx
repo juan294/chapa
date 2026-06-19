@@ -6,6 +6,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
@@ -15,7 +19,6 @@ vi.mock("@/components/GlobalCommandBarLazy", () => ({
 }));
 
 vi.mock("@/lib/i18n/server", () => ({
-  getServerLocale: vi.fn().mockResolvedValue("en"),
   getServerT: vi.fn().mockReturnValue((key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const map: Record<string, any> = {
@@ -92,25 +95,25 @@ afterEach(cleanup);
 describe("VerificationPage render", () => {
   it("renders the page heading", async () => {
     const { default: VerificationPage } = await import("./page");
-    render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    render(await VerificationPage());
     expect(screen.getByText("Badge Verification")).toBeDefined();
   });
 
   it("renders the navbar", async () => {
     const { default: VerificationPage } = await import("./page");
-    render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    render(await VerificationPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders the command bar", async () => {
     const { default: VerificationPage } = await import("./page");
-    render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    render(await VerificationPage());
     expect(screen.getByTestId("command-bar")).toBeDefined();
   });
 
   it("renders section headings about how verification works", async () => {
     const { default: VerificationPage } = await import("./page");
-    render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    render(await VerificationPage());
     expect(screen.getByText("Why verification exists")).toBeDefined();
     expect(screen.getByText("How it works")).toBeDefined();
     expect(screen.getByText("What data is signed")).toBeDefined();
@@ -118,22 +121,38 @@ describe("VerificationPage render", () => {
 
   it("renders tables with verification field data", async () => {
     const { default: VerificationPage } = await import("./page");
-    const { container } = render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    const { container } = render(await VerificationPage());
     const tables = container.querySelectorAll("table");
     expect(tables.length).toBeGreaterThan(0);
   });
 
   it("renders the ShieldCheckIcon and ArrowRightIcon in CTA", async () => {
     const { default: VerificationPage } = await import("./page");
-    const { container } = render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    const { container } = render(await VerificationPage());
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
   });
 
   it("renders the CTA section", async () => {
     const { default: VerificationPage } = await import("./page");
-    render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    render(await VerificationPage());
     expect(screen.getByText("Try it yourself")).toBeDefined();
     expect(screen.getByText("Verify a Badge")).toBeDefined();
+  });
+});
+
+describe("VerificationPage generateMetadata", () => {
+  it("returns metadata with title and openGraph for the default locale", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = generateMetadata();
+    expect(meta.title).toBeTruthy();
+    expect(meta.openGraph).toBeDefined();
+    expect(meta.twitter).toBeDefined();
+  });
+
+  it("returns metadata when lang param is provided", async () => {
+    const { generateMetadata } = await import("./page");
+    const meta = generateMetadata();
+    expect(meta.title).toBeTruthy();
   });
 });

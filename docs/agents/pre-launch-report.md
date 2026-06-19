@@ -1,578 +1,472 @@
 # Pre-Launch Codebase Audit
-> Generated on 2026-04-23 | Branch: `develop` | 8 domain tracks
+> Generated on 2026-06-19 | Branch: `develop` | 8 parallel specialists
 > Focus: comprehensive
 
 ## 1. Executive Summary
-Chapa is not in obvious collapse: the local verification baseline is strong, the repo has broad automated coverage, and the product has real operational scaffolding. But this is not ready for launch yet. The main risks cluster around green CI that does not prove the runtime works, a public share page that does not meet the product contract, public-route performance that is too heavy for a launch surface, and backend/email flows that are still missing concurrency and idempotency controls.
 
-- Top 3 strengths:
-  - Local verification is healthy: `pnpm run typecheck`, `pnpm run lint`, `pnpm run test`, `pnpm run build`, and `pnpm audit` all passed during this audit.
-  - Test breadth is real: the suite passed 402 test files / 7165 tests, and the repo has coverage across auth, API routes, render paths, admin flows, cron routes, and accessibility checks.
-  - The codebase has strong baseline discipline: typecheck passed, `pnpm run check:circular` reported no circular dependencies, and the repo already contains runbooks, health endpoints, accepted-risk docs, and deployment workflow structure.
-- Top 5 risks:
-  - `UX-B1`: the public share page does not satisfy the repo’s own requirement to show badge + breakdown + embed snippet to public visitors.
-  - `DO-H1` / `QA-H1`: CI can go green without proving launch-critical runtime integrations actually work.
-  - `FE-H1` / `FE-H2` / `PE-H1` / `PE-H2`: public routes are shipping too much client runtime before page-specific value is delivered.
-  - `PE-H3` / `PE-M1` / `PE-M2`: badge/share hot paths still expose origin fan-out and high tail-latency risk under cache misses or slow Redis.
-  - `BE-H2` / `BE-M3` / `SE-L2`: outbound email paths are not concurrency-safe or idempotent enough for public launch.
-- Verdict: NOT READY
+Chapa is a mature, well-architected codebase that is close to launch-ready. The pnpm monorepo is clean (zero circular deps across 730 files, zero unused files/exports per knip, zero `any`/`ts-ignore`), the test posture is exceptional (7,738 tests across 454 files, 100% pass, typecheck + lint clean), and the security baseline is strong (AES-256-GCM sessions + tokens, OAuth CSRF state with constant-time compare, full SVG escaping, SSRF-guarded avatar fetch). The dominant systemic risks are **operational, not structural**: the production CI gate on `main` is misconfigured (required-check contexts don't match the actual check names), multi-platform pagination silently corrupts scores on rate-limit, and a recurring i18n leak ships English into the Spanish-default UI on the highest-traffic public surfaces.
 
-There is now one confirmed `launch-blocker` in this pass: the public share page does not match the product contract documented in `CLAUDE.md`, because public visitors do not get the promised breakdown and embed experience. Combined with the still-permissive launch validation path, shipping today would be knowingly launching a product whose core public artifact is both under-validated and incomplete.
+**Top 3 strengths (evidence-backed):**
+1. Test & type health — 7,738 passing tests, every critical path (scoring, SVG, OAuth callback, cache) covered including failure modes; typecheck + lint clean (QA Domain Model).
+2. Architecture hygiene — no circular deps, env access funneled through `lib/env.ts`, `packages/shared` a pure leaf, zero `any` (AR Domain Model).
+3. Security defense-in-depth — CSRF state + single-use nonce + `timingSafeEqual`, encrypted sessions/tokens, escaped SVG, fail-secure admin/cron/webhook auth (SE Domain Model).
+
+**Top 5 risks (by blast radius):**
+1. **DO-B1** — production merge gate is not actually enforcing today's CI (context-name mismatch) + `enforce_admins:false`.
+2. **BE-H1** — rate-limit (429/5xx) mid-pagination is cached as a successful empty result → silently deflated scores persisted to permanent snapshots.
+3. **BE-H2** — PAT-fallback auth lets bogus Bearer tokens burn the shared GitHub quota (resource amplification).
+4. **FE-H1/FE-H2** — every content/SEO page is `force-dynamic` (no CDN cache) and both full i18n dictionaries ship to every client.
+5. **UX-H1/H2/H3** — English leaks into Spanish UI on archetype pages, share social cards, and the public dashboard a11y tree.
+
+**Verdict: NOT READY** — one launch-blocker (DO-B1) makes the production gate unreliable. Per the operator directive, ALL findings (all severities) are being remediated pre-launch rather than deferred to post-launch waves.
 
 ## 2. System Architecture Overview
-Chapa is a two-package workspace: `packages/shared` holds shared scoring/types contracts, and `apps/web` is the only deployable runtime. Inside `apps/web`, App Router entrypoints under `app/*` feed a shared profile pipeline: auth/session resolution in `lib/auth/*`, cache/database access in `lib/cache/*` and `lib/db/*`, provider fetch/merge work in `lib/github/*`, scoring in `lib/impact/*`, and render output in `lib/render/*`.
 
-Major modules and responsibilities:
-- `app/u/[handle]` and `app/u/[handle]/badge.svg`: public share/badge surfaces
-- `app/api/auth/*`: OAuth and session lifecycle
-- `app/api/admin/*`: admin read/write and agent/campaign controls
-- `app/api/cron/*` and `app/api/webhooks/*`: scheduled and provider-triggered background work
-- `lib/profile/*`: public/profile materialization orchestration
-- `lib/github/*`, `lib/bitbucket/*`, `lib/codeberg/*`: provider fetch and merge logic
-- `lib/email/*`: notification, audience, and campaign sending
+pnpm monorepo: `apps/web` (Next.js App Router, ~48 `route.ts` handlers + page components) + `packages/shared` (pure-logic leaf: types, scoring constants, aggregation; zero reverse deps). `apps/web/lib` (141 files) is domain-layered: `auth`, `github`/`gitlab`/`bitbucket`/`codeberg` (data acquisition), `cache` (Upstash Redis, fail-open), `impact` (pure scoring), `render` (React-to-SVG), `db` (Supabase service-role access, per-entity modules), `history`, `email`/`campaigns`, `i18n`. Env access is centralized behind ~36 typed accessors in `lib/env.ts`. Data flow: public read routes serve cached data (Redis hot path → Supabase durable fallback); the badge SVG hot path converges on `materializeProfile` (concurrent `Promise.allSettled` reads → pure `computeImpactV6` → React-to-SVG), defended by a full-response SVG cache, in-flight dedup, and a Redis render-lock.
 
-How the pieces connect:
-- Public pages and badge routes call profile materialization, which pulls cached or live provider data, scores it, renders it, and writes side effects such as snapshots and verification records.
-- Admin/campaign routes read/write Supabase rows and trigger send loops that call external email APIs.
-- Cron routes warm caches, process campaigns, and sync operational data.
-- Shared client runtime from the root layout is mounted across almost every public route.
-
-Architecture concerns:
-- `AR-M1`: `lib/github/client.ts` has become a god module with too many responsibilities.
-- `AR-M2`: route-owned `app/*` modules are being imported upward into shared layers.
-- `AR-M3`: verification reads currently have two sources of truth.
-- `AR-S1`: public traffic, admin operations, cron work, and campaign sending still share one runtime boundary.
+**Systemic architecture concerns:** (a) strong invariants (no circular deps, env centralization, pure leaf) are maintained by convention, not enforced gates (AR-S1); (b) service-role-only DB access makes route-handler authz the sole security boundary with no DB-level backstop (BE-S1).
 
 ## 3. End-to-End Flow Analysis
-Key flows reviewed:
-- Landing page -> `/api/auth/login` -> OAuth callback -> encrypted session cookie
-- `/u/[handle]` and `/u/[handle]/badge.svg` -> Redis/cache lookups -> provider fetch/merge -> scoring -> SVG/share rendering -> persistence side effects
-- Admin dashboard -> campaign CRUD -> manual campaign send
-- Cron/webhook paths -> cache warming, audience sync, campaign processing, email forwarding
 
-Request/data/control flow observations:
-- Public profile surfaces do too much request-time work on cold/cache-miss paths. GitHub fetches, cache reads, avatar retrieval, and render work are still stacked synchronously on user-facing responses.
-- CI validates a build-shaped environment, not a deployment-shaped environment. Dummy secrets and permissive smoke coverage mean green checks do not prove the launch surface actually works.
-- Email/campaign flows still behave like an ad hoc job system without durable claims or idempotency keys.
-
-Integration and boundary risks:
-- Runtime/auth config drift can silently weaken cookies or break release procedures.
-- Redis slowness/outage changes behavior in critical ways that are not always fail-open.
-- Shared client shell decisions are directly inflating public page startup cost.
+**Core conversion flow:** landing (`/`) → `/api/auth/login` (OAuth) → `/api/auth/callback` → `/generating/[handle]` → `/u/[handle]` (share). **Badge embed flow:** `/u/[handle]/badge.svg` (embedded in READMEs, fetched via GitHub Camo proxy which under-honors `s-maxage`, so origin hit rate is elevated). **Integration risks:** (1) content pages forced dynamic defeat CDN caching at the highest-traffic entry points (FE-H1); (2) multi-platform stats fetch returns partial data as success on rate-limit, corrupting cached scores (BE-H1); (3) the badge hot path pays a Redis rate-limit round-trip before the cache read (PE-M1).
 
 ## 4. Frontend / UI Findings (Staff Frontend Engineer)
-#### FE-H1 Shared global client shell is inflating the baseline JS cost of nearly every route
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/.next/diagnostics/route-bundle-stats.json:3, apps/web/.next/diagnostics/route-bundle-stats.json:109, apps/web/app/layout.tsx:4, apps/web/app/layout.tsx:125, apps/web/app/layout.tsx:131, apps/web/components/PostHogProvider.tsx:6, apps/web/components/KeyboardShortcutsListener.tsx:125, apps/web/components/ClientAnalytics.tsx:5
-- **What's happening:** Existing build diagnostics show roughly 695KB uncompressed first-load JS on mostly content routes like `/`, `/about`, and `/about/scoring`, with `/u/[handle]` even larger. The root layout mounts `ThemeProvider`, `PostHogProvider`, `KeyboardShortcutsListener`, and `ClientAnalytics` for every page, so non-essential interactive runtime is global instead of route-scoped.
-- **Why it matters:** This raises the startup cost of the entire site, not just advanced surfaces. Public launch traffic will hit landing/about/share pages first, so a heavy shared shell directly increases parse/hydration time and makes every further route optimization less effective.
-- **Recommendation:** Move non-essential client concerns out of the root shell and into route- or feature-scoped islands. Keep keyboard shortcuts and command surfaces off static marketing pages, and defer analytics behind lighter boundaries.
-- **Expected impact:** Lower first-load JS on public pages, faster hydration/interaction, and cleaner route-level bundle ownership.
-- **Effort estimate:** L
 
-#### FE-H2 The public share page is coupled to the Studio preview runtime for customized badges
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/.next/diagnostics/route-bundle-stats.json:3, apps/web/app/u/[handle]/page.tsx:69, apps/web/app/u/[handle]/page.tsx:120, apps/web/app/u/[handle]/page.tsx:190, apps/web/components/ShareBadgePreviewLazy.tsx:6, apps/web/components/ShareBadgePreview.tsx:3, apps/web/app/studio/BadgePreviewCard.tsx:22, apps/web/app/studio/BadgePreviewCard.tsx:63
-- **What's happening:** The share route server-renders inline SVG only for default configs. As soon as a saved config differs from defaults, it switches to `ShareBadgePreviewLazy` with `ssr: false`, which imports `ShareBadgePreview`, which imports the Studio-only `BadgePreviewCard` and its visual-effects stack.
-- **Why it matters:** The primary public product surface is paying for Studio runtime and a client-only render path. That makes the loading path worse for the users with customized badges and aligns with `/u/[handle]` being the heaviest public route in the current bundle stats.
-- **Recommendation:** Keep public badge rendering server-side even for custom configs, or split a slimmer share-only renderer from the Studio preview stack.
-- **Expected impact:** Smaller share-page bundles, fewer hydration dependencies on the main public route, and more predictable profile-page rendering.
-- **Effort estimate:** L
+#### FE-H1 All marketing/content pages are `force-dynamic`, defeating CDN caching under launch load
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/i18n/server.ts:11-18, apps/web/components/Navbar.tsx:20-23, apps/web/app/about/page.tsx:8, apps/web/app/archetypes/builder/page.tsx:5, apps/web/app/privacy/page.tsx:7, apps/web/app/terms/page.tsx:7, apps/web/app/about/scoring/page.tsx:8, apps/web/app/page.tsx:1
+- **What's happening:** Every content page declares `dynamic='force-dynamic'` because `getServerLocale()` calls `cookies()`+`headers()` and server `Navbar` calls `headers()`. These pages have zero per-user data.
+- **Why it matters:** Every landing/SEO visit hits origin instead of CDN edge, multiplying cold-start latency and cost and hurting TTFB exactly under traffic spikes.
+- **Recommendation:** Decouple locale from request-time APIs for static pages (render default locale statically + hydrate locale client-side as the share page already does); use `NavbarClient` on content pages; drop `force-dynamic` for `revalidate` ISR/static.
+- **Expected impact:** Content/SEO pages served from edge; large TTFB + cost reduction. **Effort:** M
 
-#### FE-M1 Studio availability is determined inconsistently between server routing and client navigation
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/feature-flags.ts:1, apps/web/lib/feature-flags.ts:61, apps/web/app/studio/page.tsx:55, apps/web/components/KeyboardShortcutsListener.tsx:187, apps/web/components/terminal/command-registry.ts:197, apps/web/components/terminal/command-registry.ts:253, apps/web/components/UserMenu.tsx:326
-- **What's happening:** The server gates `/studio` with `isStudioEnabled()`, which is DB-backed with env fallback, while client surfaces use `isStudioEnabledSync()`, which is env-only. The command bar, keyboard shortcuts, and user menu can therefore expose or hide Studio based on a different truth source than the route itself.
-- **Why it matters:** This creates split-brain routing behavior: the UI can advertise a route that immediately redirects away, or hide a route that the server would allow. That becomes especially risky near launch when operators change flags without redeploying.
-- **Recommendation:** Resolve Studio availability once on the server and pass it into client navigation surfaces, or expose one hydrated/public flag source consumed consistently by both layers.
-- **Expected impact:** Stable navigation behavior, fewer redirect dead ends, and safer operational control of feature rollout.
-- **Effort estimate:** M
+#### FE-H2 Both full i18n dictionaries ship to every client bundle
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/i18n/provider.tsx:11-16, apps/web/lib/i18n/use-translation.ts:5, apps/web/lib/i18n/dictionaries/en.ts (1005 lines), es.ts (1005 lines)
+- **What's happening:** `LanguageProvider` statically imports both `en` and `es`; it wraps the whole app, so both ~1000-line trees ship in shared client JS for every route.
+- **Why it matters:** Dead weight in First Load JS for 100% of users; grows with every copy addition; worst on the landing page where bundle size affects conversion.
+- **Recommendation:** Ship only the active locale (props from server, or `next/dynamic` import of the non-default locale on switch; `setLocale` already `router.refresh()`es).
+- **Expected impact:** ~Halves the i18n payload. **Effort:** M
 
-#### FE-M2 Admin summary cards are computed from paginated rows but presented as whole-dataset KPIs
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/admin/useAdminDashboard.ts:56, apps/web/app/admin/useAdminDashboard.ts:79, apps/web/app/admin/useAdminDashboard.ts:152, apps/web/app/admin/AdminStatsCards.tsx:39
-- **What's happening:** `useAdminDashboard()` computes `tierCounts` from the current `users` page only, while `AdminStatsCards` divides those counts by `totalUsers`, which represents the full dataset.
-- **Why it matters:** The dashboard’s top-level numbers are mathematically wrong and drift with pagination, search, and sort state. Incorrect KPIs on an operations surface are worse than missing KPIs because they look authoritative.
-- **Recommendation:** Return aggregate tier counts from `/api/admin/users` or a companion summary endpoint and keep page-local table state separate from whole-dataset metrics.
-- **Expected impact:** Correct admin telemetry and fewer operator mistakes caused by misleading summary cards.
-- **Effort estimate:** M
+#### FE-M1 Over-broad `"use client"` — 86% of components are client components
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** apps/web/components (117/136 non-test files), apps/web/app/about/loading.tsx:1, apps/web/app/archetypes/loading.tsx:1
+- **What's happening:** Many presentational pieces (skeletons, static fragments) marked client unnecessarily.
+- **Why it matters:** Inflates hydration tree + shared bundle.
+- **Recommendation:** Push `"use client"` to smallest interactive leaf; `loading.tsx` doesn't need it unless using hooks. **Effort:** L
 
-#### FE-M3 Admin table requests can race and overwrite newer state with stale responses
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/admin/useAdminDashboard.ts:61, apps/web/app/admin/useAdminDashboard.ts:97, apps/web/app/admin/useAdminDashboard.ts:146, apps/web/app/admin/AdminSearchBar.tsx:17
-- **What's happening:** `fetchUsers()` issues async fetches on mount, refresh, sort, page changes, and deferred search updates, but it has no `AbortController`, request token, or last-write-wins guard. Every response writes directly into UI state.
-- **Why it matters:** Fast input or multiple operator actions can produce out-of-order updates where an earlier response lands after a newer one and replaces correct UI state with stale rows or totals.
-- **Recommendation:** Add request cancellation or monotonic request IDs and ignore responses that are not the latest active request for the current search/sort/page state.
-- **Expected impact:** Deterministic admin table state under rapid interaction and fewer stale-response regressions.
-- **Effort estimate:** M
+#### FE-M2 Landing page is `force-dynamic` despite a static server-rendered demo SVG
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/page.tsx:1, :16-19
+- **What's happening:** Landing's only per-request input is `error`/`lang` query; demo SVG is computed once at module load, but `force-dynamic` + `getServerLocale()` re-renders per request.
+- **Recommendation:** Render landing statically/ISR (same fix as FE-H1); read `error`/`lang` client-side. **Effort:** M
 
-#### FE-L1 Owner visits to the share page trigger an automatic second refresh cycle after the initial render
-- **Severity:** low
-- **Time horizon:** After launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/u/[handle]/page.tsx:103, apps/web/components/SharePageOwnerContent.tsx:88, apps/web/hooks/useOwnerCacheWarm.ts:29, apps/web/app/api/refresh/route.ts:56
-- **What's happening:** The share page already materializes profile data on the server, but once client-side ownership resolves, `useOwnerCacheWarm()` automatically posts to `/api/refresh`, clears cached stats, recomputes the profile, revalidates the page, and then calls `router.refresh()`.
-- **Why it matters:** Owners pay for a second network/render cycle on first visit per tab session, which increases perceived work on the page and spends refresh budget even when the initial SSR payload was already sufficient.
-- **Recommendation:** Gate the owner warm-up behind explicit staleness detection or a user action rather than forcing an automatic refresh after initial render.
-- **Expected impact:** Less duplicate work on owner profile views and lower accidental churn on the refresh pipeline.
-- **Effort estimate:** M
+#### FE-M3 `UserMenu` eagerly fires 3 platform-status fetches on mount even when disabled
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/components/UserMenu.tsx:189-217
+- **What's happening:** Unconditional `useEffect` fires `/api/auth/{bitbucket,codeberg,gitlab}/status` on every authenticated navbar render, for flag-gated-off platforms, before the menu is opened.
+- **Recommendation:** Gate fetch behind `useClientFeatureFlags` and/or defer until dropdown opens. **Effort:** S
+
+#### FE-M4 `UserMenu` is a 712-line client component mixing four unrelated flows
+- **Severity:** medium | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/components/UserMenu.tsx:46-282
+- **What's happening:** 15+ `useState`, three near-identical platform link/unlink flows (copy-paste), insights upload+recalc, toast/confirm — all hydrated in the navbar everywhere.
+- **Recommendation:** Extract `usePlatformLink(platform)` hook; lazily import the insights-import child. **Effort:** L
+
+#### FE-L1 Archetype pages assert `force-dynamic` in a test named "ISR" — intent/impl mismatch
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/archetypes/archetypes-isr.test.ts:17-22, apps/web/app/archetypes/builder/page.tsx:5
+- **What's happening:** Test enforces `force-dynamic` on static content pages, locking in the FE-H1 anti-pattern.
+- **Recommendation:** Update to assert ISR/static when fixing FE-H1; rename. **Effort:** S
+
+#### FE-L2 `Date.now()`/`new Date()`/localStorage in `useState` initializers risk hydration drift
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** apps/web/components/UserMenu.tsx:90, :91-101
+- **Recommendation:** Initialize to deterministic defaults; populate from `localStorage`/`Date.now()` in `useEffect`. **Effort:** S
+
+#### FE-L3 Sparse memoization on data-derived dashboard rows (verify before acting)
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** apps/web/components/dashboard/ImpactDashboard.tsx:26-65, DimensionCardsRow.tsx, StatsGrid.tsx
+- **Recommendation:** Profile first; if material, `useMemo` profileText + `React.memo` pure rows. **Effort:** S
+
+#### FE-S1 No client bundle budget / analyzer gate in CI
+- **Severity:** strategic | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** apps/web (117/136 client components); bundle analyzer is manual (`ANALYZE=true`)
+- **Recommendation:** CI step asserting per-route First Load JS under a budget; fail on regression. **Effort:** M
 
 ## 5. Backend / API / Data Findings (Staff Backend Engineer)
-#### BE-H1 Public profile side effects fail closed when Redis is unavailable
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/profile/public-profile.ts:66, apps/web/lib/profile/public-profile.ts:72, apps/web/lib/profile/public-profile.ts:76, apps/web/lib/cache/redis.ts:326, apps/web/lib/cache/redis.ts:331, apps/web/lib/cache/redis.test.ts:610
-- **What's happening:** `runPublicProfileSideEffects()` uses `cacheSetNx()` as a once-per-day guard and returns early when that call yields `false`. In production, `cacheSetNx()` returns `false` both for “already processed” and for Redis-unavailable paths.
-- **Why it matters:** A Redis outage suppresses snapshot inserts, verification writes, badge analytics, first-badge notifications, and user upserts instead of letting them proceed. The public surface keeps rendering while data correctness silently degrades.
-- **Recommendation:** Split guard outcomes into explicit states: acquired, already exists, and storage unavailable. Only skip side effects on the duplicate case and fail open on storage outages.
-- **Expected impact:** Public rendering degrades gracefully under Redis incidents without silently dropping core persistence side effects.
-- **Effort estimate:** M
 
-#### BE-H2 Campaign sending has no claim/lease boundary, so concurrent invocations can send duplicate emails
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [inference]
-- **Files:** apps/web/app/api/admin/campaigns/[id]/send/route.ts:37, apps/web/app/api/admin/campaigns/[id]/send/route.ts:46, apps/web/app/api/cron/process-campaigns/route.ts:13, apps/web/app/api/cron/process-campaigns/route.ts:24, apps/web/lib/email/campaigns.ts:101, apps/web/lib/email/campaigns.ts:129, apps/web/lib/email/campaigns.ts:147, apps/web/lib/email/campaigns.ts:189, apps/web/lib/email/campaigns.ts:204, apps/web/lib/db/campaigns.ts:578, apps/web/lib/db/campaigns.ts:612, supabase/migrations/016_create_email_campaigns.sql:22
-- **What's happening:** Campaign processing reads `pending` rows, sends them, and only marks them sent/failed afterward. There is no claim step, lease token, transactional state transition, or outbound idempotency key. Manual send and cron both operate on the same pending set.
-- **Why it matters:** Overlap or retries can select and send the same recipients more than once. For a user-facing email system, that is a launch-grade reliability defect.
-- **Recommendation:** Add an atomic claim phase that moves a bounded set of sends from `pending` to `processing` with an owner/lease token, then finalize them idempotently after send.
-- **Expected impact:** Campaign execution becomes retry-safe and concurrency-safe instead of timing-dependent.
-- **Effort estimate:** L
+#### BE-H1 GitLab/Bitbucket/Codeberg pagination treats rate-limit (429/5xx) as successful empty results — silent score corruption
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/gitlab/queries.ts:206-211, apps/web/lib/bitbucket/queries.ts:~188, apps/web/lib/codeberg/queries.ts:~166
+- **What's happening:** In `fetchPaginated`, `if (401||403) return null` then `if (!res.ok) return items` — a 429/5xx mid-pagination returns partial/empty `items` as a complete success. That truncated data is scored, cached, and snapshotted permanently.
+- **Why it matters:** Under launch load these limits will be hit → silently deflated Impact scores in permanent `metrics_snapshots`, violating "serve cached or try-later, never wrong data."
+- **Recommendation:** Treat 429 (and 5xx) like 401/403: return `null` to fall back to stale cache. Apply across all three REST platforms. **Effort:** S
 
-#### BE-M1 Snapshot-mutating endpoints do not maintain a coherent cache invalidation sequence
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/api/refresh/route.ts:60, apps/web/app/api/refresh/route.ts:85, apps/web/app/api/recalculate/route.ts:59, apps/web/app/api/insights/route.ts:71, apps/web/lib/history/history.ts:58, apps/web/lib/history/history.ts:68
-- **What's happening:** Write paths that change a user snapshot are inconsistent about invalidation. `refresh` invalidates history before persistence completes, `recalculate` replaces the snapshot without clearing history caches, and `insights` clears only part of the read model after craft-affecting writes.
-- **Why it matters:** Clients can observe stale profile/history data after explicit refresh and recalculation actions, which makes the system look nondeterministic.
-- **Recommendation:** Centralize post-write invalidation in one helper that runs after durable persistence and clears all affected read models in a defined order.
-- **Expected impact:** Predictable read-after-write behavior across profile, history, and related cached views.
-- **Effort estimate:** M
+#### BE-H2 PAT-fallback auth lets unauthenticated requests trigger outbound GitHub calls (resource amplification)
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/auth/resolve-request-auth.ts:49-60, apps/web/app/api/supplemental/route.ts:47-59, apps/web/app/api/insights/route.ts:27, apps/web/app/api/recalculate/route.ts:24
+- **What's happening:** `resolveHandle` verifies any non-CLI Bearer by calling `fetchGitHubUser(token)`; `/recalculate` + `/insights` call `resolveRequestAuth` before any rate-limit; `/supplemental` rate-limits by attacker-chosen `targetHandle`. A stream of bogus tokens burns the shared GitHub quota.
+- **Recommendation:** Rate-limit by IP before `resolveRequestAuth` on `/recalculate` + `/insights`; verify ownership before consuming per-handle quota on `/supplemental`; cheap structural token pre-check before the GitHub call. **Effort:** M
 
-#### BE-M2 Campaign admin APIs validate campaign rows on read, but not campaign payloads on write
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/api/admin/campaigns/route.ts:40, apps/web/app/api/admin/campaigns/route.ts:66, apps/web/app/api/admin/campaigns/[id]/route.ts:75, apps/web/app/api/admin/campaigns/[id]/route.ts:85, apps/web/lib/db/campaigns.ts:164, apps/web/lib/db/campaigns.ts:184, apps/web/lib/db/campaigns.ts:224
-- **What's happening:** Create/update routes only do shallow checks on a few fields and `ctaUrl`, then persist `features` and other content directly. The stronger structural checks exist only on the read side.
-- **Why it matters:** Invalid admin payloads can be stored first and only fail later when campaigns are fetched, previewed, or processed, turning data integrity into a client-behavior problem.
-- **Recommendation:** Add shared write-time schema validation for campaign payloads and reuse the same schema at both the route and DB boundaries.
-- **Expected impact:** Invalid campaign content is rejected at ingress, preventing latent corruption and downstream 500s.
-- **Effort estimate:** M
+#### BE-M1 `getClientIp` collapses to a single `"unknown"` bucket, defeating IP rate limiting
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/http/client-ip.ts:12-27
+- **What's happening:** Missing forwarded-for headers → literal `"unknown"`, so all such requests share one rate-limit key; `x-forwarded-for` rightmost-hop trust is overstated.
+- **Recommendation:** Fail safe (strict global cap/deny) when no trusted IP header; document trusted-proxy assumption. **Effort:** S
 
-#### BE-M3 Resend webhook forwarding is not idempotent
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/api/webhooks/resend/route.ts:19, apps/web/app/api/webhooks/resend/route.ts:95, apps/web/app/api/webhooks/resend/route.ts:111, apps/web/lib/email/resend.ts:167, apps/web/lib/email/resend.ts:203
-- **What's happening:** The webhook handler verifies the signature and forwards every accepted `email.received` event immediately, but it never records `svix-id` or `email_id` as processed and does not provide application-level idempotency on the outbound forward.
-- **Why it matters:** Retries, replays, or ambiguous timeout cases can generate duplicate forwarded support emails and noisy inbox behavior.
-- **Recommendation:** Add a processed-event guard keyed by `svix-id` or `email_id` and make the forward step idempotent relative to that key.
-- **Expected impact:** Webhook retries become safe and duplicate forwards are suppressed.
-- **Effort estimate:** S
+#### BE-M2 CLI device-auth poll is unauthenticated, bound only to a UUID `sessionId`
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/api/cli/auth/poll/route.ts:13-69, apps/web/app/api/cli/auth/approve/route.ts:38-48
+- **What's happening:** No separate high-entropy `device_code`; whoever learns the `sessionId` before the device polls gets a 90-day token (one-time issuance limits but doesn't prevent theft).
+- **Recommendation:** RFC 8628 split — secret `device_code` (device-only) required for poll; `sessionId`/user_code only for approve. **Effort:** M
+
+#### BE-M3 No retry/backoff on any external API call
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/github/queries.ts, gitlab/queries.ts, bitbucket/queries.ts, codeberg/queries.ts, auth/gitlab.ts:172-204
+- **Recommendation:** Bounded jittered retry (1-2) for idempotent reads only; never token exchange/writes. **Effort:** M
+
+#### BE-M4 Upstream error response body logged verbatim (token-leak-into-logs risk)
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [inference]
+- **Files:** apps/web/lib/github/queries.ts:64
+- **Recommendation:** Log status + truncated/sanitized snippet only; same across platforms. **Effort:** S
+
+#### BE-M5 Unvalidated external JSON shape — assumed fields can throw 500s
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** apps/web/lib/github/queries.ts:~90, gitlab/queries.ts:226-231, bitbucket/queries.ts:193-194, codeberg/queries.ts:143-144
+- **Recommendation:** Minimal runtime guards at deserialization boundary; on mismatch return null/empty for graceful fallback. **Effort:** M
+
+#### BE-L1 GitLab `fetchReviewsCount` issues O(n) per-MR follow-up calls with no aggregate cap
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/gitlab/queries.ts:252-279
+- **Recommendation:** Cap per-MR approver lookups / short-circuit after K consecutive nulls. **Effort:** S
+
+#### BE-L2 Webhook dedup is fail-open under Redis outage / TOCTOU near TTL
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** apps/web/app/api/webhooks/resend/route.ts:97-104
+- **Recommendation:** Distinguish `"unavailable"` from `"exists"`; decide explicitly on unavailable. **Effort:** S
+
+#### BE-L3 `gitlab/client.ts` proceeds with empty-string OAuth credentials instead of failing fast
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/gitlab/client.ts:44-45, :~75
+- **Recommendation:** Short-circuit refresh when client id/secret absent; clear unconfigured result. **Effort:** S
+
+#### BE-S1 Service-role-only DB access makes route-handler authz the sole gate
+- **Severity:** strategic | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/db/supabase.ts:29-31, supabase/migrations/018_fix_tool_insights_rls.sql
+- **Recommendation:** Centralize ownership checks into one audited helper used by every write route; add handler-level cross-handle-rejection tests. **Effort:** L
 
 ## 6. Performance and Scalability Findings (Performance Engineer)
-#### PE-H1 Public routes carry an oversized client baseline before page-specific UI is added
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/.next/diagnostics/route-bundle-stats.json:92, apps/web/.next/diagnostics/route-bundle-stats.json:113, apps/web/.next/diagnostics/route-bundle-stats.json:739, apps/web/app/layout.tsx:4, apps/web/app/layout.tsx:125, apps/web/app/layout.tsx:131, apps/web/app/about/page.tsx:3, apps/web/app/about/page.tsx:123, apps/web/components/GlobalCommandBar.tsx:1
-- **What's happening:** The production build shows `/_not-found` at 616603 uncompressed first-load JS, `/about` at 695888, and `/` at 697155. The root layout mounts always-on client providers, and marketing pages synchronously import the full `GlobalCommandBar`.
-- **Why it matters:** This creates a large parse/hydration floor for the highest-traffic public pages, hurting startup CPU, responsiveness, and real-user LCP/INP before any route-specific content is added.
-- **Recommendation:** Move analytics, shortcut UI, and command-bar behavior behind route-group or interaction-triggered lazy boundaries and keep marketing pages server-first.
-- **Expected impact:** Lower first-load JS, faster hydration, and reduced startup CPU on landing/about/legal surfaces.
-- **Effort estimate:** M
 
-#### PE-H2 The share page ships owner-only dashboard and preview code to every visitor
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/.next/diagnostics/route-bundle-stats.json:3, apps/web/components/SharePageOwnerContent.tsx:6, apps/web/components/SharePageOwnerContent.tsx:83, apps/web/components/SharePageOwnerContent.tsx:100, apps/web/components/SharePageOwnerContent.tsx:140, apps/web/components/dashboard/ImpactDashboard.tsx:4, apps/web/components/dashboard/ImpactDashboard.tsx:46, apps/web/app/u/[handle]/page.tsx:13, apps/web/app/u/[handle]/page.tsx:20
-- **What's happening:** `/u/[handle]` is the largest measured public route at 746542 uncompressed first-load JS. Its always-mounted client subtree statically imports owner-only dashboard and preview code even though most visits are anonymous.
-- **Why it matters:** The main public profile route pays for authenticated-owner functionality on anonymous traffic, increasing transfer, parse cost, and hydration work exactly where the product needs fast share-page loads.
-- **Recommendation:** Split the owner path after session resolution with a dynamic import and keep visitor CTA/content in a lighter component.
-- **Expected impact:** Smaller public share-page bundle, better first paint for anonymous visitors, and less main-thread work on the route most likely to be shared externally.
-- **Effort estimate:** M
+#### PE-M1 Rate-limit Redis round-trip precedes the SVG cache hit on the hottest path
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/u/[handle]/badge.svg/route.ts:137-164
+- **What's happening:** `checkBadgeRateLimit` (Redis INCR+EXPIRE) runs before the full-response SVG cache read; warm-cache badges still pay a sequential rate-limit round-trip.
+- **Recommendation:** Read SVG cache first; rate-limit only on the miss branch, or fold INCR into the same pipeline. **Effort:** S
 
-#### PE-H3 The badge render lock collapses after 300ms, so cache-miss bursts can still fan out expensive renders
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/u/[handle]/badge.svg/route.ts:25, apps/web/app/u/[handle]/badge.svg/route.ts:26, apps/web/app/u/[handle]/badge.svg/route.ts:27, apps/web/app/u/[handle]/badge.svg/route.ts:70, apps/web/app/u/[handle]/badge.svg/route.ts:148, apps/web/app/u/[handle]/badge.svg/route.ts:152, apps/web/app/u/[handle]/badge.svg/route.ts:164
-- **What's happening:** Cross-instance badge rendering is guarded by a Redis lock, but losers only poll cache 6 times at 50ms intervals. After roughly 300ms, they fall through into full `materializePublicProfile()` execution even if the original render is still working.
-- **Why it matters:** On cache misses or cold starts, concurrent badge requests can still stampede GitHub, Redis, and origin CPU, pushing up p95/p99 latency and undermining the intended anti-herd protection.
-- **Recommendation:** Make the waiter horizon align with realistic render latency or lock TTL, add jitter/backoff, and prefer serving stale-or-pending results over duplicate renders.
-- **Expected impact:** Lower tail latency and materially less upstream/load amplification during bursty badge traffic.
-- **Effort estimate:** M
+#### PE-M2 In-memory inflight dedup + render-lock poll are per-instance / serverless-ineffective
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** apps/web/app/u/[handle]/badge.svg/route.ts:41,166-197, apps/web/lib/github/client.ts:29,63-66
+- **Recommendation:** Document in-memory maps as best-effort; for lock-losers return stale SVG immediately rather than ~1.85s poll, or shorten the schedule. **Effort:** M
 
-#### PE-M1 The public share/badge hot path still blocks TTFB on several synchronous remote operations
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/u/[handle]/page.tsx:108, apps/web/app/u/[handle]/page.tsx:124, apps/web/lib/profile/materialize-profile.ts:71, apps/web/lib/profile/materialize-profile.ts:77, apps/web/lib/github/client.ts:61, apps/web/lib/github/client.ts:132, apps/web/lib/github/client.ts:143, apps/web/lib/render/avatar.ts:29, apps/web/lib/render/avatar.ts:67, packages/shared/src/github-query.ts:15, packages/shared/src/github-query.ts:69
-- **What's happening:** On cache misses, the request path waits for Redis reads, a broad GitHub GraphQL query, optional platform enrichment, scoring, and a network avatar fetch before inline SVG is produced. The share page explicitly awaits the avatar promise before rendering.
-- **Why it matters:** This stacks multiple network/IO dependencies directly onto response generation, so cold or stale pages will show high TTFB variance and poor p95/p99 behavior under upstream slowness.
-- **Recommendation:** Remove avatar fetch from the critical path, precompute/persist public profile materialization more aggressively, and bias request-time work toward cached artifacts plus background refresh.
-- **Expected impact:** Lower TTFB variance on cache misses and faster recovery under upstream GitHub/CDN slowness.
-- **Effort estimate:** L
+#### PE-L1 OG-image rate limit uses the same Redis-before-cache ordering as PE-M1
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/app/u/[handle]/og-image/route.ts:35-65
+- **Recommendation:** Apply same cache-first reordering. **Effort:** S
 
-#### PE-M2 Cache operations on hot paths have error handling but no latency budget, so slow Redis still stalls requests
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/cache/redis.ts:47, apps/web/lib/cache/redis.ts:65, apps/web/lib/cache/redis.ts:176, apps/web/lib/cache/redis.ts:309, apps/web/app/u/[handle]/badge.svg/route.ts:100, apps/web/app/u/[handle]/badge.svg/route.ts:123, apps/web/app/u/[handle]/badge.svg/route.ts:148, apps/web/app/u/[handle]/page.tsx:108
-- **What's happening:** `cacheGet`, `cacheSet`, and `rateLimit` are wrapped in try/catch but not in explicit timeouts, while these calls are awaited repeatedly in badge and share-page hot paths. The health check is the exception.
-- **Why it matters:** When Upstash is slow rather than fully failing, requests do not fail open quickly; they accumulate latency at the cache layer itself, worsening tail latency across public endpoints.
-- **Recommendation:** Add short deadlines and a simple circuit-breaker strategy for hot-path cache/rate-limit calls, with fast fallback to stale data or uncached execution.
-- **Expected impact:** Better resilience to partial cache degradation and tighter p95/p99 latency under infrastructure slowness.
-- **Effort estimate:** M
+#### PE-L2 `_enrichWithLogins` adds N parallel DB reads on every stats cache hit
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/github/client.ts:58-59,94-114
+- **Recommendation:** Write enriched stats back to the stats cache key so subsequent hits skip the DB. **Effort:** S
+
+#### PE-L3 resvg re-reads four TTF font files from disk on every OG-image cache miss
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/render/svg-to-png.ts:71-81, :30-35
+- **Recommendation:** Read font buffers once at module scope; pass buffers to resvg. **Effort:** S
+
+#### PE-L4 Share page may double-fetch on cold cache via `<img>` fallback
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** apps/web/app/u/[handle]/page.tsx:119-146,219-240
+- **Recommendation:** Acceptable as failure-branch fallback (img benefits from badge route caching); no action required. **Effort:** S
+
+#### PE-S1 Per-day badge cache key forces a full recompute for every handle at UTC midnight
+- **Severity:** strategic | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** apps/web/app/u/[handle]/badge.svg/route.ts:159-160, apps/web/lib/render/badge-svg-cache.ts
+- **Recommendation:** Rolling per-handle 24h TTL or per-handle jittered expiry (hash(handle)→offset) to spread recompute load. **Effort:** M
 
 ## 7. Reliability / DevOps / Observability Findings (DevOps / SRE Lead)
-#### DO-H1 CI can go green without proving launch-critical runtime integrations work
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** .github/workflows/ci.yml:108, .github/workflows/ci.yml:137, apps/web/e2e/smoke.spec.ts:19, apps/web/e2e/smoke.spec.ts:49, docs/runbooks/release-checklist.md:27
-- **What's happening:** Build and E2E jobs inject dummy OAuth/Redis secrets, and the smoke suite explicitly accepts `badge.svg` failing with `500/503` and `/api/auth/login` failing with `500`. The only production-shaped validation described is manual preview checking.
-- **Why it matters:** A deploy can satisfy CI while still being broken in the exact launch-critical paths that matter: OAuth, public badge rendering, and environment-backed dependency wiring.
-- **Recommendation:** Add a protected preview or integration job with real non-prod secrets that asserts login redirects, badge rendering, and health dependency behavior in a deployed environment.
-- **Expected impact:** Release confidence moves from “builds in CI” to “works in a deployment-shaped environment.”
-- **Effort estimate:** M
 
-#### DO-H2 Runtime detection is still mostly passive; there is no evidence of an active alerting path
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [inference]
-- **Files:** docs/runbooks/incident-response.md:12, apps/web/lib/analytics/server-errors.ts:58, apps/web/lib/analytics/server-errors.ts:95, apps/web/lib/analytics/server-errors.ts:145
-- **What's happening:** The incident runbook says issues are typically discovered through manual health checks, deploy notifications, CI failures, or user reports. Server-side event capture is fire-and-forget and silently drops failures or missing config, and there is no repo evidence of paging or threshold-based alerting.
-- **Why it matters:** For a public launch, silent degradation can sit unnoticed until users report it, extending mean time to detect and turning telemetry into passive logging instead of monitoring.
-- **Recommendation:** Define one active alert path for launch-critical signals: health degradation, badge 5xx rate, OAuth callback failures, and cron failures. Document who receives those alerts and what thresholds trigger them.
-- **Expected impact:** Failures become operator-visible without manual polling, materially improving incident detection and response time.
-- **Effort estimate:** M
+#### DO-B1 Branch-protection required-status-check contexts don't match CI check names — production gate broken
+- **Severity:** launch-blocker | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** .github/workflows/ci.yml:11,28,113,142 (names `Lint & Typecheck`, `Test`, `Build`, `E2E Tests`); branch protection contexts = `["test","lint-typecheck","build","e2e"]`
+- **What's happening:** Required contexts never match the reported check-run names, so the gate sits on phantom contexts and the real green checks aren't the ones being enforced. With `enforce_admins:false`, a maintainer can merge a red build to prod.
+- **Recommendation:** Set required contexts to exact names (`Test`, `Lint & Typecheck`, `Build`, `E2E Tests`); set `enforce_admins:true`. Verify post-change. **Effort:** S
 
-#### DO-M1 Operational documentation has drifted from actual auth, health, and secret requirements
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/auth/cron.ts:13, apps/web/lib/auth/cron.ts:24, docs/accepted-risks.md:105, apps/web/app/api/health/route.ts:89, docs/runbooks/release-checklist.md:40, docs/runbooks/incident-response.md:14, docs/runbooks/outage-playbook.md:9, docs/runbooks/outage-playbook.md:31, apps/web/lib/verification/hmac.ts:44, README.md:149
-- **What's happening:** Code and docs no longer align on cron auth behavior, health payload shape, and whether `CHAPA_VERIFICATION_SECRET` is optional or required.
-- **Why it matters:** During release or incident response, operators will be working from incorrect assumptions, which is exactly when documentation drift causes slow diagnosis and unsafe decisions.
-- **Recommendation:** Reconcile accepted risks, README env requirements, and runbooks to current code, and update health examples to the real response schema.
-- **Expected impact:** Runbooks become trustworthy during launch and incident handling.
-- **Effort estimate:** S
+#### DO-H1 `develop` integration branch has no branch protection
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [inference]
+- **Files:** branch-protection confirmed for `main` only; all dev + Dependabot land on `develop`
+- **Recommendation:** Protect `develop` with the same correctly-named contexts. **Effort:** S
 
-#### DO-M2 The documented migration validation path is broken
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** docs/runbooks/migrations.md:21, docs/runbooks/migrations.md:38, docs/runbooks/migrations.md:70, scripts/validate-migrations.ts:1, package.json:5
-- **What's happening:** The migrations runbook instructs operators to run `pnpm tsx scripts/validate-migrations.ts`, but the repo does not define a `tsx` dependency or supported script for that command.
-- **Why it matters:** Manual schema changes are already high-risk. If the documented guardrail is not runnable as written, migration safety depends on operator improvisation at exactly the wrong moment.
-- **Recommendation:** Make migration validation executable through the repo’s supported commands and reference that exact command in the runbook and release checklist.
-- **Expected impact:** Schema-change prep becomes repeatable and less error-prone.
-- **Effort estimate:** S
+#### DO-M1 `CHAPA_ALERT_WEBHOOK_URL` missing from `.env.example` — alerting silently disabled if unset
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** .env.example (no entry), apps/web/lib/analytics/server-errors.ts:124-125, apps/web/lib/env.ts:59-61
+- **Recommendation:** Add to `.env.example` + release-checklist; optional one-time startup warn in prod when unset. **Effort:** S
+
+#### DO-M2 No automated migration application / drift detection
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** scripts/validate-migrations.ts (sequence-only), docs/runbooks/migrations.md, supabase/migrations/001-026, no CI migration step
+- **Recommendation:** Release-checklist gate (or CI) asserting all committed migrations applied to prod before promoting to `main`. **Effort:** M
+
+#### DO-M3 `pnpm audit` / license-check / gitleaks not in `main` required checks
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** protection contexts = test/lint-typecheck/build/e2e only; .github/workflows/security.yml:8,22, gitleaks.yml
+- **Recommendation:** Add `Gitleaks` + `License compliance` to required contexts; treat `pnpm audit` as required or accepted-risk. **Effort:** S
+
+#### DO-M4 `enforce_admins` disabled on `main` — production protection bypassable
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** branch protection `enforce_admins:{enabled:false}`
+- **Recommendation:** Set `enforce_admins:true` once DO-B1 is fixed (do together). **Effort:** S
+
+#### DO-L1 No per-cron failure visibility for "200 with all-failures"; no synthetic external uptime check
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** vercel.json:7-10, apps/web/lib/analytics/server-errors.ts:109-115, apps/web/app/api/cron/warm-cache/route.ts:160-164,296-298
+- **Recommendation:** External uptime monitor on `/api/health` + a known badge URL; emit P2 from warm-cache when failures exceed a threshold. **Effort:** M
+
+#### DO-L2 `not-found.tsx` and `global-error.tsx` are English-only despite Spanish default
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/not-found.tsx:10-13, apps/web/app/global-error.tsx:44,53
+- **Recommendation:** Localize `not-found.tsx` via translation; bilingual static copy for `global-error.tsx`. (Overlaps UX-M3.) **Effort:** S
+
+#### DO-L3 No CHANGELOG/version-bump verification tied to release
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** CHANGELOG.md, apps/web/package.json (2.10.0), no CI link
+- **Recommendation:** Release-checklist item (or lightweight CI on develop→main PRs) requiring CHANGELOG entry + version bump. **Effort:** S
+
+#### DO-S1 Cron concentration + GitHub-rate-limit-bound warm-cache caps scalable growth
+- **Severity:** strategic | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/app/api/cron/warm-cache/route.ts:33 (MAX_HANDLES=50), :30 (maxDuration=300), vercel.json:3-14
+- **Recommendation:** Plan scaling path (staggered invocations, larger token pool, tiered freshness); alert when active users approach the 50/day ceiling. **Effort:** L
 
 ## 8. Security / Privacy Findings (Security Reviewer)
-#### SE-M1 Cookie security depends on a public env var instead of a fail-secure default
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/auth/github.ts:44, apps/web/app/api/auth/login/route.ts:10, apps/web/app/api/auth/callback/route.ts:19, apps/web/lib/auth/bitbucket.ts:73, apps/web/lib/auth/codeberg.ts:60
-- **What's happening:** Auth-related cookies only get the `Secure` flag when `NEXT_PUBLIC_BASE_URL` starts with `https://`. If that env var is unset, stale, or mis-set, cookies are still issued but without `Secure`.
-- **Why it matters:** Cookie transport protection depends on a public-facing config string rather than a fail-secure server decision. A deployment mistake silently weakens every authenticated flow at once.
-- **Recommendation:** Default auth cookies to `Secure` everywhere except explicit localhost development, and derive the exception from request/runtime context rather than `NEXT_PUBLIC_BASE_URL`.
-- **Expected impact:** Auth cookies become fail-secure under misconfiguration, reducing the chance of accidental downgrade.
-- **Effort estimate:** S
 
-#### SE-M2 Third-party bearer tokens are stored in the client session cookie
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/auth/github.ts:323, apps/web/lib/auth/github.ts:360, apps/web/app/api/auth/callback/route.ts:128
-- **What's happening:** After OAuth callback, the GitHub access token is placed directly into the session payload and sent back to the browser inside the encrypted `chapa_session` cookie.
-- **Why it matters:** The GitHub bearer token leaves the server trust boundary and rides on every authenticated request. Even with encryption and `HttpOnly`, this increases exposure and complicates revocation semantics.
-- **Recommendation:** Move provider access tokens to a server-side session store keyed by an opaque session ID and keep only minimal metadata client-side.
-- **Expected impact:** Lower token exposure surface and cleaner revocation behavior.
-- **Effort estimate:** M
+#### SE-H1 Multiple high-severity advisories in transitive `undici` (via dev-only `jsdom`)
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** pnpm-lock.yaml (`.>jsdom>undici`), `pnpm audit` (7 advisories: 3 high, 2 moderate, 2 low; undici `>=7.0.0 <7.28.0`)
+- **What's happening:** TLS cert bypass (GHSA-vmh5-mc38-953g), WebSocket DoS, SOCKS5 pool cross-origin routing. `jsdom` is dev/test-only (vitest DOM env) so runtime exploitability is low, but a public launch should not ship 3 unresolved highs in-tree.
+- **Recommendation:** Confirm `jsdom` is dev-only; add a pnpm override forcing `undici >=7.28.0` (same pattern as `js-yaml` in commit b7b33ace); re-run `pnpm audit` to zero. **Effort:** S
 
-#### SE-L1 Third-party license inventory is stale and incomplete
-- **Severity:** low
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** LICENSE-THIRD-PARTY.md:10, LICENSE-THIRD-PARTY.md:37, apps/web/package.json:15, docs/accepted-risks.md:60, docs/accepted-risks.md:89
-- **What's happening:** `LICENSE-THIRD-PARTY.md` is out of sync with the actual dependency graph and accepted-risks record.
-- **Why it matters:** Launch-time license posture needs one accurate source of truth. Drift between manifest, inventory, and risk docs creates needless compliance uncertainty.
-- **Recommendation:** Regenerate third-party license inventory from the lockfile in CI and publish the generated output as the canonical release artifact.
-- **Expected impact:** Cleaner legal/compliance review and fewer false alarms during launch readiness checks.
-- **Effort estimate:** S
+#### SE-L1 Session cookies have no server-side revocation (24h lifetime only)
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** apps/web/lib/auth/github.ts:338-345, :389-409
+- **Recommendation:** Optionally embed `iat`, reject sessions older than Max-Age server-side; revocation list on logout if surfaces grow. Acceptable for launch. **Effort:** M
 
-#### SE-L2 Resend webhook handling has no replay/idempotency guard
-- **Severity:** low
-- **Time horizon:** Before launch
-- **Evidence type:** [inference]
-- **Files:** apps/web/app/api/webhooks/resend/route.ts:36, apps/web/app/api/webhooks/resend/route.ts:125, apps/web/lib/email/resend.ts:63
-- **What's happening:** The webhook path validates Svix signatures and immediately fetches/forwards the email, but it does not record or reject previously seen `svix-id` values and does not enforce idempotency on `email_id`.
-- **Why it matters:** Valid delivery replay or duplicate provider delivery can trigger repeated forwarding of the same message.
-- **Recommendation:** Persist a short-TTL dedupe key on `svix-id` or `email_id` before forwarding and treat repeats as already processed.
-- **Expected impact:** Safer webhook processing with duplicate forwards suppressed during retries or replay attempts.
-- **Effort estimate:** S
+#### SE-L2 Supplemental rate-limit bucket keyed on `targetHandle` before token-ownership check
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/api/supplemental/route.ts:47 vs :56-63
+- **Recommendation:** Move ownership check (`auth.handle === targetHandle`) ahead of the per-handle rate-limit increment, or key on authenticated handle. (Overlaps BE-H2.) **Effort:** S
 
 ## 9. Code Quality / Maintainability Findings (Principal Architect)
-#### AR-M1 Core Profile Retrieval Has Become a God Module
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/github/client.ts:1, apps/web/lib/github/client.ts:50, apps/web/lib/github/client.ts:142, apps/web/lib/github/client.ts:167, apps/web/lib/github/client.ts:204, apps/web/lib/profile/materialize-profile.ts:71, apps/web/app/studio/page.tsx:68
-- **What's happening:** `getStats()` now owns cache lookup, in-flight deduplication, stale fallback, linked-platform discovery, token refresh/unlink behavior, multi-provider merge policy, supplemental merge policy, and user upsert side effects.
-- **Why it matters:** This concentrates multiple failure domains behind one core dependency used by badge, studio, and profile paths. Small changes in provider auth, cache semantics, or merge rules can destabilize the entire profile pipeline.
-- **Recommendation:** Split `lib/github/client.ts` into narrower services: provider adapters, merge/orchestration, cache policy, and profile-facing read APIs.
-- **Expected impact:** Lower blast radius for provider changes and clearer ownership/testability.
-- **Effort estimate:** L
 
-#### AR-M2 Route-Owned Modules Leak Upward Into Shared Layers
-- **Severity:** medium
-- **Time horizon:** After launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/agents/report-parser.ts:8, apps/web/app/admin/agents-types.ts:17, apps/web/components/ShareBadgePreview.tsx:4, apps/web/app/studio/BadgePreviewCard.tsx:46, apps/web/app/studio/StudioClient.tsx:261
-- **What's happening:** Reusable layers depend on route-owned `app/*` modules. Shared code imports types and preview components from admin/studio route folders.
-- **Why it matters:** The directory boundary no longer reflects dependency direction. Refactoring route-local UI can break code that is supposed to be reusable.
-- **Recommendation:** Move cross-route types and reusable preview components into neutral shared locations and leave `app/*` as composition/entrypoint code only.
-- **Expected impact:** Cleaner module boundaries and safer route refactors.
-- **Effort estimate:** M
+#### AR-M1 `.worktrees/` is gitignored but not excluded from TypeScript/build scope
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/tsconfig.json:39-46 (include `**/*.ts(x)`, exclude only node_modules)
+- **What's happening:** The mandated `.worktrees/short-name` background-agent workflow lands inside the project; the moment populated, `tsc`/`next build` recurse into it, double-compiling and risking phantom typecheck errors → non-deterministic CI.
+- **Recommendation:** Add `".worktrees"` to `exclude` in apps/web + root tsconfig; add to eslint ignores; confirm `next build` outputFileTracing skips it. **Effort:** S
 
-#### AR-M3 Verification Reads Have Two Sources of Truth
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/verification/store.ts:63, apps/web/lib/verification/store.ts:105, apps/web/lib/db/verification.ts:35, apps/web/lib/db/verification.ts:146, apps/web/app/api/verify/[hash]/route.ts:38, apps/web/app/verify/[hash]/page.tsx:39
-- **What's happening:** `lib/verification/store.ts` re-queries Supabase and redefines row parsing/mapping even though `lib/db/verification.ts` already contains the same mapping and exports `dbGetVerification()`.
-- **Why it matters:** Public verification behavior depends on duplicated data-access logic, so schema or mapping changes can drift and break the API/page inconsistently.
-- **Recommendation:** Collapse reads onto one repository function and keep `lib/verification/store.ts` as a thin wrapper or remove it.
-- **Expected impact:** One authoritative verification read path and lower schema-drift risk.
-- **Effort estimate:** S
+#### AR-M2 knip `ignoreDependencies` list is over-broad, masking real dead-dep detection
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** knip.json (11 runtime deps ignored; knip emits 13 "remove from ignoreDependencies" hints)
+- **Recommendation:** Remove each entry, re-run knip, confirm used (delete ignore) or unused (remove dep); replace blanket ignores with scoped plugin config + comment. **Effort:** S
 
-#### AR-M4 OAuth Cookie and Base-URL Policy Is Copy-Pasted Across Providers
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/lib/auth/github.ts:44, apps/web/lib/auth/bitbucket.ts:73, apps/web/lib/auth/codeberg.ts:60, apps/web/app/api/auth/login/route.ts:10, apps/web/app/api/auth/callback/route.ts:19, apps/web/lib/auth/platform-oauth.ts:110
-- **What's happening:** Security-sensitive origin and cookie policy logic is duplicated across GitHub, Bitbucket, Codeberg, and route handlers.
-- **Why it matters:** Future auth changes will be easy to apply unevenly. A small policy adjustment can create provider-specific auth regressions.
-- **Recommendation:** Centralize auth URL and cookie-policy helpers behind one shared module and have provider-specific code depend on that.
-- **Expected impact:** Consistent auth behavior across providers and a safer place to evolve cookie/origin rules.
-- **Effort estimate:** M
+#### AR-L1 `lib/db/campaigns.ts` is an outsized single-file data module (835 lines, 22 exports)
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** apps/web/lib/db/campaigns.ts:1-835
+- **Recommendation:** Split along responsibility seams (crud/send/recipients) per the per-entity db convention. **Effort:** M
 
-#### AR-L1 Dead-Code Drift Is Starting to Accumulate in the Dashboard Layer
-- **Severity:** low
-- **Time horizon:** After launch
-- **Evidence type:** [inference]
-- **Files:** apps/web/components/dashboard/HeroScoreZone.tsx:9, apps/web/components/dashboard/RadarChartInteractive.tsx:77, apps/web/components/SharePageOwnerContent.tsx:142, apps/web/components/dashboard/ImpactDashboard.tsx:46
-- **What's happening:** Some exported dashboard components appear to have no non-test imports in the current production composition.
-- **Why it matters:** Unused presentation paths increase maintenance load and make future dashboard changes harder because engineers must reason about code that appears live but is not active.
-- **Recommendation:** Confirm whether these components are intentionally parked. If not, remove them and their tests; if yes, fence them clearly as experimental.
-- **Expected impact:** Smaller dashboard surface area and less ambiguity during future refactors.
-- **Effort estimate:** S
-
-#### AR-S1 Public Traffic, Admin Ops, Cron Work, and Campaign Sending Share One Runtime Boundary
-- **Severity:** strategic
-- **Time horizon:** Later
-- **Evidence type:** [evidence]
-- **Files:** package.json:6, package.json:7, apps/web/app/u/[handle]/badge.svg/route.ts:92, apps/web/app/api/cron/warm-cache/route.ts:58, apps/web/app/api/admin/agents-summary/route.ts:23, apps/web/app/api/admin/campaigns/[id]/send/route.ts:14
-- **What's happening:** The repo builds and runs a single `@chapa/web` application containing public badge rendering, cron warming, admin agent reporting, and campaign initiation.
-- **Why it matters:** Internal ops features and background work ship on the same artifact and runtime as the public badge path, so deployment risk, cold-start behavior, and dependency creep are shared whether or not end users touch those features.
-- **Recommendation:** After launch, separate internal/admin/background workloads from the public badge/share runtime or at least split deployment boundaries.
-- **Expected impact:** Better isolation of public availability from operational tooling and cleaner scaling/deployment decisions.
-- **Effort estimate:** XL
+#### AR-S1 Strong architecture rests on convention, not enforced gates
+- **Severity:** strategic | **Time horizon:** Later | **Evidence type:** [inference]
+- **Files:** package.json check:circular (not CI-wired), apps/web/lib/env.ts:36-265, knip.json
+- **Recommendation:** Wire madge `check:circular` into CI; eslint `no-process-env` allowlisting only `lib/env.ts`; eslint `no-restricted-imports` preventing `packages/shared`→`apps/web`; knip as CI gate after AR-M2. **Effort:** M
 
 ## 10. Testing / QA Findings (QA / Reliability Lead)
-#### QA-H1 Smoke coverage explicitly allows broken badge and login paths to pass
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/e2e/smoke.spec.ts:19, apps/web/e2e/smoke.spec.ts:27, apps/web/e2e/smoke.spec.ts:49, apps/web/e2e/smoke.spec.ts:55, .github/workflows/ci.yml:137
-- **What's happening:** The smoke suite accepts `/u/torvalds/badge.svg` returning non-2xx and `/api/auth/login` returning `500`, and the CI E2E job uses dummy integration secrets.
-- **Why it matters:** The highest-value public journeys can be broken while smoke/E2E still report success, which undermines launch confidence even with a green pipeline.
-- **Recommendation:** Add one protected deployment-shaped smoke suite with real non-prod secrets and strict expectations for login, badge rendering, and health semantics.
-- **Expected impact:** Green CI would begin to mean launch-critical user journeys actually work.
-- **Effort estimate:** M
 
-#### QA-L1 Passing tests emit expected-error noise that weakens CI signal quality
-- **Severity:** low
-- **Time horizon:** After launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/components/GlobalCommandBar.render.test.tsx:226, scripts/lib/agent-utils.test.ts:60
-- **What's happening:** The local `pnpm run test` pass emitted `Not implemented: navigation to another Document` and shell-style `[ERROR]` lines while still passing. The source shows tests intentionally exercising jsdom navigation traps and stderr-based error cases.
-- **Why it matters:** Green runs with noisy error output make real regressions harder to spot in CI logs and train reviewers to ignore red-looking output.
-- **Recommendation:** Stub navigation/error logging in those tests so expected-failure assertions do not leak misleading runtime noise into passing test output.
-- **Expected impact:** Cleaner CI logs and higher confidence that visible errors represent real failures.
-- **Effort estimate:** S
+#### QA-M1 No CI gate on coverage thresholds
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [inference]
+- **Files:** .github/workflows/ci.yml (no coverage step), package.json:test (`vitest run`, no thresholds)
+- **Recommendation:** Add vitest coverage thresholds (start at current level minus margin) + run `test:coverage` in CI; `coverage.exclude` type-only/helpers. **Effort:** S
+
+#### QA-L1 Four behavior-bearing pages untested (admin gating, CLI authorize, verify, generating)
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/admin/page.tsx, verify/[hash]/page.tsx, generating/[handle]/page.tsx, cli/authorize/page.tsx
+- **Recommendation:** Add render/smoke tests asserting auth gating + primary state. Static content pages stay with e2e. **Effort:** S
+
+#### QA-L2 `feature-flags-sync.ts` is the only non-trivial untested lib module
+- **Severity:** low | **Time horizon:** Later | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/feature-flags-sync.ts:1-63
+- **Recommendation:** Test each helper returns `true` only for `"true"` (incl. whitespace/casing edge cases). **Effort:** S
 
 ## 11. UX Cohesion / Design System Findings (Product Designer / UX Lead)
-#### UX-B1 Public share pages hide the product’s core explanation from the actual public audience
-- **Severity:** launch-blocker
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** CLAUDE.md:168, apps/web/app/u/[handle]/page.tsx:103, apps/web/components/SharePageOwnerContent.tsx:19, apps/web/components/SharePageOwnerContent.tsx:100, apps/web/components/SharePageOwnerContent.tsx:128, apps/web/components/SharePageOwnerContent.tsx:149
-- **What's happening:** The route already materializes public profile data server-side, but `SharePageOwnerContent` only shows breakdown/data sources/embed snippets to the owner and replaces them with an acquisition CTA for every visitor.
-- **Why it matters:** `/u/:handle` is a core launch surface and the spec explicitly says it should show “badge + breakdown + embed snippet.” Right now the public page behaves more like a lead-gen landing page than a share artifact, which weakens trust, social proof, and the product’s main “show your impact” loop.
-- **Recommendation:** Make the breakdown and embed module public by default, then layer owner-only actions on top of that public baseline.
-- **Expected impact:** Public profile links become self-explanatory, more shareable, and aligned with the product promise.
-- **Effort estimate:** M
 
-#### UX-H1 The launch copy is systemically in English despite the repo’s stated Spanish requirement
-- **Severity:** high
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** CLAUDE.md:191, apps/web/app/page.tsx:157, apps/web/app/page.tsx:176, apps/web/components/SharePageOwnerContent.tsx:105, apps/web/app/verify/page.tsx:6, apps/web/app/generating/[handle]/GeneratingProgress.tsx:12
-- **What's happening:** The primary acquisition, sharing, verification, and generation flows all present English UI copy, while the project instructions say all user-facing content must be in Spanish unless explicitly stated otherwise.
-- **Why it matters:** This creates a product-voice mismatch at launch, especially in the highest-traffic screens. It reads like the interface has not been localized or editorially finalized.
-- **Recommendation:** Decide the launch locale explicitly, then move the public funnel copy into a centralized message layer and translate the core routes in one pass instead of page-by-page patches.
-- **Expected impact:** Clearer brand positioning, less editorial drift, and a more coherent first-run experience.
-- **Effort estimate:** M
+#### UX-H1 "Dominant dimension:" leaks English on all 7 Spanish archetype pages
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/archetypes/_components/ArchetypePage.tsx:87
+- **Recommendation:** Add `archetypes.dominantDimensionLabel` to en/es; render `{t(...)}`. **Effort:** S
 
-#### UX-M1 Status semantics are inconsistent across errors and verification, so users cannot rely on color or layout cues
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** docs/design-system.md:72, docs/design-system.md:73, apps/web/app/error.tsx:16, apps/web/app/u/[handle]/error.tsx:16, apps/web/app/verify/page.tsx:27, apps/web/app/verify/[hash]/page.tsx:99, apps/web/app/verify/[hash]/page.tsx:111, apps/web/app/verify/[hash]/page.tsx:241, apps/web/app/verify/[hash]/page.tsx:283
-- **What's happening:** The design system reserves terminal-red for errors and teal/complement for verification, but generic error screens use amber as the main error color, and verification results switch between green, red, yellow, and even a red verification code on the verified state.
-- **Why it matters:** Status colors stop carrying dependable meaning. In trust-sensitive flows like verification, that undermines scanability and makes the UI feel improvised rather than intentionally designed.
-- **Recommendation:** Create shared semantic state primitives for `success`, `error`, `warning`, and `verification`, then refactor route-level pages to consume those primitives instead of choosing colors ad hoc.
-- **Expected impact:** More consistent mental models, stronger trust signals, and cleaner design-system reuse.
-- **Effort estimate:** M
+#### UX-H2 Share-page social metadata (OG/Twitter) hardcoded English
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/u/[handle]/page.tsx:62,:68,:69
+- **What's happening:** OG description, Twitter title + description hardcoded English even though dictionary keys exist; `generateMetadata` uses `getServerT("en")` at ISR build time.
+- **Recommendation:** Move all three into the dictionary; render the social card in the primary-audience locale (es) or make the route locale-aware. **Effort:** M
 
-#### UX-M2 Reduced-motion support is partial, so accessibility behavior changes unpredictably from screen to screen
-- **Severity:** medium
-- **Time horizon:** Before launch
-- **Evidence type:** [evidence]
-- **Files:** apps/web/app/studio/StudioClient.tsx:30, apps/web/app/studio/StudioClient.tsx:266, apps/web/app/loading.tsx:31, apps/web/app/page.tsx:151, apps/web/app/u/[handle]/page.tsx:185, apps/web/app/generating/[handle]/GeneratingProgress.tsx:96, apps/web/components/dashboard/ImpactDashboard.tsx:36
-- **What's happening:** Studio and the root loading shell explicitly account for `prefers-reduced-motion`, but the landing page, share page, generating flow, and dashboard content still use entrance/pulse/shimmer animation classes without the same guardrail.
-- **Why it matters:** Users who opt out of motion get inconsistent behavior depending on which route they land on. That is both an accessibility gap and a polish issue in a product that leans heavily on animated presentation.
-- **Recommendation:** Promote reduced-motion handling into a shared utility/pattern and apply it to all route-level entrance, shimmer, pulse, and progress animations.
-- **Expected impact:** More accessible defaults and a more coherent perceived-performance strategy across the product.
-- **Effort estimate:** M
+#### UX-H3 Public dashboard/share components ship English-only aria-labels
+- **Severity:** high | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/components/dashboard/ActivityHeatmap.tsx:148,:253,:562, StatsGrid.tsx:102, DimensionCard.tsx:213, apps/web/components/ShortcutCheatSheet.tsx:93,:104
+- **Recommendation:** Route all aria-labels through `t()` `aria.*` keys; interpolated key for heatmap day (count+date). **Effort:** M
+
+#### UX-M1 Archetype-list connector "or"/"o" hardcoded, inverted per page
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/about/page.tsx:73 (", or"), apps/web/app/page.tsx:262,:307 (" o ")
+- **Recommendation:** Move connector to a dictionary key (`common.orConnector`) or build list from array + localized separator. **Effort:** S
+
+#### UX-M2 verify/[hash] mixes Spanish and English labels side-by-side
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/verify/[hash]/page.tsx:185 ("Commits"), :227 ("Hash"); `verifyDetail.reviews`="Reviews" in both dicts
+- **Recommendation:** Add `verifyDetail.commits` + `verifyDetail.hashLabel`; translate `verifyDetail.reviews`→"Revisiones". **Effort:** S
+
+#### UX-M3 Root 404 page is English-only despite Spanish default
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/not-found.tsx:10-18
+- **Recommendation:** Convert to client component using `useTranslation()` (mirror error.tsx) or read locale cookie; add `notFound.*` keys. (Overlaps DO-L2.) **Effort:** S
+
+#### UX-M4 about.scoring CTA uses English verb in Spanish
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/lib/i18n/dictionaries/es.ts:814 (`about.scoring.ctaEmail`="Email …")
+- **Recommendation:** Translate es value (keep address, localize verb → "Escríbenos a…"). **Effort:** S
+
+#### UX-M5 Hardcoded rgba border breaks theming on empty heatmap cells
+- **Severity:** medium | **Time horizon:** Before launch | **Evidence type:** [evidence]
+- **Files:** apps/web/components/dashboard/ActivityHeatmap.tsx:574 (`border:"1px solid rgba(139,92,246,0.15)"`)
+- **Recommendation:** Replace with a token (`var(--color-stroke)` or a purple-tint border token defined both themes). **Effort:** S
+
+#### UX-M6 Studio page entirely unlocalized (metadata, nav, terminal seed)
+- **Severity:** medium | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/app/studio/page.tsx:51-55,:88-91, apps/web/app/studio/StudioClient.tsx:68-69
+- **Recommendation:** Localize via `getServerT`/`useTranslation`; add `studio.*` keys. **Effort:** M
+
+#### UX-L1 On-page radar colors non-tokenized; error toast announces politely not assertively
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]/[inference]
+- **Files:** apps/web/components/badge/BadgeContent.tsx:177,:182,:183,:187, apps/web/components/Toast.tsx:120-121
+- **Recommendation:** Confirm BadgeContent intended theme (may be intentionally dark like the embed SVG); if themed, tokenize. Give error toasts `role="alert"`/`aria-live="assertive"`. **Effort:** S
+
+#### UX-L2 Form/clipboard failures are silent; verify input lacks aria-invalid linkage
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/components/BadgeToolbar.tsx:81-83,:88-142, apps/web/app/verify/VerifyForm.tsx:34-50
+- **Recommendation:** Toast on clipboard/download failure; add `aria-invalid`+`aria-describedby` to verify input. **Effort:** S
+
+#### UX-L3 `role="presentation"` element carries event handlers
+- **Severity:** low | **Time horizon:** After launch | **Evidence type:** [evidence]
+- **Files:** apps/web/components/AuthorTypewriter.tsx:160
+- **Recommendation:** Move `stopPropagation` to a non-role wrapper or drop the role. **Effort:** S
 
 ## 12. Prioritized Action Plan
-| ID | Domain | Title | Severity | Time Horizon | Effort | Impact |
-|---|---|---|---|---|---|---|
-| UX-B1 | UX | Public share pages hide the product’s core explanation from the actual public audience | launch-blocker | Before launch | M | Restores the core public share artifact promised by the product |
-| DO-H1 | DO | CI can go green without proving launch-critical runtime integrations work | high | Before launch | M | Prevents green-but-broken releases |
-| DO-H2 | DO | Runtime detection is still mostly passive; there is no evidence of an active alerting path | high | Before launch | M | Improves incident detection before users report issues |
-| FE-H1 | FE | Shared global client shell is inflating the baseline JS cost of nearly every route | high | Before launch | L | Improves startup cost across the whole public surface |
-| FE-H2 | FE | The public share page is coupled to the Studio preview runtime for customized badges | high | Before launch | L | Shrinks the heaviest public route |
-| BE-H1 | BE | Public profile side effects fail closed when Redis is unavailable | high | Before launch | M | Preserves correctness during cache outages |
-| PE-H1 | PE | Public routes carry an oversized client baseline before page-specific UI is added | high | Before launch | M | Improves LCP/INP and mobile responsiveness |
-| PE-H2 | PE | The share page ships owner-only dashboard and preview code to every visitor | high | Before launch | M | Reduces share-page hydration cost |
-| PE-H3 | PE | The badge render lock collapses after 300ms, so cache-miss bursts can still fan out expensive renders | high | Before launch | M | Reduces origin amplification and p95/p99 risk |
-| QA-H1 | QA | Smoke coverage explicitly allows broken badge and login paths to pass | high | Before launch | M | Turns green CI into meaningful launch evidence |
-| BE-H2 | BE | Campaign sending has no claim/lease boundary, so concurrent invocations can send duplicate emails | high | Before launch | L | Prevents duplicate user emails |
-| AR-M3 | AR | Verification reads have two sources of truth | medium | Before launch | S | Lowers schema-drift and correctness risk |
-| DO-M1 | DO | Operational documentation has drifted from actual auth, health, and secret requirements | medium | Before launch | S | Makes runbooks trustworthy during incidents |
-| DO-M2 | DO | The documented migration validation path is broken | medium | Before launch | S | Restores a critical schema-safety guardrail |
-| SE-M1 | SE | Cookie security depends on a public env var instead of a fail-secure default | medium | Before launch | S | Reduces accidental auth downgrade risk |
-| BE-M3 | BE | Resend webhook forwarding is not idempotent | medium | Before launch | S | Prevents duplicate forwarded email noise |
-| BE-M1 | BE | Snapshot-mutating endpoints do not maintain a coherent cache invalidation sequence | medium | Before launch | M | Improves read-after-write correctness |
-| BE-M2 | BE | Campaign admin APIs validate campaign rows on read, but not campaign payloads on write | medium | Before launch | M | Prevents latent bad campaign data |
-| FE-M1 | FE | Studio availability is determined inconsistently between server routing and client navigation | medium | Before launch | M | Prevents split-brain routing |
-| FE-M2 | FE | Admin summary cards are computed from paginated rows but presented as whole-dataset KPIs | medium | Before launch | M | Fixes misleading internal KPIs |
-| FE-M3 | FE | Admin table requests can race and overwrite newer state with stale responses | medium | Before launch | M | Stabilizes admin UI under interaction |
-| SE-M2 | SE | Third-party bearer tokens are stored in the client session cookie | medium | Before launch | M | Reduces token exposure blast radius |
-| AR-M1 | AR | Core Profile Retrieval Has Become a God Module | medium | Before launch | L | Lowers blast radius of profile changes |
-| PE-M2 | PE | Cache operations on hot paths have error handling but no latency budget | medium | Before launch | M | Improves resilience to slow Redis |
-| UX-H1 | UX | The launch copy is systemically in English despite the repo’s stated Spanish requirement | high | Before launch | M | Fixes launch-editorial drift on core public flows |
-| UX-M1 | UX | Status semantics are inconsistent across errors and verification, so users cannot rely on color or layout cues | medium | Before launch | M | Strengthens trust and design-system consistency |
-| UX-M2 | UX | Reduced-motion support is partial, so accessibility behavior changes unpredictably from screen to screen | medium | Before launch | M | Improves accessibility and polish on animated routes |
-| PE-M1 | PE | The public share/badge hot path still blocks TTFB on several synchronous remote operations | medium | Before launch | L | Lowers cold-path response variance |
-| AR-M2 | AR | Route-Owned Modules Leak Upward Into Shared Layers | medium | After launch | M | Cleans dependency direction |
-| AR-L1 | AR | Dead-Code Drift Is Starting to Accumulate in the Dashboard Layer | low | After launch | S | Reduces maintenance ambiguity |
-| QA-L1 | QA | Passing tests emit expected-error noise that weakens CI signal quality | low | After launch | S | Improves CI readability |
-| FE-L1 | FE | Owner visits to the share page trigger an automatic second refresh cycle after the initial render | low | After launch | M | Reduces duplicate owner-side work |
-| SE-L1 | SE | Third-party license inventory is stale and incomplete | low | Before launch | S | Improves release/compliance clarity |
-| SE-L2 | SE | Resend webhook handling has no replay/idempotency guard | low | Before launch | S | Suppresses duplicate webhook forwards |
-| AR-S1 | AR | Public Traffic, Admin Ops, Cron Work, and Campaign Sending Share One Runtime Boundary | strategic | Later | XL | Reduces long-term blast radius |
+
+| ID | Domain | Title | Severity | Horizon | Effort |
+|----|--------|-------|----------|---------|--------|
+| DO-B1 | devops | Branch-protection context mismatch (prod gate broken) | launch-blocker | Before | S |
+| BE-H1 | backend | Pagination 429/5xx cached as success → score corruption | high | Before | S |
+| BE-H2 | backend | PAT-fallback auth amplification | high | Before | M |
+| FE-H1 | frontend | Content pages force-dynamic (no CDN) | high | Before | M |
+| FE-H2 | frontend | Both i18n dictionaries shipped to client | high | Before | M |
+| SE-H1 | security | Transitive undici advisories | high | Before | S |
+| UX-H1 | ux | "Dominant dimension" English on 7 pages | high | Before | S |
+| UX-H2 | ux | Share social metadata English | high | Before | M |
+| UX-H3 | ux | Public dashboard aria-labels English | high | Before | M |
+| DO-H1 | devops | develop unprotected | high | Before | S |
+| AR-M1 | architect | .worktrees not excluded from tsc/build | medium | Before | S |
+| BE-M1 | backend | getClientIp "unknown" bucket | medium | Before | S |
+| BE-M2 | backend | CLI device-auth poll unauthenticated | medium | Before | M |
+| BE-M4 | backend | Verbatim upstream error body logged | medium | Before | S |
+| DO-M1 | devops | Alert webhook missing from .env.example | medium | Before | S |
+| DO-M2 | devops | No migration drift detection | medium | Before | M |
+| DO-M4 | devops | enforce_admins disabled | medium | Before | S |
+| FE-M2 | frontend | Landing force-dynamic | medium | Before | M |
+| UX-M1 | ux | "or"/"o" connector hardcoded | medium | Before | S |
+| UX-M2 | ux | verify/[hash] mixed language | medium | Before | S |
+| UX-M3 | ux | 404 English-only | medium | Before | S |
+| UX-M4 | ux | scoring CTA English verb (es) | medium | Before | S |
+| UX-M5 | ux | Hardcoded rgba heatmap border | medium | Before | S |
+| AR-M2 | architect | knip ignoreDependencies over-broad | medium | After | S |
+| BE-M3 | backend | No retry/backoff on external calls | medium | After | M |
+| BE-M5 | backend | Unvalidated external JSON shape | medium | After | M |
+| PE-M1 | performance | Rate-limit before SVG cache hit | medium | After | S |
+| PE-M2 | performance | Per-instance dedup / long lock poll | medium | After | M |
+| DO-M3 | devops | Security checks not required on main | medium | After | S |
+| QA-M1 | qa | No CI coverage gate | medium | After | S |
+| UX-M6 | ux | Studio unlocalized | medium | After | M |
+| FE-M1 | frontend | Over-broad use client | medium | After | L |
+| FE-M3 | frontend | UserMenu eager platform fetches | medium | After | S |
+| BE-L1 | backend | GitLab O(n) per-MR calls | low | After | S |
+| BE-L2 | backend | Webhook dedup fail-open | low | After | S |
+| BE-L3 | backend | gitlab empty-cred refresh | low | After | S |
+| DO-L1 | devops | Cron failure visibility / uptime check | low | After | M |
+| DO-L2 | devops | not-found/global-error English | low | After | S |
+| SE-L1 | security | No session server-side revocation | low | After | M |
+| SE-L2 | security | Supplemental rate-limit ordering | low | After | S |
+| QA-L1 | qa | 4 behavior-bearing pages untested | low | After | S |
+| UX-L1 | ux | Radar colors + toast politeness | low | After | S |
+| UX-L2 | ux | Silent clipboard failures / aria-invalid | low | After | S |
+| UX-L3 | ux | presentation-role handler | low | After | S |
+| FE-L1 | frontend | Archetype ISR test mismatch | low | After | S |
+| FE-L2 | frontend | Date.now/localStorage in useState | low | After | S |
+| AR-L1 | architect | campaigns.ts oversized | low | Later | M |
+| PE-L1 | performance | OG rate-limit ordering | low | Later | S |
+| PE-L2 | performance | enrichWithLogins DB hits on cache hit | low | Later | S |
+| PE-L3 | performance | resvg font disk re-read | low | Later | S |
+| PE-L4 | performance | Share page double-fetch (accepted) | low | Later | S |
+| DO-L3 | devops | No CHANGELOG/version gate | low | Later | S |
+| QA-L2 | qa | feature-flags-sync untested | low | Later | S |
+| FE-L3 | frontend | Sparse dashboard memoization | low | Later | S |
+| AR-S1 | architect | Enforce conventions in CI | strategic | Later | M |
+| BE-S1 | backend | Service-role-only authz | strategic | Later | L |
+| PE-S1 | performance | Midnight cache-key herd | strategic | Later | M |
+| DO-S1 | devops | Cron scaling ceiling | strategic | Later | L |
+| FE-S1 | frontend | No bundle budget CI gate | strategic | Later | M |
 
 ## 13. Top 10 Highest-ROI Improvements
-1. `UX-B1` Make the public share page actually show the public breakdown and embed artifact promised by the product spec.
-2. `DO-H1` Tighten CI so it proves real login, badge, and health behavior in a deployment-shaped environment.
-3. `QA-H1` Stop accepting broken badge/login paths in smoke coverage; otherwise the pipeline cannot validate launch readiness.
-4. `PE-H3` Fix the badge lock collapse so burst traffic does not fan out expensive duplicate renders.
-5. `BE-H1` Make public-profile side effects fail open under Redis outages instead of silently dropping correctness-critical writes.
-6. `BE-H2` Add lease/idempotency controls to campaign sending before any public email-driven launch.
-7. `FE-H1` Move non-essential client runtime out of the root shell to lower JS cost across the entire public site.
-8. `FE-H2` Split the Studio preview stack away from the public share page so custom badges do not penalize the main route.
-9. `DO-M1` Reconcile docs and code for health/auth/required secrets so operators are not using stale procedures during launch.
-10. `SE-M1` Make auth cookies fail-secure by default instead of depending on a public base URL string.
+
+1. **DO-B1** — fixes the broken production gate; tiny effort, prevents shipping red builds.
+2. **BE-H1** — stops silent permanent score corruption under load; one-line semantics fix across 3 files.
+3. **SE-H1** — clears all 7 audit advisories with a single pnpm override.
+4. **UX-H1** — removes English from 7 Spanish SEO pages by routing one label through `t()`.
+5. **FE-H1/FE-M2** — converts the highest-traffic pages to CDN-cacheable, the biggest scaling + cost lever.
+6. **BE-H2/SE-L2** — closes the GitHub-quota amplification + cross-user rate-limit DoS.
+7. **FE-H2** — halves the i18n client payload on every route.
+8. **UX-H2** — localizes the primary virality surface (social cards) for the target market.
+9. **AR-M1** — eliminates non-deterministic CI from in-project worktrees.
+10. **DO-H1/DO-M3/DO-M4** — locks the integration + production branches behind the real checks.
 
 ## 14. Before Launch / After Launch / Later Strategic
+
+> **Operator override (2026-06-19):** All three waves are being executed pre-launch in a single remediation pass with one push at the end. No items are deferred. The wave index below reflects the specialists' natural ordering and is retained for traceability only.
+
 ### Before launch (Wave 1)
-- `UX-B1`: Public share pages hide the product’s core explanation from the actual public audience
-- `DO-H1`: CI can go green without proving launch-critical runtime integrations work
-- `DO-H2`: Runtime detection is still mostly passive; there is no evidence of an active alerting path
-- `FE-H1`: Shared global client shell is inflating the baseline JS cost of nearly every route
-- `FE-H2`: The public share page is coupled to the Studio preview runtime for customized badges
-- `BE-H1`: Public profile side effects fail closed when Redis is unavailable
-- `PE-H1`: Public routes carry an oversized client baseline before page-specific UI is added
-- `PE-H2`: The share page ships owner-only dashboard and preview code to every visitor
-- `PE-H3`: The badge render lock collapses after 300ms, so cache-miss bursts can still fan out expensive renders
-- `QA-H1`: Smoke coverage explicitly allows broken badge and login paths to pass
-- `BE-H2`: Campaign sending has no claim/lease boundary, so concurrent invocations can send duplicate emails
-- `AR-M3`: Verification reads have two sources of truth
-- `DO-M1`: Operational documentation has drifted from actual auth, health, and secret requirements
-- `DO-M2`: The documented migration validation path is broken
-- `SE-M1`: Cookie security depends on a public env var instead of a fail-secure default
-- `BE-M3`: Resend webhook forwarding is not idempotent
-- `BE-M1`: Snapshot-mutating endpoints do not maintain a coherent cache invalidation sequence
-- `BE-M2`: Campaign admin APIs validate campaign rows on read, but not campaign payloads on write
-- `FE-M1`: Studio availability is determined inconsistently between server routing and client navigation
-- `FE-M2`: Admin summary cards are computed from paginated rows but presented as whole-dataset KPIs
-- `FE-M3`: Admin table requests can race and overwrite newer state with stale responses
-- `SE-M2`: Third-party bearer tokens are stored in the client session cookie
-- `AR-M1`: Core Profile Retrieval Has Become a God Module
-- `PE-M2`: Cache operations on hot paths have error handling but no latency budget
-- `UX-H1`: The launch copy is systemically in English despite the repo’s stated Spanish requirement
-- `UX-M1`: Status semantics are inconsistent across errors and verification, so users cannot rely on color or layout cues
-- `UX-M2`: Reduced-motion support is partial, so accessibility behavior changes unpredictably from screen to screen
-- `PE-M1`: The public share/badge hot path still blocks TTFB on several synchronous remote operations
-- `SE-L1`: Third-party license inventory is stale and incomplete
-- `SE-L2`: Resend webhook handling has no replay/idempotency guard
+- DO-B1, BE-H1, BE-H2, FE-H1, FE-H2, SE-H1, UX-H1, UX-H2, UX-H3, DO-H1, AR-M1, BE-M1, BE-M2, BE-M4, DO-M1, DO-M2, DO-M4, UX-M1, UX-M2, UX-M3, UX-M4, UX-M5, FE-M2
 
 ### After launch (Wave 2)
-- `AR-M2`: Route-Owned Modules Leak Upward Into Shared Layers
-- `AR-L1`: Dead-Code Drift Is Starting to Accumulate in the Dashboard Layer
-- `QA-L1`: Passing tests emit expected-error noise that weakens CI signal quality
-- `FE-L1`: Owner visits to the share page trigger an automatic second refresh cycle after the initial render
+- AR-M2, BE-M3, BE-M5, PE-M1, PE-M2, DO-M3, QA-M1, UX-M6, FE-M1, FE-M3, BE-L1, BE-L2, BE-L3, DO-L1, DO-L2, SE-L1, SE-L2, QA-L1, UX-L1, UX-L2, UX-L3, FE-L1, FE-L2
 
 ### Later / strategic (Wave 3)
-- `AR-S1`: Public Traffic, Admin Ops, Cron Work, and Campaign Sending Share One Runtime Boundary
+- AR-L1, PE-L1, PE-L2, PE-L3, PE-L4, DO-L3, QA-L2, FE-L3, AR-S1, BE-S1, PE-S1, DO-S1, FE-S1
 
 ## 15. Open Questions / Assumptions
-- This audit used 8 domain tracks, but the harness capped parallel subagents at 6. QA synthesis was completed locally; the final UX section was replaced once the delayed UX specialist output arrived.
-- Specialist outputs were partial-by-design after forced stop instructions; the findings here are high-signal, not exhaustive.
-- No deployed preview with real non-prod secrets was validated during this pass. The strongest unresolved question is still whether OAuth, badge generation, and dependency-backed health behave correctly in a deployment-shaped environment.
-- The current GitHub Actions run on `develop` (`24841255535`) had `Lint & Typecheck`, `Test`, and `Build` green during the audit, while `E2E Tests` were still in progress.
-- `pnpm outdated` showed only modest dependency drift in the local workspace, but no full upgrade-risk analysis was done in this report.
+
+- **PE-L4 / share-page `<img>` fallback** and **UX-L1 / BadgeContent dark theme** were flagged as possibly-intentional; the on-page radar may be deliberately dark like the embeddable badge SVG. Confirm before changing BadgeContent colors.
+- **DO-S1 cron scaling** and **BE-S1 service-role architecture** are infra/architecture decisions whose full solutions (token pools, staggered crons, DB-level authz) may exceed a single remediation pass; the fixable sub-parts (threshold alerting, centralized authz helper) are actioned.
+- Branch-protection findings (DO-B1/H1/M3/M4) are GitHub repo-settings changes applied via `gh api`, sequenced so `enforce_admins` is enabled only after contexts are corrected (to avoid self-lockout during the release merge).
 
 ## 16. Final Verdict
-- Verdict (repeat from §1 for parser): NOT READY
-- What would most worry you about shipping today?
-  The product’s core public artifact is not actually public enough: share pages are withholding the breakdown and embed explanation promised by the repo’s own contract, while CI would still tell the team “green” even if login or badge rendering were broken in deployment. The next biggest worry is duplicate user-facing email sends and a share/badge path that is heavier and more fragile than it should be.
-- What gives you confidence?
-  The repo is already disciplined: core verification passed locally, automated coverage is broad, circular dependencies were not found, and the major issues are understandable engineering problems rather than chaotic unknowns.
-- Next 5 actions (ordered)
-  1. Fix `UX-B1` so public share pages expose the public breakdown and embed artifact promised by the product contract.
-  2. Fix `DO-H1` and `QA-H1` so the pipeline proves launch-critical runtime behavior in a deployed non-prod environment.
-  3. Fix `PE-H3` and `BE-H1` so public badge/profile traffic behaves sanely under cache misses and Redis degradation.
-  4. Fix `BE-H2`, `BE-M3`, and `SE-L2` so email sends and webhooks are concurrency-safe and idempotent.
-  5. Reduce public-route JS and hydration cost by addressing `FE-H1`, `FE-H2`, `PE-H1`, and `PE-H2`.
+
+- **Verdict: NOT READY** (one launch-blocker: DO-B1). After remediation of DO-B1 + the high-severity set, the project moves to READY.
+- **What would most worry me about shipping today?** The production merge gate is not enforcing the CI it appears to (DO-B1), and multi-platform pagination can silently persist wrong scores under exactly the rate-limit conditions a launch produces (BE-H1).
+- **What gives me confidence?** 7,738 green tests with real failure-mode coverage, clean architecture (no circular deps, no `any`), and a strong security baseline.
+- **Next 5 actions:** (1) DO-B1 + DO-H1/M3/M4 branch-protection fixes; (2) BE-H1 pagination fix; (3) SE-H1 undici override; (4) UX-H1/H2/H3 i18n leaks; (5) FE-H1/FE-H2/FE-M2 caching + bundle.

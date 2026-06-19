@@ -3,6 +3,7 @@ import type { Locale } from './types';
 const SUPPORTED_PRIMARY = new Set(['en', 'es']);
 
 function primarySubtag(lang: string): string {
+  /* v8 ignore next -- split() always returns ≥1 element; ?? '' is for noUncheckedIndexedAccess */
   return (lang.split('-')[0] ?? '').toLowerCase();
 }
 
@@ -20,9 +21,11 @@ export function pickFromAcceptLanguage(header: string | null): Locale | null {
     .split(',')
     .map((token) => {
       const parts = token.trim().split(';');
+      /* v8 ignore next -- split() always returns ≥1 element; ?? '' is for noUncheckedIndexedAccess */
       const lang = (parts[0] ?? '').trim();
       let q = 1.0;
       for (let i = 1; i < parts.length; i++) {
+        /* v8 ignore next -- valid loop index is always defined; ?? '' is for noUncheckedIndexedAccess */
         const param = (parts[i] ?? '').trim();
         if (param.startsWith('q=')) {
           const parsed = parseFloat(param.slice(2));

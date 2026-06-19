@@ -10,6 +10,7 @@ import type {
   RawBitbucketData,
 } from "./types";
 import { SCORING_WINDOW_DAYS } from "@chapa/shared";
+import { fetchWithRetry, sanitizeLogBody } from "@/lib/utils/fetch-retry";
 
 const BB_API = "https://api.bitbucket.org/2.0";
 const FETCH_TIMEOUT_MS = 30_000; // 30s total budget
@@ -41,7 +42,8 @@ export async function fetchBitbucketContributionData(
       MAX_PAGES,
       controller.signal,
     );
-    if (wsResult.authFailed) return null;
+    // BE-H1: treat auth failure and rate-limit/5xx both as unrecoverable null
+    if (wsResult.authFailed || wsResult.rateLimited) return null;
     const workspaces = wsResult.items.slice(0, MAX_WORKSPACES);
 
     // 2. Fetch repos across all workspaces
@@ -158,7 +160,11 @@ export async function fetchBitbucketContributionData(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Generic paginated fetch — follows `next` links up to maxPages */
+/**
+ * Generic paginated fetch — follows `next` links up to maxPages.
+ * Returns an empty array on any failure (auth, rate-limit, 5xx) to allow
+ * the calling context to continue collecting data from other sources.
+ */
 async function fetchPaginated<T>(
   url: string,
   token: string,
@@ -166,37 +172,66 @@ async function fetchPaginated<T>(
   signal: AbortSignal,
 ): Promise<T[]> {
   const result = await fetchPaginatedWithStatus<T>(url, token, maxPages, signal);
+  // On auth failure or rate-limit mid-pagination, return whatever we have (may be empty)
   return result.items;
 }
 
-/** Paginated fetch that also reports auth failures */
+/**
+ * Paginated fetch that also reports auth failures.
+ *
+ * BE-H1 (#859): 429 and 5xx mid-pagination set `rateLimited: true` which
+ * propagates as a null result in callers (same failure path as auth failures).
+ *
+ * BE-M3 (#880): Uses fetchWithRetry for a single jittered retry on 5xx.
+ *
+ * BE-M5 (#881): Shape-guards `data.values`; missing/non-array `values` is
+ * treated as an empty page rather than throwing.
+ */
 async function fetchPaginatedWithStatus<T>(
   url: string,
   token: string,
   maxPages: number,
   signal: AbortSignal,
-): Promise<{ items: T[]; authFailed: boolean }> {
+): Promise<{ items: T[]; authFailed: boolean; rateLimited: boolean }> {
   const items: T[] = [];
   let nextUrl: string | undefined = url;
   let pages = 0;
 
   while (nextUrl && pages < maxPages) {
-    const res = await fetch(nextUrl, {
+    const res = await fetchWithRetry(nextUrl, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal,
     });
-    if (res.status === 401 || res.status === 403) {
-      return { items, authFailed: true };
-    }
-    if (!res.ok) return { items, authFailed: false };
 
-    const data = (await res.json()) as BitbucketPaginated<T>;
+    if (res.status === 401 || res.status === 403) {
+      return { items, authFailed: true, rateLimited: false };
+    }
+    if (res.status === 429 || res.status >= 500) {
+      const rawBody = await res.text().catch(() => "");
+      if (rawBody) {
+        console.error(
+          `[bitbucket] HTTP ${res.status}: ${sanitizeLogBody(rawBody)}`,
+        );
+      }
+      return { items, authFailed: false, rateLimited: true };
+    }
+    if (!res.ok) return { items, authFailed: false, rateLimited: false };
+
+    const json: unknown = await res.json();
+
+    // BE-M5: shape guard — BitbucketPaginated must have a values array
+    const data = json as BitbucketPaginated<T>;
+    if (!Array.isArray(data?.values)) {
+      console.error(`[bitbucket] Unexpected non-array values in paginated response`);
+      return { items, authFailed: false, rateLimited: false };
+    }
+
     items.push(...data.values);
     nextUrl = data.next;
     pages++;
   }
 
-  return { items, authFailed: false };
+  return { items, authFailed: false, rateLimited: false };
 }
 
 /** Fetch commits by user in a repo (last SCORING_WINDOW_DAYS) */

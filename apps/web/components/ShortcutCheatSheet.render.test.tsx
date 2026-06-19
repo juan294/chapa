@@ -3,11 +3,11 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { ShortcutCheatSheet } from "./ShortcutCheatSheet";
 
-vi.mock("@/lib/feature-flags", () => ({
+vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => true),
 }));
 
-import { isStudioEnabledSync } from "@/lib/feature-flags";
+import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
 
 beforeEach(() => {
   vi.mocked(isStudioEnabledSync).mockReturnValue(true);

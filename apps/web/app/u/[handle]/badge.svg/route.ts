@@ -26,6 +26,8 @@ import {
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
 
+export const maxDuration = 35;
+
 const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
 const BADGE_CACHE_DEADLINE_MS = 250;
 const BADGE_RATE_LIMIT_DEADLINE_MS = 150;
@@ -131,6 +133,25 @@ export async function GET(
 ) {
   const { handle } = await params;
 
+  // Validate handle before any cache/rate-limit work
+  if (!isValidHandle(handle)) {
+    const svg = fallbackSvg(handle, "Invalid GitHub handle.");
+    return new NextResponse(svg, {
+      status: 400,
+      headers: { "Content-Type": "image/svg+xml" },
+    });
+  }
+
+  // SVG full-response cache: serve warm-cache badge without any Redis rate-limit
+  // overhead (#882 — rate limit moved to cache-MISS branch only).
+  const today = toDateString(new Date());
+  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
+  if (cachedSvg) {
+    return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
+  }
+
+  // Cache miss: apply rate limit before triggering the expensive render path.
   // Rate limit: 100 requests per IP+handle per 60 seconds
   const ip = getClientIp(request);
   const rl = await checkBadgeRateLimit(`ratelimit:badge:${ip}:${handle}`, 100, 60);
@@ -142,23 +163,6 @@ export async function GET(
         "Retry-After": "60",
       },
     });
-  }
-
-  // Validate handle before any work
-  if (!isValidHandle(handle)) {
-    const svg = fallbackSvg(handle, "Invalid GitHub handle.");
-    return new NextResponse(svg, {
-      status: 400,
-      headers: { "Content-Type": "image/svg+xml" },
-    });
-  }
-
-  // SVG full-response cache: serve stale badge without hitting GitHub API
-  const today = toDateString(new Date());
-  const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
-  const cachedSvg = await readBadgeSvgCache(svgCacheKey);
-  if (cachedSvg) {
-    return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
   }
 
   const inflightSvg = inflightBadgeRenders.get(svgCacheKey);
@@ -183,6 +187,31 @@ export async function GET(
   try {
     gotRenderLock = await acquireBadgeRenderLock(renderLockKey);
     if (!gotRenderLock) {
+      // PE-M2: lock-loser optimisation.
+      //
+      // In-memory inflight maps and the Redis render-lock are best-effort
+      // same-instance optimisations only — they do not hold across serverless
+      // function instances. The lock-loser path therefore has two tiers:
+      //
+      //   1. Stale SVG check (immediate) — if yesterday's badge is still in
+      //      Redis (24h + up to 2h jitter TTL means it survives into the next
+      //      day), return it right away instead of polling. This avoids ~1.85s
+      //      of blocking for requests that arrive at today's cold-cache boundary.
+      //
+      //   2. Poll for today's SVG — shortened schedule for cases where no stale
+      //      entry exists (brand-new handle, first badge ever).
+      const yesterday = toDateString(new Date(Date.now() - 86_400_000));
+      const staleCacheKey = buildBadgeSvgCacheKey(handle, yesterday);
+      const staleSvg = await readBadgeSvgCache(staleCacheKey);
+      if (staleSvg) {
+        const sharedResult = {
+          svg: staleSvg,
+          headers: CACHE_HEADERS,
+        } satisfies BadgeRenderResult;
+        deferred.resolve(sharedResult);
+        return new NextResponse(sharedResult.svg, { headers: sharedResult.headers });
+      }
+
       const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
       if (lockedSvg) {
         const sharedResult = {
@@ -221,7 +250,7 @@ export async function GET(
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
     });
-    await writeBadgeSvgCache(svgCacheKey, svg);
+    await writeBadgeSvgCache(svgCacheKey, svg, handle);
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return new NextResponse(successResult.svg, { headers: successResult.headers });

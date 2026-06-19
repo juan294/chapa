@@ -1,7 +1,8 @@
 {
-  "lastSyncCommit": "250d6e21934a731f68639ab588850856427a487a",
-  "lastSyncDate": "2026-05-02",
-  "blueprintVersion": "v1.18.0",
+  "lastSyncCommit": "f7e59e072bb03d7ea129092759c86d155a4e2b11",
+  "lastSyncDate": "2026-06-15",
+  "blueprintVersion": "v1.20.0",
+  "agentsTemplateSynced": true,
   "rulesSynced": [
     "deployment-safety.md",
     "push-accountability.md",
@@ -9,6 +10,5 @@
     "supabase.md",
     "testing.md"
   ],
-  "rulesCustom": [],
-  "agentsTemplateSynced": true
+  "rulesCustom": []
 }

@@ -9,7 +9,7 @@ const SOURCE = fs.readFileSync(
 
 describe("Archetypes loading.tsx", () => {
   it("renders a default export function", () => {
-    expect(SOURCE).toMatch(/export default function/);
+    expect(SOURCE).toMatch(/export default (async )?function/);
   });
 
   it("uses bg-bg for page background", () => {
@@ -28,8 +28,8 @@ describe("Archetypes loading.tsx", () => {
     expect(SOURCE).toContain('className="sr-only"');
   });
 
-  it("uses useTranslation for i18n", () => {
-    expect(SOURCE).toContain("useTranslation");
+  it("uses server-side i18n (getServerT)", () => {
+    expect(SOURCE).toContain("getServerT");
   });
 
   it("uses common.loading key", () => {
