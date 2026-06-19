@@ -33,9 +33,17 @@ vi.mock("@/lib/feature-flags", () => ({
   isGitlabEnabled: mockIsGitlabEnabled,
 }));
 
+// BE-L3: getGitlabClientId/Secret are now mutable per-test
+const { mockGetGitlabClientId, mockGetGitlabClientSecret } = vi.hoisted(() => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockGetGitlabClientId: vi.fn<() => string | null | undefined>(() => "gl-client-id" as any),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockGetGitlabClientSecret: vi.fn<() => string | null | undefined>(() => "gl-client-secret" as any),
+}));
+
 vi.mock("@/lib/env", () => ({
-  getGitlabClientId: () => "gl-client-id",
-  getGitlabClientSecret: () => "gl-client-secret",
+  getGitlabClientId: () => mockGetGitlabClientId(),
+  getGitlabClientSecret: () => mockGetGitlabClientSecret(),
 }));
 
 vi.mock("@/lib/db/user-platforms", () => ({
@@ -86,6 +94,9 @@ describe("fetchGitlabIfLinked", () => {
     mockDbDeleteLinkedPlatform.mockResolvedValue(true);
     mockDbUpdatePlatformTokens.mockResolvedValue(true);
     mockFetchGitlabUser.mockResolvedValue(GL_USER);
+    // Reset BE-L3 mocks to defaults
+    mockGetGitlabClientId.mockReturnValue("gl-client-id");
+    mockGetGitlabClientSecret.mockReturnValue("gl-client-secret");
   });
 
   it("returns cached stats when cache hit", async () => {
@@ -211,6 +222,44 @@ describe("fetchGitlabIfLinked", () => {
 
       expect(result).toBeNull();
       expect(mockDbDeleteLinkedPlatform).not.toHaveBeenCalled();
+    });
+
+    // -------------------------------------------------------------------------
+    // BE-L3 (#888): Short-circuit when client id/secret are missing
+    // -------------------------------------------------------------------------
+
+    it("BE-L3: returns null without attempting refresh when client id is missing", async () => {
+      mockIsTokenExpired.mockReturnValue(true);
+      mockGetGitlabClientId.mockReturnValue(null);
+      mockGetGitlabClientSecret.mockReturnValue("gl-client-secret");
+
+      const result = await fetchGitlabIfLinked(HANDLE, LOWER);
+
+      expect(result).toBeNull();
+      // Must not have tried the upstream refresh call
+      expect(mockRefreshGitlabToken).not.toHaveBeenCalled();
+    });
+
+    it("BE-L3: returns null without attempting refresh when client secret is missing", async () => {
+      mockIsTokenExpired.mockReturnValue(true);
+      mockGetGitlabClientId.mockReturnValue("gl-client-id");
+      mockGetGitlabClientSecret.mockReturnValue(null);
+
+      const result = await fetchGitlabIfLinked(HANDLE, LOWER);
+
+      expect(result).toBeNull();
+      expect(mockRefreshGitlabToken).not.toHaveBeenCalled();
+    });
+
+    it("BE-L3: returns null without attempting refresh when both id and secret are missing", async () => {
+      mockIsTokenExpired.mockReturnValue(true);
+      mockGetGitlabClientId.mockReturnValue(null);
+      mockGetGitlabClientSecret.mockReturnValue(null);
+
+      const result = await fetchGitlabIfLinked(HANDLE, LOWER);
+
+      expect(result).toBeNull();
+      expect(mockRefreshGitlabToken).not.toHaveBeenCalled();
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   fetchGitlabContributionData,
 } from "./queries";
 import type { GitlabEvent } from "./types";
+import { _setRetryDelayFn } from "@/lib/utils/fetch-retry";
 
 // ---------------------------------------------------------------------------
 // bucketEventsByDate (pure)
@@ -97,6 +98,8 @@ function routeFetch(routes: { match: string; status?: number; body: unknown }[])
 describe("fetchGitlabContributionData", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Skip retry delays so tests don't hang
+    _setRetryDelayFn(() => Promise.resolve());
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -261,5 +264,254 @@ describe("fetchGitlabContributionData", () => {
 
     await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
     expect(eventsCalls).toBe(5); // MAX_PAGES hard cap — never unbounded
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-H1 (#859): fetchPaginated — 429/5xx mid-pagination returns null
+  // ---------------------------------------------------------------------------
+
+  it("BE-H1: returns null when fetchPaginated encounters a 429 on page 1", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([{ match: "/events", status: 429, body: {} }]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("BE-H1: returns null when fetchPaginated encounters a 500 on page 2", async () => {
+    const fullPage = Array.from({ length: 100 }, () => ({
+      created_at: "2026-06-10T09:00:00Z",
+      action_name: "opened",
+    }));
+    let eventsCalls = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/events")) {
+        eventsCalls++;
+        const status = eventsCalls === 1 ? 200 : 500;
+        const body = eventsCalls === 1 ? fullPage : {};
+        return Promise.resolve({
+          ok: status < 400,
+          status,
+          json: () => Promise.resolve(body),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("BE-H1: 200 with data still returns items (success path unchanged)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/users/42/events", body: [{ created_at: "2026-06-10T09:00:00Z", action_name: "opened" }] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(result!.heatmap).toHaveLength(1);
+  });
+
+  it("BE-H1: 401/403 from fetchPaginated returns null (unchanged behaviour)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([{ match: "/events", status: 403, body: {} }]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M3 (#880): Jittered retry on transient 5xx
+  // ---------------------------------------------------------------------------
+
+  it("BE-M3: retries a transient 5xx and succeeds on the second attempt", async () => {
+    let eventsCalls = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/events")) {
+        eventsCalls++;
+        // First call: 503. Second call: 200 with data.
+        if (eventsCalls === 1) {
+          return Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({}) });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve([{ created_at: "2026-06-10T09:00:00Z", action_name: "opened" }]),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    // At least 2 calls to /events (initial + retry)
+    expect(eventsCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  it("BE-M3: persistent 5xx returns null after max attempts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([{ match: "/events", status: 503, body: {} }]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M4 (#870): Log body truncation and control-char stripping
+  // ---------------------------------------------------------------------------
+
+  it("BE-M4: logs only status + truncated snippet (≤200 chars) on HTTP errors", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const longBody = "x".repeat(500);
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/events")) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          json: () => Promise.resolve({}),
+          text: () => Promise.resolve(longBody),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+
+    expect(consoleSpy).toHaveBeenCalled();
+    const logged = consoleSpy.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("[gitlab]"),
+    );
+    expect(logged).toBeDefined();
+    // The logged snippet must be ≤200 chars for the body portion
+    const loggedStr = logged![0] as string;
+    expect(loggedStr.length).toBeLessThanOrEqual(350); // status prefix + ≤200 snippet
+    consoleSpy.mockRestore();
+  });
+
+  it("BE-M4: strips control characters from logged body", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const adversarialBody = "error\x00\x01\x1b[31mred\x1b[0m\ntext";
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/events")) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          json: () => Promise.resolve({}),
+          text: () => Promise.resolve(adversarialBody),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+
+    const logged = consoleSpy.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("[gitlab]"),
+    );
+    expect(logged).toBeDefined();
+    const loggedStr = logged![0] as string;
+    // Must not contain ANSI escape sequences or null bytes
+    expect(loggedStr).not.toMatch(/\x1b/);
+    expect(loggedStr).not.toMatch(/\x00/);
+    consoleSpy.mockRestore();
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-M5 (#881): Shape guards at deserialization boundary
+  // ---------------------------------------------------------------------------
+
+  it("BE-M5: malformed events response (not an array) returns null without throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([{ match: "/events", body: { not: "an array" } }]),
+    );
+
+    // Should not throw — should return null gracefully
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("BE-M5: malformed MR list (not an array) is treated as empty without throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/users/42/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: "bad" },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(result!.mergedPRs).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // BE-L1 (#886): fetchReviewsCount caps per-MR approver lookups
+  // ---------------------------------------------------------------------------
+
+  it("BE-L1: caps approver lookups and does not make unbounded per-MR API calls", async () => {
+    // Create 20 MRs authored by "other" — all eligible for approver lookup
+    const manyMRs = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1,
+      iid: i + 1,
+      project_id: 200 + i,
+      state: "merged",
+      merged_at: "x",
+      author: { username: "other" },
+    }));
+
+    let approverCalls = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/users/42/events")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      }
+      if (url.includes("merge_requests?author_username=gluser")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      }
+      if (url.includes("merge_requests?reviewer_username=gluser")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(manyMRs) });
+      }
+      if (url.includes("/approvals")) {
+        approverCalls++;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ approved_by: [] }),
+        });
+      }
+      if (url.includes("/issues")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      }
+      if (url.includes("/users/42/projects")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    // Must be strictly less than the total number of eligible MRs (20)
+    expect(approverCalls).toBeLessThan(20);
   });
 });

@@ -41,8 +41,16 @@ export async function fetchGitlabIfLinked(
         return null;
       }
     } else {
-      const clientId = getGitlabClientId() ?? "";
-      const clientSecret = getGitlabClientSecret() ?? "";
+      const clientId = getGitlabClientId();
+      const clientSecret = getGitlabClientSecret();
+
+      // BE-L3 (#888): short-circuit when OAuth app credentials are not configured.
+      // Attempting refresh with empty strings wastes a round-trip and returns a
+      // confusing upstream error. Return null clearly without calling upstream.
+      if (!clientId || !clientSecret) {
+        return null;
+      }
+
       const result = await refreshGitlabToken(
         refreshToken,
         clientId,
