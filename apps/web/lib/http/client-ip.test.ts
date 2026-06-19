@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getClientIp } from "./client-ip";
+import { getClientIp, NO_TRUSTED_IP } from "./client-ip";
 
 function makeRequest(headers: Record<string, string> = {}): Request {
   const h = new Headers();
@@ -71,5 +71,28 @@ describe("getClientIp", () => {
     // "10.0.0.1, " splits into ["10.0.0.1", " "] — last.trim() is "" → falls through
     const req = makeRequest({ "x-forwarded-for": "10.0.0.1, " });
     expect(getClientIp(req)).toBe("unknown");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BE-M1 (#868): NO_TRUSTED_IP sentinel for safe-fail rate-limiting
+// ---------------------------------------------------------------------------
+
+describe("NO_TRUSTED_IP constant (BE-M1)", () => {
+  it("is exported as a string constant equal to 'unknown'", () => {
+    // The sentinel value is "unknown" — callers must check for it and apply
+    // a strict global cap rather than a shared-bucket rate-limit key.
+    expect(NO_TRUSTED_IP).toBe("unknown");
+  });
+
+  it("getClientIp returns NO_TRUSTED_IP (not a real IP) when no trusted header is present", () => {
+    const req = makeRequest();
+    expect(getClientIp(req)).toBe(NO_TRUSTED_IP);
+  });
+
+  it("getClientIp does NOT return NO_TRUSTED_IP when a trusted header is present", () => {
+    const req = makeRequest({ "x-vercel-forwarded-for": "1.2.3.4" });
+    expect(getClientIp(req)).not.toBe(NO_TRUSTED_IP);
+    expect(getClientIp(req)).toBe("1.2.3.4");
   });
 });

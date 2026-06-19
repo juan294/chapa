@@ -317,4 +317,44 @@ describe("POST /api/supplemental", () => {
 
     await expect(POST(req)).rejects.toThrow("Auth service down");
   });
+
+  // -------------------------------------------------------------------------
+  // SE-L2 (#890): Ownership check must fire BEFORE the per-handle rate-limit
+  // -------------------------------------------------------------------------
+
+  it("verifies ownership before consuming the per-handle rate-limit quota (SE-L2)", async () => {
+    // An attacker cannot exhaust another handle's bucket by sending requests
+    // with their own valid token but a different targetHandle.
+    const ownershipCheckOrder: number[] = [];
+    const rateLimitCallOrder: number[] = [];
+    let callCounter = 0;
+
+    mockResolveRequestAuth.mockImplementation(() => {
+      ownershipCheckOrder.push(++callCounter);
+      return Promise.resolve({ handle: "attacker" });
+    });
+
+    mockRateLimit.mockImplementation((key: string) => {
+      if (key.startsWith("ratelimit:supplemental:")) {
+        rateLimitCallOrder.push(++callCounter);
+      }
+      return Promise.resolve({ allowed: true, current: 1, limit: 10 });
+    });
+
+    const req = makeRequest(
+      { targetHandle: "victim", sourceHandle: "juan_corp", stats: validStats },
+      "attacker-token",
+    );
+
+    const res = await POST(req);
+
+    // Must be 403 (ownership mismatch)
+    expect(res.status).toBe(403);
+
+    // Ownership check must have fired
+    expect(ownershipCheckOrder.length).toBeGreaterThan(0);
+
+    // Rate-limit must NOT have been incremented for the victim's handle
+    expect(rateLimitCallOrder.length).toBe(0);
+  });
 });

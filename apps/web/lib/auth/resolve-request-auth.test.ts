@@ -69,6 +69,102 @@ beforeEach(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// BE-H2c: Structural pre-check — bogus tokens rejected WITHOUT calling GitHub
+// ---------------------------------------------------------------------------
+
+describe("resolveRequestAuth — structural pre-check (BE-H2c)", () => {
+  it("rejects a token that is not CLI-shaped and not gh[pousr]_-prefixed WITHOUT calling fetchGitHubUser", async () => {
+    // bogus token: not base64url.sig and not a GitHub PAT prefix
+    mockIsCliToken.mockReturnValue(false);
+
+    const result = await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer totally-bogus-token-xyz" }),
+    );
+
+    expect(result).toBeNull();
+    // The critical assertion: fetchGitHubUser must NOT have been called
+    expect(mockFetchGitHubUser).not.toHaveBeenCalled();
+  });
+
+  it("allows gh-prefixed tokens through to fetchGitHubUser (ghp_)", async () => {
+    mockIsCliToken.mockReturnValue(false);
+    mockFetchGitHubUser.mockResolvedValue({ login: "octocat" });
+
+    await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer ghp_abc123" }),
+    );
+
+    expect(mockFetchGitHubUser).toHaveBeenCalledWith("ghp_abc123");
+  });
+
+  it("allows gh-prefixed tokens through to fetchGitHubUser (gho_)", async () => {
+    mockIsCliToken.mockReturnValue(false);
+    mockFetchGitHubUser.mockResolvedValue({ login: "octocat" });
+
+    await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer gho_abc123" }),
+    );
+
+    expect(mockFetchGitHubUser).toHaveBeenCalledWith("gho_abc123");
+  });
+
+  it("allows gh-prefixed tokens through to fetchGitHubUser (ghu_)", async () => {
+    mockIsCliToken.mockReturnValue(false);
+    mockFetchGitHubUser.mockResolvedValue({ login: "octocat" });
+
+    await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer ghu_abc123" }),
+    );
+
+    expect(mockFetchGitHubUser).toHaveBeenCalledWith("ghu_abc123");
+  });
+
+  it("allows gh-prefixed tokens through to fetchGitHubUser (ghs_)", async () => {
+    mockIsCliToken.mockReturnValue(false);
+    mockFetchGitHubUser.mockResolvedValue({ login: "octocat" });
+
+    await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer ghs_abc123" }),
+    );
+
+    expect(mockFetchGitHubUser).toHaveBeenCalledWith("ghs_abc123");
+  });
+
+  it("allows gh-prefixed tokens through to fetchGitHubUser (github_pat_)", async () => {
+    mockIsCliToken.mockReturnValue(false);
+    mockFetchGitHubUser.mockResolvedValue({ login: "octocat" });
+
+    await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer github_pat_abc123" }),
+    );
+
+    expect(mockFetchGitHubUser).toHaveBeenCalledWith("github_pat_abc123");
+  });
+
+  it("rejects empty string token without calling fetchGitHubUser", async () => {
+    mockIsCliToken.mockReturnValue(false);
+
+    const result = await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer " }),
+    );
+
+    expect(result).toBeNull();
+    expect(mockFetchGitHubUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects a random string token that looks like a word without calling fetchGitHubUser", async () => {
+    mockIsCliToken.mockReturnValue(false);
+
+    const result = await resolveRequestAuth(
+      makeRequest({ Authorization: "Bearer randomwordtoken" }),
+    );
+
+    expect(result).toBeNull();
+    expect(mockFetchGitHubUser).not.toHaveBeenCalled();
+  });
+});
+
 describe("resolveRequestAuth", () => {
   describe("Bearer CLI token", () => {
     it("resolves handle from a valid CLI token", async () => {
