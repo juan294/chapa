@@ -1,14 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreFiles": ["**/*.test.{ts,tsx}"],
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": ["du"],
-  "ignore": ["vitest.setup.ts", "test/stubs/server-only.ts"],
+  "ignore": ["test/stubs/server-only.ts"],
   "workspaces": {
     ".": {
       "entry": ["scripts/**/*.ts"],
       "ignoreDependencies": [
-        "@chapa/shared",
         "@upstash/redis",
         "@supabase/supabase-js"
       ]
@@ -25,17 +23,7 @@
       ],
       "project": ["**/*.{ts,tsx}"],
       "ignoreDependencies": [
-        "postcss",
-        "server-only",
-        "tsx",
-        "@resvg/resvg-js",
-        "@vercel/analytics",
-        "@vercel/speed-insights",
-        "canvas-confetti",
-        "next-themes",
-        "posthog-js",
-        "resend",
-        "svix"
+        "tsx"
       ]
     },
     "packages/shared": {

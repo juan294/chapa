@@ -11,5 +11,5 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["vitest.config.ts"],
-  "exclude": ["node_modules", "node_modules.nosync"]
+  "exclude": ["node_modules", "node_modules.nosync", ".worktrees"]
 }

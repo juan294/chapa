@@ -45,7 +45,23 @@ For production, confirm `CHAPA_ALERT_WEBHOOK_URL` is configured before release. 
 
 3. Leave the preview running for at least 24 hours if the change touches caching, scoring, or OAuth. For documentation-only changes, 1 hour is sufficient.
 
-### 4. Rollback Decision Criteria
+### 4. Supabase Migrations Applied to Production
+
+Before promoting `develop → main`, confirm all new Supabase migrations have been applied to the production database:
+
+- [ ] Run `supabase db diff --linked` (or check Supabase dashboard Migration History) to confirm no pending migrations exist.
+- [ ] If any migration is pending, apply it with `supabase db push --linked` before merging to `main`.
+
+Never ship code that references schema objects not yet present in the production database.
+
+### 5. CHANGELOG Entry + Version Bump
+
+Before creating the release PR:
+
+- [ ] `CHANGELOG.md` has an entry for this release describing what changed (features, fixes, breaking changes).
+- [ ] Version bump is present if the project follows semver (`package.json` version or equivalent).
+
+### 6. Rollback Decision Criteria
 
 Before merging, confirm you're prepared to roll back if needed:
 
