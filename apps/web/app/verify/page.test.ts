@@ -30,9 +30,11 @@ describe("Verify input page", () => {
     });
   });
 
-  describe("dynamic rendering (i18n)", () => {
-    it("exports dynamic = 'force-dynamic'", () => {
-      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
+  describe("static/ISR rendering", () => {
+    it("is static/ISR with force-static directive", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
+      expect(SOURCE).toContain("export const revalidate");
+      expect(SOURCE).toContain("export const dynamic = 'force-static'");
     });
 
     it("does not use the old SPANISH_PUBLIC_COPY import", () => {
@@ -99,8 +101,8 @@ describe("Verify input page", () => {
       expect(SOURCE).toContain("bg-bg");
     });
 
-    it("uses Navbar", () => {
-      expect(SOURCE).toContain("<Navbar");
+    it("uses NavbarClient (ISR-compatible)", () => {
+      expect(SOURCE).toContain("NavbarClient");
     });
 
     it("has main landmark with id", () => {

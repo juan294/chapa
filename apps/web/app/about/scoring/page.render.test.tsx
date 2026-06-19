@@ -6,6 +6,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
@@ -21,7 +25,6 @@ vi.mock("@/components/LiteYouTubeEmbed", () => ({
 }));
 
 vi.mock("@/lib/i18n/server", () => ({
-  getServerLocale: vi.fn().mockResolvedValue("en"),
   getServerT: vi.fn().mockReturnValue((key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const map: Record<string, any> = {
@@ -153,25 +156,25 @@ afterEach(cleanup);
 describe("ScoringMethodologyPage render", () => {
   it("renders the page heading", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringMethodologyPage());
     expect(screen.getByText("Scoring Methodology")).toBeDefined();
   });
 
   it("renders the navbar", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringMethodologyPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders the command bar", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringMethodologyPage());
     expect(screen.getByTestId("command-bar")).toBeDefined();
   });
 
   it("renders section headings", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringMethodologyPage());
     expect(screen.getByText("Philosophy")).toBeDefined();
     expect(screen.getByText("Normalization")).toBeDefined();
     expect(screen.getByText("Signal caps")).toBeDefined();
@@ -180,27 +183,27 @@ describe("ScoringMethodologyPage render", () => {
 
   it("renders dimension sub-headings", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    const { container } = render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    const { container } = render(await ScoringMethodologyPage());
     const h3s = container.querySelectorAll("h3");
     expect(h3s.length).toBeGreaterThan(0);
   });
 
   it("renders tables with signal caps data", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    const { container } = render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    const { container } = render(await ScoringMethodologyPage());
     const tables = container.querySelectorAll("table");
     expect(tables.length).toBeGreaterThan(0);
   });
 
   it("renders the YouTube explainer embed", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringMethodologyPage());
     expect(screen.getByTestId("youtube-embed")).toBeDefined();
   });
 
   it("renders the CTA section", async () => {
     const { default: ScoringMethodologyPage } = await import("./page");
-    render(await ScoringMethodologyPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringMethodologyPage());
     expect(screen.getByText("Help us improve this")).toBeDefined();
   });
 });
@@ -208,7 +211,7 @@ describe("ScoringMethodologyPage render", () => {
 describe("ScoringMethodologyPage generateMetadata", () => {
   it("returns metadata with title and openGraph for the default locale", async () => {
     const { generateMetadata } = await import("./page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
+    const meta = generateMetadata();
     expect(meta.title).toBeTruthy();
     expect(meta.openGraph).toBeDefined();
     expect(meta.twitter).toBeDefined();
@@ -216,7 +219,7 @@ describe("ScoringMethodologyPage generateMetadata", () => {
 
   it("returns metadata when lang param is provided", async () => {
     const { generateMetadata } = await import("./page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({ lang: "en" }) });
+    const meta = generateMetadata();
     expect(meta.title).toBeTruthy();
   });
 });

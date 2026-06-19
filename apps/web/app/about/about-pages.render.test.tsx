@@ -6,6 +6,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
@@ -240,7 +244,7 @@ afterEach(cleanup);
 describe("AboutPage render (en)", () => {
   it("renders the about page with en heading", async () => {
     const { default: AboutPage } = await import("./page");
-    render(await AboutPage({ searchParams: Promise.resolve({}) }));
+    render(await AboutPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
     expect(screen.getByText("About Chapa")).toBeDefined();
     expect(screen.getByText("Dimensions")).toBeDefined();
@@ -248,7 +252,7 @@ describe("AboutPage render (en)", () => {
 
   it("renders all section headings", async () => {
     const { default: AboutPage } = await import("./page");
-    render(await AboutPage({ searchParams: Promise.resolve({}) }));
+    render(await AboutPage());
     expect(screen.getByText("Developer archetypes")).toBeDefined();
     expect(screen.getByText("Privacy and fairness")).toBeDefined();
     expect(screen.getByText("Contact")).toBeDefined();
@@ -289,16 +293,15 @@ describe("AboutPage render (es)", () => {
       return map[key] ?? key;
     });
     const { default: AboutPage } = await import("./page");
-    render(await AboutPage({ searchParams: Promise.resolve({ lang: "es" }) }));
+    render(await AboutPage());
     expect(screen.getByText("Acerca de Chapa")).toBeDefined();
     expect(screen.getByText("Dimensiones")).toBeDefined();
   });
 });
 
 describe("generateMetadata (about/index)", () => {
-  it("returns locale-specific title for es", async () => {
-    const { getServerLocale, getServerT } = await import("@/lib/i18n/server");
-    vi.mocked(getServerLocale).mockResolvedValue("es");
+  it("returns DEFAULT_LOCALE (es) title synchronously (ISR — no per-request locale)", async () => {
+    const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       if (key === "about.index.metadataTitle") return "Acerca de";
       if (key === "about.index.metadataDescription") return "Aprende sobre Chapa.";
@@ -309,7 +312,7 @@ describe("generateMetadata (about/index)", () => {
       return key;
     });
     const { generateMetadata } = await import("./page");
-    const meta = await generateMetadata({ searchParams: Promise.resolve({ lang: "es" }) });
+    const meta = generateMetadata();
     expect(meta.title).toBe("Acerca de");
   });
 });
@@ -333,7 +336,7 @@ describe("ScoringPage render (en)", () => {
       return strMap[key] ?? (key.split('.').pop() ?? key);
     });
     const { default: ScoringPage } = await import("./scoring/page");
-    render(await ScoringPage({ searchParams: Promise.resolve({}) }));
+    render(await ScoringPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
     expect(screen.getByText("Scoring Methodology")).toBeDefined();
   });
@@ -379,7 +382,7 @@ describe("ScoringPage render (es)", () => {
       return map[key] ?? (key.split('.').pop() ?? key);
     });
     const { default: ScoringPage } = await import("./scoring/page");
-    render(await ScoringPage({ searchParams: Promise.resolve({ lang: "es" }) }));
+    render(await ScoringPage());
     expect(screen.getByText("Metodología de puntuación")).toBeDefined();
     expect(screen.getByText("Filosofía")).toBeDefined();
   });
@@ -411,7 +414,7 @@ describe("VerificationPage render (en)", () => {
       return map[key] ?? (key.split('.').pop() ?? key);
     });
     const { default: VerificationPage } = await import("./verification/page");
-    render(await VerificationPage({ searchParams: Promise.resolve({}) }));
+    render(await VerificationPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
     expect(screen.getByText("Badge Verification")).toBeDefined();
     expect(screen.getByText("Why verification exists")).toBeDefined();
@@ -444,7 +447,7 @@ describe("VerificationPage render (es)", () => {
       return map[key] ?? (key.split('.').pop() ?? key);
     });
     const { default: VerificationPage } = await import("./verification/page");
-    render(await VerificationPage({ searchParams: Promise.resolve({ lang: "es" }) }));
+    render(await VerificationPage());
     expect(screen.getByText("Verificación de Chapa")).toBeDefined();
     expect(screen.getByText("Por qué existe la verificación")).toBeDefined();
   });

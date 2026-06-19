@@ -12,6 +12,10 @@ vi.mock("@/components/Navbar", () => ({
   Navbar: () => <nav data-testid="navbar" />,
 }));
 
+vi.mock("@/components/NavbarClient", () => ({
+  NavbarClient: () => <nav data-testid="navbar" />,
+}));
+
 vi.mock("@/components/GlobalCommandBar", () => ({
   GlobalCommandBar: () => <div data-testid="command-bar" />,
 }));
@@ -64,7 +68,7 @@ afterEach(cleanup);
 describe("PrivacyPage render", () => {
   it("renders with navbar", async () => {
     const { default: PrivacyPage } = await import("./privacy/page");
-    render(await PrivacyPage({ searchParams: Promise.resolve({}) }));
+    render(await PrivacyPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -75,7 +79,7 @@ describe("PrivacyPage render", () => {
 describe("TermsPage render", () => {
   it("renders with navbar", async () => {
     const { default: TermsPage } = await import("./terms/page");
-    render(await TermsPage({ searchParams: Promise.resolve({}) }));
+    render(await TermsPage());
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -98,7 +102,7 @@ describe("ComingSoonPage render", () => {
 describe("VerifyInputPage render", () => {
   it("renders with verify heading", async () => {
     const { default: VerifyInputPage } = await import("./verify/page");
-    const jsx = await VerifyInputPage({ searchParams: Promise.resolve({}) });
+    const jsx = await VerifyInputPage();
     render(jsx);
     expect(screen.getByTestId("navbar")).toBeDefined();
   });

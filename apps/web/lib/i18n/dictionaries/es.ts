@@ -12,6 +12,7 @@ export const es: Translations = {
     loading: 'Cargando...',
     copied: '¡Copiado!',
     copy: 'Copiar',
+    orConnector: 'o',
   },
   aria: {
     mainNavigation: 'Navegación principal',

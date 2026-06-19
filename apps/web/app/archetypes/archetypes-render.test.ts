@@ -27,15 +27,11 @@ describe("Archetype pages — render tests", () => {
       );
 
       describe("metadata", () => {
-        it("exports generateMetadata (async, locale-aware)", () => {
+        it("exports generateMetadata using DEFAULT_LOCALE (no getServerLocale)", () => {
           expect(source).toContain("generateMetadata");
-          expect(source).toContain("getServerLocale");
+          expect(source).not.toContain("getServerLocale");
           expect(source).toContain("getServerT");
-        });
-
-        it("reads locale from searchParams.lang", () => {
-          expect(source).toContain("searchParams");
-          expect(source).toContain("lang");
+          expect(source).toContain("DEFAULT_LOCALE");
         });
 
         it("uses i18n key for title and description", () => {
@@ -54,15 +50,18 @@ describe("Archetype pages — render tests", () => {
           expect(source).toContain(`archetypeKey="${archetype}"`);
         });
 
-        it("passes searchParams to ArchetypePage", () => {
-          expect(source).toContain("searchParams={searchParams}");
+        it("uses ISR with no searchParams (static-friendly)", () => {
+          // Pages no longer pass searchParams — locale is handled client-side by LocaleSync
+          expect(source).not.toContain("searchParams={searchParams}");
+          expect(source).toContain("ArchetypePage");
         });
       });
 
-      describe("dynamic rendering", () => {
-        it("uses force-dynamic (not ISR revalidate)", () => {
-          expect(source).toContain("force-dynamic");
-          expect(source).not.toContain("revalidate");
+      describe("static/ISR rendering", () => {
+        it("is static/ISR with force-static directive", () => {
+          expect(source).not.toContain("force-dynamic");
+          expect(source).toContain("revalidate");
+          expect(source).toContain("export const dynamic = 'force-static'");
         });
       });
 
@@ -85,8 +84,9 @@ describe("ArchetypePage shared component", () => {
     expect(source).toContain("renderBadgeSvg");
   });
 
-  it("imports getServerLocale and getServerT from server module", () => {
-    expect(source).toContain("getServerLocale");
+  it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
+    expect(source).not.toContain("getServerLocale");
+    expect(source).toContain("DEFAULT_LOCALE");
     expect(source).toContain("getServerT");
     expect(source).toContain("@/lib/i18n/server");
   });
@@ -96,8 +96,8 @@ describe("ArchetypePage shared component", () => {
     expect(source).toContain("@/lib/i18n");
   });
 
-  it("uses Navbar and GlobalCommandBarLazy", () => {
-    expect(source).toContain("Navbar");
+  it("uses NavbarClient and GlobalCommandBarLazy (ISR-compatible)", () => {
+    expect(source).toContain("NavbarClient");
     expect(source).toContain("GlobalCommandBarLazy");
   });
 
