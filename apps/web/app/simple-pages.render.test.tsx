@@ -113,26 +113,27 @@ describe("VerifyInputPage render", () => {
 // ---------------------------------------------------------------------------
 describe("Loading page renders", () => {
   it("renders PrivacyLoading", async () => {
+    // Async server component (#884): await the call before rendering.
     const { default: PrivacyLoading } = await import("./privacy/loading");
-    render(<PrivacyLoading />);
+    render(await PrivacyLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders TermsLoading", async () => {
     const { default: TermsLoading } = await import("./terms/loading");
-    render(<TermsLoading />);
+    render(await TermsLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders ComingSoonLoading", async () => {
     const { default: ComingSoonLoading } = await import("./coming-soon/loading");
-    render(<ComingSoonLoading />);
+    render(await ComingSoonLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders CliAuthorizeLoading", async () => {
     const { default: CliAuthorizeLoading } = await import("./cli/authorize/loading");
-    render(<CliAuthorizeLoading />);
+    render(await CliAuthorizeLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
@@ -144,7 +145,7 @@ describe("Loading page renders", () => {
 
   it("renders ArchetypesLoading", async () => {
     const { default: ArchetypesLoading } = await import("./archetypes/loading");
-    render(<ArchetypesLoading />);
+    render(await ArchetypesLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 

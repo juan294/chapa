@@ -454,8 +454,9 @@ describe("VerificationPage render (es)", () => {
 });
 
 describe("AboutLoading render", () => {
-  it("renders a status element", () => {
-    render(<AboutLoading />);
+  it("renders a status element", async () => {
+    // Async server component (#884): await the call before rendering.
+    render(await AboutLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 });

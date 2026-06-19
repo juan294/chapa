@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { render, act, waitFor } from '@testing-library/react';
 import { LanguageProvider } from './provider';
 import { LangSync } from './lang-sync';
 import { useContext } from 'react';
@@ -66,6 +66,8 @@ describe('LangSync', () => {
       getByTestId('switch-es').click();
     });
 
-    expect(document.documentElement.lang).toBe('es');
+    // setLocale now loads the target locale's dictionary client-side (a dynamic
+    // import), so the locale — and thus <html lang> — updates one async tick later.
+    await waitFor(() => expect(document.documentElement.lang).toBe('es'));
   });
 });

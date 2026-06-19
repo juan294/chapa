@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { LanguageProvider } from './provider';
 import { useTranslation } from './use-translation';
+import { es } from './dictionaries/es';
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(() => ({ refresh: vi.fn() })),
@@ -38,8 +39,10 @@ describe('useTranslation inside LanguageProvider', () => {
   });
 
   it('returns context locale and t function', () => {
+    // Production passes the active locale's dictionary as a prop (the server
+    // resolves it). Mirror that here so the Spanish dictionary is available.
     render(
-      <LanguageProvider initialLocale="es">
+      <LanguageProvider initialLocale="es" dictionary={es}>
         <ConsumerInside />
       </LanguageProvider>
     );
