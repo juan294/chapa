@@ -1,5 +1,6 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreFiles": ["**/*.test.{ts,tsx}"],
   "ignoreExportsUsedInFile": true,
   "ignoreBinaries": ["du"],
   "ignore": ["vitest.setup.ts", "test/stubs/server-only.ts"],
