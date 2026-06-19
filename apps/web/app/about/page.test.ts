@@ -8,15 +8,17 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("About page", () => {
-  describe("dynamic rendering", () => {
-    it("exports force-dynamic (i18n locale resolution)", () => {
-      expect(SOURCE).toContain("export const dynamic = 'force-dynamic'");
+  describe("static/ISR rendering", () => {
+    it("is static/ISR with force-static directive", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
+      expect(SOURCE).toContain("export const revalidate");
+      expect(SOURCE).toContain("export const dynamic = 'force-static'");
     });
   });
 
   describe("metadata", () => {
     it("exports generateMetadata function", () => {
-      expect(SOURCE).toContain("export async function generateMetadata");
+      expect(SOURCE).toContain("generateMetadata");
     });
 
     it("uses about.index.metadataTitle key", () => {
@@ -37,8 +39,9 @@ describe("About page", () => {
   });
 
   describe("i18n integration", () => {
-    it("imports getServerLocale and getServerT from server module", () => {
-      expect(SOURCE).toContain("getServerLocale");
+    it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
+      expect(SOURCE).not.toContain("getServerLocale");
+      expect(SOURCE).toContain("DEFAULT_LOCALE");
       expect(SOURCE).toContain("getServerT");
       expect(SOURCE).toContain("@/lib/i18n/server");
     });
@@ -108,8 +111,8 @@ describe("About page", () => {
       expect(SOURCE).toContain("bg-bg");
     });
 
-    it("uses Navbar", () => {
-      expect(SOURCE).toContain("<Navbar");
+    it("uses NavbarClient (ISR-compatible)", () => {
+      expect(SOURCE).toContain("NavbarClient");
     });
 
     it("uses the lazy command bar", () => {

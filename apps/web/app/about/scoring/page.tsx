@@ -1,19 +1,16 @@
-import { Navbar } from "@/components/Navbar";
+import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const dynamic = 'force-static';
 
-export async function generateMetadata({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string>>;
-}): Promise<Metadata> {
-  const locale = await getServerLocale((await searchParams).lang);
-  const t = getServerT(locale);
+export function generateMetadata(): Metadata {
+  const t = getServerT(DEFAULT_LOCALE);
   return {
     title: t('about.scoring.metadataTitle') as string,
     description: t('about.scoring.metadataDescription') as string,
@@ -95,18 +92,13 @@ function Table({
 /* Page                                                                    */
 /* ---------------------------------------------------------------------- */
 
-export default async function ScoringMethodologyPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string>>;
-}) {
-  const locale = await getServerLocale((await searchParams).lang);
-  const t = getServerT(locale);
+export default async function ScoringMethodologyPage() {
+  const t = getServerT(DEFAULT_LOCALE);
 
   return (
     <div className="min-h-screen bg-bg">
-      <LocaleSync queryLang={(await searchParams).lang} />
-      <Navbar />
+      <LocaleSync />
+      <NavbarClient />
 
       <main
         id="main-content"

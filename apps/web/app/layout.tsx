@@ -5,10 +5,10 @@ import { ClientInstrumentation } from "@/components/ClientInstrumentation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvider";
 import { getBaseUrl } from "@/lib/env";
-import { isStudioEnabled } from "@/lib/feature-flags";
+import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
 import { renderJsonLd } from "@/lib/jsonld";
 import { LanguageProvider, LangSync } from "@/lib/i18n";
-import { getServerLocale } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -66,13 +66,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const studioEnabled = await isStudioEnabled();
-  const locale = await getServerLocale();
+  // Use sync env-var check instead of DB-backed async check to avoid
+  // Upstash Redis fetch(no-store) calls that force dynamic rendering.
+  const studioEnabled = isStudioEnabledSync();
+  // Use DEFAULT_LOCALE at build time — LangSync and LanguageProvider handle
+  // client-side locale detection (cookie → Accept-Language → default) on hydration.
+  // This avoids cookies()/headers() calls in the layout, which would force every
+  // page in the app into dynamic rendering (defeating ISR on /about, /archetypes/*, etc.)
+  const locale = DEFAULT_LOCALE;
 
   return (
     <html

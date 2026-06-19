@@ -1,7 +1,8 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { LocaleSync } from "@/lib/i18n";
-import { Navbar } from "@/components/Navbar";
+import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import Link from "next/link";
 import {
@@ -39,13 +40,12 @@ const ACCENT_CLASS: Record<ArchetypeKey, string> = {
 
 interface Props {
   archetypeKey: ArchetypeKey;
-  searchParams: Promise<Record<string, string>>;
 }
 
-export async function ArchetypePage({ archetypeKey, searchParams }: Props) {
-  const params = await searchParams;
-  const locale = await getServerLocale(params.lang);
-  const t = getServerT(locale);
+export async function ArchetypePage({ archetypeKey }: Props) {
+  // Render at DEFAULT_LOCALE (es) at build time; client LocaleSync swaps to
+  // the user's cookie locale on hydration — same pattern as the share page.
+  const t = getServerT(DEFAULT_LOCALE);
   const ns = `archetypes.${archetypeKey}`;
 
   const demoData = DEMO_DATA[archetypeKey];
@@ -70,8 +70,8 @@ export async function ArchetypePage({ archetypeKey, searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">
-      <Navbar />
-      <LocaleSync queryLang={params.lang} />
+      <NavbarClient />
+      <LocaleSync />
       <main id="main-content" className="mx-auto max-w-3xl px-6 pt-32 pb-16">
         <article className="animate-fade-in-up">
           <div className="flex items-center gap-2 mb-6 font-heading text-sm">

@@ -1,11 +1,13 @@
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+export const dynamic = 'force-static';
 
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
-import { Navbar } from "@/components/Navbar";
+import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
@@ -97,10 +99,10 @@ export default async function Home({
 }) {
   const { error, lang } = await searchParams;
   const errorMessage = getOAuthErrorMessage(error);
-  const locale = await getServerLocale(lang);
-  const t = getServerT(locale);
+  // Render at DEFAULT_LOCALE (es) at build time; client LocaleSync swaps to
+  // the user's cookie locale on hydration — same pattern as the share page.
+  const t = getServerT(DEFAULT_LOCALE);
 
-  const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
   const hero = t('landing.hero') as unknown as Record<string, string | string[]>;
   const heroTitle = hero.title as string;
   const heroHighlight = hero.highlight as string;
@@ -130,7 +132,7 @@ export default async function Home({
     <div className="bg-bg min-h-screen text-text-primary">
       <LocaleSync queryLang={lang} />
       {errorMessage && <ErrorBanner message={errorMessage} />}
-      <Navbar navLinks={navLinks} />
+      <NavbarClient />
 
       <main id="main-content">
         {/* ── Terminal session ─────────────────────────────── */}
@@ -259,7 +261,7 @@ export default async function Home({
                         <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
                         <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
                         <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
-                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> o{" "}
+                        <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {t('common.orConnector') as string}{" "}
                         <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link> — {feature.descriptionAfter}
                       </>
                     )}
@@ -304,7 +306,7 @@ export default async function Home({
                   <Link href="/archetypes/marathoner" className="font-semibold text-archetype-marathoner hover:text-archetype-marathoner/70 transition-colors">{archetypes.marathoner}</Link>,{" "}
                   <Link href="/archetypes/polymath" className="font-semibold text-archetype-polymath hover:text-archetype-polymath/70 transition-colors">{archetypes.polymath}</Link>,{" "}
                   <Link href="/archetypes/artificer" className="font-semibold text-archetype-artificer hover:text-archetype-artificer/70 transition-colors">{archetypes.artificer}</Link>,{" "}
-                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> o{" "}
+                  <Link href="/archetypes/balanced" className="font-semibold text-archetype-balanced hover:text-text-primary transition-colors">{archetypes.balanced}</Link> {t('common.orConnector') as string}{" "}
                   <Link href="/archetypes/emerging" className="font-semibold text-archetype-emerging hover:text-text-secondary transition-colors">{archetypes.emerging}</Link>.
                 </p>
                 {dimensions.map((dim) => (

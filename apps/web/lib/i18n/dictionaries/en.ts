@@ -12,6 +12,7 @@ export const en: Translations = {
     loading: 'Loading...',
     copied: 'Copied!',
     copy: 'Copy',
+    orConnector: 'or',
   },
   aria: {
     mainNavigation: 'Main navigation',

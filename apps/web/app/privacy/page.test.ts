@@ -11,26 +11,25 @@ describe("legal pages — i18n server component", () => {
       "utf-8",
     );
 
-    it(`/${page} exports dynamic = 'force-dynamic'`, () => {
-      expect(source).toContain("export const dynamic = 'force-dynamic'");
+    it(`/${page} is static/ISR with force-static directive`, () => {
+      expect(source).not.toContain("export const dynamic = 'force-dynamic'");
+      expect(source).toContain("export const revalidate");
+      expect(source).toContain("export const dynamic = 'force-static'");
     });
 
     it(`/${page} exports generateMetadata`, () => {
-      expect(source).toContain("export async function generateMetadata");
+      expect(source).toContain("generateMetadata");
     });
 
-    it(`/${page} imports getServerT and getServerLocale from @/lib/i18n/server`, () => {
+    it(`/${page} uses DEFAULT_LOCALE and getServerT (no getServerLocale)`, () => {
       expect(source).toContain('from "@/lib/i18n/server"');
       expect(source).toContain('getServerT');
-      expect(source).toContain('getServerLocale');
+      expect(source).not.toContain('getServerLocale');
+      expect(source).toContain('DEFAULT_LOCALE');
     });
 
     it(`/${page} does NOT use static metadata export`, () => {
       expect(source).not.toContain("export const metadata");
-    });
-
-    it(`/${page} does NOT export revalidate`, () => {
-      expect(source).not.toContain("export const revalidate");
     });
   }
 });
