@@ -130,6 +130,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
+      - name: Bundle size gate (350 KB per-chunk budget)
+        run: bash scripts/check-bundle-size.sh 350
+
       - name: Upload Next.js build
         uses: actions/upload-artifact@v7
         with:

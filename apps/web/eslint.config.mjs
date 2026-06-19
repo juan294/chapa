@@ -7,7 +7,7 @@ const nextCoreWebVitals = require("eslint-config-next/core-web-vitals");
 const nextTypescript = require("eslint-config-next/typescript");
 
 const eslintConfig = [
-  { ignores: [".next/", "node_modules/", "next-env.d.ts"] },
+  { ignores: [".next/", "node_modules/", "next-env.d.ts", ".worktrees/"] },
   ...nextConfig,
   ...nextCoreWebVitals,
   ...nextTypescript,
