@@ -629,6 +629,116 @@ describe("cookie Secure flag — env var edge cases", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// SE-L1 (#889): Session iat (issued-at) expiry hardening
+// ---------------------------------------------------------------------------
+
+describe("session iat — createSessionCookie embeds iat (SE-L1)", () => {
+  const secret = "secret-key-for-test-32-chars!!!!";
+
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_BASE_URL", "http://localhost:3001");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+
+  it("createSessionCookie embeds an iat timestamp in the payload", () => {
+    const before = Math.floor(Date.now() / 1000);
+    const cookie = createSessionCookie(
+      { login: "juan294", name: "Juan", avatar_url: "https://img" },
+      secret,
+    );
+    const after = Math.floor(Date.now() / 1000);
+    // Extract the cookie value (name=value)
+    const cookieValue = cookie.split(";")[0]!;
+    // Decrypt and parse to inspect the raw payload
+    const cookieName = "chapa_session";
+    const value = cookieValue.slice(cookieName.length + 1);
+    const json = decryptToken(value, secret);
+    const parsed = JSON.parse(json!);
+    expect(typeof parsed.iat).toBe("number");
+    expect(parsed.iat).toBeGreaterThanOrEqual(before);
+    expect(parsed.iat).toBeLessThanOrEqual(after);
+  });
+
+  it("readSessionCookie accepts a fresh session with current iat", () => {
+    const cookie = createSessionCookie(
+      { login: "juan294", name: "Juan", avatar_url: "https://img" },
+      secret,
+    );
+    const cookieHeader = cookie.split(";")[0]!;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).not.toBeNull();
+    expect(result?.login).toBe("juan294");
+  });
+
+  it("readSessionCookie rejects a session whose iat is older than 86400 seconds", () => {
+    // Craft a payload with an expired iat (more than 24h ago)
+    const expiredIat = Math.floor(Date.now() / 1000) - 86401;
+    const payload = JSON.stringify({
+      login: "juan294",
+      name: "Juan",
+      avatar_url: "https://img",
+      iat: expiredIat,
+    });
+    const encrypted = encryptToken(payload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).toBeNull();
+  });
+
+  it("readSessionCookie accepts a session whose iat is exactly at the boundary (86400s ago)", () => {
+    // Session issued exactly 24h ago should still be valid (boundary is exclusive)
+    const boundaryIat = Math.floor(Date.now() / 1000) - 86400;
+    const payload = JSON.stringify({
+      login: "juan294",
+      name: "Juan",
+      avatar_url: "https://img",
+      iat: boundaryIat,
+    });
+    const encrypted = encryptToken(payload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    // Boundary: iat == now - 86400 → age is exactly Max-Age, treat as valid (not expired)
+    expect(result).not.toBeNull();
+  });
+
+  it("readSessionCookie accepts sessions without iat (backward-compat — treats missing iat as valid)", () => {
+    // Sessions created before the iat hardening don't have iat.
+    // They must NOT hard-break — treat as still valid during transition.
+    const payload = JSON.stringify({
+      login: "juan294",
+      name: "Juan",
+      avatar_url: "https://img",
+      // no iat field
+    });
+    const encrypted = encryptToken(payload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    expect(result).not.toBeNull();
+    expect(result?.login).toBe("juan294");
+  });
+
+  it("readSessionCookie accepts a session with iat in the future (clock skew tolerance — not rejected)", () => {
+    // Small clock skew: iat slightly in the future should not reject
+    const futureIat = Math.floor(Date.now() / 1000) + 60; // 1 minute in future
+    const payload = JSON.stringify({
+      login: "juan294",
+      name: "Juan",
+      avatar_url: "https://img",
+      iat: futureIat,
+    });
+    const encrypted = encryptToken(payload, secret);
+    const cookieHeader = `chapa_session=${encrypted}`;
+    const result = readSessionCookie(cookieHeader, secret);
+    // Future iat should not be rejected (clock skew is acceptable)
+    expect(result).not.toBeNull();
+  });
+});
+
 describe("readSessionCookie — shape validation", () => {
   const secret = "secret-key-for-test-32-chars!!!!";
 

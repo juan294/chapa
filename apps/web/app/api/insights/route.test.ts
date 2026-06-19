@@ -64,6 +64,7 @@ vi.mock("@/lib/db/tool-insights", () => ({
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
+  NO_TRUSTED_IP: "unknown",
   getClientIp: mockGetClientIp,
 }));
 
@@ -319,5 +320,49 @@ describe("POST /api/insights", () => {
     mockResolveRequestAuth.mockRejectedValue(new Error("Auth service down"));
 
     await expect(POST(makePostRequest(makeValidUpload()))).rejects.toThrow("Auth service down");
+  });
+
+  // -------------------------------------------------------------------------
+  // BE-H2 (#860): IP rate-limit must fire BEFORE resolveRequestAuth
+  // -------------------------------------------------------------------------
+
+  it("applies IP rate-limit before resolveRequestAuth to prevent resource amplification (BE-H2)", async () => {
+    const ipRlCallOrder: number[] = [];
+    const authCallOrder: number[] = [];
+    let callCounter = 0;
+
+    mockRateLimit.mockImplementation((key: string) => {
+      if (key.startsWith("ratelimit:insights-ip:")) {
+        ipRlCallOrder.push(++callCounter);
+      } else if (key.startsWith("ratelimit:insights:")) {
+        // Per-handle rate limit fires after auth
+      }
+      return Promise.resolve({ allowed: true, current: 1, limit: 10 });
+    });
+
+    mockResolveRequestAuth.mockImplementation(() => {
+      authCallOrder.push(++callCounter);
+      return Promise.resolve(AUTH);
+    });
+
+    await POST(makePostRequest(makeValidUpload()));
+
+    expect(ipRlCallOrder.length).toBeGreaterThan(0);
+    expect(authCallOrder.length).toBeGreaterThan(0);
+    expect(ipRlCallOrder[0]).toBeLessThan(authCallOrder[0]!);
+  });
+
+  it("returns 429 on IP rate-limit exceeded without calling resolveRequestAuth", async () => {
+    mockRateLimit.mockImplementation((key: string) => {
+      if (key.startsWith("ratelimit:insights-ip:")) {
+        return Promise.resolve({ allowed: false, current: 11, limit: 10 });
+      }
+      return Promise.resolve({ allowed: true, current: 1, limit: 10 });
+    });
+
+    const resp = await POST(makePostRequest(makeValidUpload()));
+
+    expect(resp.status).toBe(429);
+    expect(mockResolveRequestAuth).not.toHaveBeenCalled();
   });
 });

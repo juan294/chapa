@@ -5,6 +5,7 @@ import { POST } from "./route";
 const {
   mockResolveRequestAuth,
   mockRateLimit,
+  mockGetClientIp,
   mockUpdateCraftCache,
   mockInvalidateProfileReadModels,
   mockRevalidatePath,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
+  mockGetClientIp: vi.fn(),
   mockUpdateCraftCache: vi.fn(),
   mockInvalidateProfileReadModels: vi.fn(),
   mockRevalidatePath: vi.fn(),
@@ -26,6 +28,11 @@ vi.mock("@/lib/auth/resolve-request-auth", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: (...args: unknown[]) => mockRateLimit(...args),
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  NO_TRUSTED_IP: "unknown",
+  getClientIp: (...args: unknown[]) => mockGetClientIp(...args),
 }));
 
 vi.mock("@/lib/cache/craft-cache", () => ({
@@ -100,6 +107,7 @@ describe("POST /api/recalculate", () => {
     vi.clearAllMocks();
     mockResolveRequestAuth.mockResolvedValue(AUTH);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 20 });
+    mockGetClientIp.mockReturnValue("1.2.3.4");
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockInvalidateProfileReadModels.mockResolvedValue(undefined);
     mockRevalidatePath.mockImplementation(() => undefined);
@@ -215,5 +223,49 @@ describe("POST /api/recalculate", () => {
     expect(resp.status).toBe(500);
     expect(mockInvalidateProfileReadModels).not.toHaveBeenCalled();
     expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // BE-H2 (#860): IP rate-limit must fire BEFORE resolveRequestAuth
+  // -------------------------------------------------------------------------
+
+  it("applies IP rate-limit before resolveRequestAuth to prevent resource amplification (BE-H2)", async () => {
+    // IP rate-limit first, then auth — bogus tokens never reach GitHub API
+    const ipRlCallOrder: number[] = [];
+    const authCallOrder: number[] = [];
+    let callCounter = 0;
+
+    mockRateLimit.mockImplementation((key: string) => {
+      if (key.startsWith("ratelimit:recalculate-ip:")) {
+        ipRlCallOrder.push(++callCounter);
+      }
+      return Promise.resolve({ allowed: true, current: 1, limit: 10 });
+    });
+
+    mockResolveRequestAuth.mockImplementation(() => {
+      authCallOrder.push(++callCounter);
+      return Promise.resolve(AUTH);
+    });
+
+    await POST(makeRequest());
+
+    expect(ipRlCallOrder.length).toBeGreaterThan(0);
+    expect(authCallOrder.length).toBeGreaterThan(0);
+    // IP rate-limit must have been called before auth
+    expect(ipRlCallOrder[0]).toBeLessThan(authCallOrder[0]!);
+  });
+
+  it("returns 429 on IP rate-limit exceeded without calling resolveRequestAuth", async () => {
+    mockRateLimit.mockImplementation((key: string) => {
+      if (key.startsWith("ratelimit:recalculate-ip:")) {
+        return Promise.resolve({ allowed: false, current: 11, limit: 10 });
+      }
+      return Promise.resolve({ allowed: true, current: 1, limit: 20 });
+    });
+
+    const resp = await POST(makeRequest());
+
+    expect(resp.status).toBe(429);
+    expect(mockResolveRequestAuth).not.toHaveBeenCalled();
   });
 });

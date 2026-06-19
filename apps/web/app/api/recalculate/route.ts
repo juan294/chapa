@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
 import { rateLimit } from "@/lib/cache/redis";
+import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { updateCraftCache } from "@/lib/cache/craft-cache";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { revalidatePath } from "next/cache";
@@ -21,6 +22,21 @@ import { withErrorCapture } from "@/lib/analytics/server-errors";
  * Rate limited: 20 requests/handle/hour.
  */
 export const POST = withErrorCapture("/api/recalculate", async (request: NextRequest) => {
+  // BE-H2 (#860): IP rate-limit BEFORE auth — prevents bogus tokens from burning
+  // the shared GitHub API quota via fetchGitHubUser calls in resolveRequestAuth.
+  const ip = getClientIp(request);
+  const ipRlKey =
+    ip === NO_TRUSTED_IP
+      ? "ratelimit:recalculate-ip:no-ip"
+      : `ratelimit:recalculate-ip:${ip}`;
+  const ipRl = await rateLimit(ipRlKey, 10, 3600);
+  if (!ipRl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "3600" } },
+    );
+  }
+
   const auth = await resolveRequestAuth(request);
   if (!auth) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
