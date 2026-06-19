@@ -56,7 +56,7 @@ export async function getStats(
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
-  if (cached) return _enrichWithLogins(cached, handle);
+  if (cached) return _enrichWithLogins(cached, handle, cacheKey);
 
   // Public callers can share an authenticated fetch. Authenticated callers
   // must not reuse a weaker public fetch.
@@ -90,10 +90,17 @@ export async function getStats(
 /**
  * Enrich cached stats with linkedPlatformLogins if missing.
  * Handles pre-deploy cached data that has linkedPlatforms but no logins.
+ *
+ * PE-L2: When enrichment produces logins, write the enriched stats back to
+ * the stats cache key so subsequent hits skip the N DB reads entirely.
+ * The write is fire-and-forget — it must not block the response.
+ *
+ * @param cacheKey - The Redis key to backfill on enrichment (omit to skip backfill)
  */
 async function _enrichWithLogins(
   stats: StatsData,
   handle: string,
+  cacheKey?: string,
 ): Promise<StatsData> {
   const platforms = stats.linkedPlatforms;
   if (!platforms || platforms.length === 0 || stats.linkedPlatformLogins) {
@@ -108,9 +115,22 @@ async function _enrichWithLogins(
     if (results[i]) logins[p] = results[i].remoteLogin;
   });
 
-  return Object.keys(logins).length > 0
-    ? { ...stats, linkedPlatformLogins: logins }
-    : stats;
+  if (Object.keys(logins).length === 0) {
+    return stats;
+  }
+
+  const enriched = { ...stats, linkedPlatformLogins: logins };
+
+  // PE-L2: Backfill the enriched stats into the cache so subsequent hits
+  // return pre-enriched data and skip the DB reads. Fire-and-forget.
+  if (cacheKey) {
+    fireAndForget(
+      () => cacheSet(cacheKey, enriched, CACHE_TTL),
+      () => undefined,
+    );
+  }
+
+  return enriched;
 }
 
 /** Internal: fetch from GitHub, merge Bitbucket + Codeberg + supplemental, cache. */

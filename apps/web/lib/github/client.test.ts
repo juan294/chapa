@@ -165,6 +165,58 @@ describe("getStats", () => {
     expect(mockFetchStatsData).not.toHaveBeenCalled();
   });
 
+  it("PE-L2: backfills enriched stats into the cache so the next hit needs no DB reads", async () => {
+    // First hit: cached stats with linkedPlatforms but no logins — triggers N DB reads.
+    const cached = makeStats({
+      linkedPlatforms: ["bitbucket"],
+    });
+    mockCacheGet.mockResolvedValue(cached);
+    mockDbGetLinkedPlatform.mockResolvedValue({
+      remoteLogin: "bb-user",
+      tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+    });
+
+    await getStats("test-user");
+
+    // Expect a fire-and-forget cache write with the enriched stats
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "stats:v2:merged:test-user",
+      expect.objectContaining({ linkedPlatformLogins: { bitbucket: "bb-user" } }),
+      expect.any(Number),
+    );
+  });
+
+  it("PE-L2: does not backfill the cache when no logins are found", async () => {
+    // linkedPlatforms present but DB returns null for all — no logins resolved,
+    // no enriched data to cache.
+    const cached = makeStats({
+      linkedPlatforms: ["bitbucket"],
+    });
+    mockCacheGet.mockResolvedValue(cached);
+    mockDbGetLinkedPlatform.mockResolvedValue(null);
+
+    await getStats("test-user");
+
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
+  it("PE-L2: skips DB reads on a second warm-cache hit when enrichment was backfilled", async () => {
+    // The enriched (backfilled) stats already have linkedPlatformLogins —
+    // _enrichWithLogins should return early without any DB reads.
+    const enriched = makeStats({
+      linkedPlatforms: ["bitbucket"],
+      linkedPlatformLogins: { bitbucket: "bb-user" },
+    });
+    mockCacheGet.mockResolvedValue(enriched);
+
+    await getStats("test-user");
+
+    // DB should not be called — no enrichment needed
+    expect(mockDbGetLinkedPlatform).not.toHaveBeenCalled();
+    expect(mockFetchStatsData).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+  });
+
   it("fetches from GitHub on cache miss and caches result", async () => {
     const fresh = makeStats();
     setupCacheMiss(fresh);

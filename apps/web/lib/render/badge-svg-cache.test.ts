@@ -8,6 +8,7 @@ vi.mock("@/lib/cache/redis", () => ({
 
 import {
   buildBadgeSvgCacheKey,
+  handleCacheJitterSeconds,
   readBadgeSvgCache,
   writeBadgeSvgCache,
 } from "./badge-svg-cache";
@@ -55,24 +56,76 @@ describe("badge-svg-cache", () => {
   });
 
   describe("writeBadgeSvgCache", () => {
-    it("writes the SVG with a 24h TTL", async () => {
+    it("writes the SVG with a TTL of at least 24h", async () => {
       cacheSet.mockResolvedValueOnce(true);
       await writeBadgeSvgCache(
         "badge:v2:octocat:warm-amber:2026-05-01",
         "<svg>fresh</svg>",
+        "octocat",
       );
+      const ttl = cacheSet.mock.calls[0]![2] as number;
+      expect(ttl).toBeGreaterThanOrEqual(86400);
       expect(cacheSet).toHaveBeenCalledWith(
         "badge:v2:octocat:warm-amber:2026-05-01",
         "<svg>fresh</svg>",
-        86400,
+        ttl,
       );
+    });
+
+    it("TTL is at most 24h + 2h jitter", async () => {
+      cacheSet.mockResolvedValueOnce(true);
+      await writeBadgeSvgCache(
+        "badge:v2:octocat:warm-amber:2026-05-01",
+        "<svg>fresh</svg>",
+        "octocat",
+      );
+      const ttl = cacheSet.mock.calls[0]![2] as number;
+      expect(ttl).toBeLessThanOrEqual(86400 + 7200);
     });
 
     it("does not throw when Redis errors", async () => {
       cacheSet.mockRejectedValueOnce(new Error("redis down"));
       await expect(
-        writeBadgeSvgCache("k", "<svg/>"),
+        writeBadgeSvgCache("k", "<svg/>", "testuser"),
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe("handleCacheJitterSeconds (PE-S1)", () => {
+    it("returns a number between 0 and 7200 inclusive", () => {
+      const jitter = handleCacheJitterSeconds("octocat");
+      expect(jitter).toBeGreaterThanOrEqual(0);
+      expect(jitter).toBeLessThanOrEqual(7200);
+    });
+
+    it("is deterministic — same handle always returns the same jitter", () => {
+      expect(handleCacheJitterSeconds("alice")).toBe(handleCacheJitterSeconds("alice"));
+    });
+
+    it("produces different jitter for different handles (distributes load)", () => {
+      const handles = ["alice", "bob", "carol", "dave", "eve", "frank"];
+      const jitters = handles.map(handleCacheJitterSeconds);
+      // Not all jitters should be the same — at least 2 distinct values
+      const unique = new Set(jitters);
+      expect(unique.size).toBeGreaterThan(1);
+    });
+
+    it("is case-insensitive — lowercases the handle before hashing", () => {
+      expect(handleCacheJitterSeconds("ALICE")).toBe(handleCacheJitterSeconds("alice"));
+    });
+
+    it("two different handles get different effective TTLs when written to cache (PE-S1)", async () => {
+      cacheSet.mockResolvedValue(true);
+
+      await writeBadgeSvgCache("k1", "<svg/>", "alice");
+      await writeBadgeSvgCache("k2", "<svg/>", "zz-different-hash-zz");
+
+      const ttl1 = cacheSet.mock.calls[0]![2] as number;
+      const ttl2 = cacheSet.mock.calls[1]![2] as number;
+      // These are intentionally different handles chosen to produce different hashes.
+      // If by coincidence they collide, this test is a false negative — acceptable
+      // given the wide jitter space (7201 possible values).
+      expect(ttl1).not.toBe(ttl2);
     });
   });
 });

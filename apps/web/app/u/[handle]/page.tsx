@@ -154,7 +154,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
     const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
     after(() => {
       if (svgToCache) {
-        void writeBadgeSvgCache(svgCacheKey, svgToCache);
+        void writeBadgeSvgCache(svgCacheKey, svgToCache, handle);
       }
       return runPublicProfileSideEffects(handle, materialized, { verification });
     });

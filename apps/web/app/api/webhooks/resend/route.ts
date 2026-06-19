@@ -5,7 +5,7 @@ import {
   fetchReceivedEmail,
   forwardEmail,
 } from "@/lib/email/resend";
-import { cacheGet, cacheSetNx, rateLimit } from "@/lib/cache/redis";
+import { cacheSetNxStatus, rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { log } from "@/lib/log";
@@ -94,14 +94,27 @@ export const POST = withErrorCapture("/api/webhooks/resend", async (request: Nex
     );
   }
 
+  // BE-L2: Dedup using cacheSetNxStatus so we can distinguish "already
+  // processed" from "Redis unavailable". The three outcomes are:
+  //
+  //   "acquired"    — key newly written; this is the first delivery. Process it.
+  //   "exists"      — key already present; Resend is retrying a delivery we
+  //                   already handled. Return early to avoid duplicate forwarding.
+  //   "unavailable" — Redis is down. Chosen behaviour: skip-forward (process
+  //                   the email). This is the safer default because:
+  //                   - Failing to forward a support email is worse than a rare
+  //                     duplicate forward during a Redis outage.
+  //                   - Resend retries are bounded (not infinite), so even in a
+  //                     prolonged outage the duplicate count is finite.
+  //                   - The old cacheSetNx path already skip-forwarded on
+  //                     unavailability, so this preserves existing behaviour
+  //                     while making the intent explicit.
   const dedupeKey = `webhook:resend:svix:${svixId}`;
-  const claimed = await cacheSetNx(dedupeKey, DEDUPE_TTL_SECONDS);
-  if (!claimed) {
-    const existing = await cacheGet<number>(dedupeKey);
-    if (existing !== null) {
-      return NextResponse.json({ status: "already_processed", id: svixId });
-    }
+  const dedupeStatus = await cacheSetNxStatus(dedupeKey, DEDUPE_TTL_SECONDS);
+  if (dedupeStatus === "exists") {
+    return NextResponse.json({ status: "already_processed", id: svixId });
   }
+  // "acquired" or "unavailable" → continue processing
 
   // 5. Fetch full email
   const email = await fetchReceivedEmail(emailId);
