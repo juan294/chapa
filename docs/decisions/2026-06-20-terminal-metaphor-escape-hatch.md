@@ -1,7 +1,7 @@
 # ADR: Terminal-First UI — Conversion Barrier Analysis & Escape Hatch
 
 **Date:** 2026-06-20
-**Status:** Proposed — **NEEDS PRODUCT SIGN-OFF** (no final decision asserted)
+**Status:** Accepted — progressive disclosure (implemented). Product chose Option C; the share page now leads with the badge/breakdown and demotes the command bar behind a discoverable "Press / for commands" hint (2026-06-20).
 **Refs:** Refs #783 (UX-S1)
 
 > This ADR analyzes a UX/conversion concern and presents options. It deliberately

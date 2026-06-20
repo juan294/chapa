@@ -209,6 +209,10 @@ export const en: Translations = {
     loadingAriaLabel: 'Loading',
     loadingSrText: 'Loading...',
   },
+  commandHint: {
+    label: 'for commands',
+    ariaLabel: 'Open the command bar — or press the / key',
+  },
   verify: {
     title: 'Verify a badge',
     description: 'Verify the authenticity of any Chapa badge with its verification hash.',
