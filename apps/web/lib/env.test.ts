@@ -1,5 +1,33 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { getBaseUrl, getAdminHandles } from "./env";
+
+// Next.js only inlines NEXT_PUBLIC_* env vars into the client bundle when they
+// are referenced as a STATIC LITERAL member expression (process.env.NEXT_PUBLIC_X).
+// Dynamic access (process.env[name]) is never substituted, so any NEXT_PUBLIC_*
+// reader routed through readTrimmed(name) returns undefined in the browser — which
+// silently disabled client-side feature flags (platform link/unlink rows). See #918.
+// Runtime tests run in Node where process.env[name] works, so this regression can
+// only be guarded at the source level.
+describe("env.ts NEXT_PUBLIC readers use static literal access (#918)", () => {
+  const source = readFileSync(new URL("./env.ts", import.meta.url), "utf8");
+  const publicVars = [
+    ...new Set(source.match(/NEXT_PUBLIC_[A-Z0-9_]+/g) ?? []),
+  ];
+
+  it("finds NEXT_PUBLIC vars to check", () => {
+    expect(publicVars.length).toBeGreaterThan(0);
+  });
+
+  for (const name of publicVars) {
+    it(`reads ${name} via static literal, not dynamic readTrimmed`, () => {
+      // Must be referenced literally so the bundler can inline it client-side.
+      expect(source).toContain(`process.env.${name}`);
+      // Must NOT be read via the dynamic helper (won't inline on the client).
+      expect(source).not.toContain(`readTrimmed("${name}")`);
+    });
+  }
+});
 
 describe("getBaseUrl", () => {
   afterEach(() => {
