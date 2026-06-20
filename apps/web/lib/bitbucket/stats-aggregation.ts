@@ -1,5 +1,5 @@
 import type { StatsData, HeatmapDay } from "@chapa/shared";
-import { computePrWeight, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "@chapa/shared";
+import { computePrWeight, normalizeStats, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD } from "@chapa/shared";
 import type { RawBitbucketData } from "./types";
 
 /**
@@ -70,7 +70,7 @@ export function buildStatsFromBitbucket(raw: RawBitbucketData): StatsData {
   const ownedRepos = raw.repos.filter((r) => r.isOwned);
   const totalForks = ownedRepos.reduce((sum, r) => sum + r.forkCount, 0);
 
-  return {
+  return normalizeStats({
     handle: raw.username,
     displayName: raw.displayName,
     avatarUrl: raw.avatarUrl,
@@ -89,6 +89,5 @@ export function buildStatsFromBitbucket(raw: RawBitbucketData): StatsData {
     totalForks,
     totalWatchers: 0, // Not publicly accessible
     heatmapData,
-    fetchedAt: new Date().toISOString(),
-  };
+  });
 }

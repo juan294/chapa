@@ -1,6 +1,7 @@
 import type { StatsData, HeatmapDay } from "@chapa/shared";
 import {
   computePrWeight,
+  normalizeStats,
   PR_WEIGHT_AGG_CAP,
   REPO_DEPTH_THRESHOLD,
 } from "@chapa/shared";
@@ -71,7 +72,7 @@ export function buildStatsFromGitlab(raw: RawGitlabData): StatsData {
   const totalForks = ownedRepos.reduce((sum, r) => sum + r.forksCount, 0);
   const totalWatchers = 0;
 
-  return {
+  return normalizeStats({
     handle: raw.username,
     displayName: raw.displayName || raw.username,
     avatarUrl: raw.avatarUrl,
@@ -90,6 +91,5 @@ export function buildStatsFromGitlab(raw: RawGitlabData): StatsData {
     totalForks,
     totalWatchers,
     heatmapData,
-    fetchedAt: new Date().toISOString(),
-  };
+  });
 }
