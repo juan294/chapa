@@ -1,11 +1,14 @@
-# Lighthouse CI — Core Web Vitals tracking
+# Lighthouse CI — Core Web Vitals & accessibility tracking
 #
-# Runs Lighthouse audits on key pages after a successful build.
-# Uses the build artifact from the CI workflow to avoid rebuilding.
-# Results are uploaded to temporary public storage (free, no server needed).
+# Runs Lighthouse audits on key pages (including the share page /u/:handle)
+# after a successful build. Uses the build artifact from the CI workflow to
+# avoid rebuilding. Results are uploaded to temporary public storage
+# (free, no server needed).
 #
-# Thresholds are intentionally lenient (warn, not error) so the team
-# can calibrate before making this a required check.
+# Accessibility is ENFORCED (error, minScore 0.9) — an a11y regression on any
+# audited page fails this job and blocks the PR. Performance, best-practices,
+# and SEO remain advisory (warn only) while the team calibrates those
+# thresholds, so the job is no longer marked continue-on-error.
 
 name: Lighthouse CI
 
@@ -22,8 +25,8 @@ jobs:
   lighthouse:
     name: Lighthouse Audit
     runs-on: ubuntu-latest
-    # Don't block PRs — let the team calibrate thresholds first
-    continue-on-error: true
+    # Accessibility is enforced (see lighthouserc.json) — this job now blocks
+    # PRs on a11y regressions. Performance/SEO/best-practices stay advisory.
 
     env:
       # Dummy values for build — real values are in Vercel
