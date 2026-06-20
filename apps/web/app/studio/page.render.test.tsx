@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getStats: vi.fn(),
   cacheGet: vi.fn(),
   computeImpactV6: vi.fn(),
+  getServerLocale: vi.fn(),
+  getServerT: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -46,6 +48,11 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/impact/v6", () => ({
   computeImpactV6: mocks.computeImpactV6,
+}));
+
+vi.mock("@/lib/i18n/server", () => ({
+  getServerLocale: mocks.getServerLocale,
+  getServerT: mocks.getServerT,
 }));
 
 vi.mock("@/components/Navbar", () => ({
@@ -117,6 +124,16 @@ beforeEach(() => {
   mocks.getStats.mockResolvedValue(stats);
   mocks.cacheGet.mockResolvedValue({ theme: "saved-theme" });
   mocks.computeImpactV6.mockReturnValue({ compositeScore: 80 });
+  mocks.getServerLocale.mockResolvedValue("en");
+  mocks.getServerT.mockReturnValue(
+    (key: string) =>
+      ({
+        "studio.metadataTitle": "Creator Studio — Chapa",
+        "studio.metadataDescription": "Customize your badge",
+        "studio.navLinkStudio": "Studio",
+        "studio.navLinkYourBadge": "Your Badge",
+      })[key] ?? key,
+  );
 });
 
 describe("StudioPage render", () => {
@@ -176,5 +193,19 @@ describe("StudioPage render", () => {
         ]),
       }),
     );
+  });
+
+  it("is configured as a force-dynamic route", async () => {
+    const mod = await import("./page");
+    expect(mod.dynamic).toBe("force-dynamic");
+  });
+
+  it("generates localized metadata from i18n keys", async () => {
+    const { generateMetadata } = await import("./page");
+    const metadata = await generateMetadata();
+
+    expect(metadata.title).toBe("Creator Studio — Chapa");
+    expect(metadata.description).toBe("Customize your badge");
+    expect(mocks.getServerT).toHaveBeenCalledWith("en");
   });
 });
