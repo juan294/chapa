@@ -9,7 +9,9 @@ import { parseRow, parseRows } from "../parse-row";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** The category of a campaign: product announcements or re-engagement messages. */
 export type CampaignType = "announcement" | "engagement";
+/** Lifecycle state of an email campaign from draft through completion or failure. */
 export type CampaignStatus =
   | "draft"
   | "scheduled"
@@ -17,8 +19,10 @@ export type CampaignStatus =
   | "sent"
   | "failed"
   | "cancelled";
+/** Delivery state of a single campaign send record. */
 export type CampaignSendStatus = "pending" | "processing" | "sent" | "failed";
 
+/** A fully hydrated email campaign including all content fields and send metrics. */
 export interface Campaign {
   id: string;
   type: CampaignType;
@@ -39,6 +43,7 @@ export interface Campaign {
   completedAt: string | null;
 }
 
+/** A single email send record tracking one recipient within a campaign batch. */
 export interface CampaignSend {
   id: string;
   campaignId: string;
@@ -49,6 +54,7 @@ export interface CampaignSend {
   error: string | null;
 }
 
+/** Aggregated delivery counts for a campaign (sent, pending, processing, failed). */
 export interface CampaignSendStats {
   sent: number;
   pending: number;
@@ -286,6 +292,7 @@ function parseCampaignSendRow(value: unknown): ParsedCampaignSendRow {
 // Schema objects (used by row mappers and external callers)
 // ---------------------------------------------------------------------------
 
+/** Thin schema wrapper used by `mapCampaignRow` to parse raw `email_campaigns` DB rows. */
 export const CampaignRowSchema = {
   parse: parseCampaignRow,
 };

@@ -12,6 +12,7 @@ import { fetchCodebergStats } from "./stats";
 import type { StatsData } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
+const NEG_CACHE_TTL = 3600; // 1h — short-circuit "not linked/disabled" on next request
 
 /** Fetch Codeberg stats from cache or live API. Returns null if not linked/disabled. */
 export async function fetchCodebergIfLinked(
@@ -19,15 +20,25 @@ export async function fetchCodebergIfLinked(
   lowerHandle: string,
 ): Promise<StatsData | null> {
   const cbCacheKey = `stats:v2:codeberg:${lowerHandle}`;
+  const negKey = `${cbCacheKey}:neg`;
 
   const cached = await cacheGet<StatsData>(cbCacheKey);
   if (cached) return cached;
 
+  const neg = await cacheGet<boolean>(negKey);
+  if (neg) return null;
+
   const enabled = await isCodebergEnabled();
-  if (!enabled) return null;
+  if (!enabled) {
+    void cacheSet(negKey, true, NEG_CACHE_TTL);
+    return null;
+  }
 
   const linked = await dbGetLinkedPlatform(handle, "codeberg");
-  if (!linked) return null;
+  if (!linked) {
+    void cacheSet(negKey, true, NEG_CACHE_TTL);
+    return null;
+  }
 
   let { accessToken } = linked.tokens;
   const { refreshToken, expiresAt } = linked.tokens;

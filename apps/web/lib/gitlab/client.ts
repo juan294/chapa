@@ -12,6 +12,7 @@ import { fetchGitlabStats } from "./stats";
 import type { StatsData } from "@chapa/shared";
 
 const CACHE_TTL = 21600; // 6 hours
+const NEG_CACHE_TTL = 3600; // 1h — short-circuit "not linked/disabled" on next request
 
 /** Fetch GitLab stats from cache or live API. Returns null if not linked/disabled. */
 export async function fetchGitlabIfLinked(
@@ -19,15 +20,25 @@ export async function fetchGitlabIfLinked(
   lowerHandle: string,
 ): Promise<StatsData | null> {
   const glCacheKey = `stats:v2:gitlab:${lowerHandle}`;
+  const negKey = `${glCacheKey}:neg`;
 
   const cached = await cacheGet<StatsData>(glCacheKey);
   if (cached) return cached;
 
+  const neg = await cacheGet<boolean>(negKey);
+  if (neg) return null;
+
   const enabled = await isGitlabEnabled();
-  if (!enabled) return null;
+  if (!enabled) {
+    void cacheSet(negKey, true, NEG_CACHE_TTL);
+    return null;
+  }
 
   const linked = await dbGetLinkedPlatform(handle, "gitlab");
-  if (!linked) return null;
+  if (!linked) {
+    void cacheSet(negKey, true, NEG_CACHE_TTL);
+    return null;
+  }
 
   let { accessToken } = linked.tokens;
   const { refreshToken, expiresAt } = linked.tokens;

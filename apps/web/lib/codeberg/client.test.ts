@@ -216,4 +216,34 @@ describe("fetchCodebergIfLinked", () => {
       expect(mockDbDeleteLinkedPlatform).not.toHaveBeenCalled();
     });
   });
+
+  describe("negative-result caching (P3)", () => {
+    it("caches negative result for 1h when Codeberg is not enabled", async () => {
+      mockIsCodebergEnabled.mockResolvedValue(false);
+
+      await fetchCodebergIfLinked(HANDLE, LOWER);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(`${CACHE_KEY}:neg`, true, 3600);
+    });
+
+    it("caches negative result for 1h when user is not linked", async () => {
+      mockDbGetLinkedPlatform.mockResolvedValue(null);
+
+      await fetchCodebergIfLinked(HANDLE, LOWER);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(`${CACHE_KEY}:neg`, true, 3600);
+    });
+
+    it("returns null immediately on negative cache hit without DB/flag reads", async () => {
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(true);
+
+      const result = await fetchCodebergIfLinked(HANDLE, LOWER);
+
+      expect(result).toBeNull();
+      expect(mockIsCodebergEnabled).not.toHaveBeenCalled();
+      expect(mockDbGetLinkedPlatform).not.toHaveBeenCalled();
+    });
+  });
 });

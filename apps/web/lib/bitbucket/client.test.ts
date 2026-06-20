@@ -192,4 +192,34 @@ describe("fetchBitbucketIfLinked", () => {
       expect(mockDbDeleteLinkedPlatform).not.toHaveBeenCalled();
     });
   });
+
+  describe("negative-result caching (P3)", () => {
+    it("caches negative result for 1h when Bitbucket is not enabled", async () => {
+      mockIsBitbucketEnabled.mockResolvedValue(false);
+
+      await fetchBitbucketIfLinked(HANDLE, LOWER);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(`${CACHE_KEY}:neg`, true, 3600);
+    });
+
+    it("caches negative result for 1h when user is not linked", async () => {
+      mockDbGetLinkedPlatform.mockResolvedValue(null);
+
+      await fetchBitbucketIfLinked(HANDLE, LOWER);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(`${CACHE_KEY}:neg`, true, 3600);
+    });
+
+    it("returns null immediately on negative cache hit without DB/flag reads", async () => {
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(true);
+
+      const result = await fetchBitbucketIfLinked(HANDLE, LOWER);
+
+      expect(result).toBeNull();
+      expect(mockIsBitbucketEnabled).not.toHaveBeenCalled();
+      expect(mockDbGetLinkedPlatform).not.toHaveBeenCalled();
+    });
+  });
 });
