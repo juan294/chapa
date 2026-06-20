@@ -84,8 +84,8 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
 }));
 
-vi.mock("@/components/GlobalCommandBarLazy", () => ({
-  GlobalCommandBarLazy: () => null,
+vi.mock("@/components/CommandBarHint", () => ({
+  CommandBarHint: () => null,
 }));
 vi.mock("@/components/NavbarClient", () => ({
   NavbarClient: () => null,

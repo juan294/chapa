@@ -76,8 +76,8 @@ vi.mock("@/lib/i18n", () => ({
   LocaleSync: () => null,
 }));
 
-vi.mock("@/components/GlobalCommandBarLazy", () => ({
-  GlobalCommandBarLazy: () => null,
+vi.mock("@/components/CommandBarHint", () => ({
+  CommandBarHint: () => null,
 }));
 vi.mock("@/components/NavbarClient", () => ({
   NavbarClient: () => "<nav />",

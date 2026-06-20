@@ -209,6 +209,10 @@ export const es: Translations = {
     loadingAriaLabel: 'Cargando',
     loadingSrText: 'Cargando...',
   },
+  commandHint: {
+    label: 'para comandos',
+    ariaLabel: 'Abrir la barra de comandos — o pulsa la tecla /',
+  },
   verify: {
     title: 'Verificar una Chapa',
     description: 'Verifica la autenticidad de cualquier Chapa con su hash de verificación.',

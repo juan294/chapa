@@ -19,7 +19,7 @@ import {
   writeBadgeSvgCache,
 } from "@/lib/render/badge-svg-cache";
 import { getAvatarBase64 } from "@/lib/render/avatar";
-import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { CommandBarHint } from "@/components/CommandBarHint";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
   getPublicProfileVerification,
@@ -91,7 +91,10 @@ export default async function SharePage({ params, searchParams }: SharePageProps
       <Suspense fallback={<BadgeSkeleton />}>
         <SharePageContent handle={handle} />
       </Suspense>
-      <GlobalCommandBarLazy />
+      {/* Progressive disclosure (#783): the terminal command bar is demoted to a
+          subtle, opt-in hint so the badge value stays legible to non-developer
+          visitors. The "/" shortcut and full command bar remain available. */}
+      <CommandBarHint />
     </main>
   );
 }
