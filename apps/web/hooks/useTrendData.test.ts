@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
-import { clearTrendDataCache, useTrendData } from "./use-trend-data";
+import { clearTrendDataCache, useTrendData } from "./useTrendData";
 
 // ---------------------------------------------------------------------------
 // Mock fetch globally
@@ -84,7 +84,7 @@ function makeSuccessResponse(trend: TrendSummary | null, diff: SnapshotDiff | nu
 describe("useTrendData", () => {
   // Lazy import so the module is loaded after fetch is mocked
   async function importHook() {
-    const mod = await import("./use-trend-data");
+    const mod = await import("./useTrendData");
     return mod.useTrendData;
   }
 

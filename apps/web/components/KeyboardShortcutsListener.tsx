@@ -11,12 +11,12 @@ import {
   useCallback,
   useRef,
   useLayoutEffect,
-  useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
 import { useKeyboardShortcuts } from "@/lib/keyboard/use-keyboard-shortcuts";
 import { type ShortcutScope } from "@/lib/keyboard/shortcuts";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
+import { createModuleStore } from "@/hooks/createModuleStore";
 import dynamic from "next/dynamic";
 
 const ShortcutCheatSheet = dynamic(
@@ -41,29 +41,12 @@ interface KeyboardShortcutsStore {
   openCheatSheet: () => void;
 }
 
-let _store: KeyboardShortcutsStore | null = null;
-const _subscribers = new Set<() => void>();
-
-function getStoreSnapshot(): KeyboardShortcutsStore | null {
-  return _store;
-}
-
-function getServerSnapshot(): KeyboardShortcutsStore | null {
-  return null;
-}
-
-function subscribeToStore(callback: () => void): () => void {
-  _subscribers.add(callback);
-  return () => {
-    _subscribers.delete(callback);
-  };
-}
+const _storeState = createModuleStore<KeyboardShortcutsStore | null>(null, {
+  serverSnapshot: null,
+});
 
 function setStore(store: KeyboardShortcutsStore | null): void {
-  _store = store;
-  for (const cb of _subscribers) {
-    cb();
-  }
+  _storeState.set(store);
 }
 
 /* ------------------------------------------------------------------ */
@@ -101,11 +84,7 @@ export interface KeyboardShortcutsContextValue {
  * Throws if the listener is never mounted (store stays null after hydration).
  */
 export function useKeyboardShortcutsContext(): KeyboardShortcutsContextValue {
-  const store = useSyncExternalStore(
-    subscribeToStore,
-    getStoreSnapshot,
-    getServerSnapshot,
-  );
+  const store = _storeState.useStore();
 
   if (!store) {
     // During SSR or before the listener's layout effect fires, return a no-op.
