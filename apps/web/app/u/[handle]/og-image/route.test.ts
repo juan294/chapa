@@ -165,12 +165,26 @@ describe("GET /u/[handle]/og-image", () => {
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-02-14",
+        disableAnimation: true,
       },
     );
     expect(mockCacheSet).toHaveBeenCalledWith(
       "og-image:v2:testuser:2026-02-14",
       FAKE_PNG_BASE64,
       172800,
+    );
+  });
+
+  // #760 — the SVG is rasterized to PNG, where SMIL <animate> does not run.
+  // Request static (non-animated) cells so the heatmap is not invisible.
+  it("requests static (non-animated) rendering before rasterization", async () => {
+    const [req, ctx] = makeRequest("testuser");
+    await GET(req, ctx);
+
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ disableAnimation: true }),
     );
   });
 

@@ -249,6 +249,9 @@ export async function GET(
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
+      // This SVG is always served to <img> embeds (README badges), where SMIL
+      // <animate> never runs — animated heatmap cells would stay invisible. (#760)
+      disableAnimation: true,
     });
     await writeBadgeSvgCache(svgCacheKey, svg, handle);
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;

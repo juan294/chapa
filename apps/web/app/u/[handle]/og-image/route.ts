@@ -86,6 +86,9 @@ export async function GET(
       avatarDataUri,
       verificationHash: verification?.hash,
       verificationDate: verification?.date,
+      // Rasterized to PNG below — SMIL <animate> never runs during rasterization,
+      // so animated heatmap cells would render invisible (stuck at opacity 0). (#760)
+      disableAnimation: true,
     });
 
     const png = await withTimeout(
