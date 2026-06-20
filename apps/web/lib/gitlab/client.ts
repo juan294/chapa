@@ -1,4 +1,3 @@
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { isGitlabEnabled } from "@/lib/feature-flags";
 import { getGitlabClientId, getGitlabClientSecret } from "@/lib/env";
 import {
@@ -8,38 +7,22 @@ import {
 } from "@/lib/db/user-platforms";
 import { isTokenExpired } from "@/lib/auth/bitbucket";
 import { refreshGitlabToken, fetchGitlabUser } from "@/lib/auth/gitlab";
+import {
+  fetchLinkedPlatformStats,
+  type LinkedPlatformRecord,
+} from "@/lib/platform/fetch-linked-platform";
 import { fetchGitlabStats } from "./stats";
 import type { StatsData } from "@chapa/shared";
 
-const CACHE_TTL = 21600; // 6 hours
-const NEG_CACHE_TTL = 3600; // 1h — short-circuit "not linked/disabled" on next request
-
-/** Fetch GitLab stats from cache or live API. Returns null if not linked/disabled. */
-export async function fetchGitlabIfLinked(
+/**
+ * Resolve a usable GitLab access token, refreshing if expired.
+ * Returns null (short-circuit, no fetch) when the grant can't be recovered or
+ * when OAuth app credentials are not configured (BE-L3 / #888).
+ */
+async function resolveGitlabToken(
   handle: string,
-  lowerHandle: string,
-): Promise<StatsData | null> {
-  const glCacheKey = `stats:v2:gitlab:${lowerHandle}`;
-  const negKey = `${glCacheKey}:neg`;
-
-  const cached = await cacheGet<StatsData>(glCacheKey);
-  if (cached) return cached;
-
-  const neg = await cacheGet<boolean>(negKey);
-  if (neg) return null;
-
-  const enabled = await isGitlabEnabled();
-  if (!enabled) {
-    void cacheSet(negKey, true, NEG_CACHE_TTL);
-    return null;
-  }
-
-  const linked = await dbGetLinkedPlatform(handle, "gitlab");
-  if (!linked) {
-    void cacheSet(negKey, true, NEG_CACHE_TTL);
-    return null;
-  }
-
+  linked: LinkedPlatformRecord,
+): Promise<string | null> {
   let { accessToken } = linked.tokens;
   const { refreshToken, expiresAt } = linked.tokens;
 
@@ -88,22 +71,32 @@ export async function fetchGitlabIfLinked(
     }
   }
 
-  // GitLab's events/projects endpoints key on the numeric user id, which is not
-  // stored in user_platforms (only the login). Resolve it from the token; this
-  // is the one GitLab-specific deviation from the Codeberg client shape.
-  const user = await fetchGitlabUser(accessToken);
-  if (!user) return null;
+  return accessToken;
+}
 
-  const glStats = await fetchGitlabStats(
-    user.id,
-    linked.remoteLogin,
-    accessToken,
-    { displayName: linked.remoteLogin, avatarUrl: "" },
-  );
+/** Fetch GitLab stats from cache or live API. Returns null if not linked/disabled. */
+export async function fetchGitlabIfLinked(
+  handle: string,
+  lowerHandle: string,
+): Promise<StatsData | null> {
+  return fetchLinkedPlatformStats({
+    platform: "gitlab",
+    lowerHandle,
+    isEnabled: isGitlabEnabled,
+    getLinkedPlatform: () => dbGetLinkedPlatform(handle, "gitlab"),
+    resolveAccessToken: (linked) => resolveGitlabToken(handle, linked),
+    fetchStats: async (linked, accessToken) => {
+      // GitLab's events/projects endpoints key on the numeric user id, which is
+      // not stored in user_platforms (only the login). Resolve it from the
+      // token; this is the one GitLab-specific deviation from the Codeberg
+      // client shape.
+      const user = await fetchGitlabUser(accessToken);
+      if (!user) return null;
 
-  if (glStats) {
-    await cacheSet(glCacheKey, glStats, CACHE_TTL);
-  }
-
-  return glStats;
+      return fetchGitlabStats(user.id, linked.remoteLogin, accessToken, {
+        displayName: linked.remoteLogin,
+        avatarUrl: "",
+      });
+    },
+  });
 }
