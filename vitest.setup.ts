@@ -95,6 +95,26 @@ if (typeof globalThis.localStorage === "undefined") {
   });
 }
 
+// Node.js 26 exposes localStorage as undefined without --localstorage-file.
+// JSDOM normally provides its own implementation, but Node 26's non-enumerable
+// descriptor prevents the vitest JSDOM environment from injecting it into the
+// global. Polyfill it here so tests using window.localStorage / localStorage work.
+if (typeof globalThis.localStorage === "undefined") {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    writable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, String(value)),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear(),
+      get length() { return store.size; },
+      key: (index: number) => [...store.keys()][index] ?? null,
+    },
+  });
+}
+
 let originalWarn: typeof console.warn;
 let originalError: typeof console.error;
 
