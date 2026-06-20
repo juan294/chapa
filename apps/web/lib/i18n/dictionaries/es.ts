@@ -68,6 +68,7 @@ export const es: Translations = {
         'Una Chapa embebible. Múltiples dimensiones. Verificada criptográficamente.',
       ],
       primaryCta: 'Consigue tu Chapa',
+      primaryCtaPending: 'Conectando…',
       verifyCta: 'Verificar una Chapa',
       badgePreviewLabel: 'Ejemplo de Chapa de impacto de desarrollador',
     },
@@ -167,6 +168,7 @@ export const es: Translations = {
     finalCta: {
       prompt: '¿Listo para demostrar tu impacto?',
       button: 'Consigue tu Chapa',
+      buttonPending: 'Conectando…',
     },
     footer: {
       tagline: 'Creado para desarrolladores, por desarrolladores.',

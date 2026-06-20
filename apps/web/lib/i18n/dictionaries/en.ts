@@ -68,6 +68,7 @@ export const en: Translations = {
         'One embeddable badge. Multiple dimensions. Cryptographically verified.',
       ],
       primaryCta: 'Get your badge',
+      primaryCtaPending: 'Connecting…',
       verifyCta: 'Verify a badge',
       badgePreviewLabel: 'Sample Chapa developer impact badge',
     },
@@ -167,6 +168,7 @@ export const en: Translations = {
     finalCta: {
       prompt: 'Ready to show your impact?',
       button: 'Get your badge',
+      buttonPending: 'Connecting…',
     },
     footer: {
       tagline: 'Built for developers, by developers.',

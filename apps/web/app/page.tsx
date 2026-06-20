@@ -12,6 +12,7 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+import { LoginCtaButton } from "@/components/LoginCtaButton";
 import { ClaudeCodeStar } from "@/components/ClaudeCodeStar";
 import Link from "next/link";
 
@@ -115,6 +116,7 @@ export default async function Home({
   const heroLeadAfter = hero.leadAfter as string;
   const heroBullets = hero.bullets as string[];
   const heroPrimaryCta = hero.primaryCta as string;
+  const heroPrimaryCtaPending = hero.primaryCtaPending as string;
   const heroVerifyCta = hero.verifyCta as string;
   const heroBadgePreviewLabel = hero.badgePreviewLabel as string;
 
@@ -161,14 +163,11 @@ export default async function Home({
                 </div>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
-                <a
-                  href="/api/auth/login"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
-                >
-                  <GitHubIcon className="w-4 h-4" />
-                  {heroPrimaryCta}
-                  <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </a>
+                <LoginCtaButton
+                  label={heroPrimaryCta}
+                  pendingLabel={heroPrimaryCtaPending}
+                  size="sm"
+                />
                 <Link
                   href="/verify"
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
@@ -380,7 +379,7 @@ export default async function Home({
 
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                  <span className="text-dimension-delivery font-heading text-sm shrink-0 sm:w-48">
                     {enterprise.whatItDoes}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -388,7 +387,7 @@ export default async function Home({
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                  <span className="text-dimension-consistency font-heading text-sm shrink-0 sm:w-48">
                     {enterprise.howToUse}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -400,7 +399,7 @@ export default async function Home({
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                  <span className="text-dimension-breadth font-heading text-sm shrink-0 sm:w-48">
                     {enterprise.noEmu}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -446,14 +445,11 @@ export default async function Home({
               <p className="text-text-secondary text-sm">
                 {finalCta.prompt}
               </p>
-              <a
-                href="/api/auth/login"
-                className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-8 pr-7 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
-              >
-                <GitHubIcon className="w-5 h-5" />
-                {finalCta.button}
-                <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </a>
+              <LoginCtaButton
+                label={finalCta.button as string}
+                pendingLabel={finalCta.buttonPending as string}
+                size="lg"
+              />
             </div>
           </section>
         </div>
