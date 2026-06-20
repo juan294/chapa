@@ -19,6 +19,20 @@ function readTrimmed(name: string): string | undefined {
   return v ? v : undefined;
 }
 
+/**
+ * Trim a raw env value, collapsing empty strings to `undefined`.
+ *
+ * Used for `NEXT_PUBLIC_*` readers, which MUST reference `process.env.X` as a
+ * static literal at the call site. Next.js only inlines public env vars into the
+ * client bundle for literal member expressions — dynamic access (the `name`
+ * argument to {@link readTrimmed}) is never substituted and returns `undefined`
+ * in the browser, silently disabling client-side feature flags (#918).
+ */
+function clean(value: string | undefined): string | undefined {
+  const v = value?.trim();
+  return v ? v : undefined;
+}
+
 function readBool(name: string): boolean {
   return readTrimmed(name) === "true";
 }
@@ -62,12 +76,12 @@ export function getChapaAlertWebhookUrl(): string | undefined {
 
 /** PostHog host URL (e.g. `https://app.posthog.com`). */
 export function getPosthogHost(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_POSTHOG_HOST");
+  return clean(process.env.NEXT_PUBLIC_POSTHOG_HOST);
 }
 
 /** PostHog project API key. */
 export function getPosthogKey(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_POSTHOG_KEY");
+  return clean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +130,8 @@ export function getNextauthSecret(): string | undefined {
  */
 export function getBaseUrl(): string {
   return (
-    readTrimmed("NEXT_PUBLIC_BASE_URL") ?? "https://chapa.thecreativetoken.com"
+    clean(process.env.NEXT_PUBLIC_BASE_URL) ??
+    "https://chapa.thecreativetoken.com"
   );
 }
 
@@ -136,7 +151,7 @@ export function getBitbucketClientSecret(): string | undefined {
 
 /** Raw `NEXT_PUBLIC_BITBUCKET_ENABLED` value — `"true"` when Bitbucket integration is on. */
 export function getBitbucketEnabledEnv(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_BITBUCKET_ENABLED");
+  return clean(process.env.NEXT_PUBLIC_BITBUCKET_ENABLED);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +184,7 @@ export function getCodebergClientSecret(): string | undefined {
 
 /** Raw `NEXT_PUBLIC_CODEBERG_ENABLED` value — `"true"` when Codeberg integration is on. */
 export function getCodebergEnabledEnv(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_CODEBERG_ENABLED");
+  return clean(process.env.NEXT_PUBLIC_CODEBERG_ENABLED);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +203,7 @@ export function getGitlabClientSecret(): string | undefined {
 
 /** Raw `NEXT_PUBLIC_GITLAB_ENABLED` value — `"true"` when GitLab integration is on. */
 export function getGitlabEnabledEnv(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_GITLAB_ENABLED");
+  return clean(process.env.NEXT_PUBLIC_GITLAB_ENABLED);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,17 +254,17 @@ export function getSupportForwardEmail(): string | undefined {
 
 /** Raw `NEXT_PUBLIC_EXPERIMENTS_ENABLED` value — `"true"` when experiments page is on. */
 export function getExperimentsEnabledEnv(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_EXPERIMENTS_ENABLED");
+  return clean(process.env.NEXT_PUBLIC_EXPERIMENTS_ENABLED);
 }
 
 /** Raw `NEXT_PUBLIC_INSIGHTS_ENABLED` value — `"true"` when AI Insights integration is on. */
 export function getInsightsEnabledEnv(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_INSIGHTS_ENABLED");
+  return clean(process.env.NEXT_PUBLIC_INSIGHTS_ENABLED);
 }
 
 /** Raw `NEXT_PUBLIC_STUDIO_ENABLED` value — `"true"` when Creator Studio is on. */
 export function getStudioEnabledEnv(): string | undefined {
-  return readTrimmed("NEXT_PUBLIC_STUDIO_ENABLED");
+  return clean(process.env.NEXT_PUBLIC_STUDIO_ENABLED);
 }
 
 // ---------------------------------------------------------------------------
