@@ -521,6 +521,19 @@ describe("renderBadgeSvg", () => {
       const svg = renderBadgeSvg(makeStats(), makeImpact());
       expect(svg).toContain("pulse-glow");
     });
+
+    // #760 — badges embedded via <img> don't run SMIL <animate>, so heatmap
+    // cells can render permanently invisible. disableAnimation renders static cells.
+    it("renders static heatmap cells when disableAnimation is true", () => {
+      const svg = renderBadgeSvg(makeStats(), makeImpact(), {
+        disableAnimation: true,
+      });
+      // No SMIL animate on the heatmap cells, and cells are fully opaque
+      expect(svg).not.toContain("<animate");
+      expect(svg).not.toContain('opacity="0"');
+      // Heatmap rects still present
+      expect(svg).toContain('rx="4"');
+    });
   });
 
   // ---------------------------------------------------------------------------

@@ -119,4 +119,34 @@ describe("renderHeatmapSvg", () => {
     const svg = renderHeatmapSvg([]);
     expect(svg).toBe("");
   });
+
+  it("emits animated cells by default (opacity 0 + animate)", () => {
+    const cells = buildHeatmapCells(makeHeatmapData());
+    const svg = renderHeatmapSvg(cells);
+    expect(svg).toContain('opacity="0"');
+    expect(svg).toContain("<animate");
+  });
+
+  // #760 — SMIL <animate> does not run inside <img> embeds, leaving cells
+  // permanently invisible. Static mode renders full-opacity, no-animation cells.
+  describe("disableAnimation (static cells for <img> embeds)", () => {
+    it("renders cells at full opacity with no <animate> elements", () => {
+      const cells = buildHeatmapCells(makeHeatmapData());
+      const svg = renderHeatmapSvg(cells, { disableAnimation: true });
+      expect(svg).toContain('opacity="1"');
+      expect(svg).not.toContain("<animate");
+      expect(svg).not.toContain('opacity="0"');
+    });
+
+    it("still produces one rect per cell when static", () => {
+      const cells = buildHeatmapCells(makeHeatmapData());
+      const svg = renderHeatmapSvg(cells, { disableAnimation: true });
+      const rectCount = (svg.match(/<rect /g) || []).length;
+      expect(rectCount).toBe(91);
+    });
+
+    it("returns empty string for empty cells array when static", () => {
+      expect(renderHeatmapSvg([], { disableAnimation: true })).toBe("");
+    });
+  });
 });

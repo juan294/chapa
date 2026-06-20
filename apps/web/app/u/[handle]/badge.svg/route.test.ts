@@ -198,7 +198,21 @@ describe("GET /u/[handle]/badge.svg", () => {
         avatarDataUri: "data:image/png;base64,abc123",
         verificationHash: "abc12345",
         verificationDate: "2026-04-17",
+        disableAnimation: true,
       },
+    );
+  });
+
+  // #760 — badge.svg is always consumed via <img> embeds, where SMIL <animate>
+  // does not run. The route must request static (non-animated) heatmap cells.
+  it("requests static (non-animated) rendering for img embeds", async () => {
+    const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+    await GET(req, ctx);
+
+    expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
+      FAKE_MATERIALIZED.stats,
+      FAKE_MATERIALIZED.displayImpact,
+      expect.objectContaining({ disableAnimation: true }),
     );
   });
 
