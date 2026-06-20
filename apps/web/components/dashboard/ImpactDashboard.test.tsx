@@ -7,7 +7,7 @@ import { ImpactDashboard } from "./ImpactDashboard";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@/lib/hooks/use-trend-data", () => ({
+vi.mock("@/hooks/useTrendData", () => ({
   useTrendData: vi.fn(),
 }));
 
@@ -60,7 +60,7 @@ afterEach(cleanup);
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
-import { useTrendData } from "@/lib/hooks/use-trend-data";
+import { useTrendData } from "@/hooks/useTrendData";
 
 const mockUseTrendData = vi.mocked(useTrendData);
 

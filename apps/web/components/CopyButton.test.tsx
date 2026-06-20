@@ -37,8 +37,13 @@ describe("CopyButton", () => {
   // Phase 6 — icon cross-fade transition
   describe("icon transition animation (Phase 6)", () => {
     it("renders both icon states for CSS transition (not conditional mount)", () => {
-      const svgCount = (SOURCE.match(/<svg/g) ?? []).length;
-      expect(svgCount).toBeGreaterThanOrEqual(2);
+      // The copy glyph now comes from the shared <CopyIcon> (#756); the check
+      // glyph stays an inline <svg>. Both states are always rendered so the
+      // cross-fade is CSS-driven, not a conditional mount.
+      const iconCount =
+        (SOURCE.match(/<svg/g) ?? []).length +
+        (SOURCE.match(/<CopyIcon/g) ?? []).length;
+      expect(iconCount).toBeGreaterThanOrEqual(2);
       expect(SOURCE).toContain("transition-all duration-150");
     });
 
