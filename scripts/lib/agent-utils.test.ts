@@ -25,6 +25,10 @@ function runValidation(
       {
         cwd: projectRoot,
         encoding: "utf8",
+        // Capture stderr instead of inheriting it — these tests intentionally
+        // exercise failure paths where agent-utils.sh logs [ERROR] lines.
+        // Inheriting would leak that expected noise into passing test output.
+        stdio: ["pipe", "pipe", "pipe"],
       },
     );
 
@@ -55,6 +59,10 @@ function runLockCommand(script: string): { success: boolean; output: string } {
       {
         cwd: projectRoot,
         encoding: "utf8",
+        // Capture stderr instead of inheriting it — lock-timeout tests
+        // intentionally trigger [ERROR] logging that would otherwise leak
+        // into passing test output.
+        stdio: ["pipe", "pipe", "pipe"],
       },
     );
 

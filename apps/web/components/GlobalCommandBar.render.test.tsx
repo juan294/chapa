@@ -225,11 +225,16 @@ describe("GlobalCommandBar", () => {
   describe("login navigation", () => {
     it("uses window.location.href for /api/auth/login path", () => {
       const originalHref = window.location.href;
-      // window.location.href assignment is trapped in jsdom
+      // Assigning window.location.href triggers jsdom's "Not implemented:
+      // navigation" notice. Stub the location getter to return a plain object
+      // whose href setter is a harmless no-op, so the component's navigation
+      // is exercised without leaking jsdom noise into passing output (#817).
+      const assign = vi.fn();
       const hrefSpy = vi.spyOn(window, "location", "get").mockReturnValue({
         ...window.location,
         href: originalHref,
-      } as Location);
+        assign,
+      } as unknown as Location);
 
       render(<GlobalCommandBar />);
       const input = screen.getByTestId("cmd-input");

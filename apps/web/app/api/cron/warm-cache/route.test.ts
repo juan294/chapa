@@ -289,6 +289,137 @@ describe("GET /api/cron/warm-cache", () => {
     expect(body.expiredSnapshotsDeleted).toBe(7);
   });
 
+  describe("cleanup failure paths (#764)", () => {
+    it("returns 200 and zero deletions when dbCleanExpiredVerifications rejects", async () => {
+      mockDbCleanExpiredVerifications.mockRejectedValue(
+        new Error("verification cleanup boom"),
+      );
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      // Cleanup is non-critical — the route still completes successfully.
+      expect(res.status).toBe(200);
+      expect(body.expiredVerificationsDeleted).toBe(0);
+      expect(body.warmed).toBe(2);
+    });
+
+    it("returns 200 and zero deletions when dbCleanExpiredMergeOperations rejects", async () => {
+      mockDbCleanExpiredMergeOperations.mockRejectedValue(
+        new Error("merge-ops cleanup boom"),
+      );
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.expiredMergeOpsDeleted).toBe(0);
+      expect(body.warmed).toBe(2);
+    });
+
+    it("returns 200 and zero deletions when dbCleanOldSnapshots rejects", async () => {
+      mockDbCleanOldSnapshots.mockRejectedValue(
+        new Error("snapshot cleanup boom"),
+      );
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.expiredSnapshotsDeleted).toBe(0);
+      expect(body.warmed).toBe(2);
+    });
+
+    it("isolates each cleanup failure — a rejecting cleanup does not prevent the others from running", async () => {
+      mockDbCleanExpiredVerifications.mockRejectedValue(new Error("boom-1"));
+      mockDbCleanExpiredMergeOperations.mockResolvedValue(4);
+      mockDbCleanOldSnapshots.mockResolvedValue(9);
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.expiredVerificationsDeleted).toBe(0);
+      // The cleanups that did NOT reject still report their deletions.
+      expect(body.expiredMergeOpsDeleted).toBe(4);
+      expect(body.expiredSnapshotsDeleted).toBe(9);
+    });
+
+    it("still emits the cron_warm_cache_complete event when a cleanup rejects", async () => {
+      mockDbCleanOldSnapshots.mockRejectedValue(new Error("snapshot cleanup boom"));
+
+      await GET(makeRequest());
+
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "cron_warm_cache_complete",
+        expect.objectContaining({ warmed: 2, failed: 0 }),
+      );
+    });
+  });
+
+  describe("per-handle failure resilience (#764)", () => {
+    it("continues processing remaining handles when one handle's materialization throws", async () => {
+      mockDbGetUsers.mockResolvedValue([
+        user("alice"),
+        user("bob"),
+        user("charlie"),
+      ]);
+      // bob throws (unhandled), alice and charlie succeed.
+      mockMaterializeOrchestratedProfile.mockImplementation((handle: string) => {
+        if (handle === "bob") {
+          return Promise.reject(new Error("bob exploded"));
+        }
+        return Promise.resolve(FAKE_MATERIALIZED);
+      });
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      // alice + charlie warmed despite bob failing.
+      expect(body.warmed).toBe(2);
+      expect(body.failed).toBeGreaterThanOrEqual(1);
+      // Rotation still advances since at least one handle was processed.
+      expect(mockCacheSet).toHaveBeenCalled();
+    });
+
+    it("records a snapshot failure gracefully and still counts the handle as warmed", async () => {
+      // Stats fetch succeeds but snapshot persistence throws — warm should survive.
+      mockPersistOrchestratedSnapshot.mockRejectedValue(
+        new Error("snapshot insert failed"),
+      );
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.warmed).toBe(2);
+      // Snapshot failures are swallowed — none recorded.
+      expect(body.snapshots).toBe(0);
+      expect(body.failed).toBe(0);
+    });
+
+    it("swallows a notifyScoreBump rejection without failing the warm", async () => {
+      mockDbGetLatestSnapshotBatch.mockResolvedValue(
+        new Map([["alice", { date: "2026-04-16", adjustedComposite: 55 }]]),
+      );
+      mockIsSignificantChange.mockReturnValue({
+        significant: true,
+        reason: "score_bump",
+        allReasons: ["score_bump"],
+      });
+      mockNotifyScoreBump.mockRejectedValue(new Error("email send failed"));
+
+      const res = await GET(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      // alice's notification failed but the warm itself succeeded; no crash.
+      expect(body.warmed).toBe(2);
+      expect(body.notifications).toBe(0);
+    });
+  });
+
   it("includes WARM_CACHE_PRIORITY_HANDLES in the warm list even when outside the rotation slice", async () => {
     vi.stubEnv("WARM_CACHE_PRIORITY_HANDLES", "user0,user1,unknown-user");
     // 80 users, offset=60 → rotation slice is user60..user79 (20 handles, < MAX_HANDLES)
