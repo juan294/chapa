@@ -6,11 +6,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## CSP unsafe-inline for scripts (#396)
+## CSP unsafe-inline for scripts (#396, #778)
 
 - **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`.
 - **Mitigation:** No user-controlled HTML injection points exist in the application. All user input (GitHub handles, display names) is escaped before rendering into SVG and HTML. Monitor Next.js for nonce-based CSP support.
 - **Severity:** Low
+- **See:** `docs/decisions/2026-06-20-csp-unsafe-inline-accepted-risk.md` (#778) — full rationale and a staged nonce-migration plan to remove `'unsafe-inline'`.
 
 ## CSP unsafe-eval in development (#397)
 
