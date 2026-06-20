@@ -35,7 +35,7 @@ export { BADGE_CONFIG_OPTIONS, DEFAULT_BADGE_CONFIG } from "./types";
 export type { Platform, LinkedPlatform } from "./platforms";
 
 export { CONTRIBUTION_QUERY } from "./github-query";
-export { buildStatsFromRaw } from "./stats-aggregation";
+export { buildStatsFromRaw, normalizeStats } from "./stats-aggregation";
 export { computePrWeight } from "./scoring";
 export { formatCompact } from "./format";
 export {
