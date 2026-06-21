@@ -25,6 +25,25 @@
 - [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars confirmed non-sensitive; `server-only` Supabase boundary and admin-auth routes documented in CLAUDE.md. No undocumented exports with security surface.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-06-21T03:00:00Z -->
+## Cost Analyst — 2026-06-21
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
+- **Cost-surface diff since 2026-06-20 cycle**: HEAD `226e5528 → f83d346f` via 4 commits — progressive-disclosure (UI-only `CommandBarHint`, zero cost), platform-fetcher refactor `924f6f1a` (unified `fetchLinkedPlatformStats` in `lib/platform/fetch-linked-platform.ts`, cost-neutral consolidation), NEXT_PUBLIC env fix (build-time only), back-merge chore. All prior claims re-verified in source this cycle.
+- **Platform fetcher refactor (#744)**: `lib/platform/fetch-linked-platform.ts` is the new shared skeleton for bitbucket/codeberg/gitlab fetch stacks. Pos cache 6h (`CACHE_TTL=21600`, `:86`), neg-cache 1h (`NEG_CACHE_TTL=3600`, `:13`). `cacheSet` calls at `:96,102,112`. Zero new call sites — same 24 non-test total. No module-level state; no leak surface. **Cost-neutral.**
+- Redis: **24 non-test `cacheSet` sites, 23/24 explicit positive TTL**. 3 persistent TTL-0 singletons (fixed cardinality): `cron:warm-cache:offset` cursor, `stats:badges_generated` INCR, `stats:unique_badges` HLL ~12KB. Two 365d overwrite keys: `config:<login>` (`studio/config/route.ts:73`), `badge:notified:<handle>` (`notifications.ts:18`). `cacheSet` default 21600s w/ `ttlSeconds>0` guard (`redis.ts:75–76`). Growth risk: LOW.
+- Supabase: **10 base tables, 10/10 ENABLE + 10/10 FORCE RLS**; 26 migrations. Lazy singleton `supabase.ts:13–34`, `import "server-only"` :8, `persistSession:false`. No N+1 (warm-cache cron batches with `dbGetLatestSnapshotBatch`). `_enrichWithLogins` bounded to 3 DB reads max per enrichment path.
+- External calls: **0 uncached**. GitHub badge/profile 6h + 7d SWR + in-flight dedup + Redis lock; platforms 6h + 1h neg; health probe `unstable_cache` 60s; Resend daily quota `cacheReserveQuota`; PostHog batched. Fetch-timeout coverage: **100%**.
+- Vercel: badge `maxDuration=35`; crons + bulk-recalc `=300`. Badge success `s-maxage=21600/SWR=86400`, error `300/600`. ISR `force-static revalidate=3600` on archetypes/about/privacy/verify. Bundle 1,950 KB raw / 623 KB gzipped (flat, 3rd consecutive cycle).
+- **P2-1 CARRIED**: `dbGetCampaignStats` 4-query parallel COUNT (`campaigns/sends.ts:251`); threshold-gated. **MONITOR M7/M8 CARRIED**: 365d overwrite keys, no accumulation.
+- **P1s: NONE. P2s: 1 (P2-1, threshold-gated). P3s: 0.**
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle flat 3 consecutive cycles at 1,950 KB raw / 623 KB gzipped. Progressive-disclosure adds only `CommandBarHint.tsx` (~80 lines), no new dynamic imports or vendor deps. M-bundle stays closed.
+- [Security]: Platform-fetcher refactor moves neg-cache logic from 3 client files into `fetch-linked-platform.ts` — same behavior, same TTLs, no new surface. 10/10 FORCE RLS intact. 100% fetch-timeout coverage maintained.
+- [Coverage]: No cost-path coverage gaps. `lib/platform/fetch-linked-platform.ts` covered by 143-line test file (`fetch-linked-platform.test.ts`) per `924f6f1a` diff.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-06-20T03:00:00Z -->
 ## Cost Analyst — 2026-06-20
 - **Status**: GREEN
@@ -64,25 +83,18 @@
 - [Coverage]: lib/cache 99.5%, lib/db 97.1%, app/api 98.6% — all stable per coverage 2026-06-19. No cost-path coverage gaps.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-06-18T03:00:00Z -->
-## Cost Analyst — 2026-06-18
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
-- **Cost-surface diff since 2026-06-17 cycle**: ZERO executable app-code change. HEAD advanced `300e3bbe → 63b18ac1` via CI-only upgrade (pnpm/action-setup@v4→@v5, Node.js 20 deprecation) — touches no app runtime. **33rd consecutive carry/audit cycle.** All key claims re-verified in source this cycle — not blind-carried.
-- Redis: per-user/per-entity keys all TTL'd. **24 non-test `cacheSet` call sites re-counted, 23/24 carry explicit positive TTL**; 1 exception = bounded rotation cursor `cron:warm-cache:offset` (`warm-cache/route.ts:145`, TTL 0). 3 persistent TTL-0 singletons only: cursor + `stats:badges_generated` (INCR, `redis.ts:259`) + `stats:unique_badges` (HLL ~12KB fixed, `redis.ts:260`). `cacheSet` default 21600s with `ttlSeconds>0` guard (`redis.ts:69,75–76`); client `retry:{retries:0}` (`redis.ts:36`). Two 1y keys (overwrite, fixed cardinality): `config:<login>` (`studio/config/route.ts:73`), `badge:notified:<handle>` (`notifications.ts:18,106`). Webhook dedup key `events:dedup:*` 7d TTL (`webhooks/resend/route.ts:14,98`). Growth risk: LOW.
-- Supabase: **10 base tables, 10/10 ENABLE + 10/10 FORCE RLS** (25 migrations, latest `025_force_supplemental_stats_rls.sql`). Singleton lazy service-role client `supabase.ts:13–34`, `import "server-only"` line 8, `persistSession:false`, 5s `withTimeout` health probe. No N+1 in `lib/db/`. Warm-cache cron batches snapshot pre-fetches in one query.
-- External calls: **0 uncached**. Badge/profile GitHub cache-first (6h + 7d SWR) w/ in-flight dedup + Redis lock; health GitHub probe `unstable_cache` 60s (`health/route.ts:59`); feature-flags ISR `s-maxage=60/SWR=300`; Resend event-driven w/ daily quota via `cacheReserveQuota`; PostHog batched fire-and-forget. Fetch-timeout coverage: **100% of outbound server fetches** carry `AbortSignal.timeout` or `withTimeout`.
-- Badge `maxDuration=35` (`badge.svg/route.ts:29`). Success `s-maxage=21600 / SWR=86400` / error `s-maxage=300 / SWR=600`. Share page ISR `revalidate=3600`. Bundle: 1,949 KB raw / 622.6 KB gzipped (performance 2026-06-11, flat).
-- **P2-1 CARRIED**: `dbGetCampaignStats()` 4-query parallel COUNT (`campaigns.ts:790–820`); threshold comment in place. Not triggered (>5K sends/campaign).
-- **MONITOR M7/M8 CARRIED**: `config:` and `badge:notified:` 1y TTL — overwrite, fixed cardinality, no accumulation. No action.
-- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated). P3s: 0.**
+<!-- ENTRY:START agent=triage timestamp=2026-06-21T06:55:24Z -->
+## Triage -- 2026-06-21
+- **Reports processed**: 4 (cc-rpi-update GREEN, cost-analyst GREEN, coverage GREEN, prior triage GREEN)
+- **Action items resolved**: 0 -- no implementation required. Cost posture remains flat, critical-path coverage remains above threshold, cc-rpi is already synced, and no Dependabot PRs or recent agent failures were found.
+- **Dependabot**: 0 open PRs.
+- **Summary**: Clean GREEN no-op triage cycle. Local verification passed: 7,944/7,944 tests, typecheck clean, lint clean.
 
 **Cross-agent recommendations:**
-- [Performance]: Bundle flat at 1,949 KB raw / 622.6 KB gzipped (performance 2026-06-11). M-bundle stays closed; CI pnpm upgrade is dev-only — no cold-start regression.
-- [Security]: `pnpm audit` clean (esbuild/svix cleared by triage 2026-06-16). `server-only` boundary + 10/10 FORCE RLS re-verified intact. Fail-open rate limiter (accepted risk) and 100% server fetch-timeout coverage maintained.
-- [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable per coverage 2026-06-18. No cost-path coverage gaps.
+- [Cost Analyst]: Continue carrying P2-1 as monitor-only until campaign volume exceeds ~5K sends/campaign. M7/M8 365d overwrite keys remain monitor-only.
+- [Coverage]: No action needed. `lib/impact/` remains strong at 99.6% statements / 98.7% branches / 100% functions per the latest coverage report.
+- [QA]: No flaky tests reported this cycle; local test run passed 7,944/7,944 with only known Node localStorage warning noise.
 <!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=triage timestamp=2026-06-20T06:48:00Z -->
 ## Triage — 2026-06-20
@@ -108,32 +120,6 @@
 - [Performance]: `knip.json` now matches knip v6 and no longer reports the test suite as production unused files. Keep bundle monitoring flat at 1,950 KB raw / 623 KB gzipped.
 - [Coverage]: No coverage changes. All critical paths remain GREEN and the full suite passed twice locally.
 - [QA]: Expected JSDOM/navigation and agent-fixture console noise remained non-failing; no accessibility or design-system follow-up needed.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-16T16:11:00Z -->
-## Triage — 2026-06-16
-- **Reports processed**: 4 (cost-analyst GREEN, coverage GREEN, security YELLOW, cc-rpi GREEN)
-- **Action items resolved**: 2 — removed stale `"svix": "1.92.2"` exact pin from `pnpm.overrides` (was blocking the intended `^1.95.2` upgrade in `apps/web/package.json`); added `"esbuild": ">=0.28.1"` override to clear GHSA-gv7w-rqvm-qjhr (high) and GHSA-g7r4-m6w7-qqqr (low) dev-only advisories. `pnpm audit` clean after install.
-- **Dependabot**: PR #854 (svix patch 1.92.2→1.95.2) — closed as superseded; lockfile now resolves svix@1.95.2 directly after removing the conflicting override.
-- **Summary**: Security cleared to GREEN. 7,594/7,594 tests, typecheck clean, lint clean.
-
-**Cross-agent recommendations:**
-- [Security]: `pnpm audit` should now be clean (0 advisories). esbuild@0.28.1 in lockfile. svix@1.95.2 in lockfile. Re-verify next cycle.
-- [Cost Analyst]: svix override removal has no cost-surface impact. esbuild is dev-only. P2-1 and M7/M8 carries unchanged.
-- [Coverage]: No coverage changes. 7,594 tests still passing at same coverage metrics.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=triage timestamp=2026-06-14T05:45:55Z -->
-## Triage — 2026-06-14
-- **Reports processed**: 6 (cost-analyst GREEN, performance GREEN, coverage GREEN, documentation GREEN, cc-rpi-update GREEN, qa GREEN)
-- **Action items resolved**: 4 — performance agent now verifies dependency state with `pnpm install --frozen-lockfile` before build sizing; coverage/QA scheduled runs share a `vitest-heavy-agent` lock to reduce worker-pool contention; documentation agent no longer flags direct `NEXT_PUBLIC_*` reads in client components used for Next.js build-time inlining; `getSessionSecret` JSDoc was already present.
-- **Dependabot**: 0 open PRs.
-- **Summary**: Clean GREEN triage cycle. Added scheduled-agent hardening for stale dependency measurements and shared-host vitest contention. Local verification passed: 7,594/7,594 tests, typecheck clean, lint clean.
-
-**Cross-agent recommendations:**
-- [Performance]: Keep the dependency-state check before every bundle/build measurement so future reports cannot measure stale `node_modules`.
-- [Coverage]: The new shared lock should reduce coverage/QA overlap on the same host; continue reporting any worker-spawn timeouts as environmental unless isolation reruns fail.
-- [Documentation]: Treat client-component direct `NEXT_PUBLIC_*` reads as valid when build-time inlining is required; server modules should continue using `lib/env` accessors.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=documentation timestamp=2026-06-05T10:00:00Z -->
