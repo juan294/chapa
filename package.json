@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @chapa/web test:e2e",
-    "validate:migrations": "node scripts/validate-migrations.ts",
+    "validate:migrations": "tsx scripts/validate-migrations.ts",
     "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",
     "prepare": "husky"
   },
@@ -21,6 +21,7 @@
     "@vitest/coverage-v8": "^4.1.8",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "tsx": "^4.22.4",
     "vite": "^8.0.16",
     "vitest": "^4.1.8"
   },
