@@ -40,6 +40,10 @@ vi.mock("@/lib/keyboard/shortcuts", () => ({
 
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => true),
+  isInsightsEnabledSync: vi.fn(() => false),
+  isBitbucketEnabledSync: vi.fn(() => false),
+  isCodebergEnabledSync: vi.fn(() => false),
+  isGitlabEnabledSync: vi.fn(() => false),
 }));
 
 // Mock the dynamic import of ShortcutCheatSheet

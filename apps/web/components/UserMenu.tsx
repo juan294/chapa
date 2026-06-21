@@ -4,41 +4,64 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  isInsightsEnabledSync,
-  isBitbucketEnabledSync,
-  isCodebergEnabledSync,
-  isGitlabEnabledSync,
-} from "@/lib/feature-flags-sync";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
 import { useDropdownMenu } from "@/hooks/useDropdownMenu";
 import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
+import { createModuleStore } from "@/hooks/createModuleStore";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { useTranslation } from "@/lib/i18n";
+import {
+  GitHubIcon,
+  BitbucketIcon,
+  CodebergIcon,
+  GitlabIcon,
+} from "@/components/icons";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Toast } from "./Toast";
 
-/** Module-level cache for platform status fetches — persists across mounts */
-const platformStatusCache: {
+/** Module-level cache for platform status fetches — persists across mounts. */
+interface PlatformStatus {
+  linked: boolean;
+  remoteLogin: string | null;
+}
+type PlatformId = "bitbucket" | "codeberg" | "gitlab";
+interface PlatformStatusEntry {
   fetched: boolean;
-  bitbucket: { linked: boolean; remoteLogin: string | null } | null;
-  codeberg: { linked: boolean; remoteLogin: string | null } | null;
-  gitlab: { linked: boolean; remoteLogin: string | null } | null;
-} = {
-  fetched: false,
-  bitbucket: null,
-  codeberg: null,
-  gitlab: null,
-};
+  pending: boolean;
+  status: PlatformStatus | null;
+}
+interface PlatformStatusCache {
+  bitbucket: PlatformStatusEntry;
+  codeberg: PlatformStatusEntry;
+  gitlab: PlatformStatusEntry;
+}
+
+function emptyPlatformStatusCache(): PlatformStatusCache {
+  const emptyEntry = (): PlatformStatusEntry => ({
+    fetched: false,
+    pending: false,
+    status: null,
+  });
+  return {
+    bitbucket: emptyEntry(),
+    codeberg: emptyEntry(),
+    gitlab: emptyEntry(),
+  };
+}
+
+// Backed by the shared module-store primitive (#774). This cache is read
+// imperatively (in useState initializers and effects) and written
+// imperatively after fetches/unlinks — there are no reactive subscribers, so
+// `getSnapshot()`/`set()` are used directly.
+const platformStatusStore = createModuleStore<PlatformStatusCache>(
+  emptyPlatformStatusCache(),
+);
 
 /** Clear the platform status cache — call after link/unlink actions */
 export function clearPlatformStatusCache() {
-  platformStatusCache.fetched = false;
-  platformStatusCache.bitbucket = null;
-  platformStatusCache.codeberg = null;
-  platformStatusCache.gitlab = null;
+  platformStatusStore.set(emptyPlatformStatusCache());
 }
 
 interface UserMenuProps {
@@ -50,7 +73,13 @@ interface UserMenuProps {
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
-  const { studioEnabled } = useClientFeatureFlags();
+  const {
+    studioEnabled,
+    insightsEnabled,
+    bitbucketEnabled,
+    codebergEnabled,
+    gitlabEnabled,
+  } = useClientFeatureFlags();
   const { t } = useTranslation();
   const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
   const [imgError, setImgError] = useState(false);
@@ -62,21 +91,21 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [bbStatus, setBbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(() => platformStatusCache.bitbucket);
+  } | null>(() => platformStatusStore.getSnapshot().bitbucket.status);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkLoading, setUnlinkLoading] = useState(false);
 
   const [cbStatus, setCbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(() => platformStatusCache.codeberg);
+  } | null>(() => platformStatusStore.getSnapshot().codeberg.status);
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
 
   const [glStatus, setGlStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(() => platformStatusCache.gitlab);
+  } | null>(() => platformStatusStore.getSnapshot().gitlab.status);
   const [showGlUnlinkConfirm, setShowGlUnlinkConfirm] = useState(false);
   const [glUnlinkLoading, setGlUnlinkLoading] = useState(false);
 
@@ -206,37 +235,57 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   }, []);
 
   useEffect(() => {
-    if (platformStatusCache.fetched) {
-      return;
-    }
     // Only probe the status endpoint for platforms whose public feature flag is
     // enabled. When an integration is flag-gated OFF we skip the network call
     // entirely instead of relying on the server to answer `{ enabled: false }`,
     // avoiding wasted requests on every mount (#885). The server still has the
     // final say for enabled platforms.
     function fetchPlatformStatus(
-      platform: "bitbucket" | "codeberg" | "gitlab",
+      platform: PlatformId,
       setter: typeof setBbStatus,
     ) {
+      if (platformStatusStore.getSnapshot()[platform].fetched || platformStatusStore.getSnapshot()[platform].pending) {
+        return;
+      }
+
+      platformStatusStore.set({
+        ...platformStatusStore.getSnapshot(),
+        [platform]: {
+          ...platformStatusStore.getSnapshot()[platform],
+          pending: true,
+        },
+      });
       fireAndForget(
         () =>
           fetch(`/api/auth/${platform}/status`)
             .then((r) => r.json())
             .then((data) => {
+              const status = data.enabled
+                ? { linked: data.linked, remoteLogin: data.remoteLogin }
+                : null;
+              platformStatusStore.set({
+                ...platformStatusStore.getSnapshot(),
+                [platform]: { fetched: true, pending: false, status },
+              });
               if (data.enabled) {
-                const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-                platformStatusCache[platform] = status;
                 setter(status);
               }
             }),
-        () => undefined,
+        () => {
+          platformStatusStore.set({
+            ...platformStatusStore.getSnapshot(),
+            [platform]: {
+              ...platformStatusStore.getSnapshot()[platform],
+              pending: false,
+            },
+          });
+        },
       ); // Graceful — menu works without status
     }
-    if (isBitbucketEnabledSync()) fetchPlatformStatus("bitbucket", setBbStatus);
-    if (isCodebergEnabledSync()) fetchPlatformStatus("codeberg", setCbStatus);
-    if (isGitlabEnabledSync()) fetchPlatformStatus("gitlab", setGlStatus);
-    platformStatusCache.fetched = true;
-  }, []);
+    if (bitbucketEnabled) fetchPlatformStatus("bitbucket", setBbStatus);
+    if (codebergEnabled) fetchPlatformStatus("codeberg", setCbStatus);
+    if (gitlabEnabled) fetchPlatformStatus("gitlab", setGlStatus);
+  }, [bitbucketEnabled, codebergEnabled, gitlabEnabled]);
 
   // Shared unlink flow — collapses the three near-identical platform disconnect
   // handlers into one parametrized helper (#884). Each named handler below
@@ -255,19 +304,28 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       setLoading(true);
       try {
         const res = await fetch(endpoint, { method: "POST" });
-        if (res.ok) {
+        const body = await res.json().catch(() => null);
+        if (res.ok && body?.success === true) {
           clearPlatformStatusCache();
           setStatus({ linked: false, remoteLogin: null });
           setShowConfirm(false);
           router.refresh();
+        } else {
+          setToast({
+            message: t('userMenu.unlinkFailed') as string,
+            type: "error",
+          });
         }
       } catch {
-        // Graceful failure — user can try again
+        setToast({
+          message: t('userMenu.unlinkFailed') as string,
+          type: "error",
+        });
       } finally {
         setLoading(false);
       }
     },
-    [router],
+    [router, t],
   );
 
   async function handleUnlinkBitbucket() {
@@ -396,14 +454,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-primary transition-colors hover:bg-amber/[0.06]"
             >
-              <svg
-                className="h-4 w-4 text-text-secondary"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-              </svg>
+              <GitHubIcon className="h-4 w-4 text-text-secondary" />
               {t('userMenu.myBadge') as string}
             </Link>
             {studioEnabled && (
@@ -428,7 +479,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 {t('userMenu.creatorStudio') as string}
               </Link>
             )}
-            {isInsightsEnabledSync() && (
+            {insightsEnabled && (
               <button
                 type="button"
                 role="menuitem"
@@ -471,9 +522,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 transition-colors hover:text-amber"
                   >
-                    <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
-                    </svg>
+                    <BitbucketIcon className="h-4 w-4 text-text-secondary" />
                     <span className="text-sm text-text-primary">{bbStatus.remoteLogin}</span>
                   </a>
                   <button
@@ -490,9 +539,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   href="/api/auth/bitbucket/connect"
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"/>
-                  </svg>
+                  <BitbucketIcon width={16} height={16} />
                   {t('userMenu.linkBitbucket') as string}
                 </a>
               )
@@ -506,7 +553,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 transition-colors hover:text-amber"
                   >
-                    <CodebergIcon />
+                    <CodebergIcon className="h-4 w-4 text-text-secondary" />
                     <span className="text-sm text-text-primary">{cbStatus.remoteLogin}</span>
                   </a>
                   <button
@@ -523,7 +570,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   href="/api/auth/codeberg/connect"
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
                 >
-                  <CodebergIcon />
+                  <CodebergIcon className="h-4 w-4 text-text-secondary" />
                   {t('userMenu.linkCodeberg') as string}
                 </a>
               )
@@ -537,7 +584,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 transition-colors hover:text-amber"
                   >
-                    <GitlabIcon />
+                    <GitlabIcon className="h-4 w-4 text-text-secondary" />
                     <span className="text-sm text-text-primary">{glStatus.remoteLogin}</span>
                   </a>
                   <button
@@ -554,7 +601,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   href="/api/auth/gitlab/connect"
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
                 >
-                  <GitlabIcon />
+                  <GitlabIcon className="h-4 w-4 text-text-secondary" />
                   {t('userMenu.linkGitlab') as string}
                 </a>
               )
@@ -722,21 +769,5 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         />
       )}
     </div>
-  );
-}
-
-function CodebergIcon() {
-  return (
-    <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
-    </svg>
-  );
-}
-
-function GitlabIcon() {
-  return (
-    <svg className="h-4 w-4 text-text-secondary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0539.8585.8585 0 0 0-.3362.405L.4332 9.5065l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.0301.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.462-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z" />
-    </svg>
   );
 }

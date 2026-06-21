@@ -65,6 +65,7 @@ beforeEach(() => {
   vi.mocked(isAdminHandle).mockReturnValue(false);
   // Default: GITHUB_TOKEN not set — skipped
   vi.stubEnv("GITHUB_TOKEN", undefined);
+  vi.stubEnv("VERCEL_ENV", "preview");
 });
 
 describe("GET /api/health", () => {
@@ -120,6 +121,20 @@ describe("GET /api/health", () => {
     expect(body.status).toBe("ok");
     expect(body.dependencies.redis).toBe("skipped");
     expect(captureOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when production Redis config is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(pingRedis).mockResolvedValueOnce("skipped");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.redis).toBe("skipped");
+    expect(captureOperationalAlert).toHaveBeenCalled();
   });
 
   it("returns 200 with 'skipped' when Supabase env vars are not configured (#634)", async () => {

@@ -99,7 +99,11 @@ export const POST = withErrorCapture("/api/refresh", async (request: NextRequest
     );
   }
 
-  await invalidateProfileReadModels(handle, { history: true });
+  await invalidateProfileReadModels(handle, {
+    badgeSvg: true,
+    snapshot: true,
+    history: true,
+  });
 
   // Update craft cache after the durable snapshot write succeeds.
   const craftResult = materialized.craftResult;

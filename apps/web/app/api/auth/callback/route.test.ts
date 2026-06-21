@@ -117,7 +117,7 @@ function allowRateLimit() {
 function setEnvVars() {
   vi.stubEnv("GITHUB_CLIENT_ID", "test-client-id");
   vi.stubEnv("GITHUB_CLIENT_SECRET", "test-client-secret");
-  vi.stubEnv("NEXTAUTH_SECRET", "test-session-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-session-secret-32-characters");
 }
 
 function clearEnvVars() {
@@ -434,7 +434,7 @@ describe("GET /api/auth/callback — OAuth flow", () => {
         name: "The Octocat",
         avatar_url: "https://avatars.githubusercontent.com/u/1?v=4",
       },
-      "test-session-secret",
+      "test-session-secret-32-characters",
     );
   });
 

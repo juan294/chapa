@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
+  getSessionSecret,
   getSessionKey,
   getOptionalRequestSession,
   getOptionalServerSessionFromHeaders,
@@ -35,6 +36,15 @@ describe("session helpers", () => {
   });
 
   describe("getOptionalRequestSession", () => {
+    it("treats a short NEXTAUTH_SECRET as misconfigured", () => {
+      vi.stubEnv("NEXTAUTH_SECRET", "short");
+
+      expect(() =>
+        getOptionalRequestSession(makeRequest("chapa_session=test")),
+      ).toThrow(/at least 32 chars/i);
+      expect(mockReadSessionCookie).not.toHaveBeenCalled();
+    });
+
     it("returns null when NEXTAUTH_SECRET is missing", () => {
       vi.stubEnv("NEXTAUTH_SECRET", undefined);
 
@@ -58,6 +68,12 @@ describe("session helpers", () => {
   });
 
   describe("getSessionKey", () => {
+    it("getSessionSecret also enforces the production minimum length", () => {
+      vi.stubEnv("NEXTAUTH_SECRET", "short");
+
+      expect(() => getSessionSecret()).toThrow(/at least 32 chars/i);
+    });
+
     it("throws when NEXTAUTH_SECRET is shorter than 32 chars", () => {
       vi.stubEnv("NEXTAUTH_SECRET", "short");
 

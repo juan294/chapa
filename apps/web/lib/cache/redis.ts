@@ -150,6 +150,7 @@ export async function cacheMGet<T>(keys: string[]): Promise<(T | null)[]> {
 // See also: GitHub issue #300
 // ---------------------------------------------------------------------------
 
+/** Result of a rate-limit check: whether the request is allowed plus current/max counts. */
 export interface RateLimitResult {
   allowed: boolean;
   current: number;
@@ -319,6 +320,7 @@ export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
 // Atomic set-if-not-exists (SETNX) — used for once-per-day guards
 // ---------------------------------------------------------------------------
 
+/** Outcome of a set-if-not-exists attempt: newly written, already existed, or Redis unavailable. */
 export type CacheSetNxStatus = "acquired" | "exists" | "unavailable";
 
 /**

@@ -43,7 +43,7 @@ function makeRequest(session?: string, ip?: string, deviceCode?: string): NextRe
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
 });
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ describe("GET /api/cli/auth/poll", () => {
 
     await GET(makeRequest(VALID_UUID));
 
-    expect(generateCliToken).toHaveBeenCalledWith("octocat", "test-secret");
+    expect(generateCliToken).toHaveBeenCalledWith("octocat", "test-secret-32-characters-valid-ok");
   });
 
   it("deletes session from Redis after successful token generation (one-time use)", async () => {
@@ -235,7 +235,7 @@ describe("GET /api/cli/auth/poll", () => {
 describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", () => {
   beforeEach(() => {
     vi.resetAllMocks(); // reset implementations too (prevents bleed from "cacheDel throws" test)
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
     vi.mocked(cacheSet).mockResolvedValue(true);
     vi.mocked(cacheDel).mockResolvedValue(undefined);
@@ -431,7 +431,7 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
 describe("GET /api/cli/auth/poll — rate limiting", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
     vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
     vi.mocked(cacheGet).mockResolvedValue(null);
   });

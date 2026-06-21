@@ -1,4 +1,3 @@
-import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { isBitbucketEnabled } from "@/lib/feature-flags";
 import { getBitbucketClientId, getBitbucketClientSecret } from "@/lib/env";
 import {
@@ -7,33 +6,27 @@ import {
   dbUpdatePlatformTokens,
 } from "@/lib/db/user-platforms";
 import { isTokenExpired, refreshBitbucketToken } from "@/lib/auth/bitbucket";
+import {
+  fetchLinkedPlatformStats,
+  type LinkedPlatformRecord,
+} from "@/lib/platform/fetch-linked-platform";
 import { fetchBitbucketStats } from "./stats";
 import type { StatsData } from "@chapa/shared";
 
-const CACHE_TTL = 21600; // 6 hours
-
-/** Fetch Bitbucket stats from cache or live API. Returns null if not linked/disabled. */
-export async function fetchBitbucketIfLinked(
+/**
+ * Resolve a usable Bitbucket access token, refreshing if expired.
+ * Returns null (short-circuit, no fetch) when the grant can't be recovered.
+ */
+async function resolveBitbucketToken(
   handle: string,
-  lowerHandle: string,
-): Promise<StatsData | null> {
-  const bbCacheKey = `stats:v2:bitbucket:${lowerHandle}`;
-
-  const cached = await cacheGet<StatsData>(bbCacheKey);
-  if (cached) return cached;
-
-  const enabled = await isBitbucketEnabled();
-  if (!enabled) return null;
-
-  const linked = await dbGetLinkedPlatform(handle, "bitbucket");
-  if (!linked) return null;
-
+  linked: LinkedPlatformRecord,
+): Promise<string | null> {
   let { accessToken } = linked.tokens;
   const { refreshToken, expiresAt } = linked.tokens;
 
   if (isTokenExpired(expiresAt)) {
     if (!refreshToken) {
-      void dbDeleteLinkedPlatform(handle, "bitbucket");
+      await dbDeleteLinkedPlatform(handle, "bitbucket");
       return null;
     }
 
@@ -43,13 +36,13 @@ export async function fetchBitbucketIfLinked(
 
     if (!result.ok) {
       if (result.reason === "revoked") {
-        void dbDeleteLinkedPlatform(handle, "bitbucket");
+        await dbDeleteLinkedPlatform(handle, "bitbucket");
       }
       return null;
     }
 
     accessToken = result.tokens.access_token;
-    void dbUpdatePlatformTokens(
+    await dbUpdatePlatformTokens(
       handle,
       "bitbucket",
       result.tokens.access_token,
@@ -58,15 +51,24 @@ export async function fetchBitbucketIfLinked(
     );
   }
 
-  const bbStats = await fetchBitbucketStats(
-    linked.remoteLogin,
-    accessToken,
-    { displayName: linked.remoteLogin, avatarUrl: "" },
-  );
+  return accessToken;
+}
 
-  if (bbStats) {
-    await cacheSet(bbCacheKey, bbStats, CACHE_TTL);
-  }
-
-  return bbStats;
+/** Fetch Bitbucket stats from cache or live API. Returns null if not linked/disabled. */
+export async function fetchBitbucketIfLinked(
+  handle: string,
+  lowerHandle: string,
+): Promise<StatsData | null> {
+  return fetchLinkedPlatformStats({
+    platform: "bitbucket",
+    lowerHandle,
+    isEnabled: isBitbucketEnabled,
+    getLinkedPlatform: () => dbGetLinkedPlatform(handle, "bitbucket"),
+    resolveAccessToken: (linked) => resolveBitbucketToken(handle, linked),
+    fetchStats: (linked, accessToken) =>
+      fetchBitbucketStats(linked.remoteLogin, accessToken, {
+        displayName: linked.remoteLogin,
+        avatarUrl: "",
+      }),
+  });
 }

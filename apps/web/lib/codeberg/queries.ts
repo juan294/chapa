@@ -45,10 +45,15 @@ export async function fetchCodebergContributionData(
     const sinceTs = Math.floor(since.getTime() / 1000);
     const filteredHeatmap = heatmap.filter((h) => h.timestamp >= sinceTs);
 
-    // 2. Fetch user repos (paginated)
-    // BE-H1: null means rate-limited/error — treat as empty to preserve heatmap
-    const allRepos =
-      (await fetchUserRepos(username, accessToken, controller.signal)) ?? [];
+    // 2. Fetch user repos (paginated). Any null from critical paginated
+    // endpoints means upstream failure/rate-limit; return null so callers serve
+    // stale platform stats instead of caching a heatmap-only partial profile.
+    const allRepos = await fetchUserRepos(
+      username,
+      accessToken,
+      controller.signal,
+    );
+    if (allRepos === null) return null;
 
     // 3. For each repo, fetch merged PRs, reviews, issues
     const allMergedPRs: CodebergPullRequest[] = [];
@@ -66,6 +71,7 @@ export async function fetchCodebergContributionData(
         accessToken,
         controller.signal,
       );
+      if (prs === null) return null;
       allMergedPRs.push(...prs);
 
       // Reviews on other people's PRs
@@ -75,6 +81,7 @@ export async function fetchCodebergContributionData(
         accessToken,
         controller.signal,
       );
+      if (reviews === null) return null;
       allReviews.push(...reviews);
 
       // Closed issues (only if repo has issue tracker)
@@ -85,6 +92,7 @@ export async function fetchCodebergContributionData(
           accessToken,
           controller.signal,
         );
+        if (issues === null) return null;
         totalClosedIssues += issues.length;
       }
 
@@ -246,38 +254,38 @@ async function fetchUserRepos(
   );
 }
 
-/** Fetch merged PRs authored by username in a repo. Returns [] on error. */
+/** Fetch merged PRs authored by username in a repo. Returns null on upstream failure. */
 async function fetchMergedPRs(
   repoFullName: string,
   username: string,
   token: string,
   signal: AbortSignal,
-): Promise<CodebergPullRequest[]> {
-  const prs =
-    (await fetchPaginated<CodebergPullRequest>(
-      `${CB_API}/repos/${repoFullName}/pulls?state=closed`,
-      token,
-      signal,
-    )) ?? [];
+): Promise<CodebergPullRequest[] | null> {
+  const prs = await fetchPaginated<CodebergPullRequest>(
+    `${CB_API}/repos/${repoFullName}/pulls?state=closed`,
+    token,
+    signal,
+  );
+  if (prs === null) return null;
 
   // Filter: merged AND authored by this user
   return prs.filter((pr) => pr.merged && pr.user.login === username);
 }
 
-/** Fetch reviews by username on other people's PRs. Returns [] on error. */
+/** Fetch reviews by username on other people's PRs. Returns null on upstream failure. */
 async function fetchUserReviews(
   repoFullName: string,
   username: string,
   token: string,
   signal: AbortSignal,
-): Promise<CodebergReview[]> {
+): Promise<CodebergReview[] | null> {
   // First get closed PRs NOT authored by this user
-  const prs =
-    (await fetchPaginated<CodebergPullRequest>(
-      `${CB_API}/repos/${repoFullName}/pulls?state=closed`,
-      token,
-      signal,
-    )) ?? [];
+  const prs = await fetchPaginated<CodebergPullRequest>(
+    `${CB_API}/repos/${repoFullName}/pulls?state=closed`,
+    token,
+    signal,
+  );
+  if (prs === null) return null;
 
   const reviews: CodebergReview[] = [];
 
@@ -285,12 +293,12 @@ async function fetchUserReviews(
     // Skip self-authored PRs (self-reviews don't count)
     if (pr.user.login === username) continue;
 
-    const prReviews =
-      (await fetchPaginated<CodebergReview>(
-        `${CB_API}/repos/${repoFullName}/pulls/${pr.number}/reviews`,
-        token,
-        signal,
-      )) ?? [];
+    const prReviews = await fetchPaginated<CodebergReview>(
+      `${CB_API}/repos/${repoFullName}/pulls/${pr.number}/reviews`,
+      token,
+      signal,
+    );
+    if (prReviews === null) return null;
 
     // Filter: by this user AND only APPROVED or REQUEST_CHANGES
     for (const r of prReviews) {
@@ -306,19 +314,19 @@ async function fetchUserReviews(
   return reviews;
 }
 
-/** Fetch closed issues authored/assigned to username in a repo. Returns [] on error. */
+/** Fetch closed issues authored/assigned to username in a repo. Returns null on upstream failure. */
 async function fetchClosedIssues(
   repoFullName: string,
   username: string,
   token: string,
   signal: AbortSignal,
-): Promise<CodebergIssue[]> {
-  const issues =
-    (await fetchPaginated<CodebergIssue>(
-      `${CB_API}/repos/${repoFullName}/issues?state=closed&type=issues`,
-      token,
-      signal,
-    )) ?? [];
+): Promise<CodebergIssue[] | null> {
+  const issues = await fetchPaginated<CodebergIssue>(
+    `${CB_API}/repos/${repoFullName}/issues?state=closed&type=issues`,
+    token,
+    signal,
+  );
+  if (issues === null) return null;
 
   return issues.filter((i) => i.user.login === username);
 }

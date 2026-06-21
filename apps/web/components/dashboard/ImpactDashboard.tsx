@@ -1,7 +1,7 @@
 "use client";
 
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
-import { useTrendData } from "@/lib/hooks/use-trend-data";
+import { useTrendData } from "@/hooks/useTrendData";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
 import { CoachingInsights } from "./CoachingInsights";

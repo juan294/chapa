@@ -13,6 +13,15 @@ interface BadgeOptions {
   verificationDate?: string;
   /** Render as a demo/sample badge — shows "Simulated metrics" and a sample verification strip */
   demoMode?: boolean;
+  /**
+   * Disable SMIL animations on the heatmap (renders static, fully-opaque cells).
+   *
+   * SMIL `<animate>` does not run when the SVG is embedded via `<img>` (e.g. the
+   * badge.svg route consumed in README badges), which would leave cells stuck at
+   * `opacity="0"`. Pass `true` for `<img>`-embedded badges; leave `false`/unset for
+   * interactive in-DOM previews where animation runs. (#760)
+   */
+  disableAnimation?: boolean;
 }
 
 /**
@@ -35,7 +44,7 @@ export function renderBadgeSvg(
   impact: ImpactV6Result,
   options: BadgeOptions = {},
 ): string {
-  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false } = options;
+  const { includeBranding = true, avatarDataUri, verificationHash, verificationDate, demoMode = false, disableAnimation = false } = options;
   const t = WARM_AMBER;
   const safeHandle = escapeXml(stats.handle);
   const headerName = stats.displayName
@@ -87,7 +96,7 @@ export function renderBadgeSvg(
   const heatmapX = PAD;
   const heatmapY = 190; // shifted down 30px for meta row
   const heatmapCells = buildHeatmapCells(stats.heatmapData, heatmapX, heatmapY);
-  const heatmapSvg = renderHeatmapSvg(heatmapCells);
+  const heatmapSvg = renderHeatmapSvg(heatmapCells, { disableAnimation });
 
   // Right column: radar chart + score ring (no pill — it moved above)
   const profileColX = 720;

@@ -20,12 +20,12 @@ vi.mock("@/components/ThemeProvider", () => ({
 vi.mock("@/components/ClientFeatureFlagsProvider", () => ({
   ClientFeatureFlagsProvider: ({
     children,
-    studioEnabled,
+    flags,
   }: {
     children: React.ReactNode;
-    studioEnabled: boolean;
+    flags: { studioEnabled: boolean };
   }) => (
-    <div data-testid="feature-flags" data-studio={String(studioEnabled)}>
+    <div data-testid="feature-flags" data-studio={String(flags.studioEnabled)}>
       {children}
     </div>
   ),
@@ -38,6 +38,18 @@ vi.mock("@/lib/env", () => ({
 const mockIsStudioEnabledSync = vi.fn(() => true);
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: () => mockIsStudioEnabledSync(),
+  isInsightsEnabledSync: () => false,
+  isBitbucketEnabledSync: () => false,
+  isCodebergEnabledSync: () => false,
+  isGitlabEnabledSync: () => false,
+}));
+
+vi.mock("@/lib/feature-flags", () => ({
+  isStudioEnabled: () => Promise.resolve(mockIsStudioEnabledSync()),
+  isInsightsEnabled: () => Promise.resolve(false),
+  isBitbucketEnabled: () => Promise.resolve(false),
+  isCodebergEnabled: () => Promise.resolve(false),
+  isGitlabEnabled: () => Promise.resolve(false),
 }));
 
 vi.mock("@/lib/jsonld", () => ({
@@ -49,6 +61,7 @@ vi.mock("@/lib/i18n/server", () => ({
   getServerT: vi.fn().mockImplementation(() => (key: string) => key),
 }));
 vi.mock("@/lib/i18n", () => ({
+  DEFAULT_LOCALE: "es",
   LanguageProvider: ({
     children,
     initialLocale,
@@ -93,7 +106,7 @@ describe("RootLayout render", () => {
 
   it('renders with lang=DEFAULT_LOCALE ("es") at build time for ISR compatibility', async () => {
     // The layout uses DEFAULT_LOCALE at build time instead of getServerLocale()
-    // to avoid cookies()/headers() calls that would force every page into dynamic rendering.
+    // to avoid dynamic cookie/header calls that would force every page into dynamic rendering.
     // Client-side locale detection (LangSync + LanguageProvider) handles actual user locale.
     const { default: RootLayout } = await import("./layout");
     const element = await RootLayout({ children: <span>test</span> });

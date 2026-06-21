@@ -1,16 +1,17 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-05-03 | Audit: v41
+> Last reviewed: 2026-06-21 | Audit: v42
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
 ---
 
-## CSP unsafe-inline for scripts (#396)
+## CSP unsafe-inline for scripts (#396, #778)
 
 - **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`.
 - **Mitigation:** No user-controlled HTML injection points exist in the application. All user input (GitHub handles, display names) is escaped before rendering into SVG and HTML. Monitor Next.js for nonce-based CSP support.
 - **Severity:** Low
+- **See:** `docs/decisions/2026-06-20-csp-unsafe-inline-accepted-risk.md` (#778) — full rationale and a staged nonce-migration plan to remove `'unsafe-inline'`.
 
 ## CSP unsafe-eval in development (#397)
 
@@ -101,6 +102,14 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** None required. The dependency is transitive via Tailwind and not directly imported.
 - **Severity:** Low
 - **Accepted:** 2026-03-27
+
+## DOMPurify transitive dependency license (PostHog toolbar)
+
+- **Risk:** `dompurify@3.4.11` appears in the lockfile through PostHog's transitive dependency graph, and is also pinned by a root `pnpm.overrides` security floor. Its license expression is `(MPL-2.0 OR Apache-2.0)`.
+- **Accepted because:** Chapa does not import DOMPurify directly; it is pulled in by PostHog tooling. The package offers Apache-2.0 as an alternative license, which is already on the project allowlist. The override keeps the transitive package on the patched floor without adding a runtime sanitizer dependency to application code.
+- **Mitigation:** Keep the override until PostHog's dependency range guarantees the patched version. Re-check this entry during dependency upgrades and license audits.
+- **Severity:** Low
+- **Accepted:** 2026-06-21
 
 ## Infrastructure
 

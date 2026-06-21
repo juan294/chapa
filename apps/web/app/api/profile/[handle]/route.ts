@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { isValidHandle } from "@/lib/validation";
 import { rateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
-import { dbGetLatestSnapshot } from "@/lib/db/snapshots";
+import { getCachedLatestSnapshot } from "@/lib/cache/snapshot-cache";
 import { dbGetToolInsights } from "@/lib/db/tool-insights";
 import type { DimensionScores } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
@@ -38,10 +38,7 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
     );
   }
 
-  const [snapshot, craftResult] = await Promise.all([
-    dbGetLatestSnapshot(handle),
-    dbGetToolInsights(handle),
-  ]);
+  const snapshot = await getCachedLatestSnapshot(handle);
 
   if (!snapshot) {
     return NextResponse.json(
@@ -53,6 +50,9 @@ export const GET = withErrorCapture("/api/profile/[handle]", async (
   // Prefer snapshot.craft (computed at same time as other dimensions) for consistency.
   // Fall back to the latest uploaded tool-insights report for legacy rows
   // without the craft column.
+  const craftResult = snapshot.craft == null
+    ? await dbGetToolInsights(handle)
+    : null;
   const craftScore = snapshot.craft ?? (craftResult ? craftResult.craftScore : undefined);
 
   const dimensions: DimensionScores = {

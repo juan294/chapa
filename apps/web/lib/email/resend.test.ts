@@ -251,70 +251,45 @@ describe("escapeHtml", () => {
 // ---------------------------------------------------------------------------
 
 describe("sanitizeHtml", () => {
-  it("strips script tags and their contents", () => {
+  it("escapes script tags and their contents instead of forwarding HTML", () => {
     const input = '<p>Hello</p><script>alert("xss")</script><p>World</p>';
-    expect(sanitizeHtml(input)).toBe("<p>Hello</p><p>World</p>");
+    expect(sanitizeHtml(input)).toBe(
+      "&lt;p&gt;Hello&lt;/p&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;&lt;p&gt;World&lt;/p&gt;",
+    );
   });
 
-  it("strips script tags case-insensitively", () => {
-    const input = '<SCRIPT>alert(1)</SCRIPT>';
-    expect(sanitizeHtml(input)).toBe("");
-  });
-
-  it("strips multiline script blocks", () => {
-    const input = '<script>\nconsole.log("evil");\nalert(1);\n</script>';
-    expect(sanitizeHtml(input)).toBe("");
-  });
-
-  it("removes inline event handlers with double quotes", () => {
+  it("escapes inline event handlers with double quotes", () => {
     const input = '<img src="pic.jpg" onerror="alert(1)" />';
-    expect(sanitizeHtml(input)).toBe('<img src="pic.jpg" />');
+    expect(sanitizeHtml(input)).toBe(
+      "&lt;img src=&quot;pic.jpg&quot; onerror=&quot;alert(1)&quot; /&gt;",
+    );
   });
 
-  it("removes inline event handlers with single quotes", () => {
-    const input = "<div onclick='steal()'>click</div>";
-    expect(sanitizeHtml(input)).toBe("<div>click</div>");
-  });
-
-  it("removes inline event handlers without quotes", () => {
-    const input = "<body onload=init()>";
-    expect(sanitizeHtml(input)).toBe("<body>");
-  });
-
-  it("removes various event handler types", () => {
-    const input = '<a onmouseover="track()" onfocus="hijack()">link</a>';
-    const result = sanitizeHtml(input);
-    expect(result).not.toContain("onmouseover");
-    expect(result).not.toContain("onfocus");
-    expect(result).toContain("link</a>");
-  });
-
-  it("neutralizes javascript: URLs in href", () => {
+  it("escapes javascript: URLs in href", () => {
     const input = '<a href="javascript:alert(1)">click</a>';
-    expect(sanitizeHtml(input)).toBe('<a href="#">click</a>');
+    expect(sanitizeHtml(input)).toBe(
+      "&lt;a href=&quot;javascript:alert(1)&quot;&gt;click&lt;/a&gt;",
+    );
   });
 
-  it("neutralizes javascript: URLs with single quotes", () => {
-    const input = "<a href='javascript:void(0)'>link</a>";
-    expect(sanitizeHtml(input)).toBe('<a href="#">link</a>');
-  });
-
-  it("preserves safe HTML content", () => {
+  it("escapes safe-looking HTML content too", () => {
     const input = '<p>Hello <strong>World</strong></p><a href="https://example.com">link</a>';
-    expect(sanitizeHtml(input)).toBe(input);
+    expect(sanitizeHtml(input)).toBe(
+      "&lt;p&gt;Hello &lt;strong&gt;World&lt;/strong&gt;&lt;/p&gt;&lt;a href=&quot;https://example.com&quot;&gt;link&lt;/a&gt;",
+    );
   });
 
   it("returns empty string unchanged", () => {
     expect(sanitizeHtml("")).toBe("");
   });
 
-  it("handles combined attack vectors", () => {
+  it("escapes combined attack vectors", () => {
     const input = '<div onclick="steal()"><script>exfiltrate()</script><a href="javascript:void(0)">click</a></div>';
     const result = sanitizeHtml(input);
-    expect(result).not.toContain("script");
-    expect(result).not.toContain("onclick");
-    expect(result).not.toContain("javascript:");
-    expect(result).toContain("click</a>");
+    expect(result).toContain("&lt;script&gt;");
+    expect(result).toContain("onclick=&quot;steal()&quot;");
+    expect(result).toContain("javascript:void(0)");
+    expect(result).not.toContain("<script>");
   });
 });
 
@@ -415,7 +390,7 @@ describe("forwardEmail", () => {
     const call = mockSend.mock.calls[0]![0];
     expect(call.html).toContain("alice@example.com");
     expect(call.html).toContain("Question");
-    expect(call.html).toContain("<p>Original message</p>");
+    expect(call.html).toContain("&lt;p&gt;Original message&lt;/p&gt;");
   });
 
   it("sanitizes HTML body to strip scripts and event handlers", async () => {
@@ -430,10 +405,12 @@ describe("forwardEmail", () => {
 
     const call = mockSend.mock.calls[0]![0];
     expect(call.html).not.toContain("<script>");
-    expect(call.html).not.toContain("onerror");
-    expect(call.html).not.toContain("javascript:");
-    expect(call.html).toContain("<p>Hello</p>");
-    expect(call.html).toContain("link</a>");
+    expect(call.html).not.toContain("<img");
+    expect(call.html).not.toContain("<a");
+    expect(call.html).toContain("&lt;script&gt;steal()&lt;/script&gt;");
+    expect(call.html).toContain("onerror=&quot;alert(1)&quot;");
+    expect(call.html).toContain("javascript:void(0)");
+    expect(call.html).toContain("&lt;p&gt;Hello&lt;/p&gt;");
   });
 
   it("escapes HTML entities in from and subject fields", async () => {
@@ -455,7 +432,7 @@ describe("forwardEmail", () => {
     expect(call.html).toContain("&lt;img");
     expect(call.html).toContain("&amp;");
     expect(call.html).toContain("&quot;quotes&quot;");
-    // The original HTML body should NOT be escaped (it's intentionally raw HTML)
-    expect(call.html).toContain("<p>Body</p>");
+    // The forwarded HTML body is escaped and rendered inert.
+    expect(call.html).toContain("&lt;p&gt;Body&lt;/p&gt;");
   });
 });

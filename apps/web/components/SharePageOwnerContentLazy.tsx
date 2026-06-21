@@ -6,7 +6,7 @@ import { BadgeSkeleton } from "./BadgeSkeleton";
 
 const SharePageOwnerContent = dynamic(
   () => import("./SharePageOwnerContent").then((m) => ({ default: m.SharePageOwnerContent })),
-  { ssr: false, loading: () => <BadgeSkeleton /> },
+  { loading: () => <BadgeSkeleton /> },
 );
 
 interface Props {

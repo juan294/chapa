@@ -171,6 +171,11 @@ describe("UserMenu — all buttons have explicit type attribute", () => {
           new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })),
         );
       }
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
       return Promise.resolve(new Response("{}"));
     });
 
@@ -179,6 +184,7 @@ describe("UserMenu — all buttons have explicit type attribute", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
       expect(screen.getByLabelText("Unlink Codeberg account")).toBeDefined();
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
     });
 
     const buttons = screen.getAllByRole("button");
@@ -262,6 +268,77 @@ describe("UserMenu — platform status caching", () => {
     render(<UserMenu {...baseProps} />);
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  it("retries only the platform whose status fetch failed", async () => {
+    dropdownOpen = true;
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.reject(new Error("Bitbucket status failed"));
+      }
+      if (urlStr.includes("/api/auth/codeberg/status")) {
+        return Promise.resolve(new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "cb-user" })));
+      }
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    const { unmount } = render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("cb-user")).toBeDefined();
+      expect(screen.getByText("gl-user")).toBeDefined();
+    });
+
+    unmount();
+    fetchSpy.mockClear();
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/status");
+    });
+    expect(fetchSpy).not.toHaveBeenCalledWith("/api/auth/codeberg/status");
+    expect(fetchSpy).not.toHaveBeenCalledWith("/api/auth/gitlab/status");
+  });
+
+  it("does not duplicate an in-flight platform status request on remount", async () => {
+    let resolveBitbucketStatus: (value: Response) => void = () => {};
+    fetchSpy.mockRestore();
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return new Promise<Response>((resolve) => {
+          resolveBitbucketStatus = resolve;
+        });
+      }
+      return Promise.resolve(new Response(JSON.stringify({ enabled: false })));
+    });
+
+    const { unmount } = render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/status");
+    });
+
+    unmount();
+    render(<UserMenu {...baseProps} />);
+
+    await new Promise((r) => setTimeout(r, 50));
+    const bitbucketCalls = fetchSpy.mock.calls.filter(
+      ([url]: [unknown]) => typeof url === "string" && url.includes("/api/auth/bitbucket/status"),
+    );
+    expect(bitbucketCalls.length).toBe(1);
+
+    await act(async () => {
+      resolveBitbucketStatus(
+        new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+      );
     });
   });
 });
@@ -496,9 +573,13 @@ describe("UserMenu — insights import", () => {
     const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response("", { status: 500 }),
-    );
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(new Response("", { status: 500 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
 
     render(<UserMenu {...baseProps} />);
     const fileInput = screen.getByLabelText("Select Claude Code insights HTML report");
@@ -522,15 +603,20 @@ describe("UserMenu — insights import", () => {
     const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    // First call: upload
-    fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "Solid" } }), { status: 200 }),
-    );
-    // Second call: recalculate
-    fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ adjustedComposite: 68, craftScore: 72, craftTier: "Solid" }), { status: 200 }),
-    );
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 72, tier: "Solid" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ adjustedComposite: 68, craftScore: 72, craftTier: "Solid" }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
 
     // Prevent page reload
     const reloadSpy = vi.fn();
@@ -561,15 +647,18 @@ describe("UserMenu — insights import", () => {
     const featureFlags = await import("@/lib/feature-flags-sync");
     vi.mocked(featureFlags.isInsightsEnabledSync).mockReturnValue(true);
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    // Upload succeeds
-    fetchSpy.mockResolvedValueOnce(
-      new Response(JSON.stringify({ craftScore: { craftScore: 55, tier: "Emerging" } }), { status: 200 }),
-    );
-    // Recalculate fails
-    fetchSpy.mockResolvedValueOnce(
-      new Response("", { status: 500 }),
-    );
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/insights")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ craftScore: { craftScore: 55, tier: "Emerging" } }), { status: 200 }),
+        );
+      }
+      if (urlStr.includes("/api/recalculate")) {
+        return Promise.resolve(new Response("", { status: 500 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
 
     Object.defineProperty(window, "location", {
       value: { ...window.location, reload: vi.fn() },
@@ -730,7 +819,7 @@ describe("UserMenu — Bitbucket link/unlink in dropdown", () => {
         );
       }
       if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
-        return Promise.resolve(new Response("{}", { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -751,6 +840,72 @@ describe("UserMenu — Bitbucket link/unlink in dropdown", () => {
       expect(fetchSpy).toHaveBeenCalledWith("/api/auth/bitbucket/disconnect", { method: "POST" });
     });
     expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it("keeps Bitbucket linked when disconnect returns success false", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
+        return Promise.resolve(new Response(JSON.stringify({ success: false }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+      expect(screen.getByTestId("toast").getAttribute("data-type")).toBe("error");
+    });
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("keeps Bitbucket linked when disconnect returns invalid JSON", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/bitbucket/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "bb-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
+        return Promise.resolve(new Response("not-json", { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink Bitbucket account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink Bitbucket account")).toBeDefined();
+      expect(screen.getByTestId("toast").getAttribute("data-type")).toBe("error");
+    });
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it("handles disconnect fetch failure gracefully", async () => {
@@ -949,7 +1104,7 @@ describe("UserMenu — Codeberg link/unlink in dropdown", () => {
         );
       }
       if (urlStr.includes("/api/auth/codeberg/disconnect")) {
-        return Promise.resolve(new Response("{}", { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -1018,5 +1173,240 @@ describe("UserMenu — Codeberg link/unlink in dropdown", () => {
     await new Promise((r) => setTimeout(r, 50));
     // No Codeberg UI should appear since fetch failed
     expect(screen.queryByText("Link Codeberg")).toBeNull();
+  });
+});
+
+// ─── GitLab link/unlink in dropdown ──────────────────────────────────
+
+describe("UserMenu — GitLab link/unlink in dropdown", () => {
+  beforeEach(async () => {
+    dropdownOpen = true;
+    clearPlatformStatusCache();
+  });
+
+  afterEach(() => {
+    clearPlatformStatusCache();
+  });
+
+  it("shows 'Link GitLab' when not linked", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: false, remoteLogin: null })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      const link = screen.getByText("Link GitLab").closest("a");
+      expect(link?.getAttribute("href")).toBe("/api/auth/gitlab/connect");
+    });
+  });
+
+  it("shows GitLab username and Unlink when linked", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("gl-user")).toBeDefined();
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+  });
+
+  it("linked GitLab user links to gitlab.com profile", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      const link = screen.getByText("gl-user").closest("a");
+      expect(link?.getAttribute("href")).toBe("https://gitlab.com/gl-user");
+      expect(link?.getAttribute("target")).toBe("_blank");
+    });
+  });
+
+  it("clicking Unlink opens confirmation dialog for GitLab", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    const dialog = screen.getByTestId("confirm-dialog");
+    expect(dialog.getAttribute("data-title")).toBe("Unlink GitLab?");
+  });
+
+  it("confirming GitLab unlink calls disconnect and refreshes router", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/gitlab/disconnect")) {
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/auth/gitlab/disconnect", { method: "POST" });
+    });
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it("shows loading on GitLab confirm dialog while disconnect is pending", async () => {
+    let resolveDisconnect: (value: Response) => void = () => {};
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/gitlab/disconnect")) {
+        return new Promise<Response>((resolve) => {
+          resolveDisconnect = resolve;
+        });
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog")).toBeDefined();
+    });
+    expect(screen.getByTestId("confirm-dialog").getAttribute("data-loading")).toBe("false");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-dialog").getAttribute("data-loading")).toBe("true");
+    });
+
+    await act(async () => {
+      resolveDisconnect(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    });
+  });
+
+  it("keeps GitLab linked when disconnect returns success false", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/gitlab/disconnect")) {
+        return Promise.resolve(new Response(JSON.stringify({ success: false }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+      expect(screen.getByTestId("toast").getAttribute("data-type")).toBe("error");
+    });
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("handles GitLab disconnect fetch failure gracefully", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("/api/auth/gitlab/status")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ enabled: true, linked: true, remoteLogin: "gl-user" })),
+        );
+      }
+      if (urlStr.includes("/api/auth/gitlab/disconnect")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(<UserMenu {...baseProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unlink GitLab account")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Unlink GitLab account"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("gl-user")).toBeDefined();
+      expect(screen.getByTestId("toast").getAttribute("data-type")).toBe("error");
+    });
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });

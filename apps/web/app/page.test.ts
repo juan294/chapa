@@ -51,8 +51,8 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("BadgeOverlay");
     });
 
-    it("renders GitHub login CTA", () => {
-      expect(SOURCE).toContain("/api/auth/login");
+    it("renders GitHub login CTA (via LoginCtaButton, which links to /api/auth/login)", () => {
+      expect(SOURCE).toContain("LoginCtaButton");
     });
 
     it("renders LandingTerminal", () => {

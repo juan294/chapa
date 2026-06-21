@@ -17,10 +17,82 @@ const SUPPRESSED_PREFIXES = [
   "[verification]",
 ];
 
+/**
+ * jsdom emits "Not implemented" notices through its VirtualConsole, which
+ * forwards to console.error, whenever a test exercises an unsupported browser
+ * API (e.g. window.location navigation or window.scrollTo). These are
+ * expected in component tests that trigger navigation traps and are pure
+ * noise — they are not real test failures. Match them narrowly so genuine
+ * "Not implemented" application errors are NOT swallowed: jsdom prefixes its
+ * messages with the literal "Not implemented:" string (optionally wrapped in
+ * an "Error:" prefix) and the offending API name.
+ */
+const JSDOM_NOISE_PATTERNS = [
+  /Not implemented: navigation/,
+  /Not implemented: window\.scrollTo/,
+  /Not implemented: HTMLCanvasElement/,
+];
+
+function isJsdomNoise(value: unknown): boolean {
+  const text =
+    typeof value === "string"
+      ? value
+      : value instanceof Error
+        ? value.message
+        : "";
+  return JSDOM_NOISE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 function shouldSuppress(args: unknown[]): boolean {
   const first = args[0];
-  if (typeof first !== "string") return false;
-  return SUPPRESSED_PREFIXES.some((prefix) => first.startsWith(prefix));
+  if (typeof first === "string" && SUPPRESSED_PREFIXES.some((prefix) => first.startsWith(prefix))) {
+    return true;
+  }
+  // jsdom navigation/scroll notices arrive as console.error(messageString, errorObject).
+  // Suppress only when the message itself is a recognized jsdom "Not implemented" notice.
+  return args.some((arg) => isJsdomNoise(arg));
+}
+
+// jsdom forwards its "Not implemented" notices through a VirtualConsole that
+// was wired to the worker's console reference at environment-construction time
+// — before setupFiles run — so swapping console.error in beforeAll() cannot
+// intercept them. They land directly on process.stderr. Filter them at that
+// final sink, matching ONLY the recognized jsdom noise patterns so genuine
+// stderr output (real errors, test failures) is never hidden.
+const originalStderrWrite = process.stderr.write.bind(process.stderr);
+process.stderr.write = ((
+  chunk: string | Uint8Array,
+  ...rest: unknown[]
+): boolean => {
+  if (typeof chunk === "string" && isJsdomNoise(chunk)) {
+    // Swallow the jsdom notice; honor any write callback so callers don't hang.
+    const cb = rest.find((arg) => typeof arg === "function") as
+      | ((err?: Error | null) => void)
+      | undefined;
+    cb?.();
+    return true;
+  }
+  return (originalStderrWrite as (...args: unknown[]) => boolean)(chunk, ...rest);
+}) as typeof process.stderr.write;
+
+// Node.js 26 exposes localStorage as undefined without --localstorage-file.
+// JSDOM normally provides its own implementation, but Node 26's non-enumerable
+// descriptor prevents the vitest JSDOM environment from injecting it into the
+// global. Polyfill it here so tests using window.localStorage / localStorage work.
+if (typeof globalThis.localStorage === "undefined") {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    writable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, String(value)),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear(),
+      get length() { return store.size; },
+      key: (index: number) => [...store.keys()][index] ?? null,
+    },
+  });
 }
 
 // Node.js 26 exposes localStorage as undefined without --localstorage-file.

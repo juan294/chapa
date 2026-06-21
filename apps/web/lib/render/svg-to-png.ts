@@ -8,7 +8,6 @@
 import { Resvg } from "@resvg/resvg-js";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 
 /**
  * Font files co-located with the render module for server-side SVG rendering.
@@ -31,9 +30,7 @@ const FONT_FILES = [
  * `fonts/` directory instead of the entire workspace.
  */
 export function getFontPaths(): string[] {
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
-  const fontsDir = join(moduleDir, "fonts");
-  return FONT_FILES.map((f) => join(fontsDir, f));
+  return FONT_FILES.map((f) => fileURLToPath(new URL(`./fonts/${f}`, import.meta.url)));
 }
 
 /**

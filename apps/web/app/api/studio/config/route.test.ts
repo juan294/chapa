@@ -87,8 +87,8 @@ const SESSION = {
 describe("GET /api/studio/config", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
-    mockGetSessionSecret.mockReturnValue("test-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
+    mockGetSessionSecret.mockReturnValue("test-secret-32-characters-valid-ok");
   });
 
   it("returns 401 when no session", async () => {

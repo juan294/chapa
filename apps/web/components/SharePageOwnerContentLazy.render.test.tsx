@@ -42,7 +42,7 @@ describe("SharePageOwnerContentLazy render", () => {
 
     const wrapper = screen.getByTestId("owner-content-lazy");
     expect(wrapper.getAttribute("data-handle")).toBe("octocat");
-    expect(wrapper.getAttribute("data-ssr")).toBe("false");
+    expect(wrapper.getAttribute("data-ssr")).toBe("undefined");
     expect(screen.getByTestId("badge-skeleton")).toBeTruthy();
   });
 });

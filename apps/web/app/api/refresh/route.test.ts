@@ -180,7 +180,9 @@ describe("POST /api/refresh", () => {
       { mode: "replace" },
     );
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
+      badgeSvg: true,
       history: true,
+      snapshot: true,
     });
     expect(body.stats).toEqual(FAKE_MATERIALIZED.stats);
     expect(body.impact).toEqual(FAKE_MATERIALIZED.displayImpact);

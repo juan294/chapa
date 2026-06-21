@@ -449,7 +449,7 @@ describe("fetchGitlabContributionData", () => {
     expect(result).toBeNull();
   });
 
-  it("BE-M5: malformed MR list (not an array) is treated as empty without throwing", async () => {
+  it("BE-M5: malformed MR list (not an array) returns null without throwing", async () => {
     vi.stubGlobal(
       "fetch",
       routeFetch([
@@ -462,8 +462,7 @@ describe("fetchGitlabContributionData", () => {
     );
 
     const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
-    expect(result).not.toBeNull();
-    expect(result!.mergedPRs).toHaveLength(0);
+    expect(result).toBeNull();
   });
 
   // ---------------------------------------------------------------------------

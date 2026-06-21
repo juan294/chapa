@@ -183,10 +183,11 @@ describe("UserMenu — Bitbucket integration", () => {
     expect(SOURCE).toContain("ConfirmDialog");
   });
 
-  it("uses inline Bitbucket SVG logo (no icon library)", () => {
-    // The Bitbucket logo path is distinctive
-    expect(SOURCE).toContain("M.778 1.211");
-    expect(SOURCE).toContain('aria-hidden="true"');
+  it("uses the shared Bitbucket SVG icon (no icon library)", () => {
+    // The Bitbucket logo now lives in the shared icon module (#756); the
+    // component references it by name and imports from @/components/icons.
+    expect(SOURCE).toContain("BitbucketIcon");
+    expect(SOURCE).toContain("@/components/icons");
   });
 
   it("Bitbucket section appears after Creator Studio and before Admin Panel", () => {
@@ -233,10 +234,11 @@ describe("UserMenu — Codeberg integration", () => {
     expect(SOURCE).toContain("showCbUnlinkConfirm");
   });
 
-  it("uses inline Codeberg SVG logo (no icon library)", () => {
-    // The Codeberg mountain logo path is distinctive
-    expect(SOURCE).toContain("M11.955.49");
+  it("uses the shared Codeberg SVG icon (no icon library)", () => {
+    // The Codeberg logo now lives in the shared icon module (#756); the
+    // component references it by name and imports from @/components/icons.
     expect(SOURCE).toContain("CodebergIcon");
+    expect(SOURCE).toContain("@/components/icons");
   });
 
   it("Codeberg section appears after Bitbucket and before Admin Panel", () => {
@@ -284,10 +286,11 @@ describe("UserMenu — GitLab integration", () => {
     expect(SOURCE).toContain("showGlUnlinkConfirm");
   });
 
-  it("uses inline GitLab SVG logo (no icon library)", () => {
-    // The GitLab tanuki logo path is distinctive
-    expect(SOURCE).toContain("m23.6004");
+  it("uses the shared GitLab SVG icon (no icon library)", () => {
+    // The GitLab tanuki logo now lives in the shared icon module (#756); the
+    // component references it by name and imports from @/components/icons.
     expect(SOURCE).toContain("GitlabIcon");
+    expect(SOURCE).toContain("@/components/icons");
   });
 
   it("GitLab section appears after Codeberg and before Admin Panel", () => {
@@ -394,21 +397,26 @@ describe("UserMenu — page refresh after unlink", () => {
 });
 
 describe("UserMenu — platform status cache", () => {
-  it("declares a module-level platformStatusCache object outside the component", () => {
-    // Cache must be outside the component function so it persists across mounts
+  it("declares a module-level platform status store outside the component", () => {
+    // Cache must be outside the component function so it persists across mounts.
+    // It is now backed by the shared createModuleStore primitive (#774).
     const componentStart = SOURCE.indexOf("export function UserMenu");
     const beforeComponent = SOURCE.slice(0, componentStart);
-    expect(beforeComponent).toContain("platformStatusCache");
+    expect(beforeComponent).toContain("platformStatusStore");
+    expect(beforeComponent).toContain("createModuleStore");
   });
 
-  it("cache has fetched, bitbucket, and codeberg fields", () => {
+  it("cache has per-platform fetched/status entries", () => {
     expect(SOURCE).toContain("fetched");
+    expect(SOURCE).toContain("pending");
+    expect(SOURCE).toContain("PlatformStatusEntry");
+    expect(SOURCE).toContain("status: null");
     // The cache type should track platform statuses
-    expect(SOURCE).toMatch(/platformStatusCache\b/);
+    expect(SOURCE).toMatch(/PlatformStatusCache\b/);
   });
 
-  it("useEffect checks cache before fetching", () => {
-    expect(SOURCE).toContain("platformStatusCache.fetched");
+  it("useEffect checks each platform cache entry before fetching", () => {
+    expect(SOURCE).toContain("platformStatusStore.getSnapshot()[platform].fetched");
   });
 
   it("unlink flow invalidates the cache (shared helper)", () => {
@@ -526,7 +534,7 @@ describe("UserMenu — Bitbucket disconnect handler (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -579,7 +587,7 @@ describe("UserMenu — Codeberg disconnect handler (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/codeberg/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -757,7 +765,7 @@ describe("UserMenu — cache invalidation after unlink (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -856,7 +864,7 @@ describe("UserMenu — loading state during unlink (runtime)", () => {
 
     // Resolve the disconnect to clean up
     await act(async () => {
-      resolveDisconnect(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      resolveDisconnect(new Response(JSON.stringify({ success: true }), { status: 200 }));
     });
   });
 });
@@ -880,7 +888,7 @@ describe("UserMenu — Codeberg disconnect callback details (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/codeberg/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -973,7 +981,7 @@ describe("UserMenu — Codeberg disconnect loading state (runtime)", () => {
 
     // Resolve to clean up
     await act(async () => {
-      resolveDisconnect(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      resolveDisconnect(new Response(JSON.stringify({ success: true }), { status: 200 }));
     });
   });
 });

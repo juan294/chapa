@@ -73,11 +73,12 @@ vi.mock("@/lib/i18n/server", async () => {
 });
 
 vi.mock("@/lib/i18n", () => ({
+  DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
 }));
 
-vi.mock("@/components/GlobalCommandBarLazy", () => ({
-  GlobalCommandBarLazy: () => null,
+vi.mock("@/components/CommandBarHint", () => ({
+  CommandBarHint: () => null,
 }));
 vi.mock("@/components/NavbarClient", () => ({
   NavbarClient: () => "<nav />",

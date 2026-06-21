@@ -34,9 +34,13 @@ done < <(find "${NEXT_DIR}/static" -name "*.js" -type f -print0 \
   | xargs -0 -I{} sh -c 'printf "%s\t%s\n" "$(wc -c < "$1")" "$1"' _ {})
 
 if [ "${FAILED}" -eq 0 ]; then
+  # NOTE: `awk 'NR==1'` (not `head -1`) intentionally consumes the entire
+  # sorted stream. Under `set -o pipefail`, `sort | head -1` makes `head` close
+  # the pipe early, `sort` receives SIGPIPE ("Broken pipe: write error"), and
+  # the whole script exits non-zero even though every chunk is under budget.
   LARGEST=$(find "${NEXT_DIR}/static" -name "*.js" -type f -print0 \
     | xargs -0 -I{} sh -c 'printf "%s\t%s\n" "$(wc -c < "$1")" "$1"' _ {} \
-    | sort -rn | head -1 | awk '{print int($1/1024)" KB: "$2}')
+    | sort -rn | awk 'NR==1{print int($1/1024)" KB: "$2}')
   echo "PASS: All client JS chunks under ${BUDGET_KB} KB budget."
   echo "Largest: ${LARGEST}"
   exit 0

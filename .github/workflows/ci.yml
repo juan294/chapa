@@ -21,6 +21,7 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
       - run: pnpm run check:circular
+      - run: pnpm run validate:migrations
       - name: Craft propagation guard (#680)
         run: bash scripts/check-craft-propagation.sh
 
@@ -117,7 +118,7 @@ jobs:
       # Dummy values for build — real values are in Vercel
       GITHUB_CLIENT_ID: dummy
       GITHUB_CLIENT_SECRET: dummy
-      NEXTAUTH_SECRET: dummy-secret-for-ci
+      NEXTAUTH_SECRET: dummy-secret-for-ci-32-characters
       UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
       UPSTASH_REDIS_REST_TOKEN: dummy
     steps:
@@ -148,7 +149,7 @@ jobs:
     env:
       GITHUB_CLIENT_ID: dummy
       GITHUB_CLIENT_SECRET: dummy
-      NEXTAUTH_SECRET: dummy-secret-for-ci
+      NEXTAUTH_SECRET: dummy-secret-for-ci-32-characters
       UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
       UPSTASH_REDIS_REST_TOKEN: dummy
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -208,8 +209,14 @@ jobs:
     env:
       DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
     steps:
+      - name: Require deployment smoke URL for production
+        if: env.DEPLOYMENT_SMOKE_BASE_URL == '' && github.ref == 'refs/heads/main'
+        run: |
+          echo "::error::DEPLOYMENT_SMOKE_BASE_URL is required for main deployment smoke."
+          exit 1
+
       - name: Skip deployment smoke when not configured
-        if: env.DEPLOYMENT_SMOKE_BASE_URL == ''
+        if: env.DEPLOYMENT_SMOKE_BASE_URL == '' && github.ref != 'refs/heads/main'
         run: echo "DEPLOYMENT_SMOKE_BASE_URL is not configured; skipping deployment smoke."
 
       - uses: actions/checkout@v6

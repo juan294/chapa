@@ -22,18 +22,14 @@ export { escapeHtml };
 // ---------------------------------------------------------------------------
 
 /**
- * Strip dangerous HTML constructs from an email body before forwarding.
- * Removes `<script>` blocks, inline event handlers (onclick, onerror, ...),
- * and `javascript:` URLs in href attributes.
+ * Convert inbound email HTML to escaped text before forwarding.
  *
- * This is a defense-in-depth measure — the forwarded email is rendered in
- * a mail client, but we still strip known XSS vectors to be safe.
+ * Inbound support email is fully attacker controlled, and regex HTML
+ * sanitization is not a reliable security boundary. Forward a readable escaped
+ * copy inside our wrapper instead of trying to preserve original markup.
  */
 export function sanitizeHtml(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/\s*on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"');
+  return escapeHtml(html);
 }
 
 // ---------------------------------------------------------------------------

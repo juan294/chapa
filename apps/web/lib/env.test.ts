@@ -29,6 +29,20 @@ describe("env.ts NEXT_PUBLIC readers use static literal access (#918)", () => {
   }
 });
 
+describe("env boundary lint coverage", () => {
+  it("blocks computed process.env reads outside lib/env.ts", () => {
+    const source = readFileSync(
+      new URL("../eslint.config.mjs", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain(
+      "MemberExpression[object.object.name='process'][object.property.name='env']",
+    );
+    expect(source).not.toContain("computed=false");
+  });
+});
+
 describe("getBaseUrl", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

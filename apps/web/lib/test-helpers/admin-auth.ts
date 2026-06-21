@@ -38,7 +38,7 @@ export { readSessionCookie, isAdminHandle, rateLimit };
  */
 export function adminAuthBeforeEach(): void {
   vi.clearAllMocks();
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
   vi.mocked(readSessionCookie).mockReturnValue({
     token: "t",
     login: "admin",

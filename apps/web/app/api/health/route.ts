@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { pingRedis, rateLimit } from "@/lib/cache/redis";
-import { getGithubToken } from "@/lib/env";
+import { getGithubToken, getVercelEnv } from "@/lib/env";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -84,9 +84,12 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
   const session = getOptionalRequestSession(request);
   const isAdmin = session ? isAdminHandle(session.login) : false;
 
-  // "skipped" = env vars not configured (preview deploys) — not degraded.
-  // Only "error" = configured but failing — triggers 503.
-  const isHealthy = (s: string) => s === "ok" || s === "skipped";
+  // "skipped" is acceptable in preview/dev where optional integrations degrade
+  // gracefully. In production, skipped core dependencies indicate missing
+  // runtime configuration and must fail health so smoke/monitoring can catch it.
+  const isProduction = getVercelEnv() === "production";
+  const isHealthy = (s: string) =>
+    s === "ok" || (!isProduction && s === "skipped");
   const status =
     isHealthy(redisStatus) &&
     isHealthy(supabaseStatus) &&

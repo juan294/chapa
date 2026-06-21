@@ -29,6 +29,7 @@ export function isValidHandle(handle: string): boolean {
  * Max length: 100 characters.
  */
 const EMU_HANDLE_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,98}[a-zA-Z0-9]$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Validate a GitHub EMU (Enterprise Managed User) handle.
@@ -170,7 +171,21 @@ export function isValidStatsShape(value: unknown): boolean {
     "totalWatchers",
   ] as const;
   for (const key of requiredNumbers) {
-    if (typeof obj[key] !== "number" || obj[key] < 0) return false;
+    if (!isNonNegativeFiniteNumber(obj[key])) return false;
+  }
+
+  if (typeof obj.activeDays === "number" && obj.activeDays > 365) return false;
+  if (!isRatio(obj.topRepoShare)) return false;
+
+  const optionalRatios = [
+    "microCommitRatio",
+    "docsOnlyPrRatio",
+    "largeCommitRatio",
+    "testCodeRatio",
+    "primaryReviewRatio",
+  ] as const;
+  for (const key of optionalRatios) {
+    if (obj[key] !== undefined && !isRatio(obj[key])) return false;
   }
 
   if (!Array.isArray(obj.heatmapData)) return false;
@@ -179,11 +194,27 @@ export function isValidStatsShape(value: unknown): boolean {
     if (
       entry == null ||
       typeof entry !== "object" ||
-      typeof entry.date !== "string" ||
-      typeof entry.count !== "number"
+      !("date" in entry) ||
+      !("count" in entry)
     )
       return false;
+    const heatmapEntry = entry as Record<string, unknown>;
+    if (
+      typeof heatmapEntry.date !== "string" ||
+      !ISO_DATE_RE.test(heatmapEntry.date) ||
+      !isNonNegativeFiniteNumber(heatmapEntry.count)
+    ) {
+      return false;
+    }
   }
 
   return true;
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isRatio(value: unknown): value is number {
+  return isNonNegativeFiniteNumber(value) && value <= 1;
 }

@@ -12,7 +12,14 @@ import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
 import { LandingTerminal } from "./LandingTerminal";
+import { LoginCtaButton } from "@/components/LoginCtaButton";
 import { ClaudeCodeStar } from "@/components/ClaudeCodeStar";
+import {
+  GitHubIcon,
+  BitbucketIcon,
+  CodebergIcon,
+  GitlabIcon,
+} from "@/components/icons";
 import Link from "next/link";
 
 const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
@@ -20,44 +27,6 @@ const demoBadgeSvg = renderBadgeSvg(DEMO_STATS, DEMO_IMPACT, {
   demoMode: true,
 });
 
-/* ── Icons ─────────────────────────────────────────────────────── */
-
-function BitbucketIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z" />
-    </svg>
-  );
-}
-
-function CodebergIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 1.832 6.373L11.838 5.928a.187.187 0 0 1 .324 0l10.006 12.935A12 12 0 0 0 24 12.49a12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm.375 6.467l4.416 5.774-4.416 3.252-4.416-3.252z" />
-    </svg>
-  );
-}
-
-function GitlabIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0539.8585.8585 0 0 0-.3362.405L.4332 9.5065l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.0301.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.462-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z" />
-    </svg>
-  );
-}
-
-function GitHubIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-    </svg>
-  );
-}
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (
@@ -115,6 +84,7 @@ export default async function Home({
   const heroLeadAfter = hero.leadAfter as string;
   const heroBullets = hero.bullets as string[];
   const heroPrimaryCta = hero.primaryCta as string;
+  const heroPrimaryCtaPending = hero.primaryCtaPending as string;
   const heroVerifyCta = hero.verifyCta as string;
   const heroBadgePreviewLabel = hero.badgePreviewLabel as string;
 
@@ -161,14 +131,11 @@ export default async function Home({
                 </div>
               </div>
               <div className="pt-4 flex flex-wrap items-center gap-3">
-                <a
-                  href="/api/auth/login"
-                  className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
-                >
-                  <GitHubIcon className="w-4 h-4" />
-                  {heroPrimaryCta}
-                  <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </a>
+                <LoginCtaButton
+                  label={heroPrimaryCta}
+                  pendingLabel={heroPrimaryCtaPending}
+                  size="sm"
+                />
                 <Link
                   href="/verify"
                   className="group inline-flex items-center gap-2.5 rounded-lg bg-complement pl-6 pr-5 py-3 text-sm font-semibold text-white transition-all hover:bg-complement/80 hover:shadow-xl hover:shadow-complement/25"
@@ -380,7 +347,7 @@ export default async function Home({
 
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                  <span className="text-dimension-delivery font-heading text-sm shrink-0 sm:w-48">
                     {enterprise.whatItDoes}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -388,7 +355,7 @@ export default async function Home({
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                  <span className="text-dimension-consistency font-heading text-sm shrink-0 sm:w-48">
                     {enterprise.howToUse}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -400,7 +367,7 @@ export default async function Home({
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 items-start">
-                  <span className="text-amber font-heading text-sm shrink-0 sm:w-48">
+                  <span className="text-dimension-breadth font-heading text-sm shrink-0 sm:w-48">
                     {enterprise.noEmu}
                   </span>
                   <span className="text-text-secondary text-sm">
@@ -446,14 +413,11 @@ export default async function Home({
               <p className="text-text-secondary text-sm">
                 {finalCta.prompt}
               </p>
-              <a
-                href="/api/auth/login"
-                className="group inline-flex items-center gap-2.5 rounded-lg bg-amber pl-8 pr-7 py-3.5 text-base font-semibold text-white transition-all hover:bg-amber-light hover:shadow-xl hover:shadow-amber/25"
-              >
-                <GitHubIcon className="w-5 h-5" />
-                {finalCta.button}
-                <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </a>
+              <LoginCtaButton
+                label={finalCta.button as string}
+                pendingLabel={finalCta.buttonPending as string}
+                size="lg"
+              />
             </div>
           </section>
         </div>

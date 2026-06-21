@@ -68,6 +68,7 @@ export const es: Translations = {
         'Una Chapa embebible. Múltiples dimensiones. Verificada criptográficamente.',
       ],
       primaryCta: 'Consigue tu Chapa',
+      primaryCtaPending: 'Conectando…',
       verifyCta: 'Verificar una Chapa',
       badgePreviewLabel: 'Ejemplo de Chapa de impacto de desarrollador',
     },
@@ -167,6 +168,7 @@ export const es: Translations = {
     finalCta: {
       prompt: '¿Listo para demostrar tu impacto?',
       button: 'Consigue tu Chapa',
+      buttonPending: 'Conectando…',
     },
     footer: {
       tagline: 'Creado para desarrolladores, por desarrolladores.',
@@ -206,6 +208,10 @@ export const es: Translations = {
     h2: 'Tu Impacto, Decodificado',
     loadingAriaLabel: 'Cargando',
     loadingSrText: 'Cargando...',
+  },
+  commandHint: {
+    label: 'para comandos',
+    ariaLabel: 'Abrir la barra de comandos — o pulsa la tecla /',
   },
   verify: {
     title: 'Verificar una Chapa',
@@ -272,6 +278,7 @@ export const es: Translations = {
     creatorStudio: 'Creator Studio',
     importInsights: 'Importar Claude Code Insights',
     unlinkBtn: 'Desvincular',
+    unlinkFailed: 'No se pudo desvincular',
     linkBitbucket: 'Vincular Bitbucket',
     linkCodeberg: 'Vincular Codeberg',
     linkGitlab: 'Vincular GitLab',

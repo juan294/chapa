@@ -262,4 +262,34 @@ describe("fetchGitlabIfLinked", () => {
       expect(mockRefreshGitlabToken).not.toHaveBeenCalled();
     });
   });
+
+  describe("negative-result caching (P3)", () => {
+    it("caches negative result for 1h when GitLab is not enabled", async () => {
+      mockIsGitlabEnabled.mockResolvedValue(false);
+
+      await fetchGitlabIfLinked(HANDLE, LOWER);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(`${CACHE_KEY}:neg`, true, 3600);
+    });
+
+    it("caches negative result for 1h when user is not linked", async () => {
+      mockDbGetLinkedPlatform.mockResolvedValue(null);
+
+      await fetchGitlabIfLinked(HANDLE, LOWER);
+
+      expect(mockCacheSet).toHaveBeenCalledWith(`${CACHE_KEY}:neg`, true, 3600);
+    });
+
+    it("returns null immediately on negative cache hit without DB/flag reads", async () => {
+      mockCacheGet
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(true);
+
+      const result = await fetchGitlabIfLinked(HANDLE, LOWER);
+
+      expect(result).toBeNull();
+      expect(mockIsGitlabEnabled).not.toHaveBeenCalled();
+      expect(mockDbGetLinkedPlatform).not.toHaveBeenCalled();
+    });
+  });
 });

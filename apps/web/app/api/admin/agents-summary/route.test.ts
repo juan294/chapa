@@ -183,7 +183,7 @@ const MOCK_FLAGS = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
   vi.stubEnv("ADMIN_HANDLES", "admin1");
 
   vi.mocked(readSessionCookie).mockReturnValue({

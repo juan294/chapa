@@ -58,24 +58,48 @@ export function buildHeatmapCells(
   return cells;
 }
 
+/** Options controlling how {@link renderHeatmapSvg} emits cell markup. */
+interface RenderHeatmapOptions {
+  /**
+   * When `true`, cells render at full opacity with NO SMIL `<animate>` elements.
+   *
+   * SMIL animations do not run when an SVG is embedded via `<img>` (e.g. GitHub
+   * README badges). Animated cells start at `opacity="0"`, so without a running
+   * animation they render permanently invisible. The badge SVG — which is always
+   * consumed as an `<img>` — must pass `disableAnimation: true` so cells are
+   * visible. Interactive/in-DOM previews can keep the default animated reveal. (#760)
+   */
+  disableAnimation?: boolean;
+}
+
 /**
- * Render an array of heatmap cells as SVG `<rect>` elements with fade-in animation.
+ * Render an array of heatmap cells as SVG `<rect>` elements.
  *
- * Each cell is rendered as a rounded rectangle (`rx="4"`) that starts fully
+ * By default each cell is a rounded rectangle (`rx="4"`) that starts fully
  * transparent (`opacity="0"`) and animates to full opacity via an SVG
- * `<animate>` element. The animation delay per cell is set by {@link HeatmapCell.delay},
+ * `<animate>` element, with a per-cell delay ({@link HeatmapCell.delay})
  * producing a staggered column-by-column reveal.
  *
+ * When `options.disableAnimation` is `true`, cells render statically at
+ * `opacity="1"` with no `<animate>` elements — required for `<img>` embeds
+ * where SMIL does not run (see {@link RenderHeatmapOptions.disableAnimation}).
+ *
  * @param cells - Pre-computed heatmap cells from {@link buildHeatmapCells}
+ * @param options - Rendering options (e.g. {@link RenderHeatmapOptions.disableAnimation})
  * @returns SVG markup string containing all `<rect>` elements, separated by newlines
  */
-export function renderHeatmapSvg(cells: HeatmapCell[]): string {
+export function renderHeatmapSvg(
+  cells: HeatmapCell[],
+  options: RenderHeatmapOptions = {},
+): string {
+  const { disableAnimation = false } = options;
   return cells
-    .map(
-      (c) =>
-        `<rect x="${c.x}" y="${c.y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="4" fill="${c.fill}" opacity="0">` +
-        `<animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="${c.delay}ms" fill="freeze"/>` +
-        `</rect>`,
+    .map((c) =>
+      disableAnimation
+        ? `<rect x="${c.x}" y="${c.y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="4" fill="${c.fill}" opacity="1"/>`
+        : `<rect x="${c.x}" y="${c.y}" width="${CELL_SIZE}" height="${CELL_SIZE}" rx="4" fill="${c.fill}" opacity="0">` +
+          `<animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="${c.delay}ms" fill="freeze"/>` +
+          `</rect>`,
     )
     .join("\n    ");
 }

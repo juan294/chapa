@@ -7,13 +7,13 @@ import { NextRequest } from "next/server";
 
 const {
   mockRateLimit,
-  mockDbGetLatestSnapshot,
+  mockGetCachedLatestSnapshot,
   mockDbGetToolInsights,
   mockGetClientIp,
   mockIsValidHandle,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
-  mockDbGetLatestSnapshot: vi.fn(),
+  mockGetCachedLatestSnapshot: vi.fn(),
   mockDbGetToolInsights: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockIsValidHandle: vi.fn(),
@@ -27,8 +27,8 @@ vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
 }));
 
-vi.mock("@/lib/db/snapshots", () => ({
-  dbGetLatestSnapshot: mockDbGetLatestSnapshot,
+vi.mock("@/lib/cache/snapshot-cache", () => ({
+  getCachedLatestSnapshot: mockGetCachedLatestSnapshot,
 }));
 
 vi.mock("@/lib/db/tool-insights", () => ({
@@ -113,7 +113,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockIsValidHandle.mockReturnValue(true);
   mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
-  mockDbGetLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
+  mockGetCachedLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
   mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
   mockGetClientIp.mockReturnValue("127.0.0.1");
 });
@@ -168,7 +168,7 @@ describe("GET /api/profile/:handle", () => {
 
   it("uses snapshot.craft for dimensions when present (not tool insights)", async () => {
     // Snapshot has craft=80 stored from when it was computed
-    mockDbGetLatestSnapshot.mockResolvedValue({
+    mockGetCachedLatestSnapshot.mockResolvedValue({
       ...MOCK_SNAPSHOT,
       craft: 80,
     });
@@ -181,13 +181,13 @@ describe("GET /api/profile/:handle", () => {
     const body = await resp.json();
     // dimensions.craft comes from snapshot for consistency
     expect(body.dimensions.craft).toBe(80);
-    // craft object still comes from tool insights for full details
-    expect(body.craft.score).toBe(73);
+    expect(body.craft).toBeNull();
+    expect(mockDbGetToolInsights).not.toHaveBeenCalled();
   });
 
   it("falls back to tool insights craft when snapshot has no craft", async () => {
     // Snapshot without craft (legacy row before craft column was added)
-    mockDbGetLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
+    mockGetCachedLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
     mockDbGetToolInsights.mockResolvedValue(MOCK_CRAFT);
 
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
@@ -198,7 +198,7 @@ describe("GET /api/profile/:handle", () => {
   });
 
   it("surfaces the latest uploaded craft details returned by the DB layer", async () => {
-    mockDbGetLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
+    mockGetCachedLatestSnapshot.mockResolvedValue(MOCK_SNAPSHOT);
     mockDbGetToolInsights.mockResolvedValue(LATEST_UPLOADED_CRAFT);
 
     const resp = await GET(makeRequest("juan294"), makeParams("juan294"));
@@ -215,7 +215,7 @@ describe("GET /api/profile/:handle", () => {
   // --- 404: no snapshot ---
 
   it("returns 404 when no snapshot exists for handle", async () => {
-    mockDbGetLatestSnapshot.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
     const resp = await GET(makeRequest("unknown"), makeParams("unknown"));
 
@@ -224,13 +224,13 @@ describe("GET /api/profile/:handle", () => {
     expect(body.error).toContain("No profile found");
   });
 
-  it("queries both snapshot and craft in parallel (even on 404)", async () => {
-    mockDbGetLatestSnapshot.mockResolvedValue(null);
+  it("uses the latest snapshot cache and skips craft on 404", async () => {
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
     await GET(makeRequest("unknown"), makeParams("unknown"));
 
-    expect(mockDbGetLatestSnapshot).toHaveBeenCalledWith("unknown");
-    expect(mockDbGetToolInsights).toHaveBeenCalledWith("unknown");
+    expect(mockGetCachedLatestSnapshot).toHaveBeenCalledWith("unknown");
+    expect(mockDbGetToolInsights).not.toHaveBeenCalled();
   });
 
   // --- Validation ---
@@ -250,7 +250,7 @@ describe("GET /api/profile/:handle", () => {
 
     await GET(makeRequest("-bad"), makeParams("-bad"));
 
-    expect(mockDbGetLatestSnapshot).not.toHaveBeenCalled();
+    expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
     expect(mockDbGetToolInsights).not.toHaveBeenCalled();
   });
 
@@ -291,7 +291,7 @@ describe("GET /api/profile/:handle", () => {
 
     await GET(makeRequest("juan294"), makeParams("juan294"));
 
-    expect(mockDbGetLatestSnapshot).not.toHaveBeenCalled();
+    expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
     expect(mockDbGetToolInsights).not.toHaveBeenCalled();
   });
 
@@ -324,7 +324,7 @@ describe("GET /api/profile/:handle", () => {
   });
 
   it("includes CORS header on 404 response", async () => {
-    mockDbGetLatestSnapshot.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
 
     const resp = await GET(makeRequest("unknown"), makeParams("unknown"));
 
@@ -355,8 +355,8 @@ describe("GET /api/profile/:handle", () => {
 
   // --- Error handling ---
 
-  it("re-throws when dbGetLatestSnapshot throws (handled by withErrorCapture)", async () => {
-    mockDbGetLatestSnapshot.mockRejectedValue(new Error("DB down"));
+  it("re-throws when getCachedLatestSnapshot throws (handled by withErrorCapture)", async () => {
+    mockGetCachedLatestSnapshot.mockRejectedValue(new Error("DB down"));
 
     await expect(GET(makeRequest("juan294"), makeParams("juan294"))).rejects.toThrow("DB down");
   });

@@ -84,8 +84,8 @@ vi.mock("@/lib/render/badge-svg-cache", () => ({
   writeBadgeSvgCache: (...args: unknown[]) => mockWriteBadgeSvgCache(...args),
 }));
 
-vi.mock("@/components/GlobalCommandBarLazy", () => ({
-  GlobalCommandBarLazy: () => null,
+vi.mock("@/components/CommandBarHint", () => ({
+  CommandBarHint: () => null,
 }));
 vi.mock("@/components/NavbarClient", () => ({
   NavbarClient: () => null,
@@ -103,6 +103,7 @@ vi.mock("@/components/BadgeSkeleton", () => ({
   BadgeSkeleton: () => null,
 }));
 vi.mock("@/lib/i18n", () => ({
+  DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
 }));
 
@@ -251,7 +252,7 @@ describe("Phase 4d — Share page i18n", () => {
       mockGetServerLocale.mockResolvedValue("en");
       const result = await SharePageContent({ handle: "testuser" });
       const jsxString = JSON.stringify(result);
-      expect(jsxString).toContain("Your Impact, Decoded");
+      expect(jsxString).toContain("Tu Impacto, Decodificado");
     });
 
     it("uses sharePage.h2 in Spanish for es locale", async () => {

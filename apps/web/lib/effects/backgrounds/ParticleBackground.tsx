@@ -47,6 +47,7 @@ export function useParticles(
   const mouseRef = useRef({ x: -1000, y: -1000 });
   const rafRef = useRef<number>(0);
   const timeRef = useRef(0);
+  const activeRef = useRef(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -100,7 +101,17 @@ export function useParticles(
       colorRgbMap.set(c, hexToRgb(c));
     }
 
+    const stopAnimation = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+    };
+
     const animate = () => {
+      rafRef.current = 0;
+      if (!activeRef.current) return;
+
       const rect = canvas.getBoundingClientRect();
       const cw = rect.width;
       const ch = rect.height;
@@ -174,12 +185,41 @@ export function useParticles(
       rafRef.current = requestAnimationFrame(animate);
     };
 
+    const startAnimation = () => {
+      if (!rafRef.current) animate();
+    };
+
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    let isIntersecting = true;
+    let isDocumentVisible = document.visibilityState !== "hidden";
+    let observer: IntersectionObserver | null = null;
+
+    const syncAnimationState = () => {
+      activeRef.current = isIntersecting && isDocumentVisible;
+      if (activeRef.current) {
+        startAnimation();
+      } else {
+        stopAnimation();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      isDocumentVisible = document.visibilityState !== "hidden";
+      syncAnimationState();
+    };
 
     if (!prefersReducedMotion) {
-      animate();
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      if ("IntersectionObserver" in window) {
+        observer = new IntersectionObserver(([entry]) => {
+          isIntersecting = entry?.isIntersecting ?? true;
+          syncAnimationState();
+        });
+        observer.observe(canvas);
+      }
+      syncAnimationState();
     } else {
       const particles = particlesRef.current;
       for (const p of particles) {
@@ -192,7 +232,9 @@ export function useParticles(
     }
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
+      stopAnimation();
+      observer?.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("mousemove", handleMouse);
       canvas.removeEventListener("mouseleave", handleLeave);

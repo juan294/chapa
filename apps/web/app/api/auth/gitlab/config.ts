@@ -1,4 +1,5 @@
 import { isGitlabEnabled } from "@/lib/feature-flags";
+import { getGitlabClientId, getGitlabClientSecret } from "@/lib/env";
 import {
   createGitlabStateCookie,
   buildGitlabAuthUrl,
@@ -13,8 +14,8 @@ export const gitlabOAuthConfig: PlatformOAuthConfig = {
   platform: "gitlab",
   rateLimitPrefix: "gl",
   isEnabled: isGitlabEnabled,
-  clientIdEnvVar: "GITLAB_CLIENT_ID",
-  clientSecretEnvVar: "GITLAB_CLIENT_SECRET",
+  getClientId: getGitlabClientId,
+  getClientSecret: getGitlabClientSecret,
   createStateCookie: createGitlabStateCookie,
   buildAuthUrl: buildGitlabAuthUrl,
   validateState: validateGitlabState,

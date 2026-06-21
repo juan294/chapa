@@ -1,4 +1,5 @@
 import { isBitbucketEnabled } from "@/lib/feature-flags";
+import { getBitbucketClientId, getBitbucketClientSecret } from "@/lib/env";
 import {
   createBitbucketStateCookie,
   buildBitbucketAuthUrl,
@@ -13,8 +14,8 @@ export const bitbucketOAuthConfig: PlatformOAuthConfig = {
   platform: "bitbucket",
   rateLimitPrefix: "bb",
   isEnabled: isBitbucketEnabled,
-  clientIdEnvVar: "BITBUCKET_CLIENT_ID",
-  clientSecretEnvVar: "BITBUCKET_CLIENT_SECRET",
+  getClientId: getBitbucketClientId,
+  getClientSecret: getBitbucketClientSecret,
   createStateCookie: createBitbucketStateCookie,
   buildAuthUrl: buildBitbucketAuthUrl,
   validateState: validateBitbucketState,

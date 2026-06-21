@@ -1,11 +1,11 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": "apps/web",
     "paths": {
       "@/*": ["./*"]
     },
     "module": "esnext",
-    "moduleResolution": "node",
-    "target": "ES2017"
+    "moduleResolution": "node"
   }
 }

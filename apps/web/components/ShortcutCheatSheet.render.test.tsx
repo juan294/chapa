@@ -5,6 +5,10 @@ import { ShortcutCheatSheet } from "./ShortcutCheatSheet";
 
 vi.mock("@/lib/feature-flags-sync", () => ({
   isStudioEnabledSync: vi.fn(() => true),
+  isInsightsEnabledSync: vi.fn(() => false),
+  isBitbucketEnabledSync: vi.fn(() => false),
+  isCodebergEnabledSync: vi.fn(() => false),
+  isGitlabEnabledSync: vi.fn(() => false),
 }));
 
 import { isStudioEnabledSync } from "@/lib/feature-flags-sync";

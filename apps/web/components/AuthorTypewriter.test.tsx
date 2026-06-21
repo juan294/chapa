@@ -592,4 +592,18 @@ describe("AuthorTypewriter", () => {
       expect(textSpan.textContent).toBe("</> JG");
     });
   });
+
+  describe("design system (UX-L2, #780)", () => {
+    it("trigger pill button (has text content) uses rounded-lg, not rounded-full", () => {
+      // The design system reserves rounded-full for icon-only/avatar buttons;
+      // text/CTA buttons must use rounded-lg.
+      const { container } = render(<AuthorTypewriter />);
+      const triggerButton = container.querySelector(
+        'button[aria-label^="Made by"]',
+      ) as HTMLElement;
+      expect(triggerButton).not.toBeNull();
+      expect(triggerButton.className).toContain("rounded-lg");
+      expect(triggerButton.className).not.toContain("rounded-full");
+    });
+  });
 });

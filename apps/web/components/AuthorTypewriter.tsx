@@ -195,7 +195,7 @@ export function AuthorTypewriter({ className }: AuthorTypewriterProps) {
       {/* Trigger pill — terminal typewriter */}
       <button
         type="button"
-        className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-full bg-amber/10 hover:bg-amber/15 backdrop-blur-sm cursor-default transition-all duration-150 border border-stroke"
+        className="flex items-center h-6 min-w-[3.5rem] px-2.5 rounded-lg bg-amber/10 hover:bg-amber/15 backdrop-blur-sm cursor-default transition-all duration-150 border border-stroke"
         aria-label={`Made by ${AUTHOR_NAME}`}
       >
         <span className="text-[10px] font-heading text-text-secondary group-hover:text-text-primary transition-colors duration-300 select-none whitespace-nowrap">

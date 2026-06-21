@@ -85,4 +85,11 @@ describe("AdminPage render", () => {
       "true",
     );
   });
+
+  it("exports metadata that hides the page from search engines", async () => {
+    const mod = await import("./page");
+
+    expect(mod.metadata.title).toBe("Admin Panel — Chapa");
+    expect(mod.metadata.robots).toMatchObject({ index: false, follow: false });
+  });
 });

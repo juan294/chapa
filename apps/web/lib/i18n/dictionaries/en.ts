@@ -68,6 +68,7 @@ export const en: Translations = {
         'One embeddable badge. Multiple dimensions. Cryptographically verified.',
       ],
       primaryCta: 'Get your badge',
+      primaryCtaPending: 'Connecting…',
       verifyCta: 'Verify a badge',
       badgePreviewLabel: 'Sample Chapa developer impact badge',
     },
@@ -167,6 +168,7 @@ export const en: Translations = {
     finalCta: {
       prompt: 'Ready to show your impact?',
       button: 'Get your badge',
+      buttonPending: 'Connecting…',
     },
     footer: {
       tagline: 'Built for developers, by developers.',
@@ -206,6 +208,10 @@ export const en: Translations = {
     h2: 'Your Impact, Decoded',
     loadingAriaLabel: 'Loading',
     loadingSrText: 'Loading...',
+  },
+  commandHint: {
+    label: 'for commands',
+    ariaLabel: 'Open the command bar — or press the / key',
   },
   verify: {
     title: 'Verify a badge',
@@ -272,6 +278,7 @@ export const en: Translations = {
     creatorStudio: 'Creator Studio',
     importInsights: 'Import Claude Code Insights',
     unlinkBtn: 'Unlink',
+    unlinkFailed: 'Unlink failed',
     linkBitbucket: 'Link Bitbucket',
     linkCodeberg: 'Link Codeberg',
     linkGitlab: 'Link GitLab',

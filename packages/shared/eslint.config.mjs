@@ -1,9 +1,14 @@
+import tsParser from "@typescript-eslint/parser";
+
 // ESLint config for packages/shared.
 // This package is a pure, dependency-free leaf — it must NEVER import from
 // apps/web (@/ alias) or reference anything outside its own src/ directory.
 const eslintConfig = [
   {
     files: ["src/**/*.ts"],
+    languageOptions: {
+      parser: tsParser,
+    },
     rules: {
       "no-restricted-imports": [
         "error",

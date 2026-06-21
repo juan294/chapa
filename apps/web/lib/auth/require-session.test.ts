@@ -43,7 +43,7 @@ describe("requireSession", () => {
 
   describe("when NEXTAUTH_SECRET is set but session is invalid", () => {
     beforeEach(() => {
-      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value");
+      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value-32-characters-ok");
       mockReadSession.mockReturnValue(null);
     });
 
@@ -64,7 +64,7 @@ describe("requireSession", () => {
       requireSession(makeRequest("chapa_session=some-value"));
       expect(mockReadSession).toHaveBeenCalledWith(
         "chapa_session=some-value",
-        "test-secret-value",
+        "test-secret-value-32-characters-ok",
       );
     });
   });
@@ -78,7 +78,7 @@ describe("requireSession", () => {
     };
 
     beforeEach(() => {
-      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value");
+      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-value-32-characters-ok");
       mockReadSession.mockReturnValue(mockSession);
     });
 
@@ -91,14 +91,14 @@ describe("requireSession", () => {
 
   describe("trims NEXTAUTH_SECRET", () => {
     it("trims whitespace from the secret before passing to readSessionCookie", () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "  secret-with-spaces  ");
+      vi.stubEnv("NEXTAUTH_SECRET", "  secret-with-spaces-32-characters-ok  ");
       mockReadSession.mockReturnValue(null);
 
       requireSession(makeRequest("chapa_session=test"));
 
       expect(mockReadSession).toHaveBeenCalledWith(
         "chapa_session=test",
-        "secret-with-spaces",
+        "secret-with-spaces-32-characters-ok",
       );
     });
   });

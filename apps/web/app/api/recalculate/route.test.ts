@@ -143,7 +143,9 @@ describe("POST /api/recalculate", () => {
       { mode: "replace" },
     );
     expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("testuser", {
+      badgeSvg: true,
       history: true,
+      snapshot: true,
     });
     expect(body.success).toBe(true);
     expect(body.adjustedComposite).toBe(58);

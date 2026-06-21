@@ -152,7 +152,7 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     0,
   );
 
-  return {
+  return normalizeStats({
     handle: raw.login,
     displayName: raw.name ?? undefined,
     avatarUrl: raw.avatarUrl,
@@ -167,16 +167,108 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     reposContributed,
     topRepoShare,
     maxCommitsIn10Min,
-    ...(prDescriptionRate !== undefined && { prDescriptionRate }),
-    ...(featureBranchRate !== undefined && { featureBranchRate }),
-    ...(issueLinkageRate !== undefined && { issueLinkageRate }),
-    ...(microCommitRatio !== undefined && { microCommitRatio }),
-    ...(batchSizeScore !== undefined && { batchSizeScore }),
-    ...(medianPrLeadTimeHours !== undefined && { medianPrLeadTimeHours }),
+    prDescriptionRate,
+    featureBranchRate,
+    issueLinkageRate,
+    microCommitRatio,
+    batchSizeScore,
+    medianPrLeadTimeHours,
     totalStars,
     totalForks,
     totalWatchers,
     heatmapData,
-    fetchedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Required StatsData fields and their default values. Single source of truth
+ * for StatsData defaults — every platform aggregator routes its output through
+ * `normalizeStats()` so a field added to StatsData gets a consistent default in
+ * exactly one place (root cause fix for AR-M5 / the v2.7.x craft-field bugs).
+ */
+const STATS_REQUIRED_DEFAULTS: Omit<
+  StatsData,
+  | "displayName"
+  | "avatarUrl"
+  | "primaryReviewsSubmittedCount"
+  | "microCommitRatio"
+  | "batchSizeScore"
+  | "medianPrLeadTimeHours"
+  | "docsOnlyPrRatio"
+  | "prDescriptionRate"
+  | "featureBranchRate"
+  | "issueLinkageRate"
+  | "hasSupplementalData"
+  | "linkedPlatforms"
+  | "linkedPlatformLogins"
+  | "fetchedAt"
+> = {
+  handle: "",
+  commitsTotal: 0,
+  activeDays: 0,
+  prsMergedCount: 0,
+  prsMergedWeight: 0,
+  reviewsSubmittedCount: 0,
+  issuesClosedCount: 0,
+  linesAdded: 0,
+  linesDeleted: 0,
+  reposContributed: 0,
+  topRepoShare: 0,
+  maxCommitsIn10Min: 0,
+  totalStars: 0,
+  totalForks: 0,
+  totalWatchers: 0,
+  heatmapData: [],
+};
+
+/** Optional StatsData fields — included in output only when explicitly provided. */
+const STATS_OPTIONAL_KEYS = [
+  "displayName",
+  "avatarUrl",
+  "primaryReviewsSubmittedCount",
+  "microCommitRatio",
+  "batchSizeScore",
+  "medianPrLeadTimeHours",
+  "docsOnlyPrRatio",
+  "prDescriptionRate",
+  "featureBranchRate",
+  "issueLinkageRate",
+  "hasSupplementalData",
+  "linkedPlatforms",
+  "linkedPlatformLogins",
+] as const satisfies readonly (keyof StatsData)[];
+
+/**
+ * Fill a partial StatsData with canonical defaults for all required fields.
+ *
+ * - Required numeric/string/array fields default per `STATS_REQUIRED_DEFAULTS`.
+ * - `fetchedAt` defaults to the current time when absent.
+ * - Optional fields are copied through only when `!== undefined`, preserving the
+ *   "omit when unknown" contract every aggregator relied on previously.
+ *
+ * Pure (except for the `fetchedAt` fallback, which reads the clock).
+ */
+export function normalizeStats(partial: Partial<StatsData>): StatsData {
+  const out: StatsData = {
+    ...STATS_REQUIRED_DEFAULTS,
+    heatmapData: partial.heatmapData ?? [],
+    fetchedAt: partial.fetchedAt ?? new Date().toISOString(),
   };
+  const mutable = out as unknown as Record<string, unknown>;
+
+  for (const key of Object.keys(STATS_REQUIRED_DEFAULTS)) {
+    const value = (partial as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      mutable[key] = value;
+    }
+  }
+
+  for (const key of STATS_OPTIONAL_KEYS) {
+    const value = (partial as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      mutable[key] = value;
+    }
+  }
+
+  return out;
 }
