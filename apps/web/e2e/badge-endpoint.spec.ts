@@ -1,10 +1,12 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
+  const smokeBadgePath = "/u/octocat/badge.svg?__chapa_smoke=1";
+
   test("valid handle returns SVG content with correct Content-Type", async ({
     request,
   }) => {
-    const response = await request.get("/u/torvalds/badge.svg");
+    const response = await request.get(smokeBadgePath);
 
     // Must be 200 — the route always returns a fallback SVG on error paths;
     // a 500 means an unhandled crash leaked through and must be caught.
@@ -22,7 +24,7 @@ test.describe("Badge endpoint — /u/:handle/badge.svg", () => {
   test("successful response includes public cache headers", async ({
     request,
   }) => {
-    const response = await request.get("/u/torvalds/badge.svg");
+    const response = await request.get(smokeBadgePath);
 
     // Must be 200 — a 500 means an unhandled crash that bypassed the fallback.
     expect(response.status()).toBe(200);

@@ -32,6 +32,7 @@ const BADGE_RENDER_LOCK_TTL_SECONDS = 30;
 const BADGE_CACHE_DEADLINE_MS = 250;
 const BADGE_RATE_LIMIT_DEADLINE_MS = 150;
 const BADGE_RENDER_WAIT_SCHEDULE_MS = [50, 75, 100, 125, 150, 200, 250, 300, 350, 400];
+const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
 type BadgeRenderResult = {
   svg: string;
   headers: HeadersInit;
@@ -144,6 +145,7 @@ export async function GET(
 
   // SVG full-response cache: serve warm-cache badge without any Redis rate-limit
   // overhead (#882 — rate limit moved to cache-MISS branch only).
+  const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
   const today = toDateString(new Date());
   const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
   const cachedSvg = await readBadgeSvgCache(svgCacheKey);
@@ -242,7 +244,10 @@ export async function GET(
     const verification = getPublicProfileVerification(materialized);
 
     after(() => {
-      return runPublicProfileSideEffects(handle, materialized, { verification });
+      return runPublicProfileSideEffects(handle, materialized, {
+        verification,
+        readOnly,
+      });
     });
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
@@ -253,7 +258,9 @@ export async function GET(
       // <animate> never runs — animated heatmap cells would stay invisible. (#760)
       disableAnimation: true,
     });
-    await writeBadgeSvgCache(svgCacheKey, svg, handle);
+    if (!readOnly) {
+      await writeBadgeSvgCache(svgCacheKey, svg, handle);
+    }
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
     return new NextResponse(successResult.svg, { headers: successResult.headers });

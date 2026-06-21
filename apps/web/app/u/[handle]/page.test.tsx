@@ -199,6 +199,14 @@ describe("SharePage /u/[handle]", () => {
     );
   });
 
+  it("does not register side effects in read-only smoke mode", async () => {
+    await SharePageContent({ handle: "testuser", readOnly: true });
+
+    expect(mockRenderBadgeSvg).toHaveBeenCalled();
+    expect(mockAfter).not.toHaveBeenCalled();
+    expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+  });
+
   it("does not register side effects when materialization returns null", async () => {
     mockMaterializePublicProfile.mockResolvedValue(null);
 

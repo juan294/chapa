@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
 const strictDeploymentSmoke = process.env.DEPLOYMENT_SMOKE_STRICT === "true";
+const smokeProfilePath = "/u/octocat?__chapa_smoke=1";
+const smokeBadgePath = "/u/octocat/badge.svg?__chapa_smoke=1";
 
 test.describe("Smoke tests — core routes", () => {
   test("landing page loads", async ({ page }) => {
@@ -29,7 +31,7 @@ test.describe("Smoke tests — core routes", () => {
   });
 
   test("badge SVG returns image/svg+xml", async ({ request }) => {
-    const response = await request.get("/u/torvalds/badge.svg");
+    const response = await request.get(smokeBadgePath);
     if (strictDeploymentSmoke) {
       expect(response.status()).toBe(200);
       const contentType = response.headers()["content-type"] ?? "";
@@ -54,7 +56,7 @@ test.describe("Smoke tests — core routes", () => {
   test("share page renders", async ({ page }) => {
     // Use domcontentloaded — the badge <img> triggers a second API call that
     // can push "load" past 30s in CI (SSR 15s + badge image 15s).
-    const response = await page.goto("/u/torvalds", {
+    const response = await page.goto(smokeProfilePath, {
       waitUntil: "domcontentloaded",
     });
     if (strictDeploymentSmoke) {

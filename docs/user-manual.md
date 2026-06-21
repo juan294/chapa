@@ -774,7 +774,7 @@ Use this checklist to verify every feature works.
 - [ ] See terminal bar at the bottom of the page
 - [ ] Type `/help` — see available commands
 - [ ] Type `/home` — navigates to landing page
-- [ ] Type `/badge torvalds` — navigates to `/u/torvalds`
+- [ ] Type `/badge octocat` — navigates to `/u/octocat`
 - [ ] Type `/about` — navigates to about page
 - [ ] (Admin only) Type `/admin` — navigates to admin dashboard
 - [ ] (Admin only) Type `/refresh` — refreshes dashboard data

@@ -127,9 +127,10 @@ const FAKE_MATERIALIZED = {
 function makeRequest(
   handle: string,
   headers: Record<string, string> = {},
+  search = "",
 ): [NextRequest, { params: Promise<{ handle: string }> }] {
   return [
-    new NextRequest(`https://chapa.thecreativetoken.com/u/${handle}/badge.svg`, { headers }),
+    new NextRequest(`https://chapa.thecreativetoken.com/u/${handle}/badge.svg${search}`, { headers }),
     { params: Promise.resolve({ handle }) },
   ];
 }
@@ -223,8 +224,30 @@ describe("GET /u/[handle]/badge.svg", () => {
     expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
-      { verification: { hash: "abc12345", date: "2026-04-17" } },
+      {
+        verification: { hash: "abc12345", date: "2026-04-17" },
+        readOnly: false,
+      },
     );
+  });
+
+  it("passes read-only mode and skips SVG cache writes for smoke requests", async () => {
+    const [req, ctx] = makeRequest(
+      "testuser",
+      { "x-forwarded-for": "1.2.3.4" },
+      "?__chapa_smoke=1",
+    );
+    await GET(req, ctx);
+
+    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      {
+        verification: { hash: "abc12345", date: "2026-04-17" },
+        readOnly: true,
+      },
+    );
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 
   it("falls back to an undefined avatar when avatar fetch fails", async () => {

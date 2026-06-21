@@ -37,8 +37,8 @@ When the secret is set, the job:
 |-------|-----------|
 | `/` | Landing page renders (`#main-content` visible) |
 | `/api/health` | HTTP 200, `status: "ok"`, each dependency (redis/supabase/github) is `ok` or `skipped` |
-| `/u/torvalds/badge.svg` | HTTP 200, `Content-Type: image/svg+xml`, body contains `<svg>…</svg>` |
-| `/u/torvalds` | Share page returns HTTP 200, body visible |
+| `/u/octocat/badge.svg?__chapa_smoke=1` | HTTP 200, `Content-Type: image/svg+xml`, body contains `<svg>…</svg>` |
+| `/u/octocat?__chapa_smoke=1` | Share page returns HTTP 200, body visible without persisting profile side effects |
 | `/api/auth/login` | Redirects toward GitHub OAuth |
 
 These are the same tests the local `e2e` job runs, but strict mode requires real

@@ -5,26 +5,27 @@ import { test, expect } from "@playwright/test";
 // call. In CI (no cache, slow API), waiting for "load" causes 30s+ timeouts
 // because SSR (15s) + badge image fetch (15s) exceed Playwright's timeout.
 const GOTO_OPTS = { waitUntil: "domcontentloaded" as const };
+const smokeProfilePath = "/u/octocat?__chapa_smoke=1";
 
 test.describe("Share page — /u/:handle", () => {
   test("page renders for a valid handle", async ({ page }) => {
-    const response = await page.goto("/u/torvalds", GOTO_OPTS);
+    const response = await page.goto(smokeProfilePath, GOTO_OPTS);
     expect(response).not.toBeNull();
     // Should not crash — 200 or graceful error
     expect(response!.status()).toBeLessThan(500);
   });
 
   test("page has accessible h1 with handle", async ({ page }) => {
-    const response = await page.goto("/u/torvalds", GOTO_OPTS);
+    const response = await page.goto(smokeProfilePath, GOTO_OPTS);
     if (!response?.ok()) return; // Skip if data unavailable in CI
 
-    // sr-only h1: "@torvalds — Developer Impact, Decoded"
+    // sr-only h1: "@octocat — Developer Impact, Decoded"
     const h1 = page.locator("h1");
-    await expect(h1).toContainText("torvalds");
+    await expect(h1).toContainText("octocat");
   });
 
   test("badge preview section is visible", async ({ page }) => {
-    const response = await page.goto("/u/torvalds", GOTO_OPTS);
+    const response = await page.goto(smokeProfilePath, GOTO_OPTS);
     if (!response?.ok()) return;
 
     // Badge is rendered as <img> or inline SVG
@@ -34,7 +35,7 @@ test.describe("Share page — /u/:handle", () => {
   });
 
   test('"Tu Impacto, Decodificado" heading is visible', async ({ page }) => {
-    const response = await page.goto("/u/torvalds", GOTO_OPTS);
+    const response = await page.goto(smokeProfilePath, GOTO_OPTS);
     if (!response?.ok()) return;
 
     const heading = page.getByText("Tu Impacto, Decodificado");
