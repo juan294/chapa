@@ -29,16 +29,17 @@ function getRawSessionSecret(): string | null {
 
 /** Return the configured session signing secret, or null when it is unset. */
 export function getSessionSecret(): string | null {
-  return getRawSessionSecret();
+  const sessionSecret = getRawSessionSecret();
+  return sessionSecret ? assertSessionSecretLength(sessionSecret) : null;
 }
 
 /** Return the validated session signing key used for HMAC cookie operations. */
 export function getSessionKey(): Buffer {
-  const sessionSecret = getRawSessionSecret();
+  const sessionSecret = getSessionSecret();
   if (!sessionSecret) {
     throw new Error("NEXTAUTH_SECRET must be set and at least 32 chars");
   }
-  return Buffer.from(assertSessionSecretLength(sessionSecret), "utf8");
+  return Buffer.from(sessionSecret, "utf8");
 }
 
 /** Decodes and verifies the session cookie; returns null when the header is absent or the signature is invalid. */

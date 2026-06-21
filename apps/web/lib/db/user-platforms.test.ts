@@ -18,7 +18,7 @@ vi.mock("@/lib/auth/github", () => ({
 }));
 
 // All DB functions that encrypt/decrypt need NEXTAUTH_SECRET
-vi.stubEnv("NEXTAUTH_SECRET", "test-secret-for-encryption");
+vi.stubEnv("NEXTAUTH_SECRET", "test-secret-for-encryption-32-chars");
 
 import { getSupabase } from "./supabase";
 import {

@@ -32,7 +32,7 @@ async function resolveCodebergToken(
       // No refresh token and token expired — can't recover
       // If expiresAt is null, token may be long-lived — try anyway
       if (expiresAt !== null) {
-        void dbDeleteLinkedPlatform(handle, "codeberg");
+        await dbDeleteLinkedPlatform(handle, "codeberg");
         return null;
       }
       // expiresAt is null → long-lived token, proceed with current token
@@ -47,13 +47,13 @@ async function resolveCodebergToken(
 
       if (!result.ok) {
         if (result.reason === "revoked") {
-          void dbDeleteLinkedPlatform(handle, "codeberg");
+          await dbDeleteLinkedPlatform(handle, "codeberg");
         }
         return null;
       }
 
       accessToken = result.tokens.access_token;
-      void dbUpdatePlatformTokens(
+      await dbUpdatePlatformTokens(
         handle,
         "codeberg",
         result.tokens.access_token,

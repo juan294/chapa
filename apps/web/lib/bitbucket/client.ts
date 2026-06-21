@@ -26,7 +26,7 @@ async function resolveBitbucketToken(
 
   if (isTokenExpired(expiresAt)) {
     if (!refreshToken) {
-      void dbDeleteLinkedPlatform(handle, "bitbucket");
+      await dbDeleteLinkedPlatform(handle, "bitbucket");
       return null;
     }
 
@@ -36,13 +36,13 @@ async function resolveBitbucketToken(
 
     if (!result.ok) {
       if (result.reason === "revoked") {
-        void dbDeleteLinkedPlatform(handle, "bitbucket");
+        await dbDeleteLinkedPlatform(handle, "bitbucket");
       }
       return null;
     }
 
     accessToken = result.tokens.access_token;
-    void dbUpdatePlatformTokens(
+    await dbUpdatePlatformTokens(
       handle,
       "bitbucket",
       result.tokens.access_token,

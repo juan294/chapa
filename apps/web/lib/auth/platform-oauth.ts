@@ -11,6 +11,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth/require-session";
 import { getBaseUrl } from "@/lib/env";
 import { dbUpsertLinkedPlatform, dbDeleteLinkedPlatform, dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
@@ -52,6 +53,20 @@ async function invalidatePlatformReadModels(
   await Promise.all(deletes);
 }
 
+function revalidateSharePage(handle: string): void {
+  try {
+    revalidatePath(`/u/${handle}`);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("static generation store missing")
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -79,11 +94,11 @@ export interface PlatformOAuthConfig {
   /** Async function to check if the platform feature flag is enabled */
   isEnabled: () => Promise<boolean>;
 
-  /** Env var name for the OAuth client ID */
-  clientIdEnvVar: string;
+  /** Read the OAuth client ID from the centralized env boundary. */
+  getClientId: () => string | undefined;
 
-  /** Env var name for the OAuth client secret (used in callback only) */
-  clientSecretEnvVar: string;
+  /** Read the OAuth client secret from the centralized env boundary. */
+  getClientSecret: () => string | undefined;
 
   /** Create CSRF state cookie (returns { state, cookie }) */
   createStateCookie: () => { state: string; cookie: string };
@@ -141,7 +156,7 @@ export function createConnectHandler(config: PlatformOAuthConfig) {
     if (error) return error;
 
     // 4. Validate env vars
-    const clientId = process.env[config.clientIdEnvVar]?.trim();
+    const clientId = config.getClientId();
     if (!clientId) {
       return NextResponse.redirect(
         new URL(`/u/${session.login}?error=config`, request.url),
@@ -210,8 +225,8 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
     }
 
     // 6. Validate env vars
-    const clientId = process.env[config.clientIdEnvVar]?.trim();
-    const clientSecret = process.env[config.clientSecretEnvVar]?.trim();
+    const clientId = config.getClientId();
+    const clientSecret = config.getClientSecret();
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
         new URL(`${errorRedirectBase}?error=${config.platform}_config`, request.url),
@@ -258,6 +273,7 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
       invalidatePlatformReadModels(handle, config.platform),
       markStatsDirty(handle),
     ]);
+    revalidateSharePage(handle);
 
     // 11. Clear state cookie and redirect to share page
     const response = NextResponse.redirect(
@@ -310,6 +326,7 @@ export function createDisconnectHandler(config: PlatformOAuthConfig) {
     } else {
       await invalidation;
     }
+    revalidateSharePage(handle);
 
     // 6. Return result
     return NextResponse.json({ success });

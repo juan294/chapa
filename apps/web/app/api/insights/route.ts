@@ -92,6 +92,7 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     await invalidateProfileReadModels(handle, {
       stats: true,
       craft: true,
+      badgeSvg: true,
       snapshot: true,
       history: true,
     });

@@ -2,10 +2,13 @@ import { cacheDel } from "@/lib/cache/redis";
 import { buildCraftKey } from "@/lib/cache/craft-cache";
 import { buildSnapshotKey } from "@/lib/cache/snapshot-cache";
 import { invalidateHistoryCache } from "@/lib/history/history";
+import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
+import { toDateString } from "@/lib/utils/date";
 
 type ProfileReadModelInvalidationOptions = {
   stats?: boolean;
   craft?: boolean;
+  badgeSvg?: boolean;
   snapshot?: boolean;
   history?: boolean;
 };
@@ -33,6 +36,17 @@ export async function invalidateProfileReadModels(
   if (options.craft) {
     await runInvalidationStep(() =>
       cacheDel(buildCraftKey(normalizedHandle)),
+    );
+  }
+
+  if (options.badgeSvg) {
+    await runInvalidationStep(() =>
+      cacheDel(
+        buildBadgeSvgCacheKey(
+          normalizedHandle,
+          toDateString(new Date()),
+        ),
+      ),
     );
   }
 

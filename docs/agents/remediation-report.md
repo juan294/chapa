@@ -1,37 +1,62 @@
 # Remediation Report
-> Generated on 2026-06-19 | Branch: `develop` | 60 findings processed
->
-> Pre-launch report: `docs/agents/pre-launch-report.md`
+> Generated on 2026-06-21 | Branch: `develop` | Pre-launch pass
 
 ## Summary
-- Findings processed: **60** (all severities — operator directive: no wave deferral, all fixed pre-launch)
-- Issues created/tracked: 60 (40 fresh + 20 re-filed #897–916 after a finding-ID collision with the prior 2026-04-23 audit cycle)
-- Issues resolved (merged to develop): 59 fixed + 1 already-covered (QA-L1)
-- Tests added: ~150 (suite 7,738 → 7,875)
-- CI status (local): test ✅ · typecheck ✅ · lint ✅ · build ✅ · bundle-gate ✅
-- Push policy: single push at the end (no partial pushes)
 
-## Execution
-Nine file-disjoint work units across isolated worktrees, TDD throughout, merged sequentially into local `develop`:
+All code-fixable findings from the 2026-06-21 pre-launch pass were remediated in
+one local batch. No partial push was performed.
 
-| Work unit | Findings | Merge |
-|-----------|----------|-------|
-| config/deps/CI | SE-H1, AR-M1, AR-M2, DO-M1, DO-M2, DO-L3, AR-S1, FE-S1, QA-M1 | ✅ |
-| platform-queries | BE-H1, BE-M3, BE-M4, BE-M5, BE-L1, BE-L3 | ✅ |
-| auth-hardening | BE-H2, BE-M1, BE-M2 (backward-compat), SE-L1, SE-L2, BE-S1 | ✅ |
-| badge-perf | PE-M1, PE-M2, PE-L1, PE-L2, PE-L3, PE-S1, BE-L2 | ✅ |
-| observability | DO-L1, DO-S1 (alerting parts) | ✅ |
-| qa-tests | QA-L2 (+QA-L1 already covered) | ✅ |
-| campaigns-split | AR-L1 | ✅ |
-| i18n-a11y | UX-H1, UX-H2, UX-H3, UX-M2, UX-M3, UX-M4, UX-M5, UX-M6, UX-L1, UX-L2, UX-L3, DO-L2 | ✅ |
-| fe-caching + fe-bundle | FE-H1, FE-H2, FE-M1, FE-M2, FE-M3, FE-M4, FE-L1, FE-L2, UX-M1 | ✅ |
+One GitHub issue remains open:
 
-## Notable judgment calls (explicitly stated)
-- **BE-M2 (CLI device_code)** — implemented **backward-compatible**: updated clients get the full RFC-8628 binding; legacy/external CLI binaries (no source in this repo) keep working (no 401). Fully removing the legacy fallback is gated on shipping an updated CLI — surfaced to the operator.
-- **QA-L1** — false positive: the four "untested" pages already have co-located `.test.ts` files (the audit looked for `.test.tsx`). No duplicate tests added.
-- **FE-H1 + FE-H2 reconciliation** — content pages render statically at `DEFAULT_LOCALE`; only the active locale's dict ships client-side; non-default-locale users get their language applied client-side from the cookie. Documented as an accepted risk.
-- **DO-L1 / DO-S1** — code-fixable parts (alerting) shipped; infra-scaling parts (token pool, staggered crons, external uptime monitor) noted as follow-ups.
-- **DO-B1 / DO-H1 / DO-M3 / DO-M4 (branch protection)** — require operator approval (production-config changes); deferred to the release gate, not auto-applied.
+- `#531 chore: migrate to ESLint 10` — still upstream-blocked because the current
+  Next/React ESLint stack does not yet support ESLint 10.
 
-## Prior-cycle backlog
-Per operator decision ("dedup-close overlaps only"): the prior 2026-04-23 audit backlog (~40 issues) remains open EXCEPT those this work demonstrably resolved (e.g. #719 700KB bundle → now 227 KB). Distinct prior items are left as a tracked backlog.
+## Remediated
+
+- Enforced 32-character `NEXTAUTH_SECRET` validation across session paths and
+  updated test fixtures/workflow dummy secrets.
+- Added badge SVG invalidation to profile read-model invalidation and all
+  score-changing API paths.
+- Added linked-platform per-fetch deadlines and prevented partial upstream
+  results from being cached as successful stats.
+- Awaited linked-platform token refresh and unlink DB writes.
+- Revalidated share pages after platform link/unlink, with unit-test-safe
+  best-effort handling outside Next runtime context.
+- Hardened supplemental stats validation for finite numbers, bounded ratios,
+  active-day limits, and heatmap shape.
+- Changed support forwarding to escape the inbound HTML body instead of relying
+  on sanitizer regexes.
+- Switched public profile API reads to `getCachedLatestSnapshot` and skipped tool
+  insight queries when `snapshot.craft` is already present.
+- Made `/u/[handle]` ISR-safe by using `DEFAULT_LOCALE` at render time.
+- Re-enabled SSR for `SharePageOwnerContentLazy`.
+- Hydrated client feature flags from DB-backed server helpers in the root layout
+  and consumed those flags in `UserMenu`.
+- Removed root GitHub preconnect/dns-prefetch hints.
+- Paused particle canvas animation loops on hidden documents and offscreen
+  canvases.
+- Removed the OG image Turbopack NFT trace warning by using module-relative font
+  URLs.
+- Treated skipped production health dependencies as degraded.
+- Added migration validation to CI and made deployment smoke fail on `main` when
+  unconfigured.
+- Wired recursive root lint through `packages/shared`, with a package-local ESLint
+  config and TypeScript parser.
+- Expanded env-boundary lint to catch computed `process.env[...]` reads.
+- Updated branch protection for `main` to require `Deployment Smoke`,
+  `Lighthouse Audit`, `Analyze Bundle Size`, and `Bundle Analyzer Report` in
+  addition to existing required checks.
+- Configured `DEPLOYMENT_SMOKE_BASE_URL` GitHub Actions secret to
+  `https://chapa.thecreativetoken.com`.
+- Documented DOMPurify transitive license posture and corrected the
+  package-extraction ADR for `@chapa/shared` runtime utilities.
+
+## Verification
+
+- `pnpm run typecheck`: passed
+- `pnpm run lint`: passed
+- `pnpm run test`: 462 files, 7,948 tests passed
+- `pnpm run validate:migrations`: 26 migrations valid
+- `pnpm run check:circular`: 877 files processed, no circular dependency found
+- `pnpm audit --audit-level moderate`: no known vulnerabilities
+- `pnpm run build`: passed with no Turbopack NFT warning

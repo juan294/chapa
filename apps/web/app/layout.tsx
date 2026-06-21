@@ -5,7 +5,13 @@ import { ClientInstrumentation } from "@/components/ClientInstrumentation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ClientFeatureFlagsProvider } from "@/components/ClientFeatureFlagsProvider";
 import { getBaseUrl } from "@/lib/env";
-import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
+import {
+  isBitbucketEnabled,
+  isCodebergEnabled,
+  isGitlabEnabled,
+  isInsightsEnabled,
+  isStudioEnabled,
+} from "@/lib/feature-flags";
 import { renderJsonLd } from "@/lib/jsonld";
 import { LanguageProvider, LangSync } from "@/lib/i18n";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
@@ -72,14 +78,34 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Use sync env-var check instead of DB-backed async check to avoid
-  // Upstash Redis fetch(no-store) calls that force dynamic rendering.
-  const studioEnabled = isStudioEnabledSync();
+  // Resolve client navigation flags through the same DB-backed cached helpers
+  // used by server route gates. The helpers use unstable_cache so this does not
+  // force request-time cookies()/headers() or per-request dynamic rendering.
+  const [
+    studioEnabled,
+    insightsEnabled,
+    bitbucketEnabled,
+    codebergEnabled,
+    gitlabEnabled,
+  ] = await Promise.all([
+    isStudioEnabled(),
+    isInsightsEnabled(),
+    isBitbucketEnabled(),
+    isCodebergEnabled(),
+    isGitlabEnabled(),
+  ]);
+  const clientFeatureFlags = {
+    studioEnabled,
+    insightsEnabled,
+    bitbucketEnabled,
+    codebergEnabled,
+    gitlabEnabled,
+  };
   // Render at DEFAULT_LOCALE at build time so the layout never calls
   // cookies()/headers() — that would force every page into dynamic rendering and
   // defeat ISR on /about, /archetypes/*, etc. (#861). Pass ONLY the default
@@ -96,11 +122,6 @@ export default function RootLayout({
       suppressHydrationWarning
       data-scroll-behavior="smooth"
     >
-      <head>
-        <link rel="preconnect" href="https://api.github.com" />
-        <link rel="dns-prefetch" href="https://api.github.com" />
-        <link rel="dns-prefetch" href="https://avatars.githubusercontent.com" />
-      </head>
       <body className="bg-bg text-text-primary font-body antialiased">
         {/* SAFETY: JSON-LD from hardcoded constants — renderJsonLd escapes <, >, & to prevent </script> injection. */}
         <script
@@ -144,7 +165,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider initialLocale={locale} dictionary={dictionary}>
             <LangSync />
-            <ClientFeatureFlagsProvider studioEnabled={studioEnabled}>
+            <ClientFeatureFlagsProvider flags={clientFeatureFlags}>
               {children}
             </ClientFeatureFlagsProvider>
           </LanguageProvider>

@@ -42,9 +42,9 @@ describe("lazy imports — bundle-reduction invariants", () => {
       expect(wrapper).toMatch(/from\s+["']next\/dynamic["']/);
     });
 
-    it("lazy wrapper sets ssr: false so the heavy subtree is client-only", () => {
+    it("lazy wrapper allows SSR so public share content is present before hydration", () => {
       const wrapper = read("components/SharePageOwnerContentLazy.tsx");
-      expect(wrapper).toMatch(/ssr:\s*false/);
+      expect(wrapper).not.toMatch(/ssr:\s*false/);
     });
 
     it("lazy wrapper imports SharePageOwnerContent inside the dynamic() factory", () => {

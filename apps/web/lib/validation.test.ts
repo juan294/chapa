@@ -162,6 +162,21 @@ describe("isValidStatsShape", () => {
     expect(isValidStatsShape({ ...validStats, commitsTotal: -1 })).toBe(false);
   });
 
+  it("rejects non-finite numeric fields", () => {
+    expect(isValidStatsShape({ ...validStats, commitsTotal: Infinity })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, commitsTotal: NaN })).toBe(false);
+  });
+
+  it("rejects ratio fields outside the 0..1 range", () => {
+    expect(isValidStatsShape({ ...validStats, topRepoShare: 1.01 })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, microCommitRatio: -0.1 })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, docsOnlyPrRatio: 1.1 })).toBe(false);
+  });
+
+  it("rejects activity fields that exceed a one-year contribution window", () => {
+    expect(isValidStatsShape({ ...validStats, activeDays: 366 })).toBe(false);
+  });
+
   it("rejects stats missing totalStars", () => {
     const noStars = { ...validStats };
     delete (noStars as Record<string, unknown>).totalStars;
@@ -190,6 +205,12 @@ describe("isValidStatsShape", () => {
 
   it("rejects heatmapData with invalid entries", () => {
     expect(isValidStatsShape({ ...validStats, heatmapData: [{ wrong: true }] })).toBe(false);
+  });
+
+  it("rejects heatmap entries with invalid dates or counts", () => {
+    expect(isValidStatsShape({ ...validStats, heatmapData: [{ date: "01/01/2025", count: 1 }] })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, heatmapData: [{ date: "2025-01-01", count: -1 }] })).toBe(false);
+    expect(isValidStatsShape({ ...validStats, heatmapData: [{ date: "2025-01-01", count: Infinity }] })).toBe(false);
   });
 
   it("accepts empty heatmapData array", () => {

@@ -4,12 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  isInsightsEnabledSync,
-  isBitbucketEnabledSync,
-  isCodebergEnabledSync,
-  isGitlabEnabledSync,
-} from "@/lib/feature-flags-sync";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { clearSessionCache } from "@/hooks/useSession";
 import { clearCacheWarmState } from "@/hooks/useOwnerCacheWarm";
@@ -79,7 +73,13 @@ interface UserMenuProps {
 
 export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const router = useRouter();
-  const { studioEnabled } = useClientFeatureFlags();
+  const {
+    studioEnabled,
+    insightsEnabled,
+    bitbucketEnabled,
+    codebergEnabled,
+    gitlabEnabled,
+  } = useClientFeatureFlags();
   const { t } = useTranslation();
   const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
   const [imgError, setImgError] = useState(false);
@@ -282,10 +282,10 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         },
       ); // Graceful — menu works without status
     }
-    if (isBitbucketEnabledSync()) fetchPlatformStatus("bitbucket", setBbStatus);
-    if (isCodebergEnabledSync()) fetchPlatformStatus("codeberg", setCbStatus);
-    if (isGitlabEnabledSync()) fetchPlatformStatus("gitlab", setGlStatus);
-  }, []);
+    if (bitbucketEnabled) fetchPlatformStatus("bitbucket", setBbStatus);
+    if (codebergEnabled) fetchPlatformStatus("codeberg", setCbStatus);
+    if (gitlabEnabled) fetchPlatformStatus("gitlab", setGlStatus);
+  }, [bitbucketEnabled, codebergEnabled, gitlabEnabled]);
 
   // Shared unlink flow — collapses the three near-identical platform disconnect
   // handlers into one parametrized helper (#884). Each named handler below
@@ -479,7 +479,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                 {t('userMenu.creatorStudio') as string}
               </Link>
             )}
-            {isInsightsEnabledSync() && (
+            {insightsEnabled && (
               <button
                 type="button"
                 role="menuitem"

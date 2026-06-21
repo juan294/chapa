@@ -82,9 +82,10 @@ export async function fetchGitlabContributionData(
     const heatmap = bucketEventsByDate(events);
 
     // 2. Merged MRs authored by the user (global scope — no per-project loop).
-    // BE-H1: fetchMergedMRs returns null on 429/5xx — treat as empty to keep
-    // the rest of the data (events heatmap is already collected).
-    const mrs = (await fetchMergedMRs(username, accessToken, controller.signal)) ?? [];
+    // Null means upstream failure/rate-limit; return null so callers can serve
+    // stale platform stats rather than caching a heatmap-only partial profile.
+    const mrs = await fetchMergedMRs(username, accessToken, controller.signal);
+    if (mrs === null) return null;
 
     // 3. Per-MR diffstat + per-project merged-MR counts.
     // mrs is already capped at MAX_PRS by fetchMergedMRs.
@@ -110,6 +111,7 @@ export async function fetchGitlabContributionData(
       accessToken,
       controller.signal,
     );
+    if (reviewsCount === null) return null;
 
     // 5. Closed issues authored by the user.
     const closedIssues = await fetchClosedIssuesCount(
@@ -117,10 +119,15 @@ export async function fetchGitlabContributionData(
       accessToken,
       controller.signal,
     );
+    if (closedIssues === null) return null;
 
     // 6. Owned/member projects for social metrics + depth proxy.
-    const projects =
-      (await fetchUserProjects(userId, accessToken, controller.signal)) ?? [];
+    const projects = await fetchUserProjects(
+      userId,
+      accessToken,
+      controller.signal,
+    );
+    if (projects === null) return null;
     const repos = projects.map((p) => {
       const isOwned = p.namespace?.path === username;
       return {
@@ -332,14 +339,14 @@ async function fetchReviewsCount(
   username: string,
   token: string,
   signal: AbortSignal,
-): Promise<number> {
-  const mrs =
-    (await fetchPaginated<GitlabMergeRequest>(
-      `/merge_requests?reviewer_username=${encodeURIComponent(username)}&scope=all&state=merged`,
-      token,
-      signal,
-      MAX_PRS,
-    )) ?? [];
+): Promise<number | null> {
+  const mrs = await fetchPaginated<GitlabMergeRequest>(
+    `/merge_requests?reviewer_username=${encodeURIComponent(username)}&scope=all&state=merged`,
+    token,
+    signal,
+    MAX_PRS,
+  );
+  if (mrs === null) return null;
 
   let count = 0;
   let lookups = 0;
@@ -388,13 +395,13 @@ async function fetchClosedIssuesCount(
   username: string,
   token: string,
   signal: AbortSignal,
-): Promise<number> {
-  const issues =
-    (await fetchPaginated<{ id: number }>(
-      `/issues?author_username=${encodeURIComponent(username)}&state=closed&scope=all`,
-      token,
-      signal,
-    )) ?? [];
+): Promise<number | null> {
+  const issues = await fetchPaginated<{ id: number }>(
+    `/issues?author_username=${encodeURIComponent(username)}&state=closed&scope=all`,
+    token,
+    signal,
+  );
+  if (issues === null) return null;
   return issues.length;
 }
 

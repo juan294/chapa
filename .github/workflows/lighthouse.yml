@@ -32,7 +32,7 @@ jobs:
       # Dummy values for build — real values are in Vercel
       GITHUB_CLIENT_ID: dummy
       GITHUB_CLIENT_SECRET: dummy
-      NEXTAUTH_SECRET: dummy-secret-for-ci
+      NEXTAUTH_SECRET: dummy-secret-for-ci-32-characters
       UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
       UPSTASH_REDIS_REST_TOKEN: dummy
 

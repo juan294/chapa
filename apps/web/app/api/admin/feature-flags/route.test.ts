@@ -63,7 +63,7 @@ function makeRequest(body: unknown): NextRequest {
 describe("PATCH /api/admin/feature-flags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockReadSessionCookie.mockReturnValue({
       login: "admin-user",

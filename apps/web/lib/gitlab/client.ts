@@ -31,7 +31,7 @@ async function resolveGitlabToken(
       // No refresh token and token expired — can't recover.
       // If expiresAt is null, token may be long-lived — try anyway.
       if (expiresAt !== null) {
-        void dbDeleteLinkedPlatform(handle, "gitlab");
+        await dbDeleteLinkedPlatform(handle, "gitlab");
         return null;
       }
     } else {
@@ -53,13 +53,13 @@ async function resolveGitlabToken(
 
       if (!result.ok) {
         if (result.reason === "revoked") {
-          void dbDeleteLinkedPlatform(handle, "gitlab");
+          await dbDeleteLinkedPlatform(handle, "gitlab");
         }
         return null;
       }
 
       accessToken = result.tokens.access_token;
-      void dbUpdatePlatformTokens(
+      await dbUpdatePlatformTokens(
         handle,
         "gitlab",
         result.tokens.access_token,

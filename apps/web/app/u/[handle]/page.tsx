@@ -26,8 +26,8 @@ import {
   materializePublicProfile,
   runPublicProfileSideEffects,
 } from "@/lib/profile/public-profile";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
-import { LocaleSync } from "@/lib/i18n";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 
 const BASE_URL = getBaseUrl();
@@ -102,7 +102,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
 /** Data-dependent content — streams after shell via Suspense. */
 /** @internal Exported for tests — use SharePage as the page component. */
 export async function SharePageContent({ handle }: { handle: string }) {
-  // ISR: No dynamic request APIs (next/headers, next/cookies) are called.
+  // ISR: No dynamic request APIs (next headers/cookies) are called.
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
@@ -183,12 +183,9 @@ export async function SharePageContent({ handle }: { handle: string }) {
       : {}),
   };
 
-  // Server locale for server-rendered strings (h1, h2).
-  // getServerLocale reads cookies/accept-language — safe inside SharePageContent
-  // because this component runs dynamically (inside Suspense boundary).
-  // generateMetadata (ISR build time) uses English directly via getServerT("en").
-  const locale = await getServerLocale();
-  const t = getServerT(locale);
+  // Keep the public share page ISR-safe: server-render default-locale strings
+  // without dynamic cookie/header reads; LocaleSync applies query/cookie locale client-side.
+  const t = getServerT(DEFAULT_LOCALE);
 
   return (
     <>

@@ -49,8 +49,10 @@ The strict dependency rule is **one-directional**:
        └──────────── packages/badge-renderer ◄────┘
 ```
 
-- **`@chapa/shared`** stays the leaf — types only (`StatsData`, `ImpactV6Result`,
-  `BadgeConfig`, etc.). No runtime logic.
+- **`@chapa/shared`** stays the leaf — shared domain types plus small pure
+  runtime constants/utilities (`StatsData`, `ImpactV6Result`, `BadgeConfig`,
+  `normalizeStats`, `formatCompact`, scoring constants, etc.). No I/O, React,
+  cache, database, auth, or framework runtime logic.
 - **`packages/impact-engine`** depends only on `@chapa/shared`. It must contain
   **no** I/O — no Redis, no Supabase, no GitHub fetch. It is pure compute. (Today
   `lib/impact/` is already free of those concerns; this boundary mostly needs to

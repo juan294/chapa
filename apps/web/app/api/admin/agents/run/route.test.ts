@@ -123,7 +123,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   _resetRunState();
 
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
   vi.stubEnv("ADMIN_HANDLES", "admin1");
   vi.stubEnv("NODE_ENV", "development");
 
@@ -239,7 +239,7 @@ describe("POST /api/admin/agents/run", () => {
       vi.stubEnv("ALLOW_AGENT_RUN", "true");
       vi.unstubAllEnvs();
       // Re-stub the ones needed for auth
-      vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+      vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
       vi.stubEnv("ADMIN_HANDLES", "admin1");
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("ALLOW_AGENT_RUN", "true");

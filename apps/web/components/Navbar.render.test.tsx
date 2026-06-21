@@ -79,7 +79,7 @@ vi.mock("./LanguageSwitcher", () => ({
 import { Navbar } from "./Navbar";
 
 beforeEach(() => {
-  process.env.NEXTAUTH_SECRET = "test-secret";
+  process.env.NEXTAUTH_SECRET = "test-secret-32-characters-valid-ok";
   mockReadSessionCookie.mockReset();
   mockIsAdminHandle.mockReset();
   mockHeadersGet.mockReset();

@@ -140,4 +140,23 @@ describe("fetchLinkedPlatformStats", () => {
     expect(result).toBeNull();
     expect(mockCacheSet).not.toHaveBeenCalled();
   });
+
+  it("returns null and does not cache when the live fetch exceeds its deadline", async () => {
+    vi.useFakeTimers();
+    const slowFetch: NonNullable<FetchLinkedPlatformConfig["fetchStats"]> = () =>
+      new Promise((resolve) => {
+        setTimeout(() => resolve(makeStats({ commitsTotal: 10 })), 9_000);
+      });
+    const config = makeConfig({
+      fetchStats: vi.fn(slowFetch),
+    });
+
+    const promise = fetchLinkedPlatformStats(config);
+    await vi.advanceTimersByTimeAsync(8_001);
+
+    await expect(promise).resolves.toBeNull();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
 });

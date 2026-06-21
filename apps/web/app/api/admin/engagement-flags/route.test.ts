@@ -33,7 +33,7 @@ import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("NEXTAUTH_SECRET", "test-secret");
+  vi.stubEnv("NEXTAUTH_SECRET", "test-secret-32-characters-valid-ok");
   vi.mocked(readSessionCookie).mockReturnValue({ login: "admin", token: "tok", name: "Admin", avatar_url: "" });
   vi.mocked(isAdminHandle).mockReturnValue(true);
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
@@ -168,7 +168,7 @@ describe("GET /api/admin/engagement-flags", () => {
 
   describe("branch coverage: NEXTAUTH_SECRET with whitespace", () => {
     it("trims NEXTAUTH_SECRET whitespace before checking", async () => {
-      vi.stubEnv("NEXTAUTH_SECRET", "  test-secret  ");
+      vi.stubEnv("NEXTAUTH_SECRET", "  test-secret-32-characters-valid-ok  ");
 
       const res = await GET(makeRequest());
       // Should succeed — the trimmed secret is non-empty

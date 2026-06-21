@@ -74,17 +74,16 @@ describe("RootLayout", () => {
   });
 
   describe("feature flags", () => {
-    it("resolves the Studio flag synchronously (ISR-safe — no DB fetch in layout)", () => {
-      // Layout uses isStudioEnabledSync (env-var only) instead of async DB-backed
-      // isStudioEnabled, to prevent Upstash Redis fetch(no-store) from forcing
-      // every page in the app into dynamic rendering.
-      expect(SOURCE).toContain("isStudioEnabledSync");
-      expect(SOURCE).toContain("const studioEnabled = isStudioEnabledSync()");
+    it("resolves client navigation flags through cached DB-backed server helpers", () => {
+      expect(SOURCE).toContain("isStudioEnabled()");
+      expect(SOURCE).toContain("isBitbucketEnabled()");
+      expect(SOURCE).toContain("isCodebergEnabled()");
+      expect(SOURCE).toContain("isGitlabEnabled()");
     });
 
-    it("hydrates client navigation with the server-resolved Studio flag", () => {
+    it("hydrates client navigation with the server-resolved feature flag snapshot", () => {
       expect(SOURCE).toContain("ClientFeatureFlagsProvider");
-      expect(SOURCE).toContain("studioEnabled={studioEnabled}");
+      expect(SOURCE).toContain("flags={clientFeatureFlags}");
     });
   });
 });

@@ -1,4 +1,5 @@
 import { isCodebergEnabled } from "@/lib/feature-flags";
+import { getCodebergClientId, getCodebergClientSecret } from "@/lib/env";
 import {
   createCodebergStateCookie,
   buildCodebergAuthUrl,
@@ -13,8 +14,8 @@ export const codebergOAuthConfig: PlatformOAuthConfig = {
   platform: "codeberg",
   rateLimitPrefix: "cb",
   isEnabled: isCodebergEnabled,
-  clientIdEnvVar: "CODEBERG_CLIENT_ID",
-  clientSecretEnvVar: "CODEBERG_CLIENT_SECRET",
+  getClientId: getCodebergClientId,
+  getClientSecret: getCodebergClientSecret,
   createStateCookie: createCodebergStateCookie,
   buildAuthUrl: buildCodebergAuthUrl,
   validateState: validateCodebergState,

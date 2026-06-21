@@ -53,6 +53,10 @@ vi.mock("@/lib/auth/bitbucket", () => ({
   computeTokenExpiry: mockComputeTokenExpiry,
 }));
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 import { NextRequest, NextResponse } from "next/server";
 import {
   createConnectHandler,
@@ -102,8 +106,8 @@ function makeMockConfig(): PlatformOAuthConfig & {
     platform: "testplatform",
     rateLimitPrefix: "tp",
     isEnabled: mockIsEnabled,
-    clientIdEnvVar: "TESTPLATFORM_CLIENT_ID",
-    clientSecretEnvVar: "TESTPLATFORM_CLIENT_SECRET",
+    getClientId: () => process.env.TESTPLATFORM_CLIENT_ID?.trim(),
+    getClientSecret: () => process.env.TESTPLATFORM_CLIENT_SECRET?.trim(),
     createStateCookie: mockCreateStateCookie,
     buildAuthUrl: mockBuildAuthUrl,
     validateState: mockValidateState,

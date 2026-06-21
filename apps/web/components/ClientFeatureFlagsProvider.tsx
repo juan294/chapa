@@ -1,23 +1,33 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { isStudioEnabledSync } from "@/lib/feature-flags-sync";
+import {
+  isBitbucketEnabledSync,
+  isCodebergEnabledSync,
+  isGitlabEnabledSync,
+  isInsightsEnabledSync,
+  isStudioEnabledSync,
+} from "@/lib/feature-flags-sync";
 
 interface ClientFeatureFlags {
   studioEnabled: boolean;
+  insightsEnabled: boolean;
+  bitbucketEnabled: boolean;
+  codebergEnabled: boolean;
+  gitlabEnabled: boolean;
 }
 
 const ClientFeatureFlagsContext = createContext<ClientFeatureFlags | null>(null);
 
 export function ClientFeatureFlagsProvider({
   children,
-  studioEnabled,
+  flags,
 }: {
   children: React.ReactNode;
-  studioEnabled: boolean;
+  flags: ClientFeatureFlags;
 }) {
   return (
-    <ClientFeatureFlagsContext.Provider value={{ studioEnabled }}>
+    <ClientFeatureFlagsContext.Provider value={flags}>
       {children}
     </ClientFeatureFlagsContext.Provider>
   );
@@ -27,5 +37,11 @@ export function useClientFeatureFlags(): ClientFeatureFlags {
   const flags = useContext(ClientFeatureFlagsContext);
   if (flags) return flags;
 
-  return { studioEnabled: isStudioEnabledSync() };
+  return {
+    studioEnabled: isStudioEnabledSync(),
+    insightsEnabled: isInsightsEnabledSync(),
+    bitbucketEnabled: isBitbucketEnabledSync(),
+    codebergEnabled: isCodebergEnabledSync(),
+    gitlabEnabled: isGitlabEnabledSync(),
+  };
 }

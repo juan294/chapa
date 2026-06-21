@@ -73,6 +73,7 @@ vi.mock("@/lib/i18n/server", async () => {
 });
 
 vi.mock("@/lib/i18n", () => ({
+  DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
 }));
 

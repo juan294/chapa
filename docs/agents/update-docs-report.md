@@ -1,46 +1,37 @@
 # Documentation Update Report
-> Generated on 2026-05-03 | Branch: `develop` | Changes since v2.9.1
+> Generated on 2026-06-21 | Branch: `develop` | Changes since v2.11.0
 
 ## Summary
-- 6 documents updated
-- 1 diagram flagged `[NEEDS REVIEW]`
-- 3 version references corrected
-- 0 inline doc blocks updated (no existing JSDoc found on changed modules)
-- 1 item flagged `[NEEDS REVIEW]`
+
+Updated release-adjacent documentation after the pre-launch remediation pass.
 
 ## Changes by File
 
-### `CHANGELOG.md`
-Added missing `[Unreleased]` section with the full i18n feature summary (LanguageSwitcher, structured dictionaries, locale detection, cookie persistence, parity test, insignia→Chapa rename). Added `[2.9.1]` hotfix entry (Upstash OAuth state comparison fix) and `[2.9.0]` release entry (typed env getters, structured JSON logger, withErrorCapture on all 44 routes, share page perf improvements). Added compare links for all three new sections.
+### `docs/agents/pre-launch-report.md`
 
-### `README.md`
-- Updated test counts from "389+ files, 6,950+ tests" → "440+ files, 7,530+ tests"
-- Added **Bilingual UI (ES / EN)** to the Features section
-- Added `lib/dashboard/`, `lib/i18n/`, `lib/insights/`, `lib/profile/` to the project structure tree
+Replaced the stale 2026-06-19 report with the 2026-06-21 release-readiness
+findings and initial verification state.
 
-### `CLAUDE.md`
-- Fixed cookie name: `locale` → `chapa-locale` (i18n section)
-- Fixed key count: `550+` → `650+` leaf keys per dictionary
-- Added three Code Ownership entries: `lib/i18n/`, `lib/dashboard/ + components/dashboard/`, `BadgeToolbar`
+### `docs/agents/remediation-report.md`
 
-### `docs/user-manual.md`
-Added new **Language Switcher** section explaining the globe-icon picker, how to switch locales, and how the default is auto-detected from `Accept-Language`.
+Replaced the stale prior remediation summary with the 2026-06-21 remediation
+record, external GitHub configuration changes, remaining upstream-blocked issue,
+and final local verification evidence.
 
-### `docs/runbooks/release-checklist.md`
-Added **Language switcher** row to the Preview Deployment Soak table: click globe icon → switch ES↔EN → confirm page re-renders in selected locale.
+### `docs/accepted-risks.md`
 
-### `docs/impact-v6.md`
-Corrected ASCII pipeline diagram: `"8 penalty flags"` → `"9 flag entries: 8 scored + 1 informational at 0 penalty"` to match the actual implementation in `lib/impact/utils.ts`.
+- Updated review stamp to 2026-06-21 / v42.
+- Added DOMPurify transitive dependency license note. DOMPurify is pulled through
+  PostHog tooling, offers Apache-2.0 as an allowed license option, and remains
+  pinned by the root override as a security floor.
 
-### `docs/chapa-architecture.drawio`
-Added `<!-- [NEEDS REVIEW] -->` XML comment. The DrawIO diagram is missing `lib/i18n/` module, `LanguageSwitcher` component, `lib/dashboard/`, and `lib/insights/` swimlane nodes — last updated for v2.8.0. Requires the DrawIO desktop app to update properly.
+### `docs/decisions/2026-06-20-package-extraction-roadmap.md`
 
-## Flagged for Review
+Corrected `@chapa/shared` policy from "types only" to "domain types plus small
+pure runtime constants/utilities"; retained the no-I/O, no-framework-runtime
+boundary.
 
-| File | Issue |
-|------|-------|
-| `docs/chapa-architecture.drawio` | Missing: `lib/i18n/` module, `LanguageSwitcher` in Frontend swimlane, `lib/dashboard/`, `lib/insights/`. Open in DrawIO to add nodes. |
+## Not Updated
 
-## Not Updated (checked, current)
-
-`docs/design-system.md` (LanguageSwitcher already documented), `docs/accepted-risks.md` (two i18n risks already added), `docs/svg-design.md`, `docs/how-it-works.md`, `docs/cli-guide.md`, `docs/badge-verification.md`, all deprecated impact specs (correctly archived), all research/plans docs (intentional historical snapshots), all other runbooks.
+Historical research and plan files were intentionally left unchanged. They record
+the state and decisions at the time they were written.

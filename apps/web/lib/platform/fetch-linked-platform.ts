@@ -1,4 +1,5 @@
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { withTimeout } from "@/lib/async/with-timeout";
 import type { StatsData } from "@chapa/shared";
 
 /**
@@ -11,6 +12,7 @@ export const CACHE_TTL = 21600;
  * on the next request so we don't re-hit the flag + DB every embed.
  */
 export const NEG_CACHE_TTL = 3600;
+export const PLATFORM_FETCH_DEADLINE_MS = 8_000;
 
 /**
  * The shape returned by `dbGetLinkedPlatform` — the linked account record
@@ -106,7 +108,11 @@ export async function fetchLinkedPlatformStats(
   const accessToken = await config.resolveAccessToken(linked);
   if (accessToken === null) return null;
 
-  const stats = await config.fetchStats(linked, accessToken);
+  const stats = await withTimeout(
+    config.fetchStats(linked, accessToken),
+    PLATFORM_FETCH_DEADLINE_MS,
+    `${config.platform} stats fetch`,
+  ).catch(() => null);
 
   if (stats) {
     await cacheSet(cacheKey, stats, CACHE_TTL);

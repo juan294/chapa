@@ -23,7 +23,7 @@ const eslintConfig = [
         "error",
         {
           selector:
-            "MemberExpression[object.object.name='process'][object.property.name='env'][computed=false]",
+            "MemberExpression[object.object.name='process'][object.property.name='env']",
           message:
             "Access env vars through @/lib/env getters instead of process.env directly.",
         },
