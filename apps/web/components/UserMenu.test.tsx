@@ -406,14 +406,17 @@ describe("UserMenu — platform status cache", () => {
     expect(beforeComponent).toContain("createModuleStore");
   });
 
-  it("cache has fetched, bitbucket, and codeberg fields", () => {
+  it("cache has per-platform fetched/status entries", () => {
     expect(SOURCE).toContain("fetched");
+    expect(SOURCE).toContain("pending");
+    expect(SOURCE).toContain("PlatformStatusEntry");
+    expect(SOURCE).toContain("status: null");
     // The cache type should track platform statuses
     expect(SOURCE).toMatch(/PlatformStatusCache\b/);
   });
 
-  it("useEffect checks cache before fetching", () => {
-    expect(SOURCE).toContain("platformStatusStore.getSnapshot().fetched");
+  it("useEffect checks each platform cache entry before fetching", () => {
+    expect(SOURCE).toContain("platformStatusStore.getSnapshot()[platform].fetched");
   });
 
   it("unlink flow invalidates the cache (shared helper)", () => {
@@ -531,7 +534,7 @@ describe("UserMenu — Bitbucket disconnect handler (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -584,7 +587,7 @@ describe("UserMenu — Codeberg disconnect handler (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/codeberg/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -762,7 +765,7 @@ describe("UserMenu — cache invalidation after unlink (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/bitbucket/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -861,7 +864,7 @@ describe("UserMenu — loading state during unlink (runtime)", () => {
 
     // Resolve the disconnect to clean up
     await act(async () => {
-      resolveDisconnect(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      resolveDisconnect(new Response(JSON.stringify({ success: true }), { status: 200 }));
     });
   });
 });
@@ -885,7 +888,7 @@ describe("UserMenu — Codeberg disconnect callback details (runtime)", () => {
         );
       }
       if (urlStr.includes("/api/auth/codeberg/disconnect")) {
-        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -978,7 +981,7 @@ describe("UserMenu — Codeberg disconnect loading state (runtime)", () => {
 
     // Resolve to clean up
     await act(async () => {
-      resolveDisconnect(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      resolveDisconnect(new Response(JSON.stringify({ success: true }), { status: 200 }));
     });
   });
 });

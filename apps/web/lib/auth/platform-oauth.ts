@@ -15,6 +15,7 @@ import { requireSession } from "@/lib/auth/require-session";
 import { getBaseUrl } from "@/lib/env";
 import { dbUpsertLinkedPlatform, dbDeleteLinkedPlatform, dbGetLinkedPlatforms } from "@/lib/db/user-platforms";
 import { cacheDel, rateLimit } from "@/lib/cache/redis";
+import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { getClientIp } from "@/lib/http/client-ip";
 import { computeTokenExpiry } from "@/lib/auth/bitbucket";
 import { buildBadgeSvgCacheKey } from "@/lib/render/badge-svg-cache";
@@ -27,8 +28,28 @@ import { toDateString } from "@/lib/utils/date";
  * invalidated separately; this covers the rendered artifact that the badge.svg
  * route and the share page both read.
  */
-function invalidateBadgeSvgCache(handle: string): void {
-  void cacheDel(buildBadgeSvgCacheKey(handle, toDateString(new Date())));
+async function invalidateBadgeSvgCache(handle: string): Promise<void> {
+  await cacheDel(buildBadgeSvgCacheKey(handle, toDateString(new Date())));
+}
+
+async function invalidatePlatformReadModels(
+  handle: string,
+  platform: string,
+  options: { clearSupplemental?: boolean } = {},
+): Promise<void> {
+  const lh = handle.toLowerCase();
+  const deletes: Array<Promise<unknown>> = [
+    cacheDel(`stats:v2:merged:${lh}`),
+    cacheDel(`stats:v2:${platform}:${lh}`),
+    cacheDel(`stats:v2:${platform}:${lh}:neg`),
+    invalidateBadgeSvgCache(handle),
+  ];
+
+  if (options.clearSupplemental) {
+    deletes.push(cacheDel(`supplemental:${lh}`));
+  }
+
+  await Promise.all(deletes);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,11 +253,11 @@ export function createCallbackHandler(config: PlatformOAuthConfig) {
       );
     }
 
-    // 10. Invalidate stats cache + the rendered badge so the new logo shows now
-    const lh = handle.toLowerCase();
-    void cacheDel(`stats:v2:merged:${lh}`);
-    void cacheDel(`stats:v2:${config.platform}:${lh}`);
-    invalidateBadgeSvgCache(handle);
+    // 10. Invalidate read models and mark scoring inputs dirty.
+    await Promise.all([
+      invalidatePlatformReadModels(handle, config.platform),
+      markStatsDirty(handle),
+    ]);
 
     // 11. Clear state cookie and redirect to share page
     const response = NextResponse.redirect(
@@ -279,12 +300,16 @@ export function createDisconnectHandler(config: PlatformOAuthConfig) {
     // 4. Delete linked platform
     const success = await dbDeleteLinkedPlatform(handle, config.platform);
 
-    // 5. Invalidate stats cache + supplemental EMU data + the rendered badge
-    const lh = handle.toLowerCase();
-    void cacheDel(`stats:v2:merged:${lh}`);
-    void cacheDel(`stats:v2:${config.platform}:${lh}`);
-    void cacheDel(`supplemental:${lh}`);
-    invalidateBadgeSvgCache(handle);
+    // 5. Invalidate read models + supplemental EMU data. Only a successful
+    // delete changes scoring inputs.
+    const invalidation = invalidatePlatformReadModels(handle, config.platform, {
+      clearSupplemental: true,
+    });
+    if (success) {
+      await Promise.all([invalidation, markStatsDirty(handle)]);
+    } else {
+      await invalidation;
+    }
 
     // 6. Return result
     return NextResponse.json({ success });

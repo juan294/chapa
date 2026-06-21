@@ -121,6 +121,23 @@ describe("computeConfidence", () => {
     expect(penalties).toHaveLength(0);
   });
 
+  it("keeps linked platform confidence informational with zero penalty", () => {
+    const baseStats = makeStats();
+    const withoutPlatform = computeConfidence(baseStats);
+    const withPlatform = computeConfidence({
+      ...baseStats,
+      linkedPlatforms: ["gitlab"],
+    });
+
+    expect(withPlatform.confidence).toBe(withoutPlatform.confidence);
+    expect(withPlatform.penalties).toContainEqual(
+      expect.objectContaining({
+        flag: "platform_linked",
+        penalty: 0,
+      }),
+    );
+  });
+
   // --- burst_activity ---
   describe("burst_activity flag", () => {
     it("applies -15 at the shared burst-activity threshold", () => {

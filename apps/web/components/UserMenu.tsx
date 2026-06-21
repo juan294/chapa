@@ -32,24 +32,35 @@ interface PlatformStatus {
   linked: boolean;
   remoteLogin: string | null;
 }
-interface PlatformStatusCache {
+type PlatformId = "bitbucket" | "codeberg" | "gitlab";
+interface PlatformStatusEntry {
   fetched: boolean;
-  bitbucket: PlatformStatus | null;
-  codeberg: PlatformStatus | null;
-  gitlab: PlatformStatus | null;
+  pending: boolean;
+  status: PlatformStatus | null;
+}
+interface PlatformStatusCache {
+  bitbucket: PlatformStatusEntry;
+  codeberg: PlatformStatusEntry;
+  gitlab: PlatformStatusEntry;
 }
 
 function emptyPlatformStatusCache(): PlatformStatusCache {
-  return { fetched: false, bitbucket: null, codeberg: null, gitlab: null };
+  const emptyEntry = (): PlatformStatusEntry => ({
+    fetched: false,
+    pending: false,
+    status: null,
+  });
+  return {
+    bitbucket: emptyEntry(),
+    codeberg: emptyEntry(),
+    gitlab: emptyEntry(),
+  };
 }
 
 // Backed by the shared module-store primitive (#774). This cache is read
 // imperatively (in useState initializers and effects) and written
 // imperatively after fetches/unlinks — there are no reactive subscribers, so
-// `getSnapshot()`/`set()` are used directly. The single shared object instance
-// (returned by `getSnapshot()`) preserves the previous field-mutation
-// semantics exactly: callers mutate fields in place, and `set()` is only used
-// to swap in a fresh object on clear.
+// `getSnapshot()`/`set()` are used directly.
 const platformStatusStore = createModuleStore<PlatformStatusCache>(
   emptyPlatformStatusCache(),
 );
@@ -80,21 +91,21 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   const [bbStatus, setBbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(() => platformStatusStore.getSnapshot().bitbucket);
+  } | null>(() => platformStatusStore.getSnapshot().bitbucket.status);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinkLoading, setUnlinkLoading] = useState(false);
 
   const [cbStatus, setCbStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(() => platformStatusStore.getSnapshot().codeberg);
+  } | null>(() => platformStatusStore.getSnapshot().codeberg.status);
   const [showCbUnlinkConfirm, setShowCbUnlinkConfirm] = useState(false);
   const [cbUnlinkLoading, setCbUnlinkLoading] = useState(false);
 
   const [glStatus, setGlStatus] = useState<{
     linked: boolean;
     remoteLogin: string | null;
-  } | null>(() => platformStatusStore.getSnapshot().gitlab);
+  } | null>(() => platformStatusStore.getSnapshot().gitlab.status);
   const [showGlUnlinkConfirm, setShowGlUnlinkConfirm] = useState(false);
   const [glUnlinkLoading, setGlUnlinkLoading] = useState(false);
 
@@ -224,36 +235,56 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
   }, []);
 
   useEffect(() => {
-    if (platformStatusStore.getSnapshot().fetched) {
-      return;
-    }
     // Only probe the status endpoint for platforms whose public feature flag is
     // enabled. When an integration is flag-gated OFF we skip the network call
     // entirely instead of relying on the server to answer `{ enabled: false }`,
     // avoiding wasted requests on every mount (#885). The server still has the
     // final say for enabled platforms.
     function fetchPlatformStatus(
-      platform: "bitbucket" | "codeberg" | "gitlab",
+      platform: PlatformId,
       setter: typeof setBbStatus,
     ) {
+      if (platformStatusStore.getSnapshot()[platform].fetched || platformStatusStore.getSnapshot()[platform].pending) {
+        return;
+      }
+
+      platformStatusStore.set({
+        ...platformStatusStore.getSnapshot(),
+        [platform]: {
+          ...platformStatusStore.getSnapshot()[platform],
+          pending: true,
+        },
+      });
       fireAndForget(
         () =>
           fetch(`/api/auth/${platform}/status`)
             .then((r) => r.json())
             .then((data) => {
+              const status = data.enabled
+                ? { linked: data.linked, remoteLogin: data.remoteLogin }
+                : null;
+              platformStatusStore.set({
+                ...platformStatusStore.getSnapshot(),
+                [platform]: { fetched: true, pending: false, status },
+              });
               if (data.enabled) {
-                const status = { linked: data.linked, remoteLogin: data.remoteLogin };
-                platformStatusStore.getSnapshot()[platform] = status;
                 setter(status);
               }
             }),
-        () => undefined,
+        () => {
+          platformStatusStore.set({
+            ...platformStatusStore.getSnapshot(),
+            [platform]: {
+              ...platformStatusStore.getSnapshot()[platform],
+              pending: false,
+            },
+          });
+        },
       ); // Graceful — menu works without status
     }
     if (isBitbucketEnabledSync()) fetchPlatformStatus("bitbucket", setBbStatus);
     if (isCodebergEnabledSync()) fetchPlatformStatus("codeberg", setCbStatus);
     if (isGitlabEnabledSync()) fetchPlatformStatus("gitlab", setGlStatus);
-    platformStatusStore.getSnapshot().fetched = true;
   }, []);
 
   // Shared unlink flow — collapses the three near-identical platform disconnect
@@ -273,19 +304,28 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
       setLoading(true);
       try {
         const res = await fetch(endpoint, { method: "POST" });
-        if (res.ok) {
+        const body = await res.json().catch(() => null);
+        if (res.ok && body?.success === true) {
           clearPlatformStatusCache();
           setStatus({ linked: false, remoteLogin: null });
           setShowConfirm(false);
           router.refresh();
+        } else {
+          setToast({
+            message: t('userMenu.unlinkFailed') as string,
+            type: "error",
+          });
         }
       } catch {
-        // Graceful failure — user can try again
+        setToast({
+          message: t('userMenu.unlinkFailed') as string,
+          type: "error",
+        });
       } finally {
         setLoading(false);
       }
     },
-    [router],
+    [router, t],
   );
 
   async function handleUnlinkBitbucket() {

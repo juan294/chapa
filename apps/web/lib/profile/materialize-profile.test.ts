@@ -10,6 +10,7 @@ import {
 const mockGetStats = vi.fn();
 const mockGetCachedCraftScore = vi.fn();
 const mockGetCachedLatestSnapshot = vi.fn();
+const mockIsStatsDirty = vi.fn();
 
 vi.mock("@/lib/github/client", () => ({
   getStats: (...args: unknown[]) => mockGetStats(...args),
@@ -22,6 +23,10 @@ vi.mock("@/lib/cache/craft-cache", () => ({
 vi.mock("@/lib/cache/snapshot-cache", () => ({
   getCachedLatestSnapshot: (...args: unknown[]) =>
     mockGetCachedLatestSnapshot(...args),
+}));
+
+vi.mock("@/lib/cache/dirty-stats", () => ({
+  isStatsDirty: (...args: unknown[]) => mockIsStatsDirty(...args),
 }));
 
 function makeCraftResult(
@@ -204,6 +209,41 @@ describe("materializeProfile", () => {
     expect(result?.latestSnapshot).toBeNull();
     expect(result?.displayImpact.adjustedComposite).toBe(
       result?.rawImpact.adjustedComposite,
+    );
+  });
+
+  it("uses a dirty marker to bypass stale same-day snapshot reuse", async () => {
+    const stats = makeFullStats({
+      handle: "testuser",
+      linkedPlatforms: ["gitlab"],
+    });
+    const staleSameDaySnapshot = makeSnapshot({
+      date: "2026-04-17",
+      adjustedComposite: 42,
+    });
+
+    mockGetStats.mockResolvedValue(stats);
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(staleSameDaySnapshot);
+    mockIsStatsDirty.mockResolvedValue(true);
+
+    const expected = materializeImpactState(stats, {
+      latestSnapshot: staleSameDaySnapshot,
+      today: "2026-04-17",
+      inputsChanged: true,
+    });
+
+    const result = await materializeProfile("testuser", {
+      today: "2026-04-17",
+    });
+
+    expect(mockIsStatsDirty).toHaveBeenCalledWith("testuser");
+    expect(result?.inputsChanged).toBe(true);
+    expect(result?.displayImpact.adjustedComposite).toBe(
+      expected.displayImpact.adjustedComposite,
+    );
+    expect(result?.snapshot.adjustedComposite).toBe(
+      result?.displayImpact.adjustedComposite,
     );
   });
 });

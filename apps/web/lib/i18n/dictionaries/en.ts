@@ -278,6 +278,7 @@ export const en: Translations = {
     creatorStudio: 'Creator Studio',
     importInsights: 'Import Claude Code Insights',
     unlinkBtn: 'Unlink',
+    unlinkFailed: 'Unlink failed',
     linkBitbucket: 'Link Bitbucket',
     linkCodeberg: 'Link Codeberg',
     linkGitlab: 'Link GitLab',

@@ -16,6 +16,7 @@ const {
   mockRequireSession,
   mockDbDeleteLinkedPlatform,
   mockCacheDel,
+  mockMarkStatsDirty,
   mockRateLimit,
   mockGetClientIp,
 } = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ const {
   mockRequireSession: vi.fn(),
   mockDbDeleteLinkedPlatform: vi.fn(),
   mockCacheDel: vi.fn(),
+  mockMarkStatsDirty: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
 }));
@@ -45,6 +47,10 @@ vi.mock("@/lib/db/user-platforms", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: mockCacheDel,
   rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/cache/dirty-stats", () => ({
+  markStatsDirty: mockMarkStatsDirty,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({

@@ -10,6 +10,7 @@ const {
   mockDbDeleteLinkedPlatform,
   mockDbGetLinkedPlatforms,
   mockCacheDel,
+  mockMarkStatsDirty,
   mockRateLimit,
   mockGetClientIp,
   mockComputeTokenExpiry,
@@ -19,6 +20,7 @@ const {
   mockDbDeleteLinkedPlatform: vi.fn(),
   mockDbGetLinkedPlatforms: vi.fn(),
   mockCacheDel: vi.fn(),
+  mockMarkStatsDirty: vi.fn(),
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
   mockComputeTokenExpiry: vi.fn(),
@@ -37,6 +39,10 @@ vi.mock("@/lib/db/user-platforms", () => ({
 vi.mock("@/lib/cache/redis", () => ({
   cacheDel: mockCacheDel,
   rateLimit: mockRateLimit,
+}));
+
+vi.mock("@/lib/cache/dirty-stats", () => ({
+  markStatsDirty: mockMarkStatsDirty,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -351,6 +357,7 @@ describe("createCallbackHandler", () => {
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("Location")!);
     expect(location.searchParams.get("error")).toBe("testplatform_token_exchange");
+    expect(mockMarkStatsDirty).not.toHaveBeenCalled();
   });
 
   it("redirects with error=testplatform_user_fetch when user fetch fails", async () => {
@@ -361,6 +368,7 @@ describe("createCallbackHandler", () => {
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("Location")!);
     expect(location.searchParams.get("error")).toBe("testplatform_user_fetch");
+    expect(mockMarkStatsDirty).not.toHaveBeenCalled();
   });
 
   it("redirects with error=testplatform_storage when DB upsert fails", async () => {
@@ -371,6 +379,7 @@ describe("createCallbackHandler", () => {
     expect(res.status).toBe(307);
     const location = new URL(res.headers.get("Location")!);
     expect(location.searchParams.get("error")).toBe("testplatform_storage");
+    expect(mockMarkStatsDirty).not.toHaveBeenCalled();
   });
 
   it("redirects to /u/{handle}?testplatform=linked on success", async () => {
@@ -420,6 +429,7 @@ describe("createCallbackHandler", () => {
 
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
   });
 
   it("invalidates the rendered badge SVG cache on success (#856)", async () => {
@@ -428,6 +438,12 @@ describe("createCallbackHandler", () => {
     expect(mockCacheDel).toHaveBeenCalledWith(
       expect.stringMatching(/^badge:.*:testuser:warm-amber:/),
     );
+  });
+
+  it("marks stats dirty after successful link storage", async () => {
+    await GET(makeCallbackRequest({ code: "abc", state: "xyz" }));
+
+    expect(mockMarkStatsDirty).toHaveBeenCalledWith("testuser");
   });
 
   it("clears CSRF state cookie on success", async () => {
@@ -521,6 +537,7 @@ describe("createDisconnectHandler", () => {
 
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
   });
 
   it("clears supplemental EMU data on disconnect", async () => {
@@ -537,6 +554,12 @@ describe("createDisconnectHandler", () => {
     );
   });
 
+  it("marks stats dirty when DB delete succeeds", async () => {
+    await POST(makeRequest());
+
+    expect(mockMarkStatsDirty).toHaveBeenCalledWith("testuser");
+  });
+
   it("returns { success: false } when DB delete fails", async () => {
     mockDbDeleteLinkedPlatform.mockResolvedValue(false);
 
@@ -545,6 +568,7 @@ describe("createDisconnectHandler", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(false);
+    expect(mockMarkStatsDirty).not.toHaveBeenCalled();
   });
 
   it("still invalidates cache even when DB delete fails", async () => {
@@ -554,6 +578,7 @@ describe("createDisconnectHandler", () => {
 
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:merged:testuser");
     expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser");
+    expect(mockCacheDel).toHaveBeenCalledWith("stats:v2:testplatform:testuser:neg");
     expect(mockCacheDel).toHaveBeenCalledWith("supplemental:testuser");
   });
 });
