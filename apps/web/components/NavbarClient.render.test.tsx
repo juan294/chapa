@@ -46,6 +46,22 @@ vi.mock("./LanguageSwitcher", () => ({
   LanguageSwitcher: () => <div data-testid="language-switcher">LanguageSwitcher</div>,
 }));
 
+vi.mock("./MobileNav", () => ({
+  MobileNav: ({ links }: { links: Array<{ label: string; href: string }> }) => (
+    <div data-testid="mobile-nav">
+      {links.map((l) => (
+        <span key={l.href} data-testid={`mobile-link-${l.href}`}>{l.label}</span>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock("./NavLink", () => ({
+  NavLink: ({ label, href }: { label: string; href: string }) => (
+    <a href={href} data-testid={`nav-link-${href}`}>{label}</a>
+  ),
+}));
+
 beforeEach(() => {
   mockUseSession.mockReturnValue({ session: null, loading: false, invalidate: vi.fn() });
 });
@@ -127,5 +143,25 @@ describe("NavbarClient", () => {
 
     expect(screen.getByText("login")).toBeDefined();
     expect(screen.queryByTestId("user-menu")).toBeNull();
+  });
+
+  // ─── Nav links locale awareness ───────────────────────────────────────
+
+  it("shows dictionary-translated labels for nav links, not raw prop labels", () => {
+    // Simulate server passing Spanish nav links as props (force-static was Spanish)
+    const spanishLinks = [
+      { label: "Funciones", href: "#features" },
+      { label: "Cómo funciona", href: "#how-it-works" },
+    ];
+    render(<NavbarClient navLinks={spanishLinks} />);
+    // Test env has no LanguageProvider → useTranslation falls back to English dictionary
+    // So nav links should render English labels, not the Spanish prop values
+    expect(screen.getByTestId("nav-link-#features").textContent).toBe("Features");
+    expect(screen.queryByText("Funciones")).toBeNull();
+  });
+
+  it("does not show nav links when navLinks prop is omitted", () => {
+    render(<NavbarClient />);
+    expect(screen.queryByTestId("nav-link-#features")).toBeNull();
   });
 });

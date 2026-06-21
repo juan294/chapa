@@ -22,11 +22,13 @@ describe("Landing page (server component)", () => {
     });
   });
 
-  describe("static/ISR rendering (no per-request APIs)", () => {
-    it("is static/ISR with force-static directive", () => {
+  describe("dynamic rendering (locale-aware per-request)", () => {
+    it("does not use force-static (page is dynamic to read locale cookie)", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
+    });
+
+    it("does not use force-dynamic directive", () => {
       expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
-      expect(SOURCE).toContain("export const revalidate");
-      expect(SOURCE).toContain("export const dynamic = 'force-static'");
     });
   });
 
@@ -88,9 +90,9 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("getServerT");
     });
 
-    it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
-      expect(SOURCE).not.toContain("getServerLocale");
-      expect(SOURCE).toContain("DEFAULT_LOCALE");
+    it("uses getServerLocale() to detect locale from cookie at request time", () => {
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).not.toContain("DEFAULT_LOCALE");
     });
 
     it("renders LocaleSync for sticky lang override", () => {

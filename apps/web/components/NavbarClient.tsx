@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { UserMenu } from "./UserMenu";
 import { ThemeToggle } from "./ThemeToggle";
@@ -28,6 +29,16 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   const { session } = useSession();
   const { t } = useTranslation();
 
+  // Re-derive nav link labels from the active locale's dictionary so they
+  // update immediately when the user switches languages, without waiting for
+  // a full RSC refresh. The prop is only used as a signal that nav links
+  // should be shown on this page; the translated labels always come from t().
+  const resolvedNavLinks = useMemo<NavLinkItem[] | undefined>(() => {
+    if (!navLinks || navLinks.length === 0) return undefined;
+    const fromLocale = t('landing.navLinks') as unknown as NavLinkItem[];
+    return Array.isArray(fromLocale) && fromLocale.length > 0 ? fromLocale : navLinks;
+  }, [navLinks, t]);
+
   return (
     <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
@@ -39,11 +50,11 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
         </Link>
 
         {/* Center: Command hints (desktop) */}
-        {navLinks && navLinks.length > 0 && (
+        {resolvedNavLinks && (
           <div className="hidden md:flex items-center gap-4 font-heading text-xs text-terminal-dim">
-            {navLinks.map((link) => (
+            {resolvedNavLinks.map((link) => (
               <NavLink
-                key={link.label}
+                key={link.href}
                 href={link.href}
                 label={link.label}
                 className="transition-colors hover:text-text-secondary"
@@ -53,8 +64,8 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
         )}
 
         {/* Mobile nav toggle */}
-        {navLinks && navLinks.length > 0 && (
-          <MobileNav links={navLinks} />
+        {resolvedNavLinks && (
+          <MobileNav links={resolvedNavLinks} />
         )}
 
         {/* Right: Language switcher + Theme toggle + User or login */}
