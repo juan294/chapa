@@ -132,6 +132,21 @@ describe("getStats", () => {
     expect(mockFetchStatsData).not.toHaveBeenCalled();
   });
 
+  it("does not write caches or user registry in read-only mode", async () => {
+    const githubStats = makeStats();
+    setupCacheMiss(githubStats);
+
+    const result = await getStats("test-user", undefined, { readOnly: true });
+
+    expect(result).toEqual(githubStats);
+    expect(mockFetchStatsData).toHaveBeenCalledWith("test-user", undefined);
+    expect(mockFetchBitbucketIfLinked).not.toHaveBeenCalled();
+    expect(mockFetchCodebergIfLinked).not.toHaveBeenCalled();
+    expect(mockFetchGitlabIfLinked).not.toHaveBeenCalled();
+    expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+  });
+
   it("enriches cached stats with linkedPlatformLogins when missing", async () => {
     // Simulate pre-deploy cached data: has linkedPlatforms but no linkedPlatformLogins
     const cached = makeStats({
@@ -184,6 +199,22 @@ describe("getStats", () => {
       expect.objectContaining({ linkedPlatformLogins: { bitbucket: "bb-user" } }),
       expect.any(Number),
     );
+  });
+
+  it("PE-L2: does not backfill enriched stats in read-only mode", async () => {
+    const cached = makeStats({
+      linkedPlatforms: ["bitbucket"],
+    });
+    mockCacheGet.mockResolvedValue(cached);
+    mockDbGetLinkedPlatform.mockResolvedValue({
+      remoteLogin: "bb-user",
+      tokens: { accessToken: "t", refreshToken: null, expiresAt: null },
+    });
+
+    const result = await getStats("test-user", undefined, { readOnly: true });
+
+    expect(result!.linkedPlatformLogins).toEqual({ bitbucket: "bb-user" });
+    expect(mockCacheSet).not.toHaveBeenCalled();
   });
 
   it("PE-L2: does not backfill the cache when no logins are found", async () => {

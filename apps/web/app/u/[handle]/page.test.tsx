@@ -173,7 +173,9 @@ describe("SharePage /u/[handle]", () => {
   it("renders the inline badge from displayImpact, not rawImpact", async () => {
     await renderPage();
 
-    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser");
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
+      readOnly: false,
+    });
     expect(mockRenderBadgeSvg).toHaveBeenCalledWith(
       FAKE_MATERIALIZED.stats,
       FAKE_MATERIALIZED.displayImpact,
@@ -202,7 +204,11 @@ describe("SharePage /u/[handle]", () => {
   it("does not register side effects in read-only smoke mode", async () => {
     await SharePageContent({ handle: "testuser", readOnly: true });
 
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
+      readOnly: true,
+    });
     expect(mockRenderBadgeSvg).toHaveBeenCalled();
+    expect(mockGetAvatarBase64).not.toHaveBeenCalled();
     expect(mockAfter).not.toHaveBeenCalled();
     expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
   });
