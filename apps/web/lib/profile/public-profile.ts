@@ -61,8 +61,14 @@ function buildVerificationRecord(
 export async function runPublicProfileSideEffects(
   handle: string,
   materialized: MaterializedProfile,
-  options: { verification?: PublicVerificationCode | null } = {},
+  options: {
+    verification?: PublicVerificationCode | null;
+    readOnly?: boolean;
+    sendFirstBadgeNotification?: boolean;
+  } = {},
 ): Promise<void> {
+  if (options.readOnly) return;
+
   // Deduplication guard: once-per-day SETNX key prevents duplicate Supabase
   // writes when the CDN misses and multiple edge nodes hit the origin in parallel.
   // Only the explicit duplicate case should skip work; Redis outages must fail open.
@@ -89,7 +95,9 @@ export async function runPublicProfileSideEffects(
   }
 
   ops.push(trackBadgeGenerated(handle));
-  ops.push(notifyFirstBadge(handle, materialized.displayImpact));
+  if (options.sendFirstBadgeNotification) {
+    ops.push(notifyFirstBadge(handle, materialized.displayImpact));
+  }
   ops.push(
     (async () => {
       // #826 — replace today's row when inputs changed; otherwise insert and

@@ -31,6 +31,7 @@ import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 
 const BASE_URL = getBaseUrl();
+const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
 
 interface SharePageProps {
   params: Promise<{ handle: string }>;
@@ -80,6 +81,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const { handle } = await params;
   const resolvedSearch = searchParams ? await searchParams : {};
   const queryLang = typeof resolvedSearch.lang === "string" ? resolvedSearch.lang : null;
+  const readOnly = resolvedSearch[READ_ONLY_SMOKE_PARAM] === "1";
 
   if (!isValidHandle(handle)) {
     notFound();
@@ -89,7 +91,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
     <main id="main-content" className="min-h-screen bg-bg">
       <LocaleSync queryLang={queryLang} />
       <Suspense fallback={<BadgeSkeleton />}>
-        <SharePageContent handle={handle} />
+        <SharePageContent handle={handle} readOnly={readOnly} />
       </Suspense>
       {/* Progressive disclosure (#783): the terminal command bar is demoted to a
           subtle, opt-in hint so the badge value stays legible to non-developer
@@ -101,7 +103,13 @@ export default async function SharePage({ params, searchParams }: SharePageProps
 
 /** Data-dependent content — streams after shell via Suspense. */
 /** @internal Exported for tests — use SharePage as the page component. */
-export async function SharePageContent({ handle }: { handle: string }) {
+export async function SharePageContent({
+  handle,
+  readOnly = false,
+}: {
+  handle: string;
+  readOnly?: boolean;
+}) {
   // ISR: No dynamic request APIs (next headers/cookies) are called.
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
@@ -154,7 +162,7 @@ export async function SharePageContent({ handle }: { handle: string }) {
   // and the badge.svg route can hit the cache. We deliberately do NOT
   // cache renders that fell back to a placeholder avatar — that would
   // poison the shared cache with a degraded SVG for up to 24h. (#800)
-  if (materialized && inlineSvg) {
+  if (materialized && inlineSvg && !readOnly) {
     const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
     after(() => {
       if (svgToCache) {

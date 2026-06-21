@@ -170,7 +170,7 @@ describe("runPublicProfileSideEffects", () => {
       }),
     );
     expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
-    expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", materialized.displayImpact);
+    expect(mockNotifyFirstBadge).not.toHaveBeenCalled();
     expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
     expect(mockUpdateSnapshotCache).toHaveBeenCalledWith("testuser", materialized.snapshot);
     expect(mockDbUpsertUser).toHaveBeenCalledWith("testuser", {
@@ -210,6 +210,33 @@ describe("runPublicProfileSideEffects", () => {
 
     expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
     expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
+  });
+
+  it("skips every persistent write in read-only mode", async () => {
+    const materialized = makeMaterializedProfile();
+
+    await runPublicProfileSideEffects("testuser", materialized, {
+      readOnly: true,
+    });
+
+    expect(mockCacheSetNxStatus).not.toHaveBeenCalled();
+    expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+    expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
+    expect(mockNotifyFirstBadge).not.toHaveBeenCalled();
+    expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+    expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
+    expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
+    expect(mockDbUpsertUser).not.toHaveBeenCalled();
+  });
+
+  it("sends the first-badge notification only when explicitly requested", async () => {
+    const materialized = makeMaterializedProfile();
+
+    await runPublicProfileSideEffects("testuser", materialized, {
+      sendFirstBadgeNotification: true,
+    });
+
+    expect(mockNotifyFirstBadge).toHaveBeenCalledWith("testuser", materialized.displayImpact);
   });
 
   it("skips dbUpsertUser when displayName and avatarUrl are both absent", async () => {
@@ -256,7 +283,7 @@ describe("runPublicProfileSideEffects", () => {
 
       expect(mockStoreVerificationRecord).toHaveBeenCalled();
       expect(mockTrackBadgeGenerated).toHaveBeenCalled();
-      expect(mockNotifyFirstBadge).toHaveBeenCalled();
+      expect(mockNotifyFirstBadge).not.toHaveBeenCalled();
       expect(mockDbInsertSnapshot).toHaveBeenCalled();
       expect(mockDbUpsertUser).toHaveBeenCalled();
     });
