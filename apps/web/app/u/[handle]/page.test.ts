@@ -75,9 +75,10 @@ describe("SharePage", () => {
   // #230 — badge img must have fetchpriority="high" (LCP element)
   describe("badge img fetchpriority", () => {
     it("has fetchpriority=\"high\" on the badge img tag", () => {
-      // Find the JSX <img that contains badge.svg (multi-line JSX with \n between attrs)
-      // Use \n after <img to distinguish from the single-line embed HTML string
-      const imgMatch = SOURCE.match(/<img\n[\s\S]*?badge\.svg[\s\S]*?\/>/);
+      expect(SOURCE).toContain("badgeImageSrc");
+      expect(SOURCE).toContain("badge.svg?");
+      // Find the fallback badge JSX <img (multi-line JSX with \n between attrs).
+      const imgMatch = SOURCE.match(/<img\n[\s\S]*?src=\{badgeImageSrc\}[\s\S]*?\/>/);
       expect(imgMatch).not.toBeNull();
       expect(imgMatch![0]).toContain('fetchPriority="high"');
     });

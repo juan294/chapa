@@ -116,9 +116,24 @@ describe("materializePublicProfile", () => {
     expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
       today: undefined,
+      readOnly: undefined,
       policy: "public-display",
     });
     expect(result).toBe(materialized);
+  });
+
+  it("passes read-only mode to the shared materializer", async () => {
+    const materialized = makeMaterializedProfile();
+    mockMaterializeProfile.mockResolvedValue(materialized);
+
+    await materializePublicProfile("testuser", { readOnly: true });
+
+    expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
+      token: undefined,
+      today: undefined,
+      readOnly: true,
+      policy: "public-display",
+    });
   });
 });
 

@@ -19,11 +19,12 @@ export interface PublicVerificationCode {
 
 export async function materializePublicProfile(
   handle: string,
-  options: { token?: string; today?: string } = {},
+  options: { token?: string; today?: string; readOnly?: boolean } = {},
 ): Promise<MaterializedProfile | null> {
   return materializeProfile(handle, {
     token: options.token,
     today: options.today,
+    readOnly: options.readOnly,
     policy: "public-display",
   });
 }

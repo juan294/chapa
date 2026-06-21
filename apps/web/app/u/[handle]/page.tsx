@@ -114,7 +114,7 @@ export async function SharePageContent({
   // Session is checked client-side via SharePageOwnerContent and NavbarClient.
   // Stats fetch uses env GITHUB_TOKEN fallback (no per-user OAuth token).
 
-  const materialized = await materializePublicProfile(handle);
+  const materialized = await materializePublicProfile(handle, { readOnly });
   const stats = materialized?.stats ?? null;
   const impact = materialized?.displayImpact ?? null;
   const verification = materialized
@@ -138,7 +138,7 @@ export async function SharePageContent({
     // TTFB. The /u/[handle]/badge.svg route awaits the avatar fully on its
     // own first render and writes the avatar-bearing SVG to the same
     // cache, so warm visits to the share page get the real avatar.
-    const avatarPromise = stats.avatarUrl
+    const avatarPromise = !readOnly && stats.avatarUrl
       ? getAvatarBase64(handle, stats.avatarUrl).catch(() => undefined)
       : Promise.resolve(undefined);
     const AVATAR_DEADLINE_MS = 250;
@@ -173,6 +173,11 @@ export async function SharePageContent({
   }
 
   const badgeCacheBuster = stats?.fetchedAt ?? new Date().toISOString();
+  const badgeSrcParams = new URLSearchParams({
+    v: badgeCacheBuster,
+    ...(readOnly ? { [READ_ONLY_SMOKE_PARAM]: "1" } : {}),
+  });
+  const badgeImageSrc = `/u/${encodeURIComponent(handle)}/badge.svg?${badgeSrcParams.toString()}`;
 
   const embedMarkdown = `![Chapa Badge](https://chapa.thecreativetoken.com/u/${handle}/badge.svg)`;
 
@@ -238,7 +243,7 @@ export async function SharePageContent({
                 <BadgeSkeleton />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/u/${encodeURIComponent(handle)}/badge.svg?v=${encodeURIComponent(badgeCacheBuster)}`}
+                  src={badgeImageSrc}
                   alt={interpolate(t("sharePage.badgeAlt") as string, { handle })}
                   width={1200}
                   height={630}
