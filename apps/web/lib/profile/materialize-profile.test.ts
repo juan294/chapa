@@ -188,11 +188,27 @@ describe("materializeProfile", () => {
       today: "2026-04-17",
     });
 
-    expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token");
+    expect(mockGetStats).toHaveBeenCalledWith("testuser", "oauth-token", {
+      readOnly: undefined,
+    });
     expect(mockGetCachedCraftScore).toHaveBeenCalledWith("testuser");
     expect(result?.craftResult).toEqual(craftResult);
     // Regression: stored craft must not be mutated by a refresh/read.
     // (No dbRecomputeCraft path exists anymore.)
+  });
+
+  it("passes read-only mode to the stats loader", async () => {
+    const stats = makeFullStats({ handle: "testuser" });
+    mockGetStats.mockResolvedValue(stats);
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(null);
+    mockIsStatsDirty.mockResolvedValue(false);
+
+    await materializeProfile("testuser", { readOnly: true });
+
+    expect(mockGetStats).toHaveBeenCalledWith("testuser", undefined, {
+      readOnly: true,
+    });
   });
 
   it("tolerates craft and snapshot loader failures for public consumers", async () => {

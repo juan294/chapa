@@ -39,6 +39,7 @@ export interface MaterializedImpactState {
 export interface MaterializeProfileOptions
   extends Omit<MaterializeImpactStateOptions, "craftResult" | "latestSnapshot"> {
   token?: string;
+  readOnly?: boolean;
 }
 
 export interface MaterializedProfile extends MaterializedImpactState {
@@ -80,7 +81,7 @@ export async function materializeProfile(
   // the whole profile fetch.
   const [statsSettled, craftSettled, snapshotSettled, dirtySettled] =
     await Promise.allSettled([
-      getStats(handle, options.token),
+      getStats(handle, options.token, { readOnly: options.readOnly }),
       getCachedCraftScore(handle),
       getCachedLatestSnapshot(handle),
       isStatsDirty(handle),

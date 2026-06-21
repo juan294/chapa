@@ -261,6 +261,22 @@ describe("Phase 4d — Share page i18n", () => {
       const jsxString = JSON.stringify(result);
       expect(jsxString).toContain("Tu Impacto, Decodificado");
     });
+
+    it("keeps fallback badge image requests read-only in smoke mode", async () => {
+      mockRenderBadgeSvg.mockReturnValue("");
+
+      const result = await SharePageContent({
+        handle: "testuser",
+        readOnly: true,
+      });
+      const jsxString = JSON.stringify(result);
+
+      expect(jsxString).toContain("/u/testuser/badge.svg?");
+      expect(jsxString).toContain("__chapa_smoke=1");
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
+    });
   });
 
   describe("page.tsx source — LocaleSync mount", () => {

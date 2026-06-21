@@ -184,6 +184,7 @@ describe("GET /u/[handle]/badge.svg", () => {
 
     expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
       token: "oauth-token",
+      readOnly: false,
     });
   });
 
@@ -239,6 +240,10 @@ describe("GET /u/[handle]/badge.svg", () => {
     );
     await GET(req, ctx);
 
+    expect(mockMaterializePublicProfile).toHaveBeenCalledWith("testuser", {
+      token: undefined,
+      readOnly: true,
+    });
     expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
@@ -248,6 +253,7 @@ describe("GET /u/[handle]/badge.svg", () => {
       },
     );
     expect(mockCacheSet).not.toHaveBeenCalled();
+    expect(mockGetAvatarBase64).not.toHaveBeenCalled();
   });
 
   it("falls back to an undefined avatar when avatar fetch fails", async () => {

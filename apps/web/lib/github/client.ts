@@ -47,16 +47,24 @@ export function _resetInflight(): void {
 export async function getStats(
   handle: string,
   token?: string,
+  options: { readOnly?: boolean } = {},
 ): Promise<StatsData | null> {
   const lowerHandle = handle.toLowerCase();
   const cacheKey = `stats:v2:merged:${lowerHandle}`;
-  const publicInflightKey = `${lowerHandle}:public`;
-  const authenticatedInflightKey = `${lowerHandle}:authenticated`;
+  const mode = options.readOnly ? "readonly" : "write";
+  const publicInflightKey = `${lowerHandle}:public:${mode}`;
+  const authenticatedInflightKey = `${lowerHandle}:authenticated:${mode}`;
   const inflightKey = token ? authenticatedInflightKey : publicInflightKey;
 
   // Try primary cache first (no dedup needed for cache hits)
   const cached = await cacheGet<StatsData>(cacheKey);
-  if (cached) return _enrichWithLogins(cached, handle, cacheKey);
+  if (cached) {
+    return _enrichWithLogins(
+      cached,
+      handle,
+      options.readOnly ? undefined : cacheKey,
+    );
+  }
 
   // Public callers can share an authenticated fetch. Authenticated callers
   // must not reuse a weaker public fetch.
@@ -70,7 +78,9 @@ export async function getStats(
   // even if the underlying fetch hangs indefinitely (e.g. GitHub never responds).
   // A timed-out promise resolves to null via the catch below, which causes the
   // caller to fall back to stale cache exactly as a failed API call would.
-  const rawPromise = _fetchAndCache(handle, lowerHandle, cacheKey, token);
+  const rawPromise = _fetchAndCache(handle, lowerHandle, cacheKey, token, {
+    readOnly: options.readOnly,
+  });
   const promise = withTimeout(rawPromise, INFLIGHT_TIMEOUT_MS, `getStats(${handle})`).catch(
     (err) => {
       console.error(`[github] inflight fetch timed out for ${handle}:`, err);
@@ -139,6 +149,7 @@ async function _fetchAndCache(
   lowerHandle: string,
   cacheKey: string,
   token?: string,
+  options: { readOnly?: boolean } = {},
 ): Promise<StatsData | null> {
   const staleKey = `stats:stale:${lowerHandle}`;
 
@@ -157,11 +168,17 @@ async function _fetchAndCache(
   }
 
   // Fetch Bitbucket + Codeberg + GitLab in parallel — error in one must not block the others
-  const [bbResult, cbResult, glResult] = await Promise.allSettled([
-    fetchBitbucketIfLinked(handle, lowerHandle),
-    fetchCodebergIfLinked(handle, lowerHandle),
-    fetchGitlabIfLinked(handle, lowerHandle),
-  ]);
+  const [bbResult, cbResult, glResult] = options.readOnly
+    ? [
+        { status: "fulfilled", value: null },
+        { status: "fulfilled", value: null },
+        { status: "fulfilled", value: null },
+      ] as const
+    : await Promise.allSettled([
+        fetchBitbucketIfLinked(handle, lowerHandle),
+        fetchCodebergIfLinked(handle, lowerHandle),
+        fetchGitlabIfLinked(handle, lowerHandle),
+      ]);
 
   const bbStats = bbResult.status === "fulfilled" ? bbResult.value : null;
   const cbStats = cbResult.status === "fulfilled" ? cbResult.value : null;
@@ -193,10 +210,12 @@ async function _fetchAndCache(
     const persisted = await dbGetSupplemental(lowerHandle);
     if (persisted) {
       supplemental = persisted;
-      fireAndForget(
-        () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
-        () => undefined,
-      );
+      if (!options.readOnly) {
+        fireAndForget(
+          () => cacheSet(supplementalKey, persisted, SUPPLEMENTAL_TTL),
+          () => undefined,
+        );
+      }
     }
   }
   if (supplemental) {
@@ -240,6 +259,10 @@ async function _fetchAndCache(
       linkedPlatforms,
       ...(Object.keys(linkedPlatformLogins).length > 0 && { linkedPlatformLogins }),
     };
+  }
+
+  if (options.readOnly) {
+    return stats;
   }
 
   // Cache the final (possibly merged) result — both primary and stale fallback

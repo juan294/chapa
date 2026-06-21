@@ -225,7 +225,10 @@ export async function GET(
       }
     }
 
-    const materialized = await materializePublicProfile(handle, { token });
+    const materialized = await materializePublicProfile(handle, {
+      token,
+      readOnly,
+    });
     if (!materialized) {
       const fallbackResult = {
         svg: fallbackSvg(handle, "Could not load data — try again later."),
@@ -238,7 +241,7 @@ export async function GET(
       return new NextResponse(fallbackResult.svg, { headers: fallbackResult.headers });
     }
 
-    const avatarDataUri = materialized.stats.avatarUrl
+    const avatarDataUri = !readOnly && materialized.stats.avatarUrl
       ? await getAvatarBase64(handle, materialized.stats.avatarUrl).catch(() => undefined)
       : undefined;
     const verification = getPublicProfileVerification(materialized);
