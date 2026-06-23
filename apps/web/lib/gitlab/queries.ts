@@ -76,59 +76,51 @@ export async function fetchGitlabContributionData(
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    // 1. Heatmap reconstructed from the Events API (no native endpoint).
-    const events = await fetchEvents(userId, accessToken, controller.signal);
-    if (events === null) return null; // Auth failed
-    const heatmap = bucketEventsByDate(events);
+    // 1. Heatmap (events) and merged MRs are independent — fetch concurrently.
+    // mrs caps at MAX_PRS inside fetchMergedMRs.
+    // Null from either means auth failure / rate-limit → abort everything.
+    const [eventsResult, mrsResult, reviewsResult, closedIssuesResult, projectsResult] =
+      await Promise.all([
+        fetchEvents(userId, accessToken, controller.signal),
+        fetchMergedMRs(username, accessToken, controller.signal),
+        fetchReviewsCount(username, accessToken, controller.signal),
+        fetchClosedIssuesCount(username, accessToken, controller.signal),
+        fetchUserProjects(userId, accessToken, controller.signal),
+      ]);
 
-    // 2. Merged MRs authored by the user (global scope — no per-project loop).
-    // Null means upstream failure/rate-limit; return null so callers can serve
-    // stale platform stats rather than caching a heatmap-only partial profile.
-    const mrs = await fetchMergedMRs(username, accessToken, controller.signal);
-    if (mrs === null) return null;
+    if (
+      eventsResult === null ||
+      mrsResult === null ||
+      reviewsResult === null ||
+      closedIssuesResult === null ||
+      projectsResult === null
+    ) {
+      return null;
+    }
 
-    // 3. Per-MR diffstat + per-project merged-MR counts.
-    // mrs is already capped at MAX_PRS by fetchMergedMRs.
-    const mergedPRs: GitlabMrDiffStat[] = [];
+    const heatmap = bucketEventsByDate(eventsResult);
+
+    // 2. Per-project commit counts (pure — no I/O).
     const projectCommitCounts = new Map<number, number>();
-    for (const mr of mrs) {
+    for (const mr of mrsResult) {
       projectCommitCounts.set(
         mr.project_id,
         (projectCommitCounts.get(mr.project_id) ?? 0) + 1,
       );
-      const stat = await fetchMrDiffStat(
-        mr.project_id,
-        mr.iid,
-        accessToken,
-        controller.signal,
-      );
-      mergedPRs.push(stat ?? { additions: 0, deletions: 0, changed_files: 0 });
     }
 
-    // 4. Reviews — others' MRs the user approved (0 if approvals are Premium-gated).
-    const reviewsCount = await fetchReviewsCount(
-      username,
-      accessToken,
-      controller.signal,
+    // 3. Per-MR diffstats — fetch all in parallel (#928).
+    // Each failure is treated as a zero-stat MR (same behaviour as before,
+    // just concurrent instead of sequential).
+    const diffStats = await Promise.all(
+      mrsResult.map((mr) =>
+        fetchMrDiffStat(mr.project_id, mr.iid, accessToken, controller.signal).then(
+          (stat) => stat ?? { additions: 0, deletions: 0, changed_files: 0 },
+        ),
+      ),
     );
-    if (reviewsCount === null) return null;
 
-    // 5. Closed issues authored by the user.
-    const closedIssues = await fetchClosedIssuesCount(
-      username,
-      accessToken,
-      controller.signal,
-    );
-    if (closedIssues === null) return null;
-
-    // 6. Owned/member projects for social metrics + depth proxy.
-    const projects = await fetchUserProjects(
-      userId,
-      accessToken,
-      controller.signal,
-    );
-    if (projects === null) return null;
-    const repos = projects.map((p) => {
+    const repos = projectsResult.map((p) => {
       const isOwned = p.namespace?.path === username;
       return {
         fullName: p.path_with_namespace,
@@ -145,9 +137,9 @@ export async function fetchGitlabContributionData(
       displayName: profile.displayName,
       avatarUrl: profile.avatarUrl,
       heatmap,
-      mergedPRs,
-      reviewsCount,
-      closedIssues,
+      mergedPRs: diffStats,
+      reviewsCount: reviewsResult,
+      closedIssues: closedIssuesResult,
       repos,
     };
   } catch {
