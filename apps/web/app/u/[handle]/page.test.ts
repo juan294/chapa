@@ -23,8 +23,12 @@ describe("SharePage", () => {
 
   // W4 — h2 elements must use font-heading per design system
   describe("design system typography", () => {
-    it("h2 elements include font-heading class", () => {
-      const h2Matches = SOURCE.match(/<h2[^>]*>/g) ?? [];
+    it("SharePageH2 h2 includes font-heading class", () => {
+      const h2Source = fs.readFileSync(
+        path.resolve(__dirname, "SharePageH2.tsx"),
+        "utf-8",
+      );
+      const h2Matches = h2Source.match(/<h2[^>]*>/g) ?? [];
       expect(h2Matches.length).toBeGreaterThan(0);
       for (const h2 of h2Matches) {
         expect(h2).toContain("font-heading");
