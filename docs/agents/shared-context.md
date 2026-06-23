@@ -213,22 +213,22 @@
 - [Security]: No security doc gaps. All env vars (`CHAPA_ALERT_WEBHOOK_URL`, `ADMIN_SECRET`, `CRON_SECRET`, `CHAPA_VERIFICATION_SECRET`, `RESEND_WEBHOOK_SECRET`) documented; `NEXT_PUBLIC_*` vars confirmed non-sensitive. SDK-internal env names surfaced by grep (`SUPABASE_SECRET_KEY`, `RESEND_BASE_URL`, `KV_REST_API_*`, `ICEBERG_TOKEN`) are Next.js / library bundled references, not real app config.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=security timestamp=2026-05-25T07:00:00Z -->
-## Security Scanner — 2026-05-25
-- **Status**: YELLOW
-- Vulnerabilities: 0 critical / 0 high / **1 moderate** (`brace-expansion` 5.0.5 via eslint > minimatch, GHSA-jxxr-4gwj-5jf2, CVE-2026-45149) / 0 low
-- Secret leaks: **none** in production source (`NEXT_PUBLIC_*` secret-prefix scan: 0 matches; literal-key grep: only tests and `docs/cli-guide.md`)
-- License issues: **none** — MPL-2.0 (`@resvg/resvg-js`, `lightningcss`) and LGPL-3.0 (`@img/sharp-libvips-darwin-arm64`, dynamically linked) covered in `docs/accepted-risks.md`. No GPL/AGPL.
-- RLS: 11/11 tables ENABLE + FORCE RLS; deny-all-anon policies intact (`025_force_supplemental_stats_rls.sql` confirmed).
-- CORS: wildcard scoped to 2 read-only rate-limited GETs (`/api/verify/[hash]`, `/api/profile/[handle]`); `cors-mutation-guard.test.ts` enforces invariant.
-- XSS: all user-input entry points in SVG pipeline routed through `escapeXml()` (`lib/render/escape.ts`); 23 call-sites across BadgeSvg + VerificationStrip + tests.
-- Knip `--production`: 0 findings.
-- `lib/db/supabase.ts:8` server-only boundary holds.
+<!-- ENTRY:START agent=security timestamp=2026-06-22T00:00:00Z -->
+## Security Scanner — 2026-06-22
+- **Status**: GREEN
+- Vulnerabilities: 0 critical / 0 high / 0 moderate / 0 low (pnpm audit clean; all prior overrides effective)
+- Secret leaks: none (no NEXT_PUBLIC_* carries server secrets; no hardcoded keys in production source)
+- License issues: none (no GPL/AGPL; MPL-2.0 + LGPL-3.0 documented in accepted-risks.md)
+- RLS: 10/10 ENABLE + FORCE RLS on all Supabase tables
+- CORS: wildcard scoped to 2 read-only rate-limited GETs only; mutation guard test in place
+- XSS: all 7 SVG user-input fields escaped via escapeXml(); timing-safe HMAC comparisons throughout
+- Knip --production: 9 false positives (all deps in active use via next/dynamic); 0 real unused deps
+- One INFO finding: `server-only` guard missing on 7 auth/verification files (defense-in-depth only, no current exposure)
 
 **Cross-agent recommendations:**
-- [Coverage]: No security-relevant gaps. lib/auth 98.0%, lib/verification 100%, lib/analytics 97.3% per 2026-05-24 entry; all XSS/CORS paths covered.
-- [QA]: No new security UX issues. CORS wildcard remains scoped to read-only endpoints; mutation guard static test in place.
-- [Triage]: One P2 — bump `brace-expansion` transitive to ≥5.0.6 (eslint > minimatch path). Dev tooling, no production exposure, but moderate CVE should be cleared via `pnpm.overrides` or `pnpm up --depth Infinity brace-expansion`.
+- [Coverage]: No security-critical coverage gaps. lib/auth 97.4%, lib/verification 100%, all XSS paths exercised.
+- [QA]: No security UX issues. CORS wildcard scoped; mutation guard invariant test active.
+- [Triage]: P3 only — add `server-only` to 7 auth/verification files and add knip ignoreDependencies entries. No P1/P2 action required.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=security timestamp=2026-06-01T09:00:00Z -->
