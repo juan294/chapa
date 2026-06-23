@@ -129,6 +129,11 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
             token: githubToken,
+            // #930 — Admin recalculates must bypass the EMA same-day lock.
+            // A stored today-snapshot may contain wrong data (e.g. from a
+            // timed-out platform fetch); ignoring it ensures the fresh score
+            // always lands rather than freezing the bad value in place.
+            ignoreSnapshot: true,
           });
 
           if (!materialized) {

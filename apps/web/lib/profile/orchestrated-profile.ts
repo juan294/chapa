@@ -15,12 +15,15 @@ export async function materializeOrchestratedProfile(
   options: {
     token?: string;
     today?: string;
+    /** #930 — Skip the snapshot lookup so admin recalculates always apply the fresh score. */
+    ignoreSnapshot?: boolean;
   } = {},
 ): Promise<MaterializedProfile | null> {
   return materializeProfile(handle, {
     token: options.token,
     today: options.today,
     policy: "public-display",
+    ignoreSnapshot: options.ignoreSnapshot,
   });
 }
 

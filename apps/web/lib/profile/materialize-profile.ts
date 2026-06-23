@@ -40,6 +40,14 @@ export interface MaterializeProfileOptions
   extends Omit<MaterializeImpactStateOptions, "craftResult" | "latestSnapshot"> {
   token?: string;
   readOnly?: boolean;
+  /**
+   * #930 — Skip the snapshot lookup entirely. With no prior snapshot,
+   * EMA smoothing is skipped and the raw adjusted score passes through.
+   * Use for admin bulk-recalculate where the stored today-snapshot may
+   * contain wrong data (e.g. from a timed-out platform fetch) and the
+   * same-day EMA lock would otherwise freeze the bad value in place.
+   */
+  ignoreSnapshot?: boolean;
 }
 
 export interface MaterializedProfile extends MaterializedImpactState {
@@ -83,7 +91,10 @@ export async function materializeProfile(
     await Promise.allSettled([
       getStats(handle, options.token, { readOnly: options.readOnly }),
       getCachedCraftScore(handle),
-      getCachedLatestSnapshot(handle),
+      // #930 — Skip snapshot lookup when the caller wants to force-recalculate
+      // from scratch. Passing Promise.resolve(null) skips the Redis/Supabase
+      // read so the EMA same-day lock never sees a stale today-snapshot.
+      options.ignoreSnapshot ? Promise.resolve(null) : getCachedLatestSnapshot(handle),
       isStatsDirty(handle),
     ]);
 
@@ -95,9 +106,9 @@ export async function materializeProfile(
   const craftResult = craftSettled.status === "fulfilled"
     ? craftSettled.value
     : null;
-  const latestSnapshot = snapshotSettled.status === "fulfilled"
-    ? snapshotSettled.value
-    : null;
+  const latestSnapshot = options.ignoreSnapshot
+    ? null
+    : snapshotSettled.status === "fulfilled" ? snapshotSettled.value : null;
   // Dirty-signal lookup failures fail open — defaulting to false preserves
   // the existing same-day-lock behavior rather than introducing surprise
   // refreshes when Redis hiccups.
