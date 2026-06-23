@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-06-23
+
+### Added
+- **Progressive disclosure on share page (#783)**: badge value is shown as a clear score + tier headline by default; the radar chart and dimension breakdown are revealed behind a "View full profile" hint, reducing first-load cognitive load
+- **Landing page UX (#770 #781)**: CTA button shows a loading spinner during navigation; enterprise-row accent colors are varied per card for visual rhythm
+- **Delete-user tool (#927)**: `pnpm run delete-user <handle>` dry-runs then wipes all Supabase rows and Redis keys for a handle — useful for resetting test accounts or honouring deletion requests. Also available as `/delete-user` skill
+
+### Fixed
+- **GitLab scores always 0 for active users (#928)**: the per-MR diffstat loop and five independent top-level fetches (events, MRs, reviews, issues, projects) were sequential, blowing past the 8 s outer deadline. GitLab activity was silently dropped from the merge and a 0 score was cached. All fetches now run concurrently via `Promise.all`
+- **Language picker active locale (#918 region)**: the locale switcher showed the wrong active locale when page content was statically rendered at the default locale
+- **NEXT_PUBLIC env flags (#918)**: flags read via static `process.env.NEXT_PUBLIC_*` literals so Next.js inlines them at build time; dynamic access prevented client-side env reads from resolving
+- **Landing nav links**: NavbarClient section links were broken after the ISR/static-render refactor (#861)
+
+### Changed
+- **Unified platform fetch stack (#744)**: Bitbucket, Codeberg, and GitLab share a single `fetchLinkedPlatformStats` skeleton (positive cache → negative cache → feature flag → DB link → token refresh → fetch → cache write); per-platform divergence expressed through callbacks only
+- **`StatsData` defaults via `normalizeStats`**: all platform stat builders go through a single normalisation pass, eliminating scattered field defaults and ensuring consistent shape
+- **Frontend consolidation (#745 #756 #774 #780 #516)**: shared icon components, `createModuleStore` hook factory, experiment sub-components extracted from large pages, `rounded-lg` fix applied uniformly
+- **Non-production Vercel builds skipped**: preview deployments on non-develop/main branches are cancelled early to save build minutes
+- **CI**: Lighthouse audit enforced on `/u/:handle`; bundle-size SIGPIPE flake fixed (`sort|awk` instead of `sort|head`); GitHub Security & Quality Alerts scanning added to triage workflow
+- 377 new tests; total test count: 7,967 across 463 files
+
+## [2.12.0] - 2026-06-23
+
+Pre-launch hardening and release readiness.
+
 ## [2.11.0] - 2026-06-19
 
 ### Added
