@@ -513,4 +513,77 @@ describe("fetchGitlabContributionData", () => {
     // Must be strictly less than the total number of eligible MRs (20)
     expect(approverCalls).toBeLessThan(20);
   });
+
+  // ---------------------------------------------------------------------------
+  // #928: GitLab fetch must fit the caller's 8s deadline. The per-MR diffstat
+  // loop and the independent top-level fetches must run concurrently, not
+  // one-at-a-time, or an active GitLab user's fetch times out and their stats
+  // are silently dropped from the score.
+  // ---------------------------------------------------------------------------
+
+  it("#928: fetches per-MR diffstats concurrently, not sequentially", async () => {
+    const manyMRs = Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1,
+      iid: i + 1,
+      project_id: 100,
+      state: "merged",
+      merged_at: "x",
+      author: { username: "gluser" },
+    }));
+
+    let changesInFlight = 0;
+    let maxChangesInFlight = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/changes")) {
+        changesInFlight++;
+        maxChangesInFlight = Math.max(maxChangesInFlight, changesInFlight);
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            changesInFlight--;
+            resolve({
+              ok: true,
+              status: 200,
+              json: () => Promise.resolve({ changes: [{ diff: "+a\n+b" }] }),
+            });
+          }, 5);
+        });
+      }
+      if (url.includes("merge_requests?author_username=gluser")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(manyMRs) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+
+    // Every MR is still counted (count preserved across the parallel fetch).
+    expect(result!.mergedPRs).toHaveLength(12);
+    // Sequential awaits would never have more than one /changes call in flight.
+    expect(maxChangesInFlight).toBeGreaterThan(1);
+  });
+
+  it("#928: runs the independent top-level fetches concurrently", async () => {
+    // No MRs → the only outbound calls are the independent top-level fetches
+    // (events, authored MRs, reviewed MRs, issues, projects). Sequential awaits
+    // would keep these strictly one-at-a-time (max 1 in flight).
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetchMock = vi.fn(() => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          inFlight--;
+          resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+        }, 5);
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+
+    expect(result).not.toBeNull();
+    expect(maxInFlight).toBeGreaterThan(1);
+  });
 });

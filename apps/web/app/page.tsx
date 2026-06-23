@@ -1,13 +1,9 @@
-export const revalidate = 3600;
-export const dynamic = 'force-static';
-
 import { BadgeOverlay } from "@/components/BadgeOverlay";
 import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerT } from "@/lib/i18n/server";
-import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
@@ -68,9 +64,11 @@ export default async function Home({
 }) {
   const { error, lang } = await searchParams;
   const errorMessage = getOAuthErrorMessage(error);
-  // Render at DEFAULT_LOCALE (es) at build time; client LocaleSync swaps to
-  // the user's cookie locale on hydration — same pattern as the share page.
-  const t = getServerT(DEFAULT_LOCALE);
+  // Detect locale from cookie → ?lang= → Accept-Language → 'es' default.
+  // The page is dynamic so the server always renders in the user's actual locale,
+  // and router.refresh() after setLocale() delivers the correct language immediately.
+  const locale = await getServerLocale(lang);
+  const t = getServerT(locale);
 
   const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
 
