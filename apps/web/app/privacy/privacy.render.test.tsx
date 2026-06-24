@@ -15,6 +15,7 @@ vi.mock("@/lib/i18n", () => ({
   LocaleSync: () => null,
 }));
 vi.mock("@/lib/i18n/server", () => ({
+  getServerLocale: vi.fn().mockResolvedValue("en"),
   getServerT: vi.fn().mockReturnValue((key: string) => {
     const dict: Record<string, unknown> = {
       "legal.privacy.h1Before": "Privacy ",
@@ -125,7 +126,7 @@ describe("PrivacyPage", () => {
 });
 
 describe("PrivacyPage generateMetadata", () => {
-  it("returns metadata with title and description (synchronous, no locale param)", async () => {
+  it("returns metadata with title and description", async () => {
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       const dict: Record<string, unknown> = {
         "legal.privacy.metadataTitle": "Privacy Policy",
@@ -136,9 +137,8 @@ describe("PrivacyPage generateMetadata", () => {
       return (dict[key] ?? key) as unknown as string;
     });
 
-    // generateMetadata is synchronous (no async, no locale param)
     const { generateMetadata } = await import("./page");
-    const metadata = generateMetadata();
+    const metadata = await generateMetadata();
     expect(metadata.title).toBe("Privacy Policy");
     expect(metadata.description).toContain("Privacy Policy for Chapa");
   });

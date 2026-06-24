@@ -1,6 +1,5 @@
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
-import { getServerT } from "@/lib/i18n/server";
-import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { LocaleSync } from "@/lib/i18n";
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
@@ -43,9 +42,8 @@ interface Props {
 }
 
 export async function ArchetypePage({ archetypeKey }: Props) {
-  // Render at DEFAULT_LOCALE (es) at build time; client LocaleSync swaps to
-  // the user's cookie locale on hydration — same pattern as the share page.
-  const t = getServerT(DEFAULT_LOCALE);
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
   const ns = `archetypes.${archetypeKey}`;
 
   const demoData = DEMO_DATA[archetypeKey];

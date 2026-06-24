@@ -300,7 +300,7 @@ describe("AboutPage render (es)", () => {
 });
 
 describe("generateMetadata (about/index)", () => {
-  it("returns DEFAULT_LOCALE (es) title synchronously (ISR — no per-request locale)", async () => {
+  it("returns locale-aware metadata", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       if (key === "about.index.metadataTitle") return "Acerca de";
@@ -312,7 +312,7 @@ describe("generateMetadata (about/index)", () => {
       return key;
     });
     const { generateMetadata } = await import("./page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("Acerca de");
   });
 });

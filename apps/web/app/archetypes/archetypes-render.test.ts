@@ -27,11 +27,11 @@ describe("Archetype pages — render tests", () => {
       );
 
       describe("metadata", () => {
-        it("exports generateMetadata using DEFAULT_LOCALE (no getServerLocale)", () => {
+        it("exports generateMetadata using getServerLocale() for per-request locale", () => {
           expect(source).toContain("generateMetadata");
-          expect(source).not.toContain("getServerLocale");
+          expect(source).toContain("getServerLocale");
           expect(source).toContain("getServerT");
-          expect(source).toContain("DEFAULT_LOCALE");
+          expect(source).not.toContain("DEFAULT_LOCALE");
         });
 
         it("uses i18n key for title and description", () => {
@@ -57,11 +57,10 @@ describe("Archetype pages — render tests", () => {
         });
       });
 
-      describe("static/ISR rendering", () => {
-        it("is static/ISR with force-static directive", () => {
+      describe("dynamic rendering (locale-aware per-request)", () => {
+        it("does not use force-static (page must read locale cookie)", () => {
+          expect(source).not.toContain("export const dynamic = 'force-static'");
           expect(source).not.toContain("force-dynamic");
-          expect(source).toContain("revalidate");
-          expect(source).toContain("export const dynamic = 'force-static'");
         });
       });
 
@@ -84,9 +83,9 @@ describe("ArchetypePage shared component", () => {
     expect(source).toContain("renderBadgeSvg");
   });
 
-  it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
-    expect(source).not.toContain("getServerLocale");
-    expect(source).toContain("DEFAULT_LOCALE");
+  it("uses getServerLocale() for per-request locale detection", () => {
+    expect(source).toContain("getServerLocale");
+    expect(source).not.toContain("DEFAULT_LOCALE");
     expect(source).toContain("getServerT");
     expect(source).toContain("@/lib/i18n/server");
   });

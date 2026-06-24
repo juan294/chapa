@@ -8,20 +8,20 @@ const source = fs.readFileSync(
 );
 
 describe("terms page — i18n server component", () => {
-  it("is static/ISR with force-static directive", () => {
+  it("does not use force-static (page must be dynamic to read locale cookie)", () => {
+    expect(source).not.toContain("export const dynamic = 'force-static'");
     expect(source).not.toContain("export const dynamic = 'force-dynamic'");
-    expect(source).toContain("export const revalidate");
   });
 
   it("exports generateMetadata", () => {
     expect(source).toContain("generateMetadata");
   });
 
-  it("uses DEFAULT_LOCALE and getServerT (no getServerLocale)", () => {
+  it("uses getServerLocale() and getServerT for per-request locale", () => {
     expect(source).toContain('from "@/lib/i18n/server"');
     expect(source).toContain('getServerT');
-    expect(source).not.toContain('getServerLocale');
-    expect(source).toContain('DEFAULT_LOCALE');
+    expect(source).toContain('getServerLocale');
+    expect(source).not.toContain('DEFAULT_LOCALE');
   });
 
   it("renders a main content landmark", () => {

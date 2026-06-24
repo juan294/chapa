@@ -8,11 +8,10 @@ const SOURCE = fs.readFileSync(
 );
 
 describe("Verification explainer page (server component)", () => {
-  describe("static/ISR rendering", () => {
-    it("is static/ISR with force-static directive", () => {
+  describe("dynamic rendering (locale-aware per-request)", () => {
+    it("does not use force-static (page must be dynamic to read locale cookie)", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
       expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
-      expect(SOURCE).toContain("export const revalidate");
-      expect(SOURCE).toContain("export const dynamic = 'force-static'");
     });
   });
 
@@ -31,9 +30,9 @@ describe("Verification explainer page (server component)", () => {
   });
 
   describe("i18n integration", () => {
-    it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
-      expect(SOURCE).not.toContain("getServerLocale");
-      expect(SOURCE).toContain("DEFAULT_LOCALE");
+    it("uses getServerLocale() to detect locale from cookie at request time", () => {
+      expect(SOURCE).toContain("getServerLocale");
+      expect(SOURCE).not.toContain("DEFAULT_LOCALE");
       expect(SOURCE).toContain("getServerT");
       expect(SOURCE).toContain("@/lib/i18n/server");
     });

@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerT } from "@/lib/i18n/server";
-import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { getServerLocale, getServerT } from "@/lib/i18n/server";
 import { VerifyForm } from "./VerifyForm";
 
-export const revalidate = 3600;
-export const dynamic = 'force-static';
-
-export function generateMetadata(): Metadata {
-  const t = getServerT(DEFAULT_LOCALE);
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
   return {
     title: t('verify.title') as string,
     description: t('verify.description') as string,
@@ -18,7 +15,8 @@ export function generateMetadata(): Metadata {
 }
 
 export default async function VerifyInputPage() {
-  const t = getServerT(DEFAULT_LOCALE);
+  const locale = await getServerLocale();
+  const t = getServerT(locale);
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">

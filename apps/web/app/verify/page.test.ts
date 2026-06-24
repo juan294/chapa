@@ -31,10 +31,9 @@ describe("Verify input page", () => {
   });
 
   describe("static/ISR rendering", () => {
-    it("is static/ISR with force-static directive", () => {
+    it("does not use force-static (page must be dynamic to read locale cookie)", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
       expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
-      expect(SOURCE).toContain("export const revalidate");
-      expect(SOURCE).toContain("export const dynamic = 'force-static'");
     });
 
     it("does not use the old SPANISH_PUBLIC_COPY import", () => {
