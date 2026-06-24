@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 import { useTranslation } from "@/lib/i18n";
-
-interface SubMetric {
-  label: string;
-  weight: string;
-  normalizedValue: number;
-  rawLabel: string;
-}
+import {
+  getDimensionSubMetrics,
+  type DimensionSubMetricKey,
+} from "@/lib/dashboard/dimension-sub-metrics";
 
 export interface SubMetricPanelProps {
   dimension: keyof DimensionScores;
@@ -27,186 +24,28 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   craft: "var(--color-dimension-craft)",
 };
 
-function getSubMetrics(
-  dimension: keyof DimensionScores,
-  stats: StatsData,
-  profileType: ProfileType = "collaborative",
-): SubMetric[] {
-  switch (dimension) {
-    case "delivery":
-      return [
-        {
-          label: "PR Weight",
-          weight: "70%",
-          normalizedValue: Math.min(stats.prsMergedWeight / 60, 1),
-          rawLabel: `${stats.prsMergedCount} PRs merged`,
-        },
-        {
-          label: "Issues Closed",
-          weight: "20%",
-          normalizedValue: Math.min(stats.issuesClosedCount / 40, 1),
-          rawLabel: `${stats.issuesClosedCount} issues closed`,
-        },
-        {
-          label: "Commits",
-          weight: "10%",
-          normalizedValue: Math.min(stats.commitsTotal / 300, 1),
-          rawLabel: `${stats.commitsTotal} commits`,
-        },
-      ];
-
-    case "quality": {
-      if (profileType === "solo") {
-        const descRate = stats.prDescriptionRate ?? 0;
-        const branchRate = stats.featureBranchRate ?? 0;
-        const linkageRate = stats.issueLinkageRate ?? 0;
-        const microRatio = stats.microCommitRatio ?? 0.3;
-
-        return [
-          {
-            label: "PR Descriptions",
-            weight: "40%",
-            normalizedValue: descRate,
-            rawLabel: `${(descRate * 100).toFixed(0)}% of PRs have descriptions`,
-          },
-          {
-            label: "Feature Branches",
-            weight: "25%",
-            normalizedValue: branchRate,
-            rawLabel: `${(branchRate * 100).toFixed(0)}% from feature branches`,
-          },
-          {
-            label: "Issue Linkage",
-            weight: "20%",
-            normalizedValue: linkageRate,
-            rawLabel: `${(linkageRate * 100).toFixed(0)}% linked to issues`,
-          },
-          {
-            label: "Commit Cleanliness",
-            weight: "15%",
-            normalizedValue: 1 - microRatio,
-            rawLabel: `${((1 - microRatio) * 100).toFixed(0)}% clean commits`,
-          },
-        ];
-      }
-
-      const reviewRatio =
-        stats.prsMergedCount > 0
-          ? Math.min(stats.reviewsSubmittedCount / stats.prsMergedCount, 5) / 5
-          : stats.reviewsSubmittedCount > 0
-            ? 1
-            : 0;
-      const microRatio = stats.microCommitRatio ?? 0.3;
-
-      return [
-        {
-          label: "Reviews",
-          weight: "60%",
-          normalizedValue: Math.min(stats.reviewsSubmittedCount / 80, 1),
-          rawLabel: `${stats.reviewsSubmittedCount} reviews`,
-        },
-        {
-          label: "Review Ratio",
-          weight: "25%",
-          normalizedValue: reviewRatio,
-          rawLabel: `${(reviewRatio * 5).toFixed(1)}:1 reviews per PR`,
-        },
-        {
-          label: "Code Cleanliness",
-          weight: "15%",
-          normalizedValue: 1 - microRatio,
-          rawLabel: `${((1 - microRatio) * 100).toFixed(0)}% clean commits`,
-        },
-      ];
-    }
-
-    case "consistency": {
-      const evenness = 0.5; // Placeholder — can't easily compute without full heatmap data
-      const burst = Math.min(stats.maxCommitsIn10Min / 30, 1);
-
-      return [
-        {
-          label: "Active Days",
-          weight: "45%",
-          normalizedValue: Math.sqrt(Math.min(stats.activeDays / 365, 1)),
-          rawLabel: `${stats.activeDays} of 365 days`,
-        },
-        {
-          label: "Weekly Evenness",
-          weight: "40%",
-          normalizedValue: evenness,
-          rawLabel: "Distribution across weeks",
-        },
-        {
-          label: "Low Burst Activity",
-          weight: "15%",
-          normalizedValue: 1 - burst,
-          rawLabel: `Peak: ${stats.maxCommitsIn10Min} commits in 10min`,
-        },
-      ];
-    }
-
-    case "breadth": {
-      const docsRatio = stats.docsOnlyPrRatio ?? 0;
-      const topRepoShare = stats.topRepoShare;
-
-      return [
-        {
-          label: "Repos Contributed",
-          weight: "40%",
-          normalizedValue: Math.min(stats.reposContributed / 12, 1),
-          rawLabel: `${stats.reposContributed} repos`,
-        },
-        {
-          label: "Spread",
-          weight: "25%",
-          normalizedValue: 1 - topRepoShare,
-          rawLabel: `Top repo: ${(topRepoShare * 100).toFixed(0)}% of activity`,
-        },
-        {
-          label: "Stars",
-          weight: "10%",
-          normalizedValue: Math.min(stats.totalStars / 150, 1),
-          rawLabel: `${stats.totalStars} stars earned`,
-        },
-        {
-          label: "Forks",
-          weight: "5%",
-          normalizedValue: Math.min(stats.totalForks / 80, 1),
-          rawLabel: `${stats.totalForks} forks`,
-        },
-        {
-          label: "Docs PRs",
-          weight: "15%",
-          normalizedValue: docsRatio,
-          rawLabel: `${(docsRatio * 100).toFixed(0)}% docs-only PRs`,
-        },
-      ];
-    }
-
-    case "craft":
-      return [
-        {
-          label: "AI Tool Proficiency",
-          weight: "34%",
-          normalizedValue: 0,
-          rawLabel: "Upload insights report to compute",
-        },
-        {
-          label: "Effectiveness",
-          weight: "33%",
-          normalizedValue: 0,
-          rawLabel: "Upload insights report to compute",
-        },
-        {
-          label: "Sophistication",
-          weight: "33%",
-          normalizedValue: 0,
-          rawLabel: "Upload insights report to compute",
-        },
-      ];
-  }
-}
+const SUB_METRIC_LABELS: Record<DimensionSubMetricKey, string> = {
+  prWeight: "PR Weight",
+  issues: "Issues Closed",
+  commits: "Commits",
+  reviews: "Reviews",
+  reviewRatio: "Review Ratio",
+  batchSize: "Batch Size",
+  prDescription: "PR Descriptions",
+  featureBranch: "Feature Branches",
+  issueLinkage: "Issue Linkage",
+  activeDays: "Active Days",
+  evenness: "Heatmap Evenness",
+  weekCoverage: "Week Coverage",
+  repos: "Repos Contributed",
+  spread: "Spread",
+  docs: "Docs PRs",
+  stars: "Stars",
+  forks: "Forks",
+  aiToolProficiency: "AI Tool Proficiency",
+  effectiveness: "Effectiveness",
+  sophistication: "Sophistication",
+};
 
 export function SubMetricPanel({
   dimension,
@@ -229,9 +68,13 @@ export function SubMetricPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  const subMetrics = useMemo(
+    () => getDimensionSubMetrics(dimension, stats, profileType),
+    [dimension, stats, profileType],
+  );
+
   if (!isOpen) return null;
 
-  const subMetrics = getSubMetrics(dimension, stats, profileType);
   const color = DIMENSION_COLORS[dimension];
   const label = t(`dimensions.${dimension}.label`) as string;
 
@@ -275,11 +118,12 @@ export function SubMetricPanel({
       <div className="space-y-4">
         {subMetrics.map((metric) => {
           const percent = Math.round(metric.normalizedValue * 100);
+          const metricLabel = SUB_METRIC_LABELS[metric.key];
           return (
-            <div key={metric.label}>
+            <div key={metric.key}>
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-sm font-medium text-text-primary">
-                  {metric.label}
+                  {metricLabel}
                 </span>
                 <span className="text-xs font-medium text-text-secondary">
                   {metric.weight}
@@ -290,7 +134,7 @@ export function SubMetricPanel({
                 aria-valuenow={percent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={metric.label}
+                aria-label={metricLabel}
                 className="h-2 w-full rounded-full bg-stroke"
               >
                 <div
