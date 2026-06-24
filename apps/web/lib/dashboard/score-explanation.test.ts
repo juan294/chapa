@@ -143,4 +143,16 @@ describe("buildScoreExplanation", () => {
       "craft",
     ]);
   });
+
+  it("treats missing confidence penalties as no penalties", () => {
+    const impact = makeImpact({ confidence: 88 });
+    delete (impact as Partial<typeof impact>).confidencePenalties;
+
+    const explanation = buildScoreExplanation(impact, makeStats());
+
+    expect(explanation.confidence).toEqual({
+      value: 88,
+      penalties: [],
+    });
+  });
 });

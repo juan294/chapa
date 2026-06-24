@@ -93,5 +93,5 @@ Using the mdburgos-like fixture:
 - Tests run without a `LanguageProvider` (English fallback per project convention).
 
 ## Success criteria
-- Automated: component tests pass; typecheck/lint/circular clean; bundle budget holds (panel ships inside the already-lazy `SharePageOwnerContentLazy`).
-- Manual: light/dark visual check; tooltip not clipped; owner-vs-visitor confirmed in a real session.
+- [x] Automated: component tests pass; typecheck/lint/circular clean; bundle budget holds (panel ships inside the already-lazy `SharePageOwnerContentLazy`).
+- [ ] Manual: light/dark visual check; tooltip not clipped; owner-vs-visitor confirmed in a real session.

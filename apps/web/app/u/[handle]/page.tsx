@@ -192,7 +192,7 @@ export async function SharePageContent({
     sameAs: [`https://github.com/${handle}`],
     ...(impact
       ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
+          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier).`,
         }
       : {}),
   };

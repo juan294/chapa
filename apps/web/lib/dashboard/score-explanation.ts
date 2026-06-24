@@ -154,7 +154,7 @@ export function buildScoreExplanation(
     dataSources: platforms.map((platform) => buildPlatformProvenance(platform, stats)),
     confidence: {
       value: impact.confidence,
-      penalties: impact.confidencePenalties.map(({ flag, penalty }) => ({ flag, penalty })),
+      penalties: (impact.confidencePenalties ?? []).map(({ flag, penalty }) => ({ flag, penalty })),
     },
   };
 }

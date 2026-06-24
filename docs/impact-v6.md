@@ -135,6 +135,8 @@ EMA smoothing (0.15 current + 0.85 previous)
 Badge SVG (pentagon or diamond radar) + Share page
 ```
 
+Confidence is surfaced only to the profile owner in the share page's "How is my score calculated" panel. Visitors see formulas and platform caveats, but not confidence percentage or penalty flags, and public JSON-LD excludes confidence.
+
 ## Score Recalculation
 
 Deliberate user actions (insights upload, platform connect) trigger immediate score recalculation via `POST /api/recalculate`. This endpoint:

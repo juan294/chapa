@@ -102,5 +102,5 @@ aria: { ...existing..., toggleScoreExplanation: "Toggle how your score is calcul
 - `dictionaries/parity.test.ts` must pass: identical key trees, no empty leaves, array lengths matched. (Run `pnpm run test apps/web/lib/i18n`.)
 
 ## Success criteria
-- Automated: parity test green; typecheck clean (dictionaries are typed).
-- Manual: native-speaker tone check of the Spanish copy; confirm no unreleased features referenced.
+- [x] Automated: parity test green; typecheck clean (dictionaries are typed).
+- [x] Manual: native-speaker tone check of the Spanish copy; confirm no unreleased features referenced.

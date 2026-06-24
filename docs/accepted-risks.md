@@ -156,6 +156,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## Per-platform quality-signal availability
+
+- **Risk:** PR-description, feature-branch, issue-linkage, batch-size, and lead-time signals are computed only from GitHub. GitLab, Bitbucket, and Codeberg do not expose them, so a profile whose merged work is mostly on those platforms has a Quality dimension based on limited data. For solo profiles, Quality is display-only and excluded from the composite.
+- **Mitigation:** The share-page "How is my score calculated" panel states this per platform. Quality is never counted in the solo composite, so the gap does not depress the headline score for solo developers.
+- **Severity:** Low
+- **Accepted:** 2026-06-24
+
+---
+
 ## Post-response side effects in badge route
 
 - **Risk:** After rendering a badge SVG, side effects (metrics snapshot capture, analytics events, cache warm, verification record store) are scheduled with Next.js `after()` and run via `Promise.allSettled` in `runPublicProfileSideEffects` (`apps/web/lib/profile/public-profile.ts`). Individual rejections are absorbed by `allSettled` with no retry and no alert, and the side-effect path currently has no `captureServerError`/PostHog instrumentation — failures produce, at most, whatever each callee logs internally.

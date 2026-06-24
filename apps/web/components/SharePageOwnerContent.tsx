@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
+import { ScoreExplanationPanel } from "@/components/dashboard/ScoreExplanationPanel";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
@@ -130,6 +131,12 @@ export function SharePageOwnerContent({
         </section>
       ) : (
         <EmptyImpactState handle={handle} />
+      )}
+
+      {impact && stats && (
+        <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
+          <ScoreExplanationPanel impact={impact} stats={stats} isOwner={isOwner} />
+        </section>
       )}
 
       {/* Embed Snippets */}

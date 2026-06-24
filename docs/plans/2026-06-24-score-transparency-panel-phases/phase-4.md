@@ -57,5 +57,5 @@ The panel now openly explains that GitLab/Bitbucket/Codeberg do not provide PR-h
 - Grep to confirm no remaining public surface prints `impact.confidence` to non-owners: `grep -rn "confidence" apps/web/app/u apps/web/components | grep -vi test` — only the owner-gated panel path should reference it for display.
 
 ## Success criteria
-- Automated: full suite green; JSON-LD no longer contains `confidence`.
-- Manual: view-source on a `/u/:handle` page (as a visitor) shows no confidence value anywhere; CLAUDE.md / impact-v6 / accepted-risks read consistently with the shipped behavior.
+- [x] Automated: full suite green; JSON-LD no longer contains `confidence`.
+- [ ] Manual: view-source on a `/u/:handle` page (as a visitor) shows no confidence value anywhere; CLAUDE.md / impact-v6 / accepted-risks read consistently with the shipped behavior.

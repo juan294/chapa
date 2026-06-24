@@ -54,9 +54,9 @@ wired into SharePageOwnerContent (passes isOwner) ← Phase 3
 | # | Title | Depends on | Batch |
 |---|---|---|---|
 | 1 | Pure score-explanation builder + sub-metric extraction ✅ complete | — | `[batch-eligible]` with 2 |
-| 2 | i18n keys (en + es) | — | `[batch-eligible]` with 1 |
-| 3 | `ScoreExplanationPanel` component + wiring + owner gating | 1, 2 | — |
-| 4 | Reconcile confidence exposure (JSON-LD + docs) | — | `[batch-eligible]` with 3 |
+| 2 | i18n keys (en + es) ✅ complete | — | `[batch-eligible]` with 1 |
+| 3 | `ScoreExplanationPanel` component + wiring + owner gating ✅ complete | 1, 2 | — |
+| 4 | Reconcile confidence exposure (JSON-LD + docs) ✅ complete | — | `[batch-eligible]` with 3 |
 
 Batch notes: Phases 1 and 2 touch disjoint files (`lib/dashboard/*` vs `lib/i18n/dictionaries/*`) and can run in parallel. Phase 4 touches `app/u/[handle]/page.tsx` + docs, disjoint from Phase 3's component/`SharePageOwnerContent.tsx`, so it can run in parallel with Phase 3 — but its doc wording must describe Phase 3's final owner-only behavior (already fixed by the decisions above, so no real coupling). Phase 3 is the only phase that depends on others.
 
