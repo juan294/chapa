@@ -54,10 +54,13 @@ describe("Archetype scoring signals — in EN dictionary", () => {
 });
 
 describe("ArchetypePage component — scoring links", () => {
-  const componentContent = readFileSync(
-    join(ARCHETYPE_DIR, "_components/ArchetypePage.tsx"),
-    "utf-8",
-  );
+  const componentContent = [
+    readFileSync(join(ARCHETYPE_DIR, "_components/ArchetypePage.tsx"), "utf-8"),
+    readFileSync(
+      join(ARCHETYPE_DIR, "_components/ArchetypePageClient.tsx"),
+      "utf-8",
+    ),
+  ].join("\n");
 
   it("links to /about/scoring", () => {
     expect(componentContent).toMatch(/href="\/about\/scoring"/);

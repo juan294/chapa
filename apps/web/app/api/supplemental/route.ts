@@ -6,10 +6,12 @@ import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
 import { assertHandleOwnership } from "@/lib/auth/assert-handle-ownership";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
+import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import type { SupplementalStats } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 const CACHE_TTL = 86400; // 24 hours
+const MAX_SUPPLEMENTAL_BYTES = 256 * 1024;
 
 export const POST = withErrorCapture("/api/supplemental", async (request: NextRequest) => {
   // 1. Require Bearer token (supplemental is CLI-only, no session cookie fallback)
@@ -18,10 +20,33 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
     return NextResponse.json({ error: "Missing or invalid Authorization header" }, { status: 401 });
   }
 
-  // 2. Parse body
+  const ip = getClientIp(request);
+  const ipRlKey =
+    ip === NO_TRUSTED_IP
+      ? "ratelimit:supplemental-ip:no-ip"
+      : `ratelimit:supplemental-ip:${ip}`;
+  const ipRl = await rateLimit(ipRlKey, 10, 3600);
+  if (!ipRl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429, headers: { "Retry-After": "3600" } },
+    );
+  }
+
+  const auth = await resolveRequestAuth(request);
+  if (!auth) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  // 2. Parse body after auth, with a raw-size cap before JSON decoding.
+  let rawBody: string;
   let body: { targetHandle?: string; sourceHandle?: string; stats?: unknown };
   try {
-    body = await request.json();
+    rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).length > MAX_SUPPLEMENTAL_BYTES) {
+      return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
+    }
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -49,7 +74,6 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
   // per-handle rate-limit quota. An attacker cannot exhaust another handle's bucket
   // by sending their own valid token with a different targetHandle.
   // Rate-limit key is now derived from the authenticated handle, not targetHandle.
-  const auth = await resolveRequestAuth(request);
   const ownershipError = assertHandleOwnership(auth, targetHandle);
   if (ownershipError) return ownershipError;
 

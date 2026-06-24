@@ -11,8 +11,9 @@ describe("legal pages — i18n server component", () => {
       "utf-8",
     );
 
-    it(`/${page} does not use force-static (page must be dynamic to read locale cookie)`, () => {
-      expect(source).not.toContain("export const dynamic = 'force-static'");
+    it(`/${page} forces static rendering with hourly revalidation`, () => {
+      expect(source).toContain('export const dynamic = "force-static"');
+      expect(source).toContain("export const revalidate = 3600");
       expect(source).not.toContain("export const dynamic = 'force-dynamic'");
     });
 
@@ -20,11 +21,11 @@ describe("legal pages — i18n server component", () => {
       expect(source).toContain("generateMetadata");
     });
 
-    it(`/${page} uses getServerLocale() and getServerT for per-request locale`, () => {
+    it(`/${page} uses getServerT() with DEFAULT_LOCALE`, () => {
       expect(source).toContain('from "@/lib/i18n/server"');
       expect(source).toContain('getServerT');
-      expect(source).toContain('getServerLocale');
-      expect(source).not.toContain('DEFAULT_LOCALE');
+      expect(source).toContain('DEFAULT_LOCALE');
+      expect(source).not.toContain('getServerLocale');
     });
 
     it(`/${page} does NOT use static metadata export`, () => {

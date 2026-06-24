@@ -41,9 +41,18 @@ vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: () => <div data-testid="command-bar-lazy" />,
 }));
 
-vi.mock("@/lib/i18n", () => ({
-  LocaleSync: () => null,
-}));
+vi.mock("@/lib/i18n", async () => {
+  const { getServerT } = await import("@/lib/i18n/server");
+  return {
+    DEFAULT_LOCALE: "es",
+    LocaleSync: () => null,
+    useTranslation: () => ({
+      locale: "en",
+      setLocale: vi.fn(),
+      t: getServerT("en"),
+    }),
+  };
+});
 
 vi.mock("@/lib/i18n/server", () => ({
   getServerLocale: vi.fn(async () => "en"),
@@ -265,8 +274,8 @@ describe("Archetype pages — DEFAULT_LOCALE rendering (server renders es, clien
   });
 });
 
-describe("generateMetadata — per-request locale-aware", () => {
-  it("BuilderPage generates locale-aware metadata", async () => {
+describe("generateMetadata — DEFAULT_LOCALE", () => {
+  it("BuilderPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.builder.metadataTitle") return "El arquetipo Builder";
@@ -279,7 +288,7 @@ describe("generateMetadata — per-request locale-aware", () => {
     expect(meta.description).toBe("Los Builder son el motor.");
   });
 
-  it("GuardianPage generates locale-aware metadata", async () => {
+  it("GuardianPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.guardian.metadataTitle") return "El arquetipo Quality Champion";
@@ -292,7 +301,7 @@ describe("generateMetadata — per-request locale-aware", () => {
     expect(meta.description).toBe("Los Quality Champion lideran la disciplina.");
   });
 
-  it("BalancedPage generates locale-aware metadata", async () => {
+  it("BalancedPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.balanced.metadataTitle") return "El arquetipo Balanced";
@@ -304,7 +313,7 @@ describe("generateMetadata — per-request locale-aware", () => {
     expect(meta.title).toBe("El arquetipo Balanced");
   });
 
-  it("ArtificerPage generates locale-aware metadata", async () => {
+  it("ArtificerPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.artificer.metadataTitle") return "El arquetipo Artificer";

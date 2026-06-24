@@ -11,9 +11,18 @@ vi.mock("@/components/NavbarClient", () => ({
 vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: () => null,
 }));
-vi.mock("@/lib/i18n", () => ({
-  LocaleSync: () => null,
-}));
+vi.mock("@/lib/i18n", async () => {
+  const { getServerT } = await import("@/lib/i18n/server");
+  return {
+    DEFAULT_LOCALE: "es",
+    LocaleSync: () => null,
+    useTranslation: () => ({
+      locale: "en",
+      setLocale: vi.fn(),
+      t: getServerT("en"),
+    }),
+  };
+});
 vi.mock("@/lib/i18n/server", () => ({
   getServerLocale: vi.fn().mockResolvedValue("en"),
   getServerT: vi.fn().mockReturnValue((key: string) => {

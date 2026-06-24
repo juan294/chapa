@@ -2,15 +2,20 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "page.tsx"),
-  "utf-8",
-);
+const SOURCE = [
+  fs.readFileSync(path.resolve(__dirname, "page.tsx"), "utf-8"),
+  fs.readFileSync(
+    path.resolve(__dirname, "ScoringMethodologyClient.tsx"),
+    "utf-8",
+  ),
+].join("\n");
 
 describe("Scoring methodology page (server component)", () => {
-  describe("dynamic rendering (locale-aware per-request)", () => {
-    it("does not use force-static (page must be dynamic to read locale cookie)", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
+  describe("static/ISR rendering", () => {
+    it("forces static rendering with hourly revalidation", () => {
+      expect(SOURCE).toContain('export const dynamic = "force-static"');
+      expect(SOURCE).toContain("export const revalidate = 3600");
+      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
     });
   });
 
@@ -29,14 +34,14 @@ describe("Scoring methodology page (server component)", () => {
   });
 
   describe("i18n integration", () => {
-    it("uses getServerLocale() to detect locale from cookie at request time", () => {
-      expect(SOURCE).toContain("getServerLocale");
-      expect(SOURCE).not.toContain("DEFAULT_LOCALE");
+    it("uses getServerT() with DEFAULT_LOCALE", () => {
+      expect(SOURCE).toContain("DEFAULT_LOCALE");
+      expect(SOURCE).not.toContain("getServerLocale");
       expect(SOURCE).toContain("getServerT");
       expect(SOURCE).toContain("@/lib/i18n/server");
     });
 
-    it("generateMetadata is async (required to call getServerLocale)", () => {
+    it("generateMetadata is async", () => {
       expect(SOURCE).toMatch(/async function generateMetadata/);
     });
 

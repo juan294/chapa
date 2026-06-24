@@ -29,15 +29,13 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   const { session } = useSession();
   const { t } = useTranslation();
 
-  // Re-derive nav link labels from the active locale's dictionary so they
-  // update immediately when the user switches languages, without waiting for
-  // a full RSC refresh. The prop is only used as a signal that nav links
-  // should be shown on this page; the translated labels always come from t().
+  // When the server has already rendered locale-specific labels for a dynamic
+  // page (for example /?lang=en), trust those labels for the first paint so page
+  // body and navigation chrome do not mix languages.
   const resolvedNavLinks = useMemo<NavLinkItem[] | undefined>(() => {
     if (!navLinks || navLinks.length === 0) return undefined;
-    const fromLocale = t('landing.navLinks') as unknown as NavLinkItem[];
-    return Array.isArray(fromLocale) && fromLocale.length > 0 ? fromLocale : navLinks;
-  }, [navLinks, t]);
+    return navLinks;
+  }, [navLinks]);
 
   return (
     <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">

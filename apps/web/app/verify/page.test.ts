@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "page.tsx"),
-  "utf-8",
-);
+const SOURCE = [
+  fs.readFileSync(path.resolve(__dirname, "page.tsx"), "utf-8"),
+  fs.readFileSync(path.resolve(__dirname, "VerifyInputPageClient.tsx"), "utf-8"),
+].join("\n");
 const EN_DICT = fs.readFileSync(
   path.resolve(__dirname, "../../lib/i18n/dictionaries/en.ts"),
   "utf-8",
@@ -31,8 +31,14 @@ describe("Verify input page", () => {
   });
 
   describe("static/ISR rendering", () => {
-    it("does not use force-static (page must be dynamic to read locale cookie)", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
+    it("renders from DEFAULT_LOCALE instead of request-time locale APIs", () => {
+      expect(SOURCE).toContain('export const dynamic = "force-static"');
+      expect(SOURCE).toContain("export const revalidate = 3600");
+      expect(SOURCE).toContain("DEFAULT_LOCALE");
+      expect(SOURCE).not.toContain("getServerLocale");
+    });
+
+    it("does not force dynamic rendering", () => {
       expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
     });
 
@@ -43,7 +49,7 @@ describe("Verify input page", () => {
 
   describe("default export", () => {
     it("exports a default function component", () => {
-      expect(SOURCE).toContain("export default async function VerifyInputPage");
+      expect(SOURCE).toContain("export default function VerifyInputPage");
     });
   });
 

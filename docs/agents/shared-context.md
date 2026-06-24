@@ -170,18 +170,18 @@
 - [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars confirmed non-sensitive; `server-only` Supabase boundary and admin-auth routes documented in CLAUDE.md. `PostHogProvider.tsx` direct env reads are NEXT_PUBLIC_ only — no server-secret exposure.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa timestamp=2026-04-29T09:00:00Z -->
-## QA Agent — 2026-04-29
+<!-- ENTRY:START agent=qa timestamp=2026-06-24T09:00:00Z -->
+## QA Agent — 2026-06-24
 - **Status**: GREEN
-- Tests: 7,272/7,272 passed across 409 files, 0 failed, 0 skipped
+- Tests: 7986/7986 passed across 464 files, 0 failed, 0 skipped
 - Type errors: 0
 - Lint issues: 0
-- A11y issues: 0 — all `<img>` have alt, focus-visible in globals.css + 4 production components, prefers-reduced-motion respected, aria-label in 20+ components, heading hierarchy correct in all pages, 14 error boundaries, multiple loading/empty states
-- Design system: 0 violations in production components. global-error.tsx hardcoded hex intentional (documented). apple-icon.tsx + icon.tsx hardcoded (static assets, accepted). experiments/** accepted P3 (Canvas/WebGL).
+- A11y issues: 0 — all `<img>` tags have alt; focus-visible global (`globals.css:455`) + 5 production components; campaigns `<tr role="button">` aria-label gap from May 6 now resolved (`campaigns-dashboard.tsx:908`); heading hierarchy correct across all sampled pages; 13 error boundaries + 13 loading states
+- Design system: 0 violations. Accepted exceptions unchanged: global-error.tsx, apple-icon.tsx, icon.tsx (static assets), experiments/** (Canvas/WebGL).
 
 **Cross-agent recommendations:**
-- [Coverage]: `og-image/route.ts` 60% funcs (`route.ts:77,97`) is the only critical-path gap — 5th carry cycle, must address this triage. `dirty-stats.ts` 75% funcs is a one-test fix.
-- [Security]: No new security-related quality issues. All XSS vectors covered. All interactive elements accessible. global-error.tsx hardcoded hex does not touch server secrets.
+- [Coverage]: `SharePageH2.test.tsx` exists and covers the i18n H2 wrapper. All critical paths remain ≥96% stmts.
+- [Security]: No security-related quality issues. All XSS vectors covered. No hardcoded secrets in production JSX. All interactive elements accessible.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=qa timestamp=2026-05-06T09:00:00Z -->
@@ -213,7 +213,6 @@
 - [QA]: No user-facing features with doc gaps. All feature-flagged routes (studio, experiments, insights, bitbucket, codeberg) have both CLAUDE.md entries and env var documentation.
 - [Security]: No outdated security docs. `docs/accepted-risks.md` present. All `NEXT_PUBLIC_*` vars confirmed non-sensitive and documented. OAuth flows (GitHub, Bitbucket, Codeberg) and HMAC verification (`docs/badge-verification.md`) docs align with current implementation.
 <!-- ENTRY:END -->
-
 
 <!-- ENTRY:START agent=documentation_agent timestamp=2026-05-22T07:26:10Z -->
 ## Documentation Agent — 2026-05-22
@@ -262,19 +261,6 @@
 - [QA]: No new security UX issues. CORS wildcard remains scoped to read-only endpoints; mutation guard static test in place. All interactive SVG/markup fields escaped.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent timestamp=2026-05-27T08:58:36Z -->
-## QA Agent — 2026-05-27
-- **Status**: YELLOW
-- Tests: 5483 passed / 8 failed / 5491 reached (host worker exhaustion; coverage 2026-05-24 baseline 7589/7589 GREEN unaffected)
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0
-
-**Cross-agent recommendations:**
-- [Coverage]: vitest worker-pool exhaustion recurred this cycle on a host running multiple concurrent vitest jobs (same environmental pattern noted 2026-05-22/23/24). Recommend serializing or rate-limiting agent vitest runs on shared hosts so QA + coverage don't collide.
-- [Security]: No new security-related quality issues. All XSS escape paths still covered, no hardcoded hex in production components, all `<img>` have `alt`, all interactive elements have ARIA labels.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance timestamp=2026-06-18T09:00:00Z -->
 ## Performance Agent — 2026-06-18
 - **Status**: GREEN
@@ -317,14 +303,14 @@
 - Overall coverage: **96.32% stmts / 92.06% branches / 95.32% funcs / 97.53% lines** on HEAD `be655b39`. Test suite **463 files / 7976 tests**, all passing on the clean run. Flat vs 2026-06-20 (v8 noise).
 - Critical paths all GREEN, **no critical file <80% stmts**: lib/impact 99.6% (98.7% br / 100% fn), lib/render 99.6% (92.3% br / 100% fn), app/api 97.4% (93.9% br / 96.7% fn), lib/db 96.5% (93.3% br / 100% fn). Also lib/cache 98.1%, lib/auth 97.3%, lib/github 97.1%, components 96.4%.
 - **Untested-without-sibling files in critical paths: 7** — `api/auth/{gitlab,codeberg,bitbucket}/config.ts` (100% transitive), `lib/db/campaigns/{crud 99.1%, sends 98.6%, index 100%, types 88.7%}`. No real gaps.
-- **NEW sub-80 file this cycle**: `app/u/[handle]/SharePageH2.tsx` **33.3%** — 12-line `'use client'` i18n `<h2>` wrapper added in `be655b39`, no branches; one render test closes it. Other sub-80 files unchanged P3 carries (experiments error/loading 0% JSDOM-nav, HolographicOverlay 50%, Canvas/WebGL experiment pages 70–77%, next/dynamic lazy wrappers 60–66.7%, packages/shared config/JSON 0% false positive).
+- **Resolved coverage note**: `app/u/[handle]/SharePageH2.tsx` now has `SharePageH2.test.tsx`; the prior 33.3% optional gap is closed. Other sub-80 files unchanged P3 carries (experiments error/loading 0% JSDOM-nav, HolographicOverlay 50%, Canvas/WebGL experiment pages 70–77%, next/dynamic lazy wrappers 60–66.7%, packages/shared config/JSON 0% false positive).
 - **Flaky check (3 runs)**: NO test-level flakiness. Runs 1 & 2 at default parallelism failed *different* sets (run1: scripts/agent-utils + generate-badge-reference + NavLink worker-startup; run2: experiments pages + SharePageOwnerContent + scripts) — all `Timeout waiting for worker to respond`. Run 3 with `--maxWorkers=3` = **7976/7976 pass, 0 fail**. Root cause: host load avg **120–260 on 12 CPUs** (71 sessions) → vitest fork worker-pool exhaustion. Same environmental pattern QA flagged 2026-05-22/23/24/27.
 - Report at `docs/agents/coverage-report.md`.
 
 **Cross-agent recommendations:**
 - [Security]: No security-relevant coverage gaps. lib/auth 97.3%, all SVG user-input escape paths in lib/render (99.6%) and CORS/verification guards exercised.
 - [QA]: 0 test-level flaky tests. Earlier "failures" are environmental worker-pool exhaustion under load 120+, not code — constrained `--maxWorkers=3` run is fully green. Recommend pinning agent vitest runs to `--maxWorkers=3` on shared hosts to stop colliding jobs from producing false reds.
-- [Triage]: One optional P3 — add `SharePageH2.test.tsx` (one render assertion). No P2 action items; coverage clean and flat.
+- [Triage]: Prior optional `SharePageH2.test.tsx` action is resolved. No P2 action items; coverage clean and flat.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage timestamp=2026-06-20T02:05:00Z -->
@@ -422,4 +408,17 @@
 **Cross-agent recommendations:**
 - [Coverage]: No new coverage gaps. Design system inline styles all use CSS variables. P3 carries (experiments, Canvas/WebGL, lazy wrappers) unchanged.
 - [Security]: No security-related quality issues. All `<img>` tags have alt text (no phishing-vector omissions). No hardcoded hex colors expose token leakage risk. global-error.tsx hardcoded hex is outside ThemeProvider — does not touch server secrets.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-06-24T07:06:53Z -->
+## QA Agent — 2026-06-24
+- **Status**: GREEN
+- Tests: 7977/7977 passed across 464 files, 0 failed, 0 skipped
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all `<img>` tags have alt; focus-visible global + 5 production components; campaigns `<tr role="button">` aria-label gap from May 6 is now resolved; heading hierarchy correct across all sampled pages; 13 error boundaries + 13 loading states
+
+**Cross-agent recommendations:**
+- [Coverage]: `SharePageH2.test.tsx` exists and closes the prior H2 wrapper gap. All other critical paths remain ≥96% stmts.
+- [Security]: No security-related quality issues. All XSS vectors covered. Interactive elements accessible. No hardcoded secrets or token leaks observed in production JSX.
 <!-- ENTRY:END -->

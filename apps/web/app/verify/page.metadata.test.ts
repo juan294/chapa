@@ -6,7 +6,7 @@ vi.mock("@/lib/i18n/server", () => ({
 }));
 
 vi.mock("@/components/Navbar", () => ({ Navbar: () => null }));
-vi.mock("@/lib/i18n", () => ({ LocaleSync: () => null }));
+vi.mock("@/lib/i18n", () => ({ DEFAULT_LOCALE: "es", LocaleSync: () => null }));
 vi.mock("./VerifyForm", () => ({ VerifyForm: () => null }));
 
 beforeEach(() => {

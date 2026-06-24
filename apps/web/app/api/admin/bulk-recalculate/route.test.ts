@@ -9,6 +9,8 @@ const {
   mockMaterializeOrchestratedProfile,
   mockPersistOrchestratedSnapshot,
   mockVerifyAdminSecret,
+  mockInvalidateProfileReadModels,
+  mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockGetClientIp: vi.fn(),
@@ -16,6 +18,8 @@ const {
   mockMaterializeOrchestratedProfile: vi.fn(),
   mockPersistOrchestratedSnapshot: vi.fn(),
   mockVerifyAdminSecret: vi.fn(),
+  mockInvalidateProfileReadModels: vi.fn(),
+  mockRevalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -39,6 +43,15 @@ vi.mock("@/lib/profile/orchestrated-profile", () => ({
 
 vi.mock("@/lib/auth/admin", () => ({
   verifyAdminSecret: (...args: unknown[]) => mockVerifyAdminSecret(...args),
+}));
+
+vi.mock("@/lib/profile/post-write-invalidation", () => ({
+  invalidateProfileReadModels: (...args: unknown[]) =>
+    mockInvalidateProfileReadModels(...args),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
 
 const FAKE_MATERIALIZED = {
@@ -95,6 +108,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
     mockDbGetUsers.mockResolvedValue([{ handle: "alice" }, { handle: "bob" }]);
     mockMaterializeOrchestratedProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockPersistOrchestratedSnapshot.mockResolvedValue(true);
+    mockInvalidateProfileReadModels.mockResolvedValue(undefined);
   });
 
   it("returns 401 when admin auth fails", async () => {
@@ -130,6 +144,56 @@ describe("POST /api/admin/bulk-recalculate", () => {
       "alice",
       FAKE_MATERIALIZED,
       { mode: "replace" },
+    );
+  });
+
+  it("invalidates public read models and the share page after a successful replace", async () => {
+    const res = await POST(makeRequest(VALID_SECRET, { handles: ["alice"] }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.recalculated).toBe(1);
+    expect(mockInvalidateProfileReadModels).toHaveBeenCalledWith("alice", {
+      stats: true,
+      badgeSvg: true,
+      snapshot: true,
+      history: true,
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/u/alice");
+  });
+
+  it("sorts handles before applying the alphabetical resume cursor", async () => {
+    mockDbGetUsers.mockResolvedValue([
+      { handle: "zara" },
+      { handle: "alice" },
+      { handle: "mona" },
+      { handle: "bob" },
+    ]);
+    const request = new NextRequest(
+      "https://chapa.thecreativetoken.com/api/admin/bulk-recalculate?after=bob",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${VALID_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const res = await POST(request);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.completed).toEqual(["mona", "zara"]);
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
+      1,
+      "mona",
+      { token: "ghp-server-token", ignoreSnapshot: true },
+    );
+    expect(mockMaterializeOrchestratedProfile).toHaveBeenNthCalledWith(
+      2,
+      "zara",
+      { token: "ghp-server-token", ignoreSnapshot: true },
     );
   });
 
@@ -187,6 +251,7 @@ describe("POST /api/admin/bulk-recalculate", () => {
   it("aborts cleanly with partial progress when the inline deadline is exceeded", async () => {
     vi.useFakeTimers();
     const handles = Array.from({ length: 100 }, (_, index) => `user${index}`);
+    const sortedHandles = [...handles].sort((a, b) => a.localeCompare(b));
     mockMaterializeOrchestratedProfile.mockImplementation(async (handle: string) => {
       await new Promise((resolve) => setTimeout(resolve, 251_000));
       return {
@@ -204,8 +269,8 @@ describe("POST /api/admin/bulk-recalculate", () => {
 
       expect(res.status).toBe(202);
       expect(body.partial).toBe(true);
-      expect(body.completed).toEqual(handles.slice(0, 5));
-      expect(body.pending).toEqual(handles.slice(5));
+      expect(body.completed).toEqual(sortedHandles.slice(0, 5));
+      expect(body.pending).toEqual(sortedHandles.slice(5));
       expect(body.total).toBe(100);
       expect(mockPersistOrchestratedSnapshot).toHaveBeenCalledTimes(5);
     } finally {

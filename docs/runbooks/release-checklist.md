@@ -24,11 +24,14 @@ pnpm run test && pnpm run typecheck && pnpm run lint
 
 All must exit 0. No exceptions.
 
-### 3. Preview Deployment Soak (24h recommended, 1h minimum)
+### 3. Release-Candidate Preview Deployment Soak (24h recommended, 1h minimum)
 
-Every push to `develop` creates a Vercel preview deployment automatically.
+Every push to `develop` creates a Vercel preview deployment automatically. Use
+the deployment for the exact `develop` commit that will be merged to `main`;
+do not reuse an older stable preview URL as release evidence.
 
-1. Open the preview URL from the Vercel dashboard or from the GitHub PR checks.
+1. Open the preview URL from the Vercel dashboard or from the GitHub PR checks
+   for the current `develop` SHA.
 2. Test the following flows manually:
 
 | Flow | Steps |
@@ -37,7 +40,7 @@ Every push to `develop` creates a Vercel preview deployment automatically.
 | **Badge generation** | Log in → `/generate` or visit `/u/<handle>` → confirm badge renders |
 | **Badge SVG public** | Open `/u/<handle>/badge.svg` in incognito → must load without auth |
 | **Share page** | Visit `/u/<handle>` → badge preview, breakdown, and embed snippet visible |
-| **Health endpoint** | `curl <preview-url>/api/health` → `{"status":"ok","dependencies":{"redis":"ok","supabase":"ok","github":"ok|skipped"}}` |
+| **Health endpoint** | `curl <preview-url>/api/health` → `{"status":"ok","dependencies":{"redis":"ok","supabase":"ok","github":"ok"}}` |
 | **Verification** | Click verify link on share page → `/verify/:hash` renders correctly |
 | **Language switcher** | Click the globe icon in the nav bar → switch from ES to EN and back → confirm page re-renders in the selected locale with no untranslated strings |
 
@@ -54,14 +57,27 @@ Before promoting `develop → main`, confirm all new Supabase migrations have be
 
 Never ship code that references schema objects not yet present in the production database.
 
-### 5. CHANGELOG Entry + Version Bump
+### 5. Cron Auth and Scheduled Jobs Ready
+
+Before promoting `develop → main`, confirm Vercel production has `CRON_SECRET`
+configured and that cron routes accept the configured bearer token:
+
+- [ ] `CRON_SECRET` exists in the Vercel production environment.
+- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://chapa.thecreativetoken.com/api/cron/warm-cache` returns a non-auth failure response.
+- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://chapa.thecreativetoken.com/api/cron/sync-audience` returns a non-auth failure response.
+- [ ] `curl -H "Authorization: Bearer $CRON_SECRET" https://chapa.thecreativetoken.com/api/cron/process-campaigns` returns a non-auth failure response.
+
+Run these only as an intentional release check; they execute operational cron
+work.
+
+### 6. CHANGELOG Entry + Version Bump
 
 Before creating the release PR:
 
 - [ ] `CHANGELOG.md` has an entry for this release describing what changed (features, fixes, breaking changes).
 - [ ] Version bump is present if the project follows semver (`package.json` version or equivalent).
 
-### 6. Rollback Decision Criteria
+### 7. Rollback Decision Criteria
 
 Before merging, confirm you're prepared to roll back if needed:
 

@@ -12,8 +12,9 @@ describe("EmergingPage (server component)", () => {
     expect(SOURCE).toContain("archetypeKey=\"emerging\"");
   });
 
-  it("does not use force-static (page must be dynamic to read locale cookie)", () => {
-    expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
+  it("forces static rendering with hourly revalidation", () => {
+    expect(SOURCE).toContain("export const dynamic = 'force-static'");
+    expect(SOURCE).toContain("export const revalidate = 3600");
     expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
   });
 
@@ -23,9 +24,9 @@ describe("EmergingPage (server component)", () => {
     expect(SOURCE).toContain("archetypes.emerging.metadataDescription");
   });
 
-  it("uses getServerLocale() to detect locale from cookie at request time", () => {
-    expect(SOURCE).toContain("getServerLocale");
-    expect(SOURCE).not.toContain("DEFAULT_LOCALE");
+  it("uses getServerT() with DEFAULT_LOCALE", () => {
+    expect(SOURCE).toContain("DEFAULT_LOCALE");
+    expect(SOURCE).not.toContain("getServerLocale");
     expect(SOURCE).toContain("getServerT");
     expect(SOURCE).toContain("@/lib/i18n/server");
   });

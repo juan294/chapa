@@ -5,12 +5,13 @@ import { NextRequest } from "next/server";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit, mockDbUpsertSupplemental } = vi.hoisted(() => ({
+const { mockResolveRequestAuth, mockCacheSet, mockCacheDel, mockRateLimit, mockDbUpsertSupplemental, mockGetClientIp } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockCacheSet: vi.fn(),
   mockCacheDel: vi.fn(),
   mockRateLimit: vi.fn(),
   mockDbUpsertSupplemental: vi.fn(),
+  mockGetClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -25,6 +26,11 @@ vi.mock("@/lib/cache/redis", () => ({
 
 vi.mock("@/lib/db/supplemental", () => ({
   dbUpsertSupplemental: mockDbUpsertSupplemental,
+}));
+
+vi.mock("@/lib/http/client-ip", () => ({
+  NO_TRUSTED_IP: "no-trusted-ip",
+  getClientIp: (...args: unknown[]) => mockGetClientIp(...args),
 }));
 
 // Re-export real validation functions through the mock to avoid alias resolution issues
@@ -76,6 +82,20 @@ function makeRequest(
   });
 }
 
+function makeRawRequest(body: string, token?: string): NextRequest {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return new NextRequest("https://chapa.thecreativetoken.com/api/supplemental", {
+    method: "POST",
+    body,
+    headers,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -87,6 +107,7 @@ describe("POST /api/supplemental", () => {
     mockCacheDel.mockResolvedValue(undefined);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
     mockDbUpsertSupplemental.mockResolvedValue(undefined);
+    mockGetClientIp.mockReturnValue("127.0.0.1");
   });
 
   it("returns 401 when Authorization header is missing", async () => {
@@ -107,6 +128,43 @@ describe("POST /api/supplemental", () => {
     );
     const res = await POST(req);
     expect(res.status).toBe(401);
+  });
+
+  it("rate limits by IP before resolving auth", async () => {
+    mockRateLimit.mockResolvedValueOnce({ allowed: false, current: 11, limit: 10 });
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "bad-token",
+    );
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    expect(mockRateLimit).toHaveBeenCalledWith(
+      "ratelimit:supplemental-ip:127.0.0.1",
+      10,
+      3600,
+    );
+    expect(mockResolveRequestAuth).not.toHaveBeenCalled();
+  });
+
+  it("verifies bearer auth before parsing JSON", async () => {
+    mockResolveRequestAuth.mockResolvedValue(null);
+    const req = makeRawRequest("{", "bad-token");
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects oversized payloads before JSON parsing", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    const req = makeRawRequest(`{"padding":"${"x".repeat(257 * 1024)}"}`, "valid-token");
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(413);
+    expect(mockDbUpsertSupplemental).not.toHaveBeenCalled();
   });
 
   it("returns 403 when authenticated user does not match targetHandle", async () => {
@@ -250,7 +308,10 @@ describe("POST /api/supplemental", () => {
   // -------------------------------------------------------------------------
 
   it("returns 429 when rate limited by targetHandle", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockRateLimit
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 10 })
+      .mockResolvedValueOnce({ allowed: false, current: 11, limit: 10 });
 
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
@@ -273,6 +334,11 @@ describe("POST /api/supplemental", () => {
     await POST(req);
 
     expect(mockRateLimit).toHaveBeenCalledWith(
+      "ratelimit:supplemental-ip:127.0.0.1",
+      10,
+      3600,
+    );
+    expect(mockRateLimit).toHaveBeenCalledWith(
       "ratelimit:supplemental:juan294",
       10,
       86400,
@@ -280,7 +346,10 @@ describe("POST /api/supplemental", () => {
   });
 
   it("includes Retry-After header when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 11, limit: 10 });
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockRateLimit
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 10 })
+      .mockResolvedValueOnce({ allowed: false, current: 11, limit: 10 });
 
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },

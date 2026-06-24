@@ -12,24 +12,25 @@ const ARCHETYPE_DIRS = [
   "artificer",
 ];
 
-describe("archetype pages — dynamic (locale-aware per-request)", () => {
+describe("archetype pages — static/ISR", () => {
   for (const archetype of ARCHETYPE_DIRS) {
-    it(`${archetype}/page.tsx does not use force-static (must read locale cookie)`, () => {
+    it(`${archetype}/page.tsx forces static rendering with hourly revalidation`, () => {
       const source = fs.readFileSync(
         path.resolve(__dirname, archetype, "page.tsx"),
         "utf-8",
       );
-      expect(source).not.toContain("export const dynamic = 'force-static'");
+      expect(source).toContain("export const dynamic = 'force-static'");
+      expect(source).toContain("export const revalidate = 3600");
       expect(source).not.toContain("export const dynamic = 'force-dynamic'");
     });
 
-    it(`${archetype}/page.tsx uses getServerLocale() for per-request locale`, () => {
+    it(`${archetype}/page.tsx uses DEFAULT_LOCALE instead of getServerLocale()`, () => {
       const source = fs.readFileSync(
         path.resolve(__dirname, archetype, "page.tsx"),
         "utf-8",
       );
-      expect(source).toContain("getServerLocale");
-      expect(source).not.toContain("DEFAULT_LOCALE");
+      expect(source).toContain("DEFAULT_LOCALE");
+      expect(source).not.toContain("getServerLocale");
     });
   }
 });

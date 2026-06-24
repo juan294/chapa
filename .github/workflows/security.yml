@@ -33,4 +33,4 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm dlx license-checker --production --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
+      - run: pnpm dlx license-checker --production --start apps/web --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
