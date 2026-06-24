@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-06-24
+
+### Added
+- **Release-candidate deployment gates**: release runbooks now require strict smoke tests against the exact preview URL and commit SHA, with Redis, Supabase, and GitHub health dependencies all reporting `ok`
+- **Supplemental upload payload guard**: `/api/supplemental` rejects oversized request bodies before JSON parsing
+
+### Fixed
+- **Static public content locale rendering**: `/about`, `/about/scoring`, `/about/verification`, `/privacy`, `/terms`, `/verify`, and `/archetypes/*` remain statically generated while visible copy hydrates from the active client locale
+- **Navbar first paint**: localized server-provided navigation labels are preserved on initial render
+- **Admin bulk recalculation freshness**: recalculation now invalidates public read models, badge SVG cache, snapshots, history, and share-page ISR after writes; cursor pagination is sorted and deduplicated
+- **Supplemental upload hardening**: IP rate limiting and auth resolution run before JSON parsing, reducing unauthenticated parsing work
+
+### Changed
+- **Vercel release validation**: preview deployments are no longer skipped for non-production branches, enabling release-candidate smoke testing before merge
+- **License compliance**: CI now scans `apps/web` production dependencies
+- **Deployment smoke**: strict smoke now requires Redis, Supabase, and GitHub health checks to report `ok` rather than accepting skipped dependencies
+- 19 new tests; total test count: 7,986 across 464 files
+
 ## [2.13.0] - 2026-06-23
 
 ### Added

@@ -1,5 +1,4 @@
 {
-  "ignoreCommand": "test \"$VERCEL_ENV\" != \"production\"",
   "crons": [
     {
       "path": "/api/cron/warm-cache",

@@ -1,2 +1,3 @@
-API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com.
-cc-rpi sync: FAILED after 2 attempts — Mon Jun 22 03:23:03 CEST 2026
+cc-rpi HEAD (`ff886846`, v1.23.0) equals the recorded `lastSyncCommit`. No new blueprint commits since the last sync.
+
+cc-rpi sync: already up to date as of v1.23.0.

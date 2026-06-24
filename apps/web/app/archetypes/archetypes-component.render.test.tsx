@@ -41,9 +41,18 @@ vi.mock("@/components/GlobalCommandBarLazy", () => ({
   GlobalCommandBarLazy: () => <div data-testid="command-bar-lazy" />,
 }));
 
-vi.mock("@/lib/i18n", () => ({
-  LocaleSync: () => null,
-}));
+vi.mock("@/lib/i18n", async () => {
+  const { getServerT } = await import("@/lib/i18n/server");
+  return {
+    DEFAULT_LOCALE: "es",
+    LocaleSync: () => null,
+    useTranslation: () => ({
+      locale: "en",
+      setLocale: vi.fn(),
+      t: getServerT("en"),
+    }),
+  };
+});
 
 vi.mock("@/lib/i18n/server", () => ({
   getServerLocale: vi.fn(async () => "en"),
@@ -238,7 +247,7 @@ describe("Archetype pages — DEFAULT_LOCALE rendering (server renders es, clien
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
-  it("MarathonerPage generateMetadata returns build-time (DEFAULT_LOCALE) metadata", async () => {
+  it("MarathonerPage generateMetadata returns locale-aware metadata", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.marathoner.metadataTitle") return "El arquetipo Marathoner";
@@ -246,12 +255,12 @@ describe("Archetype pages — DEFAULT_LOCALE rendering (server renders es, clien
       return key;
     });
     const { generateMetadata } = await import("./marathoner/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Marathoner");
     expect(meta.description).toBe("Los Marathoner aparecen cada dia.");
   });
 
-  it("PolymathPage generateMetadata returns build-time (DEFAULT_LOCALE) metadata", async () => {
+  it("PolymathPage generateMetadata returns locale-aware metadata", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.polymath.metadataTitle") return "El arquetipo Polymath";
@@ -259,14 +268,14 @@ describe("Archetype pages — DEFAULT_LOCALE rendering (server renders es, clien
       return key;
     });
     const { generateMetadata } = await import("./polymath/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Polymath");
     expect(meta.description).toBe("Los Polymath extienden su impacto.");
   });
 });
 
-describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request locale)", () => {
-  it("BuilderPage returns DEFAULT_LOCALE (es) metadata at build time", async () => {
+describe("generateMetadata — DEFAULT_LOCALE", () => {
+  it("BuilderPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.builder.metadataTitle") return "El arquetipo Builder";
@@ -274,12 +283,12 @@ describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request loc
       return key;
     });
     const { generateMetadata } = await import("./builder/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Builder");
     expect(meta.description).toBe("Los Builder son el motor.");
   });
 
-  it("GuardianPage generates metadata synchronously (no async locale fetch)", async () => {
+  it("GuardianPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.guardian.metadataTitle") return "El arquetipo Quality Champion";
@@ -287,12 +296,12 @@ describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request loc
       return key;
     });
     const { generateMetadata } = await import("./guardian/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Quality Champion");
     expect(meta.description).toBe("Los Quality Champion lideran la disciplina.");
   });
 
-  it("BalancedPage generates metadata synchronously", async () => {
+  it("BalancedPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.balanced.metadataTitle") return "El arquetipo Balanced";
@@ -300,11 +309,11 @@ describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request loc
       return key;
     });
     const { generateMetadata } = await import("./balanced/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Balanced");
   });
 
-  it("ArtificerPage generates metadata synchronously", async () => {
+  it("ArtificerPage generates metadata from DEFAULT_LOCALE", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.artificer.metadataTitle") return "El arquetipo Artificer";
@@ -312,12 +321,12 @@ describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request loc
       return key;
     });
     const { generateMetadata } = await import("./artificer/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Artificer");
     expect(meta.description).toBe("Los Artificer aprovechan la IA.");
   });
 
-  it("EmergingPage generates metadata synchronously", async () => {
+  it("EmergingPage generates locale-aware metadata", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValueOnce((key: string) => {
       if (key === "archetypes.emerging.metadataTitle") return "El arquetipo Emerging";
@@ -325,7 +334,7 @@ describe("generateMetadata — DEFAULT_LOCALE titles (ISR — no per-request loc
       return key;
     });
     const { generateMetadata } = await import("./emerging/page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("El arquetipo Emerging");
     expect(meta.description).toBe("Los Emerging estan construyendo impulso.");
   });

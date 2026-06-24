@@ -147,17 +147,17 @@ describe("NavbarClient", () => {
 
   // ─── Nav links locale awareness ───────────────────────────────────────
 
-  it("shows dictionary-translated labels for nav links, not raw prop labels", () => {
-    // Simulate server passing Spanish nav links as props (force-static was Spanish)
+  it("shows server-provided nav link labels on first paint", () => {
     const spanishLinks = [
       { label: "Funciones", href: "#features" },
       { label: "Cómo funciona", href: "#how-it-works" },
     ];
     render(<NavbarClient navLinks={spanishLinks} />);
-    // Test env has no LanguageProvider → useTranslation falls back to English dictionary
-    // So nav links should render English labels, not the Spanish prop values
-    expect(screen.getByTestId("nav-link-#features").textContent).toBe("Features");
-    expect(screen.queryByText("Funciones")).toBeNull();
+    expect(screen.getByTestId("nav-link-#features").textContent).toBe("Funciones");
+    expect(screen.getByTestId("nav-link-#how-it-works").textContent).toBe(
+      "Cómo funciona",
+    );
+    expect(screen.queryByText("Features")).toBeNull();
   });
 
   it("does not show nav links when navLinks prop is omitted", () => {

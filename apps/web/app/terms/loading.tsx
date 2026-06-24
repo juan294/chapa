@@ -1,7 +1,8 @@
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n";
+import { getServerT } from "@/lib/i18n/server";
 
-export default async function TermsLoading() {
-  const t = getServerT(await getServerLocale());
+export default function TermsLoading() {
+  const t = getServerT(DEFAULT_LOCALE);
   const loading = t("common.loading") as string;
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg px-6" role="status" aria-label={loading}>

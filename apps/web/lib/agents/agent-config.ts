@@ -29,17 +29,18 @@ export const AGENTS: Record<string, AgentConfig> = {
 
 Analyze the project's test coverage and produce a markdown report.
 
+IMPORTANT: Your entire stdout output becomes the report file. Write ONLY the final markdown report — no preamble, no "here is the report" framing, no tool output, no confirmation messages. Start your response with \`\`\`markdown on the very first line.
+
 Steps:
-1. Run \`pnpm vitest run --coverage\` and capture the output.
+1. Run \`pnpm vitest run --coverage\` once and capture the output.
 2. Identify files with <80% coverage, focusing on critical paths:
    - apps/web/lib/impact/ (scoring pipeline)
    - apps/web/lib/render/ (SVG rendering)
    - apps/web/app/api/ (API routes)
    - apps/web/lib/db/ (database layer)
 3. List untested files (no corresponding .test.ts).
-4. Check for flaky tests by running the suite 3 times and comparing results.
 
-Output format:
+Output format (start your response with this exact line):
 \`\`\`markdown
 # Coverage Report
 > Generated: [date] | Health status: [green|yellow|red]
@@ -56,7 +57,7 @@ Output format:
 [bullet list of specific files needing tests]
 
 ## Flaky Tests
-[list any tests that failed inconsistently, or "None detected"]
+None detected
 \`\`\`
 
 SHARED_CONTEXT_START

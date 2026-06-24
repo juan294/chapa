@@ -2,17 +2,18 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "page.tsx"),
-  "utf-8",
-);
+const SOURCE = [
+  fs.readFileSync(path.resolve(__dirname, "page.tsx"), "utf-8"),
+  fs.readFileSync(path.resolve(__dirname, "AboutPageClient.tsx"), "utf-8"),
+].join("\n");
 
 describe("About page", () => {
   describe("static/ISR rendering", () => {
-    it("is static/ISR with force-static directive", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
-      expect(SOURCE).toContain("export const revalidate");
-      expect(SOURCE).toContain("export const dynamic = 'force-static'");
+    it("renders from DEFAULT_LOCALE instead of request-time locale APIs", () => {
+      expect(SOURCE).toContain('export const dynamic = "force-static"');
+      expect(SOURCE).toContain("export const revalidate = 3600");
+      expect(SOURCE).toContain("DEFAULT_LOCALE");
+      expect(SOURCE).not.toContain("getServerLocale");
     });
   });
 
@@ -34,13 +35,12 @@ describe("About page", () => {
     });
   });
 
-  it("exports a default async component", () => {
-    expect(SOURCE).toContain("export default async function AboutPage");
+  it("exports a default component", () => {
+    expect(SOURCE).toContain("export default function AboutPage");
   });
 
   describe("i18n integration", () => {
-    it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
-      expect(SOURCE).not.toContain("getServerLocale");
+    it("uses getServerT() with the build-time default locale", () => {
       expect(SOURCE).toContain("DEFAULT_LOCALE");
       expect(SOURCE).toContain("getServerT");
       expect(SOURCE).toContain("@/lib/i18n/server");

@@ -29,6 +29,7 @@ import {
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { SharePageH2 } from "./SharePageH2";
 
 const BASE_URL = getBaseUrl();
 const READ_ONLY_SMOKE_PARAM = "__chapa_smoke";
@@ -223,9 +224,7 @@ export async function SharePageContent({
         </h1>
 
         {/* ── Badge Section Title ──────────────────────────────── */}
-        <h2 className="font-heading text-xs tracking-[0.2em] uppercase text-text-secondary mb-4 animate-fade-in-up motion-reduce:animate-none [animation-delay:150ms] text-balance">
-          {t("sharePage.h2") as string}
-        </h2>
+        <SharePageH2 />
 
         {/* ── Badge Preview ──────────────────────────────────── */}
         <div className="mb-4 animate-scale-in motion-reduce:animate-none [animation-delay:200ms]">

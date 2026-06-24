@@ -71,6 +71,13 @@ describe("NavbarClient", () => {
     });
   });
 
+  describe("locale consistency", () => {
+    it("trusts server-provided navLinks for first paint", () => {
+      expect(SOURCE).toContain("return navLinks");
+      expect(SOURCE).not.toContain("return Array.isArray(fromLocale)");
+    });
+  });
+
   describe("ISR compatibility", () => {
     it("does NOT import from next/headers", () => {
       expect(SOURCE).not.toContain("next/headers");

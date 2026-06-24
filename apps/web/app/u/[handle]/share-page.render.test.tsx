@@ -106,6 +106,9 @@ vi.mock("@/lib/i18n", () => ({
   DEFAULT_LOCALE: "es",
   LocaleSync: () => null,
 }));
+vi.mock("./SharePageH2", () => ({
+  SharePageH2: () => null,
+}));
 
 import { generateMetadata, SharePageContent } from "./page";
 
@@ -248,18 +251,27 @@ describe("Phase 4d — Share page i18n", () => {
       expect(jsxString).toContain("devuser");
     });
 
-    it("uses sharePage.h2 key for section heading", async () => {
-      mockGetServerLocale.mockResolvedValue("en");
+    it("does not hardcode sharePage.h2 text — delegates to SharePageH2 client component", async () => {
       const result = await SharePageContent({ handle: "testuser" });
       const jsxString = JSON.stringify(result);
-      expect(jsxString).toContain("Tu Impacto, Decodificado");
+      expect(jsxString).not.toContain("Tu Impacto, Decodificado");
+      expect(jsxString).not.toContain("Your Impact, Decoded");
     });
 
-    it("uses sharePage.h2 in Spanish for es locale", async () => {
-      mockGetServerLocale.mockResolvedValue("es");
-      const result = await SharePageContent({ handle: "testuser" });
+    it("keeps fallback badge image requests read-only in smoke mode", async () => {
+      mockRenderBadgeSvg.mockReturnValue("");
+
+      const result = await SharePageContent({
+        handle: "testuser",
+        readOnly: true,
+      });
       const jsxString = JSON.stringify(result);
-      expect(jsxString).toContain("Tu Impacto, Decodificado");
+
+      expect(jsxString).toContain("/u/testuser/badge.svg?");
+      expect(jsxString).toContain("__chapa_smoke=1");
+      expect(mockGetAvatarBase64).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
+      expect(mockWriteBadgeSvgCache).not.toHaveBeenCalled();
     });
 
     it("keeps fallback badge image requests read-only in smoke mode", async () => {
@@ -312,12 +324,31 @@ describe("Phase 4d — Share page i18n", () => {
       expect(SOURCE).toContain("sharePage.srH1");
     });
 
-    it("uses sharePage.h2 key in h2", () => {
-      expect(SOURCE).toContain("sharePage.h2");
+    it("renders SharePageH2 client component for the badge section heading", () => {
+      expect(SOURCE).toContain("SharePageH2");
     });
 
     it("uses sharePage.metadataOgImageAlt in generateMetadata", () => {
       expect(SOURCE).toContain("sharePage.metadataOgImageAlt");
+    });
+  });
+
+  describe("SharePageH2.tsx source", () => {
+    const H2_SOURCE = fs.readFileSync(
+      path.resolve(__dirname, "SharePageH2.tsx"),
+      "utf-8",
+    );
+
+    it("is a client component", () => {
+      expect(H2_SOURCE).toContain("'use client'");
+    });
+
+    it("uses sharePage.h2 key", () => {
+      expect(H2_SOURCE).toContain("sharePage.h2");
+    });
+
+    it("uses useTranslation", () => {
+      expect(H2_SOURCE).toContain("useTranslation");
     });
   });
 });

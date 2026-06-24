@@ -23,7 +23,16 @@
       ],
       "project": ["**/*.{ts,tsx}"],
       "ignoreDependencies": [
-        "tsx"
+        "tsx",
+        "@resvg/resvg-js",
+        "@vercel/analytics",
+        "@vercel/speed-insights",
+        "canvas-confetti",
+        "next-themes",
+        "posthog-js",
+        "resend",
+        "server-only",
+        "svix"
       ]
     },
     "packages/shared": {

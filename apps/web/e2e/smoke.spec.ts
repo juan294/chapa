@@ -19,9 +19,9 @@ test.describe("Smoke tests — core routes", () => {
     if (strictDeploymentSmoke) {
       expect(response.status()).toBe(200);
       expect(body.status).toBe("ok");
-      expect(["ok", "skipped"]).toContain(body.dependencies.redis);
-      expect(["ok", "skipped"]).toContain(body.dependencies.supabase);
-      expect(["ok", "skipped"]).toContain(body.dependencies.github);
+      expect(body.dependencies.redis).toBe("ok");
+      expect(body.dependencies.supabase).toBe("ok");
+      expect(body.dependencies.github).toBe("ok");
       return;
     }
 

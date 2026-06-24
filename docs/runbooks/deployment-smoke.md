@@ -36,7 +36,7 @@ When the secret is set, the job:
 | Route | Assertion |
 |-------|-----------|
 | `/` | Landing page renders (`#main-content` visible) |
-| `/api/health` | HTTP 200, `status: "ok"`, each dependency (redis/supabase/github) is `ok` or `skipped` |
+| `/api/health` | HTTP 200, `status: "ok"`, each core dependency (redis/supabase/github) is `ok` |
 | `/u/octocat/badge.svg?__chapa_smoke=1` | HTTP 200, `Content-Type: image/svg+xml`, body contains `<svg>…</svg>` |
 | `/u/octocat?__chapa_smoke=1` | Share page returns HTTP 200, body visible without persisting profile side effects |
 | `/api/auth/login` | Redirects toward GitHub OAuth |
@@ -47,9 +47,10 @@ silently passing.
 
 ## How to Configure `DEPLOYMENT_SMOKE_BASE_URL`
 
-The value is a base URL (no trailing path) pointing at a deployed Chapa
-instance — typically a stable Vercel **preview** alias (never production, to
-avoid load and rate-limit pressure on live traffic).
+The value is a base URL (no trailing path) pointing at the deployed Chapa
+release candidate for the exact commit under test. For release PRs, update it to
+the current Vercel preview URL for the `develop` SHA being promoted. Do not
+reuse an older stable preview URL as evidence for a new release candidate.
 
 The workflow reads it from `secrets.DEPLOYMENT_SMOKE_BASE_URL`. Set it as a
 repository secret (or environment secret) so the value is masked in logs:

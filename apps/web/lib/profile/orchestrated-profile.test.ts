@@ -68,6 +68,20 @@ describe("materializeOrchestratedProfile", () => {
     });
     expect(result).toBe(materialized);
   });
+
+  it("#930: forwards ignoreSnapshot so admin recalculates bypass the same-day EMA lock", async () => {
+    const materialized = makeMaterializedProfile();
+    mockMaterializeProfile.mockResolvedValue(materialized);
+
+    await materializeOrchestratedProfile("testuser", { ignoreSnapshot: true });
+
+    expect(mockMaterializeProfile).toHaveBeenCalledWith("testuser", {
+      token: undefined,
+      today: undefined,
+      policy: "public-display",
+      ignoreSnapshot: true,
+    });
+  });
 });
 
 describe("persistOrchestratedSnapshot", () => {

@@ -55,6 +55,15 @@
             "command": "npx eslint --fix \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/verify-edit.sh"
+          }
+        ]
       }
     ]
   }

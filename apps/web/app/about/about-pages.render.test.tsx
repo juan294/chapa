@@ -223,16 +223,25 @@ vi.mock("@/lib/i18n/server", () => ({
       "about.verification.ctaHeading": "Try it yourself",
       "about.verification.ctaBody": "Every Chapa badge has a verification hash.",
       "about.verification.ctaButton": "Verify a Badge",
+      "errors.general.title": "Something went wrong",
+      "errors.general.description": "An unexpected error occurred.",
+      "common.tryAgain": "Try again",
+      "common.goHome": "Go home",
     };
     return map[key] ?? key;
   }),
 }));
 
-vi.mock("@/lib/i18n", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+vi.mock("@/lib/i18n", async () => {
+  const { getServerT } = await import("@/lib/i18n/server");
   return {
-    ...actual,
+    DEFAULT_LOCALE: "es",
     LocaleSync: () => null,
+    useTranslation: () => ({
+      locale: "en",
+      setLocale: vi.fn(),
+      t: getServerT("en"),
+    }),
   };
 });
 
@@ -300,7 +309,7 @@ describe("AboutPage render (es)", () => {
 });
 
 describe("generateMetadata (about/index)", () => {
-  it("returns DEFAULT_LOCALE (es) title synchronously (ISR — no per-request locale)", async () => {
+  it("returns locale-aware metadata", async () => {
     const { getServerT } = await import("@/lib/i18n/server");
     vi.mocked(getServerT).mockReturnValue((key: string) => {
       if (key === "about.index.metadataTitle") return "Acerca de";
@@ -312,7 +321,7 @@ describe("generateMetadata (about/index)", () => {
       return key;
     });
     const { generateMetadata } = await import("./page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBe("Acerca de");
   });
 });
@@ -465,13 +474,13 @@ describe("AboutError render", () => {
   it("renders the error heading", () => {
     const reset = vi.fn();
     render(<AboutError error={new Error("test") as Error & { digest?: string }} reset={reset} />);
-    expect(screen.getByText("Something went wrong")).toBeDefined();
+    expect(screen.getByText("title")).toBeDefined();
   });
 
   it("calls reset on try again click", () => {
     const reset = vi.fn();
     render(<AboutError error={new Error("test") as Error & { digest?: string }} reset={reset} />);
-    fireEvent.click(screen.getByText("Try again"));
+    fireEvent.click(screen.getByText("tryAgain"));
     expect(reset).toHaveBeenCalledTimes(1);
   });
 });

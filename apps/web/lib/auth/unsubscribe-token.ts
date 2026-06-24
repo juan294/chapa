@@ -12,6 +12,7 @@
  * Format: base64url(handle).base64url(hmac_sha256(purpose:handle, secret))
  */
 
+import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
 
 const PURPOSE = "unsubscribe";

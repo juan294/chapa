@@ -1,67 +1,48 @@
 # Pre-Launch Codebase Audit
-> Generated on 2026-06-21 | Branch: `develop` | Focus: release readiness
+> Generated on 2026-06-24 | Branch: `develop` | Focus: release readiness
 
 ## Summary
 
-Pre-launch audit found the codebase locally healthy but not release-ready until
-the remediation set below was completed. The active release branch was clean at
-the start of the pass, with `develop` ahead of `main` and the previous release
-tagged as `v2.11.0`.
-
-Initial local gates passed:
-
-- `pnpm run test`: 7,944 tests passed
-- `pnpm run typecheck`: passed
-- `pnpm run lint`: passed
-- `pnpm audit --audit-level moderate`: no known vulnerabilities
-- `pnpm run build`: passed, with one Turbopack NFT trace warning
+The 2026-06-24 pre-launch pass found `develop` locally healthy at baseline, but
+not release-ready until several launch-blocking findings were remediated. No
+partial push was performed during remediation.
 
 ## Findings
 
+### Frontend / UX
+
+- **FE-M1 / PE-H1**: Static public routes (`/about`, legal pages, `/verify`,
+  and `/archetypes/*`) had regressed to request-time rendering through locale
+  reads.
+- **UX-H1**: Making those pages static with default-locale server copy would
+  leave returning non-default-locale users seeing stale body content.
+- **UX-M1**: `NavbarClient` could replace server-provided localized nav labels
+  with client fallback dictionary labels on first paint.
+
 ### Backend / Data
 
-- Score-changing APIs did not invalidate the rendered badge SVG cache.
-- Linked-platform upstream failures could be cached as fresh partial stats.
-- Linked-platform refresh/unlink DB writes were fire-and-forget.
-- Supplemental stats validation accepted loose numeric and heatmap data.
+- **BE-H1**: Admin bulk recalculation persisted new snapshots without
+  invalidating public read models, badge SVG cache, history, or share-page ISR.
+- **BE-M1**: Bulk recalculation pagination could skip users because the cursor
+  order did not match deterministic sorted handle order.
 
 ### Security
 
-- Session/token paths validated presence of `NEXTAUTH_SECRET` but not minimum
-  length consistently.
-- Support email forwarding relied on regex-style HTML sanitization.
-- DOMPurify appeared in dependency metadata without a current local license note.
+- **SE-M1**: `/api/supplemental` parsed unauthenticated JSON request bodies
+  before authentication, IP throttling, or payload-size enforcement.
+- **SE-M2**: License compliance checked only the repository root and could miss
+  `apps/web` production runtime dependency licenses.
 
-### Performance
+### DevOps / Release Safety
 
-- Linked-platform live fetches could consume the entire stats deadline.
-- Platform link/unlink refreshed stats caches but not the share page/read-model
-  artifacts.
-- Public profile API bypassed the latest-snapshot cache and always queried tool
-  insights.
-- Root layout preconnected to GitHub on every page.
-- Particle canvases kept animation loops alive while offscreen or backgrounded.
-- OG image SVG-to-PNG font path resolution caused a Turbopack NFT trace warning.
-
-### Frontend
-
-- `/u/[handle]` used a request-time locale read that defeated ISR expectations.
-- `SharePageOwnerContentLazy` disabled SSR for owner/visitor content.
-- Client feature flags could diverge from DB-backed server gates.
-
-### DevOps / Architecture
-
-- Deployment smoke was optional/missing in repo configuration.
-- Production health treated skipped dependencies as healthy.
-- Migration validation was not part of CI.
-- Main branch protection omitted launch-relevant workflows.
-- Computed `process.env[...]` reads bypassed the typed env boundary lint rule.
-- `@chapa/shared` linting was not wired into recursive root lint.
-- Package-extraction ADR described `@chapa/shared` as types-only, but the package
-  intentionally exports pure runtime utilities.
+- **DO-H1**: Vercel preview deployments could be skipped, allowing deployment
+  smoke to run against a stale URL rather than the release candidate.
+- **DO-M1**: `main` branch protection omitted the required `pnpm audit` context.
+- **DO-M2**: Cron readiness was documented too weakly; production could pass
+  release review without an explicit `CRON_SECRET` and scheduled-job auth gate.
 
 ## Release-Blocking State
 
-Release was blocked until remediation completed, local verification was green,
-deployment smoke was configured, and main branch protection required the
-launch-relevant checks.
+Release was blocked until all findings above were fixed, local verification was
+green, branch protection included `pnpm audit`, and the release documentation
+reflected the stricter deployment-smoke and cron-readiness gates.

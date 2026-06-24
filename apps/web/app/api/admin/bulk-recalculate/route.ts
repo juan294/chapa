@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { verifyAdminSecret } from "@/lib/auth/admin";
 import { getGithubToken } from "@/lib/env";
 import { rateLimit } from "@/lib/cache/redis";
@@ -10,6 +11,7 @@ import {
   materializeOrchestratedProfile,
   persistOrchestratedSnapshot,
 } from "@/lib/profile/orchestrated-profile";
+import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 
 /** Vercel Pro allows up to 300s for serverless functions. */
 export const maxDuration = 300;
@@ -74,6 +76,8 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
     handles = users.map((u) => u.handle);
   }
 
+  handles = [...new Set(handles)].sort((a, b) => a.localeCompare(b));
+
   // Apply cursor filter: skip handles up to and including the cursor value.
   if (afterCursor) {
     handles = handles.filter((h) => h > afterCursor);
@@ -129,6 +133,11 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
         try {
           const materialized = await materializeOrchestratedProfile(handle, {
             token: githubToken,
+            // #930 — Admin recalculates must bypass the EMA same-day lock.
+            // A stored today-snapshot may contain wrong data (e.g. from a
+            // timed-out platform fetch); ignoring it ensures the fresh score
+            // always lands rather than freezing the bad value in place.
+            ignoreSnapshot: true,
           });
 
           if (!materialized) {
@@ -140,6 +149,13 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
             mode: "replace",
           });
           if (replaced) {
+            await invalidateProfileReadModels(handle, {
+              stats: true,
+              badgeSvg: true,
+              snapshot: true,
+              history: true,
+            });
+            revalidatePath(`/u/${handle}`);
             recalculated++;
           } else {
             errors.push({ handle, error: "Snapshot replace failed" });

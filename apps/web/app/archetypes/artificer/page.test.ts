@@ -12,10 +12,10 @@ describe("ArtificerPage (server component)", () => {
     expect(SOURCE).toContain("archetypeKey=\"artificer\"");
   });
 
-  it("is static/ISR with force-static directive", () => {
-    expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
-    expect(SOURCE).toContain("export const revalidate");
+  it("forces static rendering with hourly revalidation", () => {
     expect(SOURCE).toContain("export const dynamic = 'force-static'");
+    expect(SOURCE).toContain("export const revalidate = 3600");
+    expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
   });
 
   it("exports generateMetadata using archetypes.artificer i18n keys", () => {
@@ -24,9 +24,9 @@ describe("ArtificerPage (server component)", () => {
     expect(SOURCE).toContain("archetypes.artificer.metadataDescription");
   });
 
-  it("uses DEFAULT_LOCALE for build-time rendering (no getServerLocale)", () => {
-    expect(SOURCE).not.toContain("getServerLocale");
+  it("uses getServerT() with DEFAULT_LOCALE", () => {
     expect(SOURCE).toContain("DEFAULT_LOCALE");
+    expect(SOURCE).not.toContain("getServerLocale");
     expect(SOURCE).toContain("getServerT");
     expect(SOURCE).toContain("@/lib/i18n/server");
   });

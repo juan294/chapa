@@ -228,6 +228,29 @@ describe("materializeProfile", () => {
     );
   });
 
+  it("#930: ignoreSnapshot bypasses the same-day EMA lock so fresh score passes through", async () => {
+    const stats = makeFullStats({ handle: "testuser" });
+    // Simulate the GitLab-timeout scenario: same-day snapshot has adjustedComposite: 0
+    const badSameDaySnapshot = makeSnapshot({ date: "2026-04-17", adjustedComposite: 0 });
+
+    mockGetStats.mockResolvedValue(stats);
+    mockGetCachedCraftScore.mockResolvedValue(null);
+    mockGetCachedLatestSnapshot.mockResolvedValue(badSameDaySnapshot);
+    mockIsStatsDirty.mockResolvedValue(false);
+
+    const result = await materializeProfile("testuser", {
+      today: "2026-04-17",
+      ignoreSnapshot: true,
+    });
+
+    expect(result).not.toBeNull();
+    // Raw score passes through — same-day lock never consulted.
+    expect(result?.displayImpact.adjustedComposite).toBe(result?.rawImpact.adjustedComposite);
+    expect(result?.latestSnapshot).toBeNull();
+    // Snapshot cache must NOT have been queried (it would have returned the bad zero).
+    expect(mockGetCachedLatestSnapshot).not.toHaveBeenCalled();
+  });
+
   it("uses a dirty marker to bypass stale same-day snapshot reuse", async () => {
     const stats = makeFullStats({
       handle: "testuser",

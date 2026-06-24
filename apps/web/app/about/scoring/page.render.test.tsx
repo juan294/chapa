@@ -25,6 +25,7 @@ vi.mock("@/components/LiteYouTubeEmbed", () => ({
 }));
 
 vi.mock("@/lib/i18n/server", () => ({
+  getServerLocale: vi.fn().mockResolvedValue("es"),
   getServerT: vi.fn().mockReturnValue((key: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const map: Record<string, any> = {
@@ -147,9 +148,18 @@ vi.mock("@/lib/i18n/server", () => ({
   }),
 }));
 
-vi.mock("@/lib/i18n", () => ({
-  LocaleSync: () => null,
-}));
+vi.mock("@/lib/i18n", async () => {
+  const { getServerT } = await import("@/lib/i18n/server");
+  return {
+    DEFAULT_LOCALE: "es",
+    LocaleSync: () => null,
+    useTranslation: () => ({
+      locale: "en",
+      setLocale: vi.fn(),
+      t: getServerT("en"),
+    }),
+  };
+});
 
 afterEach(cleanup);
 
@@ -209,17 +219,17 @@ describe("ScoringMethodologyPage render", () => {
 });
 
 describe("ScoringMethodologyPage generateMetadata", () => {
-  it("returns metadata with title and openGraph for the default locale", async () => {
+  it("returns metadata with title and openGraph", async () => {
     const { generateMetadata } = await import("./page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBeTruthy();
     expect(meta.openGraph).toBeDefined();
     expect(meta.twitter).toBeDefined();
   });
 
-  it("returns metadata when lang param is provided", async () => {
+  it("returns metadata with a title", async () => {
     const { generateMetadata } = await import("./page");
-    const meta = generateMetadata();
+    const meta = await generateMetadata();
     expect(meta.title).toBeTruthy();
   });
 });
