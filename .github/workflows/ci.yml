@@ -11,7 +11,7 @@ jobs:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
@@ -29,7 +29,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v5
@@ -122,7 +122,7 @@ jobs:
       UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
       UPSTASH_REDIS_REST_TOKEN: dummy
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
@@ -154,7 +154,7 @@ jobs:
       UPSTASH_REDIS_REST_TOKEN: dummy
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
@@ -219,7 +219,7 @@ jobs:
         if: env.DEPLOYMENT_SMOKE_BASE_URL == '' && github.ref != 'refs/heads/main'
         run: echo "DEPLOYMENT_SMOKE_BASE_URL is not configured; skipping deployment smoke."
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
       - uses: pnpm/action-setup@v5
         if: env.DEPLOYMENT_SMOKE_BASE_URL != ''
