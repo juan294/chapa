@@ -1,3 +1,4 @@
+import "server-only";
 import { createHmac } from "node:crypto";
 import type { StatsData, ImpactV6Result } from "@chapa/shared";
 import { toDateString } from "@/lib/utils/date";

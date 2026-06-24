@@ -1,3 +1,4 @@
+import "server-only";
 import { NextResponse } from "next/server";
 import { readSessionCookie } from "@/lib/auth/github";
 import { getNextauthSecret } from "@/lib/env";

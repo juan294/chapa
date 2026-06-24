@@ -1,3 +1,4 @@
+import "server-only";
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/crypto/safe-equal";
 import { getCronSecret } from "@/lib/env";

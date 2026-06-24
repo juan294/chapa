@@ -5,6 +5,7 @@
  * - `verifyAdminSecret` — bearer-token check against ADMIN_SECRET env var.
  */
 
+import "server-only";
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/crypto/safe-equal";
 import { getAdminSecret, getAdminHandles } from "@/lib/env";

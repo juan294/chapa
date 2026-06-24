@@ -7,6 +7,7 @@
  * Format: base64url(payload).base64url(hmac_sha256(payload_encoded, secret))
  */
 
+import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
 
 interface CliTokenPayload {

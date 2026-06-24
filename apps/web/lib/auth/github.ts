@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 import { buildAuthCookieFlags } from "./cookie-policy";
 import { getBaseUrl } from "@/lib/env";
