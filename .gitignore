@@ -57,6 +57,9 @@ playwright/.cache/
 .claude/worktrees/
 CLAUDE.local.md
 
+# contract-layer telemetry (local audit log; the report snapshot lives in docs/agents/)
+.claude/metrics/
+
 # product hunt launch assets
 producthunt/
 

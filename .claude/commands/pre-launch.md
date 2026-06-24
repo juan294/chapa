@@ -149,6 +149,11 @@ Rules:
 - Prefer systemic findings: one pattern covering 5 instances > five
   separate nitpicks.
 
+This contract is machine-checkable: `/remediate` runs
+`.claude/scripts/validate-findings.py` against the report before parsing and
+rejects any finding with a malformed Finding-ID, a missing required field, or
+no `file:line` ref. Emit findings in exactly this format.
+
 ### Cross-Domain Notes (optional)
 
 Findings touching another specialist's domain — noted briefly, referenced
@@ -287,7 +292,7 @@ doubt.
 ### Report Output
 
 - Path: `docs/agents/pre-launch-report.md`
-- Not committed to git (Rule #70)
+- Commit policy follows repo visibility (Rule #70): gitignored on public repos, tracked on private repos
 - Markdown only. No XML tags.
 - Finding IDs are the `/remediate` parse anchor — never reuse an ID,
   never list a finding without an ID.

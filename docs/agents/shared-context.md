@@ -83,6 +83,20 @@
 - [Coverage]: lib/cache 99.5%, lib/db 97.1%, app/api 98.6% — all stable per coverage 2026-06-19. No cost-path coverage gaps.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=triage timestamp=2026-06-24T07:50:00Z -->
+## Triage -- 2026-06-24
+- **Reports processed**: 7 (coverage GREEN, security GREEN, cc-rpi-update GREEN, pre-launch INFO, remediation COMPLETE, update-docs COMPLETE, cost-analyst FAILED — auth expired)
+- **Action items resolved**: 3 — (1) `SharePageH2.test.tsx` added (33.3% → 100% coverage); (2) `import "server-only"` added to 7 auth/verification files; (3) 9 knip false-positive deps added to `ignoreDependencies` in `knip.json`. 7977/7977 tests, typecheck + lint clean, CI green.
+- **Dependabot**: 3 open PRs — #926 (dev-and-types group) + #925 (production group) auto-merged; #924 (actions/checkout 6→7, major) deferred.
+- **Agent failure**: cost-analyst Jun 24 run failed with "Not logged in" — auth token expired overnight. Jun 21 shared-context entry (GREEN) remains valid. No code action needed.
+- **Summary**: Clean P3 triage cycle. Security posture and coverage both strengthened with defense-in-depth guards and knip noise elimination.
+
+**Cross-agent recommendations:**
+- [Cost Analyst]: Jun 24 run failed (CLI auth). Re-run with fresh auth. Jun 21 GREEN assessment still valid; no cost-surface changes since then.
+- [Coverage]: Suite at 7977 (+1 test). SharePageH2 at 100%. All critical-path modules remain ≥96% stmts.
+- [Security]: `server-only` guards now in place on all 7 auth/verification modules. Knip false positives eliminated — future `knip --production` runs should be clean with 0 findings.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=triage timestamp=2026-06-21T06:55:24Z -->
 ## Triage -- 2026-06-21
 - **Reports processed**: 4 (cc-rpi-update GREEN, cost-analyst GREEN, coverage GREEN, prior triage GREEN)
@@ -297,6 +311,22 @@
 - [Cost Analyst]: Bundle flat 1,943 KB raw / 620 KB gzipped — M-bundle stays closed, no cold-start memory regression. `ANALYZE=true` run not urgent.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=coverage timestamp=2026-06-24T03:15:00Z -->
+## Coverage Agent — 2026-06-24
+- **Status**: GREEN
+- Overall coverage: **96.32% stmts / 92.06% branches / 95.32% funcs / 97.53% lines** on HEAD `be655b39`. Test suite **463 files / 7976 tests**, all passing on the clean run. Flat vs 2026-06-20 (v8 noise).
+- Critical paths all GREEN, **no critical file <80% stmts**: lib/impact 99.6% (98.7% br / 100% fn), lib/render 99.6% (92.3% br / 100% fn), app/api 97.4% (93.9% br / 96.7% fn), lib/db 96.5% (93.3% br / 100% fn). Also lib/cache 98.1%, lib/auth 97.3%, lib/github 97.1%, components 96.4%.
+- **Untested-without-sibling files in critical paths: 7** — `api/auth/{gitlab,codeberg,bitbucket}/config.ts` (100% transitive), `lib/db/campaigns/{crud 99.1%, sends 98.6%, index 100%, types 88.7%}`. No real gaps.
+- **NEW sub-80 file this cycle**: `app/u/[handle]/SharePageH2.tsx` **33.3%** — 12-line `'use client'` i18n `<h2>` wrapper added in `be655b39`, no branches; one render test closes it. Other sub-80 files unchanged P3 carries (experiments error/loading 0% JSDOM-nav, HolographicOverlay 50%, Canvas/WebGL experiment pages 70–77%, next/dynamic lazy wrappers 60–66.7%, packages/shared config/JSON 0% false positive).
+- **Flaky check (3 runs)**: NO test-level flakiness. Runs 1 & 2 at default parallelism failed *different* sets (run1: scripts/agent-utils + generate-badge-reference + NavLink worker-startup; run2: experiments pages + SharePageOwnerContent + scripts) — all `Timeout waiting for worker to respond`. Run 3 with `--maxWorkers=3` = **7976/7976 pass, 0 fail**. Root cause: host load avg **120–260 on 12 CPUs** (71 sessions) → vitest fork worker-pool exhaustion. Same environmental pattern QA flagged 2026-05-22/23/24/27.
+- Report at `docs/agents/coverage-report.md`.
+
+**Cross-agent recommendations:**
+- [Security]: No security-relevant coverage gaps. lib/auth 97.3%, all SVG user-input escape paths in lib/render (99.6%) and CORS/verification guards exercised.
+- [QA]: 0 test-level flaky tests. Earlier "failures" are environmental worker-pool exhaustion under load 120+, not code — constrained `--maxWorkers=3` run is fully green. Recommend pinning agent vitest runs to `--maxWorkers=3` on shared hosts to stop colliding jobs from producing false reds.
+- [Triage]: One optional P3 — add `SharePageH2.test.tsx` (one render assertion). No P2 action items; coverage clean and flat.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=coverage timestamp=2026-06-20T02:05:00Z -->
 ## Coverage Agent — 2026-06-20
 - **Status**: GREEN
@@ -331,25 +361,6 @@
 - [Triage]: No P2 action items. Coverage clean and flat. Optional polish only: studio/config edge branches (85.7% br), AuthorTypewriter branch paths (67.5% br).
 - [Cost Analyst]: lib/cache 99.5%, lib/db 97.1%, app/api 98.6% — all stable. No cost-path coverage gaps.
 <!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=coverage timestamp=2026-06-18T02:00:00Z -->
-## Coverage Agent — 2026-06-18
-- **Status**: GREEN
-- Overall coverage: **96.78% stmts / 92.65% branches / 95.77% funcs / 97.89% lines** (8980/9278 stmts). Flat vs 2026-06-16 (branches +0.09pp, v8 noise). HEAD `63b18ac1` — CI-only change (pnpm/action-setup@v4→@v5); no app-code change.
-- Test suite: 445 files, **7594 tests**. 3 full runs this cycle, all identical: 7594/7594 across 445/445 files. **0 flaky tests.** ~101s / ~59s / ~92s, no worker-pool contention.
-- Critical paths GREEN, **no files <80%**: lib/impact 99.6% (98.7% br / 100% fn), lib/render 100% (92.9% br / 100% fn), app/api 97.5% (94.2% br / 96.8% fn; lowest route `/api/studio/config` 92.3% st / 85.7% br), lib/db 96.5% (93.3% br / 100% fn). Also lib/cache 98.1%, lib/auth 98.0%, lib/github 97.4%, lib/analytics 97.3%, lib/history 98.3%, lib/email 97.6%, lib/verification 100%, lib/i18n 100%, components 96.5%, packages/shared 91.6%.
-- **Untested source files in critical paths: 2** — `api/auth/{bitbucket,codeberg}/config.ts` lack direct `.test.ts` but confirmed at **100% stmts** via transitive route-test coverage. No real gaps.
-- **No new P2s**. Sub-80% files (10) all P3 carries: experiments error/loading 0% (JSDOM `navigation to another Document`, flag-gated), HolographicOverlay 50%, heatmap-wave 73.3%, metallic-shimmer 77.4% (Canvas/WebGL), next/dynamic lazy wrappers (ClientInstrumentation 60%, GlobalCommandBarLazy 60%, SharePageOwnerContentLazy 66.7%), packages/shared JSON config 0% (false positive — src/ TS 100%).
-- Report at `docs/agents/coverage-report.md`.
-
-**Cross-agent recommendations:**
-- [Security]: No security-relevant coverage gaps. lib/auth 98.0%, lib/analytics 97.3%, lib/verification 100% — XSS escape paths and CORS guards fully covered.
-- [QA]: 0 flaky tests across 3 clean full-suite runs (7594/7594 each, identical), no worker-pool contention this cycle.
-- [Triage]: No P2 action items. Coverage clean and flat on HEAD `63b18ac1`. Optional polish only: studio/config edge branches (85.7% br), campaigns-dashboard fn (78.8%, admin-only).
-- [Cost Analyst]: lib/cache 98.1%, lib/db 96.5%, app/api 97.5% — all stable. No cost-path coverage gaps.
-<!-- ENTRY:END -->
-
-
 
 <!-- ENTRY:START agent=qa_agent timestamp=2026-06-10T07:04:29Z -->
 ## QA Agent — 2026-06-10

@@ -1,2 +1,3 @@
-Failed to authenticate. API Error: 401 Invalid authentication credentials
-cc-rpi sync: FAILED after 2 attempts — Tue Jun 23 03:15:47 CEST 2026
+cc-rpi HEAD (`ff886846`, v1.23.0) equals the recorded `lastSyncCommit`. No new blueprint commits since the last sync.
+
+cc-rpi sync: already up to date as of v1.23.0.
