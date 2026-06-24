@@ -24,7 +24,8 @@ describe("getDimensionSubMetrics", () => {
     expect(metrics[0]!.normalizedValue).toBeCloseTo(0.94, 2);
     expect(metrics[1]!.normalizedValue).toBeCloseTo(0.69, 2);
     expect(metrics[2]!.normalizedValue).toBe(1);
-    expect(metrics[0]!.rawLabel).toBe("31 PRs merged");
+    expect(metrics[0]!.rawLabelKey).toBe("prsMerged");
+    expect(metrics[0]!.rawLabelParams).toEqual({ count: "31" });
   });
 
   it("returns collaborative quality keys using reviews, review ratio, and batch size", () => {
@@ -46,7 +47,8 @@ describe("getDimensionSubMetrics", () => {
     expect(metrics[0]!.normalizedValue).toBeCloseTo(0.78, 2);
     expect(metrics[1]!.normalizedValue).toBe(0.3);
     expect(metrics[2]!.normalizedValue).toBe(0.8);
-    expect(metrics[2]!.rawLabel).toBe("80% of PRs in reviewable batch size");
+    expect(metrics[2]!.rawLabelKey).toBe("reviewableBatchSize");
+    expect(metrics[2]!.rawLabelParams).toEqual({ percent: "80%" });
   });
 
   it("uses the conservative batch-size default when quality batch size is unavailable", () => {
@@ -58,7 +60,8 @@ describe("getDimensionSubMetrics", () => {
 
     expect(metrics[2]!.key).toBe("batchSize");
     expect(metrics[2]!.normalizedValue).toBe(BATCH_SIZE_DEFAULT);
-    expect(metrics[2]!.rawLabel).toBe("30% of PRs in reviewable batch size");
+    expect(metrics[2]!.rawLabelKey).toBe("reviewableBatchSize");
+    expect(metrics[2]!.rawLabelParams).toEqual({ percent: "30%" });
   });
 
   it("returns solo quality keys using PR hygiene signals and batch size", () => {

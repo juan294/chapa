@@ -31,7 +31,10 @@ export interface DimensionSubMetric {
   key: DimensionSubMetricKey;
   weight: string;
   normalizedValue: number;
-  rawLabel: string;
+  /** i18n key under `scoreExplanation.rawLabels.*` for the raw-value caption. */
+  rawLabelKey: string;
+  /** Interpolation params for the raw-value caption (all stringified). */
+  rawLabelParams: Record<string, string>;
 }
 
 function percent(value: number): string {
@@ -57,19 +60,22 @@ export function getDimensionSubMetrics(
           key: "prWeight",
           weight: "70%",
           normalizedValue: normalize(stats.prsMergedWeight, SCORING_CAPS.prWeight),
-          rawLabel: `${stats.prsMergedCount} PRs merged`,
+          rawLabelKey: "prsMerged",
+          rawLabelParams: { count: String(stats.prsMergedCount) },
         },
         {
           key: "issues",
           weight: "20%",
           normalizedValue: normalize(stats.issuesClosedCount, SCORING_CAPS.issues),
-          rawLabel: `${stats.issuesClosedCount} issues closed`,
+          rawLabelKey: "issuesClosed",
+          rawLabelParams: { count: String(stats.issuesClosedCount) },
         },
         {
           key: "commits",
           weight: "10%",
           normalizedValue: normalize(stats.commitsTotal, SCORING_CAPS.commits),
-          rawLabel: `${stats.commitsTotal} commits`,
+          rawLabelKey: "commits",
+          rawLabelParams: { count: String(stats.commitsTotal) },
         },
       ];
 
@@ -85,25 +91,29 @@ export function getDimensionSubMetrics(
             key: "prDescription",
             weight: "40%",
             normalizedValue: descRate,
-            rawLabel: `${percent(descRate)} of PRs have descriptions`,
+            rawLabelKey: "prsWithDescriptions",
+            rawLabelParams: { percent: percent(descRate) },
           },
           {
             key: "featureBranch",
             weight: "25%",
             normalizedValue: branchRate,
-            rawLabel: `${percent(branchRate)} from feature branches`,
+            rawLabelKey: "fromFeatureBranches",
+            rawLabelParams: { percent: percent(branchRate) },
           },
           {
             key: "issueLinkage",
             weight: "20%",
             normalizedValue: linkageRate,
-            rawLabel: `${percent(linkageRate)} linked to issues`,
+            rawLabelKey: "linkedToIssues",
+            rawLabelParams: { percent: percent(linkageRate) },
           },
           {
             key: "batchSize",
             weight: "15%",
             normalizedValue: batchSize,
-            rawLabel: `${percent(batchSize)} of PRs in reviewable batch size`,
+            rawLabelKey: "reviewableBatchSize",
+            rawLabelParams: { percent: percent(batchSize) },
           },
         ];
       }
@@ -114,19 +124,22 @@ export function getDimensionSubMetrics(
           key: "reviews",
           weight: "60%",
           normalizedValue: normalize(stats.reviewsSubmittedCount, SCORING_CAPS.reviews),
-          rawLabel: `${stats.reviewsSubmittedCount} reviews`,
+          rawLabelKey: "reviews",
+          rawLabelParams: { count: String(stats.reviewsSubmittedCount) },
         },
         {
           key: "reviewRatio",
           weight: "25%",
           normalizedValue: reviewRatio,
-          rawLabel: `${(reviewRatio * 5).toFixed(1)}:1 reviews per PR`,
+          rawLabelKey: "reviewsPerPr",
+          rawLabelParams: { ratio: (reviewRatio * 5).toFixed(1) },
         },
         {
           key: "batchSize",
           weight: "15%",
           normalizedValue: batchSize,
-          rawLabel: `${percent(batchSize)} of PRs in reviewable batch size`,
+          rawLabelKey: "reviewableBatchSize",
+          rawLabelParams: { percent: percent(batchSize) },
         },
       ];
     }
@@ -143,19 +156,22 @@ export function getDimensionSubMetrics(
           key: "activeDays",
           weight: "45%",
           normalizedValue: activeDayCurve,
-          rawLabel: `${stats.activeDays} of ${SCORING_WINDOW_DAYS} days`,
+          rawLabelKey: "activeOfDays",
+          rawLabelParams: { active: String(stats.activeDays), total: String(SCORING_WINDOW_DAYS) },
         },
         {
           key: "evenness",
           weight: "40%",
           normalizedValue: evenness,
-          rawLabel: "Distribution across weeks",
+          rawLabelKey: "distributionAcrossWeeks",
+          rawLabelParams: {},
         },
         {
           key: "weekCoverage",
           weight: "15%",
           normalizedValue: weekCoverage,
-          rawLabel: `${percent(weekCoverage)} active weeks`,
+          rawLabelKey: "activeWeeks",
+          rawLabelParams: { percent: percent(weekCoverage) },
         },
       ];
     }
@@ -169,31 +185,36 @@ export function getDimensionSubMetrics(
           key: "repos",
           weight: "40%",
           normalizedValue: Math.min(stats.reposContributed / SCORING_CAPS.repos, 1),
-          rawLabel: `${stats.reposContributed} repos`,
+          rawLabelKey: "repos",
+          rawLabelParams: { count: String(stats.reposContributed) },
         },
         {
           key: "spread",
           weight: "25%",
           normalizedValue: 1 - topRepoShare,
-          rawLabel: `Top repo: ${percent(topRepoShare)} of activity`,
+          rawLabelKey: "topRepoShare",
+          rawLabelParams: { percent: percent(topRepoShare) },
         },
         {
           key: "stars",
           weight: "10%",
           normalizedValue: normalize(stats.totalStars, SCORING_CAPS.stars),
-          rawLabel: `${stats.totalStars} stars earned`,
+          rawLabelKey: "starsEarned",
+          rawLabelParams: { count: String(stats.totalStars) },
         },
         {
           key: "forks",
           weight: "5%",
           normalizedValue: normalize(stats.totalForks, SCORING_CAPS.forks),
-          rawLabel: `${stats.totalForks} forks`,
+          rawLabelKey: "forks",
+          rawLabelParams: { count: String(stats.totalForks) },
         },
         {
           key: "docs",
           weight: "15%",
           normalizedValue: docsRatio,
-          rawLabel: `${percent(docsRatio)} docs-only PRs`,
+          rawLabelKey: "docsOnlyPrs",
+          rawLabelParams: { percent: percent(docsRatio) },
         },
       ];
     }
@@ -204,19 +225,22 @@ export function getDimensionSubMetrics(
           key: "aiToolProficiency",
           weight: "34%",
           normalizedValue: 0,
-          rawLabel: "Upload insights report to compute",
+          rawLabelKey: "uploadInsights",
+          rawLabelParams: {},
         },
         {
           key: "effectiveness",
           weight: "33%",
           normalizedValue: 0,
-          rawLabel: "Upload insights report to compute",
+          rawLabelKey: "uploadInsights",
+          rawLabelParams: {},
         },
         {
           key: "sophistication",
           weight: "33%",
           normalizedValue: 0,
-          rawLabel: "Upload insights report to compute",
+          rawLabelKey: "uploadInsights",
+          rawLabelParams: {},
         },
       ];
   }

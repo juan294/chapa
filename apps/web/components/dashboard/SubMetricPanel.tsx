@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 import {
   getDimensionSubMetrics,
   type DimensionSubMetricKey,
@@ -146,7 +147,10 @@ export function SubMetricPanel({
                 />
               </div>
               <p className="mt-1 text-xs text-text-secondary">
-                {metric.rawLabel}
+                {interpolate(
+                  t(`scoreExplanation.rawLabels.${metric.rawLabelKey}`) as string,
+                  metric.rawLabelParams,
+                )}
               </p>
             </div>
           );

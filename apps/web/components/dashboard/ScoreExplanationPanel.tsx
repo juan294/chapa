@@ -84,13 +84,19 @@ export function ScoreExplanationPanel({
   const activeDimensionLabels = explanation.composite.activeDimensionKeys
     .map((key) => t(`dimensions.${key}.label`) as string)
     .join(", ");
-  const compositeHeading = explanation.composite.soloQualityExcluded
-    ? t("scoreExplanation.composite.headingSolo") as string
-    : t("scoreExplanation.composite.headingCollaborative") as string;
-  const compositeFormula = interpolate(t("scoreExplanation.composite.formula") as string, {
-    score: String(explanation.composite.score),
+  // Lead with the SAME number shown on the badge (adjustedComposite). The raw
+  // dimension average (compositeScore) is shown underneath as the breakdown, so
+  // visitors never see a headline number that contradicts the badge.
+  const scoreLine = interpolate(t("scoreExplanation.composite.scoreLine") as string, {
+    score: String(explanation.composite.adjusted),
     tier: explanation.composite.tier,
+  });
+  const compositeBreakdown = interpolate(t("scoreExplanation.composite.breakdown") as string, {
     dims: activeDimensionLabels,
+    composite: String(explanation.composite.score),
+  });
+  const adjustmentNote = interpolate(t("scoreExplanation.composite.adjustmentNote") as string, {
+    composite: String(explanation.composite.score),
   });
 
   return (
@@ -139,19 +145,22 @@ export function ScoreExplanationPanel({
           <div className="space-y-6 border-t border-stroke px-4 py-5 sm:px-5">
             <section>
               <h4 className="font-heading text-sm font-bold text-text-primary">
-                {compositeHeading}
+                {t("scoreExplanation.composite.heading") as string}
               </h4>
-              <p className="mt-2 rounded-lg border border-stroke bg-track/40 p-3 text-sm font-medium text-text-primary">
-                {compositeFormula}
+              <p className="mt-2 rounded-lg border border-stroke bg-track/40 p-3 font-heading text-xl font-bold text-text-primary tabular-nums">
+                {scoreLine}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+                {compositeBreakdown}
               </p>
               {explanation.composite.soloQualityExcluded && (
-                <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">
                   {t("scoreExplanation.composite.soloNote") as string}
                 </p>
               )}
               {explanation.composite.adjusted !== explanation.composite.score && (
                 <p className="mt-2 text-xs leading-relaxed text-text-secondary">
-                  {t("scoreExplanation.composite.adjustedNote") as string}
+                  {adjustmentNote}
                 </p>
               )}
             </section>
@@ -336,7 +345,10 @@ function DimensionFormula({
                   />
                 </div>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {metric.rawLabel}
+                  {interpolate(
+                    t(`scoreExplanation.rawLabels.${metric.rawLabelKey}`) as string,
+                    metric.rawLabelParams,
+                  )}
                 </p>
               </div>
             );

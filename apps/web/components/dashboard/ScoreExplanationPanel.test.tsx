@@ -15,7 +15,7 @@ const soloImpact = makeImpact({
     breadth: 3,
   },
   compositeScore: 47,
-  adjustedComposite: 46,
+  adjustedComposite: 52,
   tier: "Solid",
   confidence: 95,
   confidencePenalties: [
@@ -72,14 +72,30 @@ describe("ScoreExplanationPanel", () => {
     fireEvent.click(toggle);
 
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("Your composite score (solo profile)")).toBeTruthy();
+    expect(screen.getByText("Your score")).toBeTruthy();
+  });
+
+  it("leads with the badge (adjusted) number, not the raw composite", () => {
+    renderPanel(false);
+    expandPanel();
+
+    // Headline must match the badge number (adjustedComposite = 52), NOT the raw
+    // dimension average (compositeScore = 47). The raw average is shown in the
+    // breakdown line with an explanation of the difference.
+    expect(screen.getByText("52 (Solid)")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This is the score shown on your badge, built from your Delivery, Consistency, Breadth — which average to 47.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("47 (Solid)")).toBeNull();
   });
 
   it("shows public formulas and data caveats to visitors but hides confidence", () => {
     renderPanel(false);
     expandPanel();
 
-    expect(screen.getByText("47 (Solid) = average of Delivery, Consistency, Breadth")).toBeTruthy();
+    expect(screen.getByText("52 (Solid)")).toBeTruthy();
     expect(screen.getByText("70% PR weight + 20% issues closed + 10% commits, with a ±5% lead-time modifier.")).toBeTruthy();
     expect(screen.getByText("45% active-day curve + 40% heatmap evenness + 15% week coverage.")).toBeTruthy();
     expect(screen.getByText("Gitlab does not expose PR-description, branch, or issue-link signals, so your Quality dimension is based on limited data here.")).toBeTruthy();
@@ -103,7 +119,11 @@ describe("ScoreExplanationPanel", () => {
 
     expect(screen.getByText("Quality")).toBeTruthy();
     expect(screen.getByText("shown, not counted")).toBeTruthy();
-    expect(screen.getByText("47 (Solid) = average of Delivery, Consistency, Breadth")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This is the score shown on your badge, built from your Delivery, Consistency, Breadth — which average to 47.",
+      ),
+    ).toBeTruthy();
   });
 
   it("renders the GitLab data-source line", () => {
