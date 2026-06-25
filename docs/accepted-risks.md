@@ -6,10 +6,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## CSP unsafe-inline for scripts (#396, #778)
+## CSP unsafe-inline for scripts (#396, #778, #959)
 
-- **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`.
-- **Mitigation:** No user-controlled HTML injection points exist in the application. All user input (GitHub handles, display names) is escaped before rendering into SVG and HTML. Monitor Next.js for nonce-based CSP support.
+- **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`. This is a known limitation of the framework — removing it causes hydration to fail.
+- **Why accepted:** The primary XSS surface (SVG user input) is separately guarded by `escapeXml()` in `apps/web/lib/render/escape.ts`, applied to all user-controlled text (GitHub handle, display name) before SVG rendering. No untrusted HTML reaches any `innerHTML`/`dangerouslySetInnerHTML` sink without prior sanitization.
+- **Mitigation in place:** `escapeXml()` covers all SVG rendering paths; `unsafe-eval` is correctly dev-only (excluded from production CSP via the `isDev` guard in `next.config.ts`).
+- **When to revisit:** When Next.js adds nonce-based CSP support (track Next.js releases — follow [nextjs/next.js#42427](https://github.com/vercel/next.js/issues/42427)). At that point, migrate to a per-request nonce injected via middleware and remove `'unsafe-inline'` from `script-src`.
 - **Severity:** Low
 - **See:** `docs/decisions/2026-06-20-csp-unsafe-inline-accepted-risk.md` (#778) — full rationale and a staged nonce-migration plan to remove `'unsafe-inline'`.
 
