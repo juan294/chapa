@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
+import type { CraftResult, DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 import type { DimensionTrend } from "@/lib/history/trend";
 import { useAnimatedCounter } from "@/lib/effects/counters/use-animated-counter";
 import { useInView } from "@/lib/effects/counters/use-in-view";
@@ -88,6 +88,7 @@ export interface DimensionCardProps {
   animationDelay?: number;
   className?: string;
   profileType?: ProfileType;
+  craftResult?: CraftResult | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +104,7 @@ export function DimensionCard({
   animationDelay = 0,
   className = "",
   profileType = "collaborative",
+  craftResult = null,
 }: DimensionCardProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -244,6 +246,7 @@ export function DimensionCard({
           isOpen={isExpanded}
           onClose={toggle}
           profileType={profileType}
+          craftResult={craftResult}
         />
       </div>
     </div>

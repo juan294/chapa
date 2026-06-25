@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
+import type { CraftResult } from "@chapa/shared";
 import { BATCH_SIZE_DEFAULT } from "@chapa/shared";
 import { makeStats } from "@/lib/test-helpers/fixtures";
 import { getDimensionSubMetrics } from "./dimension-sub-metrics";
+
+function makeCraftResult(overrides: Partial<CraftResult> = {}): CraftResult {
+  return {
+    tool: "claude-code",
+    dimensions: {
+      proficiency: 34,
+      effectiveness: 82,
+      sophistication: 91,
+    },
+    craftScore: 69,
+    tier: "Expert",
+    reportPeriod: {
+      start: "2026-06-01",
+      end: "2026-06-25",
+    },
+    computedAt: "2026-06-25T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 describe("getDimensionSubMetrics", () => {
   it("returns v6 delivery keys with log-normalized count values", () => {
@@ -116,5 +136,31 @@ describe("getDimensionSubMetrics", () => {
     expect(
       getDimensionSubMetrics("craft", makeStats(), "collaborative").map((m) => m.key),
     ).toEqual(["aiToolProficiency", "effectiveness", "sophistication"]);
+  });
+
+  it("uses uploaded Craft sub-dimension scores when available", () => {
+    const metrics = getDimensionSubMetrics(
+      "craft",
+      makeStats(),
+      "collaborative",
+      makeCraftResult(),
+    );
+
+    expect(metrics.map((m) => [m.key, m.weight])).toEqual([
+      ["aiToolProficiency", "34%"],
+      ["effectiveness", "33%"],
+      ["sophistication", "33%"],
+    ]);
+    expect(metrics.map((m) => m.normalizedValue)).toEqual([0.34, 0.82, 0.91]);
+    expect(metrics.map((m) => m.rawLabelKey)).toEqual([
+      "craftSubscore",
+      "craftSubscore",
+      "craftSubscore",
+    ]);
+    expect(metrics.map((m) => m.rawLabelParams)).toEqual([
+      { score: "34" },
+      { score: "82" },
+      { score: "91" },
+    ]);
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useId, useMemo, useState } from "react";
-import type { DimensionScores, ImpactV6Result, Platform, StatsData } from "@chapa/shared";
+import type { CraftResult, DimensionScores, ImpactV6Result, Platform, StatsData } from "@chapa/shared";
 import {
   buildScoreExplanation,
   type DimensionExplanation,
@@ -16,6 +16,7 @@ type TranslateFn = (key: string) => string | string[] | Record<string, unknown>[
 interface ScoreExplanationPanelProps {
   impact: ImpactV6Result;
   stats: StatsData;
+  craftResult?: CraftResult | null;
   isOwner: boolean;
 }
 
@@ -57,6 +58,7 @@ function formulaKeyForDimension(dimension: DimensionExplanation): string {
 export function ScoreExplanationPanel({
   impact,
   stats,
+  craftResult = null,
   isOwner,
 }: ScoreExplanationPanelProps) {
   const { t } = useTranslation();
@@ -64,8 +66,8 @@ export function ScoreExplanationPanel({
   const panelId = useId();
 
   const explanation = useMemo(
-    () => buildScoreExplanation(impact, stats),
-    [impact, stats],
+    () => buildScoreExplanation(impact, stats, craftResult),
+    [impact, stats, craftResult],
   );
 
   const toggle = useCallback(() => {

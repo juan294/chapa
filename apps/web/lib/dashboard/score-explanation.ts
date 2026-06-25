@@ -1,5 +1,6 @@
 import type {
   ConfidenceFlag,
+  CraftResult,
   DimensionScores,
   ImpactTier,
   ImpactV6Result,
@@ -128,6 +129,7 @@ function buildPlatformProvenance(platform: Platform, stats: StatsData): Platform
 export function buildScoreExplanation(
   impact: ImpactV6Result,
   stats: StatsData,
+  craftResult: CraftResult | null = null,
 ): ScoreExplanation {
   const isSolo = impact.profileType === "solo";
   const activeDimensionKeys = (isSolo ? SOLO_DIMENSION_KEYS : DIMENSION_KEYS).filter((key) =>
@@ -140,7 +142,7 @@ export function buildScoreExplanation(
       key,
       score: impact.dimensions[key]!,
       countsTowardComposite: activeDimensionKeys.includes(key),
-      subMetrics: getDimensionSubMetrics(key, stats, impact.profileType),
+      subMetrics: getDimensionSubMetrics(key, stats, impact.profileType, craftResult),
     }));
 
   const linkedPlatforms = stats.linkedPlatforms?.filter((platform) => platform !== "github") ?? [];

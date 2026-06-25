@@ -1,4 +1,4 @@
-import type { DimensionScores, ProfileType, StatsData } from "@chapa/shared";
+import type { CraftResult, DimensionScores, ProfileType, StatsData } from "@chapa/shared";
 import { BATCH_SIZE_DEFAULT, SCORING_CAPS, SCORING_WINDOW_DAYS } from "@chapa/shared";
 import { computeHeatmapEvenness, computeWeekCoverage } from "@/lib/impact/heatmap-evenness";
 import { normalize } from "@/lib/impact/utils";
@@ -52,6 +52,7 @@ export function getDimensionSubMetrics(
   dimension: DimensionKey,
   stats: StatsData,
   profileType: ProfileType = "collaborative",
+  craftResult: CraftResult | null = null,
 ): DimensionSubMetric[] {
   switch (dimension) {
     case "delivery":
@@ -220,6 +221,32 @@ export function getDimensionSubMetrics(
     }
 
     case "craft":
+      if (craftResult) {
+        return [
+          {
+            key: "aiToolProficiency",
+            weight: "34%",
+            normalizedValue: craftResult.dimensions.proficiency / 100,
+            rawLabelKey: "craftSubscore",
+            rawLabelParams: { score: String(craftResult.dimensions.proficiency) },
+          },
+          {
+            key: "effectiveness",
+            weight: "33%",
+            normalizedValue: craftResult.dimensions.effectiveness / 100,
+            rawLabelKey: "craftSubscore",
+            rawLabelParams: { score: String(craftResult.dimensions.effectiveness) },
+          },
+          {
+            key: "sophistication",
+            weight: "33%",
+            normalizedValue: craftResult.dimensions.sophistication / 100,
+            rawLabelKey: "craftSubscore",
+            rawLabelParams: { score: String(craftResult.dimensions.sophistication) },
+          },
+        ];
+      }
+
       return [
         {
           key: "aiToolProficiency",

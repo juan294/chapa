@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
+import type { CraftResult, ImpactV6Result, StatsData, DimensionScores } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 import { DimensionCard } from "./DimensionCard";
@@ -16,6 +16,7 @@ export interface DimensionCardsRowProps {
   diff?: SnapshotDiff | null;
   activeDimension?: keyof DimensionScores | null;
   className?: string;
+  craftResult?: CraftResult | null;
 }
 
 export function DimensionCardsRow({
@@ -25,6 +26,7 @@ export function DimensionCardsRow({
   diff,
   activeDimension,
   className,
+  craftResult = null,
 }: DimensionCardsRowProps) {
   const { t } = useTranslation();
   const hasCraft = impact.dimensions.craft != null;
@@ -61,6 +63,7 @@ export function DimensionCardsRow({
                   : ""
               }
               profileType={impact.profileType}
+              craftResult={craftResult}
             />
           );
         })}

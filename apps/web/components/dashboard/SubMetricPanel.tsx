@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
+import type { CraftResult, DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { getDimensionSubMetrics } from "@/lib/dashboard/dimension-sub-metrics";
@@ -12,6 +12,7 @@ export interface SubMetricPanelProps {
   isOpen: boolean;
   onClose: () => void;
   profileType?: ProfileType;
+  craftResult?: CraftResult | null;
 }
 
 const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
@@ -28,6 +29,7 @@ export function SubMetricPanel({
   isOpen,
   onClose,
   profileType = "collaborative",
+  craftResult = null,
 }: SubMetricPanelProps) {
   const { t } = useTranslation();
   useEffect(() => {
@@ -44,8 +46,8 @@ export function SubMetricPanel({
   }, [isOpen, onClose]);
 
   const subMetrics = useMemo(
-    () => getDimensionSubMetrics(dimension, stats, profileType),
-    [dimension, stats, profileType],
+    () => getDimensionSubMetrics(dimension, stats, profileType, craftResult),
+    [dimension, stats, profileType, craftResult],
   );
 
   if (!isOpen) return null;

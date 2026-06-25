@@ -988,6 +988,7 @@ export const es: Translations = {
       starsEarned: '{count} estrellas obtenidas',
       forks: '{count} forks',
       docsOnlyPrs: '{percent} PR solo de documentación',
+      craftSubscore: 'Subpuntuación de Craft: {score}/100',
       uploadInsights: 'Sube el informe de insights para calcular',
     },
     dataSources: {

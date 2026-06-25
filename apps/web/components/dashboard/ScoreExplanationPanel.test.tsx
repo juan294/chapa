@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { CraftResult } from "@chapa/shared";
 import { makeImpact, makeStats } from "@/lib/test-helpers/fixtures";
 import { ScoreExplanationPanel } from "./ScoreExplanationPanel";
 
@@ -41,6 +42,22 @@ const soloStats = makeStats({
   issueLinkageRate: undefined,
   batchSizeScore: undefined,
 });
+
+const craftResult: CraftResult = {
+  tool: "claude-code",
+  dimensions: {
+    proficiency: 34,
+    effectiveness: 82,
+    sophistication: 91,
+  },
+  craftScore: 69,
+  tier: "Expert",
+  reportPeriod: {
+    start: "2026-06-01",
+    end: "2026-06-25",
+  },
+  computedAt: "2026-06-25T00:00:00.000Z",
+};
 
 function renderPanel(isOwner: boolean) {
   return render(
@@ -149,5 +166,33 @@ describe("ScoreExplanationPanel", () => {
     expandPanel();
 
     expect(screen.getByText("GitLab (mdburgos)")).toBeTruthy();
+  });
+
+  it("renders uploaded Craft sub-scores instead of the upload prompt", () => {
+    render(
+      <ScoreExplanationPanel
+        impact={makeImpact({
+          profileType: "collaborative",
+          dimensions: {
+            delivery: 80,
+            quality: 70,
+            consistency: 60,
+            breadth: 50,
+            craft: 69,
+          },
+        })}
+        stats={makeStats()}
+        craftResult={craftResult}
+        isOwner={false}
+      />,
+    );
+
+    expandPanel();
+
+    expect(screen.getByText("Craft")).toBeTruthy();
+    expect(screen.getByText("Craft subscore: 34/100")).toBeTruthy();
+    expect(screen.getByText("Craft subscore: 82/100")).toBeTruthy();
+    expect(screen.getByText("Craft subscore: 91/100")).toBeTruthy();
+    expect(screen.queryByText("Upload insights report to compute")).toBeNull();
   });
 });
