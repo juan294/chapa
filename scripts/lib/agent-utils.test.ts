@@ -6,6 +6,10 @@ import path from "node:path";
 
 const projectRoot = path.resolve(__dirname, "../..");
 const agentUtilsPath = path.join(projectRoot, "scripts/lib/agent-utils.sh");
+const legacyAgentUtilsPath = path.join(
+  projectRoot,
+  "scripts/agents/lib/agent-utils.sh",
+);
 
 function runValidation(
   reportContent: string,
@@ -79,6 +83,46 @@ function runLockCommand(script: string): { success: boolean; output: string } {
   }
 }
 
+function runSharedContextExtraction(
+  reportContent: string,
+  utilsPath = agentUtilsPath,
+): { success: boolean; output: string } {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "agent-utils-shared-test-"));
+  const reportPath = path.join(tempDir, "report.md");
+  const sharedContextPath = path.join(tempDir, "shared-context.md");
+  writeFileSync(reportPath, reportContent, "utf8");
+
+  const sourcePrefix = utilsPath.includes("/scripts/agents/")
+    ? `SCRIPT_DIR="${path.join(projectRoot, "scripts/agents")}"; `
+    : "";
+
+  try {
+    const output = execFileSync(
+      "bash",
+      [
+        "-lc",
+        `${sourcePrefix}source "${utilsPath}"; SHARED_CONTEXT_FILE="${sharedContextPath}"; extract_and_write_shared_context "coverage_agent" "${reportPath}"; test -f "${sharedContextPath}" && cat "${sharedContextPath}" || true`,
+      ],
+      {
+        cwd: projectRoot,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+
+    return { success: true, output };
+  } catch (error) {
+    const output =
+      error instanceof Error && "stderr" in error
+        ? String((error as { stderr?: string }).stderr ?? "")
+        : "";
+
+    return { success: false, output };
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 afterEach(() => {
   delete process.env.CHAPA_PRODUCTION_URL;
   delete process.env.CHAPA_API_BASE;
@@ -133,5 +177,37 @@ describe("agent locks", () => {
 
     expect(result.success).toBe(false);
     expect(result.output).toContain("Timed out waiting for test-agent lock");
+  });
+});
+
+describe("extract_and_write_shared_context", () => {
+  it("extracts HTML-comment shared context markers without exiting nonzero", () => {
+    for (const utilsPath of [agentUtilsPath, legacyAgentUtilsPath]) {
+      const result = runSharedContextExtraction(
+        `# Coverage Report
+
+<!-- SHARED_CONTEXT_START -->
+- Tests: 7977/7977 passed
+<!-- SHARED_CONTEXT_END -->
+`,
+        utilsPath,
+      );
+
+      expect(result.success, utilsPath).toBe(true);
+      expect(result.output).toContain("agent=coverage_agent");
+      expect(result.output).toContain("- Tests: 7977/7977 passed");
+    }
+  });
+
+  it("treats missing shared context as a non-fatal condition", () => {
+    for (const utilsPath of [agentUtilsPath, legacyAgentUtilsPath]) {
+      const result = runSharedContextExtraction(
+        "# Coverage Report\n\nNo cross-agent context today.\n",
+        utilsPath,
+      );
+
+      expect(result.success, utilsPath).toBe(true);
+      expect(result.output).not.toContain("agent=coverage_agent");
+    }
   });
 });

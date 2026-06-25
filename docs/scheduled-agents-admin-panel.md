@@ -250,10 +250,16 @@ extract_and_write_shared_context() {
   local timestamp
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-  # Extract the SHARED_CONTEXT block
+  # Extract the SHARED_CONTEXT block. Accept both plain markers and
+  # HTML-comment markers that Claude may emit.
   local context_block
-  context_block=$(sed -n '/SHARED_CONTEXT_START/,/SHARED_CONTEXT_END/p' "$report_file" \
-    | sed '1d;$d')  # Strip the START/END markers
+  context_block=$(python3 -c "
+import re
+content = open('$report_file').read()
+match = re.search(r'(?:<!--\s*)?SHARED_CONTEXT_START(?:\s*-->)?\s*\n(.*?)\n\s*(?:<!--\s*)?SHARED_CONTEXT_END', content, re.DOTALL)
+if match:
+    print(match.group(1).strip())
+" 2>/dev/null) || true
 
   if [ -n "$context_block" ]; then
     # Append tagged entry
@@ -271,7 +277,7 @@ extract_and_write_shared_context() {
     python3 -c "
 import re
 content = open('$report_file').read()
-cleaned = re.sub(r'SHARED_CONTEXT_START.*?SHARED_CONTEXT_END', '', content, flags=re.DOTALL).strip()
+cleaned = re.sub(r'(?:<!--\s*)?SHARED_CONTEXT_START(?:\s*-->)?.*?(?:<!--\s*)?SHARED_CONTEXT_END(?:\s*-->)?', '', content, flags=re.DOTALL).strip()
 open('$report_file', 'w').write(cleaned + '\n')
 "
     log_info "Shared context updated for $agent_key."
