@@ -292,22 +292,24 @@
 - [Cost Analyst]: Bundle flat at 1,950 KB raw / 623 KB gzipped — no cold-start memory regression. M-bundle stays closed. `ANALYZE=true` run not urgent.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-06-04T10:00:00Z -->
-## Performance Agent — 2026-06-04
+<!-- ENTRY:START agent=performance timestamp=2026-06-25T09:00:00Z -->
+## Performance Agent — 2026-06-25
 - **Status**: GREEN
-- Total First Load JS: **1,943.29 KB raw / 620.17 KB gzipped** (77 chunks). **Flat vs 2026-05-28** (1,943.3 KB / 620.2 KB / 77 chunks). HEAD pinned at `2d7eb73c` — no code change; confirmatory cycle. M-bundle monitor stays closed.
-- Routes >500 KB: **0**. Largest chunks 227.1 / 183.2 / 153.3 / 110.0 / 107.2 KB raw — all framework/vendor, none >300 KB.
-- Build: Next 16.2.6 Turbopack, 5.0s compile, 6.9s typecheck, 0 errors. 87 routes (5 static, 82 dynamic), 48 static pages. Per-route First Load JS omitted by Turbopack — sized from `.next/static/chunks`.
-- Knip `--production`: **0 findings** (exit 0, empty output). `server-only` false positive stays suppressed.
-- `"use client"` (non-test, anchored): 112. All appropriate; key public pages (`/`, `/about`, `/u/[handle]`, archetypes) confirmed server components. Count delta vs 05-28 is grep methodology only — HEAD unchanged.
-- Badge route: `maxDuration=35` (6th cycle hold); success `s-maxage=21600 / SWR=86400`, error `s-maxage=300 / SWR=600`; in-flight dedup + Redis lock. Feature-flags ISR `unstable_cache(300)` active. `/api/health` GitHub probe cached 60s. 0 uncached external calls.
-- Fonts: `next/font/google` (JetBrains Mono + Plus Jakarta Sans), `display: swap`, no external font links. CLS risks: none (next/image w/ dimensions; raw `<img>` matches are tests/escaped strings). `prefers-reduced-motion` respected.
+- Total First Load JS: **2,074 KB raw / 657 KB gzipped** (77 chunks). **+124 KB raw (+6.4%) / +34 KB gzipped (+5.5%) vs 2026-06-18** — first non-flat cycle in 12 cycles. Growth fully attributed to feat(score): add score challenge flow (#933, 887 insertions: `ChallengeForm.tsx` 173 lines, `lib/email/challenge.ts` 101 lines, i18n keys). `ChallengeForm` → `ScoreExplanationPanel` → `SharePageOwnerContent` → **`next/dynamic` in `SharePageOwnerContentLazy`** — correctly code-split, visitor First Load JS unaffected.
+- Routes >500 KB: **0**. Routes >350 KB: **0**. Largest chunks 228 / 192 / 110 / 107 / 88 KB raw — all framework/vendor, none >300 KB.
+- Build: Next 16.2.9 Turbopack, 6.8s compile, 10.0s TypeScript, 0 errors. 89 routes (5 static, 84 dynamic), 48 static pages. Per-route First Load JS omitted by Turbopack — sized from `.next/static/chunks`.
+- Knip `--production`: **1 finding** — `vitest.setup.ts` (false positive, test infrastructure). 0 real unused production exports.
+- `"use client"` (non-test): **113**. Key public pages (`/`, `/about`, `/u/[handle]`, archetypes) confirmed server components. 22 `next/dynamic`/`import()` usages.
+- Badge route: `maxDuration=35`; success `s-maxage=21600 / SWR=86400`, error `s-maxage=300 / SWR=600`; in-flight dedup + Redis lock. 0 uncached external calls.
+- Fonts: `next/font/google` (JetBrains Mono + Plus Jakarta Sans), `display: swap`, 0 external font requests. CLS: badge fallback `<img>` has explicit `width=1200 height=630` ✓; `LiteYouTubeEmbed` thumbnail `<img>` in fixed container, no explicit attrs (P3). `prefers-reduced-motion` respected.
+- New route `/api/challenge` (#933) not yet in CLAUDE.md route table (P3 doc gap for documentation agent).
 
 **Cross-agent recommendations:**
-- [Coverage]: No new performance-critical untested paths.
-- [Security]: No performance issues with security implications. Badge in-flight dedup + rate limit unchanged; fail-open Redis rate limiter intact; fetch timeouts 100%.
-- [QA]: No CLS regressions; ISR caching active on archetype/about pages. Bundle flat — no TTI/LCP regression.
-- [Cost Analyst]: Bundle flat 1,943 KB raw / 620 KB gzipped — M-bundle stays closed, no cold-start memory regression. `ANALYZE=true` run not urgent.
+- [Coverage]: `ChallengeForm.tsx` (173 lines) and `lib/email/challenge.ts` (101 lines) ship with sibling test files per #933 diff — no coverage gap from bundle growth.
+- [Security]: `/api/challenge` new route is server-side only, no client bundle contribution. Verify rate-limiting and auth guard are in place.
+- [QA]: No CLS regressions. Bundle growth is in owner-only lazy chunk; no TTI/LCP impact on visitor pages.
+- [Cost Analyst]: Bundle grew to 2,074 KB raw / 657 KB gzipped (+124 KB). Growth in lazy-loaded chunk only — no cold-start memory regression on public pages. If next cycle exceeds 2,300 KB raw, trigger `ANALYZE=true` run.
+- [Documentation]: `/api/challenge` route added by #933 is missing from CLAUDE.md route table. Add in next doc cycle.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=coverage timestamp=2026-06-24T03:15:00Z -->
