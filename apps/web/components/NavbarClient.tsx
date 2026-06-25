@@ -38,7 +38,7 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   }, [navLinks]);
 
   return (
-    <nav aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
+    <nav suppressHydrationWarning aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2">
@@ -79,6 +79,7 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
             />
           ) : (
             <a
+              suppressHydrationWarning
               href="/api/auth/login"
               className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"
             >

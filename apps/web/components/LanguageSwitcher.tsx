@@ -91,6 +91,7 @@ export function LanguageSwitcher() {
 
   return (
     <div
+      suppressHydrationWarning
       ref={containerRef}
       role="group"
       aria-label={t("aria.languageSwitcher") as string}
@@ -106,7 +107,7 @@ export function LanguageSwitcher() {
         aria-haspopup="listbox"
         className="flex h-11 items-center gap-1.5 px-3 rounded-lg font-heading text-sm text-terminal-dim transition-colors hover:text-amber focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber/40"
       >
-        <span>{current.label}</span>
+        <span suppressHydrationWarning>{current.label}</span>
         {/* Inline chevron — no icon library dependency */}
         <svg
           width="12"
@@ -127,6 +128,7 @@ export function LanguageSwitcher() {
       </button>
 
       <div
+        suppressHydrationWarning
         role="listbox"
         aria-label={t("aria.languageSwitcher") as string}
         onClick={(e) => e.stopPropagation()}
@@ -140,6 +142,7 @@ export function LanguageSwitcher() {
         <div ref={listboxRef} className="flex flex-col gap-0.5">
           {LANGUAGES.map((lang) => (
             <button
+              suppressHydrationWarning
               key={lang.code}
               role="option"
               aria-selected={locale === lang.code}
