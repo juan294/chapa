@@ -28,7 +28,7 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
 
 const PLATFORM_LABELS: Record<Platform, string> = {
   github: "GitHub",
-  gitlab: "Gitlab",
+  gitlab: "GitLab",
   bitbucket: "Bitbucket",
   codeberg: "Codeberg",
 };

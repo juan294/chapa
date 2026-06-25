@@ -64,6 +64,16 @@ describe("buildScoreExplanation", () => {
     expect(explanation.dataSources[1]!.missingSignalKeys).toEqual(
       expect.arrayContaining(["prDescription", "featureBranch", "issueLinkage"]),
     );
+    // GitHub (primary) here has no quality data (empty account): those signals
+    // must NOT be listed as "not available on this platform" — GitHub can provide
+    // them, there is just no data. They are omitted from both lists.
+    expect(explanation.dataSources[0]!.platform).toBe("github");
+    expect(explanation.dataSources[0]!.missingSignalKeys).not.toEqual(
+      expect.arrayContaining(["prDescription", "featureBranch", "issueLinkage"]),
+    );
+    expect(explanation.dataSources[0]!.providedSignalKeys).not.toEqual(
+      expect.arrayContaining(["prDescription", "featureBranch", "issueLinkage"]),
+    );
     expect(explanation.confidence.value).toBe(95);
     expect(explanation.confidence.penalties).toEqual([
       { flag: "single_repo_concentration", penalty: 5 },

@@ -42,8 +42,8 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("PR Weight")).toBeTruthy();
-      expect(screen.getByText("Issues Closed")).toBeTruthy();
+      expect(screen.getByText("PR weight")).toBeTruthy();
+      expect(screen.getByText("Issues closed")).toBeTruthy();
       expect(screen.getByText("Commits")).toBeTruthy();
     });
   });
@@ -63,8 +63,8 @@ describe("SubMetricPanel", () => {
       );
 
       expect(screen.getByText("Reviews")).toBeTruthy();
-      expect(screen.getByText("Review Ratio")).toBeTruthy();
-      expect(screen.getByText("Batch Size")).toBeTruthy();
+      expect(screen.getByText("Review-to-PR ratio")).toBeTruthy();
+      expect(screen.getByText("Batch size")).toBeTruthy();
     });
   });
 
@@ -82,9 +82,9 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("Active Days")).toBeTruthy();
-      expect(screen.getByText("Heatmap Evenness")).toBeTruthy();
-      expect(screen.getByText("Week Coverage")).toBeTruthy();
+      expect(screen.getByText("Active days")).toBeTruthy();
+      expect(screen.getByText("Heatmap evenness")).toBeTruthy();
+      expect(screen.getByText("Week coverage")).toBeTruthy();
     });
   });
 
@@ -102,8 +102,8 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("Repos Contributed")).toBeTruthy();
-      expect(screen.getByText("Spread")).toBeTruthy();
+      expect(screen.getByText("Repos contributed")).toBeTruthy();
+      expect(screen.getByText("Spread across repos")).toBeTruthy();
       expect(screen.getByText("Stars")).toBeTruthy();
       expect(screen.getByText("Forks")).toBeTruthy();
       expect(screen.getByText("Docs PRs")).toBeTruthy();
@@ -290,10 +290,10 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("PR Descriptions")).toBeTruthy();
-      expect(screen.getByText("Feature Branches")).toBeTruthy();
-      expect(screen.getByText("Issue Linkage")).toBeTruthy();
-      expect(screen.getByText("Batch Size")).toBeTruthy();
+      expect(screen.getByText("PR descriptions")).toBeTruthy();
+      expect(screen.getByText("Feature branches")).toBeTruthy();
+      expect(screen.getByText("Issue linkage")).toBeTruthy();
+      expect(screen.getByText("Batch size")).toBeTruthy();
     });
 
     it("shows solo weight percentages", () => {
@@ -330,8 +330,8 @@ describe("SubMetricPanel", () => {
       );
 
       expect(screen.getByText("Reviews")).toBeTruthy();
-      expect(screen.getByText("Review Ratio")).toBeTruthy();
-      expect(screen.getByText("Batch Size")).toBeTruthy();
+      expect(screen.getByText("Review-to-PR ratio")).toBeTruthy();
+      expect(screen.getByText("Batch size")).toBeTruthy();
     });
   });
 
@@ -350,7 +350,7 @@ describe("SubMetricPanel", () => {
       );
 
       expect(screen.getByText("Reviews")).toBeTruthy();
-      expect(screen.getByText("Review Ratio")).toBeTruthy();
+      expect(screen.getByText("Review-to-PR ratio")).toBeTruthy();
     });
   });
 
@@ -368,7 +368,7 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("AI Tool Proficiency")).toBeTruthy();
+      expect(screen.getByText("AI tool proficiency")).toBeTruthy();
       expect(screen.getByText("Effectiveness")).toBeTruthy();
       expect(screen.getByText("Sophistication")).toBeTruthy();
     });
@@ -967,8 +967,8 @@ describe("SubMetricPanel", () => {
       );
 
       const progressBars = screen.getAllByRole("progressbar");
-      expect(progressBars[0]!.getAttribute("aria-label")).toBe("PR Weight");
-      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Issues Closed");
+      expect(progressBars[0]!.getAttribute("aria-label")).toBe("PR weight");
+      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Issues closed");
       expect(progressBars[2]!.getAttribute("aria-label")).toBe("Commits");
     });
 
@@ -985,8 +985,8 @@ describe("SubMetricPanel", () => {
 
       const progressBars = screen.getAllByRole("progressbar");
       expect(progressBars[0]!.getAttribute("aria-label")).toBe("Reviews");
-      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Review Ratio");
-      expect(progressBars[2]!.getAttribute("aria-label")).toBe("Batch Size");
+      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Review-to-PR ratio");
+      expect(progressBars[2]!.getAttribute("aria-label")).toBe("Batch size");
     });
   });
 });

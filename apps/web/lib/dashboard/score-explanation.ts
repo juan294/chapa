@@ -105,11 +105,15 @@ function buildPlatformProvenance(platform: Platform, stats: StatsData): Platform
   }
 
   for (const signal of QUALITY_SIGNAL_KEYS) {
-    if (capabilities.quality && hasQualitySignal(stats, signal)) {
-      providedSignalKeys.push(signal);
-    } else {
+    if (!capabilities.quality) {
+      // Platform genuinely cannot expose this signal (GitLab/Bitbucket/Codeberg).
       missingSignalKeys.push(signal);
+    } else if (hasQualitySignal(stats, signal)) {
+      providedSignalKeys.push(signal);
     }
+    // else: platform supports the signal but there is no data for it yet (e.g. a
+    // near-empty GitHub account) — omit it rather than claim it is unavailable
+    // on the platform, which would mislead.
   }
 
   return {

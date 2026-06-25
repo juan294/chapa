@@ -98,7 +98,7 @@ describe("ScoreExplanationPanel", () => {
     expect(screen.getByText("52 (Solid)")).toBeTruthy();
     expect(screen.getByText("70% PR weight + 20% issues closed + 10% commits, with a ±5% lead-time modifier.")).toBeTruthy();
     expect(screen.getByText("45% active-day curve + 40% heatmap evenness + 15% week coverage.")).toBeTruthy();
-    expect(screen.getByText("Gitlab does not expose PR-description, branch, or issue-link signals, so your Quality dimension is based on limited data here.")).toBeTruthy();
+    expect(screen.getByText("GitLab does not expose PR-description, branch, or issue-link signals, so your Quality dimension is based on limited data here.")).toBeTruthy();
     expect(screen.queryByText("Confidence")).toBeNull();
     expect(screen.queryByText("Confidence: 95%")).toBeNull();
   });
@@ -130,6 +130,6 @@ describe("ScoreExplanationPanel", () => {
     renderPanel(false);
     expandPanel();
 
-    expect(screen.getByText("Gitlab (mdburgos)")).toBeTruthy();
+    expect(screen.getByText("GitLab (mdburgos)")).toBeTruthy();
   });
 });

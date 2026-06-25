@@ -4,10 +4,7 @@ import { useEffect, useMemo } from "react";
 import type { DimensionScores, StatsData, ProfileType } from "@chapa/shared";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
-import {
-  getDimensionSubMetrics,
-  type DimensionSubMetricKey,
-} from "@/lib/dashboard/dimension-sub-metrics";
+import { getDimensionSubMetrics } from "@/lib/dashboard/dimension-sub-metrics";
 
 export interface SubMetricPanelProps {
   dimension: keyof DimensionScores;
@@ -23,29 +20,6 @@ const DIMENSION_COLORS: Record<keyof DimensionScores, string> = {
   consistency: "var(--color-dimension-consistency)",
   breadth: "var(--color-dimension-breadth)",
   craft: "var(--color-dimension-craft)",
-};
-
-const SUB_METRIC_LABELS: Record<DimensionSubMetricKey, string> = {
-  prWeight: "PR Weight",
-  issues: "Issues Closed",
-  commits: "Commits",
-  reviews: "Reviews",
-  reviewRatio: "Review Ratio",
-  batchSize: "Batch Size",
-  prDescription: "PR Descriptions",
-  featureBranch: "Feature Branches",
-  issueLinkage: "Issue Linkage",
-  activeDays: "Active Days",
-  evenness: "Heatmap Evenness",
-  weekCoverage: "Week Coverage",
-  repos: "Repos Contributed",
-  spread: "Spread",
-  docs: "Docs PRs",
-  stars: "Stars",
-  forks: "Forks",
-  aiToolProficiency: "AI Tool Proficiency",
-  effectiveness: "Effectiveness",
-  sophistication: "Sophistication",
 };
 
 export function SubMetricPanel({
@@ -119,7 +93,7 @@ export function SubMetricPanel({
       <div className="space-y-4">
         {subMetrics.map((metric) => {
           const percent = Math.round(metric.normalizedValue * 100);
-          const metricLabel = SUB_METRIC_LABELS[metric.key];
+          const metricLabel = t(`scoreExplanation.subMetrics.${metric.key}`) as string;
           return (
             <div key={metric.key}>
               <div className="mb-1 flex items-center justify-between">
