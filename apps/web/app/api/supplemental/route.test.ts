@@ -106,7 +106,7 @@ describe("POST /api/supplemental", () => {
     mockCacheSet.mockResolvedValue(undefined);
     mockCacheDel.mockResolvedValue(undefined);
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 10 });
-    mockDbUpsertSupplemental.mockResolvedValue(undefined);
+    mockDbUpsertSupplemental.mockResolvedValue(true);
     mockGetClientIp.mockReturnValue("127.0.0.1");
   });
 
@@ -364,16 +364,20 @@ describe("POST /api/supplemental", () => {
   // Error handling
   // -------------------------------------------------------------------------
 
-  it("re-throws when cacheSet throws (handled by withErrorCapture)", async () => {
+  it("returns 500 when cacheSet rejects AND dbUpsertSupplemental returns false", async () => {
+    // Redis is best-effort. A Redis-only failure doesn't surface as 500.
+    // But if DB also fails, the route returns 500.
     mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
     mockCacheSet.mockRejectedValue(new Error("Redis down"));
+    mockDbUpsertSupplemental.mockResolvedValue(false);
 
     const req = makeRequest(
       { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
       "valid-token",
     );
 
-    await expect(POST(req)).rejects.toThrow("Redis down");
+    const res = await POST(req);
+    expect(res.status).toBe(500);
   });
 
   it("re-throws when resolveRequestAuth throws (handled by withErrorCapture)", async () => {
@@ -385,6 +389,49 @@ describe("POST /api/supplemental", () => {
     );
 
     await expect(POST(req)).rejects.toThrow("Auth service down");
+  });
+
+  // -------------------------------------------------------------------------
+  // BE-H2 (#936): surface dual-write failures — DB is the success criterion
+  // -------------------------------------------------------------------------
+
+  it("returns 500 when dbUpsertSupplemental returns false (Supabase failure)", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    mockCacheSet.mockResolvedValue(undefined);
+    mockDbUpsertSupplemental.mockResolvedValue(false);
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toMatch(/persist supplemental/i);
+  });
+
+  it("returns 200 when Redis write fails but Supabase write succeeds (Redis best-effort)", async () => {
+    mockResolveRequestAuth.mockResolvedValue({ handle: "juan294" });
+    // Redis fails on the supplemental key write — cacheSet rejects for supplemental
+    // but we need it to succeed for the dirty marker. For this test we simulate
+    // best-effort: Redis failure should NOT cause a 500 as long as DB succeeds.
+    mockCacheSet
+      .mockRejectedValueOnce(new Error("Redis down"))  // supplemental cacheSet fails
+      .mockResolvedValue(undefined);                    // dirty marker and others succeed
+    mockDbUpsertSupplemental.mockResolvedValue(true);
+
+    const req = makeRequest(
+      { targetHandle: "juan294", sourceHandle: "juan_corp", stats: validStats },
+      "valid-token",
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(mockDbUpsertSupplemental).toHaveBeenCalledTimes(1);
   });
 
   // -------------------------------------------------------------------------

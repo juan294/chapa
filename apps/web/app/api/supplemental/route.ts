@@ -91,6 +91,7 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
   // 5. Store in Redis (hot read path) AND Supabase (durable). Redis has a
   // 24h TTL and is rebuilt from Supabase by warm-cache + by getStats() on
   // a Redis miss, so a missed CLI upload day no longer drops EMU data.
+  // Supabase is the success criterion — Redis is best-effort.
   const supplemental: SupplementalStats = {
     targetHandle,
     sourceHandle,
@@ -98,10 +99,21 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
     uploadedAt: new Date().toISOString(),
   };
 
-  await Promise.all([
-    cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL),
+  const [, dbOk] = await Promise.all([
+    cacheSet(`supplemental:${targetHandle.toLowerCase()}`, supplemental, CACHE_TTL).catch(
+      (err: unknown) => {
+        console.warn("[supplemental] Redis write failed (best-effort):", (err as Error).message);
+      },
+    ),
     dbUpsertSupplemental(targetHandle, supplemental),
   ]);
+
+  if (!dbOk) {
+    return NextResponse.json(
+      { success: false, error: "Failed to persist supplemental stats" },
+      { status: 500 },
+    );
+  }
 
   // 6. Invalidate score-dependent read models and rendered badge artifact.
   await invalidateProfileReadModels(targetHandle, {
