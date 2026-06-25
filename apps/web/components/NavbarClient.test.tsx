@@ -72,9 +72,16 @@ describe("NavbarClient", () => {
   });
 
   describe("locale consistency", () => {
-    it("trusts server-provided navLinks for first paint", () => {
-      expect(SOURCE).toContain("return navLinks");
-      expect(SOURCE).not.toContain("return Array.isArray(fromLocale)");
+    it("derives nav link labels from active locale via t('landing.navLinks')", () => {
+      // NavbarClient must use the live translation, not freeze server-passed prop labels,
+      // so locale switches (LanguageProvider cookie read on mount) update the center nav.
+      expect(SOURCE).toContain("landing.navLinks");
+    });
+
+    it("uses navLinks prop only as presence signal, with prop as fallback", () => {
+      // The prop is still read to decide whether to show center nav at all,
+      // and used as a fallback in case t() returns an empty array.
+      expect(SOURCE).toContain("navLinks");
     });
   });
 

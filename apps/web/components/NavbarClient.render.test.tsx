@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { NavbarClient } from "./NavbarClient";
+import { LanguageProvider } from "@/lib/i18n";
 import type { SessionUser } from "@/hooks/useSession";
 
 interface UseSessionReturn { session: SessionUser | null; loading: boolean; invalidate: () => void }
@@ -60,6 +61,10 @@ vi.mock("./NavLink", () => ({
   NavLink: ({ label, href }: { label: string; href: string }) => (
     <a href={href} data-testid={`nav-link-${href}`}>{label}</a>
   ),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 
 beforeEach(() => {
@@ -146,18 +151,32 @@ describe("NavbarClient", () => {
   });
 
   // ─── Nav links locale awareness ───────────────────────────────────────
+  // NavbarClient uses t('landing.navLinks') from the active LanguageProvider
+  // locale — NOT the server-passed prop — so locale switches update nav labels.
+  // The prop is a presence signal only ("show center nav on this page").
 
-  it("shows server-provided nav link labels on first paint", () => {
-    const spanishLinks = [
-      { label: "Funciones", href: "#features" },
-      { label: "Cómo funciona", href: "#how-it-works" },
-    ];
-    render(<NavbarClient navLinks={spanishLinks} />);
-    expect(screen.getByTestId("nav-link-#features").textContent).toBe("Funciones");
-    expect(screen.getByTestId("nav-link-#how-it-works").textContent).toBe(
-      "Cómo funciona",
+  it("shows nav links from the active locale (Spanish LanguageProvider)", async () => {
+    const { es } = await import("@/lib/i18n/dictionaries/es");
+    const anyLinks = [{ label: "ignored", href: "#features" }];
+    render(
+      <LanguageProvider initialLocale="es" dictionary={es}>
+        <NavbarClient navLinks={anyLinks} />
+      </LanguageProvider>
     );
-    expect(screen.queryByText("Features")).toBeNull();
+    // Spanish LanguageProvider → labels should come from the Spanish dictionary
+    expect(screen.getByTestId("nav-link-#features").textContent).toBe("Funciones");
+  });
+
+  it("shows nav links from the active locale (English LanguageProvider)", async () => {
+    const { en } = await import("@/lib/i18n/dictionaries/en");
+    const anyLinks = [{ label: "ignored", href: "#features" }];
+    render(
+      <LanguageProvider initialLocale="en" dictionary={en}>
+        <NavbarClient navLinks={anyLinks} />
+      </LanguageProvider>
+    );
+    // English LanguageProvider → labels should come from the English dictionary
+    expect(screen.getByTestId("nav-link-#features").textContent).toBe("Features");
   });
 
   it("does not show nav links when navLinks prop is omitted", () => {
