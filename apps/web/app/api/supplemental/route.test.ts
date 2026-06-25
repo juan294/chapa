@@ -22,6 +22,7 @@ vi.mock("@/lib/cache/redis", () => ({
   cacheSet: mockCacheSet,
   cacheDel: mockCacheDel,
   rateLimit: mockRateLimit,
+  rateLimitStrict: mockRateLimit,
 }));
 
 vi.mock("@/lib/db/supplemental", () => ({

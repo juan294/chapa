@@ -10,7 +10,7 @@ import {
 import { buildAuthCookieFlags } from "@/lib/auth/cookie-policy";
 import { getBaseUrl, getGithubClientId, getGithubClientSecret, getNextauthSecret } from "@/lib/env";
 import { consumeOauthState } from "@/lib/auth/oauth-state";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { dbUpsertUser } from "@/lib/db/users";
 import { addContact } from "@/lib/email/audience";
@@ -83,7 +83,7 @@ export const GET = withErrorCapture("/api/auth/callback", async (request: NextRe
   const requestId = getRequestId(request);
   // Rate limit: 10 requests per IP per 15 minutes
   const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:callback:${ip}`, 10, 900);
+  const rl = await rateLimitStrict(`ratelimit:callback:${ip}`, 10, 900);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

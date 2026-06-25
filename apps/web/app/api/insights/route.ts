@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import { getClientIp, NO_TRUSTED_IP } from "@/lib/http/client-ip";
 import { isInsightsEnabled } from "@/lib/feature-flags";
 import {
@@ -34,7 +34,7 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
     ip === NO_TRUSTED_IP
       ? "ratelimit:insights-ip:no-ip"
       : `ratelimit:insights-ip:${ip}`;
-  const ipRl = await rateLimit(ipRlKey, 10, 3600);
+  const ipRl = await rateLimitStrict(ipRlKey, 10, 3600);
   if (!ipRl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -68,7 +68,7 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
   }
 
   // Rate limit: 10 uploads per handle per 24h
-  const rl = await rateLimit(
+  const rl = await rateLimitStrict(
     `ratelimit:insights:${auth.handle.toLowerCase()}`,
     10,
     86400,

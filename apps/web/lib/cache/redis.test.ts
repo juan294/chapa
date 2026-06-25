@@ -48,6 +48,7 @@ import {
   cacheSet,
   cacheDel,
   rateLimit,
+  rateLimitStrict,
   trackBadgeGenerated,
   getBadgeStats,
   cacheMGet,
@@ -279,6 +280,75 @@ describe("rateLimit", () => {
     const result = await rateLimit("ratelimit:test", 10, 900);
 
     expect(result.allowed).toBe(true);
+    expect(mockIncr).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rateLimitStrict (fail-closed — for auth and write routes)
+// ---------------------------------------------------------------------------
+
+describe("rateLimitStrict", () => {
+  it("allows request when under the limit", async () => {
+    mockIncr.mockResolvedValueOnce(1);
+    mockExpire.mockResolvedValueOnce(1);
+
+    const result = await rateLimitStrict("ratelimit:auth:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(1);
+    expect(result.limit).toBe(10);
+    expect(mockIncr).toHaveBeenCalledWith("ratelimit:auth:test");
+    expect(mockExpire).toHaveBeenCalledWith("ratelimit:auth:test", 900);
+  });
+
+  it("sets expire only on first increment (current === 1)", async () => {
+    mockIncr.mockResolvedValueOnce(5);
+
+    const result = await rateLimitStrict("ratelimit:auth:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(5);
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("denies request when over the limit", async () => {
+    mockIncr.mockResolvedValueOnce(11);
+
+    const result = await rateLimitStrict("ratelimit:auth:test", 10, 900);
+
+    expect(result.allowed).toBe(false);
+    expect(result.current).toBe(11);
+  });
+
+  it("allows exactly at the limit boundary", async () => {
+    mockIncr.mockResolvedValueOnce(10);
+
+    const result = await rateLimitStrict("ratelimit:auth:test", 10, 900);
+
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(10);
+  });
+
+  it("FAILS CLOSED when Redis throws (security-critical: no bypass on error)", async () => {
+    mockIncr.mockRejectedValueOnce(new Error("Connection refused"));
+
+    const result = await rateLimitStrict("ratelimit:auth:test", 10, 900);
+
+    // Unlike rateLimit(), rateLimitStrict must block on Redis failure
+    expect(result.allowed).toBe(false);
+    expect(result.current).toBe(0);
+  });
+
+  it("FAILS CLOSED when Redis is unavailable (no env vars)", async () => {
+    _resetClient();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+
+    const result = await rateLimitStrict("ratelimit:auth:test", 10, 900);
+
+    // Auth routes must block when Redis cannot enforce limits
+    expect(result.allowed).toBe(false);
     expect(mockIncr).not.toHaveBeenCalled();
   });
 });

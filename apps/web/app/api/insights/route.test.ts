@@ -39,6 +39,7 @@ vi.mock("@/lib/auth/resolve-request-auth", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  rateLimitStrict: mockRateLimit,
   cacheDel: mockCacheDel,
 }));
 

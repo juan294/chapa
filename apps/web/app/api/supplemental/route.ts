@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveRequestAuth } from "@/lib/auth/resolve-request-auth";
-import { cacheSet, rateLimit } from "@/lib/cache/redis";
+import { cacheSet, rateLimitStrict } from "@/lib/cache/redis";
 import { markStatsDirty } from "@/lib/cache/dirty-stats";
 import { dbUpsertSupplemental } from "@/lib/db/supplemental";
 import { isValidHandle, isValidEmuHandle, isValidStatsShape } from "@/lib/validation";
@@ -25,7 +25,7 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
     ip === NO_TRUSTED_IP
       ? "ratelimit:supplemental-ip:no-ip"
       : `ratelimit:supplemental-ip:${ip}`;
-  const ipRl = await rateLimit(ipRlKey, 10, 3600);
+  const ipRl = await rateLimitStrict(ipRlKey, 10, 3600);
   if (!ipRl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -80,7 +80,7 @@ export const POST = withErrorCapture("/api/supplemental", async (request: NextRe
   // 4b. Rate limit: 10 requests per targetHandle per 24 hours
   // Keyed on the validated targetHandle — ownership check above ensures the caller
   // is the owner, so this is effectively keyed on the authenticated handle.
-  const rl = await rateLimit(`ratelimit:supplemental:${targetHandle}`, 10, 86400);
+  const rl = await rateLimitStrict(`ratelimit:supplemental:${targetHandle}`, 10, 86400);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests for this handle. Please try again later." },
