@@ -290,7 +290,8 @@ describe("POST /api/admin/campaigns", () => {
     });
 
     it("returns 400 with error referencing the invalid field when subject is missing", async () => {
-      const { subject: _removed, ...bodyWithoutSubject } = validBody;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { subject: _subject, ...bodyWithoutSubject } = validBody;
       const res = await POST(makeRequest("POST", bodyWithoutSubject));
       expect(res.status).toBe(400);
       const body = await res.json();
