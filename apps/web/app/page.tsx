@@ -3,7 +3,8 @@ import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync } from "@/lib/i18n";
-import { getServerLocale, getServerT } from "@/lib/i18n/server";
+import { getServerT } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { renderBadgeSvg } from "@/lib/render/BadgeSvg";
 import { DEMO_STATS, DEMO_IMPACT } from "@/lib/render/demoData";
@@ -64,11 +65,12 @@ export default async function Home({
 }) {
   const { error, lang } = await searchParams;
   const errorMessage = getOAuthErrorMessage(error);
-  // Detect locale from cookie → ?lang= → Accept-Language → 'es' default.
-  // The page is dynamic so the server always renders in the user's actual locale,
-  // and router.refresh() after setLocale() delivers the correct language immediately.
-  const locale = await getServerLocale(lang);
-  const t = getServerT(locale);
+  // Render statically at DEFAULT_LOCALE ('es') for CDN/ISR cacheability.
+  // The LocaleSync client component handles locale switching after hydration:
+  // when the user has a chapa-locale cookie set to 'en', LocaleSync loads the
+  // English dictionary client-side and re-renders without a server round-trip.
+  // This keeps the landing page ISR-cacheable while still supporting i18n.
+  const t = getServerT(DEFAULT_LOCALE);
 
   const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
 

@@ -22,13 +22,13 @@ describe("Landing page (server component)", () => {
     });
   });
 
-  describe("dynamic rendering (locale-aware per-request)", () => {
-    it("does not use force-static (page is dynamic to read locale cookie)", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
+  describe("static rendering (ISR-cacheable, DEFAULT_LOCALE)", () => {
+    it("does not use force-dynamic directive (page must be statically renderable)", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
     });
 
-    it("does not use force-dynamic directive", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
+    it("does not use force-static directive (default Next.js static rendering is fine)", () => {
+      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
     });
   });
 
@@ -90,9 +90,12 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("getServerT");
     });
 
-    it("uses getServerLocale() to detect locale from cookie at request time", () => {
-      expect(SOURCE).toContain("getServerLocale");
-      expect(SOURCE).not.toContain("DEFAULT_LOCALE");
+    it("renders at DEFAULT_LOCALE statically (no cookie read at render time)", () => {
+      // Page must NOT call getServerLocale() — that reads cookies/headers, which
+      // prevents ISR caching. Instead it uses DEFAULT_LOCALE directly and relies
+      // on the LocaleSync client component to switch locale after hydration.
+      expect(SOURCE).not.toContain("getServerLocale");
+      expect(SOURCE).toContain("DEFAULT_LOCALE");
     });
 
     it("renders LocaleSync for sticky lang override", () => {
