@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import type { DimensionScores, ImpactV6Result, Platform, StatsData } from "@chapa/shared";
 import {
   buildScoreExplanation,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/dashboard/score-explanation";
 import { useTranslation } from "@/lib/i18n";
 import { interpolate } from "@/lib/i18n/interpolate";
+import { ChallengeForm } from "./ChallengeForm";
 
 type TranslateFn = (key: string) => string | string[] | Record<string, unknown>[];
 
@@ -60,7 +61,7 @@ export function ScoreExplanationPanel({
 }: ScoreExplanationPanelProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
-  const panelId = "score-explanation-panel";
+  const panelId = useId();
 
   const explanation = useMemo(
     () => buildScoreExplanation(impact, stats),
@@ -70,16 +71,6 @@ export function ScoreExplanationPanel({
   const toggle = useCallback(() => {
     setIsExpanded((prev) => !prev);
   }, []);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggle();
-      }
-    },
-    [toggle],
-  );
 
   const activeDimensionLabels = explanation.composite.activeDimensionKeys
     .map((key) => t(`dimensions.${key}.label`) as string)
@@ -107,7 +98,6 @@ export function ScoreExplanationPanel({
         aria-controls={panelId}
         aria-label={t("aria.toggleScoreExplanation") as string}
         onClick={toggle}
-        onKeyDown={handleKeyDown}
         className="flex w-full cursor-pointer items-center justify-between gap-4 p-4 text-left sm:p-5"
       >
         <div>
@@ -260,6 +250,12 @@ export function ScoreExplanationPanel({
                     {t("scoreExplanation.confidence.noPenalties") as string}
                   </p>
                 )}
+              </section>
+            )}
+
+            {isOwner && isExpanded && (
+              <section className="border-t border-stroke pt-4">
+                <ChallengeForm handle={stats.handle} />
               </section>
             )}
           </div>

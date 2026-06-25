@@ -60,7 +60,7 @@ export function StatusCallout({
   description: string;
   children?: ReactNode;
   className?: string;
-  titleAs?: "h1" | "h2";
+  titleAs?: "h1" | "h2" | "h3" | "h4";
 }) {
   const styles = STATUS_STYLES[variant];
 

@@ -113,6 +113,24 @@ describe("ScoreExplanationPanel", () => {
     expect(screen.getByText("-5")).toBeTruthy();
   });
 
+  it("does not render ChallengeForm for visitors", () => {
+    renderPanel(false);
+    expandPanel();
+
+    expect(
+      screen.queryByRole("button", { name: /something seem off/i }),
+    ).toBeNull();
+  });
+
+  it("renders ChallengeForm CTA for owners", () => {
+    renderPanel(true);
+    expandPanel();
+
+    expect(
+      screen.getByRole("button", { name: /something seem off/i }),
+    ).toBeTruthy();
+  });
+
   it("marks solo Quality as shown but not counted", () => {
     renderPanel(false);
     expandPanel();
