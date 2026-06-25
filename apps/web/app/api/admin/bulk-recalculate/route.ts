@@ -112,11 +112,16 @@ export const POST = withErrorCapture("/api/admin/bulk-recalculate", async (reque
 
   for (let i = 0; i < handles.length; i += BATCH_SIZE) {
     if (Date.now() >= deadline) {
+      // BE-M3 (#952): Use a Set to compute pending instead of slice(completed.length).
+      // slice assumes `completed` is always a dense prefix of `handles`, which breaks
+      // silently if batch ordering ever diverges from handles order. A Set-based filter
+      // is correct regardless of insertion order.
+      const completedSet = new Set(completed);
       return NextResponse.json(
         {
           partial: true,
           completed,
-          pending: handles.slice(completed.length),
+          pending: handles.filter((h) => !completedSet.has(h)),
           recalculated,
           failed: errors.length,
           total: handles.length,
