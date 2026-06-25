@@ -7,6 +7,13 @@ import {
   screen,
   act,
 } from "@testing-library/react";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+const SOURCE = fs.readFileSync(
+  path.resolve(__dirname, "page.tsx"),
+  "utf-8",
+);
 
 // Mock requestAnimationFrame for counter animations
 beforeEach(() => {
@@ -94,6 +101,13 @@ describe("number-counters experiment page", () => {
       target: { value: "10000" },
     });
     expect(screen.getByDisplayValue("91")).toBeTruthy();
+  });
+
+  it("hero score aria-label uses i18n key (not hardcoded English)", () => {
+    // Verify the page uses the i18n aria.impactScoreValue key instead of a
+    // hardcoded template literal `Impact score: ${hero.value}`.
+    expect(SOURCE).toContain("aria.impactScoreValue");
+    expect(SOURCE).not.toMatch(/aria-label=\{`Impact score: \$/);
   });
 
   it("animates in-view counters when sections intersect", async () => {

@@ -52,6 +52,8 @@ export const es: Translations = {
     dimensionLabel: '{label}: puntuación',
     dimensionBreakdown: 'desglose de {label}',
     impactScore: 'puntuación {label}',
+    impactScoreValue: 'Puntuación de impacto: {score}',
+    impactScoreTier: 'Puntuación de impacto {score}, nivel {tier}',
   },
   landing: {
     navLinks: [

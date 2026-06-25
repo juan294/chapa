@@ -8,6 +8,8 @@ import {
   type RefObject,
 } from "react";
 import { MOCK_STATS, MOCK_IMPACT } from "../__fixtures__/mock-data";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 /* ------------------------------------------------------------------ */
 /*  Easing functions                                                   */
@@ -191,6 +193,7 @@ function HeroSection({
   globalTarget: number;
   replayKey: number;
 }) {
+  const { t } = useTranslation();
   const hero = useAnimatedCounter(globalTarget, globalDuration, globalEasing, true);
 
   // Replay when replayKey changes
@@ -237,7 +240,7 @@ function HeroSection({
           <span
             className="font-heading relative text-8xl font-extrabold tracking-tight text-amber sm:text-9xl"
             aria-live="polite"
-            aria-label={`Impact score: ${hero.value}`}
+            aria-label={interpolate(t("aria.impactScoreValue") as string, { score: String(hero.value) })}
           >
             {hero.value}
           </span>
