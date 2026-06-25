@@ -33,6 +33,7 @@ export const en: Translations = {
     languageSwitcher: 'Language switcher',
     badgeTooltips: 'Badge element tooltips',
     avatarOf: '{login}',
+    avatarAlt: "{handle}'s avatar",
     moreInfo: 'More information',
     refreshBadge: 'Refresh badge data',
     shareBadge: 'Share badge',
@@ -47,6 +48,10 @@ export const en: Translations = {
     toggleScoreExplanation: 'Toggle how your score is calculated',
     keyboardShortcuts: 'Keyboard shortcuts',
     closeKeyboardShortcuts: 'Close keyboard shortcuts',
+    dimensionScore: '{label} dimension score: {score}',
+    dimensionLabel: '{label} score',
+    dimensionBreakdown: '{label} dimension breakdown',
+    impactScore: '{label} score',
   },
   landing: {
     navLinks: [
@@ -1058,22 +1063,29 @@ export const en: Translations = {
     delivery: {
       label: 'Delivery',
       subtitle: 'PRs merged · issues closed · commits',
+      tip: 'Measures shipping output: PRs merged, issues closed, and commits. High score = consistently turning ideas into merged code.',
     },
     quality: {
       label: 'Quality',
       subtitle: 'Code reviews · quality gatekeeping',
+      tip: 'Measures code stewardship: reviews submitted, review-to-PR ratio, and commit cleanliness. High score = strong gatekeeper and quality advocate.',
+      soloTip: 'Measures engineering discipline: PR descriptions, feature branch usage, issue linkage, and commit cleanliness.',
+      soloSubtitle: 'PR descriptions · branch discipline · issue linkage',
     },
     consistency: {
       label: 'Consistency',
       subtitle: 'Active days · sustained contributions',
+      tip: 'Measures sustained engagement: active days, even weekly distribution, and low burst patterns. High score = reliable daily contributor.',
     },
     breadth: {
       label: 'Breadth',
       subtitle: 'Repos contributed · community reach',
+      tip: 'Measures breadth of impact: repos contributed to, contribution spread, stars, forks, and docs PRs. High score = wide cross-project influence.',
     },
     craft: {
       label: 'Craft',
       subtitle: 'AI tool proficiency · effectiveness · sophistication',
+      tip: 'Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.',
     },
   },
   tiers: {

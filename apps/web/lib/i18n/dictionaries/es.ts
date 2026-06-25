@@ -33,6 +33,7 @@ export const es: Translations = {
     languageSwitcher: 'Selector de idioma',
     badgeTooltips: 'Tooltips de elementos de la Chapa',
     avatarOf: '{login}',
+    avatarAlt: 'avatar de {handle}',
     moreInfo: 'Más información',
     refreshBadge: 'Actualizar datos de la Chapa',
     shareBadge: 'Compartir Chapa',
@@ -47,6 +48,10 @@ export const es: Translations = {
     toggleScoreExplanation: 'Alternar cómo se calcula tu puntuación',
     keyboardShortcuts: 'Atajos de teclado',
     closeKeyboardShortcuts: 'Cerrar atajos de teclado',
+    dimensionScore: '{label}: puntuación {score}',
+    dimensionLabel: '{label}: puntuación',
+    dimensionBreakdown: 'desglose de {label}',
+    impactScore: 'puntuación {label}',
   },
   landing: {
     navLinks: [
@@ -1058,22 +1063,29 @@ export const es: Translations = {
     delivery: {
       label: 'Entrega',
       subtitle: 'PRs fusionadas · issues cerrados · commits',
+      tip: 'Mide el rendimiento de entrega: PRs fusionadas, issues cerrados y commits. Puntuación alta = conviertes ideas en código fusionado de forma constante.',
     },
     quality: {
       label: 'Calidad',
       subtitle: 'Revisiones de código · control de calidad',
+      tip: 'Mide la custodia del código: revisiones enviadas, ratio revisiones/PR y limpieza de commits. Puntuación alta = guardián sólido y defensor de la calidad.',
+      soloTip: 'Mide la disciplina de ingeniería: descripciones de PR, uso de ramas de funcionalidades, vinculación a issues y limpieza de commits.',
+      soloSubtitle: 'Descripciones de PR · disciplina de ramas · vinculación de issues',
     },
     consistency: {
       label: 'Constancia',
       subtitle: 'Días activos · contribuciones sostenidas',
+      tip: 'Mide la implicación sostenida: días activos, distribución uniforme semanal y pocos patrones en ráfaga. Puntuación alta = contribuidor diario fiable.',
     },
     breadth: {
       label: 'Alcance',
       subtitle: 'Repositorios contribuidos · alcance comunitario',
+      tip: 'Mide la amplitud del impacto: repositorios a los que se contribuye, distribución de contribuciones, estrellas, forks y PRs de documentación. Puntuación alta = amplia influencia entre proyectos.',
     },
     craft: {
       label: 'Oficio',
       subtitle: 'Dominio de IA · efectividad · sofisticación',
+      tip: 'Mide el dominio de herramientas de IA: competencia con asistentes de código, efectividad de los flujos asistidos por IA y sofisticación de los patrones de uso.',
     },
   },
   tiers: {
