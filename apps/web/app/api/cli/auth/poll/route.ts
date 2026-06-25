@@ -27,8 +27,11 @@ interface DeviceSession {
 const NO_IP_POLL_LIMIT = 50;
 const NO_IP_POLL_WINDOW = 300; // seconds
 
-// BE-M2 (#869): Device session TTL (same as approve route)
-const DEVICE_SESSION_TTL = 300; // 5 minutes
+// BE-M2 (#869): Device session TTL (same as approve route).
+// BE-M4 (#953): 300s (5 minutes) caps the window during which a passive attacker
+// who learns the sessionId can redeem via the legacy path on an unconfirmed session.
+// TODO: Remove legacy sessionId-only path once CLI v2.x ships device_code universally. Track: #953
+const DEVICE_SESSION_TTL = 300; // 5 minutes — must stay ≤ 300 to limit unconfirmed session exposure
 
 export const GET = withErrorCapture("/api/cli/auth/poll", async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);

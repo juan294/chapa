@@ -425,6 +425,29 @@ describe("GET /api/cli/auth/poll — device_code (BE-M2, backward-compatible)", 
 });
 
 // ---------------------------------------------------------------------------
+// BE-M4 (#953): Unconfirmed session window — must be ≤ 300 seconds
+// ---------------------------------------------------------------------------
+
+describe("GET /api/cli/auth/poll — BE-M4 (#953): session TTL", () => {
+  it("stores pending sessions with a TTL of at most 300 seconds", async () => {
+    vi.mocked(cacheGet).mockResolvedValue(null);
+    vi.mocked(cacheSet).mockResolvedValue(true);
+    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 120 });
+
+    await GET(makeRequest(VALID_UUID));
+
+    // cacheSet must have been called with a TTL ≤ 300 seconds
+    expect(cacheSet).toHaveBeenCalledWith(
+      expect.stringContaining("cli:device:"),
+      expect.any(Object),
+      expect.any(Number),
+    );
+    const ttlArg = vi.mocked(cacheSet).mock.calls[0]?.[2] as number;
+    expect(ttlArg).toBeLessThanOrEqual(300);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Rate limiting
 // ---------------------------------------------------------------------------
 
