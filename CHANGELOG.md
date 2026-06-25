@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-06-25
+
+### Added
+- **Score challenge flow (#933)**: users can dispute their computed Impact score via a structured challenge form; challenges are recorded and trigger a manual re-review workflow
+- **Score transparency panel (#932)**: share page shows a detailed breakdown of how the composite score was calculated, with per-dimension contribution weights and confidence notes
+- **Supabase backing store for studio config (#935)**: badge customisation config is now durably stored in Supabase (`studio_configs` table) with Redis as a hot read cache; config survives Redis eviction
+- **Fail-closed rate limiting for auth and write routes (#954)**: `rateLimitStrict()` blocks requests when Redis is unavailable on sensitive paths (`/api/auth/callback`, `/api/supplemental`, `/api/insights`); public badge routes remain fail-open
+- **Cross-platform aggregation helper (#947)**: `computePlatformStats()` extracted to `packages/shared` and shared across Bitbucket, Codeberg, and GitLab stat builders; parity test added
+- **Input validation on admin routes (#951)**: Zod schemas validate all `POST /api/admin/feature-flags` and `POST /api/admin/campaigns` request bodies; invalid payloads return structured 400 errors
+- **Health endpoint alertWebhook status (#943)**: `/api/health` response includes `alertWebhook: "configured" | "skipped"` so operators can verify the alert webhook is wired up
+- **`no-restricted-imports` ESLint rule (#948)**: relative imports from `packages/shared` are banned; the `@chapa/shared` workspace alias is the only permitted path
+
+### Fixed
+- **Avatar fetch timeout (#961)**: reduced from 5 s to 2 s to prevent slow avatar CDNs from blocking badge renders
+- **Landing page static rendering (#945)**: `getServerLocale()` removed from the root page; the landing page now renders statically at `DEFAULT_LOCALE` and is fully CDN-cacheable
+- **i18n: dimension tooltip copy (#937)**: dimension `tip` strings moved into the i18n dictionaries so they are translatable; hardcoded English copy removed from `DimensionCard`
+- **i18n: avatar alt text (#939)**: `aria.avatarAlt` key added; avatar `alt` attributes across `AdminUserTable`, `UserMenu`, and `BadgeContent` now use translated strings
+- **i18n: experiment page aria-labels (#957)**: `aria.impactScoreValue` and `aria.impactScoreTier` keys added; number-counters and metallic-shimmer experiment pages use `useTranslation` instead of hardcoded English
+- **i18n: aria-label templates (#938)**: `aria.dimensionScore`, `aria.dimensionLabel`, `aria.dimensionBreakdown`, `aria.impactScore` keys added; `ImpactBreakdown` and `SubMetricPanel` use translated strings
+- **Supplemental dual-write failures surfaced (#936)**: `/api/supplemental` now inspects `Promise.all` results and returns 500 when the Supabase write fails; previously silent DB failures were swallowed
+- **Admin bulk-recalculate deduplication (#952)**: pending-handles computation uses a `Set` to avoid processing the same handle twice when it appears in both active and provided lists
+- **CLI auth device-code window shortened (#953)**: unconfirmed device sessions expire after 1 minute instead of 5; a TODO comment marks the legacy no-device-code path for removal in v2.16
+- **Bundle size CI budget (#940)**: `bundle-size.yml` and `CLAUDE.md` now consistently enforce the 350 KB/chunk limit; the stale 500 KB figure is removed
+- **Vercel cron maxDuration (#942)**: `vercel.json` declares `maxDuration: 300` for the three cron routes; the release checklist documents that this requires Vercel Pro
+- **Validation numeric range caps (#950)**: `isValidStatsShape` caps 12 numeric fields (e.g. `totalCommits ≤ 100 000`, `stars ≤ 1 000 000`) to reject implausibly large supplemental payloads
+- **CSP unsafe-inline documented (#959)**: `docs/accepted-risks.md` and `next.config.ts` comment explain the `unsafe-inline` script policy and reference issue #959
+- **`posthog-js` import optimisation (#959)**: `optimizePackageImports` hint added to `next.config.ts` so Next.js tree-shakes the PostHog bundle more aggressively
+
+### Changed
+- **Pre-deploy migration runbook (#941)**: `docs/runbooks/migrations.md` documents the required pre-deploy migration check so database schema is always in sync before a release
+- 126 new tests; total test count: 8,112 across 473 files
+
 ## [2.14.0] - 2026-06-24
 
 ### Added
@@ -541,7 +573,11 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.15.0...HEAD
+[2.15.0]: https://github.com/juan294/chapa/compare/v2.14.0...v2.15.0
+[2.14.0]: https://github.com/juan294/chapa/compare/v2.13.0...v2.14.0
+[2.13.0]: https://github.com/juan294/chapa/compare/v2.12.0...v2.13.0
+[2.12.0]: https://github.com/juan294/chapa/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/juan294/chapa/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/juan294/chapa/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/juan294/chapa/compare/v2.9.0...v2.9.1

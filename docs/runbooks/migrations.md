@@ -71,6 +71,30 @@ supabase db execute --file supabase/migrations/021_your_description.sql
 3. Apply new migrations to the production Supabase project **before** the code deploy goes live (or simultaneously — the application is designed to degrade gracefully if new columns don't exist yet).
 4. Verify with a quick health check: `curl https://chapa.thecreativetoken.com/api/health`
 
+## Pre-Deploy Migration Check
+
+Before merging the release PR (`develop → main`), run this check to confirm no migration has been forgotten:
+
+```bash
+# Show all migration files added since the last production release
+git diff main..develop -- supabase/migrations/
+```
+
+If new `.sql` files appear in the diff:
+
+1. **Verify they have been applied to the production Supabase project.** Open [app.supabase.com](https://app.supabase.com/) → select the Chapa project → navigate to **Database → Migrations** (or use the SQL Editor to query `schema_migrations`) and confirm each file's timestamp/name appears.
+2. **Alternatively, use the CLI:** `supabase db diff --linked` should return no pending migrations. If it does, apply them first:
+   ```bash
+   supabase db push --linked
+   ```
+3. **Never merge the release PR if pending migrations exist.** Code that references schema objects not yet present in the production database will silently degrade or error.
+
+### Release Checklist Addition
+
+Add this step to your release checklist before promoting `develop → main`:
+
+- [ ] Run `git diff main..develop -- supabase/migrations/` — if any new migration files appear, confirm they have been applied to the production Supabase project before merging.
+
 ## RLS Policies
 
 All tables have Row Level Security (RLS) enabled (see `002_enable_rls.sql`). Every migration that adds a new table must also add the appropriate RLS policies.

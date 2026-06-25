@@ -179,7 +179,7 @@ The adjustment is deliberately gentle. Confidence provides transparency, not pun
 
 ### Why this matters
 
-Confidence is used **internally** to produce the adjusted score (which determines the tier), but it is **not displayed** on the badge or share page. Developers see their tier and adjusted score — the confidence calculation happens behind the scenes to ensure fair scoring without exposing a number that could be misinterpreted.
+Confidence is used to produce the adjusted score (which determines the tier), but it is **not displayed** on the badge or to public share-page visitors. The profile owner can see their confidence percentage and non-accusatory penalty reasons in the share page's "How is my score calculated" panel.
 
 The admin dashboard retains full visibility into confidence values for diagnostic purposes.
 

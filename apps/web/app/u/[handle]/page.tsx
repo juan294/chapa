@@ -118,6 +118,7 @@ export async function SharePageContent({
   const materialized = await materializePublicProfile(handle, { readOnly });
   const stats = materialized?.stats ?? null;
   const impact = materialized?.displayImpact ?? null;
+  const craftResult = materialized?.craftResult ?? null;
   const verification = materialized
     ? getPublicProfileVerification(materialized)
     : null;
@@ -192,7 +193,7 @@ export async function SharePageContent({
     sameAs: [`https://github.com/${handle}`],
     ...(impact
       ? {
-          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier) and ${impact.confidence}% confidence.`,
+          description: `Developer with a Chapa Impact Score of ${impact.adjustedComposite} (${impact.tier} tier).`,
         }
       : {}),
   };
@@ -266,6 +267,7 @@ export async function SharePageContent({
           handle={handle}
           stats={stats}
           impact={impact}
+          craftResult={craftResult}
         />
       </div>
     </>

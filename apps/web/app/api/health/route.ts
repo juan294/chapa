@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { pingRedis, rateLimit } from "@/lib/cache/redis";
-import { getGithubToken, getVercelEnv } from "@/lib/env";
+import { getChapaAlertWebhookUrl, getGithubToken, getVercelEnv } from "@/lib/env";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -101,6 +101,7 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     redis: redisStatus,
     supabase: supabaseStatus,
     github: githubResult.status,
+    alertWebhook: getChapaAlertWebhookUrl() ? "configured" : "skipped",
     ...(isAdmin && githubResult.rateLimit && {
       githubRateLimit: githubResult.rateLimit,
     }),

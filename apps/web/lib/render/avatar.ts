@@ -27,7 +27,10 @@ export async function fetchAvatarBase64(
       return undefined;
     }
     const res = await fetch(avatarUrl, {
-      signal: AbortSignal.timeout(5000),
+      // 2s ceiling keeps the badge render path fast under GitHub CDN slowdowns.
+      // The badge route has maxDuration=35s but avatar is non-critical; if it
+      // misses the deadline the caller falls back to the Chapa shield icon.
+      signal: AbortSignal.timeout(2000),
     });
     if (!res.ok) return undefined;
 

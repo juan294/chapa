@@ -197,6 +197,44 @@ export async function rateLimit(
 }
 
 /**
+ * Check and increment a rate limit counter — **fail-closed** variant.
+ *
+ * Identical to `rateLimit()` in the happy path, but returns
+ * `{ allowed: false }` when Redis is unavailable (missing credentials)
+ * or throws an error. Use this on auth and write routes where losing
+ * rate-limit enforcement during a Redis outage is unacceptable.
+ *
+ * **Public badge read routes must continue to use `rateLimit()` (fail-open)**
+ * to preserve availability when Redis is temporarily down.
+ *
+ * @param key - Rate limit key (e.g. "ratelimit:callback:1.2.3.4")
+ * @param limit - Maximum allowed requests in the window
+ * @param windowSeconds - Window duration in seconds
+ * @returns Whether the request is allowed, or `{ allowed: false }` if Redis is unavailable (fail-closed)
+ */
+export async function rateLimitStrict(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<RateLimitResult> {
+  const redis = getRedis();
+  // Fail-closed: if Redis is unconfigured, block the request
+  if (!redis) return { allowed: false, current: 0, limit };
+
+  try {
+    const current = await redis.incr(key);
+    // Set expiry only on first increment (when counter is 1)
+    if (current === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+    return { allowed: current <= limit, current, limit };
+  } catch {
+    // Fail closed — block requests if Redis is down on security-sensitive routes
+    return { allowed: false, current: 0, limit };
+  }
+}
+
+/**
  * Atomically reserve quota in Redis using a single pipeline for
  * read + increment + TTL refresh.
  *

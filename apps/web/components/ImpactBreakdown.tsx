@@ -4,6 +4,7 @@ import type { ImpactV6Result, StatsData, Platform, DimensionScores } from "@chap
 import { formatCompact } from "@chapa/shared";
 import { InfoTooltip } from "./InfoTooltip";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 const DIMENSION_SUBTITLES: Record<string, string> = {
   delivery: "PRs merged \u00b7 issues closed \u00b7 commits",
@@ -264,7 +265,7 @@ export function ImpactBreakdown({ impact, stats }: ImpactBreakdownProps) {
                   aria-valuenow={dims[key]}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label={`${t(`dimensions.${key}.label`) as string} score`}
+                  aria-label={interpolate(t('aria.impactScore') as string, { label: t(`dimensions.${key}.label`) as string })}
                   className="h-1.5 rounded-full bg-track overflow-hidden"
                 >
                   <div

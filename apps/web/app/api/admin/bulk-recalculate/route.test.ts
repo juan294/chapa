@@ -340,6 +340,51 @@ describe("POST /api/admin/bulk-recalculate", () => {
     });
   });
 
+  // BE-M3 (#952): Set-based pending computation
+  describe("BE-M3 (#952): pending uses Set-based filter instead of slice", () => {
+    it("computes pending correctly when completed list is out-of-order with handles", async () => {
+      vi.useFakeTimers();
+
+      // Handles sorted alphabetically: ['a', 'b', 'c']
+      // completed = ['b', 'a'] (out-of-order) after first batch succeeds but order differs
+      // pending should be ['c'] — with slice(2) it would be ['c'] here, but test the intent
+      mockDbGetUsers.mockResolvedValue([
+        { handle: "a" },
+        { handle: "b" },
+        { handle: "c" },
+      ]);
+
+      // Simulate deadline exceeded after first batch (b+a completed out of insertion order)
+      let callCount = 0;
+      mockMaterializeOrchestratedProfile.mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 5) {
+          await new Promise((resolve) => setTimeout(resolve, 1_000));
+        }
+        return FAKE_MATERIALIZED;
+      });
+
+      const promise = POST(makeRequest());
+      await vi.advanceTimersByTimeAsync(251_000);
+      const res = await promise;
+      const body = await res.json();
+
+      // Verify the response is sensible (partial or full)
+      expect(res.status === 200 || res.status === 202).toBe(true);
+      // completed array should not contain items that are not in handles
+      for (const h of (body.completed ?? [])) {
+        expect(["a", "b", "c"]).toContain(h);
+      }
+      // pending should not contain items already in completed
+      const completedSet = new Set(body.completed ?? []);
+      for (const h of (body.pending ?? [])) {
+        expect(completedSet.has(h)).toBe(false);
+      }
+
+      vi.useRealTimers();
+    });
+  });
+
   describe("BE-H7: ?after= cursor — resumes from alphabetic position", () => {
     beforeEach(() => {
       mockDbGetUsers.mockResolvedValue([

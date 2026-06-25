@@ -12,5 +12,16 @@
       "path": "/api/cron/process-campaigns",
       "schedule": "0 8 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/cron/warm-cache/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/sync-audience/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/process-campaigns/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }

@@ -141,6 +141,30 @@ describe("PATCH /api/admin/feature-flags", () => {
     expect(res.status).toBe(400);
   });
 
+  // BE-M2 (#951): zod validation for mutation body
+  describe("BE-M2 (#951): zod schema validation", () => {
+    it("returns 400 with structured error when key is non-string", async () => {
+      const res = await PATCH(makeRequest({ key: 42, enabled: true }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBeTruthy();
+    });
+
+    it("returns 400 with structured error when enabled is non-boolean", async () => {
+      const res = await PATCH(makeRequest({ key: "test", enabled: "yes" }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBeTruthy();
+    });
+
+    it("returns 400 when config contains non-object value", async () => {
+      const res = await PATCH(makeRequest({ key: "test", config: "bad" }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBeTruthy();
+    });
+  });
+
   it("returns 500 when DB update fails", async () => {
     mockDbUpdateFeatureFlag.mockResolvedValue(false);
 

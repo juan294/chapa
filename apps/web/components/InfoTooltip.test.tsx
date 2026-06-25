@@ -304,7 +304,21 @@ describe("InfoTooltip", () => {
     });
   });
 
-  describe("portal rendering", () => {
+  describe("portal rendering (UX-L1: #958 — safe inside CSS-transformed ancestors)", () => {
+    it("uses createPortal to render outside transformed ancestor", () => {
+      // InfoTooltip is used inside DimensionCard which has animate-fade-in-up
+      // (a CSS transform). position:fixed breaks inside transformed ancestors,
+      // so the tooltip panel MUST be portaled to document.body.
+      expect(SOURCE).toContain("createPortal");
+      expect(SOURCE).toContain("document.body");
+    });
+
+    it("uses position:fixed via z-[99999] class on the portaled panel", () => {
+      // z-[99999] implies position:fixed positioning — both must be present.
+      expect(SOURCE).toContain("fixed");
+      expect(SOURCE).toContain("z-[99999]");
+    });
+
     it("renders tooltip into document.body via createPortal", () => {
       render(
         <div data-testid="parent-container">

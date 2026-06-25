@@ -1,5 +1,5 @@
 ---
-description: Production deployment safety -- main is production, Dependabot handling, cost awareness, rollback-first
+description: Production deployment safety -- protected production branch, Dependabot handling, cost awareness, rollback-first
 paths:
   - .github/**
   - deploy/**

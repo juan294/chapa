@@ -138,14 +138,14 @@ extract_and_write_shared_context() {
   fi
 
   local entry
+  # Match both plain (SHARED_CONTEXT_START) and HTML-comment
+  # (<!-- SHARED_CONTEXT_START -->) formats that Claude may emit.
   entry=$(python3 -c "
-import re, sys
+import re
 content = open('${report_file}').read()
-match = re.search(r'SHARED_CONTEXT_START\n(.*?)SHARED_CONTEXT_END', content, re.DOTALL)
+match = re.search(r'(?:<!--\s*)?SHARED_CONTEXT_START(?:\s*-->)?\s*\n(.*?)\n\s*(?:<!--\s*)?SHARED_CONTEXT_END', content, re.DOTALL)
 if match:
     print(match.group(1).strip())
-else:
-    sys.exit(1)
 " 2>/dev/null) || true
 
   if [ -z "${entry}" ]; then

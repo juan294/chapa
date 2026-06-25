@@ -3,11 +3,11 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { SubMetricPanel } from "./SubMetricPanel";
 import type { StatsData } from "@chapa/shared";
+import { makeStats } from "@/lib/test-helpers/fixtures";
 
 afterEach(cleanup);
 
-const mockStats: StatsData = {
-  handle: "testuser",
+const mockStats: StatsData = makeStats({
   prsMergedWeight: 47,
   prsMergedCount: 47,
   issuesClosedCount: 12,
@@ -25,8 +25,7 @@ const mockStats: StatsData = {
   docsOnlyPrRatio: 0.08,
   linesAdded: 15000,
   linesDeleted: 5000,
-  fetchedAt: "2026-02-28T00:00:00Z",
-};
+});
 
 describe("SubMetricPanel", () => {
   // ----------------------------------------------------------------
@@ -43,8 +42,8 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("PR Weight")).toBeTruthy();
-      expect(screen.getByText("Issues Closed")).toBeTruthy();
+      expect(screen.getByText("PR weight")).toBeTruthy();
+      expect(screen.getByText("Issues closed")).toBeTruthy();
       expect(screen.getByText("Commits")).toBeTruthy();
     });
   });
@@ -53,7 +52,7 @@ describe("SubMetricPanel", () => {
   // 2. Quality dimension sub-metrics
   // ----------------------------------------------------------------
   describe("Quality dimension", () => {
-    it("renders Reviews, Review Ratio, and Code Cleanliness sub-metrics", () => {
+    it("renders Reviews, Review Ratio, and Batch Size sub-metrics", () => {
       render(
         <SubMetricPanel
           dimension="quality"
@@ -64,8 +63,8 @@ describe("SubMetricPanel", () => {
       );
 
       expect(screen.getByText("Reviews")).toBeTruthy();
-      expect(screen.getByText("Review Ratio")).toBeTruthy();
-      expect(screen.getByText("Code Cleanliness")).toBeTruthy();
+      expect(screen.getByText("Review-to-PR ratio")).toBeTruthy();
+      expect(screen.getByText("Batch size")).toBeTruthy();
     });
   });
 
@@ -73,7 +72,7 @@ describe("SubMetricPanel", () => {
   // 3. Consistency dimension sub-metrics
   // ----------------------------------------------------------------
   describe("Consistency dimension", () => {
-    it("renders Active Days, Weekly Evenness, and Low Burst Activity sub-metrics", () => {
+    it("renders Active Days, Heatmap Evenness, and Week Coverage sub-metrics", () => {
       render(
         <SubMetricPanel
           dimension="consistency"
@@ -83,9 +82,9 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("Active Days")).toBeTruthy();
-      expect(screen.getByText("Weekly Evenness")).toBeTruthy();
-      expect(screen.getByText("Low Burst Activity")).toBeTruthy();
+      expect(screen.getByText("Active days")).toBeTruthy();
+      expect(screen.getByText("Heatmap evenness")).toBeTruthy();
+      expect(screen.getByText("Week coverage")).toBeTruthy();
     });
   });
 
@@ -103,8 +102,8 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("Repos Contributed")).toBeTruthy();
-      expect(screen.getByText("Spread")).toBeTruthy();
+      expect(screen.getByText("Repos contributed")).toBeTruthy();
+      expect(screen.getByText("Spread across repos")).toBeTruthy();
       expect(screen.getByText("Stars")).toBeTruthy();
       expect(screen.getByText("Forks")).toBeTruthy();
       expect(screen.getByText("Docs PRs")).toBeTruthy();
@@ -165,13 +164,13 @@ describe("SubMetricPanel", () => {
 
     const [prWeight, issuesClosed, commits] = progressBars;
 
-    // PR Weight: min(47/60, 1) = 0.783... → round to 78
-    expect(prWeight!.getAttribute("aria-valuenow")).toBe("78");
+    // PR Weight: log-normalized against cap 60 → round to 94
+    expect(prWeight!.getAttribute("aria-valuenow")).toBe("94");
     expect(prWeight!.getAttribute("aria-valuemin")).toBe("0");
     expect(prWeight!.getAttribute("aria-valuemax")).toBe("100");
 
-    // Issues Closed: min(12/40, 1) = 0.3 → 30
-    expect(issuesClosed!.getAttribute("aria-valuenow")).toBe("30");
+    // Issues Closed: log-normalized against cap 40 → 69
+    expect(issuesClosed!.getAttribute("aria-valuenow")).toBe("69");
 
     // Commits: min(312/300, 1) = 1 → 100
     expect(commits!.getAttribute("aria-valuenow")).toBe("100");
@@ -280,7 +279,7 @@ describe("SubMetricPanel", () => {
       microCommitRatio: 0.15,
     };
 
-    it("renders PR Descriptions, Feature Branches, Issue Linkage, and Commit Cleanliness", () => {
+    it("renders PR Descriptions, Feature Branches, Issue Linkage, and Batch Size", () => {
       render(
         <SubMetricPanel
           dimension="quality"
@@ -291,10 +290,10 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("PR Descriptions")).toBeTruthy();
-      expect(screen.getByText("Feature Branches")).toBeTruthy();
-      expect(screen.getByText("Issue Linkage")).toBeTruthy();
-      expect(screen.getByText("Commit Cleanliness")).toBeTruthy();
+      expect(screen.getByText("PR descriptions")).toBeTruthy();
+      expect(screen.getByText("Feature branches")).toBeTruthy();
+      expect(screen.getByText("Issue linkage")).toBeTruthy();
+      expect(screen.getByText("Batch size")).toBeTruthy();
     });
 
     it("shows solo weight percentages", () => {
@@ -319,7 +318,7 @@ describe("SubMetricPanel", () => {
   // Collaborative profile quality (unchanged)
   // ----------------------------------------------------------------
   describe("Quality dimension — collaborative profile", () => {
-    it("renders Reviews, Review Ratio, and Code Cleanliness when profileType is collaborative", () => {
+    it("renders Reviews, Review Ratio, and Batch Size when profileType is collaborative", () => {
       render(
         <SubMetricPanel
           dimension="quality"
@@ -331,8 +330,8 @@ describe("SubMetricPanel", () => {
       );
 
       expect(screen.getByText("Reviews")).toBeTruthy();
-      expect(screen.getByText("Review Ratio")).toBeTruthy();
-      expect(screen.getByText("Code Cleanliness")).toBeTruthy();
+      expect(screen.getByText("Review-to-PR ratio")).toBeTruthy();
+      expect(screen.getByText("Batch size")).toBeTruthy();
     });
   });
 
@@ -351,7 +350,7 @@ describe("SubMetricPanel", () => {
       );
 
       expect(screen.getByText("Reviews")).toBeTruthy();
-      expect(screen.getByText("Review Ratio")).toBeTruthy();
+      expect(screen.getByText("Review-to-PR ratio")).toBeTruthy();
     });
   });
 
@@ -369,7 +368,7 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      expect(screen.getByText("AI Tool Proficiency")).toBeTruthy();
+      expect(screen.getByText("AI tool proficiency")).toBeTruthy();
       expect(screen.getByText("Effectiveness")).toBeTruthy();
       expect(screen.getByText("Sophistication")).toBeTruthy();
     });
@@ -471,10 +470,10 @@ describe("SubMetricPanel", () => {
       expect(progressBars[0]!.getAttribute("aria-valuenow")).toBe("50");
       // Spread: 1 - 0.45 = 0.55 → 55
       expect(progressBars[1]!.getAttribute("aria-valuenow")).toBe("55");
-      // Stars: min(120/150, 1) = 0.8 → 80
-      expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("80");
-      // Forks: min(25/80, 1) = 0.3125 → 31
-      expect(progressBars[3]!.getAttribute("aria-valuenow")).toBe("31");
+      // Stars: log-normalized against cap 150 → 96
+      expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("96");
+      // Forks: log-normalized against cap 80 → 74
+      expect(progressBars[3]!.getAttribute("aria-valuenow")).toBe("74");
       // Docs: 0.08 → 8
       expect(progressBars[4]!.getAttribute("aria-valuenow")).toBe("8");
     });
@@ -513,7 +512,7 @@ describe("SubMetricPanel", () => {
 
       expect(screen.getByText("180 of 365 days")).toBeTruthy();
       expect(screen.getByText("Distribution across weeks")).toBeTruthy();
-      expect(screen.getByText("Peak: 8 commits in 10min")).toBeTruthy();
+      expect(screen.getByText("0% active weeks")).toBeTruthy();
     });
 
     it("renders consistency progress bars with correct values", () => {
@@ -531,10 +530,9 @@ describe("SubMetricPanel", () => {
 
       // Active Days: sqrt(min(180/365, 1)) = sqrt(0.493...) ≈ 0.702 → 70
       expect(progressBars[0]!.getAttribute("aria-valuenow")).toBe("70");
-      // Weekly Evenness: 0.5 → 50
-      expect(progressBars[1]!.getAttribute("aria-valuenow")).toBe("50");
-      // Low Burst: 1 - min(8/30, 1) = 1 - 0.266... = 0.733... → 73
-      expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("73");
+      // Empty heatmap data → evenness 0 and week coverage 0
+      expect(progressBars[1]!.getAttribute("aria-valuenow")).toBe("0");
+      expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("0");
     });
 
     it("shows consistency weight percentages", () => {
@@ -571,7 +569,7 @@ describe("SubMetricPanel", () => {
       expect(screen.getByText("35 reviews")).toBeTruthy();
       // Review ratio: min(35/47, 5)/5 = min(0.744, 5)/5 = 0.744/5 = 0.149 → 0.7:1
       expect(screen.getByText("0.7:1 reviews per PR")).toBeTruthy();
-      expect(screen.getByText("85% clean commits")).toBeTruthy();
+      expect(screen.getByText("30% of PRs in reviewable batch size")).toBeTruthy();
     });
 
     it("renders quality collaborative progress bars with correct values", () => {
@@ -588,12 +586,12 @@ describe("SubMetricPanel", () => {
       const progressBars = screen.getAllByRole("progressbar");
       expect(progressBars.length).toBe(3);
 
-      // Reviews: min(35/80, 1) = 0.4375 → 44
-      expect(progressBars[0]!.getAttribute("aria-valuenow")).toBe("44");
+      // Reviews: log-normalized against cap 80 → 82
+      expect(progressBars[0]!.getAttribute("aria-valuenow")).toBe("82");
       // Review Ratio: min(35/47, 5)/5 ≈ 0.149 → 15
       expect(progressBars[1]!.getAttribute("aria-valuenow")).toBe("15");
-      // Code Cleanliness: 1 - 0.15 = 0.85 → 85
-      expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("85");
+      // Batch Size: defaults to 0.3 when unavailable → 30
+      expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("30");
     });
 
     it("shows collaborative quality weight percentages", () => {
@@ -639,7 +637,7 @@ describe("SubMetricPanel", () => {
       expect(screen.getByText("75% of PRs have descriptions")).toBeTruthy();
       expect(screen.getByText("90% from feature branches")).toBeTruthy();
       expect(screen.getByText("40% linked to issues")).toBeTruthy();
-      expect(screen.getByText("85% clean commits")).toBeTruthy();
+      expect(screen.getByText("30% of PRs in reviewable batch size")).toBeTruthy();
     });
 
     it("renders solo quality progress bars with correct values", () => {
@@ -662,8 +660,8 @@ describe("SubMetricPanel", () => {
       expect(progressBars[1]!.getAttribute("aria-valuenow")).toBe("90");
       // Issue Linkage: 0.4 → 40
       expect(progressBars[2]!.getAttribute("aria-valuenow")).toBe("40");
-      // Commit Cleanliness: 1 - 0.15 = 0.85 → 85
-      expect(progressBars[3]!.getAttribute("aria-valuenow")).toBe("85");
+      // Batch Size: defaults to 0.3 when unavailable → 30
+      expect(progressBars[3]!.getAttribute("aria-valuenow")).toBe("30");
     });
   });
 
@@ -694,11 +692,11 @@ describe("SubMetricPanel", () => {
       expect(screen.getByText("0% of PRs have descriptions")).toBeTruthy();
       expect(screen.getByText("0% from feature branches")).toBeTruthy();
       expect(screen.getByText("0% linked to issues")).toBeTruthy();
-      // microCommitRatio defaults to 0.3 → 1 - 0.3 = 0.7 → 70%
-      expect(screen.getByText("70% clean commits")).toBeTruthy();
+      // batchSizeScore defaults to 0.3 when unavailable.
+      expect(screen.getByText("30% of PRs in reviewable batch size")).toBeTruthy();
     });
 
-    it("uses default microCommitRatio of 0.3 when undefined", () => {
+    it("uses default batchSizeScore of 0.3 when undefined", () => {
       const soloStatsNoOptionals = {
         ...mockStats,
         reviewsSubmittedCount: 0,
@@ -719,8 +717,8 @@ describe("SubMetricPanel", () => {
       );
 
       const progressBars = screen.getAllByRole("progressbar");
-      // Commit Cleanliness: 1 - 0.3 = 0.7 → 70
-      expect(progressBars[3]!.getAttribute("aria-valuenow")).toBe("70");
+      // Batch Size: defaults to 0.3 when unavailable → 30
+      expect(progressBars[3]!.getAttribute("aria-valuenow")).toBe("30");
     });
   });
 
@@ -774,10 +772,10 @@ describe("SubMetricPanel", () => {
       expect(progressBars[1]!.getAttribute("aria-valuenow")).toBe("0");
     });
 
-    it("uses default microCommitRatio 0.3 for collaborative when undefined", () => {
+    it("uses default batchSizeScore 0.3 for collaborative when undefined", () => {
       const statsNoMicro: StatsData = {
         ...mockStats,
-        microCommitRatio: undefined as unknown as number,
+        batchSizeScore: undefined,
       };
 
       render(
@@ -790,8 +788,7 @@ describe("SubMetricPanel", () => {
         />
       );
 
-      // Code Cleanliness: 1 - 0.3 = 0.7 → 70%
-      expect(screen.getByText("70% clean commits")).toBeTruthy();
+      expect(screen.getByText("30% of PRs in reviewable batch size")).toBeTruthy();
     });
   });
 
@@ -970,8 +967,8 @@ describe("SubMetricPanel", () => {
       );
 
       const progressBars = screen.getAllByRole("progressbar");
-      expect(progressBars[0]!.getAttribute("aria-label")).toBe("PR Weight");
-      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Issues Closed");
+      expect(progressBars[0]!.getAttribute("aria-label")).toBe("PR weight");
+      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Issues closed");
       expect(progressBars[2]!.getAttribute("aria-label")).toBe("Commits");
     });
 
@@ -988,8 +985,8 @@ describe("SubMetricPanel", () => {
 
       const progressBars = screen.getAllByRole("progressbar");
       expect(progressBars[0]!.getAttribute("aria-label")).toBe("Reviews");
-      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Review Ratio");
-      expect(progressBars[2]!.getAttribute("aria-label")).toBe("Code Cleanliness");
+      expect(progressBars[1]!.getAttribute("aria-label")).toBe("Review-to-PR ratio");
+      expect(progressBars[2]!.getAttribute("aria-label")).toBe("Batch size");
     });
   });
 });

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 /* ------------------------------------------------------------------ */
 /*  Metallic Gold Shimmer — Experiment #39                            */
@@ -322,6 +324,7 @@ function SvgMetallicScore({
   speed: number;
   intensity: number;
 }) {
+  const { t } = useTranslation();
   const highlightOpacity = intensity / 100;
 
   return (
@@ -331,7 +334,7 @@ function SvgMetallicScore({
         xmlns="http://www.w3.org/2000/svg"
         className="w-full max-w-md"
         role="img"
-        aria-label={`Impact score ${score}, tier ${tier} with metallic shimmer effect`}
+        aria-label={interpolate(t("aria.impactScoreTier") as string, { score: String(score), tier })}
       >
         <defs>
           {/* Metallic gold gradient with animated sweep */}

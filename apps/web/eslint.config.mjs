@@ -30,6 +30,20 @@ const eslintConfig = [
       ],
     },
   },
+  {
+    // Enforce @chapa/shared workspace alias — no relative imports to packages/shared.
+    // Application code must use `@chapa/shared`, never `../../packages/shared/src/...`.
+    // This matches the CLAUDE.md CI gate: "packages/shared import boundary".
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: ["**/packages/shared/**"],
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

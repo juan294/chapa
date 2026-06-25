@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const SRC = readFileSync(resolve(__dirname, "BadgeOverlay.tsx"), "utf-8");
+const PAGE_SRC = readFileSync(resolve(__dirname, "../app/page.tsx"), "utf-8");
 const EN_DICT = readFileSync(
   resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
   "utf-8",
@@ -215,5 +216,38 @@ describe("BadgeOverlay mobile fallback", () => {
     // to hide on desktop. On non-leader-line hotspots it shows normally.
     // Either way, InfoTooltip is always in the DOM.
     expect(SRC).toContain("<InfoTooltip");
+  });
+});
+
+// FE-L1 (#962): BadgeOverlay absolute positioning clip risk audit
+describe("BadgeOverlay clip risk audit (#962)", () => {
+  it("outer overlay div has overflow: visible (not clipped)", () => {
+    // The overlay container must not clip annotation panels that extend
+    // above or below the badge boundary (panelTop: '-14%' etc.).
+    expect(SRC).toContain('overflow: "visible"');
+  });
+
+  it("landing page badge section has no overflow-hidden on the relative wrapper", () => {
+    // The .relative parent of BadgeOverlay in page.tsx must NOT have
+    // overflow-hidden — that would clip above-anchored annotation panels.
+    // The overflow-hidden on the sibling image div is intentional (border-radius),
+    // but the wrapper div itself must remain unclipped.
+    //
+    // This test extracts the badge-preview section and checks that the innermost
+    // .relative wrapper does NOT carry overflow-hidden directly.
+    const badgeSection = PAGE_SRC.match(
+      /badge-preview[\s\S]*?<\/section>/,
+    )?.[0];
+    expect(badgeSection).toBeDefined();
+    // The .relative wrapper directly containing BadgeOverlay must not be clipped.
+    // Pattern: <div className="relative"> without overflow-hidden on the same div.
+    expect(badgeSection).toContain('className="relative"');
+    // Confirm overflow-hidden is NOT on the direct .relative parent (it may appear
+    // on the sibling image container but not the wrapper).
+    const relativeWrapperLine = badgeSection
+      ?.split("\n")
+      .find((l) => l.includes('className="relative"'));
+    expect(relativeWrapperLine).toBeDefined();
+    expect(relativeWrapperLine).not.toContain("overflow-hidden");
   });
 });

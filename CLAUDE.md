@@ -176,7 +176,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - A user can log in with GitHub (OAuth success).
 - `/u/:handle/badge.svg` loads publicly without auth (use cached public stats where possible).
 - Badge shows: heatmap, radar chart (4 or 5 dimensions — pentagon when Craft is present, diamond fallback), archetype label, stars/forks/watchers, Impact tier, adjusted score.
-- `/u/:handle` shows badge + breakdown + embed snippet. Confidence is computed internally but not shown to users.
+- `/u/:handle` shows badge + breakdown + embed snippet. Confidence (% + penalty flags) is shown only to the profile owner in the "How is my score calculated" panel; it is hidden from visitors and excluded from public metadata (JSON-LD).
 - Caching prevents repeated GitHub API calls for same handle within 24h.
 - Confidence messaging is non-accusatory (never claims wrongdoing).
 - Repo contains `docs/impact-v6.md` (current spec truth), `docs/impact-v4.md`, `docs/impact-v5.md`, and `docs/svg-design.md`.
@@ -309,7 +309,7 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 - **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
 - **`no-process-env` ESLint rule**: direct `process.env` access is banned outside `apps/web/lib/env.ts` (allowlisted). All env reads go through the centralized env module.
 - **`packages/shared` import boundary**: application code may not import from `packages/shared` via relative paths — use the workspace alias (`@chapa/shared`).
-- **Bundle-size budget**: the largest JS chunk must stay under 500 KB (checked in CI via build output analysis).
+- **Bundle-size budget**: the largest JS chunk must stay under 350 KB (checked in CI via build output analysis).
 - **Coverage thresholds**: configured in `vitest.config.ts` — CI fails if coverage drops below defined per-module thresholds.
 
 ## Test Conventions

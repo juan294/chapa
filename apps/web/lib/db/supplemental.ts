@@ -41,13 +41,14 @@ function rowToSupplemental(row: SupplementalRow): SupplementalStats {
 /**
  * Upsert a supplemental stats record. One row per target handle — the latest
  * upload replaces any prior one.
+ * Returns true on success, false when DB is unavailable or on error.
  */
 export async function dbUpsertSupplemental(
   handle: string,
   supplemental: SupplementalStats,
-): Promise<void> {
+): Promise<boolean> {
   const db = getSupabase();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     const { error } = await db
@@ -63,8 +64,10 @@ export async function dbUpsertSupplemental(
       );
 
     if (error) throw error;
+    return true;
   } catch (error) {
     console.error("[db] dbUpsertSupplemental failed:", (error as Error).message);
+    return false;
   }
 }
 

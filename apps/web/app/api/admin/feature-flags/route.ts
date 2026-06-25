@@ -1,10 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
+import { z } from "zod";
 import { adminAuth } from "@/lib/auth/admin-route";
 import { dbUpdateFeatureFlag } from "@/lib/db/feature-flags";
 import { dbTimeoutOr504 } from "@/lib/async/with-timeout";
 import { invalidateFeatureFlagCache } from "@/lib/feature-flags";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+
+// BE-M2 (#951): Zod schema enforces the expected body shape for the PATCH mutation.
+const FeatureFlagPatchSchema = z.object({
+  key: z.string().min(1),
+  enabled: z.boolean().optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
 
 /**
  * PATCH /api/admin/feature-flags
@@ -17,20 +25,23 @@ export const PATCH = withErrorCapture("/api/admin/feature-flags", async (request
   const authError = await adminAuth(request, "ratelimit:admin-feature-flags");
   if (authError) return authError;
 
-  // Parse body
-  let body: { key?: string; enabled?: boolean; config?: Record<string, unknown> };
+  // Parse and validate body with zod schema
+  let rawBody: unknown;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.key || typeof body.key !== "string") {
+  const parsed = FeatureFlagPatchSchema.safeParse(rawBody);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Missing required field: key" },
+      { error: parsed.error.issues[0]?.message ?? "Invalid request body" },
       { status: 400 },
     );
   }
+
+  const body = parsed.data;
 
   // Build update payload
   const updates: { enabled?: boolean; config?: Record<string, unknown> } = {};

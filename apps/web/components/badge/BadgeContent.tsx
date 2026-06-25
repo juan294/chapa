@@ -15,6 +15,8 @@ import { useInView } from "@/lib/effects/counters/use-in-view";
 import { tierPillClasses, SparkleDots, TIER_VISUALS_CSS } from "@/lib/effects/tier/TierVisuals";
 import { HeatmapGrid, HEATMAP_GRID_CSS } from "@/lib/effects/heatmap/HeatmapGrid";
 import { WARM_AMBER } from "@/lib/render/theme";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,6 +110,8 @@ export function BadgeContent({
   className = "",
   style,
 }: BadgeContentProps) {
+  const { t } = useTranslation();
+  const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: stats.handle });
   const statsRef = useRef<HTMLDivElement>(null);
   const statsInView = useInView(statsRef);
   void statsInView;
@@ -120,7 +124,7 @@ export function BadgeContent({
           {stats.avatarUrl ? (
             <Image
               src={stats.avatarUrl}
-              alt={`${stats.handle}'s avatar`}
+              alt={avatarAlt}
               className="w-8 h-8 rounded-full ring-2 ring-amber/30 img-outline"
               width={32}
               height={32}

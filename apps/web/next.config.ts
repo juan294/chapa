@@ -17,7 +17,7 @@ const isDev = process.env.NODE_ENV !== "production";
 function buildCsp(frameAncestors: string): string {
   const scriptSrc = [
     "'self'",
-    // 'unsafe-inline' is required by Next.js App Router for inline scripts
+    // unsafe-inline required for Next.js App Router hydration — see docs/accepted-risks.md
     // (hydration, page transitions). Removing it requires nonce-based CSP
     // which Next.js does not yet support without custom middleware.
     "'unsafe-inline'",
@@ -87,6 +87,12 @@ const defaultHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Prevents posthog-js barrel-import bloat from being included in the
+    // main bundle. posthog-js is already interaction-gated; this is cheap
+    // insurance for future import additions. (#960)
+    optimizePackageImports: ["posthog-js"],
+  },
   serverExternalPackages: ["@resvg/resvg-js"],
   transpilePackages: ["@chapa/shared"],
   outputFileTracingIncludes: {

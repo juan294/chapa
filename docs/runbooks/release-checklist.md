@@ -59,6 +59,13 @@ Never ship code that references schema objects not yet present in the production
 
 ### 5. Cron Auth and Scheduled Jobs Ready
 
+> **Vercel Pro plan required.** All three cron routes (`/api/cron/warm-cache`,
+> `/api/cron/sync-audience`, `/api/cron/process-campaigns`) set `maxDuration = 300`
+> seconds (see `vercel.json` `functions` block). The Vercel Hobby plan caps
+> serverless functions at 60 seconds — deploying on Hobby will cause these cron
+> jobs to time out silently. Ensure the Vercel project is on the Pro plan before
+> release.
+
 Before promoting `develop → main`, confirm Vercel production has `CRON_SECRET`
 configured and that cron routes accept the configured bearer token:
 

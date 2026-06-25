@@ -47,6 +47,7 @@ vi.mock("@/lib/auth/oauth-state", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  rateLimitStrict: mockRateLimit,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({

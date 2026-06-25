@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { AdminUser, SortField, SortDir } from "./admin-types";
 import { ARCHETYPE_COLOR, TIER_COLOR, tierBadgeClasses, formatDate } from "./admin-types";
 import { AdminSortableHeader, AdminHeaderCell } from "./AdminSortableHeader";
+import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 
 // ---------------------------------------------------------------------------
 // AdminUserTableRow — memoized row component
@@ -20,6 +22,8 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
   hasImgError,
   onImgError,
 }: AdminUserTableRowProps) {
+  const { t } = useTranslation();
+  const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: user.handle });
   return (
     <tr
       className={`transition-colors hover:bg-amber/[0.03] ${user.lastSnapshotDate === null ? "opacity-60" : ""}`}
@@ -33,7 +37,7 @@ const AdminUserTableRow = memo(function AdminUserTableRow({
           {user.avatarUrl && !hasImgError ? (
             <Image
               src={user.avatarUrl}
-              alt={`${user.handle}'s avatar`}
+              alt={avatarAlt}
               width={28}
               height={28}
               className="h-7 w-7 rounded-full img-outline"

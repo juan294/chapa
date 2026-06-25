@@ -272,4 +272,30 @@ describe("POST /api/admin/campaigns", () => {
     );
     expect(res.status).toBe(201);
   });
+
+  // BE-M2 (#951): zod schema validation for POST body
+  describe("BE-M2 (#951): zod schema validation", () => {
+    it("returns 400 with structured error when name is a number", async () => {
+      const res = await POST(makeRequest("POST", { ...validBody, name: 999 }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBeTruthy();
+    });
+
+    it("returns 400 with structured error when required fields are entirely absent", async () => {
+      const res = await POST(makeRequest("POST", {}));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBeTruthy();
+    });
+
+    it("returns 400 with error referencing the invalid field when subject is missing", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { subject: _subject, ...bodyWithoutSubject } = validBody;
+      const res = await POST(makeRequest("POST", bodyWithoutSubject));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/subject/i);
+    });
+  });
 });

@@ -6,10 +6,12 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
-## CSP unsafe-inline for scripts (#396, #778)
+## CSP unsafe-inline for scripts (#396, #778, #959)
 
-- **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`.
-- **Mitigation:** No user-controlled HTML injection points exist in the application. All user input (GitHub handles, display names) is escaped before rendering into SVG and HTML. Monitor Next.js for nonce-based CSP support.
+- **Risk:** Next.js App Router injects inline scripts for hydration, requiring `'unsafe-inline'` in `script-src`. This is a known limitation of the framework — removing it causes hydration to fail.
+- **Why accepted:** The primary XSS surface (SVG user input) is separately guarded by `escapeXml()` in `apps/web/lib/render/escape.ts`, applied to all user-controlled text (GitHub handle, display name) before SVG rendering. No untrusted HTML reaches any `innerHTML`/`dangerouslySetInnerHTML` sink without prior sanitization.
+- **Mitigation in place:** `escapeXml()` covers all SVG rendering paths; `unsafe-eval` is correctly dev-only (excluded from production CSP via the `isDev` guard in `next.config.ts`).
+- **When to revisit:** When Next.js adds nonce-based CSP support (track Next.js releases — follow [nextjs/next.js#42427](https://github.com/vercel/next.js/issues/42427)). At that point, migrate to a per-request nonce injected via middleware and remove `'unsafe-inline'` from `script-src`.
 - **Severity:** Low
 - **See:** `docs/decisions/2026-06-20-csp-unsafe-inline-accepted-risk.md` (#778) — full rationale and a staged nonce-migration plan to remove `'unsafe-inline'`.
 
@@ -153,6 +155,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Mitigation:** The threshold is intentionally conservative (solo-favoring) because the collaborative path has a much stronger impact on scores. Edge cases near the boundary will see modest score changes when crossing. The threshold (0.15) is a shared constant (`SOLO_REVIEW_RATIO_THRESHOLD`) that can be tuned.
 - **Severity:** Low
 - **Accepted:** 2026-03-28
+
+---
+
+## Per-platform quality-signal availability
+
+- **Risk:** PR-description, feature-branch, issue-linkage, batch-size, and lead-time signals are computed only from GitHub. GitLab, Bitbucket, and Codeberg do not expose them, so a profile whose merged work is mostly on those platforms has a Quality dimension based on limited data. For solo profiles, Quality is display-only and excluded from the composite.
+- **Mitigation:** The share-page "How is my score calculated" panel states this per platform. Quality is never counted in the solo composite, so the gap does not depress the headline score for solo developers.
+- **Severity:** Low
+- **Accepted:** 2026-06-24
 
 ---
 

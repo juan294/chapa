@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImpactV6Result, StatsData } from "@chapa/shared";
+import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
 import { useTrendData } from "@/hooks/useTrendData";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
@@ -17,6 +17,7 @@ interface ImpactDashboardProps {
   impact: ImpactV6Result;
   stats: StatsData;
   handle: string;
+  craftResult?: CraftResult | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,7 @@ export function ImpactDashboard({
   impact,
   stats,
   handle,
+  craftResult = null,
 }: ImpactDashboardProps) {
   const { trend, diff } = useTrendData(handle);
   const { t } = useTranslation();
@@ -50,6 +52,7 @@ export function ImpactDashboard({
         stats={stats}
         trend={trend}
         diff={diff}
+        craftResult={craftResult}
       />
 
       <CoachingInsights impact={impact} trend={trend} diff={diff} />

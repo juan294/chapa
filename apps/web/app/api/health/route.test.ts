@@ -105,6 +105,7 @@ describe("GET /api/health", () => {
           redis: "error",
           supabase: "ok",
           github: "skipped",
+          alertWebhook: "skipped",
         },
       },
     });
@@ -195,6 +196,32 @@ describe("GET /api/health", () => {
     expect(response.headers.get("Retry-After")).toBe("60");
     const body = await response.json();
     expect(body.error).toMatch(/too many requests/i);
+  });
+
+  describe("alertWebhook configuration status (#943)", () => {
+    it("reports alertWebhook as 'skipped' when CHAPA_ALERT_WEBHOOK_URL is not set", async () => {
+      vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", undefined);
+      vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+      vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.alertWebhook).toBe("skipped");
+    });
+
+    it("reports alertWebhook as 'configured' when CHAPA_ALERT_WEBHOOK_URL is set", async () => {
+      vi.stubEnv("CHAPA_ALERT_WEBHOOK_URL", "https://hooks.example.com/webhook");
+      vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+      vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.dependencies.alertWebhook).toBe("configured");
+    });
   });
 
   describe("GitHub API probe (#709)", () => {

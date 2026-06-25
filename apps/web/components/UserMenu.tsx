@@ -12,6 +12,7 @@ import { useAnimatedUnmount } from "@/hooks/useAnimatedUnmount";
 import { createModuleStore } from "@/hooks/createModuleStore";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { useTranslation } from "@/lib/i18n";
+import { interpolate } from "@/lib/i18n/interpolate";
 import {
   GitHubIcon,
   BitbucketIcon,
@@ -81,6 +82,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
     gitlabEnabled,
   } = useClientFeatureFlags();
   const { t } = useTranslation();
+  const avatarAlt = interpolate(t('aria.avatarAlt') as string, { handle: login });
   const insightsStorageKey = `chapa_insights_last_submitted_${login}`;
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -387,7 +389,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
         ) : (
           <Image
             src={avatarUrl}
-            alt={`${login}'s avatar`}
+            alt={avatarAlt}
             width={32}
             height={32}
             className="h-8 w-8 rounded-full img-outline"
@@ -428,7 +430,7 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
               ) : (
                 <Image
                   src={avatarUrl}
-                  alt={`${login}'s avatar`}
+                  alt={avatarAlt}
                   width={40}
                   height={40}
                   className="h-10 w-10 rounded-full img-outline"

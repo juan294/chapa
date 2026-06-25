@@ -94,16 +94,28 @@ describe("dbUpsertSupplemental", () => {
     expect(firstCall?.stats.commitsTotal).toBe(1312);
   });
 
-  it("does not throw on error", async () => {
-    mockUpsert.mockResolvedValue({ error: new Error("DB down") });
+  it("returns true on success", async () => {
+    mockUpsert.mockResolvedValue({ error: null });
 
-    await expect(dbUpsertSupplemental("juan294", supplemental)).resolves.toBeUndefined();
+    const result = await dbUpsertSupplemental("juan294", supplemental);
+
+    expect(result).toBe(true);
   });
 
-  it("returns void when DB is unavailable", async () => {
+  it("returns false on error", async () => {
+    mockUpsert.mockResolvedValue({ error: new Error("DB down") });
+
+    const result = await dbUpsertSupplemental("juan294", supplemental);
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when DB is unavailable", async () => {
     vi.mocked(getSupabase).mockReturnValueOnce(null);
 
-    await expect(dbUpsertSupplemental("juan294", supplemental)).resolves.toBeUndefined();
+    const result = await dbUpsertSupplemental("juan294", supplemental);
+
+    expect(result).toBe(false);
     expect(mockFrom).not.toHaveBeenCalled();
   });
 });

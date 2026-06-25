@@ -7,12 +7,16 @@ import {
 import { cacheGet, cacheSet, rateLimit } from "@/lib/cache/redis";
 import { isValidBadgeConfig } from "@/lib/validation";
 import { isStudioEnabled } from "@/lib/feature-flags";
+import { dbGetStudioConfig, dbUpsertStudioConfig } from "@/lib/db/studio";
 import type { BadgeConfig } from "@chapa/shared";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
+
+const CONFIG_TTL = 31536000; // 365 days
 
 /**
  * GET /api/studio/config — Load the authenticated user's badge config.
  * Returns { config: BadgeConfig | null }.
+ * Read path: Redis first; on miss, fall back to Supabase and rehydrate Redis.
  */
 export const GET = withErrorCapture("/api/studio/config", async (request: NextRequest) => {
   if (!(await isStudioEnabled())) {
@@ -31,13 +35,29 @@ export const GET = withErrorCapture("/api/studio/config", async (request: NextRe
     );
   }
 
-  const config = await cacheGet<BadgeConfig>(`config:${session.login}`);
-  return NextResponse.json({ config });
+  const cacheKey = `config:${session.login}`;
+
+  const cached = await cacheGet<BadgeConfig>(cacheKey);
+  if (cached !== null) {
+    return NextResponse.json({ config: cached });
+  }
+
+  // Redis miss — fall back to Supabase and rehydrate Redis (best-effort)
+  const dbConfig = await dbGetStudioConfig(session.login);
+  if (dbConfig !== null) {
+    cacheSet(cacheKey, dbConfig as BadgeConfig, CONFIG_TTL).catch((err: unknown) => {
+      console.warn("[studio/config] Redis rehydration failed (best-effort):", (err as Error).message);
+    });
+    return NextResponse.json({ config: dbConfig });
+  }
+
+  return NextResponse.json({ config: null });
 });
 
 /**
  * PUT /api/studio/config — Save the authenticated user's badge config.
  * Auth required. Rate limited: 30 requests/hour per user.
+ * Write path: Supabase is the success criterion; Redis is best-effort.
  */
 export const PUT = withErrorCapture("/api/studio/config", async (request: NextRequest) => {
   if (!(await isStudioEnabled())) {
@@ -69,8 +89,23 @@ export const PUT = withErrorCapture("/api/studio/config", async (request: NextRe
     );
   }
 
-  // Persist config (365-day TTL — user-authored content)
-  await cacheSet(`config:${session.login}`, body as BadgeConfig, 31536000);
+  const cacheKey = `config:${session.login}`;
+
+  // Write to Supabase (durable) AND Redis (hot read path).
+  // Supabase is the success criterion — Redis is best-effort.
+  const [, dbOk] = await Promise.all([
+    cacheSet(cacheKey, body as BadgeConfig, CONFIG_TTL).catch((err: unknown) => {
+      console.warn("[studio/config] Redis write failed (best-effort):", (err as Error).message);
+    }),
+    dbUpsertStudioConfig(session.login, body),
+  ]);
+
+  if (!dbOk) {
+    return NextResponse.json(
+      { success: false, error: "Failed to persist studio config" },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ success: true });
 });

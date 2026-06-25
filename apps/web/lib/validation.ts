@@ -177,6 +177,21 @@ export function isValidStatsShape(value: unknown): boolean {
   if (typeof obj.activeDays === "number" && obj.activeDays > 365) return false;
   if (!isRatio(obj.topRepoShare)) return false;
 
+  // BE-M1 (#950): Numeric range caps — prevent arbitrarily large values from
+  // flowing into computeImpactV6 and snapshots.
+  if (typeof obj.commitsTotal === "number" && obj.commitsTotal > 100_000) return false;
+  if (typeof obj.prsMergedCount === "number" && obj.prsMergedCount > 10_000) return false;
+  if (typeof obj.prsMergedWeight === "number" && obj.prsMergedWeight > 10_000) return false;
+  if (typeof obj.reviewsSubmittedCount === "number" && obj.reviewsSubmittedCount > 50_000) return false;
+  if (typeof obj.issuesClosedCount === "number" && obj.issuesClosedCount > 10_000) return false;
+  if (typeof obj.linesAdded === "number" && obj.linesAdded > 500_000) return false;
+  if (typeof obj.linesDeleted === "number" && obj.linesDeleted > 500_000) return false;
+  if (typeof obj.reposContributed === "number" && obj.reposContributed > 5_000) return false;
+  if (typeof obj.maxCommitsIn10Min === "number" && obj.maxCommitsIn10Min > 1_000) return false;
+  if (typeof obj.totalStars === "number" && obj.totalStars > 10_000_000) return false;
+  if (typeof obj.totalForks === "number" && obj.totalForks > 1_000_000) return false;
+  if (typeof obj.totalWatchers === "number" && obj.totalWatchers > 1_000_000) return false;
+
   const optionalRatios = [
     "microCommitRatio",
     "docsOnlyPrRatio",

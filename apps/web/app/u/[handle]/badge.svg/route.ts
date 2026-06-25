@@ -39,6 +39,14 @@ type BadgeRenderResult = {
   status?: number;
 };
 
+// NOTE: This Map only coalesces concurrent renders within a single serverless
+// function instance. On Vercel each invocation gets its own V8 isolate, so the
+// Map is empty at the start of every cold-start and provides no cross-instance
+// dedup benefit. Cross-instance coalescing is handled by the Redis render-lock
+// (acquireBadgeRenderLock) and the stale-SVG / poll-for-today branches below.
+// The in-memory Map still provides a meaningful win during local development
+// and in long-lived (warm) serverless instances where two requests arrive for
+// the same handle in the same JS event-loop cycle.
 const inflightBadgeRenders = new Map<string, Promise<BadgeRenderResult>>();
 
 const CACHE_HEADERS = {

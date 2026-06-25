@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { ImpactV6Result, StatsData } from "@chapa/shared";
+import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
 import { DataSources } from "@/components/ImpactBreakdown";
 import { ImpactDashboard } from "@/components/dashboard/ImpactDashboard";
+import { ScoreExplanationPanel } from "@/components/dashboard/ScoreExplanationPanel";
 import { CopyButton } from "@/components/CopyButton";
 import { useSession } from "@/hooks/useSession";
 import { useOwnerCacheWarm } from "@/hooks/useOwnerCacheWarm";
@@ -87,12 +88,14 @@ interface SharePageOwnerContentProps {
   handle: string;
   stats: StatsData | null;
   impact: ImpactV6Result | null;
+  craftResult?: CraftResult | null;
 }
 
 export function SharePageOwnerContent({
   handle,
   stats,
   impact,
+  craftResult = null,
 }: SharePageOwnerContentProps) {
   const { t } = useTranslation();
   const { session, loading } = useSession();
@@ -126,10 +129,26 @@ export function SharePageOwnerContent({
       {/* Impact Dashboard */}
       {impact && stats ? (
         <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:350ms]">
-          <ImpactDashboard impact={impact} stats={stats} handle={handle} />
+          <ImpactDashboard
+            impact={impact}
+            stats={stats}
+            handle={handle}
+            craftResult={craftResult}
+          />
         </section>
       ) : (
         <EmptyImpactState handle={handle} />
+      )}
+
+      {impact && stats && (
+        <section className="mb-12 animate-fade-in-up motion-reduce:animate-none [animation-delay:430ms]">
+          <ScoreExplanationPanel
+            impact={impact}
+            stats={stats}
+            craftResult={craftResult}
+            isOwner={isOwner}
+          />
+        </section>
       )}
 
       {/* Embed Snippets */}

@@ -244,6 +244,73 @@ describe("isValidStatsShape", () => {
     }));
     expect(isValidStatsShape({ ...validStats, heatmapData: heatmap })).toBe(true);
   });
+
+  // BE-M1 (#950): numeric range caps
+  describe("numeric range caps (BE-M1 #950)", () => {
+    it("rejects linesAdded exceeding 500_000", () => {
+      expect(isValidStatsShape({ ...validStats, linesAdded: 999_999_999 })).toBe(false);
+    });
+
+    it("accepts linesAdded at the upper bound (500_000)", () => {
+      expect(isValidStatsShape({ ...validStats, linesAdded: 500_000 })).toBe(true);
+    });
+
+    it("accepts linesAdded just below the upper bound (499_999)", () => {
+      expect(isValidStatsShape({ ...validStats, linesAdded: 499_999 })).toBe(true);
+    });
+
+    it("rejects linesDeleted exceeding 500_000", () => {
+      expect(isValidStatsShape({ ...validStats, linesDeleted: 500_001 })).toBe(false);
+    });
+
+    it("rejects prsMergedCount exceeding 10_000", () => {
+      expect(isValidStatsShape({ ...validStats, prsMergedCount: 10_001 })).toBe(false);
+    });
+
+    it("accepts prsMergedCount at the upper bound (10_000)", () => {
+      expect(isValidStatsShape({ ...validStats, prsMergedCount: 10_000 })).toBe(true);
+    });
+
+    it("rejects prsMergedWeight exceeding 10_000", () => {
+      expect(isValidStatsShape({ ...validStats, prsMergedWeight: 10_001 })).toBe(false);
+    });
+
+    it("rejects commitsTotal exceeding 100_000", () => {
+      expect(isValidStatsShape({ ...validStats, commitsTotal: 100_001 })).toBe(false);
+    });
+
+    it("accepts commitsTotal at the upper bound (100_000)", () => {
+      expect(isValidStatsShape({ ...validStats, commitsTotal: 100_000 })).toBe(true);
+    });
+
+    it("rejects reviewsSubmittedCount exceeding 50_000", () => {
+      expect(isValidStatsShape({ ...validStats, reviewsSubmittedCount: 50_001 })).toBe(false);
+    });
+
+    it("rejects issuesClosedCount exceeding 10_000", () => {
+      expect(isValidStatsShape({ ...validStats, issuesClosedCount: 10_001 })).toBe(false);
+    });
+
+    it("rejects reposContributed exceeding 5_000", () => {
+      expect(isValidStatsShape({ ...validStats, reposContributed: 5_001 })).toBe(false);
+    });
+
+    it("rejects maxCommitsIn10Min exceeding 1_000", () => {
+      expect(isValidStatsShape({ ...validStats, maxCommitsIn10Min: 1_001 })).toBe(false);
+    });
+
+    it("rejects totalStars exceeding 10_000_000", () => {
+      expect(isValidStatsShape({ ...validStats, totalStars: 10_000_001 })).toBe(false);
+    });
+
+    it("rejects totalForks exceeding 1_000_000", () => {
+      expect(isValidStatsShape({ ...validStats, totalForks: 1_000_001 })).toBe(false);
+    });
+
+    it("rejects totalWatchers exceeding 1_000_000", () => {
+      expect(isValidStatsShape({ ...validStats, totalWatchers: 1_000_001 })).toBe(false);
+    });
+  });
 });
 
 describe("isValidBadgeConfig", () => {
