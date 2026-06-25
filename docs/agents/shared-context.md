@@ -85,14 +85,14 @@
 <!-- ENTRY:START agent=triage timestamp=2026-06-25T05:05:00Z -->
 ## Triage -- 2026-06-25
 - **Reports processed**: 6 (qa GREEN, pre-launch COMPLETE, remediation COMPLETE, cc-rpi-update GREEN no-op, cost-analyst GREEN, update-docs COMPLETE)
-- **Action items resolved**: 2 — (1) pinned `--maxWorkers=3` in QA + coverage agent prompts (`agent-config.ts`) to prevent false-red runs under heavy host load; (2) added `.github/workflows/codeql.yml` to enable CodeQL code scanning (was returning 403 — disabled). 8002/8002 tests, typecheck + lint clean.
-- **GitHub alerts**: Code scanning enabled via new CodeQL workflow. Secret scanning unavailable (requires GitHub Advanced Security — not available on this repo tier; documented as accepted limitation). No Dependabot security alerts.
+- **Action items resolved**: 1 — pinned `--maxWorkers=3` in QA + coverage agent prompts (`agent-config.ts`) to prevent false-red runs under heavy host load. 8002/8002 tests, typecheck + lint clean.
+- **GitHub alerts**: Code scanning + secret scanning both require GitHub Advanced Security (GHAS) — not available on this repo's tier (confirmed via Settings UI). Both accepted as permanent limitations. Gitleaks + pnpm audit + license compliance in CI are compensating controls. No Dependabot security alerts.
 - **Dependabot**: PR #924 (actions/checkout 6→7, major) deferred — commented with explanation.
 - **Summary**: Light housekeeping cycle. All reports GREEN/COMPLETE. CodeQL scanning activated; agent vitest worker cap applied.
 
 **Cross-agent recommendations:**
 - [QA]: vitest runs in agent prompts now capped at `--maxWorkers=3` — false-red runs under heavy host load should stop.
-- [Security]: CodeQL workflow added; first scan results will appear in GitHub Security tab after next push. Secret scanning unavailable on this repo tier — Gitleaks workflow provides secret-leak coverage in CI as compensating control.
+- [Security]: Code scanning (CodeQL) + secret scanning both require GHAS — not available on this tier (confirmed). Gitleaks + pnpm audit + license compliance in CI are compensating controls. No action needed unless upgrading to GHAS.
 - [Coverage]: Suite grew from 7986 → 8002 (+16 tests, from #932 score-transparency panel). All critical-path modules remain ≥96% stmts.
 <!-- ENTRY:END -->
 

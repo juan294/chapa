@@ -1,5 +1,5 @@
 # Triage Report
-> Generated on 2026-06-25 | 6 reports processed | 2 action items | 1 Dependabot PR
+> Generated on 2026-06-25 | 6 reports processed | 1 action item | 1 Dependabot PR
 
 ## Agent Failures
 None — all agents ran successfully.
@@ -20,13 +20,12 @@ None — all agents ran successfully.
 | # | Item | Source | Tests Added | Status |
 |---|------|--------|-------------|--------|
 | 1 | Pinned `--maxWorkers=3` in QA + coverage agent prompts (`agent-config.ts:35,147`) | qa-report P3 | n/a | Done |
-| 2 | Added `.github/workflows/codeql.yml` to enable CodeQL code scanning | GitHub alert (YELLOW) | n/a | Done |
 
 ## GitHub Security & Quality Alerts
 | # | Type | Severity | Status | Notes |
 |---|------|----------|--------|-------|
-| 1 | Code scanning (CodeQL) | — | YELLOW → RESOLVED | Was disabled (403); CodeQL workflow added — scanning activates on next push |
-| 2 | Secret scanning | — | YELLOW (accepted) | Requires GitHub Advanced Security; not available on this repo's tier. Gitleaks workflow is compensating control. |
+| 1 | Code scanning (CodeQL) | — | YELLOW (accepted) | Requires GitHub Advanced Security — not available on this repo's tier. Confirmed via Settings → Advanced Security (no code scanning section present). Gitleaks + pnpm audit in CI are compensating controls. |
+| 2 | Secret scanning | — | YELLOW (accepted) | Same — requires GHAS. Gitleaks workflow is compensating control. |
 | 3 | Dependabot security | — | GREEN | No open alerts |
 
 ## Dependabot PRs
@@ -44,4 +43,4 @@ None — all agents ran successfully.
 - **P3 (permanent)**: `experiments/**` Canvas/WebGL pages 70–77% coverage — JSDOM cannot run Canvas/WebGL APIs; accepted since pages are flag-gated with no production exposure.
 - **P2-1 (cost-analyst)**: `dbGetCampaignStats` 4-query parallel COUNT — threshold-gated at ~5K sends/campaign; monitor only.
 - **Monitor M7/M8 (cost-analyst)**: 365-day overwrite keys `config:<login>` + `badge:notified:<handle>` — fixed cardinality, no accumulation.
-- **Secret scanning unavailable**: GitHub Advanced Security not available on this repo tier. Gitleaks workflow provides compensating coverage.
+- **Code scanning + secret scanning unavailable**: Both require GitHub Advanced Security (GHAS), which is not available on this repo's tier. Gitleaks + pnpm audit + license compliance checks in CI provide compensating coverage. Accept as permanent limitation unless upgrading to GHAS.
