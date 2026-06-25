@@ -53,7 +53,8 @@ describe("ImpactBreakdown", () => {
     });
 
     it("breakdown bars have aria-label with the signal name", () => {
-      expect(SOURCE).toMatch(/aria-label=\{`.*score`\}/i);
+      // aria-label is now provided via interpolate(t('aria.impactScore'), ...) for i18n support
+      expect(SOURCE).toMatch(/aria-label=\{interpolate\(/);
     });
   });
 
