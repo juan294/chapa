@@ -42,38 +42,14 @@ const DIMENSION_COLORS: Record<
   },
 };
 
-const DIMENSION_TOOLTIPS: Record<
-  keyof DimensionScores,
-  { id: string; tip: string }
-> = {
-  delivery: {
-    id: "dim-delivery",
-    tip: "Measures shipping output: PRs merged, issues closed, and commits. High score = consistently turning ideas into merged code.",
-  },
-  quality: {
-    id: "dim-quality",
-    tip: "Measures code stewardship: reviews submitted, review-to-PR ratio, and commit cleanliness. High score = strong gatekeeper and quality advocate.",
-  },
-  consistency: {
-    id: "dim-consistency",
-    tip: "Measures sustained engagement: active days, even weekly distribution, and low burst patterns. High score = reliable daily contributor.",
-  },
-  breadth: {
-    id: "dim-breadth",
-    tip: "Measures breadth of impact: repos contributed to, contribution spread, stars, forks, and docs PRs. High score = wide cross-project influence.",
-  },
-  craft: {
-    id: "dim-craft",
-    tip: "Measures AI tool mastery: proficiency with coding assistants, effectiveness of tool-assisted workflows, and sophistication of usage patterns.",
-  },
+const DIMENSION_TOOLTIP_IDS: Record<keyof DimensionScores, string> = {
+  delivery: "dim-delivery",
+  quality: "dim-quality",
+  consistency: "dim-consistency",
+  breadth: "dim-breadth",
+  craft: "dim-craft",
 };
 
-// Solo quality overrides — shared with ImpactBreakdown.tsx (keep in sync)
-const SOLO_QUALITY_SUBTITLE = "PR descriptions \u00B7 branch discipline \u00B7 issue linkage";
-const SOLO_QUALITY_TOOLTIP = {
-  id: "dim-quality",
-  tip: "Measures engineering discipline: PR descriptions, feature branch usage, issue linkage, and commit cleanliness.",
-};
 
 // ---------------------------------------------------------------------------
 // Props
@@ -141,12 +117,13 @@ export function DimensionCard({
   const label = t(`dimensions.${dimension}.label`) as string;
   const isSoloQuality = dimension === "quality" && profileType === "solo";
   const subtitle = isSoloQuality
-    ? SOLO_QUALITY_SUBTITLE
+    ? t('dimensions.quality.soloSubtitle') as string
     : t(`dimensions.${dimension}.subtitle`) as string;
   const colors = DIMENSION_COLORS[dimension];
-  const tooltip = isSoloQuality
-    ? SOLO_QUALITY_TOOLTIP
-    : DIMENSION_TOOLTIPS[dimension];
+  const tooltipId = DIMENSION_TOOLTIP_IDS[dimension];
+  const tooltipTip = isSoloQuality
+    ? t('dimensions.quality.soloTip') as string
+    : t(`dimensions.${dimension}.tip`) as string;
 
   const hasTrendRow =
     (trend != null && trend.values.length > 0) || delta != null;
@@ -155,7 +132,7 @@ export function DimensionCard({
     <div
       ref={containerRef}
       role="article"
-      aria-label={`${label} dimension score: ${score}`}
+      aria-label={interpolate(t('aria.dimensionScore') as string, { label, score: String(score) })}
       className={`rounded-xl bg-card shadow-card transition-shadow duration-200 hover:shadow-card-hover animate-fade-in-up ${className}`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
@@ -165,7 +142,7 @@ export function DimensionCard({
           <span className="text-xs font-medium uppercase tracking-wider text-text-secondary font-body">
             {label}
           </span>
-          <InfoTooltip id={tooltip.id} content={tooltip.tip} />
+          <InfoTooltip id={tooltipId} content={tooltipTip} />
         </div>
         <span className="font-heading text-3xl font-extrabold text-text-primary tabular-nums">
           {displayScore}
@@ -179,7 +156,7 @@ export function DimensionCard({
           aria-valuenow={score}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`${label} score`}
+          aria-label={interpolate(t('aria.dimensionLabel') as string, { label })}
           className="h-1.5 overflow-hidden rounded-full bg-stroke/30"
         >
           <div
