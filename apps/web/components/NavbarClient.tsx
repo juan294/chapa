@@ -29,13 +29,16 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   const { session } = useSession();
   const { t } = useTranslation();
 
-  // When the server has already rendered locale-specific labels for a dynamic
-  // page (for example /?lang=en), trust those labels for the first paint so page
-  // body and navigation chrome do not mix languages.
+  // Use the active locale's translation for labels so locale switches (via
+  // LanguageProvider's cookie read on mount or LanguageSwitcher) update the
+  // center nav. The navLinks prop is a presence signal ("show center nav here")
+  // and a last-resort fallback if t() returns an empty array.
   const resolvedNavLinks = useMemo<NavLinkItem[] | undefined>(() => {
     if (!navLinks || navLinks.length === 0) return undefined;
+    const localeLinks = t('landing.navLinks') as unknown as NavLinkItem[] | undefined;
+    if (Array.isArray(localeLinks) && localeLinks.length > 0) return localeLinks;
     return navLinks;
-  }, [navLinks]);
+  }, [navLinks, t]);
 
   return (
     <nav suppressHydrationWarning aria-label={t('aria.mainNavigation') as string} className="fixed top-0 z-50 w-full border-b border-stroke bg-bg/80 backdrop-blur-xl">
