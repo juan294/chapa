@@ -25,6 +25,24 @@
 - [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars confirmed non-sensitive; `server-only` Supabase boundary and admin-auth routes documented in CLAUDE.md. No undocumented exports with security surface.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-06-25T03:00:00Z -->
+## Cost Analyst — 2026-06-25
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
+- **Cost-surface diff since 2026-06-21 cycle**: first cost cycle on **v2.14.0** (HEAD `f9d30758`). Only change = share-page score-transparency panel (#932, `ScoreExplanationPanel.tsx` + `lib/dashboard/{score-explanation,dimension-sub-metrics}.ts`) + locale-aware static pages. Both pure compute over already-fetched `StatsData`/`DimensionScores` — verified imports only from `@chapa/shared` + `lib/impact` pure fns, **0 `fetch`/`cacheSet`/`cacheGet`/`supabase` calls**, no module-level state. Wired into owner-only `SharePageOwnerContent.tsx` (+7 lines). **Cost-neutral.**
+- Redis: **24 non-test `cacheSet` sites, 23/24 explicit positive TTL**. 3 persistent TTL-0 singletons (fixed cardinality): `cron:warm-cache:offset` cursor (`warm-cache/route.ts:146`), `stats:badges_generated` INCR (`redis.ts:244`), `stats:unique_badges` HLL ~12KB (`redis.ts:245`). Two 365d overwrite keys: `config:<login>` (`studio/config/route.ts`), `badge:notified:<handle>` (`MARKER_TTL=31_536_000`, `notifications.ts:18`). `cacheSet` default 21600s w/ `ttlSeconds>0` guard (`redis.ts:75–76`); client `retry:{retries:0}` (`redis.ts:36`). Growth risk: LOW.
+- Supabase: **10 base tables, ENABLE + FORCE RLS** (26 migrations, latest `026_seed_integration_flags.sql`). Lazy service-role singleton `supabase.ts:13–34`, `import "server-only"` :8, `persistSession:false`. No N+1 — `dbGetCampaignStats` 4 parallel `count:exact,head:true` COUNTs (`sends.ts:243,251`), zero row transfer; warm-cache cron batch-prefetches snapshots.
+- External calls: **0 uncached**. GitHub badge/profile cache-first 6h + 7d SWR + in-flight dedup + Redis render lock; platform stats 6h pos / 1h neg; health probe `unstable_cache` 60s; feature-flags ISR s-maxage 60/SWR 300; Resend daily quota `cacheReserveQuota`; PostHog batched. Fetch-timeout coverage: **100%**.
+- Vercel: badge `maxDuration=35`; crons + bulk-recalc `=300`. Badge success `s-maxage=21600/SWR=86400`, error `300/600`. ISR `force-static revalidate=3600` on archetypes/about/privacy/verify. Bundle flat ~1,950 KB raw / 623 KB gzipped.
+- **P2-1 CARRIED** (threshold-gated): `dbGetCampaignStats` 4-query parallel COUNT; only matters >5K sends/campaign. **MONITOR M7/M8 CARRIED**: 365d overwrite keys, no accumulation.
+- **P1s: NONE. P2s: 1 (P2-1, threshold-gated). P3s: 0.**
+
+**Cross-agent recommendations:**
+- [Performance]: Bundle flat ~1,950 KB raw / 623 KB gzipped. #932 score-transparency panel adds only client compute + dictionary keys — no new dynamic imports or vendor deps on public pages. M-bundle stays closed.
+- [Security]: #932 panel reads no secrets and makes no external/DB calls; owner-gated render path unchanged. 10/10 FORCE RLS intact; `server-only` Supabase boundary holds. Fail-open rate limiter (accepted risk) + 100% fetch-timeout coverage maintained.
+- [Coverage]: New `lib/dashboard/{score-explanation,dimension-sub-metrics}.ts` ship with sibling test files (`*.test.ts`, 158 + 120 lines per #932 diff). No cost-path coverage gaps.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-06-21T03:00:00Z -->
 ## Cost Analyst — 2026-06-21
 - **Status**: GREEN
@@ -64,23 +82,18 @@
 - [Coverage]: lib/cache 98.1%, lib/db 96.5%, app/api 97.4% per coverage 2026-06-20. No cost-path coverage gaps; GitLab client paths covered in the 7875-test suite.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-06-19T03:00:00Z -->
-## Cost Analyst — 2026-06-19
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
-- **Cost-surface diff since 2026-06-18 cycle**: ZERO executable app-code change. HEAD advanced `63b18ac1 → b6cb414d` via js-yaml CVE override (`b7b33ace`, build-tool only, CVE-2026-53550) + agent report chore. **35th consecutive carry/audit cycle.** All key claims re-verified in source this cycle — not blind-carried.
-- Redis: per-user/per-entity keys all TTL'd. **24 non-test `cacheSet` call sites re-counted, 23/24 carry explicit positive TTL**; 1 exception = bounded rotation cursor `cron:warm-cache:offset` (`warm-cache/route.ts:145`, TTL 0). 3 persistent TTL-0 singletons only: cursor + `stats:badges_generated` (INCR, `redis.ts:259`) + `stats:unique_badges` (HLL ~12KB fixed, `redis.ts:260`). `cacheSet` default 21600s with `ttlSeconds>0` guard (`redis.ts:69,75–76`); client `retry:{retries:0}` (`redis.ts:36`). Two 1y keys (overwrite, fixed cardinality): `config:<login>` (`studio/config/route.ts:73`), `badge:notified:<handle>` (`notifications.ts:18,106`). Growth risk: LOW.
-- Supabase: **10 base tables, 10/10 ENABLE + 10/10 FORCE RLS** (25 migrations, latest `025_force_supplemental_stats_rls.sql`). Singleton lazy service-role client `supabase.ts:13–34`, `import "server-only"` line 8, `persistSession:false`, 5s `withTimeout` health probe. No N+1 in `lib/db/`. Warm-cache cron batches snapshot pre-fetches in one query.
-- External calls: **0 uncached**. Badge/profile GitHub cache-first (6h + 7d SWR) w/ in-flight dedup + Redis lock; health GitHub probe `unstable_cache` 60s (`health/route.ts:59`); feature-flags ISR `s-maxage=60/SWR=300`; Resend event-driven w/ daily quota via `cacheReserveQuota`; PostHog batched fire-and-forget. Fetch-timeout coverage: **100% of outbound server fetches** carry `AbortSignal.timeout` or `withTimeout`.
-- Badge `maxDuration=35` (`badge.svg/route.ts:29`). Success `s-maxage=21600 / SWR=86400` / error `s-maxage=300 / SWR=600`. Share page ISR `revalidate=3600`. Bundle: 1,950 KB raw / 623 KB gzipped (performance 2026-06-18, flat).
-- **P2-1 CARRIED**: `dbGetCampaignStats()` 4-query parallel COUNT (`campaigns.ts:790–820`); threshold comment in place. Not triggered (>5K sends/campaign).
-- **MONITOR M7/M8 CARRIED**: `config:` and `badge:notified:` 1y TTL — overwrite, fixed cardinality, no accumulation. No action.
-- **P1s: NONE. P2s: 1 active (P2-1, threshold-gated). P3s: 0.**
+<!-- ENTRY:START agent=triage timestamp=2026-06-25T05:05:00Z -->
+## Triage -- 2026-06-25
+- **Reports processed**: 6 (qa GREEN, pre-launch COMPLETE, remediation COMPLETE, cc-rpi-update GREEN no-op, cost-analyst GREEN, update-docs COMPLETE)
+- **Action items resolved**: 2 — (1) pinned `--maxWorkers=3` in QA + coverage agent prompts (`agent-config.ts`) to prevent false-red runs under heavy host load; (2) added `.github/workflows/codeql.yml` to enable CodeQL code scanning (was returning 403 — disabled). 8002/8002 tests, typecheck + lint clean.
+- **GitHub alerts**: Code scanning enabled via new CodeQL workflow. Secret scanning unavailable (requires GitHub Advanced Security — not available on this repo tier; documented as accepted limitation). No Dependabot security alerts.
+- **Dependabot**: PR #924 (actions/checkout 6→7, major) deferred — commented with explanation.
+- **Summary**: Light housekeeping cycle. All reports GREEN/COMPLETE. CodeQL scanning activated; agent vitest worker cap applied.
 
 **Cross-agent recommendations:**
-- [Performance]: Bundle flat at 1,950 KB raw / 623 KB gzipped (performance 2026-06-18). M-bundle stays closed; js-yaml override is build-tool only — no cold-start regression.
-- [Security]: js-yaml >=4.2.0 override clears CVE-2026-53550 (build-tool). `pnpm audit` expected clean. `server-only` boundary + 10/10 FORCE RLS re-verified intact. Fail-open rate limiter (accepted risk) and 100% server fetch-timeout coverage maintained.
-- [Coverage]: lib/cache 99.5%, lib/db 97.1%, app/api 98.6% — all stable per coverage 2026-06-19. No cost-path coverage gaps.
+- [QA]: vitest runs in agent prompts now capped at `--maxWorkers=3` — false-red runs under heavy host load should stop.
+- [Security]: CodeQL workflow added; first scan results will appear in GitHub Security tab after next push. Secret scanning unavailable on this repo tier — Gitleaks workflow provides secret-leak coverage in CI as compensating control.
+- [Coverage]: Suite grew from 7986 → 8002 (+16 tests, from #932 score-transparency panel). All critical-path modules remain ≥96% stmts.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-06-24T07:50:00Z -->

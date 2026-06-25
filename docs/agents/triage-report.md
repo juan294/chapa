@@ -1,54 +1,47 @@
 # Triage Report
-> Generated on 2026-06-24 | 7 reports processed | 3 action items | 3 Dependabot PRs
+> Generated on 2026-06-25 | 6 reports processed | 2 action items | 1 Dependabot PR
 
 ## Agent Failures
-| Agent | Error | Log File |
-|-------|-------|----------|
-| cost-analyst | "Not logged in · Please run /login" — CLI auth token expired before 3 AM run | None in `logs/` |
-
-Note: The cost-analyst Jun 21 shared-context entry (GREEN) remains valid. No new cost-surface changes since that cycle.
+None — all agents ran successfully.
 
 ## Reports Reviewed
 | # | Report | Agent | Status | Action Items |
 |---|--------|-------|--------|--------------|
-| 1 | `coverage-report.md` | coverage | GREEN | 1 (SharePageH2 test) |
-| 2 | `security-report.md` | security | GREEN | 2 (server-only guards, knip ignoreDependencies) |
-| 3 | `cc-rpi-update-report.md` | cc-rpi | GREEN | 0 |
-| 4 | `pre-launch-report.md` | pre-launch | Informational | 0 (all findings already remediated) |
-| 5 | `remediation-report.md` | remediation | COMPLETE | 0 |
-| 6 | `update-docs-report.md` | docs | COMPLETE | 0 |
-| 7 | `cost-analyst-report.md` | cost-analyst | FAILED | 0 (auth failure, Jun 21 entry still valid) |
+| 1 | `qa-report.md` | QA Agent | GREEN | 1 (vitest --maxWorkers=3) |
+| 2 | `pre-launch-report.md` | Pre-launch | COMPLETE | 0 (all items already in d451ea87) |
+| 3 | `remediation-report.md` | Remediation | COMPLETE | 0 |
+| 4 | `cc-rpi-update-report.md` | cc-rpi Update | GREEN (no-op) | 0 |
+| 5 | `cost-analyst-report.md` | Cost Analyst | GREEN | 0 |
+| 6 | `update-docs-report.md` | Documentation | COMPLETE | 0 |
 
 ## Overall Status: GREEN
 
 ## Action Items Completed
-| # | Item | Source Report | Tests Added | Status |
-|---|------|--------------|-------------|--------|
-| 1 | Add `SharePageH2.test.tsx` — 12-line i18n h2 wrapper was at 33.3% stmts | coverage-report | 1 | Done |
-| 2 | Add `import "server-only"` to 7 auth/verification files (`lib/auth/{session,cli-token,github,admin,cron,unsubscribe-token}.ts`, `lib/verification/hmac.ts`) | security-report | — | Done |
-| 3 | Add 9 `ignoreDependencies` entries to `knip.json` (`@resvg/resvg-js`, `@vercel/analytics`, `@vercel/speed-insights`, `canvas-confetti`, `next-themes`, `posthog-js`, `resend`, `server-only`, `svix`) | security-report | — | Done |
+| # | Item | Source | Tests Added | Status |
+|---|------|--------|-------------|--------|
+| 1 | Pinned `--maxWorkers=3` in QA + coverage agent prompts (`agent-config.ts:35,147`) | qa-report P3 | n/a | Done |
+| 2 | Added `.github/workflows/codeql.yml` to enable CodeQL code scanning | GitHub alert (YELLOW) | n/a | Done |
 
 ## GitHub Security & Quality Alerts
-| # | Type | Notes |
-|---|------|-------|
-| — | Code scanning | Feature not enabled on this repo (403 from API) |
-| — | Dependabot security | CLEAN — no open advisories |
-| — | Secret scanning | Feature not enabled on this repo (404 from API) |
+| # | Type | Severity | Status | Notes |
+|---|------|----------|--------|-------|
+| 1 | Code scanning (CodeQL) | — | YELLOW → RESOLVED | Was disabled (403); CodeQL workflow added — scanning activates on next push |
+| 2 | Secret scanning | — | YELLOW (accepted) | Requires GitHub Advanced Security; not available on this repo's tier. Gitleaks workflow is compensating control. |
+| 3 | Dependabot security | — | GREEN | No open alerts |
 
 ## Dependabot PRs
 | # | PR | Update Type | Disposition | Notes |
 |---|----|----|----|----|
-| 1 | #926 | dev-and-types group (3 updates) | Auto-merged | All CI green |
-| 2 | #925 | production group (6 updates) | Auto-merged | All CI green |
-| 3 | #924 | actions/checkout 6 → 7 | Deferred | Major version bump — human review required |
+| 1 | #924 — actions/checkout 6→7 | Major | Deferred | All CI green; human review required for major bump. Comment added to PR. |
 
 ## Verification
-- [x] All tests passing (7977/7977)
+- [x] All tests passing — 8002/8002
 - [x] Typecheck clean
 - [x] Lint clean
-- [x] CI green (develop @ `5e0c847b`)
+- [ ] CI green — pending push
 
 ## Carried Items
-- **P2-1 (cost-analyst)**: `dbGetCampaignStats` 4-query parallel COUNT — threshold-gated, monitor only until >5K sends/campaign.
-- **Dependabot PR #924**: actions/checkout v6 → v7 — deferred for human review of major version breaking changes.
-- **cost-analyst auth**: overnight run failed with expired CLI auth. Token needs renewal for next scheduled run.
+- **P3 (permanent)**: `experiments/**` Canvas/WebGL pages 70–77% coverage — JSDOM cannot run Canvas/WebGL APIs; accepted since pages are flag-gated with no production exposure.
+- **P2-1 (cost-analyst)**: `dbGetCampaignStats` 4-query parallel COUNT — threshold-gated at ~5K sends/campaign; monitor only.
+- **Monitor M7/M8 (cost-analyst)**: 365-day overwrite keys `config:<login>` + `badge:notified:<handle>` — fixed cardinality, no accumulation.
+- **Secret scanning unavailable**: GitHub Advanced Security not available on this repo tier. Gitleaks workflow provides compensating coverage.

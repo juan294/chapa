@@ -32,7 +32,7 @@ Analyze the project's test coverage and produce a markdown report.
 IMPORTANT: Your entire stdout output becomes the report file. Write ONLY the final markdown report — no preamble, no "here is the report" framing, no tool output, no confirmation messages. Start your response with \`\`\`markdown on the very first line.
 
 Steps:
-1. Run \`pnpm vitest run --coverage\` once and capture the output.
+1. Run \`pnpm vitest run --maxWorkers=3 --coverage\` once and capture the output.
 2. Identify files with <80% coverage, focusing on critical paths:
    - apps/web/lib/impact/ (scoring pipeline)
    - apps/web/lib/render/ (SVG rendering)
@@ -144,7 +144,7 @@ IMPORTANT: Your entire stdout output becomes the report file. Write ONLY the fin
 Perform a quality assurance audit and produce a markdown report.
 
 Steps:
-1. Run the full test suite: \`pnpm vitest run\` and capture results.
+1. Run the full test suite: \`pnpm vitest run --maxWorkers=3\` and capture results.
 2. Run TypeScript type checking: \`pnpm run typecheck\` and capture any errors.
 3. Run ESLint: \`pnpm run lint\` and capture any warnings/errors.
 4. Check accessibility (use Grep on source files for each):
