@@ -309,7 +309,7 @@ Prefixes: `feat`, `fix`, `test`, `refactor`, `chore`, `docs`
 - **Circular dependency check**: `pnpm run check:circular` (via `madge`) — no circular imports allowed.
 - **`no-process-env` ESLint rule**: direct `process.env` access is banned outside `apps/web/lib/env.ts` (allowlisted). All env reads go through the centralized env module.
 - **`packages/shared` import boundary**: application code may not import from `packages/shared` via relative paths — use the workspace alias (`@chapa/shared`).
-- **Bundle-size budget**: the largest JS chunk must stay under 500 KB (checked in CI via build output analysis).
+- **Bundle-size budget**: the largest JS chunk must stay under 350 KB (checked in CI via build output analysis).
 - **Coverage thresholds**: configured in `vitest.config.ts` — CI fails if coverage drops below defined per-module thresholds.
 
 ## Test Conventions

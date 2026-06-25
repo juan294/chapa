@@ -4,7 +4,7 @@
 # 1. `analyze` — Standard build, measures aggregate directory sizes, comments
 #    on PRs with a size table.
 # 2. `bundle-analyzer` — Runs @next/bundle-analyzer (ANALYZE=true), uploads
-#    interactive HTML treemap reports as CI artifacts, and enforces a 500 KB
+#    interactive HTML treemap reports as CI artifacts, and enforces a 350 KB
 #    per-file budget on JS bundles.
 #
 # NOTE: Turbopack limitation (see GitHub issue #303)
@@ -222,10 +222,10 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-      - name: Check JS bundle sizes (500 KB budget)
+      - name: Check JS bundle sizes (350 KB budget)
         working-directory: apps/web
         run: |
-          BUDGET_KB=500
+          BUDGET_KB=350
           BUDGET_BYTES=$((BUDGET_KB * 1024))
           FAILED=0
 
