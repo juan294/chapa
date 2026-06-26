@@ -22,18 +22,18 @@ describe("Landing page (server component)", () => {
     });
   });
 
-  describe("static rendering (ISR-cacheable, DEFAULT_LOCALE)", () => {
-    it("does not use force-dynamic directive (page must be statically renderable)", () => {
+  describe("rendering mode", () => {
+    it("does not use force-dynamic directive (Next.js infers dynamic from cookies() call)", () => {
       expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
     });
 
-    it("does not use force-static directive (default Next.js static rendering is fine)", () => {
+    it("does not use force-static directive", () => {
       expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
     });
   });
 
   describe("rendering", () => {
-    it("renders NavbarClient (ISR-compatible, no headers() call)", () => {
+    it("renders NavbarClient (session fetched client-side)", () => {
       expect(SOURCE).toContain("NavbarClient");
     });
 
@@ -90,15 +90,14 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).toContain("getServerT");
     });
 
-    it("renders at DEFAULT_LOCALE statically (no cookie read at render time)", () => {
-      // Page must NOT call getServerLocale() — that reads cookies/headers, which
-      // prevents ISR caching. Instead it uses DEFAULT_LOCALE directly and relies
-      // on the LocaleSync client component to switch locale after hydration.
-      expect(SOURCE).not.toContain("getServerLocale");
-      expect(SOURCE).toContain("DEFAULT_LOCALE");
+    it("uses getServerLocale() to read locale from cookie/header for full page translation", () => {
+      // The page is server-rendered per-request so switching locale via the
+      // LanguageSwitcher (which sets chapa-locale cookie + calls router.refresh())
+      // results in the server re-rendering all content in the correct language.
+      expect(SOURCE).toContain("getServerLocale");
     });
 
-    it("renders LocaleSync for sticky lang override", () => {
+    it("renders LocaleSync for sticky ?lang= query param override", () => {
       expect(SOURCE).toContain("LocaleSync");
     });
 
