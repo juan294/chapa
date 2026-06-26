@@ -2,8 +2,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
-// Mock getServerT to return English without needing Next.js infrastructure.
-// Page now renders at DEFAULT_LOCALE statically (no getServerLocale call at render time).
+// Mock getServerLocale + getServerT to return English without needing Next.js infrastructure.
 // Uses a deep-traversal resolver that returns sub-objects (not just leaves) for intermediate keys.
 vi.mock("@/lib/i18n/server", async () => {
   const { en } = await import("@/lib/i18n/dictionaries/en");
@@ -18,6 +17,7 @@ vi.mock("@/lib/i18n/server", async () => {
     return current;
   }
   return {
+    getServerLocale: vi.fn().mockResolvedValue("en"),
     getServerT: vi.fn().mockImplementation(() => (key: string) =>
       deepGet(en as unknown as Record<string, unknown>, key)
     ),
