@@ -1,163 +1,88 @@
 # Security Report
-> Generated: 2026-06-22 | Health status: **green**
+> Generated: 2026-06-29 | Health status: green
 
 ## Executive Summary
-
-All eight security checks pass cleanly: zero dependency vulnerabilities (pnpm audit clean at all severities), no hardcoded secrets, full XSS escaping in the SVG pipeline, no server secrets reachable by client code, CORS wildcard scoped only to two read-only rate-limited endpoints, and all 10 Supabase tables with ENABLE + FORCE RLS. The single informational finding is a missing `server-only` guard on auth and verification modules (defense-in-depth only — Next.js strips non-`NEXT_PUBLIC_` vars at build time regardless).
-
----
+All security dimensions are clean: zero vulnerabilities in `pnpm audit`, no hardcoded secrets, all 11 Supabase tables under ENABLE + FORCE RLS, SVG user input fully escaped via `escapeXml()`, CORS wildcard scoped to two read-only endpoints only, and all non-permissive licenses formally accepted in `docs/accepted-risks.md`. One P3 carry from prior cycles remains open: `/api/challenge` handle-level rate limiter uses fail-open `rateLimit()` instead of `rateLimitStrict()`, mitigated by session auth and Resend send limits.
 
 ## Dependency Vulnerabilities
 
-`pnpm audit` output (628 total, 0 dev dependencies counted):
+`pnpm audit` result: **0 critical / 0 high / 0 moderate / 0 low** across 628 dependencies.
 
-| Severity | Count | Notes |
-|----------|-------|-------|
-| Critical | 0 | — |
-| High | 0 | — |
-| Moderate | 0 | — |
-| Low | 0 | — |
+| Severity | Package | Issue | Fix |
+|----------|---------|-------|-----|
+| — | — | No vulnerabilities found | — |
 
-**Result: CLEAN.** Prior advisories cleared by existing `pnpm.overrides`:
-- `esbuild >=0.28.1` — cleared 2026-06-15 HIGH (GHSA-gv7w-rqvm-qjhr, Deno RCE)
-- `brace-expansion >=5.0.6` — cleared 2026-05-25 MODERATE (GHSA-jxxr-4gwj-5jf2, ReDoS)
-- `js-yaml >=4.2.0` — cleared 2026-06-19 (CVE-2026-53550, build-tool)
-
----
-
-## Knip Analysis (Attack Surface / Unused Dependencies)
-
-`npx knip --production` flagged 9 "unused" dependencies + 1 "unused" file. All are **false positives**:
-
-| Flagged Dep | Actual Usage | Verdict |
-|-------------|-------------|---------|
-| `@resvg/resvg-js` | SVG-to-PNG via `lib/render/svgToPng.ts` (dynamic Turbopack load) | False positive |
-| `@vercel/analytics` | `components/ClientAnalytics.tsx` via `next/dynamic` | False positive |
-| `@vercel/speed-insights` | Lazy client component | False positive |
-| `canvas-confetti` | `lib/effects/celebrations/confetti.ts`, Studio + experiments | False positive |
-| `next-themes` | `components/ThemeProvider.tsx`, `ThemeToggle.tsx` | False positive |
-| `posthog-js` | `components/ClientAnalytics.tsx` via `next/dynamic` | False positive |
-| `resend` | `lib/email/resend.ts` | False positive |
-| `server-only` | `lib/db/supabase.ts:8` | False positive |
-| `svix` | `app/api/webhooks/resend/route.ts` — Resend webhook HMAC verification | False positive |
-| `vitest.setup.ts` | Test setup file, not a production file | False positive |
-
-Knip does not resolve `next/dynamic` call sites; all 9 deps are actively used. **No dead production dependencies.**
-
----
+Prior YELLOW finding from 2026-06-15 (esbuild GHSA-gv7w-rqvm-qjhr HIGH via vite/vitest) was resolved via `pnpm.overrides` pinning `esbuild >= 0.28.1`. Audit is fully clean this cycle.
 
 ## Code Findings
 
-- **[INFO] Missing `server-only` guard on auth/verification modules** — `lib/db/supabase.ts` imports `server-only` as the sole boundary guard, but `lib/auth/session.ts`, `lib/auth/cli-token.ts`, `lib/auth/github.ts`, `lib/auth/admin.ts`, `lib/auth/cron.ts`, `lib/auth/unsubscribe-token.ts`, and `lib/verification/hmac.ts` all read `NEXTAUTH_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_SECRET`, or `CRON_SECRET` without the `server-only` import. In practice these are never imported from client components — Next.js strips non-`NEXT_PUBLIC_` env vars at build time — but adding the guard would make the boundary explicit and fail the build immediately if someone accidentally imports them client-side.
+**PASS — XSS (SVG rendering)**
+All 7 user-controlled SVG fields are escaped via `escapeXml()` (`apps/web/lib/render/escape.ts`):
+- `handle` — `BadgeSvg.tsx:49`
+- `displayName` — `BadgeSvg.tsx:51`
+- `avatarDataUri` — `BadgeSvg.tsx:164`
+- `archetypeText` — `BadgeSvg.tsx:188`
+- `tier` — `BadgeSvg.tsx:245`
+- `hash` + `date` — `VerificationStrip.ts:13-14`
 
-  **Severity:** Informational (defense-in-depth, no current exposure)
-  **Affected files:** 7 files in `apps/web/lib/auth/` and `apps/web/lib/verification/hmac.ts`
+All 5 XML metacharacters (`&`, `<`, `>`, `'`, `"`) covered. `escape.test.ts` verifies all cases.
 
-- **[PASS] SVG XSS escaping** — All user-controlled entry points in the badge pipeline are escaped via `escapeXml()` (`lib/render/escape.ts`). Covered fields: `handle` (BadgeSvg:49), `displayName` (:51), `avatarDataUri` (:164), `archetypeText` (:188), `tier` (:245), `hash` and `date` (VerificationStrip:13–14), and the error fallback in `badge.svg/route.ts:56,62`. All five XML metacharacters (`& < > ' "`) replaced by named entities. No raw user interpolation in SVG output.
+**PASS — Secret leak to client**
+No `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `ADMIN_SECRET`, `CRON_SECRET`, `GITHUB_CLIENT_SECRET`, or `RESEND_API_KEY` appears in any `NEXT_PUBLIC_*` binding. All server secrets flow through `apps/web/lib/env.ts` with `import "server-only"` boundaries at `lib/db/supabase.ts:8`. Only publishable variables are exposed: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, and feature-flag booleans.
 
-- **[PASS] HMAC timing safety** — All signature comparisons use `crypto.timingSafeEqual`: OAuth state cookies (GitHub/Bitbucket/Codeberg/GitLab), CLI token verification (`cli-token.ts:71`), and unsubscribe token verification (`unsubscribe-token.ts:74`). No string-equality HMAC comparisons anywhere in the auth pipeline.
+**PASS — Hardcoded secrets**
+No literal API keys, tokens, or passwords found in `apps/web/lib/`, `apps/web/app/`, or `packages/`. All references to secret names are in comments/JSDoc, `process.env` reads, or test fixtures with mock values (e.g. `platform-auth-fixtures.ts` uses `test-bb/cb-client-secret` strings).
 
-- **[PASS] Resend webhook HMAC** — `app/api/webhooks/resend/route.ts` reads the raw request body before JSON parsing (as required by Svix), validates all three Svix headers (`svix-id`, `svix-timestamp`, `svix-signature`), and calls `verifyWebhookSignature()` before processing any payload.
+**PASS — CORS**
+Wildcard `Access-Control-Allow-Origin: *` is scoped to exactly 2 read-only rate-limited GET endpoints:
+- `/api/verify/[hash]` — 30 req/60s rate-limited
+- `/api/profile/[handle]` — 60 req/60s rate-limited
 
-- **[PASS] No hardcoded secrets** — Grepped `apps/web/app`, `apps/web/lib`, and `packages` for common key patterns (GitHub PAT prefixes, Resend `re_`, AWS AKIA, OpenAI `sk-`, Slack `xox*`). Zero matches in production source. The only secret-shaped strings in the codebase are in test fixtures (`platform-auth-fixtures.ts` mock values labeled `test-*`) and the CLI guide doc.
+`apps/web/app/api/cors-mutation-guard.test.ts` enforces that no `POST`/`PUT`/`PATCH`/`DELETE` handler can ship a wildcard origin — fails the build if violated.
 
----
+**PASS — Supabase RLS**
+All 11 user tables have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`:
 
-## CORS
+| Table | ENABLE | FORCE | Deny-anon policy |
+|-------|--------|-------|-----------------|
+| users | ✓ (002) | ✓ (018) | ✓ (008) |
+| metrics_snapshots | ✓ (002) | ✓ (018) | ✓ (008) |
+| verification_records | ✓ (002) | ✓ (018) | ✓ (008) |
+| feature_flags | ✓ (003) | ✓ (018) | ✓ (008) |
+| merge_operations | ✓ (007) | ✓ (018) | ✓ (008) |
+| tool_insights | ✓ (015/018) | ✓ (018) | ✓ (018) |
+| email_campaigns | ✓ (016) | ✓ (018) | ✓ (018) |
+| campaign_sends | ✓ (016) | ✓ (018) | ✓ (018) |
+| user_platforms | ✓ (010) | ✓ (018) | ✓ (008) |
+| supplemental_stats | ✓ (024) | ✓ (025) | ✓ (025) |
+| studio_configs | ✓ (027) | ✓ (027) | ✓ (027) |
 
-Wildcard `Access-Control-Allow-Origin: *` is scoped to exactly two endpoints:
+Views: `latest_snapshots_view` + `admin_users_view` configured with `SECURITY INVOKER` (migration 014).
 
-| Route | Method | Rate limit | Auth required |
-|-------|--------|-----------|---------------|
-| `/api/verify/[hash]` | GET | 30 req/60s | No |
-| `/api/profile/[handle]` | GET | 60 req/60s | No |
+**P3 — `/api/challenge` fail-open rate limiter (CARRY)**
+Location: `apps/web/app/api/challenge/route.ts:81`
+Handle-level rate limit (3 challenges/day per handle) uses `rateLimit()` (fail-open) instead of `rateLimitStrict()`. During a Redis outage, authenticated users could exceed the 3/day email cap. Compensating controls: session auth required (only owner can challenge their own handle), Resend send limits apply. Fix: swap `rateLimit` → `rateLimitStrict` on line 81.
 
-Both are read-only, rate-limited, and serve public data. All mutation endpoints (generate, refresh, studio, admin, supplemental) return no CORS headers, blocking cross-origin POST/PUT/DELETE. The `cors-mutation-guard.test.ts` file enforces this invariant at test time.
-
----
-
-## `NEXT_PUBLIC_` Secret Leak Check
-
-All vars prefixed `NEXT_PUBLIC_` in `lib/env.ts`:
-
-| Variable | Value type | Sensitive? |
-|----------|-----------|-----------|
-| `NEXT_PUBLIC_POSTHOG_KEY` | Publishable analytics write key | No (intended for client) |
-| `NEXT_PUBLIC_POSTHOG_HOST` | Analytics host URL | No |
-| `NEXT_PUBLIC_BASE_URL` | Site URL | No |
-| `NEXT_PUBLIC_BITBUCKET_ENABLED` | Boolean flag string | No |
-| `NEXT_PUBLIC_CODEBERG_ENABLED` | Boolean flag string | No |
-| `NEXT_PUBLIC_GITLAB_ENABLED` | Boolean flag string | No |
-| `NEXT_PUBLIC_EXPERIMENTS_ENABLED` | Boolean flag string | No |
-| `NEXT_PUBLIC_INSIGHTS_ENABLED` | Boolean flag string | No |
-| `NEXT_PUBLIC_STUDIO_ENABLED` | Boolean flag string | No |
-
-`SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `ADMIN_SECRET`, `CRON_SECRET`, `CHAPA_VERIFICATION_SECRET`, and `RESEND_WEBHOOK_SECRET` are all server-side only and absent from any `NEXT_PUBLIC_*` binding. **No secret leakage.**
-
----
-
-## Supabase RLS
-
-All 10 base tables verified with both `ENABLE ROW LEVEL SECURITY` and `FORCE ROW LEVEL SECURITY`:
-
-| Table | ENABLE RLS | FORCE RLS | Migration |
-|-------|-----------|----------|-----------|
-| `users` | 002 | 018 | ✓ |
-| `metrics_snapshots` | 002 | 018 | ✓ |
-| `verification_records` | 002 | 018 | ✓ |
-| `feature_flags` | 003 | 018 | ✓ |
-| `merge_operations` | 007 | 018 | ✓ |
-| `user_platforms` | 010 | 018 | ✓ |
-| `tool_insights` | 015 | 018 | ✓ |
-| `email_campaigns` | 016 | 018 | ✓ |
-| `campaign_sends` | 016 | 018 | ✓ |
-| `supplemental_stats` | 024 | 025 | ✓ |
-
-Deny-all-anon policies added in migrations 008 and 018. `FORCE RLS` ensures the service-role client used in API routes cannot bypass row-level policies accidentally. **10/10 ENABLE + FORCE RLS.**
-
----
+**INFO — Knip `--production`**
+1 finding: `vitest.setup.ts` (false positive — test infrastructure file). No real unused production dependencies detected.
 
 ## License Compliance
 
-`license-checker --production` returned no GPL or AGPL packages.
+No GPL or AGPL dependencies. Non-permissive licenses in use are all formally accepted:
 
-Previously documented exceptions in `docs/accepted-risks.md`:
-- **MPL-2.0**: `@resvg/resvg-js`, `lightningcss` — file-level copyleft (not library-level), does not require open-sourcing the application
-- **LGPL-3.0**: `@img/sharp-libvips-darwin-arm64` — dynamically linked, permissive exception applies; `sharp` itself is Apache-2.0 since 0.34.5
+| Package | License | Status |
+|---------|---------|--------|
+| `@resvg/resvg-js` | MPL-2.0 | Accepted — weak copyleft, file-level, unmodified use |
+| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | Accepted — dynamically linked, satisfies re-link requirement |
+| `lightningcss` | MPL-2.0 | Accepted — build-time only, not bundled to users |
+| `dompurify` (transitive via PostHog) | MPL-2.0 OR Apache-2.0 | Accepted — Apache-2.0 option on allowlist; not imported directly |
 
-**All clear. No GPL or AGPL violations.**
-
----
+All documented in `docs/accepted-risks.md`. No copyleft infections of Chapa application code.
 
 ## Recommendations
 
-| Priority | Item | Action |
-|----------|------|--------|
-| P3 | Add `server-only` to auth and verification modules | `import "server-only"` at the top of `lib/auth/session.ts`, `lib/auth/cli-token.ts`, `lib/auth/github.ts`, `lib/auth/admin.ts`, `lib/auth/cron.ts`, `lib/auth/unsubscribe-token.ts`, and `lib/verification/hmac.ts`. Defense-in-depth — no current exposure. |
-| P3 | Suppress knip false positives for dynamic imports | Add explicit `ignoreDependencies` entries in `knip.json` for the 9 dynamically-loaded deps so future knip runs stay noise-free. |
+| Priority | Action | Location |
+|----------|--------|----------|
+| P3 | Swap `rateLimit()` → `rateLimitStrict()` for handle-level guard in `/api/challenge` | `apps/web/app/api/challenge/route.ts:81` |
 
-No P1 or P2 items.
-
----
-
-## SHARED_CONTEXT_ENTRY
-
-```
-<!-- ENTRY:START agent=security timestamp=2026-06-22T00:00:00Z -->
-## Security Scanner — 2026-06-22
-- **Status**: GREEN
-- Vulnerabilities: 0 critical / 0 high / 0 moderate / 0 low (pnpm audit clean; all prior overrides effective)
-- Secret leaks: none (no NEXT_PUBLIC_* carries server secrets; no hardcoded keys in production source)
-- License issues: none (no GPL/AGPL; MPL-2.0 + LGPL-3.0 documented in accepted-risks.md)
-- RLS: 10/10 ENABLE + FORCE RLS on all Supabase tables
-- CORS: wildcard scoped to 2 read-only rate-limited GETs only; mutation guard test in place
-- XSS: all 7 SVG user-input fields escaped via escapeXml(); timing-safe HMAC comparisons throughout
-- Knip --production: 9 false positives (all deps in active use via next/dynamic); 0 real unused deps
-- One INFO finding: `server-only` guard missing on 7 auth/verification files (defense-in-depth only, no current exposure)
-
-**Cross-agent recommendations:**
-- [Coverage]: No security-critical coverage gaps. lib/auth 97.4%, lib/verification 100%, all XSS paths exercised.
-- [QA]: No security UX issues. CORS wildcard scoped; mutation guard invariant test active.
-- [Triage]: P3 only — add `server-only` to 7 auth/verification files and add knip ignoreDependencies entries. No P1/P2 action required.
-<!-- ENTRY:END -->
-```
+No P1 or P2 items. Security posture is strong across all audit dimensions.
