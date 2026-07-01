@@ -84,7 +84,7 @@ The remaining 10 older `[remediate]` issues (`#959`, `#961`-`#965`, `#971`-`#976
 - [x] All tests passing (8,164/8,164)
 - [x] Typecheck clean
 - [x] Lint clean
-- [ ] CI green (pending push + monitor)
+- [x] CI green on `develop` (headSha `0db09432`) — Secret Scanning, Security Scan, Dead Code Detection, Bundle Size Analysis, CI (lint/typecheck/test/build/E2E/deployment smoke) all succeeded
 
 ## Carried Items (for next cycle)
 - 10 older `[remediate]` issues (`#959`, `#961`-`#965`, `#971`-`#976`) from the earlier pre-launch cycle were not re-verified this cycle — spot-check and close/action next time.
