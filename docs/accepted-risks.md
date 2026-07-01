@@ -167,6 +167,15 @@ Documented security, infrastructure, and performance decisions that were evaluat
 
 ---
 
+## In-memory inflight badge render map provides no cross-instance dedup (PE-L3)
+
+- **Risk:** `inflightBadgeRenders` (`apps/web/app/u/[handle]/badge.svg/route.ts:50`) is a module-level `Map` used to coalesce concurrent badge render requests hitting the same serverless instance. On Vercel, each invocation typically runs on its own isolated instance, so this in-memory map rarely coalesces cross-instance concurrent requests — the real dedup mechanism is the Redis SETNX render lock plus stale-yesterday serve.
+- **Mitigation:** The Redis lock (`acquireBadgeRenderLock`) and stale-serve fallback bound the blast radius regardless of whether the in-memory map fires; the map is a same-instance optimization only, not a correctness dependency. No unbounded growth risk — entries are cleaned up in a `finally` block after each render.
+- **Severity:** Low
+- **Accepted:** 2026-07-01
+
+---
+
 ## Post-response side effects in badge route
 
 - **Risk:** After rendering a badge SVG, side effects (metrics snapshot capture, analytics events, cache warm, verification record store) are scheduled with Next.js `after()` and run via `Promise.allSettled` in `runPublicProfileSideEffects` (`apps/web/lib/profile/public-profile.ts`). Individual rejections are absorbed by `allSettled` with no retry and no alert, and the side-effect path currently has no `captureServerError`/PostHog instrumentation — failures produce, at most, whatever each callee logs internally.

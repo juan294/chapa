@@ -91,6 +91,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - POST `/api/insights` Submit tool insights data
 - GET `/api/cli/auth/poll` CLI device auth polling (RFC 8628-style: first poll issues + returns a `device_code`; subsequent polls from the CLI should echo it to bind the session to the initiating device; legacy CLIs that omit it still work)
 - POST `/api/cli/auth/approve` CLI device auth approval
+- POST `/api/challenge` Score challenge submission — authenticated, rate-limited; sends dispute email via Resend
 
 ### Admin API
 - GET `/api/admin/users` Admin user list (session auth + admin check)

@@ -403,32 +403,50 @@ export async function dbGetLatestSnapshot(
 }
 
 /**
+ * Maximum batch-delete iterations per `dbCleanOldSnapshots()` call. Bounds
+ * worst-case runtime (a batch a day keeping pace with retention growth) while
+ * still letting the cleanup catch up past a single SNAPSHOT_CLEANUP_BATCH_SIZE
+ * batch when eligible rows accumulate.
+ */
+export const SNAPSHOT_CLEANUP_MAX_ITERATIONS = 20;
+
+/**
  * Delete snapshots older than SNAPSHOT_RETENTION_DAYS (batched to avoid table locks).
+ * Loops until a batch deletes fewer than SNAPSHOT_CLEANUP_BATCH_SIZE rows (caught up)
+ * or SNAPSHOT_CLEANUP_MAX_ITERATIONS is reached (safety cap on worst-case runtime).
  * Intended to be called from cron (warm-cache).
- * Returns the number of deleted rows, or 0 on error.
+ * Returns the total number of deleted rows, or 0 on error.
  */
 export async function dbCleanOldSnapshots(): Promise<number> {
   const db = getSupabase();
   if (!db) return 0;
 
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - SNAPSHOT_RETENTION_DAYS);
+
+  let totalDeleted = 0;
+
   try {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - SNAPSHOT_RETENTION_DAYS);
+    for (let i = 0; i < SNAPSHOT_CLEANUP_MAX_ITERATIONS; i++) {
+      const { data, error } = await db
+        .from("metrics_snapshots")
+        .delete()
+        .lt("captured_at", cutoff.toISOString())
+        .limit(SNAPSHOT_CLEANUP_BATCH_SIZE)
+        .select("id");
 
-    const { data, error } = await db
-      .from("metrics_snapshots")
-      .delete()
-      .lt("captured_at", cutoff.toISOString())
-      .limit(SNAPSHOT_CLEANUP_BATCH_SIZE)
-      .select("id");
+      if (error) throw error;
+      const deletedCount = data?.length ?? 0;
+      totalDeleted += deletedCount;
 
-    if (error) throw error;
-    return data?.length ?? 0;
+      if (deletedCount < SNAPSHOT_CLEANUP_BATCH_SIZE) break;
+    }
+    return totalDeleted;
   } catch (error) {
     console.error(
       "[db] dbCleanOldSnapshots failed:",
       (error as Error).message,
     );
-    return 0;
+    return totalDeleted;
   }
 }
