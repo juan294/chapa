@@ -315,7 +315,8 @@ doubt.
 ### Report Output
 
 - Path: `docs/agents/pre-launch-report.md`
-- Commit policy follows repo visibility (Rule #70): gitignored on public repos, tracked on private repos
+- Commit policy follows repo visibility (Rule #70): gitignored on public
+  repos, tracked on private repos
 - Markdown only. No XML tags.
 - Finding IDs are the `/remediate` parse anchor — never reuse an ID,
   never list a finding without an ID.
