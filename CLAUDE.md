@@ -195,6 +195,12 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - Prefer pure functions for scoring & rendering.
 - Escape/encode any user-controlled text in SVG (handle, display name).
 - Handle GitHub rate limit errors gracefully (serve cached or show "try later").
+- A 500 on legal user input is always a bug.
+- A durable write that fails but reports success is always a bug. Per-route
+  behavior may be loud (5xx) or graceful (`persisted:false`), but every durable
+  write failure must be observable through capture/logging.
+- New write endpoints must be registered in the payload-matrix contract suite
+  (`pnpm run check:write-registration`).
 - **Accepted risks**: See `docs/accepted-risks.md` for formally documented design decisions and known limitations. Items in that file are intentional and should not be flagged as audit warnings.
 
 ## Deployment
@@ -263,6 +269,8 @@ Go directly to these paths -- never search for them.
 | PR descriptions | `docs/prs/{number}_description.md` | |
 | Research docs | `docs/research/YYYY-MM-DD-description.md` | |
 | Plans | `docs/plans/YYYY-MM-DD-description.md` | Phase files in `-phases/phase-N.md` |
+| Reliability playbooks | `docs/playbooks/reliability-hardening-playbook.md` | Seam-bug hardening reference |
+| Reliability plan | `docs/plans/2026-07-03-reliability-hardening.md` | Contract matrix, canaries, process guarantees |
 
 ---
 

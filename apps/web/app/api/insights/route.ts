@@ -12,7 +12,7 @@ import { computeCraftScore } from "@/lib/insights/scoring";
 import { dbUpsertToolInsights } from "@/lib/db/tool-insights";
 import { invalidateProfileReadModels } from "@/lib/profile/post-write-invalidation";
 import type { InsightsUpload } from "@chapa/shared";
-import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { captureServerError, withErrorCapture } from "@/lib/analytics/server-errors";
 import { log } from "@/lib/log";
 
 /**
@@ -85,6 +85,19 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
 
   // Store in database (synchronous — response needs the stored result)
   const stored = await dbUpsertToolInsights(auth.handle, data, scores);
+  const persisted = stored != null;
+
+  if (!persisted) {
+    log("error", "[insights] durable persist returned null", {
+      route: "/api/insights",
+      handle: auth.handle,
+    });
+    void captureServerError({
+      route: "/api/insights",
+      statusCode: 200,
+      error: new Error("Tool insights durable persist returned null"),
+    });
+  }
 
   // Defer cache invalidation until after the durable write completes.
   after(async () => {
@@ -101,6 +114,7 @@ export const POST = withErrorCapture("/api/insights", async (request: NextReques
 
   return NextResponse.json({
     success: true,
+    persisted,
     craftScore: stored ?? scores,
   });
 });

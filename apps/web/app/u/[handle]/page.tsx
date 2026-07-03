@@ -23,8 +23,9 @@ import { CommandBarHint } from "@/components/CommandBarHint";
 import { BadgeSkeleton } from "@/components/BadgeSkeleton";
 import {
   getPublicProfileVerification,
+  deferProfileCacheWork,
   materializePublicProfile,
-  runPublicProfileSideEffects,
+  persistProfileSnapshot,
 } from "@/lib/profile/public-profile";
 import { getServerT } from "@/lib/i18n/server";
 import { DEFAULT_LOCALE, LocaleSync } from "@/lib/i18n";
@@ -166,11 +167,15 @@ export async function SharePageContent({
   // poison the shared cache with a degraded SVG for up to 24h. (#800)
   if (materialized && inlineSvg && !readOnly) {
     const svgToCache = renderedFresh && avatarResolved ? inlineSvg : null;
+    const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
+      readOnly,
+    });
     after(() => {
       if (svgToCache) {
         void writeBadgeSvgCache(svgCacheKey, svgToCache, handle);
       }
-      return runPublicProfileSideEffects(handle, materialized, { verification });
+      if (!shouldRunDeferred) return;
+      return deferProfileCacheWork(handle, materialized, { verification });
     });
   }
 

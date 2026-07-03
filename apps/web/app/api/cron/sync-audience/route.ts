@@ -19,6 +19,8 @@ export const maxDuration = 300;
 const BATCH_SIZE = 5;
 const CONTACTS_CACHE_KEY = "sync-audience:contacts";
 const CONTACTS_CACHE_TTL = 3600; // 1h — avoids repeated Resend API calls across same-day cron retries
+const HEARTBEAT_KEY = "cron:lastrun:sync-audience";
+const HEARTBEAT_TTL_SECONDS = 60 * 60 * 48;
 
 interface Contact {
   id: string;
@@ -91,6 +93,7 @@ export const GET = withErrorCapture("/api/cron/sync-audience", async (request: N
   // Ensure segment exists
   const segmentId = await ensureSegment();
   if (!segmentId) {
+    await cacheSet(HEARTBEAT_KEY, Date.now(), HEARTBEAT_TTL_SECONDS);
     return NextResponse.json({
       status: "skipped",
       reason: "no_segment",
@@ -132,6 +135,8 @@ export const GET = withErrorCapture("/api/cron/sync-audience", async (request: N
 
   const added = addResults.succeeded.length;
   const unsubscribed = unsubResults.succeeded.length;
+
+  await cacheSet(HEARTBEAT_KEY, Date.now(), HEARTBEAT_TTL_SECONDS);
 
   return NextResponse.json({
     status: "ok",

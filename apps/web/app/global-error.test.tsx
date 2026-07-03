@@ -1,42 +1,33 @@
-import { describe, it, expect } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
+// @vitest-environment jsdom
+import { render, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import GlobalError from "./global-error";
 
-const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "global-error.tsx"),
-  "utf-8",
-);
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
 
-describe("global-error.tsx — root error boundary", () => {
-  it("has 'use client' directive", () => {
-    expect(SOURCE).toContain('"use client"');
+describe("GlobalError", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ ok: true })));
   });
 
-  it("exports a default function", () => {
-    expect(SOURCE).toContain("export default function");
-  });
+  it("posts client-error telemetry on mount", async () => {
+    const error = Object.assign(new Error("render failed"), {
+      digest: "digest-1",
+    });
 
-  it("contains <html> tag (replaces root layout)", () => {
-    expect(SOURCE).toContain("<html");
-  });
+    render(<GlobalError error={error} reset={vi.fn()} />);
 
-  it("contains <body> tag (replaces root layout)", () => {
-    expect(SOURCE).toContain("<body");
-  });
-
-  it("contains a retry button", () => {
-    expect(SOURCE).toContain("Try again");
-  });
-
-  it("calls reset on retry button click", () => {
-    expect(SOURCE).toContain("onClick={reset}");
-  });
-
-  it("contains a 'go home' link", () => {
-    expect(SOURCE).toContain("Go home");
-  });
-
-  it("links to the root path", () => {
-    expect(SOURCE).toContain('href="/"');
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/telemetry",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: expect.stringContaining("render failed"),
+        }),
+      );
+    });
   });
 });

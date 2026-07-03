@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/cache/redis", () => ({
+  cacheGetCronLastRun: vi.fn(),
   pingRedis: vi.fn(),
   rateLimit: vi.fn(),
 }));
@@ -38,7 +39,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
 import { GET } from "./route";
-import { pingRedis, rateLimit } from "@/lib/cache/redis";
+import { cacheGetCronLastRun, pingRedis, rateLimit } from "@/lib/cache/redis";
 import { pingSupabase } from "@/lib/db/supabase";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
@@ -61,6 +62,7 @@ function makeGitHubRateLimitResponse(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 30 });
+  vi.mocked(cacheGetCronLastRun).mockResolvedValue(Date.now());
   vi.mocked(getOptionalRequestSession).mockReturnValue(null);
   vi.mocked(isAdminHandle).mockReturnValue(false);
   // Default: GITHUB_TOKEN not set — skipped
@@ -105,6 +107,7 @@ describe("GET /api/health", () => {
           redis: "error",
           supabase: "ok",
           github: "skipped",
+          cronHeartbeats: expect.any(Object),
           alertWebhook: "skipped",
         },
       },
@@ -174,6 +177,36 @@ describe("GET /api/health", () => {
     expect(body.status).toBe("degraded");
     expect(body.dependencies.redis).toBe("error");
     expect(body.dependencies.supabase).toBe("error");
+  });
+
+  it("returns 503 when a cron heartbeat is stale", async () => {
+    const twentySevenHoursAgo = Date.now() - 27 * 60 * 60 * 1000;
+    vi.mocked(cacheGetCronLastRun).mockImplementation(async (name: string) =>
+      name === "warm-cache" ? twentySevenHoursAgo : Date.now(),
+    );
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("degraded");
+    expect(body.dependencies.cronHeartbeats["warm-cache"].stale).toBe(true);
+    expect(captureOperationalAlert).toHaveBeenCalled();
+  });
+
+  it("does not degrade during the missing-heartbeat grace window", async () => {
+    vi.mocked(cacheGetCronLastRun).mockResolvedValue(null);
+    vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+    vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+
+    const response = await GET(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.dependencies.cronHeartbeats["warm-cache"].stale).toBe(false);
   });
 
   it("always returns a valid timestamp", async () => {
@@ -252,6 +285,21 @@ describe("GET /api/health", () => {
       expect(body.status).toBe("ok");
       expect(body.dependencies.github).toBe("ok");
       expect(body.dependencies.githubRateLimit).toBeUndefined();
+    });
+
+    it("returns 503 when GitHub quota is below the floor", async () => {
+      vi.stubEnv("GITHUB_TOKEN", "ghp_test_token");
+      vi.mocked(pingRedis).mockResolvedValueOnce("ok");
+      vi.mocked(pingSupabase).mockResolvedValueOnce("ok");
+      mockFetch.mockResolvedValueOnce(makeGitHubRateLimitResponse(499, 5000));
+
+      const response = await GET(makeRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.status).toBe("degraded");
+      expect(body.dependencies.githubQuotaLow).toBe(true);
+      expect(captureOperationalAlert).toHaveBeenCalled();
     });
 
     it("calls the GitHub rate_limit endpoint with Authorization header", async () => {

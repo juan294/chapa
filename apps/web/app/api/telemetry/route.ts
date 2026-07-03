@@ -4,7 +4,7 @@ import { isValidTelemetryPayload } from "@/lib/validation";
 import { dbInsertTelemetry, type TelemetryPayload } from "@/lib/db/telemetry";
 import { getClientIp } from "@/lib/http/client-ip";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
-import { withErrorCapture } from "@/lib/analytics/server-errors";
+import { captureServerEvent, withErrorCapture } from "@/lib/analytics/server-errors";
 import { log } from "@/lib/log";
 
 // Trust model: this endpoint intentionally remains unauthenticated for CLI compatibility.
@@ -16,6 +16,18 @@ export const POST = withErrorCapture("/api/telemetry", async (request: NextReque
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  if (isClientErrorTelemetryPayload(body)) {
+    void captureServerEvent(body.event, {
+      category: body.category,
+      message: body.message.slice(0, 500),
+      ...(body.stack && { stack: body.stack.slice(0, 1000) }),
+      ...(body.digest && { digest: body.digest.slice(0, 128) }),
+      ...(body.path && { path: body.path.slice(0, 300) }),
+      source: body.source,
+    });
+    return NextResponse.json({ ok: true });
   }
 
   // 2. Validate payload structure
@@ -78,3 +90,29 @@ export const POST = withErrorCapture("/api/telemetry", async (request: NextReque
   // 5. Always return success — telemetry is a best-effort analytics sink.
   return NextResponse.json({ ok: true });
 });
+
+function isClientErrorTelemetryPayload(value: unknown): value is {
+  event: "client_error" | "client_api_error";
+  category: string;
+  message: string;
+  stack?: string;
+  digest?: string;
+  path?: string;
+  source?: string;
+} {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
+  return (
+    (obj.event === "client_error" || obj.event === "client_api_error") &&
+    typeof obj.category === "string" &&
+    obj.category.length > 0 &&
+    typeof obj.message === "string" &&
+    obj.message.length > 0 &&
+    (obj.stack === undefined || typeof obj.stack === "string") &&
+    (obj.digest === undefined || typeof obj.digest === "string") &&
+    (obj.path === undefined || typeof obj.path === "string") &&
+    (obj.source === undefined || typeof obj.source === "string")
+  );
+}

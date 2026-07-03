@@ -68,7 +68,20 @@ export async function runPublicProfileSideEffects(
     sendFirstBadgeNotification?: boolean;
   } = {},
 ): Promise<void> {
-  if (options.readOnly) return;
+  const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
+    readOnly: options.readOnly,
+  });
+  if (!shouldRunDeferred) return;
+
+  await deferProfileCacheWork(handle, materialized, options);
+}
+
+export async function persistProfileSnapshot(
+  handle: string,
+  materialized: MaterializedProfile,
+  options: { readOnly?: boolean } = {},
+): Promise<boolean> {
+  if (options.readOnly) return false;
 
   // Deduplication guard: once-per-day SETNX key prevents duplicate Supabase
   // writes when the CDN misses and multiple edge nodes hit the origin in parallel.
@@ -80,7 +93,33 @@ export async function runPublicProfileSideEffects(
     `sideeffects:done:${handle}:${today}`,
     86400,
   );
-  if (guardStatus === "exists" && !materialized.inputsChanged) return;
+  if (guardStatus === "exists" && !materialized.inputsChanged) return false;
+
+  // #826 — replace today's row when inputs changed; otherwise insert and
+  // let the UNIQUE(handle, date) constraint dedupe.
+  const persisted = materialized.inputsChanged
+    ? await dbReplaceSnapshot(handle, materialized.snapshot)
+    : await dbInsertSnapshot(handle, materialized.snapshot);
+  if (persisted) {
+    await updateSnapshotCache(handle, materialized.snapshot);
+    if (materialized.inputsChanged) {
+      await clearStatsDirty(handle);
+    }
+  }
+
+  return true;
+}
+
+export async function deferProfileCacheWork(
+  handle: string,
+  materialized: MaterializedProfile,
+  options: {
+    verification?: PublicVerificationCode | null;
+    readOnly?: boolean;
+    sendFirstBadgeNotification?: boolean;
+  } = {},
+): Promise<void> {
+  if (options.readOnly) return;
 
   const verification = options.verification ??
     getPublicProfileVerification(materialized);
@@ -99,21 +138,6 @@ export async function runPublicProfileSideEffects(
   if (options.sendFirstBadgeNotification) {
     ops.push(notifyFirstBadge(handle, materialized.displayImpact));
   }
-  ops.push(
-    (async () => {
-      // #826 — replace today's row when inputs changed; otherwise insert and
-      // let the UNIQUE(handle, date) constraint dedupe.
-      const persisted = materialized.inputsChanged
-        ? await dbReplaceSnapshot(handle, materialized.snapshot)
-        : await dbInsertSnapshot(handle, materialized.snapshot);
-      if (persisted) {
-        await updateSnapshotCache(handle, materialized.snapshot);
-        if (materialized.inputsChanged) {
-          await clearStatsDirty(handle);
-        }
-      }
-    })(),
-  );
 
   if (materialized.stats.displayName || materialized.stats.avatarUrl) {
     ops.push(

@@ -268,14 +268,16 @@ export async function dbReplaceSnapshot(
 
   try {
     const row = snapshotToRow(handle, snapshot);
-    const { error } = await db
+    const { data, error } = await db
       .from("metrics_snapshots")
       .upsert(row, {
         onConflict: "handle,date",
-      });
+      })
+      .select("id")
+      .maybeSingle();
 
     if (error) throw error;
-    return true;
+    return data !== null;
   } catch (error) {
     console.error(
       "[db] dbReplaceSnapshot failed:",

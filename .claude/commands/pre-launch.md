@@ -87,6 +87,9 @@ logging, alerting, runbook readiness, incident response readiness.
 Commands: `gh run list --branch <integration-branch> --limit 5`, audit
 env var docs vs actual usage, verify error pages exist, check git state
 clean.
+Reliability gate: verify cron-heartbeat health checks are active and that
+`.github/workflows/nightly-prod-probe.yml` exists, is scheduled, and is
+read-only.
 
 **Specialist 6 — Security Reviewer** (`security-reviewer`, SE)
 
@@ -104,6 +107,8 @@ critical workflows; graceful degradation; failure modes;
 retry/idempotency coverage; high-risk untested files.
 Commands: `$TEST_CMD` (full suite — the ONE specialist authorized;
 Rule #73).
+Reliability gate: verify `pnpm run test:contract` is green and every write
+route is registered (`pnpm run check:write-registration` exits 0).
 Rule #73: other 7 specialists MUST NOT run `$TEST_CMD` in parallel.
 
 **Specialist 8 — Product Designer / UX Lead** (`ux-lead`, UX)

@@ -172,6 +172,13 @@ Read-only. Do not modify any files.
    - Identify patterns (multiple agents flagging the same area).
    - Check shared-context.md recommendations against report findings.
    - Cross-reference GitHub alerts with report findings, Dependabot PRs, and carried items so GitHub-native warnings cannot be hidden by GREEN local reports.
+   - Review PostHog/server alert streams for `server_error`, `badge_5xx`,
+     `oauth_callback_failure`, `client_error`, and `client_api_error`. Any
+     production 5xx on legal input or "success but nothing saved" report must
+     become a tracked seam-bug issue with a real-stack regression requirement.
+   - For every bug-class fix proposed, include the grep signature that will be
+     swept and require the implementation report to list all matching
+     `file:line` instances.
 
 7. **Draft the action plan:**
 

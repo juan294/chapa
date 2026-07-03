@@ -9,7 +9,11 @@ export default defineConfig({
       "packages/**/*.test.{ts,tsx}",
       "scripts/**/*.test.ts",
     ],
-    exclude: ["**/node_modules/**", "**/node_modules.nosync/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/node_modules.nosync/**",
+      "**/*.contract.test.ts",
+    ],
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
       provider: "v8",

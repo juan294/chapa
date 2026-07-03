@@ -1,0 +1,64 @@
+name: Nightly Production Probe
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Read-only prod probe
+    runs-on: ubuntu-latest
+    env:
+      DEPLOYMENT_SMOKE_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
+      PLAYWRIGHT_BASE_URL: ${{ secrets.DEPLOYMENT_SMOKE_BASE_URL }}
+      DEPLOYMENT_SMOKE_STRICT: "true"
+    steps:
+      - name: Require deployment smoke URL
+        if: env.DEPLOYMENT_SMOKE_BASE_URL == ''
+        run: |
+          echo "::error::DEPLOYMENT_SMOKE_BASE_URL is required for nightly production probe."
+          exit 1
+
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: nightly-playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
+          restore-keys: |
+            nightly-playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: apps/web
+
+      - name: Run strict read-only smoke probe
+        run: npx playwright test e2e/smoke.spec.ts --project=chromium
+        working-directory: apps/web
+        env:
+          CI: true
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-prod-probe-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
