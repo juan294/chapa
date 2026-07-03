@@ -145,8 +145,13 @@ jobs:
       - name: Export Supabase local env
         run: |
           supabase status -o env > supabase.env
-          echo "SUPABASE_URL=$(grep '^API_URL=' supabase.env | cut -d= -f2-)" >> "$GITHUB_ENV"
-          echo "SUPABASE_SERVICE_ROLE_KEY=$(grep '^SERVICE_ROLE_KEY=' supabase.env | cut -d= -f2-)" >> "$GITHUB_ENV"
+          set -a
+          . ./supabase.env
+          set +a
+          : "${API_URL:?Missing API_URL from Supabase CLI status output}"
+          : "${SERVICE_ROLE_KEY:?Missing SERVICE_ROLE_KEY from Supabase CLI status output}"
+          printf 'SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
       - run: supabase db reset
       - name: Contract tests
         run: pnpm run test:contract
