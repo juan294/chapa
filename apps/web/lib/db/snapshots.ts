@@ -104,6 +104,14 @@ function snapshotToRow(
   handle: string,
   s: MetricsSnapshot,
 ): Record<string, unknown> {
+  // NOT-NULL numeric columns below are forwarded WITHOUT a `?? 0` default on
+  // purpose (detect, don't mask). MetricsSnapshot types these as required
+  // numbers, so `undefined` should never occur; if it ever does at runtime, we
+  // want the resulting Postgres 23502 (not_null_violation) to surface rather
+  // than silently persisting a fabricated 0 that would corrupt the score. The
+  // failure is made observable, not swallowed: dbReplaceSnapshot returns
+  // `data !== null` and the caller reports `persisted: false` + captures the
+  // error. Only genuinely-nullable columns get `?? null` (see below).
   return {
     handle: handle.toLowerCase(),
     date: s.date,
