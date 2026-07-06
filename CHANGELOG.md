@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-07-06
+
+### Added
+- **Reliability hardening (#987–#992)**: real-stack contract test coverage, write-route registration checks, DB-backed journey E2E tests, persistence fail-closed fixes, and cron/client-error canaries, plus reliability process documentation
+
+### Fixed
+- **Admin Users tab rate limiting (#993)**: the Users tab tripped "Too many requests" during normal use — search input now debounces (400ms) instead of firing a fetch per keystroke, and the endpoint's rate limit was raised from 10 to 30 requests/60s to give headroom for legitimate pagination/sort/search
+- **Score challenge rate limiting (#976)**: `/api/challenge`'s IP and handle rate limiters switched from fail-open to fail-closed, closing a gap carried across several triage cycles
+- **Landing page locale switching**: restored `getServerLocale()` after an earlier ISR optimization silently broke locale switching — the page body stayed in Spanish regardless of the selected language
+- **Center nav labels locale bug (#979)**: nav labels in `NavbarClient` now derive from the active locale instead of a stale value
+- **Contract & reliability CI stabilized**: contract suite now runs on Node 24; flaky reliability CI checks hardened
+
+### Changed
+- Migrated the Claude Code Review workflow and RPI commands to Sonnet 5
+- Synced with cc-rpi blueprint v1.25.0
+- Documented the detect-don't-mask rationale for NOT-NULL numeric snapshot columns
+
+62 new tests since v2.15.0; total test count: 8,174 across 477 files.
+
 ## [2.15.0] - 2026-06-25
 
 ### Added
@@ -573,7 +592,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.15.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.16.0...HEAD
+[2.16.0]: https://github.com/juan294/chapa/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/juan294/chapa/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/juan294/chapa/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/juan294/chapa/compare/v2.12.0...v2.13.0
