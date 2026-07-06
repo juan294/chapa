@@ -30,7 +30,9 @@ const VALID_SORT_FIELDS: AdminSortField[] = [
  * Data comes from Supabase `admin_users` view (users + latest snapshot).
  */
 export const GET = withErrorCapture("/api/admin/users", async (request: NextRequest) => {
-  const authError = await adminAuth(request, "ratelimit:admin-users");
+  // Pagination/sort/search each trigger a distinct request; the shared
+  // adminAuth default (10/60s) is too tight for normal dashboard use (#993).
+  const authError = await adminAuth(request, "ratelimit:admin-users", 30, 60);
   if (authError) return authError;
 
   // Parse query params

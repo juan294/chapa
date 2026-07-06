@@ -116,6 +116,11 @@ describe("GET /api/admin/users", () => {
     expect(res.status).toBe(429);
   });
 
+  it("rate-limits with headroom for legitimate pagination/sort/search traffic", async () => {
+    await GET(makeRequest());
+    expect(rateLimit).toHaveBeenCalledWith("ratelimit:admin-users:127.0.0.1", 30, 60);
+  });
+
   // Data layer — dbGetAdminUsers
   it("returns paginated users from Supabase", async () => {
     const res = await GET(makeRequest());

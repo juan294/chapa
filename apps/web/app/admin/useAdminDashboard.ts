@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import type { AdminUser, SortField, SortDir, PaginatedResponse } from "./admin-types";
+
+const SEARCH_DEBOUNCE_MS = 400;
 
 // ---------------------------------------------------------------------------
 // Tab type
@@ -49,7 +52,7 @@ export function useAdminDashboard(): AdminDashboardState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearchRaw] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const deferredSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [sortField, setSortField] = useState<SortField>("adjustedComposite");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [refreshing, setRefreshing] = useState(false);
