@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
+import { trackEvent } from "@/lib/analytics/posthog";
 
 const STORAGE_PREFIX = "chapa:refreshed:";
 
@@ -56,6 +57,12 @@ export function useOwnerCacheWarm(handle: string, isOwner: boolean): void {
           if (res.ok) {
             try { sessionStorage.setItem(key, "1"); } catch {}
             router.refresh();
+          } else {
+            trackEvent("client_api_error", {
+              route: "/api/refresh",
+              status: res.status,
+              source: "useOwnerCacheWarm",
+            });
           }
         }),
       () => undefined,

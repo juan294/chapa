@@ -79,19 +79,52 @@ describe("parseDiffStat", () => {
 
 const PROFILE = { displayName: "GL User", avatarUrl: "https://gitlab.com/a/1" };
 
+/** Build a mock fetch Response — a plain object with the subset of the Response API used here. */
+function jsonResponse(
+  body: unknown,
+  opts: { status?: number; text?: string | (() => Promise<string>) } = {},
+) {
+  const status = opts.status ?? 200;
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.resolve(body),
+    text: typeof opts.text === "function" ? opts.text : () => Promise.resolve(opts.text ?? ""),
+  };
+}
+
 /** Route a fetch mock by URL substring. */
-function routeFetch(routes: { match: string; status?: number; body: unknown }[]) {
+function routeFetch(
+  routes: {
+    match: string;
+    status?: number;
+    body: unknown;
+    text?: string | (() => Promise<string>);
+  }[],
+) {
   return vi.fn((url: string) => {
     const route = routes.find((r) => url.includes(r.match));
-    if (!route) {
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
-    }
-    const status = route.status ?? 200;
-    return Promise.resolve({
-      ok: status >= 200 && status < 300,
-      status,
-      json: () => Promise.resolve(route.body),
-    });
+    if (!route) return Promise.resolve(jsonResponse([]));
+    return Promise.resolve(jsonResponse(route.body, { status: route.status, text: route.text }));
+  });
+}
+
+/**
+ * Route a fetch mock by URL substring like `routeFetch`, but for one matched
+ * URL, cycle through a sequence of responses per call (holding the last one
+ * once exhausted) — for tests exercising multi-page/multi-call behavior.
+ */
+function sequencedFetch(
+  match: string,
+  responses: ReturnType<typeof jsonResponse>[],
+  fallback: ReturnType<typeof jsonResponse> = jsonResponse([]),
+) {
+  let call = 0;
+  return vi.fn((url: string) => {
+    if (!url.includes(match)) return Promise.resolve(fallback);
+    const response = responses[Math.min(call, responses.length - 1)]!;
+    call += 1;
+    return Promise.resolve(response);
   });
 }
 
@@ -585,5 +618,363 @@ describe("fetchGitlabContributionData", () => {
 
     expect(result).not.toBeNull();
     expect(maxInFlight).toBeGreaterThan(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: repos mapping for non-owned / namespace-less projects
+  // ---------------------------------------------------------------------------
+
+  it("marks a project not-owned (0 stars/forks) when namespace is missing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/users/42/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        {
+          match: "/users/42/projects",
+          body: [
+            { id: 5, path_with_namespace: "org/repo", star_count: 99, forks_count: 4 },
+          ],
+        },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result!.repos[0]).toMatchObject({
+      isOwned: false,
+      starsCount: 0,
+      forksCount: 0,
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: fetchPaginated's own status-check / rawBody / pagination
+  // branches (distinct from fetchEvents' separately-implemented duplicate).
+  // ---------------------------------------------------------------------------
+
+  it("fetchPaginated: returns null and logs when /issues returns 401 with a body", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", status: 401, body: {}, text: "unauthorized" },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("fetchPaginated: returns null on 403 with an empty body (no log line)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", status: 403, body: {}, text: "" },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+    consoleSpy.mockRestore();
+  });
+
+  it("fetchPaginated: returns null on a 5xx from the user projects endpoint", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", status: 502, body: {}, text: "bad gateway" },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("fetchPaginated: an unrecognized non-ok status (404) stops pagination but keeps items already fetched", async () => {
+    // /issues has no maxItems, so a full page-1 doesn't cap out — pagination
+    // continues to page 2, which returns a status outside the null-signalling
+    // set (401/403/429/5xx). fetchPaginated should stop and return what it
+    // already accumulated instead of signalling failure.
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+    const fetchMock = sequencedFetch("/issues", [
+      jsonResponse(fullPage),
+      jsonResponse({}, { status: 404, text: "not found" }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(result!.closedIssues).toBe(100);
+    expect(fetchMock.mock.calls.filter((c) => (c[0] as string).includes("/issues"))).toHaveLength(2);
+  });
+
+  it("fetchPaginated: caps accumulated items at maxItems once a full page reaches the cap", async () => {
+    // MAX_REPOS = 50, PAGE_SIZE = 100 — a single full page (100 items) already
+    // exceeds maxItems, exercising both the maxItems-truthy and length>=maxItems
+    // arms of the `if (maxItems && items.length >= maxItems) break;` check.
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({
+      id: i,
+      path_with_namespace: `gluser/repo-${i}`,
+      star_count: 0,
+      forks_count: 0,
+      namespace: { path: "gluser" },
+    }));
+    const fetchMock = sequencedFetch("/users/42/projects", [jsonResponse(fullPage)]);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result!.repos).toHaveLength(50);
+    // Capped after the first full page — no second page requested.
+    expect(
+      fetchMock.mock.calls.filter((c) => (c[0] as string).includes("/users/42/projects")),
+    ).toHaveLength(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: fetchReviewsCount / fetchApprovers / fetchClosedIssuesCount
+  // ---------------------------------------------------------------------------
+
+  it("fetchReviewsCount: returns null overall when the reviewer MR list fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        { match: "merge_requests?reviewer_username=gluser", status: 429, body: {}, text: "" },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("fetchReviewsCount: skips an MR with no author without throwing (optional chaining)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        {
+          match: "merge_requests?reviewer_username=gluser",
+          body: [{ id: 3, iid: 11, project_id: 300, state: "merged", merged_at: "x" }],
+        },
+        { match: "/merge_requests/11/approvals", body: { approved_by: [] } },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(result!.reviewsCount).toBe(0);
+  });
+
+  it("fetchApprovers: treats a missing approved_by field as no approvers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        {
+          match: "merge_requests?reviewer_username=gluser",
+          body: [{ id: 4, iid: 12, project_id: 400, state: "merged", merged_at: "x", author: { username: "other" } }],
+        },
+        // approvals response with no `approved_by` key at all
+        { match: "/merge_requests/12/approvals", body: {} },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(result!.reviewsCount).toBe(0);
+  });
+
+  it("fetchClosedIssuesCount: returns null overall when the issues fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/events", body: [] },
+        { match: "merge_requests?author_username=gluser", body: [] },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", status: 500, body: {}, text: "" },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: fetchEvents' own duplicate status-check/pagination logic
+  // ---------------------------------------------------------------------------
+
+  it("fetchEvents: an unrecognized non-ok status (404) stops pagination but keeps events already fetched", async () => {
+    const fullPage = Array.from({ length: 100 }, () => ({
+      created_at: "2026-06-10T09:00:00Z",
+      action_name: "opened",
+    }));
+    const fetchMock = sequencedFetch("/events", [
+      jsonResponse(fullPage),
+      jsonResponse({}, { status: 404, text: "not found" }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).not.toBeNull();
+    expect(fetchMock.mock.calls.filter((c) => (c[0] as string).includes("/events"))).toHaveLength(2);
+    expect(result!.heatmap.reduce((sum, d) => sum + d.count, 0)).toBe(100);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: res.text() itself rejecting (the `.catch(() => "")` guard)
+  // ---------------------------------------------------------------------------
+
+  it("returns null gracefully when res.text() rejects while reading the error body (fetchPaginated path)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        {
+          match: "/issues",
+          status: 401,
+          body: {},
+          text: () => Promise.reject(new Error("stream closed")),
+        },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  it("returns null gracefully when res.text() rejects while reading the error body (fetchEvents path)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        {
+          match: "/events",
+          status: 401,
+          body: {},
+          text: () => Promise.reject(new Error("stream closed")),
+        },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: fetchMrDiffStat's `data.changes ?? []` nullish fallback
+  // ---------------------------------------------------------------------------
+
+  it("fetchMrDiffStat: treats a response with no changes field as a zero diffstat", async () => {
+    vi.stubGlobal(
+      "fetch",
+      routeFetch([
+        { match: "/users/42/events", body: [] },
+        {
+          match: "merge_requests?author_username=gluser",
+          body: [{ id: 1, iid: 7, project_id: 100, state: "merged", merged_at: "x", author: { username: "gluser" } }],
+        },
+        // 200 OK but no `changes` key in the body at all.
+        { match: "/merge_requests/7/changes", body: {} },
+        { match: "reviewer_username=gluser", body: [] },
+        { match: "/issues", body: [] },
+        { match: "/users/42/projects", body: [] },
+      ]),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result!.mergedPRs).toEqual([{ additions: 0, deletions: 0, changed_files: 0 }]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: fetchReviewsCount skips self-authored reviewed MRs
+  // ---------------------------------------------------------------------------
+
+  it("fetchReviewsCount: skips a self-authored MR in the reviewer list (no approver lookup)", async () => {
+    let approverCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.includes("/approvals")) {
+          approverCalls++;
+        }
+        if (url.includes("merge_requests?reviewer_username=gluser")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve([
+                { id: 9, iid: 20, project_id: 900, state: "merged", merged_at: "x", author: { username: "gluser" } },
+              ]),
+            text: () => Promise.resolve(""),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([]),
+          text: () => Promise.resolve(""),
+        });
+      }),
+    );
+
+    const result = await fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+    expect(result!.reviewsCount).toBe(0);
+    expect(approverCalls).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch coverage: the overall fetch-deadline AbortController timeout
+  // ---------------------------------------------------------------------------
+
+  it("aborts and returns null when the overall fetch deadline elapses", async () => {
+    vi.useFakeTimers();
+    try {
+      let capturedSignal: AbortSignal | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_url: string, init?: { signal?: AbortSignal }) => {
+          capturedSignal = init?.signal;
+          return new Promise((_resolve, reject) => {
+            capturedSignal?.addEventListener("abort", () => {
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          });
+        }),
+      );
+
+      const resultPromise = fetchGitlabContributionData(42, "gluser", "tok", PROFILE);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await resultPromise;
+
+      expect(result).toBeNull();
+      expect(capturedSignal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

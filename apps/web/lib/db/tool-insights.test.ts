@@ -8,6 +8,7 @@ import type { CraftResult, InsightsUpload } from "@chapa/shared";
 const mockUpsert = vi.fn();
 const mockSelect = vi.fn();
 const mockSingle = vi.fn();
+const mockMaybeSingle = vi.fn();
 const mockEq = vi.fn();
 const mockLimit = vi.fn();
 const mockOrder = vi.fn();
@@ -29,6 +30,10 @@ const mockFrom = vi.fn((): any => {
   };
   chain.single = () => {
     mockSingle();
+    return chain;
+  };
+  chain.maybeSingle = () => {
+    mockMaybeSingle();
     return chain;
   };
   chain.eq = (...args: unknown[]) => {
@@ -169,14 +174,14 @@ describe("dbUpsertToolInsights", () => {
     );
   });
 
-  it("calls .select().single() after upsert", async () => {
+  it("calls .select().maybeSingle() after upsert", async () => {
     terminalResolve = { data: validRow, error: null };
     mockGetSupabase.mockReturnValue({ from: mockFrom });
 
     await dbUpsertToolInsights("testuser", validUpload, validScores);
 
     expect(mockSelect).toHaveBeenCalled();
-    expect(mockSingle).toHaveBeenCalled();
+    expect(mockMaybeSingle).toHaveBeenCalled();
   });
 
   it("uses the provided uploaded timestamp override when supplied", async () => {
@@ -212,7 +217,7 @@ describe("dbUpsertToolInsights", () => {
     });
   });
 
-  it("falls back to input scores when parseRow returns null", async () => {
+  it("returns null when parseRow returns null", async () => {
     // Return data missing a required key so parseRow returns null
     const incompleteRow = { ...validRow };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -222,8 +227,7 @@ describe("dbUpsertToolInsights", () => {
 
     const result = await dbUpsertToolInsights("testuser", validUpload, validScores);
 
-    // Should fall back to the scores argument
-    expect(result).toEqual(validScores);
+    expect(result).toBeNull();
   });
 
   it("returns null on Supabase error", async () => {
@@ -509,4 +513,3 @@ describe("dbGetToolInsights", () => {
     });
   });
 });
-

@@ -4,6 +4,8 @@ const {
   mockMaterializePublicProfile,
   mockGetPublicProfileVerification,
   mockRunPublicProfileSideEffects,
+  mockPersistProfileSnapshot,
+  mockDeferProfileCacheWork,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -13,6 +15,8 @@ const {
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
+  mockPersistProfileSnapshot: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -26,6 +30,10 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
+  persistProfileSnapshot: (...args: unknown[]) =>
+    mockPersistProfileSnapshot(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -141,6 +149,8 @@ describe("SharePage /u/[handle]", () => {
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
+    mockPersistProfileSnapshot.mockResolvedValue(true);
+    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockGetServerLocale.mockResolvedValue("en");
@@ -194,7 +204,12 @@ describe("SharePage /u/[handle]", () => {
     const callback = mockAfter.mock.calls[0][0];
     await callback();
 
-    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
+    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      { readOnly: false },
+    );
+    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
       { verification: { hash: "abc12345", date: "2026-04-17" } },
@@ -211,6 +226,8 @@ describe("SharePage /u/[handle]", () => {
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
     expect(mockAfter).not.toHaveBeenCalled();
     expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
+    expect(mockPersistProfileSnapshot).not.toHaveBeenCalled();
+    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
   });
 
   it("does not register side effects when materialization returns null", async () => {

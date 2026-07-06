@@ -6,6 +6,8 @@ const {
   mockMaterializePublicProfile,
   mockGetPublicProfileVerification,
   mockRunPublicProfileSideEffects,
+  mockPersistProfileSnapshot,
+  mockDeferProfileCacheWork,
   mockRenderBadgeSvg,
   mockGetAvatarBase64,
   mockGetOptionalRequestSession,
@@ -20,6 +22,8 @@ const {
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
+  mockPersistProfileSnapshot: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockGetOptionalRequestSession: vi.fn(),
@@ -38,6 +42,10 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
+  persistProfileSnapshot: (...args: unknown[]) =>
+    mockPersistProfileSnapshot(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
 }));
 
 vi.mock("@/lib/render/BadgeSvg", () => ({
@@ -144,6 +152,8 @@ describe("GET /u/[handle]/badge.svg", () => {
     mockMaterializePublicProfile.mockResolvedValue(FAKE_MATERIALIZED);
     mockGetPublicProfileVerification.mockReturnValue({ hash: "abc12345", date: "2026-04-17" });
     mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
+    mockPersistProfileSnapshot.mockResolvedValue(true);
+    mockDeferProfileCacheWork.mockResolvedValue(undefined);
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockCaptureServerError.mockResolvedValue(undefined);
@@ -222,7 +232,12 @@ describe("GET /u/[handle]/badge.svg", () => {
     const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
     await GET(req, ctx);
 
-    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
+    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
+      "testuser",
+      FAKE_MATERIALIZED,
+      { readOnly: false },
+    );
+    expect(mockDeferProfileCacheWork).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
       {
@@ -233,6 +248,7 @@ describe("GET /u/[handle]/badge.svg", () => {
   });
 
   it("passes read-only mode and skips SVG cache writes for smoke requests", async () => {
+    mockPersistProfileSnapshot.mockResolvedValue(false);
     const [req, ctx] = makeRequest(
       "testuser",
       { "x-forwarded-for": "1.2.3.4" },
@@ -244,14 +260,13 @@ describe("GET /u/[handle]/badge.svg", () => {
       token: undefined,
       readOnly: true,
     });
-    expect(mockRunPublicProfileSideEffects).toHaveBeenCalledWith(
+    expect(mockPersistProfileSnapshot).toHaveBeenCalledWith(
       "testuser",
       FAKE_MATERIALIZED,
-      {
-        verification: { hash: "abc12345", date: "2026-04-17" },
-        readOnly: true,
-      },
+      { readOnly: true },
     );
+    expect(mockDeferProfileCacheWork).not.toHaveBeenCalled();
+    expect(mockRunPublicProfileSideEffects).not.toHaveBeenCalled();
     expect(mockCacheSet).not.toHaveBeenCalled();
     expect(mockGetAvatarBase64).not.toHaveBeenCalled();
   });

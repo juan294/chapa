@@ -38,6 +38,8 @@ const BATCH_SIZE = 5;
 
 /** Redis key storing the rotation offset for round-robin handle processing. */
 const ROTATION_KEY = "cron:warm-cache:offset";
+const HEARTBEAT_KEY = "cron:lastrun:warm-cache";
+const HEARTBEAT_TTL_SECONDS = 60 * 60 * 48;
 
 /** Per-handle result from warmHandle, used to aggregate counters. */
 interface HandleResult {
@@ -225,6 +227,8 @@ export const GET = withErrorCapture("/api/cron/warm-cache", async (request: Next
     failed,
     durationMs,
   });
+
+  await cacheSet(HEARTBEAT_KEY, Date.now(), HEARTBEAT_TTL_SECONDS);
 
   return NextResponse.json(
     {

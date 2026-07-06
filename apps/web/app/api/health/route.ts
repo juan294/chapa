@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { pingRedis, rateLimit } from "@/lib/cache/redis";
+import { cacheGetCronLastRun, pingRedis, rateLimit } from "@/lib/cache/redis";
 import { getChapaAlertWebhookUrl, getGithubToken, getVercelEnv } from "@/lib/env";
 import { isAdminHandle } from "@/lib/auth/admin";
 import { getOptionalRequestSession } from "@/lib/auth/session";
@@ -12,6 +12,22 @@ import { captureOperationalAlert, withErrorCapture } from "@/lib/analytics/serve
 interface GitHubRateLimit {
   remaining: number;
   limit: number;
+}
+
+const GITHUB_RATE_LIMIT_FLOOR = 500;
+const CRON_HEARTBEAT_TTL_MS = 26 * 60 * 60 * 1000;
+const MISSING_HEARTBEAT_GRACE_MS = 2 * 60 * 60 * 1000;
+const PROCESS_STARTED_AT = Date.now();
+const CRON_HEARTBEATS = [
+  "warm-cache",
+  "sync-audience",
+  "process-campaigns",
+] as const;
+
+interface CronHeartbeatStatus {
+  lastRun: number | null;
+  stale: boolean;
+  ageMs: number | null;
 }
 
 /** Probe GitHub's rate_limit API to verify reachability.
@@ -60,6 +76,35 @@ const cachedPingGitHub = unstable_cache(pingGitHub, ["health-github-probe"], {
   revalidate: 60,
 });
 
+async function getCronHeartbeatStatuses(): Promise<
+  Record<(typeof CRON_HEARTBEATS)[number], CronHeartbeatStatus>
+> {
+  const now = Date.now();
+  const missingHeartbeatIsStale =
+    now - PROCESS_STARTED_AT > MISSING_HEARTBEAT_GRACE_MS;
+  const entries = await Promise.all(
+    CRON_HEARTBEATS.map(async (name) => {
+      const lastRun = await cacheGetCronLastRun(name);
+      const ageMs = lastRun == null ? null : now - lastRun;
+      return [
+        name,
+        {
+          lastRun,
+          ageMs,
+          stale:
+            lastRun == null
+              ? missingHeartbeatIsStale
+              : ageMs !== null && ageMs > CRON_HEARTBEAT_TTL_MS,
+        },
+      ] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as Record<
+    (typeof CRON_HEARTBEATS)[number],
+    CronHeartbeatStatus
+  >;
+}
+
 /**
  * GET /api/health
  *
@@ -76,10 +121,11 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     );
   }
 
-  const [redisStatus, supabaseStatus, githubResult] = await Promise.all([
+  const [redisStatus, supabaseStatus, githubResult, cronHeartbeats] = await Promise.all([
     pingRedis(),
     pingSupabase(),
     cachedPingGitHub(),
+    getCronHeartbeatStatuses(),
   ]);
   const session = getOptionalRequestSession(request);
   const isAdmin = session ? isAdminHandle(session.login) : false;
@@ -90,10 +136,19 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
   const isProduction = getVercelEnv() === "production";
   const isHealthy = (s: string) =>
     s === "ok" || (!isProduction && s === "skipped");
+  const staleCrons = Object.entries(cronHeartbeats)
+    .filter(([, heartbeat]) => heartbeat.stale)
+    .map(([name]) => name);
+  const githubQuotaLow =
+    githubResult.status === "ok" &&
+    githubResult.rateLimit !== undefined &&
+    githubResult.rateLimit.remaining < GITHUB_RATE_LIMIT_FLOOR;
   const status =
     isHealthy(redisStatus) &&
     isHealthy(supabaseStatus) &&
-    isHealthy(githubResult.status)
+    isHealthy(githubResult.status) &&
+    staleCrons.length === 0 &&
+    !githubQuotaLow
       ? "ok"
       : "degraded";
   const httpStatus = status === "ok" ? 200 : 503;
@@ -101,6 +156,8 @@ export const GET = withErrorCapture("/api/health", async (request: NextRequest) 
     redis: redisStatus,
     supabase: supabaseStatus,
     github: githubResult.status,
+    cronHeartbeats,
+    ...(githubQuotaLow && { githubQuotaLow: true }),
     alertWebhook: getChapaAlertWebhookUrl() ? "configured" : "skipped",
     ...(isAdmin && githubResult.rateLimit && {
       githubRateLimit: githubResult.rateLimit,

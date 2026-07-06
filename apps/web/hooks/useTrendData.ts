@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { trackEvent } from "@/lib/analytics/posthog";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
 
@@ -58,6 +59,11 @@ function fetchTrendData(handle: string): Promise<CachedResult> {
     .then((res): Promise<CachedResult> => {
       if (!res.ok) {
         const msg = res.status === 429 ? "Rate limited" : "Failed to load trend data";
+        trackEvent("client_api_error", {
+          route: "/api/history/[handle]",
+          status: res.status,
+          source: "useTrendData",
+        });
         return Promise.resolve({ ok: false, error: msg });
       }
       return (

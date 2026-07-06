@@ -238,3 +238,41 @@ describe("svgToPng", () => {
     expect(() => svgToPng(MINIMAL_SVG)).toThrow("Render failed");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: font buffer load failure fallback (module-scope try/catch branch)
+// ---------------------------------------------------------------------------
+
+describe("svgToPng — font buffer load failure fallback", () => {
+  it("falls back to fontFiles when readFileSync throws at module load", async () => {
+    vi.resetModules();
+    vi.doMock("node:fs", () => ({
+      readFileSync: vi.fn(() => {
+        throw new Error("ENOENT: font file missing");
+      }),
+    }));
+
+    const mod = await import("./svg-to-png");
+    const { Resvg: FreshResvg } = await import("@resvg/resvg-js");
+    const FreshMockResvg = vi.mocked(FreshResvg);
+    FreshMockResvg.mockImplementation(function (this: { render: () => unknown }) {
+      this.render = () => ({ asPng: () => FAKE_PNG });
+    });
+
+    expect(mod.getFontBuffers()).toBeUndefined();
+
+    const result = mod.svgToPng(MINIMAL_SVG);
+    expect(result).toBeInstanceOf(Uint8Array);
+    const font = FreshMockResvg.mock.calls.at(-1)![1]!.font as {
+      loadSystemFonts: boolean;
+      fontBuffers?: Buffer[];
+      fontFiles?: string[];
+    };
+    expect(font.fontBuffers).toBeUndefined();
+    expect(font.fontFiles).toBeInstanceOf(Array);
+    expect(font.fontFiles!.length).toBe(4);
+
+    vi.doUnmock("node:fs");
+    vi.resetModules();
+  });
+});

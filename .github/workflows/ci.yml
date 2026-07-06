@@ -110,6 +110,59 @@ jobs:
             echo "No scoring files changed — skipping integrity gate"
           fi
 
+  contract:
+    name: Contract (real DB)
+    runs-on: ubuntu-latest
+    env:
+      NEXTAUTH_SECRET: contract-nextauth-secret-32-characters
+      CHAPA_VERIFICATION_SECRET: test-verification-secret
+      CRON_SECRET: test-cron-secret
+      ADMIN_SECRET: test-admin-secret
+      NEXT_PUBLIC_INSIGHTS_ENABLED: "true"
+      NEXT_PUBLIC_STUDIO_ENABLED: "true"
+      NEXT_PUBLIC_BITBUCKET_ENABLED: "true"
+      NEXT_PUBLIC_CODEBERG_ENABLED: "true"
+      NEXT_PUBLIC_GITLAB_ENABLED: "true"
+      NEXT_PUBLIC_BASE_URL: http://localhost:3001
+      GITHUB_CLIENT_ID: dummy
+      GITHUB_CLIENT_SECRET: dummy
+      UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
+      UPSTASH_REDIS_REST_TOKEN: dummy
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Write-route registration
+        run: pnpm run check:write-registration
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - name: Export Supabase local env
+        run: |
+          supabase status -o env > supabase.env
+          set -a
+          . ./supabase.env
+          set +a
+          : "${API_URL:?Missing API_URL from Supabase CLI status output}"
+          : "${SERVICE_ROLE_KEY:?Missing SERVICE_ROLE_KEY from Supabase CLI status output}"
+          printf 'SUPABASE_URL=%s\n' "$API_URL" >> "$GITHUB_ENV"
+          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+      - run: supabase db reset
+      - name: Contract tests
+        run: pnpm run test:contract
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+      - name: Build web for journey E2E
+        run: pnpm --filter @chapa/web build
+      - name: Journey E2E (desktop + mobile)
+        run: pnpm --filter @chapa/web exec playwright test e2e/journey.spec.ts --project=chromium --project=mobile
+
   build:
     name: Build
     needs: [lint-and-typecheck, test]

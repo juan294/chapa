@@ -10,13 +10,19 @@ vi.mock("@/lib/email/campaigns", () => ({
   processCampaignBatch: vi.fn(),
 }));
 
+vi.mock("@/lib/cache/redis", () => ({
+  cacheSet: vi.fn(),
+}));
+
 import { dbGetCampaigns } from "@/lib/db/campaigns";
 import { processCampaignBatch } from "@/lib/email/campaigns";
+import { cacheSet } from "@/lib/cache/redis";
 import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("CRON_SECRET", "test-secret");
+  vi.mocked(cacheSet).mockResolvedValue(true);
 });
 
 function makeRequest(bearer?: string): NextRequest {
@@ -39,6 +45,7 @@ describe("process-campaigns cron", () => {
   it("returns 401 with wrong token", async () => {
     const res = await GET(makeRequest("wrong"));
     expect(res.status).toBe(401);
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 
   it("returns idle when no active campaigns", async () => {
@@ -48,6 +55,11 @@ describe("process-campaigns cron", () => {
     const body = await res.json();
 
     expect(body.status).toBe("idle");
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:process-campaigns",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("processes first active campaign", async () => {
@@ -84,5 +96,11 @@ describe("process-campaigns cron", () => {
     expect(body.status).toBe("ok");
     expect(body.campaignId).toBe("c-1");
     expect(body.sent).toBe(5);
+    expect(processCampaignBatch).toHaveBeenCalledWith("c-1");
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:process-campaigns",
+      expect.any(Number),
+      172800,
+    );
   });
 });

@@ -28,15 +28,19 @@ export const POST = withErrorCapture("/api/cli/auth/approve", async (request: Ne
   if (error) return error;
 
   // 2. Parse body
-  let body: { sessionId?: string };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sessionId } = body;
-  if (!sessionId || !/^[a-f0-9-]{36}$/.test(sessionId)) {
+  if (body == null || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const { sessionId } = body as { sessionId?: unknown };
+  if (typeof sessionId !== "string" || !/^[a-f0-9-]{36}$/.test(sessionId)) {
     return NextResponse.json({ error: "Invalid session ID" }, { status: 400 });
   }
 

@@ -355,6 +355,16 @@ export async function pingRedis(): Promise<"ok" | "error" | "skipped"> {
 }
 
 // ---------------------------------------------------------------------------
+// Cron heartbeat helpers
+// ---------------------------------------------------------------------------
+
+/** Read the last successful completion timestamp for a cron route. */
+export async function cacheGetCronLastRun(name: string): Promise<number | null> {
+  const value = await cacheGet<number>(`cron:lastrun:${name}`);
+  return typeof value === "number" ? value : null;
+}
+
+// ---------------------------------------------------------------------------
 // Atomic set-if-not-exists (SETNX) — used for once-per-day guards
 // ---------------------------------------------------------------------------
 

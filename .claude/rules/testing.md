@@ -25,6 +25,13 @@ All code changes follow Red-Green-Refactor:
 No exceptions. Bug fixes need a regression test.
 Refactors need existing coverage. No "tests later."
 
+## Seam-Bug Standard
+
+Production 5xx failures on legal input and "reported success but nothing
+saved" failures need real-stack seam regressions: a `*.contract.test.ts`
+payload matrix or a DB-reading E2E. Unit mocks can accompany the fix, but they
+are not sufficient by themselves.
+
 ## Verification Sequencing
 
 Run checks sequentially, never as parallel Bash calls

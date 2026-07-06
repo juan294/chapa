@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { trackEvent } from "@/lib/analytics/posthog";
 
 export interface SessionUser {
   login: string;
@@ -29,7 +30,17 @@ function fetchSession(): Promise<SessionUser | null> {
   if (cachedPromise) return cachedPromise;
 
   cachedPromise = fetch("/api/auth/session")
-    .then((res) => res.json())
+    .then((res) => {
+      if (!res.ok) {
+        trackEvent("client_api_error", {
+          route: "/api/auth/session",
+          status: res.status,
+          source: "useSession",
+        });
+        return { user: null };
+      }
+      return res.json() as Promise<{ user: SessionUser | null }>;
+    })
     .then((data: { user: SessionUser | null }) => {
       cachedResult = data.user ?? null;
       return cachedResult;
@@ -101,4 +112,3 @@ export function useSession(): UseSessionReturn {
 
   return { session, loading, invalidate };
 }
-

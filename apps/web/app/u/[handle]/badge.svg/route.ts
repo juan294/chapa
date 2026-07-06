@@ -22,8 +22,9 @@ import { toDateString } from "@/lib/utils/date";
 import { withTimeout } from "@/lib/async/with-timeout";
 import {
   getPublicProfileVerification,
+  deferProfileCacheWork,
   materializePublicProfile,
-  runPublicProfileSideEffects,
+  persistProfileSnapshot,
 } from "@/lib/profile/public-profile";
 
 export const maxDuration = 35;
@@ -254,11 +255,12 @@ export async function GET(
       : undefined;
     const verification = getPublicProfileVerification(materialized);
 
+    const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
+      readOnly,
+    });
     after(() => {
-      return runPublicProfileSideEffects(handle, materialized, {
-        verification,
-        readOnly,
-      });
+      if (!shouldRunDeferred) return;
+      return deferProfileCacheWork(handle, materialized, { verification, readOnly });
     });
 
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {

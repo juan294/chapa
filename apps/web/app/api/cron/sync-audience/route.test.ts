@@ -63,6 +63,11 @@ describe("sync-audience auth", () => {
   it("returns 401 with wrong Bearer token", async () => {
     const res = await GET(makeRequest("wrong-secret"));
     expect(res.status).toBe(401);
+    expect(cacheSet).not.toHaveBeenCalledWith(
+      "cron:lastrun:sync-audience",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("returns 401 without Authorization header", async () => {
@@ -95,6 +100,11 @@ describe("sync-audience logic", () => {
 
     expect(body.status).toBe("skipped");
     expect(body.reason).toBe("no_segment");
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:sync-audience",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("adds new contacts for users not in Resend", async () => {
@@ -174,6 +184,11 @@ describe("sync-audience logic", () => {
     expect(body.status).toBe("ok");
     expect(body.synced).toBe(0);
     expect(body.totalEligible).toBe(0);
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:sync-audience",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("returns correct summary counts", async () => {

@@ -93,12 +93,14 @@ export async function dbUpsertToolInsights(
         { onConflict: "handle,tool" },
       )
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
+    if (!rows) return null;
+
     const row = parseRow<ToolInsightsRow>(rows, REQUIRED_KEYS, "tool_insights");
-    return row ? rowToCraftResult(row) : scores;
+    return row ? rowToCraftResult(row) : null;
   } catch (error) {
     console.error("[db] dbUpsertToolInsights failed:", (error as Error).message);
     return null;
@@ -141,4 +143,3 @@ export async function dbGetToolInsights(
     return null;
   }
 }
-

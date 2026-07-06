@@ -60,7 +60,11 @@ function chainBuilder() {
     mockMaybeSingle();
     return chain;
   };
-  chain.upsert = mockUpsert;
+  chain.upsert = (...args: unknown[]) => {
+    const result = mockUpsert(...args);
+    const options = args[1] as { ignoreDuplicates?: boolean } | undefined;
+    return options?.ignoreDuplicates ? result : chain;
+  };
   // Terminal — resolves as a thenable
   chain.then = undefined;
   return chain;
@@ -218,13 +222,13 @@ describe("dbInsertSnapshot", () => {
 
 describe("dbReplaceSnapshot", () => {
   it("inserts a new snapshot when none exists for today", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: { id: 1 }, error: null, status: 201 };
     const result = await dbReplaceSnapshot("testuser", makeSnapshot());
     expect(result).toBe(true);
   });
 
   it("replaces existing same-day snapshot (returns true)", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 200 });
+    terminalResolve = { data: { id: 1 }, error: null, status: 200 };
     const result = await dbReplaceSnapshot(
       "testuser",
       makeSnapshot({ adjustedComposite: 65 }),
@@ -233,11 +237,26 @@ describe("dbReplaceSnapshot", () => {
   });
 
   it("does NOT use ignoreDuplicates", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: { id: 1 }, error: null, status: 201 };
     await dbReplaceSnapshot("testuser", makeSnapshot());
     const upsertArgs = mockUpsert.mock.calls[0]!;
     expect(upsertArgs[1]).toEqual({ onConflict: "handle,date" });
     expect(upsertArgs[1]).not.toHaveProperty("ignoreDuplicates");
+  });
+
+  it("selects one written row so zero-row writes do not look successful", async () => {
+    terminalResolve = { data: { id: 1 }, error: null, status: 200 };
+
+    await dbReplaceSnapshot("testuser", makeSnapshot());
+
+    expect(mockSelect).toHaveBeenCalledWith("id");
+    expect(mockMaybeSingle).toHaveBeenCalled();
+  });
+
+  it("returns false when Supabase returns no written row", async () => {
+    terminalResolve = { data: null, error: null, status: 200 };
+    const result = await dbReplaceSnapshot("testuser", makeSnapshot());
+    expect(result).toBe(false);
   });
 
   it("returns false when Supabase is unavailable", async () => {
@@ -247,16 +266,13 @@ describe("dbReplaceSnapshot", () => {
   });
 
   it("returns false on error", async () => {
-    mockUpsert.mockResolvedValue({
-      error: new Error("DB error"),
-      status: 500,
-    });
+    terminalResolve = { data: null, error: new Error("DB error"), status: 500 };
     const result = await dbReplaceSnapshot("testuser", makeSnapshot());
     expect(result).toBe(false);
   });
 
   it("lowercases handle", async () => {
-    mockUpsert.mockResolvedValue({ error: null, status: 201 });
+    terminalResolve = { data: { id: 1 }, error: null, status: 201 };
     await dbReplaceSnapshot("TestUser", makeSnapshot());
     expect(mockUpsert.mock.calls[0]![0].handle).toBe("testuser");
   });
@@ -518,6 +534,70 @@ describe("dbCleanOldSnapshots", () => {
     terminalResolve = { data: null, error: null };
     const result = await dbCleanOldSnapshots();
     expect(result).toBe(0);
+  });
+
+  /**
+   * Temporarily override `mockFrom` to resolve a sequence of `.from()` calls
+   * (or a single repeating response), then restore the prior implementation —
+   * even if `run()` throws — so an assertion failure can't leak the override
+   * into later tests.
+   */
+  async function withFromResponses<T>(
+    responses: { data: unknown; error: unknown }[] | { data: unknown; error: unknown },
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const originalImpl = mockFrom.getMockImplementation();
+    let call = 0;
+    mockFrom.mockImplementation((): unknown => {
+      const response = Array.isArray(responses) ? responses[call]! : responses;
+      call += 1;
+      const chain = chainBuilder();
+      chain.then = (
+        resolve: (v: unknown) => void,
+        reject: (e: unknown) => void,
+      ) => {
+        if (response.error) reject(response.error);
+        else resolve(response);
+      };
+      return chain;
+    });
+
+    try {
+      return await run();
+    } finally {
+      mockFrom.mockImplementation(originalImpl!);
+    }
+  }
+
+  it("loops until a batch returns fewer rows than the batch size", async () => {
+    const fullBatch = Array.from({ length: SNAPSHOT_CLEANUP_BATCH_SIZE }, (_, i) => ({
+      id: i,
+    }));
+    const partialBatch = [{ id: 9999 }, { id: 10000 }];
+    const result = await withFromResponses(
+      [
+        { data: fullBatch, error: null },
+        { data: fullBatch, error: null },
+        { data: partialBatch, error: null },
+      ],
+      () => dbCleanOldSnapshots(),
+    );
+
+    expect(result).toBe(SNAPSHOT_CLEANUP_BATCH_SIZE * 2 + partialBatch.length);
+    expect(mockFrom).toHaveBeenCalledTimes(3);
+  });
+
+  it("caps the number of batch iterations to avoid an unbounded loop", async () => {
+    const fullBatch = Array.from({ length: SNAPSHOT_CLEANUP_BATCH_SIZE }, (_, i) => ({
+      id: i,
+    }));
+    const result = await withFromResponses(
+      { data: fullBatch, error: null },
+      () => dbCleanOldSnapshots(),
+    );
+
+    expect(mockFrom.mock.calls.length).toBeLessThanOrEqual(20);
+    expect(result).toBe(SNAPSHOT_CLEANUP_BATCH_SIZE * mockFrom.mock.calls.length);
   });
 });
 

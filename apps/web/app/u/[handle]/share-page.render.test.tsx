@@ -10,6 +10,8 @@ const {
   mockMaterializePublicProfile,
   mockGetPublicProfileVerification,
   mockRunPublicProfileSideEffects,
+  mockPersistProfileSnapshot,
+  mockDeferProfileCacheWork,
   mockIsValidHandle,
   mockGetAvatarBase64,
   mockRenderBadgeSvg,
@@ -21,6 +23,8 @@ const {
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
   mockRunPublicProfileSideEffects: vi.fn(),
+  mockPersistProfileSnapshot: vi.fn(),
+  mockDeferProfileCacheWork: vi.fn(),
   mockIsValidHandle: vi.fn(),
   mockGetAvatarBase64: vi.fn(),
   mockRenderBadgeSvg: vi.fn(),
@@ -37,6 +41,10 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockGetPublicProfileVerification(...args),
   runPublicProfileSideEffects: (...args: unknown[]) =>
     mockRunPublicProfileSideEffects(...args),
+  persistProfileSnapshot: (...args: unknown[]) =>
+    mockPersistProfileSnapshot(...args),
+  deferProfileCacheWork: (...args: unknown[]) =>
+    mockDeferProfileCacheWork(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -151,6 +159,8 @@ beforeEach(() => {
     date: "2026-05-03",
   });
   mockRunPublicProfileSideEffects.mockResolvedValue(undefined);
+  mockPersistProfileSnapshot.mockResolvedValue(true);
+  mockDeferProfileCacheWork.mockResolvedValue(undefined);
   mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
   mockRenderBadgeSvg.mockReturnValue(
     '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>',

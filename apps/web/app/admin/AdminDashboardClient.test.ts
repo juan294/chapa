@@ -311,13 +311,14 @@ describe("AdminDashboardClient", () => {
   });
 
   describe("deferred search", () => {
-    it("uses useDeferredValue in the hook", () => {
-      // After #480, deferred search logic lives in useAdminDashboard hook
-      expect(HOOK_SOURCE).toMatch(/useDeferredValue/);
+    it("uses useDebouncedValue in the hook", () => {
+      // After #993, useDeferredValue (render-priority only, not network throttling)
+      // was replaced with a real debounce to stop a fetch firing per keystroke.
+      expect(HOOK_SOURCE).toMatch(/useDebouncedValue/);
     });
 
-    it("creates deferredSearch from search state", () => {
-      expect(HOOK_SOURCE).toMatch(/useDeferredValue\(search\)/);
+    it("creates deferredSearch from debounced search state", () => {
+      expect(HOOK_SOURCE).toMatch(/useDebouncedValue\(search,/);
     });
 
     it("uses deferredSearch in server-side fetch params", () => {

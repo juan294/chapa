@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 import { requireSession } from "@/lib/auth/require-session";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import {
   isChallengeBody,
   MAX_CHALLENGE_BYTES,
@@ -21,7 +21,7 @@ export const POST = withErrorCapture("/api/challenge", async (request: NextReque
     ip === NO_TRUSTED_IP
       ? "ratelimit:challenge-ip:no-ip"
       : `ratelimit:challenge-ip:${ip}`;
-  const ipRl = await rateLimit(ipKey, 5, 3600);
+  const ipRl = await rateLimitStrict(ipKey, 5, 3600);
   if (!ipRl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -78,7 +78,7 @@ export const POST = withErrorCapture("/api/challenge", async (request: NextReque
   }
 
   const lowerHandle = handle.toLowerCase();
-  const handleRl = await rateLimit(`ratelimit:challenge:${lowerHandle}`, 3, 86400);
+  const handleRl = await rateLimitStrict(`ratelimit:challenge:${lowerHandle}`, 3, 86400);
   if (!handleRl.allowed) {
     return NextResponse.json(
       { error: "Too many challenges submitted. Please try again tomorrow." },

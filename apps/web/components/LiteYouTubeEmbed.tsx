@@ -45,6 +45,8 @@ export function LiteYouTubeEmbed({ videoId, title }: LiteYouTubeEmbedProps) {
             <img
               src={thumbnailUrl}
               alt={title}
+              width={480}
+              height={270}
               className="h-full w-full object-cover"
               loading="lazy"
             />

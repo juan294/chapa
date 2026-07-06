@@ -9,10 +9,12 @@
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
+    "test:contract": "vitest run -c vitest.config.contract.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @chapa/web test:e2e",
     "validate:migrations": "tsx scripts/validate-migrations.ts",
+    "check:write-registration": "tsx scripts/check-write-registration.ts --max-unregistered=0",
     "delete-user": "tsx scripts/delete-user.ts",
     "check:circular": "pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.madge.json apps/web/ packages/shared/src/",
     "prepare": "husky"

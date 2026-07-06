@@ -66,6 +66,7 @@ export interface CampaignSendStats {
 // Internal row shapes (snake_case from DB)
 // ---------------------------------------------------------------------------
 
+/** Raw `email_campaigns` DB row shape (snake_case), before parsing into a `Campaign`. */
 export interface CampaignRow {
   id: string;
   type: string | null;
@@ -86,6 +87,7 @@ export interface CampaignRow {
   completed_at?: string | null;
 }
 
+/** Raw `campaign_sends` DB row shape (snake_case), before parsing into a `CampaignSend`. */
 export interface CampaignSendRow {
   id: string;
   campaign_id: string;
@@ -109,6 +111,7 @@ interface ParsedCampaignSendRow extends CampaignSendRow {
 // Constants
 // ---------------------------------------------------------------------------
 
+/** All valid `CampaignStatus` values, used for runtime validation. */
 export const CAMPAIGN_STATUSES = [
   "draft",
   "scheduled",
@@ -118,6 +121,7 @@ export const CAMPAIGN_STATUSES = [
   "cancelled",
 ] as const satisfies readonly CampaignStatus[];
 
+/** All valid `CampaignSendStatus` values, used for runtime validation. */
 export const CAMPAIGN_SEND_STATUSES = [
   "pending",
   "processing",

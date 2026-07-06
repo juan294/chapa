@@ -10,7 +10,7 @@ vi.mock("@/lib/auth/require-session", () => ({
   requireSession: vi.fn(),
 }));
 vi.mock("@/lib/cache/redis", () => ({
-  rateLimit: vi.fn(async () => ({ allowed: true, current: 1, limit: 10 })),
+  rateLimitStrict: vi.fn(async () => ({ allowed: true, current: 1, limit: 3 })),
 }));
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: vi.fn(() => "1.2.3.4"),
@@ -24,7 +24,7 @@ vi.mock("@/lib/validation", () => ({
 }));
 
 import { requireSession } from "@/lib/auth/require-session";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import { sendChallengeEmail } from "@/lib/email/challenge";
 import { isValidHandle } from "@/lib/validation";
 
@@ -43,7 +43,7 @@ function makeRequest(body: unknown, sessionLogin = "octocat") {
 describe("POST /api/challenge", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: true, current: 1, limit: 10 });
+    vi.mocked(rateLimitStrict).mockResolvedValue({ allowed: true, current: 1, limit: 3 });
     vi.mocked(sendChallengeEmail).mockResolvedValue({ success: true });
     vi.mocked(isValidHandle).mockReturnValue(true);
   });
@@ -68,8 +68,31 @@ describe("POST /api/challenge", () => {
       session: { login: "octocat", name: "Octocat", avatar_url: "" },
       error: null,
     } as never);
-    vi.mocked(rateLimit).mockResolvedValue({ allowed: false, current: 6, limit: 5 });
+    vi.mocked(rateLimitStrict).mockResolvedValueOnce({ allowed: false, current: 6, limit: 5 });
     const req = makeRequest({ handle: "octocat", reason: "My score seems off." });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+  });
+
+  it("uses the fail-closed limiter for the per-IP check", async () => {
+    const req = makeRequest({
+      handle: "octocat",
+      reason: "My delivery score seems off because all my PRs were merged in March.",
+    });
+
+    await POST(req);
+
+    expect(rateLimitStrict).toHaveBeenCalledWith("ratelimit:challenge-ip:1.2.3.4", 5, 3600);
+  });
+
+  it("returns 429 when the per-IP limiter fails closed (Redis unavailable)", async () => {
+    vi.mocked(rateLimitStrict).mockResolvedValueOnce({ allowed: false, current: 0, limit: 5 });
+    const req = makeRequest({
+      handle: "octocat",
+      reason: "My delivery score seems off because all my PRs were merged in March.",
+    });
 
     const res = await POST(req);
 
@@ -158,9 +181,34 @@ describe("POST /api/challenge", () => {
   });
 
   it("returns 429 when per-handle limit exceeded", async () => {
-    vi.mocked(rateLimit)
-      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 5 })
-      .mockResolvedValueOnce({ allowed: false, current: 4, limit: 3 });
+    vi.mocked(rateLimitStrict)
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 5 }) // IP check
+      .mockResolvedValueOnce({ allowed: false, current: 4, limit: 3 }); // handle check
+    const req = makeRequest({
+      handle: "octocat",
+      reason: "My delivery score seems off because all my PRs were merged in March.",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+  });
+
+  it("uses the fail-closed limiter for the per-handle check", async () => {
+    const req = makeRequest({
+      handle: "octocat",
+      reason: "My delivery score seems off because all my PRs were merged in March.",
+    });
+
+    await POST(req);
+
+    expect(rateLimitStrict).toHaveBeenCalledWith("ratelimit:challenge:octocat", 3, 86400);
+  });
+
+  it("returns 429 when the per-handle limiter fails closed (Redis unavailable)", async () => {
+    vi.mocked(rateLimitStrict)
+      .mockResolvedValueOnce({ allowed: true, current: 1, limit: 5 }) // IP check
+      .mockResolvedValueOnce({ allowed: false, current: 0, limit: 3 }); // handle check
     const req = makeRequest({
       handle: "octocat",
       reason: "My delivery score seems off because all my PRs were merged in March.",

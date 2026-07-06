@@ -197,6 +197,11 @@ describe("GET /api/cron/warm-cache", () => {
       "alice",
       "https://avatars.example.com/alice.png",
     );
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:warm-cache",
+      expect.any(Number),
+      172800,
+    );
   });
 
   it("counts failed warms when materialization returns null", async () => {

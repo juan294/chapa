@@ -4,12 +4,31 @@
 // this page since it renders outside the normal component tree.
 "use client";
 
+import { useEffect } from "react";
+
 export default function GlobalError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    void fetch("/api/telemetry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "client_error",
+        category: "global_error",
+        message: error.message,
+        stack: error.stack,
+        digest: error.digest,
+        path: typeof window === "undefined" ? undefined : window.location.pathname,
+        source: "global-error",
+      }),
+    }).catch(() => undefined);
+  }, [error]);
+
   return (
     <html lang="en">
       <body

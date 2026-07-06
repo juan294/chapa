@@ -5,7 +5,7 @@
  * their corresponding named entities. This prevents XSS when user-controlled
  * text (handles, display names) is interpolated into SVG badge markup.
  *
- * NOTE: This is intentionally separate from `escapeHtml` in `lib/email/resend.ts`.
+ * NOTE: This is intentionally separate from `escapeHtml` in `lib/utils/escape.ts`.
  * The two functions differ in single-quote escaping:
  *   - `escapeXml` uses `&apos;` — the correct named entity for XML/SVG contexts.
  *   - `escapeHtml` uses `&#39;`  — the numeric reference, which is universally safe in HTML.

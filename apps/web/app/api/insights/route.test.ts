@@ -19,6 +19,7 @@ const {
   mockBuildCraftKey,
   mockInvalidateHistoryCache,
   mockRevalidatePath,
+  mockCaptureServerError,
 } = vi.hoisted(() => ({
   mockResolveRequestAuth: vi.fn(),
   mockRateLimit: vi.fn(),
@@ -31,6 +32,7 @@ const {
   mockBuildCraftKey: vi.fn(),
   mockInvalidateHistoryCache: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockCaptureServerError: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/resolve-request-auth", () => ({
@@ -63,6 +65,14 @@ vi.mock("@/lib/db/tool-insights", () => ({
   dbUpsertToolInsights: mockDbUpsert,
   dbGetToolInsights: mockDbGet,
 }));
+
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/analytics/server-errors")>();
+  return {
+    ...actual,
+    captureServerError: mockCaptureServerError,
+  };
+});
 
 vi.mock("@/lib/http/client-ip", () => ({
   NO_TRUSTED_IP: "unknown",
@@ -157,6 +167,7 @@ beforeEach(() => {
   mockBuildCraftKey.mockImplementation((handle: string) => `craft:v2:${handle}`);
   mockInvalidateHistoryCache.mockResolvedValue(undefined);
   mockRevalidatePath.mockImplementation(() => undefined);
+  mockCaptureServerError.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -289,7 +300,14 @@ describe("POST /api/insights", () => {
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.success).toBe(true);
+    expect(body.persisted).toBe(false);
     expect(body.craftScore.craftScore).toBeGreaterThan(0);
+    expect(mockCaptureServerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "/api/insights",
+        statusCode: 200,
+      }),
+    );
   });
 
   it("upserts replace previous data (same handle+tool)", async () => {
@@ -304,6 +322,7 @@ describe("POST /api/insights", () => {
     mockDbUpsert.mockResolvedValue(stored);
     const resp = await POST(makePostRequest(makeValidUpload()));
     const body = await resp.json();
+    expect(body.persisted).toBe(true);
     expect(body.craftScore.craftScore).toBe(60);
   });
 

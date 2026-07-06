@@ -318,6 +318,44 @@ describe("useAdminDashboard", () => {
 
       expect(result.current.page).toBe(1);
     });
+
+    it("debounces rapid keystrokes into a single fetch (no fetch-per-keystroke, #993)", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        mockFetchSuccess();
+        const { result } = renderHook(() => useAdminDashboard());
+
+        await vi.waitFor(() => {
+          expect(result.current.loading).toBe(false);
+        });
+
+        vi.mocked(globalThis.fetch).mockClear();
+
+        for (const value of ["a", "al", "ali", "alic", "alice"]) {
+          act(() => {
+            result.current.setSearch(value);
+          });
+          act(() => {
+            vi.advanceTimersByTime(100);
+          });
+        }
+
+        // Only 100ms since the last keystroke — debounce window (400ms) not elapsed
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+        await vi.waitFor(() => {
+          expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+        });
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          expect.stringContaining("search=alice"),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("tab switching", () => {

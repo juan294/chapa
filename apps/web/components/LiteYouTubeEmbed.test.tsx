@@ -33,6 +33,14 @@ describe("LiteYouTubeEmbed", () => {
     expect(img!.getAttribute("alt")).toBe("Scoring Explainer");
   });
 
+  it("sets explicit width/height on the thumbnail to prevent CLS", () => {
+    const { container } = render(<LiteYouTubeEmbed {...defaultProps} />);
+
+    const img = container.querySelector("img");
+    expect(img!.getAttribute("width")).toBe("480");
+    expect(img!.getAttribute("height")).toBe("270");
+  });
+
   it("loads the iframe when play button is clicked", () => {
     render(<LiteYouTubeEmbed {...defaultProps} />);
 
