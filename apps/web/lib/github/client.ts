@@ -1,5 +1,7 @@
 import { fetchStats } from "./stats";
 import { mergeStats } from "./merge";
+import { isDegradedPrFetch } from "./stats-integrity";
+import { captureServerEvent } from "@/lib/analytics/server-errors";
 import { cacheGet, cacheSet } from "../cache/redis";
 import { dbUpsertUser } from "@/lib/db/users";
 import { dbGetSupplemental } from "@/lib/db/supplemental";
@@ -259,6 +261,42 @@ async function _fetchAndCache(
       linkedPlatforms,
       ...(Object.keys(linkedPlatformLogins).length > 0 && { linkedPlatformLogins }),
     };
+  }
+
+  // #1002 — Guard against a viewer-scoped fetch that lost merged-PR visibility.
+  // The GitHub contributionsCollection is scoped to the authenticating token:
+  // a token that cannot see a user's private-repo merges (server GITHUB_TOKEN
+  // in the warm-cache cron, or an anonymous badge request) returns
+  // prsMergedCount=0 even when the user has hundreds of merged PRs. Caching
+  // that result collapses Delivery (PR weight is 70% of it) and flips
+  // profileType to "collaborative". If the fresh result lost PR data relative
+  // to last-known-good, serve the good stale data and do NOT overwrite the
+  // stale key — otherwise a corrupt zero poisons the very fallback meant to
+  // protect against it.
+  if (isDegradedPrFetch(stats, stale)) {
+    console.warn(
+      `[github] degraded PR fetch for ${lowerHandle} ` +
+        `(prsMergedCount 0, last-known-good ${stale!.prsMergedCount}) — ` +
+        `serving last-known-good, not overwriting stale cache`,
+    );
+    fireAndForget(
+      () =>
+        captureServerEvent("github_degraded_pr_fetch", {
+          handle: lowerHandle,
+          freshPrsMergedCount: stats.prsMergedCount,
+          stalePrsMergedCount: stale!.prsMergedCount,
+          freshCommitsTotal: stats.commitsTotal,
+          authenticated: Boolean(token),
+        }),
+      () => undefined,
+    );
+    if (!options.readOnly) {
+      // Refresh only the primary key with the good data so we serve fast and
+      // avoid refetch-thrash while upstream stays degraded. The stale key —
+      // the protected last-known-good — is left untouched.
+      await cacheSet(cacheKey, stale!, CACHE_TTL);
+    }
+    return stale!;
   }
 
   if (options.readOnly) {
