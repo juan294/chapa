@@ -6,7 +6,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSelect = vi.fn();
 const mockOr = vi.fn();
-const mockIlike = vi.fn();
 const mockEq = vi.fn();
 const mockOrder = vi.fn();
 const mockRange = vi.fn();
@@ -19,10 +18,6 @@ function chainBuilder() {
   };
   chain.or = (...args: unknown[]) => {
     mockOr(...args);
-    return chain;
-  };
-  chain.ilike = (...args: unknown[]) => {
-    mockIlike(...args);
     return chain;
   };
   chain.eq = (...args: unknown[]) => {
@@ -181,8 +176,7 @@ describe("dbGetAdminUsers", () => {
 
     await dbGetAdminUsers(defaultQuery({ search: "alice" }));
 
-    expect(mockIlike).toHaveBeenCalledWith("handle", "%alice%");
-    expect(mockIlike).toHaveBeenCalledWith("display_name", "%alice%");
+    expect(mockOr).toHaveBeenCalledWith("handle.ilike.%alice%,display_name.ilike.%alice%");
   });
 
   it("escapes underscore SQL wildcard in search terms (BE-H5)", async () => {
@@ -191,8 +185,9 @@ describe("dbGetAdminUsers", () => {
     await dbGetAdminUsers(defaultQuery({ search: "alice_b" }));
 
     // _ must be escaped so it matches a literal underscore, not any character
-    expect(mockIlike).toHaveBeenCalledWith("handle", "%alice\\_b%");
-    expect(mockIlike).toHaveBeenCalledWith("display_name", "%alice\\_b%");
+    expect(mockOr).toHaveBeenCalledWith(
+      "handle.ilike.%alice\\_b%,display_name.ilike.%alice\\_b%",
+    );
   });
 
   it("escapes backslash in search terms to prevent wildcard bypass (BE-H5)", async () => {
@@ -200,8 +195,9 @@ describe("dbGetAdminUsers", () => {
 
     await dbGetAdminUsers(defaultQuery({ search: "alice\\b" }));
 
-    expect(mockIlike).toHaveBeenCalledWith("handle", "%alice\\\\b%");
-    expect(mockIlike).toHaveBeenCalledWith("display_name", "%alice\\\\b%");
+    expect(mockOr).toHaveBeenCalledWith(
+      "handle.ilike.%alice\\\\b%,display_name.ilike.%alice\\\\b%",
+    );
   });
 
   it("strips PostgREST delimiter characters from search terms to prevent predicate injection (BE-H5)", async () => {
@@ -211,13 +207,16 @@ describe("dbGetAdminUsers", () => {
     await dbGetAdminUsers(defaultQuery({ search: ",handle.eq.juan)" }));
 
     // The delimiters , . ( ) must be stripped so no injection occurs
-    const calls = mockIlike.mock.calls;
+    const calls = mockOr.mock.calls;
     expect(calls.length).toBeGreaterThan(0);
-    for (const [, pattern] of calls) {
-      expect(pattern).not.toContain(",");
-      expect(pattern).not.toContain("(");
-      expect(pattern).not.toContain(")");
-    }
+    const [filterString] = calls[0]!;
+    // The literal comma between the two OR clauses is expected and safe —
+    // only characters coming from the user-supplied term must be absent.
+    // "handle.eq.juan" (the injected clause) must not appear as a distinct
+    // predicate; the whole term collapses into the ilike value instead.
+    expect(filterString).not.toContain("handle.eq.juan)");
+    expect(filterString).not.toContain("(");
+    expect(filterString).not.toContain(")");
   });
 
   it("applies tier filter", async () => {
@@ -355,8 +354,9 @@ describe("dbGetAdminUsers", () => {
 
     await dbGetAdminUsers(defaultQuery({ search: "100%" }));
 
-    expect(mockIlike).toHaveBeenCalledWith("handle", "%100\\%%");
-    expect(mockIlike).toHaveBeenCalledWith("display_name", "%100\\%%");
+    expect(mockOr).toHaveBeenCalledWith(
+      "handle.ilike.%100\\%%,display_name.ilike.%100\\%%",
+    );
   });
 
   it("skips search filter when search is whitespace-only", async () => {

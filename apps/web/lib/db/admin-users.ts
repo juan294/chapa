@@ -205,13 +205,12 @@ export async function dbGetAdminUsers(
   try {
     let q = db.from("admin_users").select("*", { count: "exact" });
 
-    // Search filter: ILIKE on handle and display_name.
-    // Uses chained .ilike() builder calls (parameterized) instead of raw
-    // .or() string interpolation to prevent SQL wildcard abuse (_ and %)
-    // and PostgREST delimiter injection (, . ( )).
+    // Search filter: ILIKE on handle OR display_name. The term is run through
+    // escapeIlike() first, which strips PostgREST filter-string delimiters
+    // and escapes SQL wildcards, so it's safe to interpolate into .or().
     if (query.search?.trim()) {
       const term = escapeIlike(query.search.trim());
-      q = q.ilike("handle", `%${term}%`).ilike("display_name", `%${term}%`);
+      q = q.or(`handle.ilike.%${term}%,display_name.ilike.%${term}%`);
     }
 
     // Tier filter
