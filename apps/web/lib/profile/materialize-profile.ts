@@ -34,6 +34,28 @@ export interface MaterializedImpactState {
   snapshot: MetricsSnapshot;
   /** True when scoring inputs have changed since today's snapshot (#826). */
   inputsChanged: boolean;
+  /**
+   * #1003 — False when the served stats look like the corrupt "0 merged PRs
+   * despite real commit/issue activity" shape (e.g. served from an old
+   * poisoned `stats:stale` entry). Gates permanent snapshot persistence and
+   * verification-record minting in `public-profile.ts` — a degraded payload
+   * is never attested, even though it can still be displayed.
+   */
+  statsComplete: boolean;
+}
+
+/**
+ * A later phase of this plan adds an `isPoisonedStats` predicate with this
+ * identical shape to `lib/github/stats-integrity.ts` for the repair script;
+ * at that point this should become `!isPoisonedStats(stats)` imported from
+ * there to keep a single source of truth. Not done yet — that helper doesn't
+ * exist on this branch.
+ */
+function statsLookComplete(stats: StatsData): boolean {
+  if (stats.prsMergedCount > 0) return true;
+  // 0 PRs is only trustworthy when there's no other heavy activity (genuine
+  // new/empty account) — otherwise it's the corrupt degraded-fetch shape.
+  return stats.commitsTotal === 0 && stats.issuesClosedCount === 0;
 }
 
 export interface MaterializeProfileOptions
@@ -88,6 +110,7 @@ export function materializeImpactState(
     // tomorrow's EMA has a stable prior; the headline stays fresh.
     snapshot: buildSnapshot(stats, smoothedImpact, options.today),
     inputsChanged,
+    statsComplete: statsLookComplete(stats),
   };
 }
 
