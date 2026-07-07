@@ -20,7 +20,8 @@ const mockUpdateSnapshotCache = vi.fn();
 const mockDbUpsertUser = vi.fn();
 const mockCacheSetNxStatus = vi.fn();
 const mockClearStatsDirty = vi.fn();
-const mockCaptureServerEvent = vi.fn((..._args: unknown[]) => Promise.resolve());
+const mockCaptureServerEvent =
+  vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
 
 vi.mock("./materialize-profile", () => ({
   materializeProfile: (...args: unknown[]) => mockMaterializeProfile(...args),
