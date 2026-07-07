@@ -31,6 +31,13 @@ export async function fetchContributionData(
   const since = new Date(now);
   since.setDate(since.getDate() - SCORING_WINDOW_DAYS);
 
+  // Authoritative merged-PR search window — `search(is:merged)` is not
+  // token-scoped/capped the way `pullRequestContributions` is (see #1002 /
+  // the 2026-07-07 scoring-integrity-contract research).
+  const sinceDate = since.toISOString().slice(0, 10);
+  const untilDate = now.toISOString().slice(0, 10);
+  const mergedPrSearch = `author:${login} is:pr is:merged created:${sinceDate}..${untilDate}`;
+
   // Use session token if available, otherwise fall back to server-side
   // GITHUB_TOKEN (provided automatically by GitHub Actions in CI).
   const effectiveToken = token ?? getGithubToken();
@@ -56,6 +63,7 @@ export async function fetchContributionData(
           until: now.toISOString(),
           historySince: since.toISOString(),
           historyUntil: now.toISOString(),
+          mergedPrSearch,
         },
       }),
     });
@@ -90,15 +98,23 @@ export async function fetchContributionData(
 
     const user = json.data.user;
     const cc = user.contributionsCollection;
+    const mergedPrTotalCount: number = json.data?.search?.issueCount ?? 0;
 
     return {
       login: user.login,
       name: user.name,
       avatarUrl: user.avatarUrl,
+      mergedPrTotalCount,
       contributionCalendar: cc.contributionCalendar,
       pullRequests: {
-        totalCount: cc.pullRequestContributions.totalCount,
-        nodes: cc.pullRequestContributions.nodes
+        // Optional-chained: an empty/missing `pullRequestContributions` no
+        // longer throws (which would mask the degradation as an ordinary
+        // fetch failure) — it safely defaults to an empty sample, so
+        // `assessRawFetchIntegrity` (driven by the authoritative
+        // `mergedPrTotalCount` above) is the one place that decides whether
+        // this payload is trustworthy.
+        totalCount: cc?.pullRequestContributions?.totalCount ?? 0,
+        nodes: (cc?.pullRequestContributions?.nodes ?? [])
           .filter((n: { pullRequest: unknown } | null) => n != null && n.pullRequest != null)
           .map(
             (n: {
@@ -128,8 +144,8 @@ export async function fetchContributionData(
             }),
           ),
       },
-      reviews: { totalCount: cc.pullRequestReviewContributions.totalCount },
-      issues: { totalCount: cc.issueContributions.totalCount },
+      reviews: { totalCount: cc?.pullRequestReviewContributions?.totalCount ?? 0 },
+      issues: { totalCount: cc?.issueContributions?.totalCount ?? 0 },
       repositories: {
         totalCount: user.repositories.totalCount,
         nodes: user.repositories.nodes,

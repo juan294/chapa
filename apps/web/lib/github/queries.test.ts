@@ -218,6 +218,138 @@ describe("fetchContributionData", () => {
     expect(body.variables.historyUntil).toBe(body.variables.until);
   });
 
+  // ---------------------------------------------------------------------------
+  // Authoritative merged-PR search (2026-07-07 scoring-integrity-contract)
+  // ---------------------------------------------------------------------------
+
+  it("builds mergedPrSearch as author:<login> is:pr is:merged created:<since>..<until> (YYYY-MM-DD)", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            user: {
+              login: "testuser",
+              name: "Test",
+              avatarUrl: "https://example.com/avatar.png",
+              contributionsCollection: {
+                contributionCalendar: { totalContributions: 0, weeks: [] },
+                pullRequestContributions: { totalCount: 0, nodes: [] },
+                pullRequestReviewContributions: { totalCount: 0 },
+                issueContributions: { totalCount: 0 },
+              },
+              repositories: { totalCount: 0, nodes: [] },
+            },
+            search: { issueCount: 904 },
+          },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await fetchContributionData("testuser", "token");
+
+    const [, opts] = mockFetch.mock.calls[0]!;
+    const body = JSON.parse(opts.body);
+    expect(body.variables.mergedPrSearch).toMatch(
+      /^author:testuser is:pr is:merged created:\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$/,
+    );
+  });
+
+  it("sets mergedPrTotalCount from search.issueCount", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                login: "testuser",
+                name: "Test",
+                avatarUrl: "https://example.com/avatar.png",
+                contributionsCollection: {
+                  contributionCalendar: { totalContributions: 0, weeks: [] },
+                  pullRequestContributions: { totalCount: 143, nodes: [] },
+                  pullRequestReviewContributions: { totalCount: 0 },
+                  issueContributions: { totalCount: 0 },
+                },
+                repositories: { totalCount: 0, nodes: [] },
+              },
+              search: { issueCount: 904 },
+            },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).not.toBeNull();
+    expect(result!.mergedPrTotalCount).toBe(904);
+  });
+
+  it("defaults mergedPrTotalCount to 0 when search is missing from the response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                login: "testuser",
+                name: "Test",
+                avatarUrl: "https://example.com/avatar.png",
+                contributionsCollection: {
+                  contributionCalendar: { totalContributions: 0, weeks: [] },
+                  pullRequestContributions: { totalCount: 0, nodes: [] },
+                  pullRequestReviewContributions: { totalCount: 0 },
+                  issueContributions: { totalCount: 0 },
+                },
+                repositories: { totalCount: 0, nodes: [] },
+              },
+            },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).not.toBeNull();
+    expect(result!.mergedPrTotalCount).toBe(0);
+  });
+
+  it("does not throw when pullRequestContributions is null (optional-chained, defaults to empty sample)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              user: {
+                login: "testuser",
+                name: "Test",
+                avatarUrl: "https://example.com/avatar.png",
+                contributionsCollection: {
+                  contributionCalendar: { totalContributions: 5, weeks: [] },
+                  pullRequestContributions: null,
+                  pullRequestReviewContributions: { totalCount: 0 },
+                  issueContributions: { totalCount: 0 },
+                },
+                repositories: { totalCount: 0, nodes: [] },
+              },
+              search: { issueCount: 904 },
+            },
+          }),
+      }),
+    );
+
+    const result = await fetchContributionData("testuser", "token");
+    expect(result).not.toBeNull();
+    expect(result!.pullRequests).toEqual({ totalCount: 0, nodes: [] });
+    // The authoritative count still comes through — this is exactly the shape
+    // assessRawFetchIntegrity (stats-integrity.ts) rejects downstream.
+    expect(result!.mergedPrTotalCount).toBe(904);
+  });
+
   it("skips PR contribution nodes where pullRequest is null", async () => {
     vi.stubGlobal(
       "fetch",

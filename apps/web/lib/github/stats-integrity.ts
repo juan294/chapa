@@ -1,4 +1,4 @@
-import type { StatsData } from "@chapa/shared";
+import type { RawContributionData, StatsData } from "@chapa/shared";
 
 /**
  * Detects a GitHub fetch that lost merged-PR visibility relative to
@@ -43,4 +43,51 @@ export function isDegradedPrFetch(
   // shows other activity; a fetch that is entirely empty is indistinguishable
   // from a genuinely reset account and is left alone.
   return fresh.commitsTotal > 0 || fresh.issuesClosedCount > 0;
+}
+
+/**
+ * Assesses whether a raw GitHub fetch is internally consistent enough to
+ * trust, *without requiring a last-known-good baseline*. See #1002's
+ * follow-up (the 2026-07-07 scoring-integrity-contract): the authoritative
+ * `search(is:merged)` count (`raw.mergedPrTotalCount`) is fetched
+ * independently of the token-scoped, 100-node-capped
+ * `pullRequestContributions` sample, so a divergence between the two — the
+ * search sees merged PRs but the sample came back empty — is the signature
+ * of a degraded/partial fetch (token-scope loss or a partial GraphQL error),
+ * not a genuinely empty account.
+ *
+ * This complements `isDegradedPrFetch`: that predicate needs a trusted prior
+ * value to compare against and is blind on a cold or already-poisoned
+ * baseline; this one judges the payload on its own internal consistency, so
+ * it also catches the very first degraded fetch for a handle.
+ *
+ * @param raw The raw contribution payload, before `buildStatsFromRaw`.
+ * @returns `{ ok: true }` when the payload is internally consistent, or
+ *   `{ ok: false, reason }` when it should be rejected (caller serves stale).
+ */
+export function assessRawFetchIntegrity(
+  raw: RawContributionData,
+): { ok: true } | { ok: false; reason: string } {
+  if (!raw.contributionCalendar || !raw.pullRequests) {
+    return { ok: false, reason: "missing_required_block" };
+  }
+
+  const mergedNodeCount = raw.pullRequests.nodes.filter((n) => n.merged).length;
+
+  // The juan294 signature: search sees merged PRs, but the sample came back
+  // completely empty. Independent of whether pullRequestContributions was
+  // null (defaulted to empty by queries.ts) or merely returned an empty
+  // nodes array — either way, the sample cannot be trusted for this fetch.
+  if (raw.mergedPrTotalCount > 0 && mergedNodeCount === 0) {
+    return { ok: false, reason: "pr_nodes_empty_but_search_positive" };
+  }
+
+  // Internal inconsistency: the sample itself claims PR contributions exist
+  // (totalCount > 0) but returned no nodes at all — a partial-payload shape
+  // distinct from a genuinely empty account (which reports totalCount: 0).
+  if (raw.pullRequests.totalCount > 0 && raw.pullRequests.nodes.length === 0) {
+    return { ok: false, reason: "pr_totalcount_positive_but_nodes_empty" };
+  }
+
+  return { ok: true };
 }

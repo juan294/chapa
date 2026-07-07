@@ -103,6 +103,14 @@ export interface RawContributionData {
   login: string;
   name: string | null;
   avatarUrl: string;
+  /**
+   * Authoritative merged-PR count from `search(query: "is:pr is:merged ...")`.
+   * Independent of the token-scoped, 100-node-capped `pullRequestContributions`
+   * sample below — used as the source of truth for `prsMergedCount` and as the
+   * signal `assessRawFetchIntegrity` compares against the sample to detect a
+   * degraded fetch (see `stats-integrity.ts`).
+   */
+  mergedPrTotalCount: number;
   contributionCalendar: {
     totalContributions: number;
     weeks: {

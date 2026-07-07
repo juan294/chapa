@@ -7,12 +7,15 @@
  * - $until: DateTime! — End of window (contributionsCollection)
  * - $historySince: GitTimestamp! — Start of window (commit history)
  * - $historyUntil: GitTimestamp! — End of window (commit history)
+ * - $mergedPrSearch: String! — `author:<login> is:pr is:merged created:<since>..<until>`,
+ *   used by the top-level `search` field for an authoritative merged-PR count
+ *   that isn't capped/scoped the way `pullRequestContributions` is.
  *
  * Note: DateTime and GitTimestamp are different GraphQL types but accept
  * the same ISO 8601 strings. They must be declared as separate variables.
  */
 export const CONTRIBUTION_QUERY = `
-query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitTimestamp!, $historyUntil: GitTimestamp!) {
+query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitTimestamp!, $historyUntil: GitTimestamp!, $mergedPrSearch: String!) {
   user(login: $login) {
     login
     name
@@ -69,6 +72,9 @@ query($login: String!, $since: DateTime!, $until: DateTime!, $historySince: GitT
     ownedRepos: repositories(ownerAffiliations: OWNER, first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
       nodes { stargazerCount forkCount watchers { totalCount } }
     }
+  }
+  search(query: $mergedPrSearch, type: ISSUE) {
+    issueCount
   }
 }
 `;

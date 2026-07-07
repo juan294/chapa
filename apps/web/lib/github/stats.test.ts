@@ -17,6 +17,7 @@ function makeContribData(
     login: "test-user",
     name: "Test User",
     avatarUrl: "https://avatars.githubusercontent.com/u/1",
+    mergedPrTotalCount: 3,
     contributionCalendar: {
       totalContributions: 120,
       weeks: Array.from({ length: 13 }, (_, w) => ({
@@ -94,6 +95,7 @@ describe("fetchStats", () => {
 
   it("excludes unmerged PRs from weight calculation", async () => {
     const data = makeContribData({
+      mergedPrTotalCount: 1,
       pullRequests: {
         totalCount: 2,
         nodes: [
@@ -158,6 +160,38 @@ describe("fetchStats", () => {
 
     const stats = await fetchStats("test-user", "gho_token");
     expect(stats).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Scoring-integrity contract (2026-07-07): reject a degraded fetch at the
+  // source instead of ever building a corrupt StatsData.
+  // ---------------------------------------------------------------------------
+
+  it("rejects a degraded fetch (search sees merged PRs, sample is empty) and returns null", async () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const data = makeContribData({
+      mergedPrTotalCount: 904,
+      pullRequests: { totalCount: 143, nodes: [] },
+    });
+    mockedQueries.fetchContributionData.mockResolvedValue(data);
+
+    const stats = await fetchStats("test-user", "gho_token");
+
+    expect(stats).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("rejecting degraded fetch for test-user"),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("accepts a healthy fetch where the sample is a non-empty subset of the authoritative count", async () => {
+    const data = makeContribData({ mergedPrTotalCount: 904 });
+    mockedQueries.fetchContributionData.mockResolvedValue(data);
+
+    const stats = await fetchStats("test-user", "gho_token");
+
+    expect(stats).not.toBeNull();
+    expect(stats!.prsMergedCount).toBe(904);
   });
 
   it("counts active days from heatmap (days with count > 0)", async () => {
