@@ -1,3 +1,5 @@
+import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
 import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
@@ -32,6 +34,12 @@ export async function materializePublicProfile(
 export function getPublicProfileVerification(
   materialized: MaterializedProfile,
 ): PublicVerificationCode | null {
+  // #1003 — Never attest a verification record from stats that look
+  // incomplete (e.g. served from an old poisoned `stats:stale` entry). This
+  // single gate covers all four call sites: the three route call sites and
+  // the internal `deferProfileCacheWork` call below.
+  if (!materialized.statsComplete) return null;
+
   return generateVerificationCode(
     materialized.stats,
     materialized.displayImpact,
@@ -68,10 +76,19 @@ export async function runPublicProfileSideEffects(
     sendFirstBadgeNotification?: boolean;
   } = {},
 ): Promise<void> {
-  const shouldRunDeferred = await persistProfileSnapshot(handle, materialized, {
+  if (options.readOnly) return;
+
+  const persisted = await persistProfileSnapshot(handle, materialized, {
     readOnly: options.readOnly,
   });
-  if (!shouldRunDeferred) return;
+
+  // The SETNX dedup guard returning "exists" means deferred work already ran
+  // earlier today for this handle — skip re-running it. Incomplete stats
+  // (#1003) also skip persistence but are NOT a dedup case: the badge still
+  // rendered for a real visitor, so telemetry/notifications should still run
+  // once for this view. The verification record is separately gated inside
+  // getPublicProfileVerification, so it stays skipped either way.
+  if (!persisted && materialized.statsComplete) return;
 
   await deferProfileCacheWork(handle, materialized, options);
 }
@@ -82,6 +99,21 @@ export async function persistProfileSnapshot(
   options: { readOnly?: boolean } = {},
 ): Promise<boolean> {
   if (options.readOnly) return false;
+
+  // #1003 — Never build a permanent snapshot row from stats that look
+  // incomplete (e.g. served from an old poisoned `stats:stale` entry).
+  if (!materialized.statsComplete) {
+    fireAndForget(
+      () =>
+        captureServerEvent("snapshot_skipped_incomplete_stats", {
+          handle,
+          prsMergedCount: materialized.stats.prsMergedCount,
+          commitsTotal: materialized.stats.commitsTotal,
+        }),
+      () => undefined,
+    );
+    return false;
+  }
 
   // Deduplication guard: once-per-day SETNX key prevents duplicate Supabase
   // writes when the CDN misses and multiple edge nodes hit the origin in parallel.

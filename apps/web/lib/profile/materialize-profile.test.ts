@@ -175,6 +175,52 @@ describe("materializeImpactState", () => {
   });
 });
 
+describe("statsComplete (#1003 persist-boundary integrity gate)", () => {
+  it("is true when prsMergedCount is greater than zero", () => {
+    const stats = makeFullStats({ prsMergedCount: 5, commitsTotal: 50 });
+
+    const result = materializeImpactState(stats);
+
+    expect(result.statsComplete).toBe(true);
+  });
+
+  it("is true for a genuine new/empty account (0 PRs, 0 commits, 0 issues)", () => {
+    const stats = makeFullStats({
+      prsMergedCount: 0,
+      commitsTotal: 0,
+      issuesClosedCount: 0,
+    });
+
+    const result = materializeImpactState(stats);
+
+    expect(result.statsComplete).toBe(true);
+  });
+
+  it("is false for the corrupt shape: 0 PRs but real commit activity", () => {
+    const stats = makeFullStats({
+      prsMergedCount: 0,
+      commitsTotal: 15585,
+      issuesClosedCount: 0,
+    });
+
+    const result = materializeImpactState(stats);
+
+    expect(result.statsComplete).toBe(false);
+  });
+
+  it("is false for the corrupt shape: 0 PRs but real issue activity", () => {
+    const stats = makeFullStats({
+      prsMergedCount: 0,
+      commitsTotal: 0,
+      issuesClosedCount: 5104,
+    });
+
+    const result = materializeImpactState(stats);
+
+    expect(result.statsComplete).toBe(false);
+  });
+});
+
 describe("materializeProfile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
