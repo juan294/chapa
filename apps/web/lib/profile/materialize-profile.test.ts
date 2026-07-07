@@ -73,7 +73,7 @@ describe("materializeImpactState", () => {
     );
   });
 
-  it("applies EMA and recalculates the tier when the snapshot is from a previous day", () => {
+  it("#1001: keeps the display headline fresh but applies EMA to the persisted snapshot when the snapshot is from a previous day", () => {
     const stats = makeFullStats();
     const previousDaySnapshot = makeSnapshot({
       date: "2026-04-16",
@@ -85,19 +85,21 @@ describe("materializeImpactState", () => {
       today: "2026-04-17",
     });
 
-    expect(result.displayImpact.adjustedComposite).not.toBe(
+    // Headline is always the fresh score, consistent with the dimensions.
+    expect(result.displayImpact.adjustedComposite).toBe(
       result.rawImpact.adjustedComposite,
     );
-    expect(result.displayImpact.adjustedComposite).toBeLessThan(95);
-    expect(result.displayImpact.tier).toBe(
-      getTier(result.displayImpact.adjustedComposite),
+    // EMA smoothing is retained only for the persisted trend snapshot, and it
+    // genuinely differs from the fresh headline (EMA pulls toward yesterday's 95).
+    expect(result.snapshot.adjustedComposite).not.toBe(
+      result.rawImpact.adjustedComposite,
     );
-    expect(result.snapshot.adjustedComposite).toBe(
-      result.displayImpact.adjustedComposite,
+    expect(result.snapshot.tier).toBe(
+      getTier(result.snapshot.adjustedComposite),
     );
   });
 
-  it("reuses the same-day snapshot score to prevent the feedback loop", () => {
+  it("#1001: keeps the display headline fresh while the same-day lock still governs the persisted snapshot", () => {
     const stats = makeFullStats();
     const sameDaySnapshot = makeSnapshot({
       date: "2026-04-17",
@@ -110,10 +112,15 @@ describe("materializeImpactState", () => {
       today: "2026-04-17",
     });
 
-    expect(result.displayImpact.adjustedComposite).toBe(91);
-    expect(result.displayImpact.tier).toBe("Elite");
-    expect(result.rawImpact.adjustedComposite).not.toBe(91);
+    // Headline reflects today's fresh computation, not the locked snapshot.
+    expect(result.displayImpact.adjustedComposite).toBe(
+      result.rawImpact.adjustedComposite,
+    );
+    expect(result.displayImpact.adjustedComposite).not.toBe(91);
+    // The same-day feedback-loop lock still preserves the smoothed value in
+    // the trend snapshot (prevents the stored series from spiralling).
     expect(result.snapshot.adjustedComposite).toBe(91);
+    expect(result.snapshot.tier).toBe("Elite");
   });
 
   it("includes craft when a craft result is available", () => {
@@ -128,7 +135,7 @@ describe("materializeImpactState", () => {
     expect(result.snapshot.craft).toBe(88);
   });
 
-  it("keeps raw and display impact distinct in explicit-recalculate mode while snapshotting the display score", () => {
+  it("#1001: keeps the display headline fresh in explicit-recalculate mode while the snapshot carries the smoothed score", () => {
     const stats = makeFullStats();
     const previousDaySnapshot = makeSnapshot({
       date: "2026-04-16",
@@ -141,11 +148,29 @@ describe("materializeImpactState", () => {
       today: "2026-04-17",
     });
 
-    expect(result.rawImpact.adjustedComposite).not.toBe(
+    // Headline is the fresh score; smoothing only touches the trend snapshot.
+    expect(result.displayImpact.adjustedComposite).toBe(
+      result.rawImpact.adjustedComposite,
+    );
+    expect(result.snapshot.adjustedComposite).not.toBe(
       result.displayImpact.adjustedComposite,
     );
-    expect(result.snapshot.adjustedComposite).toBe(
-      result.displayImpact.adjustedComposite,
+  });
+
+  it("#1001: never applies score smoothing to the display headline — it is the raw impact object", () => {
+    const stats = makeFullStats();
+    const priorDay = makeSnapshot({ date: "2026-04-16", adjustedComposite: 95 });
+
+    const result = materializeImpactState(stats, {
+      latestSnapshot: priorDay,
+      today: "2026-04-17",
+    });
+
+    // Object identity: no policy transform is applied to the display headline.
+    expect(result.displayImpact).toBe(result.rawImpact);
+    // The persisted snapshot still carries a distinct, EMA-smoothed value.
+    expect(result.snapshot.adjustedComposite).not.toBe(
+      result.rawImpact.adjustedComposite,
     );
   });
 });
@@ -281,8 +306,10 @@ describe("materializeProfile", () => {
     expect(result?.displayImpact.adjustedComposite).toBe(
       expected.displayImpact.adjustedComposite,
     );
+    // The dirty marker (inputsChanged) still governs the persisted snapshot's
+    // smoothing via the same-day-lock bypass — match the snapshot, not display.
     expect(result?.snapshot.adjustedComposite).toBe(
-      result?.displayImpact.adjustedComposite,
+      expected.snapshot.adjustedComposite,
     );
   });
 });

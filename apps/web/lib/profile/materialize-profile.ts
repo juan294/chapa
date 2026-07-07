@@ -62,18 +62,31 @@ export function materializeImpactState(
   const latestSnapshot = options.latestSnapshot ?? null;
   const inputsChanged = options.inputsChanged ?? false;
   const rawImpact = computeImpactV6(stats, craftResult?.craftScore);
-  const displayImpact = applyImpactScorePolicy(rawImpact, latestSnapshot, {
+
+  // #1001 — The live headline shown to users (badge, dashboard, verification
+  // record, emails) is the FRESH score, always internally consistent with the
+  // dimensions displayed beside it. EMA smoothing — and the same-day lock /
+  // #826 dirty-input bypass / #930 ignoreSnapshot machinery in
+  // applyImpactScorePolicy — is retained ONLY for the persisted trend snapshot
+  // and the day-over-day EMA prior. Previously the smoothed composite was shown
+  // as the headline next to un-smoothed dimensions, so a real dimension change
+  // (e.g. Delivery dropping) showed immediately on the radar while the headline
+  // lagged for days — reading as "the number doesn't match the breakdown".
+  const smoothedImpact = applyImpactScorePolicy(rawImpact, latestSnapshot, {
     policy: options.policy,
     today: options.today,
     inputsChanged,
   });
+  const displayImpact = rawImpact;
 
   return {
     craftResult,
     latestSnapshot,
     rawImpact,
     displayImpact,
-    snapshot: buildSnapshot(stats, displayImpact, options.today),
+    // Persist the smoothed composite so the history sparkline stays smooth and
+    // tomorrow's EMA has a stable prior; the headline stays fresh.
+    snapshot: buildSnapshot(stats, smoothedImpact, options.today),
     inputsChanged,
   };
 }

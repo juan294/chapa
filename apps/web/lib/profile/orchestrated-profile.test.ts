@@ -116,7 +116,7 @@ describe("persistOrchestratedSnapshot", () => {
     expect(mockUpdateSnapshotCache).toHaveBeenCalledWith("testuser", materialized.snapshot);
   });
 
-  it("keeps same-day public reads aligned with a replaced orchestration snapshot", () => {
+  it("keeps same-day public reads stable after a replaced orchestration snapshot (#1001)", () => {
     const stats = makeFullStats({ handle: "testuser" });
     const replaced = materializeImpactState(stats, {
       latestSnapshot: makeSnapshot({
@@ -131,7 +131,13 @@ describe("persistOrchestratedSnapshot", () => {
       today: "2026-04-17",
     });
 
+    // #1001 — the fresh headline is stable across same-day re-reads...
     expect(sameDayPublicRead.displayImpact.adjustedComposite).toBe(
+      replaced.displayImpact.adjustedComposite,
+    );
+    // ...and the persisted trend snapshot stays locked to its smoothed value
+    // (the same-day lock prevents the stored series from spiralling).
+    expect(sameDayPublicRead.snapshot.adjustedComposite).toBe(
       replaced.snapshot.adjustedComposite,
     );
   });
