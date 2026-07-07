@@ -42,6 +42,8 @@ export default defineConfig({
         // Test helpers and stubs
         "test/**",
         "apps/web/test/**",
+        // Package config files: not runtime source, no behaviour to measure
+        "packages/shared/{package.json,tsconfig*.json,eslint.config.mjs}",
       ],
       thresholds: {
         statements: 75,
