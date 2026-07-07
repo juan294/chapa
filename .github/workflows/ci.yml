@@ -100,12 +100,12 @@ jobs:
       - name: Scoring integrity gate
         if: github.event_name == 'pull_request'
         run: |
-          SCORING_FILES="apps/web/lib/impact/ apps/web/lib/github/merge.ts packages/shared/src/stats-aggregation.ts packages/shared/src/types.ts packages/shared/src/constants.ts packages/shared/src/stats-schema.ts"
+          SCORING_FILES="apps/web/lib/impact/ apps/web/lib/github/merge.ts packages/shared/src/stats-aggregation.ts packages/shared/src/types.ts packages/shared/src/constants.ts packages/shared/src/stats-schema.ts apps/web/lib/github/stats-integrity.ts apps/web/lib/github/queries.ts apps/web/lib/github/client.ts apps/web/lib/github/stats.ts apps/web/lib/profile/materialize-profile.ts apps/web/lib/profile/public-profile.ts"
           CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- $SCORING_FILES || true)
           if [ -n "$CHANGED" ]; then
             echo "::notice::Scoring files changed — running integrity tests"
             echo "$CHANGED"
-            pnpm vitest run --reporter=verbose apps/web/lib/impact/golden-profiles.test.ts apps/web/lib/impact/pipeline.test.ts apps/web/lib/github/merge.test.ts
+            pnpm vitest run --reporter=verbose apps/web/lib/impact/golden-profiles.test.ts apps/web/lib/impact/pipeline.test.ts apps/web/lib/github/merge.test.ts apps/web/lib/github/stats-integrity.test.ts packages/shared/src/stats-aggregation.test.ts
           else
             echo "No scoring files changed — skipping integrity gate"
           fi

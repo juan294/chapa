@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fetchStats } from "./stats";
 import * as queries from "./queries";
+import * as serverErrors from "@/lib/analytics/server-errors";
 
 vi.mock("./queries");
+vi.mock("@/lib/analytics/server-errors");
 
 const mockedQueries = vi.mocked(queries);
+const mockedServerErrors = vi.mocked(serverErrors);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,6 +61,8 @@ function makeContribData(
 describe("fetchStats", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mockedServerErrors.captureServerEvent.mockReset();
+    mockedServerErrors.captureServerEvent.mockResolvedValue(undefined);
   });
 
   it("transforms raw data into StatsData shape", async () => {
@@ -181,6 +186,18 @@ describe("fetchStats", () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("rejecting degraded fetch for test-user"),
     );
+    await vi.waitFor(() => {
+      expect(mockedServerErrors.captureServerEvent).toHaveBeenCalledWith(
+        "stats_fetch_rejected",
+        {
+          handle: "test-user",
+          reason: "pr_nodes_empty_but_search_positive",
+          mergedPrTotalCount: 904,
+          mergedNodeCount: 0,
+          authenticated: true,
+        },
+      );
+    });
     consoleSpy.mockRestore();
   });
 
@@ -192,6 +209,7 @@ describe("fetchStats", () => {
 
     expect(stats).not.toBeNull();
     expect(stats!.prsMergedCount).toBe(904);
+    expect(mockedServerErrors.captureServerEvent).not.toHaveBeenCalled();
   });
 
   it("counts active days from heatmap (days with count > 0)", async () => {

@@ -180,11 +180,19 @@ describe("buildStatsFromRaw", () => {
     const raw = makeRaw({
       mergedPrTotalCount: 904,
       pullRequests: { totalCount: 143, nodes: mergedSample },
+      reviews: { totalCount: 16 },
     });
     const result = buildStatsFromRaw(raw);
     expect(result.prsMergedCount).toBe(904);
     // Weight still derives from the sample and caps at PR_WEIGHT_AGG_CAP (120)
     expect(result.prsMergedWeight).toBe(120);
+    // Downstream profile-type classification (detectProfileType, apps/web) divides
+    // reviewsSubmittedCount by prsMergedCount. That denominator must be the
+    // authoritative 904, not the 96-node sample — 16/904 ≈ 0.018 (solo) vs.
+    // 16/96 ≈ 0.167 (wrongly collaborative pre-fix). See v6.test.ts's
+    // "detectProfileType with buildStatsFromRaw" for the full-pipeline assertion.
+    expect(result.reviewsSubmittedCount).toBe(16);
+    expect(result.reviewsSubmittedCount / result.prsMergedCount).toBeLessThan(0.15);
   });
 
   it("computes PR weight with log formula, capped at 3.0 per PR", () => {
