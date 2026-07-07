@@ -1,82 +1,35 @@
 # QA Report
-> Generated: 2026-06-24 | Health status: green
+> Generated: 2026-07-01 | Health status: green
 
 ## Executive Summary
-All 7986 tests pass across 464 files with zero TypeScript errors and zero lint violations. No accessibility regressions found; the `<tr role="button">` aria-label gap flagged in the May 6 report has been resolved.
+All 8,164 tests pass across 474 files, TypeScript and ESLint are both clean, and no accessibility or design-system violations were found in production code. The codebase remains in a stable, release-ready state.
 
 ## Test Results
-- Total: 7986 tests across 464 files
-- Passed: 7986 | Failed: 0 | Skipped: 0
+- Total: 8,164 tests across 474 files
+- Passed: 8,164 | Failed: 0 | Skipped: 0
+- Duration: 67.63s (`pnpm vitest run --maxWorkers=3`)
 
 ## TypeScript
-Clean — `tsc --noEmit` exited 0 across both `apps/web` and `packages/shared`.
+Clean — `pnpm run typecheck` reports 0 errors across both `packages/shared` and `apps/web`.
 
 ## Linting
-Clean — ESLint exited 0 across both workspace packages. No warnings or errors.
+Clean — `pnpm run lint` reports 0 errors/warnings across both `packages/shared` and `apps/web`.
 
 ## Accessibility
-
-### `<img>` alt attributes
-All `<img>` tags in production components carry `alt`:
-- `apps/web/app/u/[handle]/page.tsx:244` — `alt` at line 246 (`sharePage.badgeAlt` i18n key via `interpolate`)
-- `apps/web/components/LiteYouTubeEmbed.tsx:45` — `alt={title}` (dynamic thumbnail)
-
-No missing-alt violations found.
-
-### Focus indicators
-Global `*:focus-visible` ring defined in `apps/web/styles/globals.css:455`. Component-level `focus-visible:ring-*` also present in:
-- `BadgeOverlay.tsx` — `focus-visible:ring-2 focus-visible:ring-amber`
-- `BadgeToolbar.tsx` — `focus-visible:text-text-primary focus-visible:bg-amber/[0.06]`
-- `InfoTooltip.tsx` — `focus-visible:ring-2 focus-visible:ring-amber`
-- `LanguageSwitcher.tsx` — `focus-visible:ring-2 focus-visible:ring-amber/40`
-- `CommandBarHint.tsx` — `focus-visible:ring-2 focus-visible:ring-amber/40`
-
-Focus indicators are comprehensive and consistent.
-
-### Interactive elements / ARIA labels
-Prior finding (May 6): `<tr role="button" tabIndex={0}>` in campaigns table missing `aria-label`. **Resolved** — `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:908` now carries `aria-label={\`Campaign: ${c.name}\`}` with full keyboard handler (`Enter`/`Space`).
-
-No new interactive-element ARIA gaps detected in production components.
-
-### Heading hierarchy
-Sampled across all non-experiment page components:
-- Landing, privacy, terms, verify, archetypes, share page, admin dashboard — all maintain h1 → h2 → h3 ordering with no skipped levels.
-- SR-only h1s used where the visual layout omits a visible heading (`/studio`, `/admin`, `/u/[handle]`), preserving document outline for screen readers.
-
-No hierarchy violations found.
+- **`<img>` alt attributes**: 0 findings — no `<img>` tags missing `alt` in production `.tsx` files.
+- **Heading hierarchy**: No skipped levels found. All sampled pages follow correct h1→h2→h3 structure. Note: `app/verify/[hash]/page.tsx` has no literal `<h1` in the file, but renders its h1 via `<StatusCallout titleAs="h1">` — hierarchy is correct once the shared component is accounted for (h1 → h2 for the "Dimensions"/"Key Metrics" sections).
+- **Interactive elements missing ARIA labels**: 0 findings. Both `role="button"` usages in production code have explicit `aria-label`:
+  - `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:901` — `aria-label={\`Campaign: ${c.name}\`}`
+  - `apps/web/components/dashboard/ActivityHeatmap.tsx:565` — `aria-label` via i18n `aria.contributionOnDate`
+- **Focus indicators**: `focus-visible` / `focus-visible:` present in `globals.css` (global rule) plus component-level usage in `LanguageSwitcher.tsx`, `ChallengeForm.tsx`, `CommandBarHint.tsx`, `BadgeToolbar.tsx`, `VerifyForm.tsx`, `InfoTooltip.tsx`, `BadgeOverlay.tsx`, and the experiments pages. Coverage is broad across interactive components.
 
 ## Error States
-- **Error boundaries**: 13 `error.tsx` files covering all major route segments (root, admin, studio, share page, generating, verify, privacy, terms, archetypes, experiments).
-- **Loading states**: 13 `loading.tsx` files with matching route coverage.
-- **Empty states**: Handled inline in dashboard components (admin user table, campaigns list, engagement flags).
-
-Error state coverage is solid with full parity between error and loading routes.
+- Error boundaries present for all major routes: `global-error.tsx` plus per-route `error.tsx` for `/`, `/about`, `/admin`, `/archetypes`, `/cli/authorize`, `/coming-soon`, `/experiments`, `/generating`, `/privacy`, `/studio`, `/terms`, `/u/[handle]`, `/verify` — all with matching test coverage.
+- Loading states present for the same set of routes (`loading.tsx` + `loading.test.tsx` pairs), including `/generating/[handle]` and `/u/[handle]`.
+- Empty-state handling confirmed in `SharePageOwnerContent` (regenerate CTA, per `SharePageOwnerContent.render.test.tsx`).
 
 ## Design System Compliance
-No hardcoded hex colors found in production component `className` or `style` props outside the accepted exceptions:
-- `global-error.tsx` — hardcoded dark background (intentional; renders before theme provider)
-- `apple-icon.tsx`, `icon.tsx` — static assets (no semantic token needed)
-- `experiments/**` — accepted P3 for Canvas/WebGL contexts
-
-All production UI components use semantic tokens (`bg-bg`, `text-text-primary`, `border-stroke`, `text-amber`, etc.) as required by the design system.
+0 violations found. Grepped `apps/web/components/**/*.tsx` (production files) for hardcoded hex colors (`#[0-9A-Fa-f]{3,8}`) — all matches were confined to `.test.tsx` files (test fixtures/assertions, e.g. `Sparkline.test.tsx`, `BadgeContent.test.tsx`) or code comments referencing issue numbers, not production markup. Production components consistently use semantic tokens (`bg-bg`, `text-text-primary`, `text-amber`, etc.) as required by `docs/design-system.md`.
 
 ## Recommendations
-
-1. **(P3 — carry)** `experiments/**` Canvas/WebGL pages remain 70–77% coverage due to JSDOM limitations. Accepted; flag-gated, no production exposure.
-
-2. **(P3 — carry)** Vitest worker exhaustion under heavy host load (load avg 120+) produces false red runs. Pin agent vitest invocations to `--maxWorkers=3` to avoid collisions with other sessions.
-
----
-
-SHARED_CONTEXT_START
-## QA Agent — 2026-06-24
-- **Status**: GREEN
-- Tests: 7986/7986 passed across 464 files, 0 failed, 0 skipped
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0 — all `<img>` tags have alt; focus-visible global + 5 production components; campaigns `<tr role="button">` aria-label gap from May 6 is now resolved; heading hierarchy correct across all sampled pages; 13 error boundaries + 13 loading states
-
-**Cross-agent recommendations:**
-- [Coverage]: `SharePageH2.test.tsx` exists and covers the i18n H2 wrapper. All critical paths remain ≥96% stmts.
-- [Security]: No security-related quality issues. All XSS vectors covered. Interactive elements accessible. No hardcoded secrets or token leaks observed in production JSX.
-SHARED_CONTEXT_END
+No new action items — repository is fully green across tests, types, lint, accessibility, and design-system compliance. Continue monitoring the carried cross-agent items already tracked in shared context (e.g. cost-analyst's `/api/challenge` rate-limit note, now resolved per 2026-07-01 triage entry).

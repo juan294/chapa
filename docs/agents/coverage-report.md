@@ -1,67 +1,51 @@
 ```markdown
 # Coverage Report
-> Generated: 2026-07-01 | Health status: green
+> Generated: 2026-07-07 | Health status: green
 
 ## Executive Summary
-473 test files / 8,114 tests all passing on HEAD `e54c7a6b`. Overall coverage is 96.31% statements / 92.15% branches / 95.32% functions / 97.52% lines — identical to the prior three coverage cycles (2026-06-28, 06-29, 06-30), confirming a stable baseline with zero regressions. All critical-path modules (impact scoring, SVG rendering, API routes, database layer) remain at or above 91% statements, with only branch-level gaps in a few files.
+Full suite passes clean — 8,174/8,174 tests across 477 files (112s, `--maxWorkers=3`) on HEAD `29d2b524` (v2.16.0) — with overall coverage of **96.42% statements / 92.17% branches / 95.40% functions / 97.58% lines**, a slight improvement over the 2026-06-30 baseline (96.31%/92.15%). All four critical paths (impact scoring, SVG rendering, API routes, database layer) are at or above 97% statements; the prior largest gap (`lib/gitlab/queries.ts`, 71.8% branches) is confirmed closed at 100%/97.2%.
 
 ## Coverage by Module
-| Module | Stmts | Branches | Funcs | Lines | Status |
-|--------|-------|----------|-------|-------|--------|
-| apps/web/lib/impact | 99.6% | 98.7% | 100.0% | 99.5% | 🟢 |
-| apps/web/lib/render | 99.6% | 92.3% | 100.0% | 99.6% | 🟢 |
-| apps/web/app/api | 97.3% | 93.5% | 96.1% | 97.6% | 🟢 |
-| apps/web/lib/db | 96.5% | 93.3% | 100.0% | 98.7% | 🟢 |
-| apps/web/lib/verification | 100.0% | 100.0% | 100.0% | 100.0% | 🟢 |
-| apps/web/lib/dashboard | 99.2% | 96.3% | 100.0% | 99.2% | 🟢 |
-| apps/web/lib/history | 98.3% | 96.6% | 100.0% | 99.0% | 🟢 |
-| apps/web/lib/cache | 98.2% | 95.5% | 96.9% | 98.7% | 🟢 |
-| apps/web/lib/email | 97.7% | 94.9% | 100.0% | 98.1% | 🟢 |
-| apps/web/lib/auth | 97.3% | 94.8% | 99.0% | 98.6% | 🟢 |
-| apps/web/lib/analytics | 97.3% | 91.2% | 100.0% | 98.5% | 🟢 |
-| apps/web/lib/i18n | 97.5% | 89.7% | 96.8% | 98.1% | 🟢 |
-| apps/web/lib/github | 97.1% | 98.0% | 90.6% | 98.6% | 🟢 |
-| apps/web/lib/bitbucket | 96.9% | 91.1% | 92.6% | 100.0% | 🟢 |
-| apps/web/lib/other | 96.8% | 93.4% | 96.9% | 97.4% | 🟢 |
-| apps/web/components | 96.1% | 90.9% | 95.2% | 98.1% | 🟢 |
-| apps/web/app (pages) | 94.8% | 89.3% | 92.5% | 96.1% | 🟢 |
-| apps/web/lib/codeberg | 93.1% | 86.8% | 92.3% | 98.5% | 🟢 |
-| apps/web/lib/gitlab | 91.3% | **75.2%** | 90.9% | 94.4% | 🟡 |
-| packages/shared | 89.7% | 100.0% | 100.0% | 88.6% | 🟢 |
-
-**Overall**: 96.31% stmts / 92.15% branches / 95.32% funcs / 97.52% lines (9,739/10,112 stmts, 5,342/5,797 branches).
-
-Only `apps/web/lib/gitlab` falls below 80% on any metric — branches at 75.2%, driven almost entirely by `lib/gitlab/queries.ts` (71.8% branches, 24 missed branches — GitLab GraphQL/OAuth error paths). All statement/function coverage in this module still exceeds 90%.
+| Module | Coverage | Status |
+|--------|----------|--------|
+| `apps/web/lib/impact` (scoring) | 99.6% stmts / 98.7% br / 100% fn | 🟢 |
+| `apps/web/lib/render` (SVG) | 100% stmts / 93.4% br / 100% fn | 🟢 |
+| `apps/web/app/api` (API routes) | 97.1% stmts / 91.1% br / 96.2% fn | 🟢 |
+| `apps/web/lib/db` (database) | 97.3% stmts / 94.6% br / 100% fn | 🟢 |
+| `apps/web/lib/auth` | 97.3% stmts / 94.8% br | 🟢 |
+| `apps/web/lib/cache` | 97.1% stmts / 92.6% br | 🟢 |
+| `apps/web/lib/history` | 98.3% stmts / 96.6% br | 🟢 |
+| `apps/web/lib/gitlab` | 100% stmts / 97.2% br | 🟢 (was 75.2% br — gap closed 2026-07-01) |
+| `apps/web/lib/verification` | 100% all metrics | 🟢 |
+| `apps/web/lib/email` | 97.7% stmts / 94.9% br | 🟢 |
+| `apps/web/lib/i18n` | 97.5% stmts / 89.7% br | 🟢 |
+| `apps/web/components` | 95.7% stmts / 90.2% br | 🟢 |
+| `apps/web/app` (pages) | 94.8% stmts / 89.2% br | 🟢 |
+| `apps/web/lib/effects` (experiments) | 93.3% stmts / 88.5% br | 🟡 (Canvas/WebGL, accepted) |
+| `apps/web/lib/codeberg` | 93.1% stmts / 86.8% br | 🟡 |
+| `packages/shared` | 100% stmts on all 7 `src/` files | 🟢 (89.7% aggregate is an artifact of 4 config files — `package.json`, `tsconfig*.json`, `eslint.config.mjs` — counted at 0%; recommend excluding from coverage collection) |
 
 ## Gaps & Recommendations
-No files in the critical-path directories (`lib/impact/`, `lib/render/`, `app/api/`, `lib/db/`) fall below 80% statement coverage. The only critical-path items below 80% are branch-level gaps in edge-case paths:
-
-- `apps/web/lib/render/svg-to-png.ts` — 66.7% branches (1 missed branch, Sharp conversion error path). Add a test that forces the Sharp encode call to reject.
-- `apps/web/lib/render/archetypeDemoData.ts`, `apps/web/lib/render/demoData.ts` — 50% branches each (trivial fallback branches in demo/sample data generators, low risk).
-- `apps/web/app/api/studio/config/route.ts` — 75% functions (92.3% stmts); one uncovered handler branch, likely an auth/validation early-return.
-- `apps/web/lib/gitlab/queries.ts` — 71.8% branches (24 missed), the largest single gap in the repo. Recommend mock-network tests covering GitLab OAuth token-refresh and GraphQL error responses.
-- `apps/web/lib/db/campaigns/types.ts` — 88.7% stmts, no sibling `.test.ts` file (covered transitively via `crud.ts`/`sends.ts` test suites at 97–99%). Consider adding a dedicated `types.test.ts` with Zod `.safeParse()` boundary tests for direct coverage.
-
-Non-critical-path items under 80% stmts (accepted, low risk):
-- `apps/web/app/experiments/**` (glassmorphism, heatmap-wave, metallic-shimmer pages; error.tsx; loading.tsx) — Canvas/WebGL-heavy experimental pages, JSDOM limitations.
-- `apps/web/lib/effects/interactions/HolographicOverlay.tsx` — 50% stmts, Canvas rendering.
-- `apps/web/components/ClientInstrumentation.tsx`, `GlobalCommandBarLazy.tsx`, `SharePageOwnerContentLazy.tsx` — thin `next/dynamic` lazy-load wrappers.
-- `packages/shared/{eslint.config.mjs,package.json,tsconfig*.json}` — config files, not executable logic.
-
-Untested-file scan (no sibling `.test.ts(x)`) in critical directories found 7 files (`auth/{gitlab,codeberg,bitbucket}/config.ts`, `lib/db/campaigns/{crud,sends,types,index}.ts`) — all are covered indirectly at 88.7–100% via other suites, so no direct action needed beyond the `types.test.ts` recommendation above.
+- **`apps/web/app/api/telemetry/route.ts` — 43.6% branches (87.1% stmts)**: the only critical-path file below 80% on any metric. It has both `route.test.ts` and `route.contract.test.ts`, but the durable-write observability branches added in the reliability-hardening commits (`ac7e465f`..`3d3bc29f`) are not exercised. Recommend adding tests for the capture/logging failure branches. **This is the one actionable P2 this cycle.**
+- `apps/web/lib/i18n/provider.tsx` — 61.5% branches (carry): JSDOM locale-switch branches; unchanged for 4+ cycles.
+- `apps/web/components/ClientErrorReporter.tsx` — 61.1% stmts / 33.3% branches: error-reporting wiring; low risk but cheap to cover with a window-event test.
+- Lazy-wrapper components (`GlobalCommandBarLazy`, `SharePageOwnerContentLazy`, `ClientInstrumentation`) — 60–67% stmts: `next/dynamic` shells, accepted P3 carries.
+- Experiments pages (`glassmorphism`, `heatmap-wave`, `metallic-shimmer`, `particle-core`, `HolographicOverlay`) — 50–83% stmts: Canvas/WebGL not exercisable in JSDOM, accepted P3 carries per `docs/accepted-risks.md` posture.
+- **Untested files (no sibling test)**: `lib/db/campaigns/{crud,sends,index}.ts` have no sibling test files but are covered at 98.6–100% via the `campaigns.test.ts` barrel suite — no action needed. `lib/history/types.ts` is type-only. **Zero genuinely untested critical-path files.**
+- Coverage-config hygiene: exclude `packages/shared` JSON/config files from v8 collection so the module aggregate reflects the true 100% of `src/`.
 
 ## Flaky Tests
-None detected — single clean run, 8114/8114 passing in 84.15s under `--maxWorkers=3`.
+None detected
+```
 
 SHARED_CONTEXT_START
-## Coverage Agent — 2026-07-01
+## Coverage Agent — 2026-07-07
 - **Status**: GREEN
-- Overall coverage: 96.31% stmts / 92.15% branches / 95.32% funcs / 97.52% lines on HEAD `e54c7a6b` (473 files / 8,114 tests, all passing). Numbers identical to 2026-06-28/29/30 cycles — fourth consecutive stable cycle, zero regressions.
-- Critical gaps: only `apps/web/lib/gitlab` module below 80% (75.2% branches, driven by `lib/gitlab/queries.ts` at 71.8% br, 24 missed branches — OAuth/GraphQL error paths). No critical-path (`lib/impact/`, `lib/render/`, `app/api/`, `lib/db/`) file below 80% statements. Branch-level P3 carries unchanged: `lib/render/svg-to-png.ts` (66.7% br, Sharp error path), `lib/db/campaigns/types.ts` (88.7% stmts, no sibling test).
+- Overall coverage: 96.42% stmts / 92.17% branches / 95.40% funcs / 97.58% lines on HEAD `29d2b524` (v2.16.0). Suite grew 473→477 files, 8,114→8,174 tests (+60, from the reliability-hardening contract suite and v2.16.0 fixes). All passing, 112s under `--maxWorkers=3`.
+- Critical gaps: only one — `app/api/telemetry/route.ts` at **43.6% branches** (durable-write observability branches from the reliability commits are untested despite two sibling test files). Everything else: lib/impact 99.6%, lib/render 100% stmts, app/api 97.1%, lib/db 97.3%. Prior largest gap `lib/gitlab/queries.ts` confirmed closed (100% stmts / 97.2% br module). `packages/shared` src/ files all 100% — the 89.7% aggregate is config-file noise (recommend coverage exclude).
 - Flaky tests: 0
 
 **Cross-agent recommendations:**
-- [Security]: No security-relevant coverage gaps. lib/auth 97.3%, lib/render 99.6% (all SVG escape paths covered), lib/verification 100%.
-- [QA]: 0 flaky tests. Suite stable at 8,114/8,114 across 473 files for the 4th consecutive cycle — no new gaps introduced.
+- [Security]: No security-relevant coverage gaps — lib/auth 97.3%, lib/render 100% stmts (all `escapeXml` paths covered), lib/verification 100%. The telemetry branch gap is observability-only, not an auth/input-validation surface.
+- [QA]: Suite stable and clean at 8,174/8,174, 0 flakes. One P2 for triage: add branch tests for `app/api/telemetry/route.ts` failure/capture paths (43.6% br); plus P3 config hygiene to exclude `packages/shared` JSON/config files from v8 collection.
 SHARED_CONTEXT_END
-```

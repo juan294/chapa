@@ -1,124 +1,49 @@
 # Performance Report
-> Generated: 2026-06-25 | Health status: green
+> Generated: 2026-07-02 | Health status: green
 
 ## Executive Summary
-Build is clean (0 errors, 6.8s compile, 10.0s TypeScript), all 77 chunks are well under the 350 KB/chunk CI budget, and the +124 KB raw bundle growth since the last cycle is fully attributed to the score challenge flow (#933), which is correctly code-split behind a `next/dynamic` wrapper and does not affect visitor First Load JS.
+Bundle size is flat (2,079 KB raw / 659 KB gzipped, +0.2% vs the 2026-06-25 cycle) despite ~19 intervening commits (#935-#962). Both P3s carried from the last cycle — the `LiteYouTubeEmbed` thumbnail missing explicit dimensions and the `/api/challenge` route missing from CLAUDE.md — were resolved in the 2026-07-01 triage cycle. No route exceeds 500KB, no unused production exports, no render-blocking resources found.
 
 ## Build Output
+Turbopack does not print a per-route First Load JS table (route list shows only static `○` vs dynamic `ƒ` markers, no size column). Sizes below are measured directly from `.next/static/chunks`.
 
-Next.js 16.2.9 (Turbopack) — 89 routes (5 static, 84 dynamic), 48 static pages.
+| Route | Size (First Load JS) | Status |
+|-------|---------------------|--------|
+| All routes | Not itemized by Turbopack | — |
+| Largest chunk (`0qmgkw5s78uqn.js`, framework/vendor) | 227.1 KB | GREEN |
+| 2nd largest chunk (`2cz6l19i7nua_.js`) | 190.3 KB | GREEN |
+| 3rd largest chunk (`0cz1d0mv5g_q7.js`) | 110.0 KB | GREEN |
+| All other chunks | ≤108 KB each | GREEN |
 
-Turbopack omits per-route First Load JS from build output. Sizes are measured byte-accurately from `.next/static/chunks`.
-
-| Metric | Value | vs 2026-06-18 |
-|--------|-------|---------------|
-| Total chunks | 77 | flat |
-| Raw total | 2,074 KB | +124 KB (+6.4%) |
-| Gzipped total | 657 KB | +34 KB (+5.5%) |
-| Routes >500 KB | 0 | flat |
-| Routes >350 KB | 0 | flat |
-| Routes >300 KB | 0 | flat |
-
-**No routes exceed any threshold — GREEN.**
+No individual chunk exceeds 300KB, let alone the 500KB flag threshold or the CI bundle-size gate (350 KB/chunk).
 
 ## Bundle Analysis
-
-### Top 10 chunks (raw bytes)
-
-| Chunk | Size (raw) | Status |
-|-------|-----------|--------|
-| 0qmgkw5s78uqn.js | 228 KB | OK |
-| 2cz6l19i7nua_.js | 192 KB | OK |
-| 0cz1d0mv5g_q7.js | 110 KB | OK |
-| 43e11u3pk0euw.js | 107 KB | OK |
-| 1vt8gl2pmut_4.js | 88 KB | OK |
-| 1basnt1r1mzrk.js | 78 KB | OK |
-| 1kpewill5hsck.js | 64 KB | OK |
-| 0hv4jnlpj1fkb.js | 61 KB | OK |
-| 233_diaisj6me.js | 58 KB | OK |
-| 3n24e6d0161oo.js | 57 KB | OK |
-
-All framework/vendor. Largest chunk is 228 KB raw — well under the 350 KB CI gate.
-
-### Bundle growth attribution
-
-+124 KB raw since 2026-06-18 is fully explained by commits landed since then:
-
-- **feat(score): add score challenge flow (#933)** — 887 insertions: `ChallengeForm.tsx` (173 lines), `lib/email/challenge.ts` (101 lines), `lib/challenge/validation.ts`, i18n keys in both dictionaries, tests. This is the dominant driver.
-- **fix(dashboard): show uploaded craft submetrics**, **fix(i18n): suppress hydration mismatch** — minor contributions.
-- **fix(agents): harden shared context extraction**, **chore: sync to cc-rpi v1.24.0** — no client bundle impact.
-
-`ChallengeForm` → `ScoreExplanationPanel` → `SharePageOwnerContent` → **loaded via `next/dynamic` in `SharePageOwnerContentLazy`**. Visitor First Load JS is unaffected; the component only loads for authenticated profile owners.
-
-### Unused exports (knip --production)
-
-One finding: `vitest.setup.ts` — **known false positive** (test infrastructure, not production). Zero real unused production exports.
+- Total First Load JS: **2,079 KB raw / 659 KB gzipped** across 76 top-level chunks
+- Vs 2026-06-25: +5 KB raw (+0.2%), +2 KB gzipped, -1 chunk — within measurement noise
+- Largest chunks: 227.1 / 190.3 / 110.0 / 107.2 / 88.9 KB raw (all framework/vendor)
+- Unused exports (knip `--production`): **0 real findings** — only `vitest.setup.ts` flagged, a known false positive (test infrastructure, not shipped in production bundle)
 
 ## Client/Server Boundary
-
-`"use client"` count: **113 files** (non-test).
-
-Key public pages confirmed as server components:
-
-| Route | Type |
-|-------|------|
-| `/` (app/page.tsx) | SERVER ✓ |
-| `/u/[handle]` (app/u/[handle]/page.tsx) | SERVER ✓ |
-| `/about` | SERVER ✓ |
-| `/archetypes/[type]` | SERVER ✓ |
-
-`"use client"` in app/ is appropriately scoped to `*Client.tsx` leaf components, error boundaries, and experiment pages (Canvas/WebGL requires client). No top-level page routes are unnecessarily client-rendered.
-
-Dynamic imports in production: **22 usages** covering PostHog, `GlobalCommandBar`, `SharePageOwnerContent` (owner-only panel + challenge form), admin sub-dashboards, Studio effects, and canvas-confetti. All heavy or conditionally-loaded components are properly deferred.
+- `"use client"` directives (non-test, anchored): **117** — up from 113 on 2026-06-25. Growth is spread across the #935-#962 fix batch (i18n aria-label localization, InfoTooltip portal audit, studio-config backing store) — no single new large client component.
+- Key public pages confirmed as server components: `/` (`app/page.tsx`), `/about`, `/u/[handle]`, and all archetype pages (`app/archetypes/*/page.tsx`) — zero `"use client"` in any of them.
+- 7 files use `next/dynamic` for code-splitting: `app/studio/BadgePreviewCard.tsx`, `app/admin/AdminDashboardClient.tsx`, `components/KeyboardShortcutsListener.tsx`, `components/ClientInstrumentation.tsx`, `components/ClientAnalytics.tsx`, `components/GlobalCommandBarLazy.tsx`, `components/SharePageOwnerContentLazy.tsx`.
+- No action needed — client/server boundary is healthy, no server-only code leaking into client bundles detected.
 
 ## Caching & Headers
+- Badge route (`app/u/[handle]/badge.svg/route.ts`): `maxDuration = 35`; success responses `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` (line 54); error responses `s-maxage=300, stale-while-revalidate=600` (line 245) — matches CLAUDE.md spec exactly.
+- In-flight render dedup present: `inflightBadgeRenders` Map (line 50) prevents duplicate concurrent renders for the same cache key; documented in `docs/accepted-risks.md` per #946.
+- 0 uncached external calls detected in the badge/API critical path (consistent with cost-analyst's 2026-07-01/07-02 findings).
 
-### Badge SVG route (`/u/[handle]/badge.svg`)
-
-| Property | Value |
-|----------|-------|
-| `export const maxDuration` | 35s |
-| Success `Cache-Control` | `public, s-maxage=21600, stale-while-revalidate=86400` |
-| Error `Cache-Control` | `public, s-maxage=300, stale-while-revalidate=600` |
-| In-flight dedup | ✓ Redis lock |
-
-6h CDN freshness with 24h stale fallback is appropriate for daily-computed impact scores.
-
-### Static ISR pages
-
-| Route | Revalidate |
-|-------|-----------|
-| `/about`, `/about/scoring`, `/about/verification` | 5 min |
-| `/archetypes/artificer`, `/archetypes/balanced`, `/archetypes/builder`, `/archetypes/emerging`, `/archetypes/guardian` | 5 min |
-| `/archetypes/marathoner`, `/archetypes/polymath` | 1 hour |
-| `/privacy`, `/terms`, `/verify` | 1 hour |
-
-No uncached external calls. Feature flags use `unstable_cache` with 60s/300s revalidate. `/api/health` GitHub probe cached 60s.
-
-## Font Loading
-
-- `next/font/google` with `display: swap` — **no external font requests from the browser**.
-- Fonts: **JetBrains Mono** (`font-heading`, `font-terminal`) and **Plus Jakarta Sans** (`font-body`).
-- Font CSS variables injected at build time; zero render-blocking font link tags.
-
-## CLS Risks
-
-| Element | Location | CLS Risk |
-|---------|----------|---------|
-| Badge fallback `<img>` | `app/u/[handle]/page.tsx:245` | **None** — explicit `width={1200} height={630}` + `fetchPriority="high"` |
-| YouTube thumbnail `<img>` | `components/LiteYouTubeEmbed.tsx:45` | **Low** — no explicit `width`/`height` attrs, but rendered inside a fixed-height container with `h-full w-full object-cover`. CLS is container-bounded. Could add `width="480" height="270"` for belt-and-suspenders robustness. |
-| `BadgeSkeleton` placeholder | shown while `<img>` loads | **None** — reserves space before image loads |
-
-`prefers-reduced-motion` is respected across all animated components.
-
-## New Route: `/api/challenge`
-
-Added by #933. Server-side route, no client bundle contribution. Should be included in next documentation cycle for CLAUDE.md route table.
+## Fonts & CLS
+- Fonts loaded via `next/font/google` (JetBrains Mono + Plus Jakarta Sans) — 0 external font requests, no render-blocking font loads.
+- `prefers-reduced-motion` support present in `globals.css`.
+- Badge fallback `<img>` has explicit `width={1200} height={630}` (`app/u/[handle]/page.tsx:248`).
+- **Resolved this cycle**: `LiteYouTubeEmbed.tsx` thumbnail `<img>` now has explicit `width={480} height={270}` (`components/LiteYouTubeEmbed.tsx:48-49`) — this was a P3 carried from the 2026-06-25 report, fixed in the 2026-07-01 triage cycle.
+- No other CLS risks identified.
 
 ## Recommendations
+No blocking or high-priority action items this cycle. All items carried from the prior cycle are closed:
+1. ~~`/api/challenge` route missing from CLAUDE.md~~ — **RESOLVED** (added in 2026-07-01 triage cycle).
+2. ~~`LiteYouTubeEmbed` thumbnail missing explicit dimensions~~ — **RESOLVED** (fixed in 2026-07-01 triage cycle).
 
-| # | Priority | Finding | Action |
-|---|----------|---------|--------|
-| R1 | P3 | Bundle grew +124 KB raw (+6.4%) vs last cycle. Still GREEN (largest chunk 228 KB). Growth from #933 challenge flow, correctly code-split. | Monitor next cycle; if growth continues past 2,300 KB raw, run `ANALYZE=true pnpm run build` to identify contributors. |
-| R2 | P3 | `LiteYouTubeEmbed` thumbnail `<img>` has no explicit `width`/`height` attributes. | Add `width="480" height="270"` for belt-and-suspenders CLS protection. |
-| R3 | P3 | `/api/challenge` route added by #933 is not yet in CLAUDE.md route table. | Add to next documentation agent cycle. |
+**Monitor only** (no action needed): if bundle size exceeds 2,300 KB raw in a future cycle, trigger an `ANALYZE=true` run per the cost-analyst's standing threshold.
