@@ -244,6 +244,7 @@ const STATS_OPTIONAL_KEYS = [
   "hasSupplementalData",
   "linkedPlatforms",
   "linkedPlatformLogins",
+  "fetchScope",
 ] as const satisfies readonly (keyof StatsData)[];
 
 /**

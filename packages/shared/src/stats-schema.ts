@@ -36,6 +36,7 @@ const _STATS_DATA_KEYS = [
   "hasSupplementalData",
   "linkedPlatforms",
   "linkedPlatformLogins",
+  "fetchScope",
 ] as const satisfies readonly (keyof StatsData)[];
 
 export const STATS_DATA_KEYS: readonly string[] = _STATS_DATA_KEYS;

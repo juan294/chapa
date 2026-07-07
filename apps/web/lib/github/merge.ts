@@ -13,7 +13,7 @@ import { PR_WEIGHT_AGG_CAP } from "@chapa/shared";
  * - `maxCommitsIn10Min`: max of both.
  * - `microCommitRatio` / `docsOnlyPrRatio`: max of both (if defined) via {@link mergeOptionalMax}.
  * - `totalStars` / `totalForks` / `totalWatchers`: max of both (vanity metrics may overlap across accounts).
- * - Identity fields (`handle`, `displayName`, `avatarUrl`, `fetchedAt`): kept from primary.
+ * - Identity fields (`handle`, `displayName`, `avatarUrl`, `fetchedAt`, `fetchScope`): kept from primary.
  * - `hasSupplementalData`: set to `true` (controllable via `options.markAsSupplemental`).
  *
  * @param primary - The user's primary GitHub stats (identity fields are preserved from here)
@@ -44,6 +44,7 @@ export function mergeStats(
     displayName: primary.displayName,
     avatarUrl: primary.avatarUrl,
     fetchedAt: primary.fetchedAt,
+    fetchScope: primary.fetchScope,
     commitsTotal: totalCommits,
     activeDays,
     prsMergedCount: primary.prsMergedCount + supplemental.prsMergedCount,

@@ -58,6 +58,7 @@ export function makeFullStats(overrides: Partial<StatsData> = {}): StatsData {
     batchSizeScore: 0.65,
     medianPrLeadTimeHours: 12,
     hasSupplementalData: false,
+    fetchScope: "authenticated",
     ...overrides,
   };
 }

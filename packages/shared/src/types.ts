@@ -38,6 +38,7 @@ export interface StatsData {
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
   linkedPlatforms?: Platform[]; // platforms whose data was merged (informational)
   linkedPlatformLogins?: Record<string, string>; // platform → remote username (for profile URLs)
+  fetchScope?: "authenticated" | "public"; // token scope of the fetch that produced this data — used to prevent a lower-scope fetch from downgrading a better-scoped cached entry (#1004)
 }
 
 /** Confidence flag identifiers */

@@ -247,6 +247,22 @@ describe("mergeStats", () => {
     });
   });
 
+  describe("fetchScope preservation (#1004 phase 2)", () => {
+    it("preserves fetchScope from primary, ignoring supplemental's", () => {
+      const primary = makeStats({ fetchScope: "authenticated" });
+      const supplemental = makeStats({ fetchScope: "public" });
+      const merged = mergeStats(primary, supplemental);
+      expect(merged.fetchScope).toBe("authenticated");
+    });
+
+    it("leaves fetchScope undefined when primary does not have it", () => {
+      const primary = makeStats({});
+      const supplemental = makeStats({ fetchScope: "authenticated" });
+      const merged = mergeStats(primary, supplemental);
+      expect(merged.fetchScope).toBeUndefined();
+    });
+  });
+
   describe("primaryReviewsSubmittedCount", () => {
     it("stores primary's review count for profile type detection", () => {
       const primary = makeStats({ reviewsSubmittedCount: 0 });

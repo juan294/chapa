@@ -237,6 +237,147 @@ describe("getStats", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // #1004 phase 2 — scope-aware, non-downgrading cache writes
+  // A lower-scope (public) fetch must never overwrite a higher-scope
+  // (authenticated) entry already cached for this handle.
+  // ---------------------------------------------------------------------------
+  describe("scope-aware non-downgrading cache writes (#1004 phase 2)", () => {
+    it("tags a fetch made without a token as public scope", async () => {
+      const fresh = makeStats({ prsMergedCount: 10 });
+      setupCacheMiss(fresh);
+
+      const result = await getStats("test-user");
+
+      expect(result!.fetchScope).toBe("public");
+    });
+
+    it("tags a fetch made with a token as authenticated scope", async () => {
+      const fresh = makeStats({ prsMergedCount: 10 });
+      setupCacheMiss(fresh);
+
+      const result = await getStats("test-user", "auth-token");
+
+      expect(result!.fetchScope).toBe("authenticated");
+    });
+
+    it("a public fetch does NOT overwrite an authenticated stats:v2:merged entry", async () => {
+      // getStats() itself misses on cacheKey (that's why _fetchAndCache runs
+      // at all), but a concurrent authenticated fetch races ahead and writes
+      // its better-scoped entry before this fetch reaches its own write —
+      // the re-read inside _fetchAndCache must catch it.
+      const authenticatedEntry = makeStats({ fetchScope: "authenticated", prsMergedCount: 904 });
+      const publicFetch = makeStats({ prsMergedCount: 3 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // getStats(): cacheKey miss -> triggers fetch
+        .mockResolvedValueOnce(null) // _fetchAndCache: staleKey miss
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(authenticatedEntry); // re-read cacheKey before write: race
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      const result = await getStats("test-user");
+
+      // The caller still gets its own freshly-fetched (public) data.
+      expect(result!.fetchScope).toBe("public");
+      // But the shared cache is not clobbered.
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("a public fetch does NOT overwrite an authenticated stats:stale entry", async () => {
+      const authenticatedStale = makeStats({ fetchScope: "authenticated", prsMergedCount: 904 });
+      const publicFetch = makeStats({ prsMergedCount: 3 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(authenticatedStale) // staleKey hit -> authenticated
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(null); // re-read cacheKey -> no existing merged entry
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:stale:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+      // The merged key has no existing entry, so it still writes normally.
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+    });
+
+    it("an authenticated fetch DOES overwrite a public entry (upgrade allowed)", async () => {
+      const publicStale = makeStats({ fetchScope: "public", prsMergedCount: 3 });
+      const authedFetch = makeStats({ prsMergedCount: 904 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(publicStale) // staleKey hit -> public
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(null); // re-read cacheKey -> no existing merged entry
+      mockFetchStatsData.mockResolvedValue(authedFetch);
+
+      await getStats("test-user", "auth-token");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:stale:test-user",
+        expect.objectContaining({ fetchScope: "authenticated" }),
+        expect.any(Number),
+      );
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "authenticated" }),
+        expect.any(Number),
+      );
+    });
+
+    it("a first fetch (no existing entry at either key) writes normally regardless of scope", async () => {
+      const fresh = makeStats({ prsMergedCount: 10 });
+      setupCacheMiss(fresh); // no 4th queued cacheGet response -> falls through to undefined
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:stale:test-user",
+        expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+    });
+
+    it("an untagged (legacy) cached entry is treated as public and does not block a public write", async () => {
+      const legacyStale = makeStats({ prsMergedCount: 3 }); // no fetchScope
+      const publicFetch = makeStats({ prsMergedCount: 5 });
+
+      mockCacheGet
+        .mockResolvedValueOnce(null) // cacheKey miss
+        .mockResolvedValueOnce(legacyStale) // staleKey hit -> untagged
+        .mockResolvedValueOnce(null) // supplemental miss
+        .mockResolvedValueOnce(null); // re-read cacheKey -> no existing merged entry
+      mockFetchStatsData.mockResolvedValue(publicFetch);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:stale:test-user",
+        expect.objectContaining({ fetchScope: "public" }),
+        expect.any(Number),
+      );
+    });
+  });
+
   it("does not write caches or user registry in read-only mode", async () => {
     const githubStats = makeStats();
     setupCacheMiss(githubStats);
