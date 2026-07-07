@@ -347,6 +347,12 @@ Step 2: Next badge request merges the data automatically
                                               +------------------+
 ```
 
+> **Partial-fetch protection (#1002):** step 1 ("Fetch primary GitHub stats") is guarded
+> against a degraded fetch. GitHub's contributions API is scoped to the authenticating token,
+> so a request that can't see a user's private-repo merges can return zero merged PRs. Rather
+> than cache that corrupt result, Chapa detects the collapse and serves the last-known-good
+> stats, so the score never drops on a partial fetch.
+
 ### How stats are merged
 
 When supplemental data exists, the merge is straightforward:
