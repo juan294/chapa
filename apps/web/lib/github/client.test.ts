@@ -18,6 +18,7 @@ const {
   mockFetchBitbucketIfLinked,
   mockFetchCodebergIfLinked,
   mockFetchGitlabIfLinked,
+  mockCaptureServerEvent,
 } = vi.hoisted(() => ({
   mockFetchStatsData: vi.fn(),
   mockCacheGet: vi.fn(),
@@ -33,6 +34,7 @@ const {
   mockFetchBitbucketIfLinked: vi.fn(),
   mockFetchCodebergIfLinked: vi.fn(),
   mockFetchGitlabIfLinked: vi.fn(),
+  mockCaptureServerEvent: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("./stats", () => ({
@@ -72,6 +74,10 @@ vi.mock("@/lib/codeberg/client", () => ({
 
 vi.mock("@/lib/gitlab/client", () => ({
   fetchGitlabIfLinked: mockFetchGitlabIfLinked,
+}));
+
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerEvent: mockCaptureServerEvent,
 }));
 
 import { getStats, _resetInflight } from "./client";
@@ -130,6 +136,105 @@ describe("getStats", () => {
     const result = await getStats("test-user");
     expect(result).toEqual(cached);
     expect(mockFetchStatsData).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1002 — degraded-PR-fetch guard
+  // A viewer-scoped fetch that can't see private-repo merges returns
+  // prsMergedCount=0. That corrupt zero must not overwrite last-known-good.
+  // ---------------------------------------------------------------------------
+  describe("degraded PR fetch guard (#1002)", () => {
+    /** primary miss → stale=lastGood → supplemental miss, fetch returns `fresh`. */
+    function setupWithStale(fresh: StatsData, lastGood: StatsData | null) {
+      mockCacheGet
+        .mockResolvedValueOnce(null) // stats:v2:merged (primary miss)
+        .mockResolvedValueOnce(lastGood) // stats:stale (last-known-good)
+        .mockResolvedValueOnce(null); // supplemental miss
+      mockFetchStatsData.mockResolvedValue(fresh);
+    }
+
+    it("serves last-known-good and does NOT overwrite the stale key when PRs collapse to 0", async () => {
+      const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120, commitsTotal: 14000 });
+      const degraded = makeStats({
+        prsMergedCount: 0,
+        prsMergedWeight: 0,
+        commitsTotal: 15533,
+        issuesClosedCount: 5096,
+      });
+      setupWithStale(degraded, lastGood);
+
+      const result = await getStats("test-user");
+
+      // The good baseline is served, not the zero-PR result.
+      expect(result).toEqual(lastGood);
+      // The protected stale key is never overwritten with degraded data.
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        "stats:stale:test-user",
+        expect.anything(),
+        expect.anything(),
+      );
+      // The degraded object is never written anywhere.
+      expect(mockCacheSet).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ prsMergedCount: 0 }),
+        expect.anything(),
+      );
+      // Telemetry fired for observability.
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "github_degraded_pr_fetch",
+        expect.objectContaining({ handle: "test-user", stalePrsMergedCount: 41 }),
+      );
+    });
+
+    it("refreshes the primary key with good data so it does not refetch-thrash", async () => {
+      const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120 });
+      const degraded = makeStats({ prsMergedCount: 0, prsMergedWeight: 0, commitsTotal: 9000 });
+      setupWithStale(degraded, lastGood);
+
+      await getStats("test-user");
+
+      expect(mockCacheSet).toHaveBeenCalledWith(
+        "stats:v2:merged:test-user",
+        lastGood,
+        expect.any(Number),
+      );
+    });
+
+    it("does not write any cache in read-only mode but still serves last-known-good", async () => {
+      const lastGood = makeStats({ prsMergedCount: 41, prsMergedWeight: 120 });
+      const degraded = makeStats({ prsMergedCount: 0, prsMergedWeight: 0, commitsTotal: 9000 });
+      setupWithStale(degraded, lastGood);
+
+      const result = await getStats("test-user", undefined, { readOnly: true });
+
+      expect(result).toEqual(lastGood);
+      expect(mockCacheSet).not.toHaveBeenCalled();
+    });
+
+    it("heals: a real-PR fetch writes through even when the baseline was poisoned", async () => {
+      const poisoned = makeStats({ prsMergedCount: 0, prsMergedWeight: 0, commitsTotal: 15000 });
+      const healthy = makeStats({ prsMergedCount: 41, prsMergedWeight: 120, commitsTotal: 15100 });
+      setupWithStale(healthy, poisoned);
+
+      const result = await getStats("test-user");
+
+      expect(result).toEqual(healthy);
+      // Both keys are written with the healthy data.
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:v2:merged:test-user", healthy, expect.any(Number));
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", healthy, expect.any(Number));
+      expect(mockCaptureServerEvent).not.toHaveBeenCalled();
+    });
+
+    it("caches a zero-PR fetch normally when there is no baseline (new user)", async () => {
+      const fresh = makeStats({ prsMergedCount: 0, prsMergedWeight: 0, commitsTotal: 100 });
+      setupWithStale(fresh, null);
+
+      const result = await getStats("test-user");
+
+      expect(result).toEqual(fresh);
+      expect(mockCacheSet).toHaveBeenCalledWith("stats:stale:test-user", fresh, expect.any(Number));
+      expect(mockCaptureServerEvent).not.toHaveBeenCalled();
+    });
   });
 
   it("does not write caches or user registry in read-only mode", async () => {
