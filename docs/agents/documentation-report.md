@@ -1,192 +1,54 @@
-# Documentation Report
-> Generated: 2026-06-26 | Health status: yellow
+The audit is complete. Here's the summary.
 
-## Executive Summary
-One missing route entry (`/api/challenge`, added by #933) is the only documentation gap since the last GREEN cycle on 2026-06-19. All 38 design-system color tokens, all environment variables, and all other routes remain fully documented.
+## Documentation Audit — 2026-07-03 · Health: 🟢 GREEN
 
----
+The documentation is in its strongest state on record. All nine audit steps passed clean.
 
-## Route Documentation
+| Check | Result |
+|-------|--------|
+| **Routes vs CLAUDE.md** | **88/88 documented** (34 pages + 54 route.ts). The `/api/challenge` gap from prior cycles is now closed. |
+| **Design tokens vs globals.css** | **38/38 exact match**, bidirectional — zero drift, zero orphans. |
+| **Required docs exist & non-empty** | ✅ impact-v4/v5/v6, svg-design, design-system, README all present. |
+| **API routes documented** | ✅ every route group has a description in CLAUDE.md. |
+| **JSDoc on complex logic** | ✅ all functions documented (v6.ts 9/9, redis.ts 14/14, BadgeSvg full). One cosmetic P3: `campaigns/types.ts` type-only exports. |
+| **Env vars vs code** | **Zero mismatches** — 26 server vars via `lib/env.ts` + 10 `NEXT_PUBLIC_*` + `ANALYZE`, all documented; all documented vars used. |
+| **shared-context freshness** | ✅ fresh entries through today. |
+| **Doc-referencing TODOs** | 0 real (1 false positive = this prompt's own template text). |
+| **README setup** | ✅ Quick Start with clone → pnpm install → env → dev. |
 
-| Route | In CLAUDE.md | Status |
-|-------|-------------|--------|
-| `GET /` | ✅ | OK |
-| `GET /studio` | ✅ | OK |
-| `GET /admin` | ✅ | OK |
-| `GET /u/:handle` | ✅ | OK |
-| `GET /u/:handle/badge.svg` | ✅ | OK |
-| `GET /verify/:hash` | ✅ | OK |
-| `GET /about` | ✅ | OK |
-| `GET /about/scoring` | ✅ | OK |
-| `GET /about/verification` | ✅ | OK |
-| `GET /archetypes/:type` (7 variants) | ✅ | OK |
-| `GET /generating/:handle` | ✅ | OK |
-| `GET /cli/authorize` | ✅ | OK |
-| `GET /privacy` | ✅ | OK |
-| `GET /terms` | ✅ | OK |
-| `GET /coming-soon` | ✅ | OK |
-| `GET /verify` | ✅ | OK |
-| `GET /experiments/*` (13 variants) | ✅ | OK |
-| `GET /api/auth/login` | ✅ | OK |
-| `GET /api/auth/callback` | ✅ | OK |
-| `GET /api/auth/session` | ✅ | OK |
-| `POST /api/auth/logout` | ✅ | OK |
-| `GET /api/auth/bitbucket/callback` | ✅ | OK |
-| `GET /api/auth/bitbucket/connect` | ✅ | OK |
-| `POST /api/auth/bitbucket/disconnect` | ✅ | OK |
-| `GET /api/auth/bitbucket/status` | ✅ | OK |
-| `GET /api/auth/codeberg/callback` | ✅ | OK |
-| `GET /api/auth/codeberg/connect` | ✅ | OK |
-| `POST /api/auth/codeberg/disconnect` | ✅ | OK |
-| `GET /api/auth/codeberg/status` | ✅ | OK |
-| `GET /api/auth/gitlab/callback` | ✅ | OK |
-| `GET /api/auth/gitlab/connect` | ✅ | OK |
-| `POST /api/auth/gitlab/disconnect` | ✅ | OK |
-| `GET /api/auth/gitlab/status` | ✅ | OK |
-| `GET /api/verify/:hash` | ✅ | OK |
-| `GET /api/profile/:handle` | ✅ | OK |
-| `GET /api/history/:handle` | ✅ | OK |
-| `GET /api/health` | ✅ | OK |
-| `GET /api/feature-flags` | ✅ | OK |
-| `GET /u/:handle/og-image` | ✅ | OK |
-| `GET /og-image` | ✅ | OK |
-| `GET /llms.txt` | ✅ | OK |
-| `GET /llms-full.txt` | ✅ | OK |
-| `GET /.well-known/security.txt` | ✅ | OK |
-| `POST /api/supplemental` | ✅ | OK |
-| `GET\|PUT /api/studio/config` | ✅ | OK |
-| `POST /api/refresh` | ✅ | OK |
-| `POST /api/generate` | ✅ | OK |
-| `POST /api/recalculate` | ✅ | OK |
-| `GET /api/insights/:handle` | ✅ | OK |
-| `POST /api/insights` | ✅ | OK |
-| `GET /api/cli/auth/poll` | ✅ | OK |
-| `POST /api/cli/auth/approve` | ✅ | OK |
-| `GET /api/admin/users` | ✅ | OK |
-| `GET /api/admin/stats` | ✅ | OK |
-| `POST\|GET\|DELETE /api/admin/agents/run` | ✅ | OK |
-| `GET /api/admin/agents-summary` | ✅ | OK |
-| `POST /api/admin/bulk-recalculate` | ✅ | OK |
-| `PATCH /api/admin/feature-flags` | ✅ | OK |
-| `GET /api/admin/engagement-flags` | ✅ | OK |
-| `GET\|POST /api/admin/campaigns` | ✅ | OK |
-| `GET\|PATCH\|DELETE /api/admin/campaigns/:id` | ✅ | OK |
-| `GET /api/admin/campaigns/:id/preview` | ✅ | OK |
-| `POST /api/admin/campaigns/:id/send` | ✅ | OK |
-| `POST /api/admin/campaigns/:id/test` | ✅ | OK |
-| `GET /api/notifications/unsubscribe` | ✅ | OK |
-| `POST /api/webhooks/resend` | ✅ | OK |
-| `GET /api/cron/warm-cache` | ✅ | OK |
-| `GET /api/cron/sync-audience` | ✅ | OK |
-| `GET /api/cron/process-campaigns` | ✅ | OK |
-| `POST /api/telemetry` | ✅ | OK |
-| **`POST /api/challenge`** | ❌ | **MISSING — added by #933** |
+**Notable findings:**
+- The 3 odd env tokens a naive `process.env.` grep surfaces (`X`, `UPPERCASE`, `NEXT_PUBLIC_X`) are ESLint-rule literal examples inside `lib/env.ts` doc-comments — not real variables. Not flagged.
+- Only actionable item is a **cosmetic P3**: add one-line JSDoc to the 5 Zod type exports in `apps/web/lib/db/campaigns/types.ts` for parity with the rest of `lib/db`. No runtime or accuracy impact.
 
-**Route coverage: 85/86 (99%).** One route missing from CLAUDE.md.
+**Deliverables written:**
+- `docs/agents/documentation-report.md` (full report)
+- New `documentation` entry appended to `docs/agents/shared-context.md` (pruned the oldest 2026-06-12 entry to keep the 3-per-agent cap)
 
----
-
-## Stale Documentation
-
-None. All sections verified against current code:
-
-- **Design system tokens**: 38/38 `--color-*` tokens in `docs/design-system.md` exactly match `apps/web/styles/globals.css`. Zero drift.
-- **Required docs**: All present and non-empty — `impact-v4.md` (131 lines, deprecated), `impact-v5.md` (152 lines), `impact-v6.md` (289 lines, current spec), `svg-design.md` (173 lines), `README.md` (228 lines with Quick Start).
-- **CLAUDE.md acceptance criteria and engineering rules**: Match current codebase behavior (v2.15.0 / HEAD `1bfc75df`). The challenge flow (#933) does not contradict any existing acceptance criteria.
-
----
+No blockers, no stale docs, no missing docs, no env mismatches.
+system.md` match `apps/web/styles/globals.css` bidirectionally — zero drift, zero orphans.
+- **Required spec docs** all present and non-empty: `impact-v4.md` (131), `impact-v5.md` (152), `impact-v6.md` (289, current truth), `svg-design.md` (173), `design-system.md` (236), `README.md` (228).
+- **`shared-context.md`** (442 lines) has fresh entries through **2026-07-03** (coverage_agent 00:03, cost-analyst 03:00).
 
 ## Missing Documentation
-
-### P2 — Route missing from CLAUDE.md
-
-**`POST /api/challenge`** (added by #933, `app/api/challenge/route.ts`)
-
-- Authenticated endpoint: requires session, IP-based rate-limited
-- Sends a challenge email when a user disputes their impact score
-- Validates body via `isChallengeBody()` + `MIN/MAX_CHALLENGE_REASON_LENGTH`
-- Depends on: `lib/challenge/validation.ts`, `lib/email/challenge.ts`
-- Currently zero mentions in CLAUDE.md
-
-**Suggested entry** (under Authenticated API section):
-
-```
-- POST `/api/challenge` Score challenge submission — authenticated, rate-limited; sends dispute email via Resend
-```
-
-### P3 — JSDoc carries (unchanged from prior cycle)
-
-These were logged as P3 in the 2026-06-19 cycle and remain:
-- `lib/cache/redis.ts`: `RateLimitResult` interface and `CacheSetNxStatus` type — no JSDoc (self-explanatory)
-- `lib/db/campaigns/types.ts`: Zod schema and 5 type exports without JSDoc
-
----
+None material.
+- **JSDoc (P3 carry, cosmetic)**: `apps/web/lib/db/campaigns/types.ts` — 5 exported Zod-derived type aliases + schema have no JSDoc. Self-explanatory type declarations; a sibling `types.test.ts` now exercises them (added 2026-07-01 triage). All *functions* in complex modules are documented: `lib/impact/v6.ts` 9/9, `lib/cache/redis.ts` 14/14, `lib/render/BadgeSvg.tsx` fully documented.
+- **TODO/FIXME doc-gap scan**: 0 real findings. Sole hit is `lib/agents/agent-config.ts:283` — this auditor prompt's own template text (false positive, unchanged from prior cycles).
 
 ## Environment Variables
+Every server var read through `lib/env.ts` is documented; every documented var maps to real usage. **Zero mismatches.**
 
-| Variable | In CLAUDE.md | Used in code | Status |
-|----------|-------------|-------------|--------|
-| `GITHUB_CLIENT_ID` | ✅ | ✅ via env.ts | OK |
-| `GITHUB_CLIENT_SECRET` | ✅ | ✅ via env.ts | OK |
-| `NEXTAUTH_SECRET` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_BASE_URL` | ✅ | ✅ via env.ts | OK |
-| `UPSTASH_REDIS_REST_URL` | ✅ | ✅ via env.ts | OK |
-| `UPSTASH_REDIS_REST_TOKEN` | ✅ | ✅ via env.ts | OK |
-| `SUPABASE_URL` | ✅ | ✅ via env.ts | OK |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_POSTHOG_KEY` | ✅ | ✅ via env.ts + PostHogProvider.tsx direct | OK (NEXT_PUBLIC_ in client component — acceptable) |
-| `NEXT_PUBLIC_POSTHOG_HOST` | ✅ | ✅ via env.ts + PostHogProvider.tsx direct | OK (NEXT_PUBLIC_ in client component — acceptable) |
-| `CHAPA_ALERT_WEBHOOK_URL` | ✅ | ✅ via env.ts | OK |
-| `RESEND_API_KEY` | ✅ | ✅ via env.ts | OK |
-| `RESEND_WEBHOOK_SECRET` | ✅ | ✅ via env.ts | OK |
-| `SUPPORT_FORWARD_EMAIL` | ✅ | ✅ via env.ts | OK |
-| `GITHUB_TOKEN` | ✅ | ✅ via env.ts | OK |
-| `CHAPA_VERIFICATION_SECRET` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_STUDIO_ENABLED` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_EXPERIMENTS_ENABLED` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_INSIGHTS_ENABLED` | ✅ | ✅ via env.ts | OK |
-| `BITBUCKET_CLIENT_ID` | ✅ | ✅ via env.ts | OK |
-| `BITBUCKET_CLIENT_SECRET` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_BITBUCKET_ENABLED` | ✅ | ✅ via env.ts | OK |
-| `CODEBERG_CLIENT_ID` | ✅ | ✅ via env.ts | OK |
-| `CODEBERG_CLIENT_SECRET` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_CODEBERG_ENABLED` | ✅ | ✅ via env.ts | OK |
-| `GITLAB_CLIENT_ID` | ✅ | ✅ via env.ts | OK |
-| `GITLAB_CLIENT_SECRET` | ✅ | ✅ via env.ts | OK |
-| `NEXT_PUBLIC_GITLAB_ENABLED` | ✅ | ✅ via env.ts | OK |
-| `ADMIN_HANDLES` | ✅ | ✅ via env.ts | OK |
-| `ADMIN_SECRET` | ✅ | ✅ via env.ts | OK |
-| `ALLOW_AGENT_RUN` | ✅ | ✅ via env.ts | OK |
-| `CRON_SECRET` | ✅ | ✅ via env.ts | OK |
-| `WARM_CACHE_PRIORITY_HANDLES` | ✅ | ✅ via env.ts | OK |
-| `VERCEL_ENV` | ✅ | ✅ via env.ts | OK |
-| `ANALYZE` | ✅ (noted as dev-only) | ✅ via next.config.ts | OK (intentionally outside env.ts) |
-| `CI` | — | playwright.config.ts | OK (test-only, documented as intentional omission) |
-| `PLAYWRIGHT_BASE_URL` | — | playwright.config.ts | OK (test-only, intentional omission) |
-| `DEPLOYMENT_SMOKE_STRICT` | — | e2e/smoke.spec.ts | OK (test-only, intentional omission) |
+| Variable class | In CLAUDE.md | Used in code | Status |
+|----------------|-------------|-------------|--------|
+| 26 server vars via `lib/env.ts` (OAuth GitHub/GitLab/Bitbucket/Codeberg, Upstash, Supabase, Resend, admin, cron, verification, alert webhook) | Yes | Yes (`lib/env.ts`) | OK |
+| 10 `NEXT_PUBLIC_*` (direct client reads: BASE_URL, POSTHOG_KEY/HOST, STUDIO/EXPERIMENTS/INSIGHTS/BITBUCKET/CODEBERG/GITLAB_ENABLED) | Yes | Yes | OK (build-time inlined) |
+| `ANALYZE` (build-only, `next.config.ts`) | Yes | Yes | OK |
+| `NODE_ENV`, `CI`, `VERCEL_*` (standard build vars) | Intentionally omitted (noted in CLAUDE.md) | Yes | OK |
+| `TESTPLATFORM_*`, `PLAYWRIGHT_BASE_URL`, `DEPLOYMENT_SMOKE_STRICT` (test-only) | Intentionally omitted | test/e2e only | OK |
 
-**Env var coverage: 100%. Zero mismatches. Zero undocumented server-side vars.**
-
----
-
-## Shared Context Health
-
-`docs/agents/shared-context.md` — 453 lines, entries as recent as **2026-06-26** (coverage + cost analyst). GREEN. All agent types have active entries well within the 3-per-type limit.
-
----
-
-## TODO/FIXME Scan
-
-No real documentation-gap TODOs found. One false positive: `lib/agents/agent-config.ts:283` — this is the audit prompt's own instruction text rendered into the agent config, not a real TODO.
-
----
+Note: `X` / `UPPERCASE` / `NEXT_PUBLIC_X` appearing in a raw `process.env.` grep are ESLint-rule literal examples in `lib/env.ts` doc-comments and `env.test.ts` — not real variables. `PostHogProvider.tsx` reads `NEXT_PUBLIC_POSTHOG_*` directly (client component, build-time inlining) — acceptable per policy.
 
 ## Recommendations
+1. **(P3, optional)** Add one-line JSDoc to the 5 type exports + schema in `apps/web/lib/db/campaigns/types.ts` for parity with the rest of `lib/db`. Purely cosmetic — no runtime or accuracy impact.
+2. **(Housekeeping, cross-agent relay)** Coverage agent (2026-07-03) noted `packages/shared` config files (tsconfig/eslint/package.json) leak into the coverage map at 0% — add them to the vitest coverage `exclude`. Not a docs issue.
 
-| Priority | Item | Action |
-|----------|------|--------|
-| **P2** | `POST /api/challenge` missing from CLAUDE.md | Add one-line entry under "Authenticated API" section: `POST /api/challenge Score challenge submission — authenticated, rate-limited; sends dispute email via Resend` |
-| P3 | `lib/cache/redis.ts` — `RateLimitResult` + `CacheSetNxStatus` no JSDoc | Add one-line JSDoc (carry from prior cycle) |
-| P3 | `lib/db/campaigns/types.ts` — Zod schema + 5 type exports no JSDoc | Add one-line JSDoc per export (carry from prior cycle) |
-
-**The only actionable item is P2: add the `/api/challenge` route to CLAUDE.md.** Everything else is green.
+No blockers. Documentation health is **GREEN** — matching the strongest state on record.

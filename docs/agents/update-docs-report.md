@@ -1,69 +1,62 @@
 # Documentation Update Report
-> Generated on 2026-06-25 | Branch: `develop` | Changes since v2.14.0
+
+> Generated on 2026-07-07 | Branch: `docs/update-post-2.16.0` | Changes since `v2.16.0`
 
 ## Summary
-- 2 documents updated
-- 0 diagrams refreshed (no Mermaid diagrams in project)
-- 5 version references corrected (Unreleased link + 4 missing compare links)
-- 0 inline doc blocks updated
-- 0 items flagged [NEEDS REVIEW]
+
+- **4 documents updated** (`CHANGELOG.md`, `docs/impact-v6.md`, `CLAUDE.md`, `docs/how-it-works.md`)
+- **1 diagram refreshed** (the scoring-pipeline ASCII data-flow in `docs/impact-v6.md`)
+- **0 version references corrected** (v2.16.0 is current everywhere; nothing stale)
+- **0 inline doc blocks updated** (the #1001/#1002 JSDoc was written as part of those fixes and is already current; refresh-not-expand scope excludes adding new JSDoc to `stats.ts`)
+- **0 items flagged [NEEDS REVIEW]**
+
+Discovery ran 4 parallel read-only agents (change-analyst, doc-inventory, diagram-analyzer, version-scanner). The delta since `v2.16.0` is 8 commits: two scoring fixes (#1001, #1002), one admin fix (#1003), a telemetry-coverage chore, and doc syncs. No routes, env vars, shared types, or public APIs changed.
 
 ## Changes by File
 
 ### `CHANGELOG.md`
-Added full `[2.15.0]` section covering 180 commits (6 feat, 70 fix) since v2.14.0. Fixed stale
-`[Unreleased]` compare link (was `v2.11.0...HEAD`, now `v2.15.0...HEAD`). Added 4 missing
-compare-link reference footers (`[2.15.0]`, `[2.14.0]`, `[2.13.0]`, `[2.12.0]`).
 
-The `[Unreleased]` link was 3 releases out of date. The section headings for v2.12.0, v2.13.0,
-v2.14.0 existed but had no hyperlinks because their `[x.y.z]:` reference-link definitions were
-missing. v2.15.0 had no entry at all.
+Populated the empty `[Unreleased]` section with three `### Fixed` entries:
 
-New section highlights:
-- Added: score challenge flow, score transparency panel, Supabase studio config backing store,
-  fail-closed rate limiting, cross-platform aggregation helper, Zod admin validation, health
-  alertWebhook field, `no-restricted-imports` ESLint rule
-- Fixed: avatar timeout, static landing page, 6 i18n keys, supplemental dual-write errors,
-  admin bulk-recalculate dedup, CLI auth window, bundle size budget, vercel cron maxDuration,
-  validation range caps, CSP documentation, posthog import optimisation
-- Changed: migration runbook added; test count updated (8,112 across 473 files)
+- **#1002** — Delivery score collapse from partial GitHub fetches (zero-PR guard).
+- **#1001** — headline score now consistent with dimensions (fresh headline; EMA only for the trend snapshot).
+- **#1003** — admin user search returning zero results (OR semantics restored).
 
-### `apps/web/package.json`
-`"version"` bumped from `"2.14.0"` to `"2.15.0"`.
+### `docs/impact-v6.md`
 
-6 `feat:` commits since v2.14.0 warrant a minor version bump per semver. No breaking changes
-were introduced (0 `BREAKING CHANGE` markers in git log).
+- **Refreshed the Scoring Pipeline diagram** (was `ImpactV6Result → EMA smoothing → Badge/Share`). After #1001 the flow branches: `ImpactV6Result → Badge/Share/verification (FRESH headline)` and `ImpactV6Result → EMA smoothing → persisted trend snapshot + next-day EMA prior (sparkline only)`.
+- Added a **"Display vs. trend smoothing (#1001)"** note explaining the fresh headline / smoothed-snapshot split and why it exists.
+- Added a **"Degraded-fetch guard (#1002)"** note (token-scoped fetch → `prsMergedCount: 0` → served last-known-good).
+- Corrected the Score Recalculation paragraph that claimed "EMA smoothing continues to apply for passive badge views" — the displayed headline is now always fresh; smoothing applies only to the trend snapshot.
 
-## Docs Checked and Left Unchanged
+### `CLAUDE.md`
 
-| Document | Reason unchanged |
-|----------|-----------------|
-| `docs/impact-v6.md` | Scoring algorithm unchanged since v2.14.0 |
-| `docs/design-system.md` | Design tokens and patterns unchanged |
-| `docs/accepted-risks.md` | Updated during Wave 2 remediation (#959) |
-| `docs/runbooks/migrations.md` | Updated during Wave 1 remediation (#941) |
-| `docs/runbooks/release-checklist.md` | Updated during Wave 1 remediation (#942) |
-| `CLAUDE.md` | Routes and types updated during remediation session |
-| `README.md` | No user-facing API surface changes |
-| `packages/shared` | No README exists (intentional — internal workspace) |
-| `docs/plans/*`, `docs/research/*` | Historical context, correct as written |
-| `docs/agents/*-report.md` | Timestamped audit outputs, not living docs |
+Caching-rules section:
 
-## Version References Corrected
+- Rewrote the **Same-day refresh signal** bullet: the dirty-marker/#826 bypass now governs the persisted trend snapshot, not what the user sees (headline is always fresh since #1001).
+- Added a **Display vs. trend smoothing (#1001)** bullet (`displayImpact = rawImpact`; smoothing confined to the snapshot).
+- Added a **Degraded-fetch protection (#1002)** bullet (`isDegradedPrFetch`, last-known-good served, `stats:stale` preserved, `github_degraded_pr_fetch` telemetry event, self-heals on authenticated fetch).
 
-| File | Was | Now |
-|------|-----|-----|
-| `CHANGELOG.md` `[Unreleased]` link | `…v2.11.0…HEAD` | `…v2.15.0…HEAD` |
-| `CHANGELOG.md` | missing `[2.15.0]:` compare link | added |
-| `CHANGELOG.md` | missing `[2.14.0]:` compare link | added |
-| `CHANGELOG.md` | missing `[2.13.0]:` compare link | added |
-| `CHANGELOG.md` | missing `[2.12.0]:` compare link | added |
-| `apps/web/package.json` | `"version": "2.14.0"` | `"version": "2.15.0"` |
+Route list and env-var list verified unchanged — not touched.
+
+### `docs/how-it-works.md`
+
+Added a concise **"Partial-fetch protection (#1002)"** blockquote after the EMU badge-request flow diagram, noting the primary GitHub fetch is guarded against degraded (zero-PR) results.
+
+## Checked — No Update Needed
+
+- `README.md`, `apps/web/app/llms.txt/route.ts`, `apps/web/app/llms-full.txt/route.ts` — grep confirmed **no** smoothed-headline or degraded-fetch references; nothing contradicts current content (removed from scope after verification).
+- `docs/how-it-works.md` scoring narrative — does not describe the displayed score as smoothed (only trend/data-export mentions of "adjusted composite"), so no #1001 correction needed there.
+- `docs/chapa-architecture.drawio` — #1002 reuses existing `stats:v2:*` / `stats:stale:*` nodes and the `lib/github/` client node; #1001 is below its component granularity. No change.
+- Version references — `v2.16.0` current across `package.json`, `CHANGELOG` headers, and compare links. All other `v2.x`/`v6`/dependency/Node references are spec versions, dependency pins, CI matrix values, or historical entries (intentionally pinned).
+- `docs/impact-v4.md`, `docs/impact-v5.md` — deprecated/superseded banners accurate.
+- Inline JSDoc in `lib/impact/*`, `lib/github/*`, `lib/profile/*` — the #1001/#1002 comments were added with the fixes and are current.
 
 ## Flagged for Review
+
 None.
 
-## Verification
-- `pnpm run lint`: passed (0 errors, 0 warnings)
-- markdownlint: project has no `.markdownlint` config; existing docs fail the same
-  line-length and blank-line rules. New section matches the established project style.
+## Notes
+
+- **markdownlint**: the repo has no markdownlint config and does not follow default rules (existing files use long lines and heading/list spacing that default MD013/MD022/MD032/MD024 rules flag). markdownlint is not part of the project's CI gate. All edits deliberately match each file's existing conventions; reformatting whole files to satisfy the default ruleset was intentionally avoided (preserve voice and structure).
+- No `$LINT_CMD` (eslint) run needed — only Markdown files changed; no source code was touched.

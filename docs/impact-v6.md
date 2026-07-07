@@ -129,11 +129,29 @@ computeImpactV6(stats, craftScore?)
   └→ Tier classification (Emerging/Solid/High/Elite)
   ↓
 ImpactV6Result (with optional craft in dimensions)
-  ↓
-EMA smoothing (0.15 current + 0.85 previous)
-  ↓
-Badge SVG (pentagon or diamond radar) + Share page
+  ├→ Badge SVG (pentagon or diamond radar) + Share page + verification   ← FRESH headline
+  │     adjustedComposite shown as-is, always consistent with the dimensions
+  └→ EMA smoothing (0.15 current + 0.85 previous)
+        ↓
+      Persisted trend snapshot + next-day EMA prior  (history sparkline only)
 ```
+
+**Display vs. trend smoothing (#1001):** The `adjustedComposite` shown on the badge,
+share page, dashboard, verification record, JSON-LD, and emails is the **fresh** score
+straight from `computeImpactV6` — it always reconciles with the dimensions rendered beside
+it. EMA smoothing is applied only when persisting the daily trend snapshot (and as the prior
+for the next day's EMA), so the history sparkline stays smooth without the live headline
+lagging behind a real dimension change. Previously the smoothed composite was shown as the
+headline next to un-smoothed dimensions, so a dimension drop (e.g. Delivery) appeared on the
+radar immediately while the number lagged for days. See `materializeImpactState` in
+`apps/web/lib/profile/materialize-profile.ts`.
+
+**Degraded-fetch guard (#1002):** GitHub's `contributionsCollection` is scoped to the
+authenticating token, so a fetch that cannot see a user's private-repo merges (the warm-cache
+cron's server token, or an anonymous badge hit) returns `prsMergedCount: 0` even for users
+with many merged PRs — which would collapse Delivery (70% PR-weighted) and flip `profileType`
+to collaborative. `isDegradedPrFetch` (`apps/web/lib/github/stats-integrity.ts`) detects this
+and serves last-known-good instead of caching the zero (see CLAUDE.md → Caching rules).
 
 Confidence is surfaced only to the profile owner in the share page's "How is my score calculated" panel. Visitors see formulas and platform caveats, but not confidence percentage or penalty flags, and public JSON-LD excludes confidence.
 
@@ -148,7 +166,7 @@ Deliberate user actions (insights upload, platform connect) trigger immediate sc
 5. Replaces today's snapshot via `dbReplaceSnapshot` (upsert, not ignore-duplicate)
 6. Updates the Redis snapshot cache
 
-This ensures that after an insights upload, the badge and share page immediately reflect the new score. EMA smoothing continues to apply for passive badge views where GitHub stats change organically.
+This ensures that after an insights upload, the badge and share page immediately reflect the new score. Since #1001 the displayed headline is always the fresh score — even on passive badge views where GitHub stats change organically — so EMA smoothing applies only to the persisted trend snapshot (see "Display vs. trend smoothing" above).
 
 ### Same-day refresh after a CLI supplemental upload (#826)
 

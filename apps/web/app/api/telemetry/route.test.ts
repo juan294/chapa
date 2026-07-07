@@ -5,10 +5,11 @@ import { NextRequest } from "next/server";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockRateLimit, mockDbInsertTelemetry, mockGetClientIp } = vi.hoisted(() => ({
+const { mockRateLimit, mockDbInsertTelemetry, mockGetClientIp, mockCaptureServerEvent } = vi.hoisted(() => ({
   mockRateLimit: vi.fn(),
   mockDbInsertTelemetry: vi.fn(),
   mockGetClientIp: vi.fn(),
+  mockCaptureServerEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/cache/redis", () => ({
@@ -22,6 +23,14 @@ vi.mock("@/lib/db/telemetry", () => ({
 vi.mock("@/lib/http/client-ip", () => ({
   getClientIp: mockGetClientIp,
 }));
+
+vi.mock("@/lib/analytics/server-errors", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/analytics/server-errors")>();
+  return {
+    ...actual,
+    captureServerEvent: mockCaptureServerEvent,
+  };
+});
 
 // Re-export real validation functions through the mock
 vi.mock("@/lib/validation", async () => {
@@ -147,6 +156,23 @@ describe("POST /api/telemetry", () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it("stringifies a non-Error rejection in the fire-and-forget onError handler", async () => {
+    mockDbInsertTelemetry.mockRejectedValue("connection reset");
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await POST(makeRequest(validPayload));
+    expect(res.status).toBe(200);
+
+    await vi.waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledOnce();
+    });
+
+    const entry = JSON.parse((consoleErrorSpy.mock.calls[0] as [string])[0]) as Record<string, unknown>;
+    expect(entry.error).toBe("connection reset");
+
+    consoleErrorSpy.mockRestore();
+  });
+
   it("does not await DB insert — response resolves before insert completes (fire-and-forget)", async () => {
     // The insert should NOT be awaited — response must return even if insert hangs
     let insertResolve!: () => void;
@@ -200,6 +226,16 @@ describe("POST /api/telemetry", () => {
 
   it("returns 400 when stats fields are missing", async () => {
     const res = await POST(makeRequest({ ...validPayload, stats: { commitsTotal: 1 } }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when the JSON body is an array, not an object", async () => {
+    const res = await POST(makeRequest([]));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when the JSON body is a primitive", async () => {
+    const res = await POST(makeRequest("just a string"));
     expect(res.status).toBe(400);
   });
 
@@ -283,5 +319,83 @@ describe("POST /api/telemetry", () => {
   it("does not require authorization header", async () => {
     const res = await POST(makeRequest(validPayload));
     expect(res.status).toBe(200);
+  });
+
+  // -------------------------------------------------------------------------
+  // Client-side error telemetry (isClientErrorTelemetryPayload branch)
+  // -------------------------------------------------------------------------
+
+  describe("client error telemetry", () => {
+    it("accepts a client_api_error event without persisting to the DB", async () => {
+      const res = await POST(
+        makeRequest({
+          event: "client_api_error",
+          category: "fetch",
+          message: "API call failed",
+        }),
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json).toEqual({ ok: true });
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+        "client_api_error",
+        expect.objectContaining({ category: "fetch" }),
+      );
+      expect(mockDbInsertTelemetry).not.toHaveBeenCalled();
+    });
+
+    it("forwards and truncates stack, digest, and path when all optional fields are present", async () => {
+      const res = await POST(
+        makeRequest({
+          event: "client_error",
+          category: "render",
+          message: "x".repeat(600),
+          stack: "y".repeat(1200),
+          digest: "z".repeat(200),
+          path: "/u/octocat".padEnd(400, "a"),
+          source: "ErrorBoundary",
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(mockCaptureServerEvent).toHaveBeenCalledWith("client_error", {
+        category: "render",
+        message: "x".repeat(500),
+        stack: "y".repeat(1000),
+        digest: "z".repeat(128),
+        path: "/u/octocat".padEnd(400, "a").slice(0, 300),
+        source: "ErrorBoundary",
+      });
+    });
+
+    it("does not check rate limits or validate telemetry shape for client error events", async () => {
+      const res = await POST(
+        makeRequest({
+          event: "client_error",
+          category: "render",
+          message: "boom",
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(mockRateLimit).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Per-handle rate limit isolation
+  // -------------------------------------------------------------------------
+
+  it("returns 429 when only the per-handle rate limit is exceeded (IP checks pass)", async () => {
+    mockRateLimit.mockImplementation(async (key: string) => {
+      if (key === `ratelimit:telemetry:${validPayload.targetHandle}`) {
+        return { allowed: false, current: 11, limit: 10 };
+      }
+      return { allowed: true, current: 1, limit: 600 };
+    });
+
+    const res = await POST(makeRequest(validPayload));
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.error).toMatch(/too many requests for this handle/i);
+    expect(mockRateLimit).toHaveBeenCalledTimes(3);
   });
 });

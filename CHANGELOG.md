@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-07-07
+
+### Fixed
+- **Delivery score collapse from partial GitHub fetches (#1002)**: a token-scoped GitHub `contributionsCollection` fetch that could not see a user's private-repo merges returned `prsMergedCount: 0`, collapsing the Delivery dimension (70% PR-weighted) and flipping the profile to "collaborative". A new `isDegradedPrFetch` guard (`apps/web/lib/github/stats-integrity.ts`) now detects this collapse and serves last-known-good instead of caching the zero — preserving the `stats:stale` fallback and emitting a `github_degraded_pr_fetch` telemetry event. The data self-heals on the next authenticated fetch.
+- **Headline score inconsistent with dimensions (#1001)**: the displayed composite was EMA-smoothed while the dimensions shown beside it were recomputed fresh, so a real dimension change (e.g. Delivery dropping) appeared on the radar immediately while the headline lagged for days. The live headline is now the fresh score — always reconcilable with the dimensions — and EMA smoothing is retained only for the persisted history/trend snapshot.
+- **Admin user search returning zero results (#1003)**: the admin users search AND-combined its handle and display-name filters, so a handle-only match with a null or non-matching display name returned no rows. Restored OR semantics via a sanitized `.or(...)` filter, guarded by a real-Postgres contract test.
+
 ## [2.16.0] - 2026-07-06
 
 ### Added
@@ -592,7 +599,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.16.0...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.16.1...HEAD
+[2.16.1]: https://github.com/juan294/chapa/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/juan294/chapa/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/juan294/chapa/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/juan294/chapa/compare/v2.13.0...v2.14.0

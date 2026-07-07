@@ -1,88 +1,31 @@
 # Security Report
-> Generated: 2026-06-29 | Health status: green
+> Generated: 2026-07-06 | Health status: green
 
 ## Executive Summary
-All security dimensions are clean: zero vulnerabilities in `pnpm audit`, no hardcoded secrets, all 11 Supabase tables under ENABLE + FORCE RLS, SVG user input fully escaped via `escapeXml()`, CORS wildcard scoped to two read-only endpoints only, and all non-permissive licenses formally accepted in `docs/accepted-risks.md`. One P3 carry from prior cycles remains open: `/api/challenge` handle-level rate limiter uses fail-open `rateLimit()` instead of `rateLimitStrict()`, mitigated by session auth and Resend send limits.
+No new vulnerabilities, secret leaks, or license violations since the last cycle (2026-06-29); `pnpm audit` is fully clean across 1,087 dependencies and every previously-flagged item (esbuild dev-CVE, `/api/challenge` fail-open rate limiter) remains resolved.
 
 ## Dependency Vulnerabilities
-
-`pnpm audit` result: **0 critical / 0 high / 0 moderate / 0 low** across 628 dependencies.
-
 | Severity | Package | Issue | Fix |
 |----------|---------|-------|-----|
-| — | — | No vulnerabilities found | — |
-
-Prior YELLOW finding from 2026-06-15 (esbuild GHSA-gv7w-rqvm-qjhr HIGH via vite/vitest) was resolved via `pnpm.overrides` pinning `esbuild >= 0.28.1`. Audit is fully clean this cycle.
+| — | — | None found — `pnpm audit` reports 0 critical / 0 high / 0 moderate / 0 low across 1,087 dependencies | — |
 
 ## Code Findings
 
-**PASS — XSS (SVG rendering)**
-All 7 user-controlled SVG fields are escaped via `escapeXml()` (`apps/web/lib/render/escape.ts`):
-- `handle` — `BadgeSvg.tsx:49`
-- `displayName` — `BadgeSvg.tsx:51`
-- `avatarDataUri` — `BadgeSvg.tsx:164`
-- `archetypeText` — `BadgeSvg.tsx:188`
-- `tier` — `BadgeSvg.tsx:245`
-- `hash` + `date` — `VerificationStrip.ts:13-14`
-
-All 5 XML metacharacters (`&`, `<`, `>`, `'`, `"`) covered. `escape.test.ts` verifies all cases.
-
-**PASS — Secret leak to client**
-No `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_SECRET`, `ADMIN_SECRET`, `CRON_SECRET`, `GITHUB_CLIENT_SECRET`, or `RESEND_API_KEY` appears in any `NEXT_PUBLIC_*` binding. All server secrets flow through `apps/web/lib/env.ts` with `import "server-only"` boundaries at `lib/db/supabase.ts:8`. Only publishable variables are exposed: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, and feature-flag booleans.
-
-**PASS — Hardcoded secrets**
-No literal API keys, tokens, or passwords found in `apps/web/lib/`, `apps/web/app/`, or `packages/`. All references to secret names are in comments/JSDoc, `process.env` reads, or test fixtures with mock values (e.g. `platform-auth-fixtures.ts` uses `test-bb/cb-client-secret` strings).
-
-**PASS — CORS**
-Wildcard `Access-Control-Allow-Origin: *` is scoped to exactly 2 read-only rate-limited GET endpoints:
-- `/api/verify/[hash]` — 30 req/60s rate-limited
-- `/api/profile/[handle]` — 60 req/60s rate-limited
-
-`apps/web/app/api/cors-mutation-guard.test.ts` enforces that no `POST`/`PUT`/`PATCH`/`DELETE` handler can ship a wildcard origin — fails the build if violated.
-
-**PASS — Supabase RLS**
-All 11 user tables have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`:
-
-| Table | ENABLE | FORCE | Deny-anon policy |
-|-------|--------|-------|-----------------|
-| users | ✓ (002) | ✓ (018) | ✓ (008) |
-| metrics_snapshots | ✓ (002) | ✓ (018) | ✓ (008) |
-| verification_records | ✓ (002) | ✓ (018) | ✓ (008) |
-| feature_flags | ✓ (003) | ✓ (018) | ✓ (008) |
-| merge_operations | ✓ (007) | ✓ (018) | ✓ (008) |
-| tool_insights | ✓ (015/018) | ✓ (018) | ✓ (018) |
-| email_campaigns | ✓ (016) | ✓ (018) | ✓ (018) |
-| campaign_sends | ✓ (016) | ✓ (018) | ✓ (018) |
-| user_platforms | ✓ (010) | ✓ (018) | ✓ (008) |
-| supplemental_stats | ✓ (024) | ✓ (025) | ✓ (025) |
-| studio_configs | ✓ (027) | ✓ (027) | ✓ (027) |
-
-Views: `latest_snapshots_view` + `admin_users_view` configured with `SECURITY INVOKER` (migration 014).
-
-**P3 — `/api/challenge` fail-open rate limiter (CARRY)**
-Location: `apps/web/app/api/challenge/route.ts:81`
-Handle-level rate limit (3 challenges/day per handle) uses `rateLimit()` (fail-open) instead of `rateLimitStrict()`. During a Redis outage, authenticated users could exceed the 3/day email cap. Compensating controls: session auth required (only owner can challenge their own handle), Resend send limits apply. Fix: swap `rateLimit` → `rateLimitStrict` on line 81.
-
-**INFO — Knip `--production`**
-1 finding: `vitest.setup.ts` (false positive — test infrastructure file). No real unused production dependencies detected.
+- **[INFO] Hardcoded secrets** — none. Grepped `apps/web/app`, `apps/web/lib`, `apps/web/components`, `packages` for API-key/token/password literal patterns; zero matches outside test fixtures. All server secrets flow through `apps/web/lib/env.ts` with `.trim()` boundaries.
+- **[INFO] SVG/XSS escaping** — confirmed intact. `BadgeSvg.tsx` escapes all user-controlled fields via `escapeXml()`: `handle` (`:49`), `displayName`/`headerName` (`:50-52`, escaped on both branches — falls back to the already-escaped `safeHandle` when no display name), `avatarDataUri` (`:164`), `archetypeText` (`:188`), `tier` (`:245`). `VerificationStrip.ts` escapes `hash`/`date` (`:13-14`). No unescaped interpolation of user input found.
+- **[INFO] `NEXT_PUBLIC_*` leak check** — none. Grepped all `NEXT_PUBLIC_*` reads in `lib/env.ts` and across `app`/`components`/`lib` for `SERVICE_ROLE`, `NEXTAUTH_SECRET`, `ADMIN_SECRET`, `CRON_SECRET`, `VERIFICATION_SECRET`, `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `CLIENT_SECRET` — zero hits (the one grep match is a doc-comment listing these as things to check, not an actual leak). Only `NEXT_PUBLIC_POSTHOG_KEY` (publishable) and feature-flag booleans are public.
+- **[INFO] `server-only` guards** — present on all 7 auth/verification modules (`lib/auth/github.ts`, `unsubscribe-token.ts`, `admin.ts`, `session.ts`, `cron.ts`, `cli-token.ts`, `lib/verification/hmac.ts`), matching the fix applied in the 2026-06-24 triage cycle.
+- **[INFO] `/api/challenge` rate limiting** — confirmed both the IP-level (`rateLimitStrict`, 5/hour) and handle-level (`rateLimitStrict`, 3/day) limiters remain on the fail-closed `rateLimitStrict()` path (`apps/web/app/api/challenge/route.ts:24,81`). The fail-open P3 closed in the 2026-07-01 triage cycle has not regressed.
+- **[INFO] CORS** — wildcard `Access-Control-Allow-Origin: *` scoped to exactly 2 read-only, rate-limited GET endpoints (`/api/verify/[hash]`, `/api/profile/[handle]`). `cors-mutation-guard.test.ts` statically asserts no POST/PUT/PATCH/DELETE handler ships a wildcard CORS header.
+- **[INFO] RLS** — all 11 Supabase tables (`users`, `metrics_snapshots`, `verification_records`, `feature_flags`, `merge_operations`, `user_platforms`, `tool_insights`, `email_campaigns`, `campaign_sends`, `supplemental_stats`, `studio_configs`) have `ENABLE ROW LEVEL SECURITY`, and all have a corresponding `FORCE ROW LEVEL SECURITY` (verified via migrations 002, 003, 007, 010, 015, 016, 018, 024, 025, 027). Deny-all-anon policies in place; views use `SECURITY INVOKER` (014).
+- **[INFO] Knip `--production`** — 2 findings, both false positives: `vitest.contract-setup.ts` and `vitest.setup.ts` (test infrastructure, flagged as "unused files" only because knip's production scan doesn't follow vitest config references). No real unused production dependencies — zero attack-surface reduction opportunities.
+- **[INFO] GitHub security posture** — Dependabot vulnerability alerts enabled (confirmed via 204 response on `/vulnerability-alerts`), 0 open security PRs. One non-security Dependabot PR remains open and deferred: #924 (`actions/checkout` 6→7, major version bump, previously explained in PR comments).
 
 ## License Compliance
-
-No GPL or AGPL dependencies. Non-permissive licenses in use are all formally accepted:
-
-| Package | License | Status |
-|---------|---------|--------|
-| `@resvg/resvg-js` | MPL-2.0 | Accepted — weak copyleft, file-level, unmodified use |
-| `@img/sharp-libvips-darwin-arm64` | LGPL-3.0 | Accepted — dynamically linked, satisfies re-link requirement |
-| `lightningcss` | MPL-2.0 | Accepted — build-time only, not bundled to users |
-| `dompurify` (transitive via PostHog) | MPL-2.0 OR Apache-2.0 | Accepted — Apache-2.0 option on allowlist; not imported directly |
-
-All documented in `docs/accepted-risks.md`. No copyleft infections of Chapa application code.
+All clear — 0 GPL/AGPL matches across the full dependency tree (root + `apps/web`, production dependencies). Existing weak-copyleft acceptances are unchanged and documented in `docs/accepted-risks.md`:
+- MPL-2.0: `@resvg/resvg-js`, `lightningcss`, `dompurify` (transitive via PostHog) — file-level copyleft, unmodified dependencies, no obligation to open-source Chapa code.
+- LGPL-3.0: `@img/sharp-libvips-darwin-arm64` — dynamically linked, satisfies LGPL's re-linking requirement without restriction.
 
 ## Recommendations
-
-| Priority | Action | Location |
-|----------|--------|----------|
-| P3 | Swap `rateLimit()` → `rateLimitStrict()` for handle-level guard in `/api/challenge` | `apps/web/app/api/challenge/route.ts:81` |
-
-No P1 or P2 items. Security posture is strong across all audit dimensions.
+1. No action required this cycle — all findings are informational confirmations that prior fixes (esbuild override, `/api/challenge` strict rate limiting, `server-only` guards, RLS FORCE policies) remain in place with no regressions.
+2. Continue monitoring Dependabot PR #924 (`actions/checkout` major bump) at the next convenient dependency-upgrade window; no urgency since it's CI-tooling only.
