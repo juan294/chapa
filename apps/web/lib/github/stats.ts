@@ -1,5 +1,7 @@
 import type { StatsData } from "@chapa/shared";
 import { buildStatsFromRaw } from "@chapa/shared";
+import { captureServerEvent } from "@/lib/analytics/server-errors";
+import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { fetchContributionData } from "./queries";
 import { assessRawFetchIntegrity } from "./stats-integrity";
 
@@ -20,6 +22,18 @@ export async function fetchStats(
   const integrity = assessRawFetchIntegrity(raw);
   if (!integrity.ok) {
     console.warn(`[github] rejecting degraded fetch for ${handle}: ${integrity.reason}`);
+    const mergedNodeCount = raw.pullRequests?.nodes.filter((n) => n.merged).length ?? 0;
+    fireAndForget(
+      () =>
+        captureServerEvent("stats_fetch_rejected", {
+          handle,
+          reason: integrity.reason,
+          mergedPrTotalCount: raw.mergedPrTotalCount,
+          mergedNodeCount,
+          authenticated: Boolean(token),
+        }),
+      () => undefined,
+    );
     return null;
   }
 
