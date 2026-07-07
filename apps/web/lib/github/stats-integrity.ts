@@ -91,3 +91,21 @@ export function assessRawFetchIntegrity(
 
   return { ok: true };
 }
+
+/**
+ * The single source of truth for "does this stats payload look poisoned by
+ * the #1002/#1004 degraded-fetch corruption?" — zero merged PRs while other
+ * activity (commits or closed issues) is present. A genuinely empty account
+ * reports zero for all three fields and is not poisoned.
+ *
+ * Used by `materializeProfile`'s persist-boundary gate (Phase 3) and by the
+ * `heal-poisoned-stats` repair script (Phase 4) to identify already-corrupt
+ * cached/persisted data written before this integrity contract existed.
+ */
+export function isPoisonedStats(s: {
+  prsMergedCount: number;
+  commitsTotal: number;
+  issuesClosedCount: number;
+}): boolean {
+  return s.prsMergedCount === 0 && (s.commitsTotal > 0 || s.issuesClosedCount > 0);
+}

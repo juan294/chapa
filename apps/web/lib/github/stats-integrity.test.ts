@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RawContributionData } from "@chapa/shared";
-import { isDegradedPrFetch, assessRawFetchIntegrity } from "./stats-integrity";
+import { isDegradedPrFetch, assessRawFetchIntegrity, isPoisonedStats } from "./stats-integrity";
 import { makeStats } from "../test-helpers/fixtures";
 
 function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionData {
@@ -130,5 +130,31 @@ describe("assessRawFetchIntegrity", () => {
     // @ts-expect-error — simulating a malformed payload at runtime
     raw.pullRequests = undefined;
     expect(assessRawFetchIntegrity(raw)).toEqual({ ok: false, reason: "missing_required_block" });
+  });
+});
+
+describe("isPoisonedStats", () => {
+  it("flags the poisoned shape: zero merged PRs despite real commit activity", () => {
+    expect(
+      isPoisonedStats({ prsMergedCount: 0, commitsTotal: 15533, issuesClosedCount: 0 }),
+    ).toBe(true);
+  });
+
+  it("flags the poisoned shape: zero merged PRs despite real closed-issue activity", () => {
+    expect(
+      isPoisonedStats({ prsMergedCount: 0, commitsTotal: 0, issuesClosedCount: 42 }),
+    ).toBe(true);
+  });
+
+  it("does not flag a genuinely empty account (all zero)", () => {
+    expect(
+      isPoisonedStats({ prsMergedCount: 0, commitsTotal: 0, issuesClosedCount: 0 }),
+    ).toBe(false);
+  });
+
+  it("does not flag a healthy profile with merged PRs", () => {
+    expect(
+      isPoisonedStats({ prsMergedCount: 41, commitsTotal: 14000, issuesClosedCount: 608 }),
+    ).toBe(false);
   });
 });

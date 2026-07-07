@@ -11,6 +11,7 @@ import {
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { getStats } from "@/lib/github/client";
+import { isPoisonedStats } from "@/lib/github/stats-integrity";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -45,17 +46,13 @@ export interface MaterializedImpactState {
 }
 
 /**
- * A later phase of this plan adds an `isPoisonedStats` predicate with this
- * identical shape to `lib/github/stats-integrity.ts` for the repair script;
- * at that point this should become `!isPoisonedStats(stats)` imported from
- * there to keep a single source of truth. Not done yet — that helper doesn't
- * exist on this branch.
+ * Thin wrapper over the shared `isPoisonedStats` predicate (Phase 4) so
+ * there's a single source of truth for "does this stats shape look
+ * corrupted by the degraded-fetch bug" across the persist-boundary gate and
+ * the `heal-poisoned-stats` repair script.
  */
 function statsLookComplete(stats: StatsData): boolean {
-  if (stats.prsMergedCount > 0) return true;
-  // 0 PRs is only trustworthy when there's no other heavy activity (genuine
-  // new/empty account) — otherwise it's the corrupt degraded-fetch shape.
-  return stats.commitsTotal === 0 && stats.issuesClosedCount === 0;
+  return !isPoisonedStats(stats);
 }
 
 export interface MaterializeProfileOptions
