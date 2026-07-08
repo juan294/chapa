@@ -44,9 +44,14 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
   // 3. Total commits from contribution calendar
   const commitsTotal = raw.contributionCalendar.totalContributions;
 
-  // 4. PRs: only count merged, compute weight
+  // 4. PRs: only count merged, compute weight.
+  // prsMergedCount is authoritative — sourced from `search(is:merged)`
+  // (raw.mergedPrTotalCount), not the token-scoped/100-node-capped sample
+  // below. The sample (mergedPRs) still drives weight + every quality
+  // sub-metric on a best-effort basis (see stats-integrity.ts for the fetch
+  // rejection that keeps a degraded sample from ever reaching here).
   const mergedPRs = raw.pullRequests.nodes.filter((pr) => pr.merged);
-  const prsMergedCount = mergedPRs.length;
+  const prsMergedCount = raw.mergedPrTotalCount;
   const prsMergedWeight = Math.min(
     mergedPRs.reduce((sum, pr) => sum + computePrWeight(pr), 0),
     PR_WEIGHT_AGG_CAP,
@@ -85,9 +90,12 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
     ? developmentPRs.filter((pr) => pr.closingIssuesCount > 0).length / devPrCount
     : undefined;
 
-  // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold
-  const microCommitRatio = prsMergedCount > 0
-    ? mergedPRs.filter((pr) => pr.additions + pr.deletions < MICRO_PR_LINE_THRESHOLD).length / prsMergedCount
+  // 5c. Micro-commit ratio: fraction of merged PRs below the line-change threshold.
+  // Denominator is the sample size (mergedPRs.length), not the authoritative
+  // prsMergedCount — both numerator and denominator must come from the same
+  // sample for the ratio to be meaningful.
+  const microCommitRatio = mergedPRs.length > 0
+    ? mergedPRs.filter((pr) => pr.additions + pr.deletions < MICRO_PR_LINE_THRESHOLD).length / mergedPRs.length
     : undefined;
 
   // 5d. Batch size score: fraction of merged PRs in the reviewable sweet spot
@@ -236,6 +244,7 @@ const STATS_OPTIONAL_KEYS = [
   "hasSupplementalData",
   "linkedPlatforms",
   "linkedPlatformLogins",
+  "fetchScope",
 ] as const satisfies readonly (keyof StatsData)[];
 
 /**

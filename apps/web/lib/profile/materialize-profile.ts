@@ -11,6 +11,7 @@ import {
 } from "@/lib/impact/smoothing";
 import { computeImpactV6 } from "@/lib/impact/v6";
 import { getStats } from "@/lib/github/client";
+import { isPoisonedStats } from "@/lib/github/stats-integrity";
 
 export interface MaterializeImpactStateOptions {
   craftResult?: CraftResult | null;
@@ -34,6 +35,24 @@ export interface MaterializedImpactState {
   snapshot: MetricsSnapshot;
   /** True when scoring inputs have changed since today's snapshot (#826). */
   inputsChanged: boolean;
+  /**
+   * #1003 — False when the served stats look like the corrupt "0 merged PRs
+   * despite real commit/issue activity" shape (e.g. served from an old
+   * poisoned `stats:stale` entry). Gates permanent snapshot persistence and
+   * verification-record minting in `public-profile.ts` — a degraded payload
+   * is never attested, even though it can still be displayed.
+   */
+  statsComplete: boolean;
+}
+
+/**
+ * Thin wrapper over the shared `isPoisonedStats` predicate (Phase 4) so
+ * there's a single source of truth for "does this stats shape look
+ * corrupted by the degraded-fetch bug" across the persist-boundary gate and
+ * the `heal-poisoned-stats` repair script.
+ */
+function statsLookComplete(stats: StatsData): boolean {
+  return !isPoisonedStats(stats);
 }
 
 export interface MaterializeProfileOptions
@@ -88,6 +107,7 @@ export function materializeImpactState(
     // tomorrow's EMA has a stable prior; the headline stays fresh.
     snapshot: buildSnapshot(stats, smoothedImpact, options.today),
     inputsChanged,
+    statsComplete: statsLookComplete(stats),
   };
 }
 

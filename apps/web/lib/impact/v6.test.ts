@@ -10,7 +10,8 @@ import {
   computeImpactV6,
   computeLeadTimeModifier,
 } from "./v6";
-import type { StatsData, DimensionScores } from "@chapa/shared";
+import type { StatsData, DimensionScores, RawContributionData } from "@chapa/shared";
+import { buildStatsFromRaw } from "@chapa/shared";
 import { makeStats as _makeStats } from "../test-helpers/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -1031,6 +1032,47 @@ describe("detectProfileType(stats)", () => {
       reviewsSubmittedCount: 6,
       prsMergedCount: 31,
     }))).toBe("collaborative");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: authoritative merged-PR count feeds detectProfileType
+// (2026-07-07 scoring-integrity-contract, Phase 5c)
+// ---------------------------------------------------------------------------
+
+describe("detectProfileType with buildStatsFromRaw (juan294 golden case)", () => {
+  function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionData {
+    return {
+      login: "juan294",
+      name: "Juan",
+      avatarUrl: "https://avatars.githubusercontent.com/u/1",
+      mergedPrTotalCount: 904,
+      contributionCalendar: { totalContributions: 15533, weeks: [] },
+      pullRequests: {
+        totalCount: 143,
+        // Token-scoped/100-node-capped sample: 96 of the 904 merged PRs.
+        nodes: Array.from({ length: 96 }, (_, i) => ({
+          additions: 50, deletions: 10, changedFiles: 3, merged: true,
+          body: `PR ${i}`, headRefName: `feat/${i}`, closingIssuesCount: 0,
+        })),
+      },
+      reviews: { totalCount: 16 },
+      issues: { totalCount: 5096 },
+      repositories: { totalCount: 0, nodes: [] },
+      ownedRepoStars: { nodes: [] },
+      ...overrides,
+    };
+  }
+
+  it("classifies as solo using the authoritative 904 denominator, not the 96-node sample size", () => {
+    const stats = buildStatsFromRaw(makeRaw());
+
+    // Pre-fix bug: using the sample size (96) as the denominator would give
+    // 16/96 = 0.167 (>= 0.15 → wrongly "collaborative"). The authoritative
+    // search count (904) gives 16/904 ≈ 0.018 (< 0.15 → correctly "solo").
+    expect(stats.prsMergedCount).toBe(904);
+    expect(stats.reviewsSubmittedCount).toBe(16);
+    expect(detectProfileType(stats)).toBe("solo");
   });
 });
 

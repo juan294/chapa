@@ -77,6 +77,16 @@ describe("normalizeStats", () => {
     expect("displayName" in stats).toBe(false);
   });
 
+  it("preserves fetchScope when provided (#1004 phase 2)", () => {
+    const stats = normalizeStats({ handle: "octocat", fetchScope: "authenticated" });
+    expect(stats.fetchScope).toBe("authenticated");
+  });
+
+  it("omits fetchScope when not provided", () => {
+    const stats = normalizeStats({ handle: "octocat" });
+    expect("fetchScope" in stats).toBe(false);
+  });
+
   it("honors a provided fetchedAt instead of defaulting to now", () => {
     const stats = normalizeStats({ fetchedAt: "2020-01-01T00:00:00.000Z" });
     expect(stats.fetchedAt).toBe("2020-01-01T00:00:00.000Z");

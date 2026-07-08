@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-07-08
+
+### Added
+- **Scoring-data integrity contract (#1004)**: a durable, three-boundary defense that ends the recurring "a degraded GitHub fetch collapses a user's score" class of bug (previously patched piecemeal by #826/#930/#1001/#1002 and the 2026-03-31 OAuth fix). (1) **Fetch boundary** — an authoritative `search(is:merged)` merged-PR count plus `assessRawFetchIntegrity` rejects a structurally-valid-but-degraded payload (e.g. empty PR nodes while `search` reports merged PRs) at the source, before it can be scored, cached, or persisted — and it needs no prior baseline. (2) **Cache boundary** — scope-aware, non-downgrading writes so a public/cron `GITHUB_TOKEN` fetch can never clobber a user's authenticated (private-inclusive) data, and `stats:stale` only ever holds complete data. (3) **Persist boundary** — snapshot history and the HMAC verification record are gated on stats completeness, so corruption is never written to permanent history or attested. A real-pipeline regression contract test fails the build if the class regresses; `stats_fetch_rejected` / `snapshot_skipped_incomplete_stats` telemetry surface degradation in production.
+- **`heal-poisoned-stats` maintenance script**: repairs already-poisoned cache keys and corrupt snapshot rows for affected handles (dry-run by default, `--apply` to purge).
+
+### Fixed
+- **Delivery collapse for private-heavy users (#1004)**: the authoritative merged-PR count resolves the intermittent `prsMergedCount: 0` → Delivery ≈ 30 collapse (and solo→collaborative flip) that a token-scoped or partial `contributionsCollection` fetch could produce; affected profiles recover to their true Delivery once a healthy fetch lands, and can no longer be re-poisoned by a lower-scope fetch.
+
 ## [2.16.1] - 2026-07-07
 
 ### Fixed
@@ -599,7 +608,8 @@ Pre-launch hardening and release readiness.
 - CI/CD with GitHub Actions (tests, typecheck, lint, security scanning, bundle analysis)
 - Public release documentation (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 
-[Unreleased]: https://github.com/juan294/chapa/compare/v2.16.1...HEAD
+[Unreleased]: https://github.com/juan294/chapa/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/juan294/chapa/compare/v2.16.1...v2.17.0
 [2.16.1]: https://github.com/juan294/chapa/compare/v2.16.0...v2.16.1
 [2.16.0]: https://github.com/juan294/chapa/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/juan294/chapa/compare/v2.14.0...v2.15.0

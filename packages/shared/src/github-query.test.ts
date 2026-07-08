@@ -38,4 +38,21 @@ describe("CONTRIBUTION_QUERY", () => {
     expect(CONTRIBUTION_QUERY).toContain("watchers");
     expect(CONTRIBUTION_QUERY).toContain("totalCount");
   });
+
+  // ---------------------------------------------------------------------------
+  // Authoritative merged-PR search (2026-07-07 scoring-integrity-contract)
+  // ---------------------------------------------------------------------------
+
+  it("declares a $mergedPrSearch variable and a top-level search(is:merged) field", () => {
+    expect(CONTRIBUTION_QUERY).toContain("$mergedPrSearch: String!");
+    expect(CONTRIBUTION_QUERY).toContain("search(query: $mergedPrSearch, type: ISSUE)");
+    expect(CONTRIBUTION_QUERY).toContain("issueCount");
+  });
+
+  it("declares the search field as a sibling of user, not nested inside it", () => {
+    const userBlockEnd = CONTRIBUTION_QUERY.indexOf("search(query: $mergedPrSearch");
+    const userBlockStart = CONTRIBUTION_QUERY.indexOf("user(login: $login)");
+    expect(userBlockStart).toBeGreaterThanOrEqual(0);
+    expect(userBlockEnd).toBeGreaterThan(userBlockStart);
+  });
 });

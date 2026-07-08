@@ -38,6 +38,7 @@ export interface StatsData {
   hasSupplementalData?: boolean; // true when merged with EMU/supplemental stats
   linkedPlatforms?: Platform[]; // platforms whose data was merged (informational)
   linkedPlatformLogins?: Record<string, string>; // platform → remote username (for profile URLs)
+  fetchScope?: "authenticated" | "public"; // token scope of the fetch that produced this data — used to prevent a lower-scope fetch from downgrading a better-scoped cached entry (#1004)
 }
 
 /** Confidence flag identifiers */
@@ -103,6 +104,14 @@ export interface RawContributionData {
   login: string;
   name: string | null;
   avatarUrl: string;
+  /**
+   * Authoritative merged-PR count from `search(query: "is:pr is:merged ...")`.
+   * Independent of the token-scoped, 100-node-capped `pullRequestContributions`
+   * sample below — used as the source of truth for `prsMergedCount` and as the
+   * signal `assessRawFetchIntegrity` compares against the sample to detect a
+   * degraded fetch (see `stats-integrity.ts`).
+   */
+  mergedPrTotalCount: number;
   contributionCalendar: {
     totalContributions: number;
     weeks: {

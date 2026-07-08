@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeFullStats, makeSnapshot } from "../test-helpers/fixtures";
 import type { MaterializedProfile } from "./materialize-profile";
 import {
+  deferProfileCacheWork,
   getPublicProfileVerification,
   materializePublicProfile,
+  persistProfileSnapshot,
   runPublicProfileSideEffects,
 } from "./public-profile";
 
@@ -18,6 +20,8 @@ const mockUpdateSnapshotCache = vi.fn();
 const mockDbUpsertUser = vi.fn();
 const mockCacheSetNxStatus = vi.fn();
 const mockClearStatsDirty = vi.fn();
+const mockCaptureServerEvent =
+  vi.fn<(...args: unknown[]) => Promise<void>>(() => Promise.resolve());
 
 vi.mock("./materialize-profile", () => ({
   materializeProfile: (...args: unknown[]) => mockMaterializeProfile(...args),
@@ -55,6 +59,10 @@ vi.mock("@/lib/cache/snapshot-cache", () => ({
 
 vi.mock("@/lib/db/users", () => ({
   dbUpsertUser: (...args: unknown[]) => mockDbUpsertUser(...args),
+}));
+
+vi.mock("@/lib/analytics/server-errors", () => ({
+  captureServerEvent: (...args: unknown[]) => mockCaptureServerEvent(...args),
 }));
 
 function makeMaterializedProfile(): MaterializedProfile {
@@ -99,6 +107,7 @@ function makeMaterializedProfile(): MaterializedProfile {
       craft: undefined,
     }),
     inputsChanged: false,
+    statsComplete: true,
   };
 }
 
@@ -153,6 +162,85 @@ describe("getPublicProfileVerification", () => {
       materialized.displayImpact,
     );
     expect(result).toEqual({ hash: "abc123", date: "2026-04-17" });
+  });
+
+  it("#1003: returns null when stats are incomplete, without calling generateVerificationCode", () => {
+    const materialized = {
+      ...makeMaterializedProfile(),
+      statsComplete: false,
+    };
+    mockGenerateVerificationCode.mockReturnValue({ hash: "abc123", date: "2026-04-17" });
+
+    const result = getPublicProfileVerification(materialized);
+
+    expect(result).toBeNull();
+    expect(mockGenerateVerificationCode).not.toHaveBeenCalled();
+  });
+});
+
+describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCacheSetNxStatus.mockResolvedValue("acquired");
+    mockDbInsertSnapshot.mockResolvedValue(true);
+    mockDbReplaceSnapshot.mockResolvedValue(true);
+    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockClearStatsDirty.mockResolvedValue(undefined);
+  });
+
+  it("returns false and writes nothing when stats are incomplete (corrupt shape)", async () => {
+    const materialized = {
+      ...makeMaterializedProfile(),
+      statsComplete: false,
+    };
+
+    const result = await persistProfileSnapshot("testuser", materialized);
+
+    expect(result).toBe(false);
+    expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+    expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
+    expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
+    expect(mockCacheSetNxStatus).not.toHaveBeenCalled();
+  });
+
+  it("emits snapshot_skipped_incomplete_stats telemetry when stats are incomplete", async () => {
+    const materialized = {
+      ...makeMaterializedProfile(),
+      statsComplete: false,
+    };
+    materialized.stats = { ...materialized.stats, prsMergedCount: 0, commitsTotal: 15585 };
+
+    await persistProfileSnapshot("testuser", materialized);
+
+    expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+      "snapshot_skipped_incomplete_stats",
+      expect.objectContaining({
+        handle: "testuser",
+        prsMergedCount: 0,
+        commitsTotal: 15585,
+      }),
+    );
+  });
+
+  it("persists a snapshot for a genuine new/empty account (not treated as corrupt)", async () => {
+    const materialized = {
+      ...makeMaterializedProfile(),
+      statsComplete: true,
+    };
+
+    const result = await persistProfileSnapshot("testuser", materialized);
+
+    expect(result).toBe(true);
+    expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
+  });
+
+  it("persists normally for healthy stats (prsMergedCount > 0)", async () => {
+    const materialized = makeMaterializedProfile();
+
+    const result = await persistProfileSnapshot("testuser", materialized);
+
+    expect(result).toBe(true);
+    expect(mockDbInsertSnapshot).toHaveBeenCalledWith("testuser", materialized.snapshot);
   });
 });
 
@@ -381,6 +469,57 @@ describe("runPublicProfileSideEffects", () => {
       await runPublicProfileSideEffects("testuser", materialized);
 
       expect(mockClearStatsDirty).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #1003 — Persist-boundary integrity gate: incomplete stats never mint a
+  // permanent snapshot row or a verification record, but the badge still
+  // rendered for a real visitor, so non-safety-critical deferred work
+  // (telemetry, user metadata upsert) still runs. This is NOT the same as the
+  // same-day SETNX dedup skip above — that case means the work already ran
+  // today; incomplete stats means it never ran and should still fire once.
+  // -------------------------------------------------------------------------
+
+  describe("#1003 incomplete-stats path", () => {
+    it("does not persist a snapshot but still runs telemetry/notification side effects", async () => {
+      const materialized = { ...makeMaterializedProfile(), statsComplete: false };
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+      expect(mockDbReplaceSnapshot).not.toHaveBeenCalled();
+      expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
+      expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
+      expect(mockDbUpsertUser).toHaveBeenCalled();
+    });
+
+    it("does not store a verification record when stats are incomplete", async () => {
+      const materialized = { ...makeMaterializedProfile(), statsComplete: false };
+
+      await runPublicProfileSideEffects("testuser", materialized);
+
+      expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+      expect(mockGenerateVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it("still skips everything in read-only mode even when stats are incomplete", async () => {
+      const materialized = { ...makeMaterializedProfile(), statsComplete: false };
+
+      await runPublicProfileSideEffects("testuser", materialized, { readOnly: true });
+
+      expect(mockTrackBadgeGenerated).not.toHaveBeenCalled();
+      expect(mockDbUpsertUser).not.toHaveBeenCalled();
+      expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("deferProfileCacheWork does not call storeVerificationRecord when stats are incomplete", async () => {
+      const materialized = { ...makeMaterializedProfile(), statsComplete: false };
+
+      await deferProfileCacheWork("testuser", materialized);
+
+      expect(mockStoreVerificationRecord).not.toHaveBeenCalled();
+      expect(mockTrackBadgeGenerated).toHaveBeenCalledWith("testuser");
     });
   });
 });

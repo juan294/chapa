@@ -30,6 +30,17 @@ const INFLIGHT_TIMEOUT_MS = 30_000;
 // fetch because it produces a safe superset of the public result.
 const _inflight = new Map<string, Promise<StatsData | null>>();
 
+/**
+ * Rank a fetch's token scope for the non-downgrading cache-write rule (#1004,
+ * phase 2). An authenticated fetch outranks a public one because only the
+ * user's own OAuth token can see their private-repo merges; an untagged
+ * (legacy, pre-#1004) entry is treated as the weakest scope so it never
+ * blocks a fresh write.
+ */
+function scopeRank(scope: StatsData["fetchScope"]): number {
+  return scope === "authenticated" ? 2 : 1;
+}
+
 /** @internal — exported for tests only. Resets the inflight map. */
 export function _resetInflight(): void {
   _inflight.clear();
@@ -263,6 +274,11 @@ async function _fetchAndCache(
     };
   }
 
+  // Tag the fetch's scope so the non-downgrading cache-write rule below can
+  // refuse to let a lower-scope (public) fetch overwrite a higher-scope
+  // (authenticated) entry already cached for this handle. See #1004.
+  stats.fetchScope = token ? "authenticated" : "public";
+
   // #1002 — Guard against a viewer-scoped fetch that lost merged-PR visibility.
   // The GitHub contributionsCollection is scoped to the authenticating token:
   // a token that cannot see a user's private-repo merges (server GITHUB_TOKEN
@@ -303,9 +319,37 @@ async function _fetchAndCache(
     return stats;
   }
 
-  // Cache the final (possibly merged) result — both primary and stale fallback
-  await cacheSet(cacheKey, stats, CACHE_TTL);
-  await cacheSet(staleKey, stats, STALE_TTL);
+  // Non-downgrading cache-write rule (#1004, phase 2 of the scoring-integrity
+  // contract): a lower-scope fetch must never overwrite a higher-scope entry
+  // already cached for this handle — e.g. the warm-cache cron's public
+  // GITHUB_TOKEN must not clobber a user's own authenticated fetch that saw
+  // their private-repo merges (the 2026-03-31 seam). This subsumes the old
+  // unconditional cache writes below.
+  //
+  // `getStats` already confirmed a miss on `cacheKey` before calling this
+  // function, so `existingMerged` is normally null here. But the public and
+  // authenticated fetch paths for the same handle are deduplicated under
+  // *separate* inflight keys (a public caller may reuse an in-flight
+  // authenticated fetch, but not vice versa — see `getStats` above), so a
+  // public fetch and an authenticated fetch for the same handle can run
+  // concurrently and both reach this point. Re-reading `cacheKey` here,
+  // immediately before the write, catches that race: if the authenticated
+  // fetch already wrote its better-scoped entry by the time this call
+  // reaches its write, this read sees it and skips the downgrade.
+  const existingMerged = await cacheGet<StatsData>(cacheKey);
+  const mergedIsDowngrade =
+    existingMerged != null && scopeRank(stats.fetchScope) < scopeRank(existingMerged.fetchScope);
+  if (!mergedIsDowngrade) {
+    await cacheSet(cacheKey, stats, CACHE_TTL);
+  }
+
+  // `stale` (the protected 7-day last-known-good) was already read at the
+  // top of this function, before the fetch — no race window to close there.
+  const staleIsDowngrade =
+    stale != null && scopeRank(stats.fetchScope) < scopeRank(stale.fetchScope);
+  if (!staleIsDowngrade) {
+    await cacheSet(staleKey, stats, STALE_TTL);
+  }
 
   // Record in permanent user registry (fire-and-forget)
   fireAndForget(() => dbUpsertUser(handle), () => undefined);

@@ -59,6 +59,24 @@
 - [Security]: No security doc gaps. All `NEXT_PUBLIC_*` vars confirmed non-sensitive; `server-only` Supabase boundary and admin-auth routes documented in CLAUDE.md. No undocumented exports with security surface.
 <!-- ENTRY:END -->
 
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-07-08T03:00:00Z -->
+## Cost Analyst — 2026-07-08
+- **Status**: GREEN
+- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
+- Redis key growth risk: low | Uncached external calls: 0 | Resource leak risks: 0
+- **Cost-surface delta since 2026-07-07 cycle**: HEAD `29d2b524 → 3b953903` — 23 commits, the #1001–#1004 scoring-integrity batch (v2.16.1; v2.17.0 release prep uncommitted in tree). Audited call-by-call: **cost-neutral**. The authoritative merged-PR count (#1002/#1004) is a `search(is:merged)` **field added to the existing GitHub GraphQL POST** (`queries.ts:31-70`) — no extra HTTP request, negligible extra rate-limit points. Only new steady-state cost: +1 Redis GET per *uncached* fetch (downgrade-race re-read, `client.ts:334`).
+- Redis: **35 non-redis-module `cacheSet()` call sites (+1), 34/35 (97%) explicit positive TTL**. New site is `client.ts:313` — degraded-fetch path re-caches stale into the primary key at `CACHE_TTL` (anti-thrash, cost-reducing). Cached `StatsData` gains a small `fetchScope` tag. Default TTL 21,600s (`redis.ts:69`); 1 intentional TTL-0 cursor. Growth risk: LOW.
+- Supabase: **11 tables + 2 views, 28 migrations** (unchanged). Singleton/`server-only`/`persistSession:false`/`withTimeout` intact. `admin-users.ts` OR-semantics fix = same single query. #1003 `statsComplete` gate *skips* snapshot writes for poisoned stats (small write reduction). `dbGetCampaignStats` P2-1 carried.
+- External calls: **0 uncached**. 3 new fire-and-forget PostHog server events (`github_degraded_pr_fetch`, `stats_fetch_rejected`, `snapshot_skipped_incomplete_stats`), incident-bounded. `scripts/heal-poisoned-stats.ts` (376 lines) is operator-run, not deployed.
+- Vercel: `maxDuration` unchanged (35 badge / 4×300). **Zero client-bundle delta** — batch touches server lib + scripts + tests only (`components/`: 0 files). Bundle carried 2,079 KB raw / 659 KB gzipped, below 2,300 KB trigger.
+- **P1s: NONE. P2s: 1 (P2-1 carried, monitor-only). P3s: 1 (NEW P3-1)** — asymmetric anti-thrash: `isDegradedPrFetch` path re-caches stale for 6h, but the `assessRawFetchIntegrity` rejection path (`fetchStats` → null → `client.ts:174-181`) serves stale *without* refreshing the primary key, so a transient GitHub partial-degradation incident causes per-origin-request GraphQL refetch + one PostHog event per uncached handle until it heals. Bounded by CDN s-maxage + in-flight dedup; fix = mirror the 6h stale re-cache or add a short negative-cache.
+
+**Cross-agent recommendations:**
+- [Performance]: Zero client-bundle delta from the 23-commit batch — 2,079 KB raw / 659 KB gzipped figure still current, no `ANALYZE=true` run needed. The GraphQL query grew by one `search` field; per-fetch latency impact negligible (same POST).
+- [Security]: The non-downgrading cache-write rule (#1004 phase 2) is also a cost win — prevents cron/anonymous fetches from poisoning authenticated cache entries, avoiding repair-script churn. No new rate-limit gaps; new PostHog events carry handle + counts only, no secrets.
+- [Coverage]: The new cost-sensitive paths (`stats-integrity.ts`, `client.ts` scope-rank writes, `materialize-profile.ts` statsComplete gate) all shipped with sibling + contract tests in the batch. Watch P3-1's rejection path (`client.ts:174-181`) if anyone adds a negative-cache there — it currently has no cache-write to test.
+<!-- ENTRY:END -->
+
 <!-- ENTRY:START agent=cost-analyst timestamp=2026-07-07T03:00:00Z -->
 ## Cost Analyst — 2026-07-07
 - **Status**: GREEN
@@ -94,23 +112,6 @@
 - [Performance]: No app-code delta — HEAD unchanged at `09666b59` since 2026-07-05. Bundle figure (2,079 KB raw / 659 KB gzipped) still current.
 - [Security]: `/api/challenge` strict limiters (IP + handle) re-confirmed present. No new rate-limit cost gaps.
 - [Coverage]: `dbGetCampaignStats` and the badge in-flight dedup Map remain the two cost-sensitive code paths worth re-checking coverage on if either file changes.
-<!-- ENTRY:END -->
-
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-07-05T03:00:00Z -->
-## Cost Analyst — 2026-07-05
-- **Status**: GREEN
-- Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
-- **Cost-surface delta since 2026-07-04 cycle**: HEAD `8516b06b → 09666b59` — 3 reliability commits (harden reliability seams, stabilize reliability CI, contract CI on Node 24). App-code touches are durable-write observability in route handlers (`public-profile.ts`, `snapshots.ts`, `tool-insights.ts`, `health/route.ts`, `telemetry/route.ts`, cron routes) + a contract test suite (`test/contract/*`). **Zero new cache keys, Supabase queries, or external API calls.**
-- Redis: `cacheSet` default TTL 21,600s (`redis.ts:69`). 1 intentional TTL-0 (`cron:warm-cache:offset`, `warm-cache/route.ts:148`). Persistent keys bounded (HLL ~12 KB + INCR counter + 365d overwrite cursors). `cron:lastrun:<name>` heartbeat written with TTL. Growth risk: LOW.
-- Supabase: **11 tables + 2 views, 28 migrations** (+`028_grant_service_role_access.sql`). Lazy singleton `supabase.ts:13`, `server-only`, `persistSession:false`, `withTimeout`. No N+1. `dbReplaceSnapshot`/`dbUpsertToolInsights` upserts add `.select("id").maybeSingle()` RETURNING for durable-write failure detection — same round-trip. `dbGetCampaignStats` 4-parallel-COUNT P2-1 carried (threshold-gated).
-- External calls: **0 uncached** (non-auth). GitHub 6h + 7d SWR + in-flight dedup + Redis lock; platforms 6h/1h; health probe 60s + batched heartbeat GETs; PostHog/Resend fire-and-forget. Fetch-timeout coverage 100%.
-- Vercel: badge `maxDuration=35`; 4 routes `=300`. Badge `s-maxage=21600/SWR=86400`. Bundle carried 2,079 KB raw / 659 KB gzipped (no app-code bundle delta), below 2,300 KB trigger.
-- **P1s: NONE. P2s: 1 (P2-1, monitor-only). P3s: 0.**
-
-**Cross-agent recommendations:**
-- [Performance]: No app-code bundle delta — reliability commits touch route handlers + tests only. Bundle carried at 2,079 KB raw / 659 KB gzipped. M-bundle stays closed; no `ANALYZE=true` run needed.
-- [Security]: No cost-related rate-limit gaps. `/api/challenge` strict limiters remain; `/api/health` cron-heartbeat reads are rate-limited GETs. Durable-write observability additions do not widen attack surface.
-- [Coverage]: The contract suite (`test/contract/payload-matrix.ts`, `redis-fake.ts`, `invoke.ts`) strengthens cost-critical write-path coverage; no cost path lacks tests.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-07-01T07:20:00Z -->
@@ -403,18 +404,6 @@
 - [Security]: No security-related quality issues. All XSS vectors covered. Interactive elements accessible. No hardcoded secrets or token leaks observed in production JSX.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-07-03T00:03:44Z -->
-## Coverage Agent — 2026-07-03
-- **Status**: GREEN
-- Overall coverage: 96.57% stmts / 92.72% branches / 95.51% funcs / 97.72% lines (474 files / 8,164 tests, all passing, 120.9s under --maxWorkers=3, HEAD `8516b06b`)
-- Critical gaps: none in critical paths — lib/impact 99.6%, lib/render 100% stmts, app/api 97.3%, lib/db 97.5%. All three prior P3 triage items confirmed CLOSED: lib/gitlab now 100% stmts / 97.2% br (was 71.8% br), svg-to-png Sharp branch covered, campaigns/types.test.ts present. Remaining carries: i18n/provider.tsx 61.5% br (JSDOM), lazy wrappers 60–67% stmts, experiments Canvas/WebGL. New minor: packages/shared config files (tsconfig/eslint/package.json) leak into coverage map at 0% — add to vitest coverage exclude.
-- Flaky tests: 0
-
-**Cross-agent recommendations:**
-- [Security]: No security-relevant coverage gaps. lib/auth 97.3%, lib/render 100% stmts (all SVG escapeXml paths exercised), lib/verification 100%, /api/challenge route covered within app/api 97.3%.
-- [QA]: 0 flaky tests, suite grew 8,114 → 8,164 (+50 from the 2026-07-01 triage cycle's gitlab/svg-to-png/campaigns tests). Re-baselined per triage request — gitlab gap closed as promised. Only actionable item is the vitest coverage `exclude` cleanup for packages/shared config artifacts (cosmetic, P3).
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=coverage_agent timestamp=2026-07-06T00:06:18Z -->
 ## Coverage Agent — 2026-07-06
 - **Status**: GREEN
@@ -450,4 +439,16 @@
 **Cross-agent recommendations:**
 - [Security]: No security-relevant coverage gaps — lib/auth 97.3%, lib/render 100% stmts (all `escapeXml` paths covered), lib/verification 100%. The telemetry branch gap is observability-only, not an auth/input-validation surface.
 - [QA]: Suite stable and clean at 8,174/8,174, 0 flakes. One P2 for triage: add branch tests for `app/api/telemetry/route.ts` failure/capture paths (43.6% br); plus P3 config hygiene to exclude `packages/shared` JSON/config files from v8 collection.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-07-08T00:03:27Z -->
+## Coverage Agent — 2026-07-08
+- **Status**: GREEN
+- Overall coverage: 96.58% stmts / 92.64% branches / 95.29% funcs / 97.79% lines (8,251 tests / 479 files, all passing, single clean run)
+- Critical gaps: none in critical paths — lib/impact 99.6%, lib/render 100% stmts, app/api 97.4%, lib/db 97.3%. Remaining sub-80% files are experiments (Canvas/WebGL), lazy wrappers, `ClientInstrumentation.tsx` (60%, no test file), and `ClientErrorReporter.tsx` (61%, dedup/transport branches untested — best-value fix)
+- Flaky tests: 0
+
+**Cross-agent recommendations:**
+- [Security]: No security-relevant gaps. lib/auth 97.3%, lib/render 100% stmts (all escapeXml paths), lib/verification 100%, lib/gitlab branch gap from June cycles confirmed closed (97.2% br).
+- [QA]: Suite grew 8,193 → 8,251 (+58) since 2026-07-07 triage with coverage improving slightly — new code shipped with tests. Only actionable item: `ClientErrorReporter.tsx` branch coverage (33%) is JSDOM-testable; `ClientInstrumentation.tsx` lacks any sibling test.
 <!-- ENTRY:END -->

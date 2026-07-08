@@ -11,6 +11,7 @@ function makeRaw(overrides: Partial<RawContributionData> = {}): RawContributionD
     login: "test-user",
     name: "Test User",
     avatarUrl: "https://avatars.githubusercontent.com/u/1",
+    mergedPrTotalCount: 2,
     contributionCalendar: {
       totalContributions: 120,
       weeks: Array.from({ length: 13 }, (_, w) => ({
@@ -167,6 +168,33 @@ describe("buildStatsFromRaw", () => {
     expect(result.prsMergedCount).toBe(2);
   });
 
+  it("sources prsMergedCount from the authoritative search count, not the sample (juan294 golden case)", () => {
+    // The confirmed corruption signature: search sees 904 merged PRs, but the
+    // token-scoped/100-node-capped sample only returned 96 of them (still
+    // non-empty, so this is a healthy — not degraded — fetch). prsMergedCount
+    // must reflect the authoritative 904, not the 96-node sample size.
+    const mergedSample = Array.from({ length: 96 }, (_, i) => ({
+      additions: 50, deletions: 10, changedFiles: 3, merged: true,
+      body: `PR ${i}`, headRefName: `feat/${i}`, closingIssuesCount: 0,
+    }));
+    const raw = makeRaw({
+      mergedPrTotalCount: 904,
+      pullRequests: { totalCount: 143, nodes: mergedSample },
+      reviews: { totalCount: 16 },
+    });
+    const result = buildStatsFromRaw(raw);
+    expect(result.prsMergedCount).toBe(904);
+    // Weight still derives from the sample and caps at PR_WEIGHT_AGG_CAP (120)
+    expect(result.prsMergedWeight).toBe(120);
+    // Downstream profile-type classification (detectProfileType, apps/web) divides
+    // reviewsSubmittedCount by prsMergedCount. That denominator must be the
+    // authoritative 904, not the 96-node sample — 16/904 ≈ 0.018 (solo) vs.
+    // 16/96 ≈ 0.167 (wrongly collaborative pre-fix). See v6.test.ts's
+    // "detectProfileType with buildStatsFromRaw" for the full-pipeline assertion.
+    expect(result.reviewsSubmittedCount).toBe(16);
+    expect(result.reviewsSubmittedCount / result.prsMergedCount).toBeLessThan(0.15);
+  });
+
   it("computes PR weight with log formula, capped at 3.0 per PR", () => {
     const raw = makeRaw({
       pullRequests: {
@@ -201,6 +229,7 @@ describe("buildStatsFromRaw", () => {
 
   it("excludes unmerged PRs from weight and line counts", () => {
     const raw = makeRaw({
+      mergedPrTotalCount: 1,
       pullRequests: {
         totalCount: 2,
         nodes: [
@@ -366,6 +395,7 @@ describe("buildStatsFromRaw", () => {
 
   it("handles empty PR nodes array", () => {
     const raw = makeRaw({
+      mergedPrTotalCount: 0,
       pullRequests: { totalCount: 0, nodes: [] },
     });
     const result = buildStatsFromRaw(raw);
@@ -521,6 +551,7 @@ describe("buildStatsFromRaw", () => {
       body: `Feature ${i}`, headRefName: `feat/f${i}`, baseRefName: "develop", closingIssuesCount: 1,
     }));
     const raw = makeRaw({
+      mergedPrTotalCount: 6,
       pullRequests: {
         totalCount: 6,
         nodes: [
@@ -565,6 +596,7 @@ describe("buildStatsFromRaw", () => {
       { additions: 2000, deletions: 500, changedFiles: 10, merged: true, body: "chore", headRefName: "chore/ci", baseRefName: "develop", closingIssuesCount: 0 },
     ];
     const raw = makeRaw({
+      mergedPrTotalCount: 10,
       pullRequests: { totalCount: 10, nodes: [...releasePRs, ...devPRs] },
     });
     const result = buildStatsFromRaw(raw);
