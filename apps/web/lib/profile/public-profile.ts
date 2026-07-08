@@ -2,8 +2,6 @@ import { captureServerEvent } from "@/lib/analytics/server-errors";
 import { fireAndForget } from "@/lib/async/fire-and-forget";
 import { cacheSetNxStatus, trackBadgeGenerated } from "@/lib/cache/redis";
 import { clearStatsDirty } from "@/lib/cache/dirty-stats";
-import { updateSnapshotCache } from "@/lib/cache/snapshot-cache";
-import { dbInsertSnapshot, dbReplaceSnapshot } from "@/lib/db/snapshots";
 import { dbUpsertUser } from "@/lib/db/users";
 import { notifyFirstBadge } from "@/lib/email/notifications";
 import { generateVerificationCode } from "@/lib/verification/hmac";
@@ -13,6 +11,7 @@ import {
   materializeProfile,
   type MaterializedProfile,
 } from "./materialize-profile";
+import { reconcileSnapshotWrite } from "./snapshot-write";
 
 export interface PublicVerificationCode {
   hash: string;
@@ -128,15 +127,16 @@ export async function persistProfileSnapshot(
   if (guardStatus === "exists" && !materialized.inputsChanged) return false;
 
   // #826 — replace today's row when inputs changed; otherwise insert and
-  // let the UNIQUE(handle, date) constraint dedupe.
-  const persisted = materialized.inputsChanged
-    ? await dbReplaceSnapshot(handle, materialized.snapshot)
-    : await dbInsertSnapshot(handle, materialized.snapshot);
-  if (persisted) {
-    await updateSnapshotCache(handle, materialized.snapshot);
-    if (materialized.inputsChanged) {
-      await clearStatsDirty(handle);
-    }
+  // let the UNIQUE(handle, date) constraint dedupe. The durable Supabase write
+  // and its Redis cache mirror are reconciled as one envelope so a partial
+  // failure (durable ok, cache stale) surfaces an operational alert (#975).
+  const { persisted } = await reconcileSnapshotWrite(
+    handle,
+    materialized.snapshot,
+    { mode: materialized.inputsChanged ? "replace" : "insert" },
+  );
+  if (persisted && materialized.inputsChanged) {
+    await clearStatsDirty(handle);
   }
 
   return true;

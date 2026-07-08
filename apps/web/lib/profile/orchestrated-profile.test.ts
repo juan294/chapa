@@ -89,7 +89,7 @@ describe("persistOrchestratedSnapshot", () => {
     vi.clearAllMocks();
     mockDbInsertSnapshot.mockResolvedValue(true);
     mockDbReplaceSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockUpdateSnapshotCache.mockResolvedValue(true);
   });
 
   it("inserts and caches the canonical snapshot for warm-cache flows", async () => {

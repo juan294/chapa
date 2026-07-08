@@ -37,6 +37,19 @@ function getRedis(): Redis | null {
   return _redis;
 }
 
+/**
+ * Whether a Redis cache layer is configured (URL + token present).
+ *
+ * Distinguishes "no cache layer" from "cache write failed": when Redis is not
+ * configured, cache writes are no-ops by design and reads fall back to the
+ * durable store, so a failed `cacheSet` implies no store divergence. Callers
+ * that reconcile durable-vs-cache writes use this to avoid false-positive
+ * alerts on unconfigured deployments.
+ */
+export function isRedisConfigured(): boolean {
+  return Boolean(getUpstashRedisRestUrl() && getUpstashRedisRestToken());
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------

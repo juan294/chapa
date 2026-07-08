@@ -184,7 +184,7 @@ describe("persistProfileSnapshot (#1003 persist-boundary integrity gate)", () =>
     mockCacheSetNxStatus.mockResolvedValue("acquired");
     mockDbInsertSnapshot.mockResolvedValue(true);
     mockDbReplaceSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockUpdateSnapshotCache.mockResolvedValue(true);
     mockClearStatsDirty.mockResolvedValue(undefined);
   });
 
@@ -250,7 +250,7 @@ describe("runPublicProfileSideEffects", () => {
     mockTrackBadgeGenerated.mockResolvedValue(undefined);
     mockNotifyFirstBadge.mockResolvedValue(undefined);
     mockDbInsertSnapshot.mockResolvedValue(true);
-    mockUpdateSnapshotCache.mockResolvedValue(undefined);
+    mockUpdateSnapshotCache.mockResolvedValue(true);
     mockDbUpsertUser.mockResolvedValue(undefined);
     mockStoreVerificationRecord.mockResolvedValue(undefined);
     mockGenerateVerificationCode.mockReturnValue({ hash: "abc123", date: "2026-04-17" });

@@ -55,6 +55,7 @@ import {
   pingRedis,
   cacheIncr,
   cacheReserveQuota,
+  isRedisConfigured,
   _resetClient,
 } from "./redis";
 
@@ -71,6 +72,26 @@ beforeEach(() => {
   // Ensure env vars are set for tests (so getRedis() creates a client)
   vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://fake-redis.upstash.io");
   vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "fake-token");
+});
+
+// ---------------------------------------------------------------------------
+// isRedisConfigured
+// ---------------------------------------------------------------------------
+
+describe("isRedisConfigured", () => {
+  it("returns true when both URL and token are present", () => {
+    expect(isRedisConfigured()).toBe(true);
+  });
+
+  it("returns false when the URL is missing", () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    expect(isRedisConfigured()).toBe(false);
+  });
+
+  it("returns false when the token is missing", () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+    expect(isRedisConfigured()).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

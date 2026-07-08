@@ -59,18 +59,16 @@ export async function getCachedLatestSnapshot(
  * Update the snapshot cache after recording a new snapshot.
  *
  * Call this after dbInsertSnapshot() succeeds to keep the cache fresh.
- * Fire-and-forget safe — silently no-ops on Redis failure.
+ * Never throws. Returns `true` if the cache now reflects the snapshot,
+ * `false` if the write failed or Redis is unavailable — callers that
+ * reconcile durable-vs-cache writes use this to detect divergence.
  */
 export async function updateSnapshotCache(
   handle: string,
   snapshot: MetricsSnapshot,
-): Promise<void> {
+): Promise<boolean> {
   const key = buildSnapshotKey(handle);
-  try {
-    await cacheSet(key, snapshot, SNAPSHOT_TTL);
-  } catch {
-    // Fire-and-forget — cache update is non-critical
-  }
+  return cacheSet(key, snapshot, SNAPSHOT_TTL);
 }
 
 /**
