@@ -1,51 +1,51 @@
 ```markdown
 # Coverage Report
-> Generated: 2026-07-07 | Health status: green
+> Generated: 2026-07-08 | Health status: green
 
 ## Executive Summary
-Full suite passes clean — 8,174/8,174 tests across 477 files (112s, `--maxWorkers=3`) on HEAD `29d2b524` (v2.16.0) — with overall coverage of **96.42% statements / 92.17% branches / 95.40% functions / 97.58% lines**, a slight improvement over the 2026-06-30 baseline (96.31%/92.15%). All four critical paths (impact scoring, SVG rendering, API routes, database layer) are at or above 97% statements; the prior largest gap (`lib/gitlab/queries.ts`, 71.8% branches) is confirmed closed at 100%/97.2%.
+The full suite passed cleanly — 8,251/8,251 tests across 479 files (114s, `--maxWorkers=3`) — with overall coverage at **96.58% statements / 92.64% branches / 95.29% functions / 97.79% lines**, a slight improvement over the 2026-06-30 baseline (96.31% stmts). All four critical paths (scoring, rendering, API routes, database layer) are ≥97% statements, and the previously flagged `lib/gitlab/queries.ts` branch gap (71.8%) is confirmed closed at 97.2%.
 
 ## Coverage by Module
 | Module | Coverage | Status |
 |--------|----------|--------|
-| `apps/web/lib/impact` (scoring) | 99.6% stmts / 98.7% br / 100% fn | 🟢 |
-| `apps/web/lib/render` (SVG) | 100% stmts / 93.4% br / 100% fn | 🟢 |
-| `apps/web/app/api` (API routes) | 97.1% stmts / 91.1% br / 96.2% fn | 🟢 |
-| `apps/web/lib/db` (database) | 97.3% stmts / 94.6% br / 100% fn | 🟢 |
-| `apps/web/lib/auth` | 97.3% stmts / 94.8% br | 🟢 |
-| `apps/web/lib/cache` | 97.1% stmts / 92.6% br | 🟢 |
-| `apps/web/lib/history` | 98.3% stmts / 96.6% br | 🟢 |
-| `apps/web/lib/gitlab` | 100% stmts / 97.2% br | 🟢 (was 75.2% br — gap closed 2026-07-01) |
-| `apps/web/lib/verification` | 100% all metrics | 🟢 |
-| `apps/web/lib/email` | 97.7% stmts / 94.9% br | 🟢 |
-| `apps/web/lib/i18n` | 97.5% stmts / 89.7% br | 🟢 |
-| `apps/web/components` | 95.7% stmts / 90.2% br | 🟢 |
-| `apps/web/app` (pages) | 94.8% stmts / 89.2% br | 🟢 |
-| `apps/web/lib/effects` (experiments) | 93.3% stmts / 88.5% br | 🟡 (Canvas/WebGL, accepted) |
-| `apps/web/lib/codeberg` | 93.1% stmts / 86.8% br | 🟡 |
-| `packages/shared` | 100% stmts on all 7 `src/` files | 🟢 (89.7% aggregate is an artifact of 4 config files — `package.json`, `tsconfig*.json`, `eslint.config.mjs` — counted at 0%; recommend excluding from coverage collection) |
+| `apps/web/lib/impact` (scoring pipeline) | 99.6% stmts / 98.7% br / 100% fn | ✅ Green |
+| `apps/web/lib/render` (SVG rendering) | 100% stmts / 93.4% br / 100% fn | ✅ Green |
+| `apps/web/app/api` (API routes) | 97.4% stmts / 94.1% br / 96.2% fn | ✅ Green |
+| `apps/web/lib/db` (database layer) | 97.3% stmts / 94.6% br / 100% fn | ✅ Green |
+| `apps/web/lib/auth` | 97.3% stmts / 94.8% br | ✅ Green |
+| `apps/web/lib/cache` | 97.1% stmts / 92.6% br | ✅ Green |
+| `apps/web/lib/gitlab` | 100% stmts / 97.2% br | ✅ Green (was yellow) |
+| `apps/web/lib/history` | 98.3% stmts / 96.6% br | ✅ Green |
+| `apps/web/lib/email` | 97.7% stmts / 94.9% br | ✅ Green |
+| `apps/web/lib/verification` | 100% across the board | ✅ Green |
+| `packages/shared` | 100% across the board | ✅ Green |
+| `apps/web/components` | 95.8% stmts / 90.6% br | ✅ Green |
+| `apps/web/app` (pages) | 94.8% stmts / 89.2% br | 🟡 Yellow (experiments-only drag) |
+| `apps/web/lib/effects` | 93.3% stmts / 88.5% br | 🟡 Yellow (Canvas/WebGL limits) |
 
 ## Gaps & Recommendations
-- **`apps/web/app/api/telemetry/route.ts` — 43.6% branches (87.1% stmts)**: the only critical-path file below 80% on any metric. It has both `route.test.ts` and `route.contract.test.ts`, but the durable-write observability branches added in the reliability-hardening commits (`ac7e465f`..`3d3bc29f`) are not exercised. Recommend adding tests for the capture/logging failure branches. **This is the one actionable P2 this cycle.**
-- `apps/web/lib/i18n/provider.tsx` — 61.5% branches (carry): JSDOM locale-switch branches; unchanged for 4+ cycles.
-- `apps/web/components/ClientErrorReporter.tsx` — 61.1% stmts / 33.3% branches: error-reporting wiring; low risk but cheap to cover with a window-event test.
-- Lazy-wrapper components (`GlobalCommandBarLazy`, `SharePageOwnerContentLazy`, `ClientInstrumentation`) — 60–67% stmts: `next/dynamic` shells, accepted P3 carries.
-- Experiments pages (`glassmorphism`, `heatmap-wave`, `metallic-shimmer`, `particle-core`, `HolographicOverlay`) — 50–83% stmts: Canvas/WebGL not exercisable in JSDOM, accepted P3 carries per `docs/accepted-risks.md` posture.
-- **Untested files (no sibling test)**: `lib/db/campaigns/{crud,sends,index}.ts` have no sibling test files but are covered at 98.6–100% via the `campaigns.test.ts` barrel suite — no action needed. `lib/history/types.ts` is type-only. **Zero genuinely untested critical-path files.**
-- Coverage-config hygiene: exclude `packages/shared` JSON/config files from v8 collection so the module aggregate reflects the true 100% of `src/`.
+All critical paths are green; every remaining gap is in non-critical UI code, and most are known P3 carries (JSDOM cannot exercise Canvas/WebGL or `next/dynamic` lazy-mount paths).
+
+- **`apps/web/components/ClientInstrumentation.tsx`** — 60% stmts, **no sibling test file**. Only true untested file outside experiments; a small render test mocking the instrumentation hook would close it.
+- **`apps/web/components/SharePageOwnerContentLazy.tsx`** — 66.7% stmts, **no sibling test file**. `next/dynamic` wrapper; loader callback branch unexercised (same accepted pattern as `GlobalCommandBarLazy`, which has a test but sits at 60% for the same reason).
+- **`apps/web/components/ClientErrorReporter.tsx`** — 61.1% stmts / 33.3% br despite having a test; the error-dedup and report-transport branches are unexercised and are testable in JSDOM. Best-value fix in this list.
+- **`apps/web/app/experiments/error.tsx` / `loading.tsx`** — 0% stmts; trivial boundary components behind the experiments feature flag (accepted carry).
+- **Experiments pages** (`glassmorphism` 70.6%, `heatmap-wave` 73.3%, `metallic-shimmer` 78.1%, `particle-core.ts` 58% br) — Canvas/WebGL rendering paths unreachable in JSDOM; long-standing accepted P3 carries, no action.
+- **Branch-only watch items** (stmts ≥80%): `AuthorTypewriter.tsx` 67.5% br, `ParticleBackground.tsx` 68% br, `lib/i18n/provider.tsx` 61.5% br (JSDOM locale-switch limitation, known carry).
+- **`lib/db/campaigns/crud.ts` / `sends.ts`** have no sibling test files but are covered indirectly at 99.1%/98.6% stmts via the campaigns suite — not a gap, noted for file-placement convention only.
 
 ## Flaky Tests
 None detected
 ```
 
 SHARED_CONTEXT_START
-## Coverage Agent — 2026-07-07
+## Coverage Agent — 2026-07-08
 - **Status**: GREEN
-- Overall coverage: 96.42% stmts / 92.17% branches / 95.40% funcs / 97.58% lines on HEAD `29d2b524` (v2.16.0). Suite grew 473→477 files, 8,114→8,174 tests (+60, from the reliability-hardening contract suite and v2.16.0 fixes). All passing, 112s under `--maxWorkers=3`.
-- Critical gaps: only one — `app/api/telemetry/route.ts` at **43.6% branches** (durable-write observability branches from the reliability commits are untested despite two sibling test files). Everything else: lib/impact 99.6%, lib/render 100% stmts, app/api 97.1%, lib/db 97.3%. Prior largest gap `lib/gitlab/queries.ts` confirmed closed (100% stmts / 97.2% br module). `packages/shared` src/ files all 100% — the 89.7% aggregate is config-file noise (recommend coverage exclude).
+- Overall coverage: 96.58% stmts / 92.64% branches / 95.29% funcs / 97.79% lines (8,251 tests / 479 files, all passing, single clean run)
+- Critical gaps: none in critical paths — lib/impact 99.6%, lib/render 100% stmts, app/api 97.4%, lib/db 97.3%. Remaining sub-80% files are experiments (Canvas/WebGL), lazy wrappers, `ClientInstrumentation.tsx` (60%, no test file), and `ClientErrorReporter.tsx` (61%, dedup/transport branches untested — best-value fix)
 - Flaky tests: 0
 
 **Cross-agent recommendations:**
-- [Security]: No security-relevant coverage gaps — lib/auth 97.3%, lib/render 100% stmts (all `escapeXml` paths covered), lib/verification 100%. The telemetry branch gap is observability-only, not an auth/input-validation surface.
-- [QA]: Suite stable and clean at 8,174/8,174, 0 flakes. One P2 for triage: add branch tests for `app/api/telemetry/route.ts` failure/capture paths (43.6% br); plus P3 config hygiene to exclude `packages/shared` JSON/config files from v8 collection.
+- [Security]: No security-relevant gaps. lib/auth 97.3%, lib/render 100% stmts (all escapeXml paths), lib/verification 100%, lib/gitlab branch gap from June cycles confirmed closed (97.2% br).
+- [QA]: Suite grew 8,193 → 8,251 (+58) since 2026-07-07 triage with coverage improving slightly — new code shipped with tests. Only actionable item: `ClientErrorReporter.tsx` branch coverage (33%) is JSDOM-testable; `ClientInstrumentation.tsx` lacks any sibling test.
 SHARED_CONTEXT_END
