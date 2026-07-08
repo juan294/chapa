@@ -26,6 +26,10 @@ import {
   materializePublicProfile,
   persistProfileSnapshot,
 } from "@/lib/profile/public-profile";
+import {
+  formatServerTiming,
+  type ServerTimingEntry,
+} from "@/lib/monitoring/latency-slo";
 
 export const maxDuration = 35;
 
@@ -137,19 +141,47 @@ function createDeferred<T>(): {
   return { promise, resolve };
 }
 
+// #974: emit a Server-Timing header on every badge response so per-request
+// latency (and its cache/materialize/render breakdown) is inspectable, and so
+// the /api/cron/latency-check synthetic monitor can classify cache-hit vs
+// cache-miss responses when measuring the route against its p95 SLO budgets.
+function badgeSvgResponse(
+  svg: string,
+  baseHeaders: HeadersInit,
+  startedAt: number,
+  metrics: ServerTimingEntry[] = [],
+  status?: number,
+): NextResponse {
+  const serverTiming = formatServerTiming([
+    ...metrics,
+    { name: "total", durMs: Date.now() - startedAt },
+  ]);
+  return new NextResponse(svg, {
+    status,
+    headers: {
+      ...(baseHeaders as Record<string, string>),
+      "Server-Timing": serverTiming,
+    },
+  });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
+  const startedAt = Date.now();
   const { handle } = await params;
 
   // Validate handle before any cache/rate-limit work
   if (!isValidHandle(handle)) {
     const svg = fallbackSvg(handle, "Invalid GitHub handle.");
-    return new NextResponse(svg, {
-      status: 400,
-      headers: { "Content-Type": "image/svg+xml" },
-    });
+    return badgeSvgResponse(
+      svg,
+      { "Content-Type": "image/svg+xml" },
+      startedAt,
+      [],
+      400,
+    );
   }
 
   // SVG full-response cache: serve warm-cache badge without any Redis rate-limit
@@ -157,9 +189,12 @@ export async function GET(
   const readOnly = request.nextUrl.searchParams.get(READ_ONLY_SMOKE_PARAM) === "1";
   const today = toDateString(new Date());
   const svgCacheKey = buildBadgeSvgCacheKey(handle, today);
+  const cacheReadStart = Date.now();
   const cachedSvg = await readBadgeSvgCache(svgCacheKey);
   if (cachedSvg) {
-    return new NextResponse(cachedSvg, { headers: CACHE_HEADERS });
+    return badgeSvgResponse(cachedSvg, CACHE_HEADERS, startedAt, [
+      { name: "cache", desc: "hit", durMs: Date.now() - cacheReadStart },
+    ]);
   }
 
   // Cache miss: apply rate limit before triggering the expensive render path.
@@ -179,10 +214,13 @@ export async function GET(
   const inflightSvg = inflightBadgeRenders.get(svgCacheKey);
   if (inflightSvg) {
     const shared = await inflightSvg;
-    return new NextResponse(shared.svg, {
-      status: shared.status,
-      headers: shared.headers,
-    });
+    return badgeSvgResponse(
+      shared.svg,
+      shared.headers,
+      startedAt,
+      [{ name: "coalesced", durMs: Date.now() - startedAt }],
+      shared.status,
+    );
   }
 
   const deferred = createDeferred<BadgeRenderResult>();
@@ -220,7 +258,9 @@ export async function GET(
           headers: CACHE_HEADERS,
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
-        return new NextResponse(sharedResult.svg, { headers: sharedResult.headers });
+        return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
+          { name: "cache", desc: "stale", durMs: Date.now() - startedAt },
+        ]);
       }
 
       const lockedSvg = await waitForBadgeSvgCache(svgCacheKey);
@@ -230,14 +270,18 @@ export async function GET(
           headers: CACHE_HEADERS,
         } satisfies BadgeRenderResult;
         deferred.resolve(sharedResult);
-        return new NextResponse(sharedResult.svg, { headers: sharedResult.headers });
+        return badgeSvgResponse(sharedResult.svg, sharedResult.headers, startedAt, [
+          { name: "cache", desc: "poll", durMs: Date.now() - startedAt },
+        ]);
       }
     }
 
+    const materializeStart = Date.now();
     const materialized = await materializePublicProfile(handle, {
       token,
       readOnly,
     });
+    const materializeMs = Date.now() - materializeStart;
     if (!materialized) {
       const fallbackResult = {
         svg: fallbackSvg(handle, "Could not load data — try again later."),
@@ -247,7 +291,9 @@ export async function GET(
         },
       } satisfies BadgeRenderResult;
       deferred.resolve(fallbackResult);
-      return new NextResponse(fallbackResult.svg, { headers: fallbackResult.headers });
+      return badgeSvgResponse(fallbackResult.svg, fallbackResult.headers, startedAt, [
+        { name: "materialize", durMs: materializeMs },
+      ]);
     }
 
     const avatarDataUri = !readOnly && materialized.stats.avatarUrl
@@ -263,6 +309,7 @@ export async function GET(
       return deferProfileCacheWork(handle, materialized, { verification, readOnly });
     });
 
+    const renderStart = Date.now();
     const svg = renderBadgeSvg(materialized.stats, materialized.displayImpact, {
       avatarDataUri,
       verificationHash: verification?.hash,
@@ -271,12 +318,16 @@ export async function GET(
       // <animate> never runs — animated heatmap cells would stay invisible. (#760)
       disableAnimation: true,
     });
+    const renderMs = Date.now() - renderStart;
     if (!readOnly) {
       await writeBadgeSvgCache(svgCacheKey, svg, handle);
     }
     const successResult = { svg, headers: CACHE_HEADERS } satisfies BadgeRenderResult;
     deferred.resolve(successResult);
-    return new NextResponse(successResult.svg, { headers: successResult.headers });
+    return badgeSvgResponse(successResult.svg, successResult.headers, startedAt, [
+      { name: "materialize", durMs: materializeMs },
+      { name: "render", durMs: renderMs },
+    ]);
   } catch (err) {
     const fallbackResult = {
       svg: fallbackSvg(handle, "Something went wrong — try again later."),
@@ -291,10 +342,13 @@ export async function GET(
       error: err,
     }));
 
-    return new NextResponse(fallbackResult.svg, {
-      status: fallbackResult.status,
-      headers: fallbackResult.headers,
-    });
+    return badgeSvgResponse(
+      fallbackResult.svg,
+      fallbackResult.headers,
+      startedAt,
+      [],
+      fallbackResult.status,
+    );
   } finally {
     inflightBadgeRenders.delete(svgCacheKey);
     if (gotRenderLock) {

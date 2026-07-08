@@ -467,6 +467,35 @@ describe("GET /u/[handle]/badge.svg", () => {
     });
   });
 
+  describe("Server-Timing latency instrumentation (#974)", () => {
+    it("emits a cache metric and total duration on a cache hit", async () => {
+      mockCacheGet.mockResolvedValue(FAKE_SVG);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      const timing = res.headers.get("Server-Timing");
+      expect(timing).toBeTruthy();
+      expect(timing).toMatch(/cache;/);
+      expect(timing).toMatch(/total;dur=\d+/);
+    });
+
+    it("emits a materialize + render breakdown with total on a cache miss", async () => {
+      mockCacheGet.mockResolvedValue(null);
+
+      const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });
+      const res = await GET(req, ctx);
+
+      const timing = res.headers.get("Server-Timing");
+      expect(timing).toMatch(/materialize;dur=\d+/);
+      expect(timing).toMatch(/render;dur=\d+/);
+      expect(timing).toMatch(/total;dur=\d+/);
+      // A cache-miss must NOT report a cache metric — the synthetic monitor
+      // relies on its absence to select the cache-miss SLO budget.
+      expect(timing).not.toMatch(/cache;/);
+    });
+  });
+
   describe("rate limit key uses (ip, handle) not just ip (#693)", () => {
     it("rate-limits on combined ip+handle key", async () => {
       const [req, ctx] = makeRequest("testuser", { "x-forwarded-for": "1.2.3.4" });

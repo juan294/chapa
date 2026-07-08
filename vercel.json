@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/process-campaigns",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/latency-check",
+      "schedule": "15 6 * * *"
     }
   ],
   "functions": {
@@ -22,6 +26,9 @@
     },
     "app/api/cron/process-campaigns/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/cron/latency-check/route.ts": {
+      "maxDuration": 60
     }
   }
 }

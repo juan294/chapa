@@ -113,6 +113,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 - GET `/api/cron/warm-cache` Daily cache warming (bearer auth via `CRON_SECRET`)
 - GET `/api/cron/sync-audience` Daily Resend audience sync (bearer auth via `CRON_SECRET`)
 - GET `/api/cron/process-campaigns` Daily campaign batch processor (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/latency-check` Daily badge-route latency SLO synthetic monitor (bearer auth via `CRON_SECRET`); times `/u/:handle/badge.svg` and raises a P2 alert via `CHAPA_ALERT_WEBHOOK_URL` on p95 budget breach
 - POST `/api/telemetry` Client telemetry ingestion
 
 ## Data & types
@@ -158,6 +159,7 @@ Footer shows "Forged from purpose. Driven by curiosity." + dynamic platform logo
 - **Rate-limit fail-open**: The Redis rate limiter (`rateLimit()` in `lib/cache/redis.ts`) intentionally allows all requests when Redis is unavailable (fail-open). This is an availability-first design — blocking every embedded badge because Redis is temporarily down is worse than briefly losing rate enforcement. GitHub's own API limits and CDN caching provide secondary protection. See `redis.ts` for the full rationale.
 - Response headers for badge endpoint (6h s-maxage provides fresher badge updates):
   - `Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400`
+- **Badge latency SLO (#974)**: the badge route (`/u/:handle/badge.svg`) has a defined p95 latency budget — **800ms cache-hit**, **3000ms cache-miss** — enforced in `apps/web/lib/monitoring/latency-slo.ts`. Every badge response carries a `Server-Timing` header (`cache;desc="hit"` on warm hits; `materialize` + `render` breakdown on cold misses; always a `total`) so per-request latency is inspectable. The `/api/cron/latency-check` daily synthetic monitor times the live endpoint and raises a P2 `badge_latency_slo_breach` operational alert via `CHAPA_ALERT_WEBHOOK_URL` when the budget is exceeded (or the probe fails).
 
 ## Code ownership areas
 - OAuth: `apps/web/app/api/auth/*`, `apps/web/lib/auth/*`
