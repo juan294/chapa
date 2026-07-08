@@ -3,7 +3,9 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const SRC = readFileSync(resolve(__dirname, "BadgeOverlay.tsx"), "utf-8");
-const PAGE_SRC = readFileSync(resolve(__dirname, "../app/page.tsx"), "utf-8");
+// The landing page badge-preview markup lives in the client component since
+// #982 made app/page.tsx a thin static server wrapper.
+const PAGE_SRC = readFileSync(resolve(__dirname, "../app/LandingPageClient.tsx"), "utf-8");
 const EN_DICT = readFileSync(
   resolve(__dirname, "../lib/i18n/dictionaries/en.ts"),
   "utf-8",

@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+// The landing page body (and its responsive classes) lives in the client
+// component since #982 made page.tsx a thin static server wrapper.
 const SOURCE = fs.readFileSync(
-  path.resolve(__dirname, "page.tsx"),
+  path.resolve(__dirname, "LandingPageClient.tsx"),
   "utf-8",
 );
 

@@ -1,30 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 
-// Mock getServerLocale + getServerT to return English without needing Next.js infrastructure.
-// Uses a deep-traversal resolver that returns sub-objects (not just leaves) for intermediate keys.
-vi.mock("@/lib/i18n/server", async () => {
-  const { en } = await import("@/lib/i18n/dictionaries/en");
-  function deepGet(obj: Record<string, unknown>, key: string): unknown {
-    const parts = key.split(".");
-    let current: unknown = obj;
-    for (const part of parts) {
-      if (current === null || typeof current !== "object" || Array.isArray(current)) return key;
-      current = (current as Record<string, unknown>)[part];
-      if (current === undefined) return key;
-    }
-    return current;
-  }
-  return {
-    getServerLocale: vi.fn().mockResolvedValue("en"),
-    getServerT: vi.fn().mockImplementation(() => (key: string) =>
-      deepGet(en as unknown as Record<string, unknown>, key)
-    ),
-  };
-});
+// page.tsx computes the demo badge SVG at module scope and passes it to
+// LandingPageClient. LandingPageClient translates via useTranslation, which
+// falls back to English when no LanguageProvider is present (test default).
 
-// Mock heavy dependencies before import
 vi.mock("@/lib/render/BadgeSvg", () => ({
   renderBadgeSvg: vi.fn(() => "<svg data-testid='demo-badge'></svg>"),
 }));
@@ -48,45 +29,48 @@ vi.mock("@/components/ErrorBanner", () => ({
   ),
 }));
 
-vi.mock("@/components/Navbar", () => ({
-  Navbar: () => <nav data-testid="navbar" />,
-}));
-
 vi.mock("@/components/NavbarClient", () => ({
   NavbarClient: () => <nav data-testid="navbar" />,
 }));
 
 vi.mock("@/lib/auth/error-messages", () => ({
-  getOAuthErrorMessage: vi.fn((err?: string) => (err ? `Error: ${err}` : undefined)),
+  getOAuthErrorMessage: vi.fn((err?: string) => (err ? `Error: ${err}` : null)),
 }));
 
 vi.mock("./LandingTerminal", () => ({
   LandingTerminal: () => <div data-testid="landing-terminal" />,
 }));
 
+// LocaleSync issues a server action; stub it out in the render environment.
+vi.mock("@/lib/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+  return { ...actual, LocaleSync: () => null };
+});
+
+beforeEach(() => {
+  window.history.pushState({}, "", "/");
+});
 afterEach(cleanup);
+
+async function renderHome() {
+  const { default: Home } = await import("./page");
+  return render(Home());
+}
 
 describe("Home page render", () => {
   it("renders the page with heading", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({ searchParams: Promise.resolve({}) });
-    render(page);
-    // useTranslation falls back to English when LanguageProvider is absent
-    // English key: landing.hero.headingWord2 = 'decoded'
+    await renderHome();
+    // English key: landing.hero.highlight = 'decoded'
     expect(screen.getByText("decoded")).toBeDefined();
   });
 
   it("renders the navbar", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({ searchParams: Promise.resolve({}) });
-    render(page);
+    await renderHome();
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 
   it("renders feature cards", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({ searchParams: Promise.resolve({}) });
-    render(page);
+    await renderHome();
     // English dict: landing.features[0].title = 'MULTI-DIMENSIONAL'
     expect(screen.getByText("MULTI-DIMENSIONAL")).toBeDefined();
     // English dict: landing.features[2].title = 'VERIFIED METRICS'
@@ -94,9 +78,7 @@ describe("Home page render", () => {
   });
 
   it("renders how-it-works steps", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({ searchParams: Promise.resolve({}) });
-    render(page);
+    await renderHome();
     // English dict: landing.steps[0,1,2].title
     expect(screen.getByText("Sign in with GitHub")).toBeDefined();
     expect(screen.getByText("We build your profile")).toBeDefined();
@@ -104,27 +86,28 @@ describe("Home page render", () => {
   });
 
   it("renders stats section", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({ searchParams: Promise.resolve({}) });
-    render(page);
+    await renderHome();
     // English dict: landing.stats[*].label
     expect(screen.getByText("archetypes")).toBeDefined();
     expect(screen.getByText("dimensions")).toBeDefined();
   });
 
-  it("renders error banner when error param present", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({
-      searchParams: Promise.resolve({ error: "access_denied" }),
-    });
-    render(page);
-    expect(screen.getByTestId("error-banner")).toBeDefined();
+  it("renders error banner when error param present in the URL", async () => {
+    window.history.pushState({}, "", "/?error=access_denied");
+    await renderHome();
+    // Read client-side from window.location in an effect, so wait for it.
+    await waitFor(() =>
+      expect(screen.getByTestId("error-banner")).toBeDefined(),
+    );
+  });
+
+  it("does not render an error banner without an error param", async () => {
+    await renderHome();
+    expect(screen.queryByTestId("error-banner")).toBeNull();
   });
 
   it("renders icons (GitHubIcon, ArrowRightIcon, ShieldCheckIcon)", async () => {
-    const { default: Home } = await import("./page");
-    const page = await Home({ searchParams: Promise.resolve({}) });
-    const { container } = render(page);
+    const { container } = await renderHome();
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
   });

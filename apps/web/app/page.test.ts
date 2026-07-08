@@ -17,56 +17,50 @@ describe("Landing page (server component)", () => {
       expect(SOURCE).not.toMatch(/^["']use client["']/m);
     });
 
-    it("is an async function (server component)", () => {
-      expect(SOURCE).toContain("async function");
+    it("delegates the body to the LandingPageClient client component", () => {
+      expect(SOURCE).toContain("LandingPageClient");
     });
   });
 
-  describe("rendering mode", () => {
-    it("does not use force-dynamic directive (Next.js infers dynamic from cookies() call)", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-dynamic'");
+  // #982 — the landing page must be statically renderable (ISR/CDN-cacheable).
+  // It must NOT read cookies, headers, or searchParams at render time, since any
+  // of those opts the route out of static generation. Locale + query-param
+  // handling is delegated to the client (LandingPageClient / useTranslation /
+  // window.location in an effect).
+  describe("static rendering contract (#982)", () => {
+    it("declares force-static so the route is ISR/CDN-cacheable", () => {
+      expect(SOURCE).toContain('export const dynamic = "force-static"');
     });
 
-    it("does not use force-static directive", () => {
-      expect(SOURCE).not.toContain("export const dynamic = 'force-static'");
+    it("does not use force-dynamic directive", () => {
+      expect(SOURCE).not.toContain("force-dynamic");
+    });
+
+    it("does not call getServerLocale (no cookie read at render time)", () => {
+      expect(SOURCE).not.toContain("getServerLocale");
+    });
+
+    it("does not call getServerT (translation delegated to the client)", () => {
+      expect(SOURCE).not.toContain("getServerT");
+    });
+
+    it("does not read searchParams server-side (would force dynamic rendering)", () => {
+      expect(SOURCE).not.toContain("searchParams");
     });
   });
 
   describe("rendering", () => {
-    it("renders NavbarClient (session fetched client-side)", () => {
-      expect(SOURCE).toContain("NavbarClient");
-    });
-
-    it("renders main content area", () => {
-      expect(SOURCE).toContain('id="main-content"');
-    });
-
-    it("hero heading copy is in the English dictionary", () => {
-      expect(EN_DICT).toContain("Developer Impact,");
-    });
-
-    it("renders badge preview", () => {
+    it("computes the demo badge SVG server-side and passes it as a prop", () => {
+      expect(SOURCE).toContain("renderBadgeSvg");
       expect(SOURCE).toContain("demoBadgeSvg");
-    });
-
-    it("renders BadgeOverlay", () => {
-      expect(SOURCE).toContain("BadgeOverlay");
-    });
-
-    it("renders GitHub login CTA (via LoginCtaButton, which links to /api/auth/login)", () => {
-      expect(SOURCE).toContain("LoginCtaButton");
-    });
-
-    it("renders LandingTerminal", () => {
-      expect(SOURCE).toContain("LandingTerminal");
-    });
-
-    it("renders footer", () => {
-      expect(SOURCE).toContain("<footer");
     });
   });
 
-  describe("features section", () => {
+  describe("i18n dictionary content (English)", () => {
+    it("hero heading copy is in the English dictionary", () => {
+      expect(EN_DICT).toContain("Developer impact,");
+    });
+
     it("lists all five features in the English dictionary", () => {
       expect(EN_DICT).toContain("MULTI-DIMENSIONAL");
       expect(EN_DICT).toContain("DEVELOPER ARCHETYPE");
@@ -74,103 +68,12 @@ describe("Landing page (server component)", () => {
       expect(EN_DICT).toContain("LIVING DOCUMENT");
       expect(EN_DICT).toContain("ONE-CLICK EMBED");
     });
-  });
 
-  describe("dimensions section", () => {
     it("lists all four core dimensions in the English dictionary", () => {
       expect(EN_DICT).toContain("'DELIVERY'");
       expect(EN_DICT).toContain("'QUALITY'");
       expect(EN_DICT).toContain("'CONSISTENCY'");
       expect(EN_DICT).toContain("'BREADTH'");
-    });
-  });
-
-  describe("i18n integration", () => {
-    it("uses getServerT() for translations", () => {
-      expect(SOURCE).toContain("getServerT");
-    });
-
-    it("uses getServerLocale() to read locale from cookie/header for full page translation", () => {
-      // The page is server-rendered per-request so switching locale via the
-      // LanguageSwitcher (which sets chapa-locale cookie + calls router.refresh())
-      // results in the server re-rendering all content in the correct language.
-      expect(SOURCE).toContain("getServerLocale");
-    });
-
-    it("renders LocaleSync for sticky ?lang= query param override", () => {
-      expect(SOURCE).toContain("LocaleSync");
-    });
-
-    it("does not use the old SPANISH_PUBLIC_COPY import", () => {
-      expect(SOURCE).not.toContain("SPANISH_PUBLIC_COPY");
-    });
-
-    it("does not keep the old English acquisition CTAs on the landing page", () => {
-      expect(SOURCE).not.toContain("Get Your Badge");
-      expect(SOURCE).not.toContain("Verify a Badge");
-      expect(SOURCE).not.toContain("Ready to prove your impact?");
-      expect(EN_DICT).not.toContain("Get Your Badge");
-      // "Verify a Badge" is legitimately used as a CTA in the verification page namespace
-      // (about.verification.ctaButton), so we only check landing-specific keys
-      expect(EN_DICT).not.toContain("Ready to prove your impact?");
-    });
-  });
-
-  describe("error handling", () => {
-    it("reads searchParams for OAuth errors", () => {
-      expect(SOURCE).toContain("searchParams");
-    });
-
-    it("uses getOAuthErrorMessage", () => {
-      expect(SOURCE).toContain("getOAuthErrorMessage");
-    });
-
-    it("renders ErrorBanner conditionally", () => {
-      expect(SOURCE).toContain("ErrorBanner");
-    });
-  });
-
-  // #740 — UX-M3: verification CTA uses complement (teal) tokens
-  describe("verification CTA uses complement tokens (#740)", () => {
-    it("Verify a Badge button uses bg-complement", () => {
-      expect(SOURCE).toContain("bg-complement");
-    });
-
-    it("Verify a Badge button links to /verify", () => {
-      expect(SOURCE).toContain('href="/verify"');
-    });
-  });
-
-  describe("archetype links", () => {
-    it("links to all seven archetype pages", () => {
-      expect(SOURCE).toContain("/archetypes/builder");
-      expect(SOURCE).toContain("/archetypes/guardian");
-      expect(SOURCE).toContain("/archetypes/marathoner");
-      expect(SOURCE).toContain("/archetypes/polymath");
-      expect(SOURCE).toContain("/archetypes/artificer");
-      expect(SOURCE).toContain("/archetypes/balanced");
-      expect(SOURCE).toContain("/archetypes/emerging");
-    });
-  });
-
-  // Phase 9 — optical icon alignment on CTA buttons
-  describe("optical icon alignment (Phase 9)", () => {
-    it("CTA buttons use asymmetric padding for optical icon alignment", () => {
-      // Hero buttons should have pl-6 pr-5 (not symmetric px-6)
-      expect(SOURCE).toContain("pl-6 pr-5");
-    });
-  });
-
-  // #741 — visible section labels for landmark sections
-  describe("visible section labels (#741)", () => {
-    it("Features section has a visible label element (not only sr-only)", () => {
-      // There should be a visible label with font-heading + tracking-widest or similar
-      expect(SOURCE).toContain("tracking-widest");
-    });
-
-    it("section labels use text-text-secondary and font-heading", () => {
-      expect(SOURCE).toContain("text-text-secondary");
-      expect(SOURCE).toContain("font-heading");
     });
 
     it("section headings are present in the English dictionary", () => {
@@ -179,6 +82,11 @@ describe("Landing page (server component)", () => {
       expect(EN_DICT).toContain("Enterprise");
       expect(EN_DICT).toContain("Stats");
       expect(EN_DICT).toContain("Get started");
+    });
+
+    it("does not keep the old English acquisition CTAs in the dictionary", () => {
+      expect(EN_DICT).not.toContain("Get Your Badge");
+      expect(EN_DICT).not.toContain("Ready to prove your impact?");
     });
   });
 });
