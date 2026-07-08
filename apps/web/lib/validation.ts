@@ -140,8 +140,9 @@ export function isValidTelemetryPayload(value: unknown): boolean {
  *
  * Ensures the shape matches what the scoring pipeline expects — prevents
  * arbitrary JSON from being stored. Validates: handle + fetchedAt (strings),
- * 14 required non-negative number fields (commits, PRs, reviews, etc.),
- * and heatmapData (array of {date, count} entries, max 371 = 53 weeks × 7 days).
+ * 14 required non-negative number fields (commits, PRs, reviews, etc.) with
+ * per-field magnitude caps, optional ratio/numeric fields that feed scoring
+ * (#984), and heatmapData (array of {date, count} entries, max 371 = 53 weeks × 7 days).
  *
  * Used by POST /api/supplemental.
  */
@@ -192,15 +193,33 @@ export function isValidStatsShape(value: unknown): boolean {
   if (typeof obj.totalForks === "number" && obj.totalForks > 1_000_000) return false;
   if (typeof obj.totalWatchers === "number" && obj.totalWatchers > 1_000_000) return false;
 
+  // Optional ratio fields (0..1) that feed the Quality/Craft dimensions.
   const optionalRatios = [
     "microCommitRatio",
     "docsOnlyPrRatio",
-    "largeCommitRatio",
-    "testCodeRatio",
-    "primaryReviewRatio",
+    "batchSizeScore",
+    "prDescriptionRate",
+    "featureBranchRate",
+    "issueLinkageRate",
   ] as const;
   for (const key of optionalRatios) {
     if (obj[key] !== undefined && !isRatio(obj[key])) return false;
+  }
+
+  // #984: optional non-ratio numeric fields that also flow into computeImpactV6
+  // and persist into snapshots/history need non-negative + range guards.
+  if (obj.medianPrLeadTimeHours !== undefined) {
+    if (!isNonNegativeFiniteNumber(obj.medianPrLeadTimeHours) || obj.medianPrLeadTimeHours > 100_000) {
+      return false;
+    }
+  }
+  if (obj.primaryReviewsSubmittedCount !== undefined) {
+    if (
+      !isNonNegativeFiniteNumber(obj.primaryReviewsSubmittedCount) ||
+      obj.primaryReviewsSubmittedCount > 50_000
+    ) {
+      return false;
+    }
   }
 
   if (!Array.isArray(obj.heatmapData)) return false;
