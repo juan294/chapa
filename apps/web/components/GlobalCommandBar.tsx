@@ -15,6 +15,7 @@ import {
 import type { OutputLine } from "@/components/terminal/command-registry";
 import { useClientFeatureFlags } from "@/components/ClientFeatureFlagsProvider";
 import { useTranslation } from "@/lib/i18n";
+import { tObject } from "@/lib/i18n/typed-accessors";
 
 const OUTPUT_TIMEOUT_MS = 5000;
 
@@ -37,7 +38,7 @@ export function GlobalCommandBar({
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const descriptions = useMemo(() => {
-    const d = t("commands.descriptions") as unknown as Record<string, string>;
+    const d = tObject<Record<string, string>>(t, "commands.descriptions");
     return typeof d === "object" && d !== null && !Array.isArray(d) ? d : {};
   }, [t]);
 

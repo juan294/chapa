@@ -9,6 +9,7 @@ import { NavLink } from "./NavLink";
 import { MobileNav } from "./MobileNav";
 import { useSession } from "@/hooks/useSession";
 import { useTranslation } from "@/lib/i18n";
+import { tArray } from "@/lib/i18n/typed-accessors";
 
 interface NavLinkItem {
   label: string;
@@ -35,8 +36,8 @@ export function NavbarClient({ navLinks }: { navLinks?: NavLinkItem[] }) {
   // and a last-resort fallback if t() returns an empty array.
   const resolvedNavLinks = useMemo<NavLinkItem[] | undefined>(() => {
     if (!navLinks || navLinks.length === 0) return undefined;
-    const localeLinks = t('landing.navLinks') as unknown as NavLinkItem[] | undefined;
-    if (Array.isArray(localeLinks) && localeLinks.length > 0) return localeLinks;
+    const localeLinks = tArray<NavLinkItem>(t, 'landing.navLinks');
+    if (localeLinks.length > 0) return localeLinks;
     return navLinks;
   }, [navLinks, t]);
 

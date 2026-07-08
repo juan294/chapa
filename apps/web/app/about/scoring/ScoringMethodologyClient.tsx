@@ -4,6 +4,7 @@ import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
+import { tArray } from "@/lib/i18n/typed-accessors";
 
 /* ---------------------------------------------------------------------- */
 /* Reusable sub-components                                                 */
@@ -167,7 +168,7 @@ export function ScoringMethodologyClient() {
             </p>
             <Table
               headers={t('about.scoring.capsTableHeaders') as string[]}
-              rows={t('about.scoring.capsTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.capsTableRows')}
             />
 
             {/* ---------------------------------------------------------- */}
@@ -182,7 +183,7 @@ export function ScoringMethodologyClient() {
             <SubHeading>{t('about.scoring.deliveryHeading') as string}</SubHeading>
             <Table
               headers={t('about.scoring.deliveryTableHeaders') as string[]}
-              rows={t('about.scoring.deliveryTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.deliveryTableRows')}
             />
             <p>
               {t('about.scoring.deliveryPrWeightNote1') as string}
@@ -205,12 +206,12 @@ export function ScoringMethodologyClient() {
             <SubHeading>{t('about.scoring.collaborativeQualityHeading') as string}</SubHeading>
             <Table
               headers={t('about.scoring.collaborativeQualityTableHeaders') as string[]}
-              rows={t('about.scoring.collaborativeQualityTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.collaborativeQualityTableRows')}
             />
             <SubHeading>{t('about.scoring.soloQualityHeading') as string}</SubHeading>
             <Table
               headers={t('about.scoring.soloQualityTableHeaders') as string[]}
-              rows={t('about.scoring.soloQualityTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.soloQualityTableRows')}
             />
             <p>
               {t('about.scoring.soloQualityNote') as string}
@@ -222,7 +223,7 @@ export function ScoringMethodologyClient() {
             </SubHeading>
             <Table
               headers={t('about.scoring.consistencyTableHeaders') as string[]}
-              rows={t('about.scoring.consistencyTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.consistencyTableRows')}
             />
             <p>
               {t('about.scoring.consistencyNote1Prefix') as string}
@@ -236,7 +237,7 @@ export function ScoringMethodologyClient() {
             <SubHeading>{t('about.scoring.breadthHeading') as string}</SubHeading>
             <Table
               headers={t('about.scoring.breadthTableHeaders') as string[]}
-              rows={t('about.scoring.breadthTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.breadthTableRows')}
             />
             <p>
               {t('about.scoring.breadthNote') as string}
@@ -259,7 +260,7 @@ export function ScoringMethodologyClient() {
             </p>
             <Table
               headers={t('about.scoring.craftTableHeaders') as string[]}
-              rows={t('about.scoring.craftTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.craftTableRows')}
             />
             <p>
               {t('about.scoring.craftFrictionNote1') as string}
@@ -274,7 +275,7 @@ export function ScoringMethodologyClient() {
             </p>
             <Table
               headers={t('about.scoring.archetypesTableHeaders') as string[]}
-              rows={t('about.scoring.archetypesTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.archetypesTableRows')}
             />
             <p>
               {t('about.scoring.archetypesTieBreaking') as string}
@@ -301,7 +302,7 @@ export function ScoringMethodologyClient() {
             </p>
             <Table
               headers={t('about.scoring.tiersTableHeaders') as string[]}
-              rows={t('about.scoring.tiersTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.tiersTableRows')}
             />
 
             {/* ---------------------------------------------------------- */}
@@ -318,7 +319,7 @@ export function ScoringMethodologyClient() {
             </p>
             <Table
               headers={t('about.scoring.confidenceTableHeaders') as string[]}
-              rows={t('about.scoring.confidenceTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.scoring.confidenceTableRows')}
             />
             <p>
               {t('about.scoring.confidenceFloor1Prefix') as string}

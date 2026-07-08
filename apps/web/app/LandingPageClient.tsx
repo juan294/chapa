@@ -7,6 +7,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { NavbarClient } from "@/components/NavbarClient";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
+import { tArray, tObject } from "@/lib/i18n/typed-accessors";
 import { getOAuthErrorMessage } from "@/lib/auth/error-messages";
 import { LandingTerminal } from "./LandingTerminal";
 import { LoginCtaButton } from "@/components/LoginCtaButton";
@@ -95,9 +96,9 @@ export function LandingPageClient({
 }) {
   const { t } = useTranslation();
 
-  const navLinks = t('landing.navLinks') as unknown as Array<{ label: string; href: string }>;
+  const navLinks = tArray<{ label: string; href: string }>(t, 'landing.navLinks');
 
-  const hero = t('landing.hero') as unknown as Record<string, string | string[]>;
+  const hero = tObject<Record<string, string | string[]>>(t, 'landing.hero');
   const heroTitle = hero.title as string;
   const heroHighlight = hero.highlight as string;
   const heroLeadBefore = hero.leadBefore as string;
@@ -111,17 +112,17 @@ export function LandingPageClient({
   const heroVerifyCta = hero.verifyCta as string;
   const heroBadgePreviewLabel = hero.badgePreviewLabel as string;
 
-  const embed = t('landing.embed') as unknown as Record<string, string>;
-  const sections = t('landing.sections') as unknown as Record<string, string>;
-  const features = t('landing.features') as unknown as Array<{ title: string; description?: string; descriptionBefore?: string; descriptionAfter?: string }>;
-  const archetypes = t('landing.archetypes') as unknown as Record<string, string>;
-  const steps = t('landing.steps') as unknown as Array<{ number: string; title: string; description: string }>;
-  const measure = t('landing.measure') as unknown as Record<string, string>;
-  const dimensions = t('landing.dimensions') as unknown as Array<{ title: string; description: string }>;
-  const enterprise = t('landing.enterprise') as unknown as Record<string, string>;
-  const stats = t('landing.stats') as unknown as Array<{ value: string; label: string }>;
-  const finalCta = t('landing.finalCta') as unknown as Record<string, string>;
-  const footer = t('landing.footer') as unknown as Record<string, string>;
+  const embed = tObject<Record<string, string>>(t, 'landing.embed');
+  const sections = tObject<Record<string, string>>(t, 'landing.sections');
+  const features = tArray<{ title: string; description?: string; descriptionBefore?: string; descriptionAfter?: string }>(t, 'landing.features');
+  const archetypes = tObject<Record<string, string>>(t, 'landing.archetypes');
+  const steps = tArray<{ number: string; title: string; description: string }>(t, 'landing.steps');
+  const measure = tObject<Record<string, string>>(t, 'landing.measure');
+  const dimensions = tArray<{ title: string; description: string }>(t, 'landing.dimensions');
+  const enterprise = tObject<Record<string, string>>(t, 'landing.enterprise');
+  const stats = tArray<{ value: string; label: string }>(t, 'landing.stats');
+  const finalCta = tObject<Record<string, string>>(t, 'landing.finalCta');
+  const footer = tObject<Record<string, string>>(t, 'landing.footer');
 
   return (
     <div className="bg-bg min-h-screen text-text-primary">

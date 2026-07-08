@@ -4,6 +4,7 @@ import Link from "next/link";
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { LocaleSync, useTranslation } from "@/lib/i18n";
+import { tArray } from "@/lib/i18n/typed-accessors";
 
 /* ---------------------------------------------------------------------- */
 /* Reusable sub-components                                                 */
@@ -183,7 +184,7 @@ export function VerificationPageClient() {
             </p>
             <Table
               headers={t('about.verification.whatTableHeaders') as string[]}
-              rows={t('about.verification.whatTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.verification.whatTableRows')}
             />
             <p>
               {t('about.verification.whatDeterministicNote') as string}
@@ -277,7 +278,7 @@ export function VerificationPageClient() {
             <SectionHeading>{t('about.verification.sectionDesign') as string}</SectionHeading>
             <Table
               headers={t('about.verification.designTableHeaders') as string[]}
-              rows={t('about.verification.designTableRows') as unknown as string[][]}
+              rows={tArray<string[]>(t, 'about.verification.designTableRows')}
             />
 
             {/* ---------------------------------------------------------- */}
