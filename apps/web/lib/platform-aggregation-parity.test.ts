@@ -2,21 +2,24 @@
  * Cross-platform aggregation parity test (AR-S1 / #949)
  *
  * Asserts that the invariant aggregation steps (active days, repos contributed,
- * top-repo share, maxCommitsIn10Min) produce identical results across all three
- * platform aggregators when given equivalent normalized inputs.
+ * top-repo share, maxCommitsIn10Min) plus the PR-weight metrics (prsMergedWeight,
+ * linesAdded, linesDeleted, prsMergedCount) produce identical results across all
+ * three platform aggregators when given equivalent normalized inputs.
  *
  * Why this matters: AR-M1 extracted the invariant skeleton into
- * computePlatformStats() in packages/shared. This test is the regression guard —
- * if the skeleton ever drifts back toward per-platform divergence, these
- * assertions will catch it before it reaches scoring.
+ * computePlatformStats() in packages/shared; #983 extended it to own the PR
+ * aggregation loop (weight + aggregate cap + line sums) previously duplicated in
+ * each per-platform file. This test is the regression guard — if the skeleton
+ * ever drifts back toward per-platform divergence, these assertions will catch
+ * it before it reaches scoring.
  *
  * Design:
  *   - Builds minimal "equivalent" fixtures for Bitbucket, GitLab, and Codeberg
  *     that represent the same logical developer activity.
- *   - Asserts that all invariant output fields are byte-for-byte identical.
- *   - Platform-specific fields (totalStars, totalForks, totalWatchers, handle,
- *     displayName, prsMergedCount, linesAdded, linesDeleted, reviewsSubmittedCount,
- *     issuesClosedCount) are NOT compared — those legitimately differ by platform.
+ *   - Asserts that all invariant + PR-weight output fields are identical.
+ *   - Genuinely platform-specific fields (totalStars, totalForks, totalWatchers,
+ *     handle, displayName, reviewsSubmittedCount, issuesClosedCount) are NOT
+ *     compared — those legitimately differ by platform.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -279,6 +282,30 @@ describe("cross-platform aggregation parity (AR-S1)", () => {
 
     expect(glInvariants).toEqual(bbInvariants);
     expect(cbInvariants).toEqual(bbInvariants);
+  });
+
+  it("produces identical PR-weight metrics across all three platforms (#983)", () => {
+    // prsMergedWeight, linesAdded and linesDeleted are now computed by the
+    // shared computePlatformStats() from equivalent normalized merged-PR inputs,
+    // so they must be byte-for-byte identical across platforms. This guards the
+    // #983 extraction of the PR aggregation loop out of the per-platform files.
+    const bb = buildStatsFromBitbucket(makeBitbucketRaw());
+    const gl = buildStatsFromGitlab(makeGitlabRaw());
+    const cb = buildStatsFromCodeberg(makeCodebergRaw());
+
+    // All three fixtures carry one PR of PR_ADDITIONS/PR_DELETIONS/PR_CHANGED_FILES.
+    expect(bb.linesAdded).toBe(PR_ADDITIONS);
+    expect(bb.linesDeleted).toBe(PR_DELETIONS);
+    expect(bb.prsMergedWeight).toBeGreaterThan(0);
+
+    expect(gl.linesAdded).toBe(bb.linesAdded);
+    expect(cb.linesAdded).toBe(bb.linesAdded);
+    expect(gl.linesDeleted).toBe(bb.linesDeleted);
+    expect(cb.linesDeleted).toBe(bb.linesDeleted);
+    expect(gl.prsMergedWeight).toBeCloseTo(bb.prsMergedWeight, 10);
+    expect(cb.prsMergedWeight).toBeCloseTo(bb.prsMergedWeight, 10);
+    expect(gl.prsMergedCount).toBe(bb.prsMergedCount);
+    expect(cb.prsMergedCount).toBe(bb.prsMergedCount);
   });
 
   it("does NOT assert equality on platform-specific fields (smoke check)", () => {

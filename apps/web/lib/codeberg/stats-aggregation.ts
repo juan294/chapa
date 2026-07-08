@@ -1,5 +1,5 @@
-import type { HeatmapDay, StatsData } from "@chapa/shared";
-import { computePlatformStats, computePrWeight, PR_WEIGHT_AGG_CAP } from "@chapa/shared";
+import type { HeatmapDay, NormalizedMergedPr, StatsData } from "@chapa/shared";
+import { computePlatformStats } from "@chapa/shared";
 import type { RawCodebergData } from "./types";
 import { toDateString } from "@/lib/utils/date";
 
@@ -12,13 +12,14 @@ import { toDateString } from "@/lib/utils/date";
  *      ({timestamp, contributions}) → {date: "YYYY-MM-DD", count}
  *      Aggregates multiple timestamps mapping to the same date.
  *   2. commitsTotal: sum of heatmap contribution counts
- *   4. PR diffstat: additions/deletions/changed_files inline on Codeberg PRs
+ *   4. PR diffstat → per-PR {additions, deletions, changedFiles} (inline on
+ *      Codeberg PRs; weight/cap/line-sum aggregation delegated to computePlatformStats)
  *   5. Review counting: raw.reviews.length (already filtered in queries layer)
  *   6. issuesClosedCount passthrough
  *  10. Social metrics: all available (stars, forks, watchers)
  *
- * Invariant steps (active days, repo depth, top-repo share, maxCommitsIn10Min)
- * are delegated to computePlatformStats().
+ * Invariant steps — active days, repo depth, top-repo share, maxCommitsIn10Min,
+ * and PR-weight aggregation — are delegated to computePlatformStats().
  */
 export function buildStatsFromCodeberg(raw: RawCodebergData): StatsData {
   // 1. Build heatmap from native data
@@ -36,21 +37,13 @@ export function buildStatsFromCodeberg(raw: RawCodebergData): StatsData {
   // 2. Commit count from heatmap totals
   const commitsTotal = heatmapData.reduce((sum, d) => sum + d.count, 0);
 
-  // 4. PR metrics — additions/deletions/changedFiles are inline on Codeberg PRs
-  const prsMergedCount = raw.mergedPRs.length;
-  let prsMergedWeight = 0;
-  let linesAdded = 0;
-  let linesDeleted = 0;
-  for (const pr of raw.mergedPRs) {
-    linesAdded += pr.additions;
-    linesDeleted += pr.deletions;
-    prsMergedWeight += computePrWeight({
-      additions: pr.additions,
-      deletions: pr.deletions,
-      changedFiles: pr.changed_files,
-    });
-  }
-  prsMergedWeight = Math.min(prsMergedWeight, PR_WEIGHT_AGG_CAP);
+  // 4. PR metrics — additions/deletions/changedFiles are inline on Codeberg PRs.
+  //    Weight/cap/line-sum aggregation is owned by computePlatformStats().
+  const mergedPrs: NormalizedMergedPr[] = raw.mergedPRs.map((pr) => ({
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changedFiles: pr.changed_files,
+  }));
 
   // 5. Reviews — already filtered in queries layer
   const reviewsSubmittedCount = raw.reviews.length;
@@ -75,10 +68,7 @@ export function buildStatsFromCodeberg(raw: RawCodebergData): StatsData {
     avatarUrl: raw.avatarUrl,
     heatmapData,
     commitsTotal,
-    prsMergedCount,
-    prsMergedWeight,
-    linesAdded,
-    linesDeleted,
+    mergedPrs,
     reviewsSubmittedCount,
     issuesClosedCount,
     repos: raw.repos, // { fullName, commitCount, isOwned } — subset of CodebergRepo
