@@ -4,11 +4,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock dependencies BEFORE importing the route handler.
 // ---------------------------------------------------------------------------
 
-const { mockGetOptionalRequestSession, mockRateLimit, mockIsAdminHandle } = vi.hoisted(() => ({
-  mockGetOptionalRequestSession: vi.fn(),
-  mockRateLimit: vi.fn(),
-  mockIsAdminHandle: vi.fn(),
-}));
+const { mockGetOptionalRequestSession, mockRateLimit, mockRateLimitStrict, mockIsAdminHandle } =
+  vi.hoisted(() => ({
+    mockGetOptionalRequestSession: vi.fn(),
+    mockRateLimit: vi.fn(),
+    mockRateLimitStrict: vi.fn(),
+    mockIsAdminHandle: vi.fn(),
+  }));
 
 vi.mock("@/lib/auth/session", () => ({
   getOptionalRequestSession: mockGetOptionalRequestSession,
@@ -20,6 +22,7 @@ vi.mock("@/lib/auth/admin", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   rateLimit: mockRateLimit,
+  rateLimitStrict: mockRateLimitStrict,
 }));
 
 vi.mock("@/lib/http/client-ip", () => ({
@@ -52,6 +55,7 @@ describe("GET /api/auth/session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
     mockIsAdminHandle.mockReturnValue(false);
   });
 
@@ -191,10 +195,11 @@ describe("GET /api/auth/session — rate limiting", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRateLimit.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: true, current: 1, limit: 60 });
   });
 
   it("returns 429 when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
 
     const res = await GET(makeRequest(undefined, "1.2.3.4"));
 
@@ -203,12 +208,33 @@ describe("GET /api/auth/session — rate limiting", () => {
     expect(json.error).toMatch(/too many/i);
   });
 
+  it("uses the fail-closed rate limiter (not the fail-open variant)", async () => {
+    mockGetOptionalRequestSession.mockReturnValue(null);
+
+    await GET(makeRequest(undefined, "1.2.3.4"));
+
+    expect(mockRateLimitStrict).toHaveBeenCalledWith("ratelimit:session:1.2.3.4", 60, 60);
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("rejects the request when Redis is unavailable (fails closed)", async () => {
+    // Simulate a Redis outage: the fail-open limiter would allow the request,
+    // but the fail-closed limiter blocks it. An auth-critical route must block.
+    mockRateLimit.mockResolvedValue({ allowed: true, current: 0, limit: 60 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 0, limit: 60 });
+    mockGetOptionalRequestSession.mockReturnValue(null);
+
+    const res = await GET(makeRequest(undefined, "1.2.3.4"));
+
+    expect(res.status).toBe(429);
+  });
+
   it("rate limits by IP with correct key and window (60 req / 60s)", async () => {
     mockGetOptionalRequestSession.mockReturnValue(null);
 
     await GET(makeRequest(undefined, "1.2.3.4"));
 
-    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:session:1.2.3.4", 60, 60);
+    expect(mockRateLimitStrict).toHaveBeenCalledWith("ratelimit:session:1.2.3.4", 60, 60);
   });
 
   it("uses 'unknown' when x-forwarded-for is absent", async () => {
@@ -216,11 +242,11 @@ describe("GET /api/auth/session — rate limiting", () => {
 
     await GET(makeRequest());
 
-    expect(mockRateLimit).toHaveBeenCalledWith("ratelimit:session:unknown", 60, 60);
+    expect(mockRateLimitStrict).toHaveBeenCalledWith("ratelimit:session:unknown", 60, 60);
   });
 
   it("includes Retry-After header when rate limited", async () => {
-    mockRateLimit.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
+    mockRateLimitStrict.mockResolvedValue({ allowed: false, current: 61, limit: 60 });
 
     const res = await GET(makeRequest(undefined, "1.2.3.4"));
 

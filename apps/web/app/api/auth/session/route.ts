@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getOptionalRequestSession } from "@/lib/auth/session";
 import { isAdminHandle } from "@/lib/auth/admin";
-import { rateLimit } from "@/lib/cache/redis";
+import { rateLimitStrict } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { withErrorCapture } from "@/lib/analytics/server-errors";
 
 export const GET = withErrorCapture("/api/auth/session", async (request: NextRequest) => {
   // Rate limit: 60 requests per IP per 60 seconds
   const ip = getClientIp(request);
-  const rl = await rateLimit(`ratelimit:session:${ip}`, 60, 60);
+  const rl = await rateLimitStrict(`ratelimit:session:${ip}`, 60, 60);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
