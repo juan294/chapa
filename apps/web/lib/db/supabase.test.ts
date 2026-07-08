@@ -97,11 +97,41 @@ describe("getSupabase", () => {
 // ---------------------------------------------------------------------------
 
 describe("pingSupabase", () => {
+  /**
+   * Builds a Supabase client mock whose query chain mirrors the app's
+   * hot-path snapshot read: from().select().order().limit(). The terminal
+   * limit() resolves/rejects with `result`. Returns the `from` spy so tests
+   * can assert which table was probed.
+   */
+  function mockSupabaseChain(result: {
+    resolved?: unknown;
+    rejected?: unknown;
+  }) {
+    const limit =
+      "rejected" in result
+        ? vi.fn().mockRejectedValue(result.rejected)
+        : vi.fn().mockResolvedValue(result.resolved);
+    const order = vi.fn().mockReturnValue({ limit });
+    const select = vi.fn().mockReturnValue({ order });
+    const from = vi.fn().mockReturnValue({ select });
+    mockCreateClient.mockReturnValue({ from });
+    return { from, select, order, limit };
+  }
+
+  it("probes the metrics_snapshots table, not users", async () => {
+    const { from } = mockSupabaseChain({ resolved: { error: null } });
+
+    vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
+
+    await pingSupabase();
+
+    expect(from).toHaveBeenCalledWith("metrics_snapshots");
+    expect(from).not.toHaveBeenCalledWith("users");
+  });
+
   it("returns 'ok' when query succeeds", async () => {
-    const mockSelect = vi.fn().mockReturnValue({
-      limit: vi.fn().mockResolvedValue({ error: null }),
-    });
-    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+    mockSupabaseChain({ resolved: { error: null } });
 
     vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
@@ -119,10 +149,7 @@ describe("pingSupabase", () => {
   });
 
   it("returns 'error' when query fails", async () => {
-    const mockSelect = vi.fn().mockReturnValue({
-      limit: vi.fn().mockResolvedValue({ error: new Error("DB down") }),
-    });
-    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+    mockSupabaseChain({ resolved: { error: new Error("DB down") } });
 
     vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
@@ -132,10 +159,7 @@ describe("pingSupabase", () => {
   });
 
   it("returns 'error' when query rejects (timeout or network failure)", async () => {
-    const mockSelect = vi.fn().mockReturnValue({
-      limit: vi.fn().mockRejectedValue(new Error("ping timeout")),
-    });
-    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+    mockSupabaseChain({ rejected: new Error("ping timeout") });
 
     vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
@@ -148,10 +172,7 @@ describe("pingSupabase", () => {
     vi.useFakeTimers();
 
     // Query never resolves — setTimeout callback must fire
-    const mockSelect = vi.fn().mockReturnValue({
-      limit: vi.fn().mockReturnValue(new Promise(() => {})),
-    });
-    mockCreateClient.mockReturnValue({ from: () => ({ select: mockSelect }) });
+    mockSupabaseChain({ resolved: new Promise(() => {}) });
 
     vi.stubEnv("SUPABASE_URL", "https://test.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sk-test-key");
