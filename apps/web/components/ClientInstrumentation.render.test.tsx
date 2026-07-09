@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import dynamic from "next/dynamic";
 
 vi.mock("@/components/ClientAnalytics", () => ({
   ClientAnalytics: () => <div data-testid="client-analytics" />,
@@ -30,5 +31,17 @@ describe("ClientInstrumentation render", () => {
       "false",
     );
     expect(screen.getByTestId("client-analytics")).toBeTruthy();
+  });
+
+  it("resolves the deferred loader to PostHogInit", async () => {
+    await import("./ClientInstrumentation");
+    const { PostHogInit } = await import("@/components/PostHogProvider");
+
+    const call = vi.mocked(dynamic).mock.calls[0];
+    if (!call) throw new Error("dynamic() was not called");
+    const loader = call[0] as () => Promise<{ default: typeof PostHogInit }>;
+    const resolved = await loader();
+
+    expect(resolved.default).toBe(PostHogInit);
   });
 });
