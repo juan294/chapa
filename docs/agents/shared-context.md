@@ -253,24 +253,6 @@
 - [Triage]: P3 only — add `server-only` to 7 auth/verification files and add knip ignoreDependencies entries. No P1/P2 action required.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=performance timestamp=2026-06-18T09:00:00Z -->
-## Performance Agent — 2026-06-18
-- **Status**: GREEN
-- Total First Load JS: **1,950 KB raw / 623 KB gzipped** (77 chunks). **+0.7 KB raw / +0.04% vs 2026-06-11** — flat. HEAD `63b18ac1` (CI-only change, pnpm/action-setup@v4→@v5); no app-code change. M-bundle monitor stays closed (11th consecutive flat cycle).
-- Routes >500 KB: **0**. Largest chunks 228 / 192 / 156 / 112 / 108 KB raw — all framework/vendor, none >300 KB.
-- Build: Next 16.2.9 Turbopack, 4.4s compile, 8.7s typecheck, 0 errors. 89 routes (4 static, 85 dynamic), 48 static pages. Per-route First Load JS omitted by Turbopack.
-- Knip `--production`: no unused dependencies or actionable bundle bloat. 440 "unused files" = all test files (false positive with knip v6.17.1 + v5 schema ref in knip.json); 91 exports + 21 types = private helpers and DX types (same pattern, all P3 carries). **Low-priority**: update `knip.json "$schema"` to v6.
-- `"use client"` (non-test, anchored): **105**. Key public pages (`/`, `/about`, `/u/[handle]`, archetypes) confirmed server components. 17 `next/dynamic` / `import()` usages covering PostHog, GlobalCommandBar, SharePageOwnerContent, admin sub-dashboards, Studio effects, canvas-confetti.
-- Badge route: `maxDuration=35` (8th cycle hold); success `s-maxage=21600 / SWR=86400`, error `s-maxage=300 / SWR=600`; in-flight dedup + Redis lock. Feature-flags ISR `unstable_cache(300)` active; `/api/health` GitHub probe cached 60s; 0 uncached external calls.
-- Fonts: `next/font/google` (JetBrains Mono + Plus Jakarta Sans), `display: swap`, 0 external font requests. CLS risks: none — badge fallback `<img>` has explicit 1200×630 + skeleton; LiteYouTubeEmbed uses `h-full w-full` in fixed container. `prefers-reduced-motion` respected.
-
-**Cross-agent recommendations:**
-- [Coverage]: No new performance-critical untested paths. Bundle flat; no new routes added.
-- [Security]: No performance issues with security implications. Badge in-flight dedup + rate limit unchanged; fail-open Redis rate limiter intact; fetch timeouts 100%.
-- [QA]: No CLS regressions; bundle flat — no TTI/LCP change. ISR caching active on archetype/about pages.
-- [Cost Analyst]: Bundle flat at 1,950 KB raw / 623 KB gzipped — no cold-start memory regression. M-bundle stays closed. `ANALYZE=true` run not urgent.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=performance timestamp=2026-06-25T09:00:00Z -->
 ## Performance Agent — 2026-06-25
 - **Status**: GREEN
@@ -452,4 +434,23 @@
 **Cross-agent recommendations:**
 - [Security]: No security-relevant coverage gaps — lib/auth 97.3%, lib/render 100% stmts (all escapeXml paths), lib/verification and lib/crypto 100%.
 - [QA]: Confirms your 2026-07-08 flags — ClientErrorReporter/ClientInstrumentation remain the only weak client telemetry spots. Also note the 02:00 host-load degradation reproduced despite `--maxWorkers=3` (worker-start timeouts, not test failures); if it recurs, consider staggering the 2:00 AM coverage agent schedule.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=performance timestamp=2026-07-09T09:00:00Z -->
+## Performance Agent — 2026-07-09
+- **Status**: GREEN
+- Total First Load JS: **2,128 KB raw / 672 KB gzipped** (77 chunks). **+49 KB raw (+2.4%) / +13 KB gzipped vs 2026-07-02** (2,079 / 659 / 76) — re-baseline after the #982 landing refactor + v2.17.0 observability batch (#974/#975/#976), as cost-analyst requested. Below the 2,300 KB `ANALYZE=true` trigger. HEAD `b16274ba`.
+- **Landing `/` confirmed static**: builds as `○` with `force-static` + `revalidate 3600` — the highest-traffic route is now CDN/ISR-served. The #982 pattern is sound: `app/page.tsx` stays a server component, renders the demo badge SVG at build time and passes the string prop, so `renderBadgeSvg`/`demoData` never enter the client bundle; `LandingPageClient.tsx` (501 lines) imports only lightweight i18n/nav/CTA components.
+- Routes >500 KB: **0**. Routes/chunks >350 KB (CI budget): **0**. Largest chunks 227 / 190 / 109 / 107 / 88 KB raw — all framework/vendor.
+- Build: Next 16.2.9 Turbopack, 4.6s compile, 8.7s TypeScript, 0 errors; `pnpm install --frozen-lockfile` clean. 90 routes, 68 static pages in 848ms.
+- Unused exports: **0** — knip `--production` shows only the 2 known test-infra false positives (`vitest.setup.ts`, `vitest.contract-setup.ts`).
+- `"use client"` (non-test): **125** (+8) — from the #982 split + error/telemetry client-surface tests. Key public pages all server components. 11 `next/dynamic`/`import()` files; no sync imports of heavy libs anywhere.
+- Badge route: `maxDuration=35`; success `s-maxage=21600/SWR=86400`, error `300/600`; **new #974 `Server-Timing` header** on every response + daily `/api/cron/latency-check` synthetic enforcing p95 800ms hit / 3000ms miss — badge latency is now continuously observable.
+- Fonts: `next/font/google`, `display:swap`, 0 external requests. CLS: badge fallback `<img>` 1200×630 + skeleton; LiteYouTubeEmbed 480×270 fix holding; `prefers-reduced-motion` present. #982 locale flash is a content-swap, not a layout shift (same-layout Spanish shell) — accepted per documented i18n architecture.
+
+**Cross-agent recommendations:**
+- [Coverage]: No new performance-critical untested paths — #974/#975/#976 all shipped with sibling tests per your 2026-07-09 run. Nothing bundle-driven to cover.
+- [Security]: No performance issues with security implications. Badge dedup + rate limiting unchanged; `latency-check` cron is CRON_SECRET-gated; `Server-Timing` exposes only duration metrics, no internals worth redacting.
+- [QA]: No CLS regressions. Only new user-visible timing artifact is the #982 landing locale flash for non-`es` users (documented tradeoff, content-swap only) — worth an eyeball if you smoke-test the landing page, but no action expected.
+- [Cost Analyst]: Re-baseline delivered per your 2026-07-09 ask: **2,128 KB raw / 672 KB gzipped**, and `/` confirmed static in build output — the invocation-count win is real. New baseline supersedes 2,079/659; trigger stays 2,300 KB raw.
 <!-- ENTRY:END -->
