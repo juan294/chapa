@@ -1,35 +1,51 @@
 # QA Report
-> Generated: 2026-07-01 | Health status: green
+> Generated: 2026-07-08 | Health status: green
 
 ## Executive Summary
-All 8,164 tests pass across 474 files, TypeScript and ESLint are both clean, and no accessibility or design-system violations were found in production code. The codebase remains in a stable, release-ready state.
+All 8,326 tests pass with zero type errors and zero lint issues; no accessibility regressions or design-system violations were found in production components. The codebase remains in the same GREEN state as the previous QA cycle, with the suite having grown by +75 tests since the 2026-07-08 coverage run.
 
 ## Test Results
-- Total: 8,164 tests across 474 files
-- Passed: 8,164 | Failed: 0 | Skipped: 0
-- Duration: 67.63s (`pnpm vitest run --maxWorkers=3`)
+- Total: 8,326 tests across 485 files
+- Passed: 8,326 | Failed: 0 | Skipped: 0
+- Duration: 66.9s under `--maxWorkers=3` (vitest v4.1.8), single clean run — no flakes observed
 
 ## TypeScript
-Clean — `pnpm run typecheck` reports 0 errors across both `packages/shared` and `apps/web`.
+Clean — `tsc --noEmit` passes in both workspaces (`packages/shared`, `apps/web`) with 0 errors.
 
 ## Linting
-Clean — `pnpm run lint` reports 0 errors/warnings across both `packages/shared` and `apps/web`.
+Clean — `eslint .` passes in both workspaces with 0 errors and 0 warnings.
 
 ## Accessibility
-- **`<img>` alt attributes**: 0 findings — no `<img>` tags missing `alt` in production `.tsx` files.
-- **Heading hierarchy**: No skipped levels found. All sampled pages follow correct h1→h2→h3 structure. Note: `app/verify/[hash]/page.tsx` has no literal `<h1` in the file, but renders its h1 via `<StatusCallout titleAs="h1">` — hierarchy is correct once the shared component is accounted for (h1 → h2 for the "Dimensions"/"Key Metrics" sections).
-- **Interactive elements missing ARIA labels**: 0 findings. Both `role="button"` usages in production code have explicit `aria-label`:
-  - `apps/web/app/admin/campaigns/campaigns-dashboard.tsx:901` — `aria-label={\`Campaign: ${c.name}\`}`
-  - `apps/web/components/dashboard/ActivityHeatmap.tsx:565` — `aria-label` via i18n `aria.contributionOnDate`
-- **Focus indicators**: `focus-visible` / `focus-visible:` present in `globals.css` (global rule) plus component-level usage in `LanguageSwitcher.tsx`, `ChallengeForm.tsx`, `CommandBarHint.tsx`, `BadgeToolbar.tsx`, `VerifyForm.tsx`, `InfoTooltip.tsx`, `BadgeOverlay.tsx`, and the experiments pages. Coverage is broad across interactive components.
+No issues found.
+
+- **Images**: 0 `<img>` tags missing `alt` attributes across all `.tsx` source (multiline-aware regex scan of `apps/web`).
+- **Heading hierarchy**: One heuristic flag — `app/verify/[hash]/page.tsx` shows `<h2>` with no literal `<h1>` — verified as a **false positive**: the page renders its `<h1>` via `<StatusCallout titleAs="h1">` (lines 101, 223, 244). All other pages have correct h1→h2→h3 ordering.
+- **Interactive elements**: Both `role="button"` usages carry `aria-label`s — `app/admin/campaigns/campaigns-dashboard.tsx:903` (``aria-label={`Campaign: ${c.name}`}``, plus `tabIndex={0}` and Enter/Space `onKeyDown`) and `components/dashboard/ActivityHeatmap.tsx:567` (localized `aria.contributionOnDate` label). No `onClick` handlers on non-interactive elements (`div`/`span`/`tr` scan clean outside the two labeled `role="button"` cases). Files flagged by the buttons-vs-aria-labels ratio heuristic (error boundaries, `QuickControls`, `ChallengeForm`, experiments pages) were spot-checked: all buttons contain visible text content, so `aria-label` is not required. No icon-only buttons lacking labels were found.
+- **Focus indicators**: `focus-visible` present in `styles/globals.css` (3 occurrences, global-scope) plus 8 production components (`InfoTooltip`, `LanguageSwitcher`, `BadgeOverlay`, `BadgeToolbar`, `CommandBarHint`, `ChallengeForm`, `VerifyForm`, experiments pages) — guarded by tests in `globals.test.ts` and `BadgeToolbar.test.tsx`.
 
 ## Error States
-- Error boundaries present for all major routes: `global-error.tsx` plus per-route `error.tsx` for `/`, `/about`, `/admin`, `/archetypes`, `/cli/authorize`, `/coming-soon`, `/experiments`, `/generating`, `/privacy`, `/studio`, `/terms`, `/u/[handle]`, `/verify` — all with matching test coverage.
-- Loading states present for the same set of routes (`loading.tsx` + `loading.test.tsx` pairs), including `/generating/[handle]` and `/u/[handle]`.
-- Empty-state handling confirmed in `SharePageOwnerContent` (regenerate CTA, per `SharePageOwnerContent.render.test.tsx`).
+- **Error boundaries**: 13 route-level `error.tsx` files + 1 `global-error.tsx` covering all major route groups (`/`, `/about`, `/admin`, `/archetypes`, `/cli/authorize`, `/coming-soon`, `/experiments`, `/generating`, `/privacy`, `/studio`, `/terms`, `/u/[handle]`, `/verify`).
+- **Loading states**: 13 `loading.tsx` files.
+- **Not-found**: 1 `not-found.tsx`.
+- **Empty states**: present in `AdminUserTable.tsx`, `campaigns-dashboard.tsx`, and `SharePageOwnerContent.tsx`, each with render-test coverage (`*.render.test.tsx` / `*.test.tsx` siblings).
 
 ## Design System Compliance
-0 violations found. Grepped `apps/web/components/**/*.tsx` (production files) for hardcoded hex colors (`#[0-9A-Fa-f]{3,8}`) — all matches were confined to `.test.tsx` files (test fixtures/assertions, e.g. `Sparkline.test.tsx`, `BadgeContent.test.tsx`) or code comments referencing issue numbers, not production markup. Production components consistently use semantic tokens (`bg-bg`, `text-text-primary`, `text-amber`, etc.) as required by `docs/design-system.md`.
+0 violations. A hardcoded-hex scan (`bg-[#…]`, `text-[#…]`, raw `#RRGGBB`) across `app/` and `components/` (excluding tests) matched only the previously accepted exceptions: `global-error.tsx`, `apple-icon.tsx`, `icon.tsx` (static assets that cannot use runtime CSS variables), and `experiments/**` (Canvas/WebGL demos). All production components use semantic tokens (`bg-bg`, `bg-card`, `text-text-primary`, `border-stroke`, dimension/archetype token classes) — consistent with the two prior QA cycles.
 
 ## Recommendations
-No new action items — repository is fully green across tests, types, lint, accessibility, and design-system compliance. Continue monitoring the carried cross-agent items already tracked in shared context (e.g. cost-analyst's `/api/challenge` rate-limit note, now resolved per 2026-07-01 triage entry).
+1. **[P3] Add branch tests for `components/ClientErrorReporter.tsx`** (~61% branches per the 2026-07-08 coverage cycle — dedup/transport branches are JSDOM-testable). This is the client-side error-reporting path surfaced in the Error States check; it works, but its failure branches are the least-verified part of the error UX.
+2. **[P3] Add a sibling test for `components/ClientInstrumentation.tsx`** (60% stmts, no test file) — the only production component in the error/telemetry surface without one.
+3. **No QA-blocking action items** — tests, types, lint, a11y, and design-system checks are all clean; maintain the current gates.
+
+SHARED_CONTEXT_START
+## QA Agent — 2026-07-08
+- **Status**: GREEN
+- Tests: 8326/8326 passed across 485 files, 0 failed, 0 skipped, 0 flakes (66.9s, --maxWorkers=3)
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all `<img>` have alt; both `role="button"` usages (`campaigns-dashboard.tsx:903`, `ActivityHeatmap.tsx:567`) carry aria-labels + keyboard handlers; focus-visible global + 8 production components; verify/[hash] h1 rendered via `StatusCallout titleAs="h1"` (heuristic false positive, do not re-flag); 13 error boundaries + global-error + 13 loading states + not-found
+
+**Cross-agent recommendations:**
+- [Coverage]: Confirms your 2026-07-08 findings from the QA angle — `ClientErrorReporter.tsx` (~61% br) and `ClientInstrumentation.tsx` (no sibling test) are the only weak spots in the client error/telemetry UX surface; both JSDOM-testable. Suite grew 8,251 → 8,326 (+75) since your run, still 0 flakes.
+- [Security]: No security-related quality issues. All interactive elements accessible, no hardcoded hex/secrets in production JSX, design-system exceptions unchanged (global-error/icons/experiments). Nothing new for your next scan.
+SHARED_CONTEXT_END

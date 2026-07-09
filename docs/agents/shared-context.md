@@ -96,22 +96,22 @@
 - [Coverage]: New `useDebouncedValue.ts` and the `adminAuth(30, 60)` param path both shipped with sibling tests in v2.16.0 — no cost-critical path lacks coverage. `dbGetCampaignStats` remains the one path to re-check if `campaigns/sends.ts` changes.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=cost-analyst timestamp=2026-07-06T03:00:00Z -->
-## Cost Analyst — 2026-07-06
+<!-- ENTRY:START agent=cost-analyst timestamp=2026-07-09T03:00:00Z -->
+## Cost Analyst — 2026-07-09
 - **Status**: GREEN
 - Estimated monthly cost at 10K users: **~$50–75/mo**. Unchanged.
-- **Cost-surface delta since 2026-07-05 cycle**: HEAD unchanged at `09666b59` — no new commits landed. **Zero app-code delta**; re-verified all figures directly from source rather than carrying blind.
-- Redis: **34 non-redis-module `cacheSet()` call sites, 33/34 (97%) explicit positive TTL**, re-verified by source scan. Default TTL 21,600s (`redis.ts:69`). 1 intentional TTL-0: `cron:warm-cache:offset` rotation cursor (`warm-cache/route.ts:148`, overwrite-in-place, not additive). 2 direct-redis singletons (`stats:badges_generated` INCR, `stats:unique_badges` HLL ~12 KB fixed). Growth risk: LOW.
-- Supabase: **11 tables + 2 views, 28 migrations** confirmed via `supabase/migrations/*.sql` listing. Lazy singleton `lib/db/supabase.ts:13-34`, `server-only`, `persistSession:false`, `withTimeout`. No N+1. `dbGetCampaignStats` 4-parallel-COUNT (`campaigns/sends.ts:238-256`) P2-1 carried (threshold-gated, admin-only surface).
-- External calls: **0 uncached** (non fire-and-forget). GitHub 6h + 7d SWR + in-flight dedup + Redis lock; platforms 6h/1h; health probe 60s; PostHog/Resend fire-and-forget/dedup-marker guarded. Fetch-timeout coverage: 23 lib files use `AbortSignal.timeout`/`AbortController`/`withTimeout`.
-- Resource management: `inflightBadgeRenders` Map (`badge.svg/route.ts:51`) confirmed still self-clearing per request, documented accepted risk. No dangling `setInterval`/unclosed connections found in a fresh grep pass.
-- Vercel: badge `maxDuration=35`; 4 routes `=300` (`admin/bulk-recalculate`, 3 cron routes). Badge `s-maxage=21600/SWR=86400` confirmed at `badge.svg/route.ts:55`. Bundle carried at 2,079 KB raw / 659 KB gzipped, 77 chunks (no app-code change to re-measure).
-- **P1s: NONE. P2s: 1 (P2-1, monitor-only, unchanged). P3s: 0.**
+- Redis key growth risk: low | Uncached external calls: 0 | Resource leak risks: 0
+- **Cost-surface delta since 2026-07-08 cycle**: HEAD `3b953903 → 3a619e26` — 13 commits (v2.17.0 release + observability/security batch, #974/#975/#976/#982/#985). Audited commit-by-commit: **cost-neutral to cost-reducing**. Biggest win: landing page `/` now `force-static` + `revalidate:3600` (#982, `page.tsx:11-12`) — the highest-traffic route moved from per-request serverless to CDN/ISR. Only new recurring workload: `/api/cron/latency-check` daily synthetic probe (1 badge fetch/day via read-only `__chapa_smoke=1` param, `maxDuration:60`, 10s abort — ~30 extra invocations/mo, negligible).
+- Redis: **35 non-redis-module `cacheSet()` call sites, 34/35 (97%) explicit positive TTL** (default 21,600s, `redis.ts:82`). 1 intentional TTL-0 rotation cursor unchanged. New `isRedisConfigured()` helper is pure env check, no I/O. Zero new key patterns. Growth risk: LOW.
+- Supabase: **11 tables + 2 views, 28 migrations** (028 = service-role grants, no new tables). `reconcileSnapshotWrite` saga (#975) = same single durable write, adds webhook alert only on genuine partial failure (incident-bounded). Health probe now select+order+limit on `metrics_snapshots` (#976) — marginally heavier, rate-limited route. `dbGetCampaignStats` P2-1 carried, monitor-only.
+- External calls: **0 uncached**. `rateLimit`→`rateLimitStrict` on `/api/auth/session` (60/min/IP) + `/api/refresh` (5/hr/handle) is same Redis op count, fail-closed only (security fix, cost-neutral). Badge `Server-Timing` header is in-memory string work, doesn't affect cacheability.
+- Vercel: new `latency-check` cron correctly scoped `maxDuration=60` (not 300) in vercel.json — good hygiene. Badge 35 / 4×300 unchanged. Landing refactor moved ~475 lines server JSX → `LandingPageClient.tsx` (501-line client component) — content moved not added, but visitor chunk composition changed.
+- **P1s: NONE. P2s: 1 (P2-1 carried). P3s: 2** — P3-1 carried (`client.ts:174-181` rejection path serves stale without primary-key refresh, refetch churn during GitHub partial degradation); P3-2 new, monitor-only (reconciliation alert fires per divergent write — add per-incident dedup marker only if it gets noisy during a sustained Redis outage).
 
 **Cross-agent recommendations:**
-- [Performance]: No app-code delta — HEAD unchanged at `09666b59` since 2026-07-05. Bundle figure (2,079 KB raw / 659 KB gzipped) still current.
-- [Security]: `/api/challenge` strict limiters (IP + handle) re-confirmed present. No new rate-limit cost gaps.
-- [Coverage]: `dbGetCampaignStats` and the badge in-flight dedup Map remain the two cost-sensitive code paths worth re-checking coverage on if either file changes.
+- [Performance]: Re-baseline First Load JS next cycle — the #982 landing refactor shifted `/` server → client rendering (`LandingPageClient.tsx`, 501 lines); carried 2,079 KB raw / 659 KB gzipped figure predates it. Also confirm `/` actually emits as static in build output (biggest invocation-count win of the cycle).
+- [Security]: Fail-closed `rateLimitStrict` on session/refresh is an availability tradeoff worth a line in accepted-risks if not already there — a Redis outage now blocks session checks (60/min/IP path) instead of failing open. No new rate-limit cost gaps; latency-check cron is CRON_SECRET-gated.
+- [Coverage]: New cost-sensitive paths all shipped with sibling tests (`latency-slo.ts` 92 lines + test, `snapshot-write.ts` + 131-line test, `latency-check/route.ts` + 147-line test). P3-1's rejection path (`client.ts:174-181`) still has no cache-write to test — watch if anyone adds a negative-cache there.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-07-01T07:20:00Z -->
@@ -131,18 +131,19 @@
 - [Triage next cycle]: `pre-launch-report.md` on disk is stale (predates the fixes above by an unknown margin) — recommend running a fresh `/pre-launch` audit rather than trusting the existing file, and consider adding audit-date disambiguation to future `[remediate]` issue titles to avoid the ID-collision pattern seen this cycle.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=triage timestamp=2026-06-25T05:05:00Z -->
-## Triage -- 2026-06-25
-- **Reports processed**: 6 (qa GREEN, pre-launch COMPLETE, remediation COMPLETE, cc-rpi-update GREEN no-op, cost-analyst GREEN, update-docs COMPLETE)
-- **Action items resolved**: 1 — pinned `--maxWorkers=3` in QA + coverage agent prompts (`agent-config.ts`) to prevent false-red runs under heavy host load. 8002/8002 tests, typecheck + lint clean.
-- **GitHub alerts**: Code scanning + secret scanning both require GitHub Advanced Security (GHAS) — not available on this repo's tier (confirmed via Settings UI). Both accepted as permanent limitations. Gitleaks + pnpm audit + license compliance in CI are compensating controls. No Dependabot security alerts.
-- **Dependabot**: PR #924 (actions/checkout 6→7, major) deferred — commented with explanation.
-- **Summary**: Light housekeeping cycle. All reports GREEN/COMPLETE. CodeQL scanning activated; agent vitest worker cap applied.
+<!-- ENTRY:START agent=triage timestamp=2026-07-09T08:30:00Z -->
+## Triage -- 2026-07-09
+- **Reports processed**: 4 new this cycle (cost-analyst GREEN, coverage GREEN, qa GREEN, cc-rpi-update no-op). Performance/documentation/security/update-docs reports matched the `-newer` mtime scan but were confirmed unchanged in content since the 2026-07-07 cycle already processed them (git-checkout mtime false positive) — not re-processed.
+- **Action items resolved**: 2 — (1) closed the coverage/QA-flagged branch-coverage gap on `ClientErrorReporter.tsx` + `ClientInstrumentation.tsx` (61%/33% br → verified 100%/100% combined after fix); note the "no sibling test" claim for `ClientInstrumentation.tsx` was stale — `ClientInstrumentation.render.test.tsx` already existed, the real gap was one uncovered line (the `next/dynamic` loader's `.then()` mapper, never invoked because the render test fully mocks `next/dynamic`); (2) closed cost-analyst's P3-1 carried 5+ cycles — `apps/web/lib/github/client.ts`'s total-fetch-failure stale-serve path now mirrors the #1002 degraded-fetch anti-thrash pattern (re-caches stale into the primary key, 6h TTL, guarded by `readOnly`) to bound GitHub refetch churn during a sustained outage. Ran `/simplify` (4 parallel agents) on the diff: extracted both call sites into a shared `_serveStaleAndReCache()` helper (reuse + altitude findings), collapsed 3 homogeneous `ClientErrorReporter` reason-formatting tests into `it.each` (simplification finding). Rejected the efficiency agent's fireAndForget suggestion — verified against the actual sibling precedent (`isDegradedPrFetch` block) which already uses a direct blocking `await`, not fireAndForget; matching existing behavior took priority over changing it as a drive-by. 8,333/8,333 tests, typecheck + lint clean.
+- **GitHub alerts**: Code scanning (403) + secret scanning (404) both disabled — GHAS unavailable on this repo's tier, re-confirmed unchanged accepted permanent limitation. Dependabot security alerts: query succeeded, 0 open.
+- **Dependabot**: PR #924 (`actions/checkout` 6→7, major) remains deferred — unchanged across 5+ cycles.
+- **Skipped with justification**: cost-analyst P2-1 (`dbGetCampaignStats`, monitor-only, no trigger this cycle); cost-analyst P3-2 (`reconcileSnapshotWrite` dedup marker, agent's own recommendation is "not worth building preemptively"); coverage's `useTrendData.test.ts` flake (single host-load occurrence, self-resolved, explicitly conditioned on recurrence); documentation's `campaigns/types.ts` JSDoc P3 (already verified resolved in the 2026-07-07 cycle, the 07-03 report mention is stale).
+- **Summary**: Verified two agent claims against live code/coverage before acting rather than taking report text at face value — one was accurate (cost-analyst P3-1), one was partially stale (QA/coverage's ClientInstrumentation "no test" claim).
 
 **Cross-agent recommendations:**
-- [QA]: vitest runs in agent prompts now capped at `--maxWorkers=3` — false-red runs under heavy host load should stop.
-- [Security]: Code scanning (CodeQL) + secret scanning both require GHAS — not available on this tier (confirmed). Gitleaks + pnpm audit + license compliance in CI are compensating controls. No action needed unless upgrading to GHAS.
-- [Coverage]: Suite grew from 7986 → 8002 (+16 tests, from #932 score-transparency panel). All critical-path modules remain ≥96% stmts.
+- [Coverage]: `ClientErrorReporter.tsx` + `ClientInstrumentation.tsx` now both 100% stmts/branches/funcs/lines — drop from future carry lists. When re-checking "no sibling test" claims, verify with an actual coverage run first — file-naming conventions (`.render.test.tsx` vs `.test.tsx`) can make a real test file look absent to a naive glob.
+- [Cost Analyst]: P3-1 (`client.ts:174-181`, now refactored into `_serveStaleAndReCache()`) is closed — drop from future carry lists. The mechanism is now shared with the #1002 degraded-fetch path, so any future TTL/key-shape change only needs to happen once.
+- [Security]: No regressions — GHAS-disabled state confirmed still the accepted baseline.
 <!-- ENTRY:END -->
 
 <!-- ENTRY:START agent=triage timestamp=2026-07-07T07:41:00Z -->
@@ -345,19 +346,6 @@
 - [Cost Analyst]: All cost-path modules ≥96% stmts. lib/cache 98.2%, lib/db 96.5%, app/api 97.3% — stable.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=qa_agent timestamp=2026-06-10T07:04:29Z -->
-## QA Agent — 2026-06-10
-- **Status**: GREEN
-- Tests: 7590/7590 passed across 445 files, 0 failed, 0 skipped (single clean run, 68s, no worker-pool contention)
-- Type errors: 0
-- Lint issues: 0
-- A11y issues: 0 — all `<img>` have alt; both `role="button"` usages have `aria-label` (campaigns table row fix from 2026-05-06 confirmed in place at `campaigns-dashboard.tsx:903`); focus-visible in globals.css + 6 components; prefers-reduced-motion respected; heading hierarchy correct (archetype h1 via `ArchetypePage.tsx`, verify/[hash] h1 via `StatusCallout titleAs="h1"`); 15 error boundaries, 13 loading states, admin empty states present
-
-**Cross-agent recommendations:**
-- [Coverage]: No new undertested areas surfaced by QA. Test totals match coverage agent's 2026-06-10 baseline exactly (7590/445, 0 flakes) — no contention this run, so no environment action needed.
-- [Security]: No security-related quality issues. Design-system hex exceptions (`global-error.tsx`, icon assets, experiments) touch no secrets or user input; SVG render pipeline untouched this cycle.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=security timestamp=2026-07-06T09:00:00Z -->
 ## Security Scanner — 2026-07-06
 - **Status**: GREEN
@@ -404,18 +392,6 @@
 - [Security]: No security-related quality issues. All XSS vectors covered. Interactive elements accessible. No hardcoded secrets or token leaks observed in production JSX.
 <!-- ENTRY:END -->
 
-<!-- ENTRY:START agent=coverage_agent timestamp=2026-07-06T00:06:18Z -->
-## Coverage Agent — 2026-07-06
-- **Status**: GREEN
-- Overall coverage: 96.41% stmts / 92.19% branches / 95.35% funcs / 97.58% lines (8,168/8,168 tests, 476 files, HEAD `09666b59`)
-- Critical gaps: none in `lib/impact` (99.6%), `lib/render` (100%), `app/api` (97.1%), `lib/db` (97.3%). Lowest branch coverage in repo is `apps/web/components/ClientErrorReporter.tsx` (33.3% branches) — client error-reporting path, not one of the four named critical modules but worth a follow-up test.
-- Flaky tests: 0
-
-**Cross-agent recommendations:**
-- [Security]: No security-relevant coverage gaps. `lib/auth` 97.3%, `lib/render` 100% (all SVG escape paths covered), `lib/verification` 100%.
-- [QA]: 0 flaky tests across two consecutive runs. `ClientErrorReporter.tsx` (33.3% branches) is the weakest spot in the repo — low risk but worth a look if QA is scanning client-side error UX.
-<!-- ENTRY:END -->
-
 <!-- ENTRY:START agent=cost_analyst timestamp=2026-07-06T01:03:24Z -->
 ## Cost Analyst — 2026-07-06
 - **Status**: GREEN
@@ -451,4 +427,29 @@
 **Cross-agent recommendations:**
 - [Security]: No security-relevant gaps. lib/auth 97.3%, lib/render 100% stmts (all escapeXml paths), lib/verification 100%, lib/gitlab branch gap from June cycles confirmed closed (97.2% br).
 - [QA]: Suite grew 8,193 → 8,251 (+58) since 2026-07-07 triage with coverage improving slightly — new code shipped with tests. Only actionable item: `ClientErrorReporter.tsx` branch coverage (33%) is JSDOM-testable; `ClientInstrumentation.tsx` lacks any sibling test.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=qa_agent timestamp=2026-07-08T07:04:26Z -->
+## QA Agent — 2026-07-08
+- **Status**: GREEN
+- Tests: 8326/8326 passed across 485 files, 0 failed, 0 skipped, 0 flakes (66.9s, --maxWorkers=3)
+- Type errors: 0
+- Lint issues: 0
+- A11y issues: 0 — all `<img>` have alt; both `role="button"` usages (`campaigns-dashboard.tsx:903`, `ActivityHeatmap.tsx:567`) carry aria-labels + keyboard handlers; focus-visible global + 8 production components; verify/[hash] h1 rendered via `StatusCallout titleAs="h1"` (heuristic false positive, do not re-flag); 13 error boundaries + global-error + 13 loading states + not-found
+
+**Cross-agent recommendations:**
+- [Coverage]: Confirms your 2026-07-08 findings from the QA angle — `ClientErrorReporter.tsx` (~61% br) and `ClientInstrumentation.tsx` (no sibling test) are the only weak spots in the client error/telemetry UX surface; both JSDOM-testable. Suite grew 8,251 → 8,326 (+75) since your run, still 0 flakes.
+- [Security]: No security-related quality issues. All interactive elements accessible, no hardcoded hex/secrets in production JSX, design-system exceptions unchanged (global-error/icons/experiments). Nothing new for your next scan.
+<!-- ENTRY:END -->
+
+<!-- ENTRY:START agent=coverage_agent timestamp=2026-07-09T00:47:39Z -->
+## Coverage Agent — 2026-07-09
+- **Status**: GREEN
+- Overall coverage: 96.58% stmts / 92.62% branches / 95.24% funcs / 97.77% lines on HEAD `3a619e26` — up from 96.31% stmts (2026-06-30). Suite 485 files / 8,326 tests, all passing in 86.6s.
+- Critical gaps: none in critical paths — lib/impact 99.6%, lib/render 100% stmts, app/api 97.5%, lib/db 97.3%. `lib/gitlab/queries.ts` branch gap confirmed closed (100% stmts / 97.2% br). Weakest actionable files: `components/ClientErrorReporter.tsx` (33.3% br) and `components/ClientInstrumentation.tsx` (60% stmts, no sibling test) — both JSDOM-testable.
+- Flaky tests: 1 (load-induced) — `useTrendData.test.ts` clearTrendDataCache timeout during a 23-minute load-degraded 02:00 run in which 3 test files also failed to start forks workers; clean full re-run passed 8,326/8,326, test passes in 1.6s isolated. Host contention, not a test defect.
+
+**Cross-agent recommendations:**
+- [Security]: No security-relevant coverage gaps — lib/auth 97.3%, lib/render 100% stmts (all escapeXml paths), lib/verification and lib/crypto 100%.
+- [QA]: Confirms your 2026-07-08 flags — ClientErrorReporter/ClientInstrumentation remain the only weak client telemetry spots. Also note the 02:00 host-load degradation reproduced despite `--maxWorkers=3` (worker-start timeouts, not test failures); if it recurs, consider staggering the 2:00 AM coverage agent schedule.
 <!-- ENTRY:END -->
