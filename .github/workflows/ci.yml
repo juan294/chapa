@@ -52,16 +52,21 @@ jobs:
 
       - name: Test shard with coverage (blob report)
         run: |
+          # blob feeds the merge gate; github reporter surfaces failing tests as
+          # inline annotations (blob alone prints nothing per-test on failure).
           pnpm exec vitest run \
             --shard=${{ matrix.shard }}/2 \
             --coverage \
             --reporter=blob \
+            --reporter=github-actions \
             --coverage.thresholds.lines=0 \
             --coverage.thresholds.functions=0 \
             --coverage.thresholds.statements=0 \
             --coverage.thresholds.branches=0
 
       - name: Upload blob report
+        # always() so a failing shard still uploads its blob for offline triage
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: vitest-blob-${{ matrix.shard }}
