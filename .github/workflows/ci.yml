@@ -25,10 +25,76 @@ jobs:
       - name: Craft propagation guard (#680)
         run: bash scripts/check-craft-propagation.sh
 
+  # WHY sharded (#ci-perf): the unit+coverage suite is a CPU-bound ~5.5min
+  # `vitest run --coverage` on a 2-core runner. Splitting it across 2 shards
+  # (each ~half the wall-clock) roughly halves the unit-test critical path.
+  # Each shard emits a Vitest *blob* report (raw run data, coverage folded in)
+  # that the `test` gate below merges to enforce the REAL coverage thresholds
+  # exactly once. Per-shard coverage thresholds are forced to 0 so a partial
+  # shard can never trip the gate on its own — enforcement happens only on the
+  # merged result. fail-fast:false so one failing shard still lets the other
+  # finish (full signal in one run).
+  test-shard:
+    name: Test Shard (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Test shard with coverage (blob report)
+        run: |
+          # blob feeds the merge gate; github reporter surfaces failing tests as
+          # inline annotations (blob alone prints nothing per-test on failure).
+          pnpm exec vitest run \
+            --shard=${{ matrix.shard }}/2 \
+            --coverage \
+            --reporter=blob \
+            --reporter=github-actions \
+            --coverage.thresholds.lines=0 \
+            --coverage.thresholds.functions=0 \
+            --coverage.thresholds.statements=0 \
+            --coverage.thresholds.branches=0
+
+      - name: Upload blob report
+        # always() so a failing shard still uploads its blob for offline triage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest-reports/*
+          # .vitest-reports is a dot-dir, so hidden files must be included
+          include-hidden-files: true
+          retention-days: 1
+
+  # WHY a separate gate job named exactly "Test": branch protection on
+  # develop/main requires a status check literally named "Test". A matrix job
+  # publishes per-shard checks ("Test Shard (1)"…), not "Test", so this
+  # aggregator preserves the required-check name. It merges the shard blobs,
+  # enforces the REAL coverage thresholds once, and owns the portfolio coverage
+  # report + scoring integrity gate (moved off the old monolithic test job).
+  # `if: always()` so it runs even when a shard fails, then fails itself if any
+  # shard was not successful — keeping "Test" red on a real failure.
   test:
     name: Test
+    needs: [test-shard]
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Fail if any shard failed
+        if: needs.test-shard.result != 'success'
+        run: |
+          echo "::error::One or more unit-test shards did not succeed (result: ${{ needs.test-shard.result }})"
+          exit 1
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -39,11 +105,24 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - name: Test with coverage
+      - name: Download shard blob reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: vitest-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      - name: Merge coverage & enforce thresholds
         id: test
         run: |
-          # Run tests with coverage and capture counts from output
-          OUTPUT=$(pnpm run test:coverage 2>&1) || true
+          # Merge both shard blobs into a single coverage report and enforce the
+          # REAL thresholds (from vitest.config.ts) exactly once on the union.
+          # Capture the exit status so a test failure OR a coverage-threshold
+          # breach (both non-zero) fails this gate, while still recording counts.
+          set +e
+          OUTPUT=$(pnpm exec vitest run --merge-reports --coverage 2>&1)
+          STATUS=$?
+          set -e
           echo "$OUTPUT"
 
           # Extract test counts from Vitest output
@@ -56,8 +135,11 @@ jobs:
           echo "tests_passed=$PASSED" >> "$GITHUB_OUTPUT"
           echo "tests_failed=$FAILED" >> "$GITHUB_OUTPUT"
 
-          # Fail the step if any tests failed
-          if [ "$FAILED" -gt 0 ]; then exit 1; fi
+          # Propagate any failure (failed tests or unmet coverage thresholds).
+          if [ "$STATUS" -ne 0 ]; then
+            echo "::error::Merged unit run failed (exit $STATUS): failed tests or coverage below threshold"
+            exit "$STATUS"
+          fi
 
       - name: Report coverage to portfolio
         if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
@@ -165,7 +247,12 @@ jobs:
 
   build:
     name: Build
-    needs: [lint-and-typecheck, test]
+    # WHY only lint-and-typecheck (#ci-perf): the build consumes a green
+    # typecheck, not unit-test results — E2E runs against the build artifact,
+    # not coverage. Dropping `test` from needs un-serializes the ~3.7min E2E
+    # path from behind the ~5.5min unit suite. `test` still runs as its own
+    # required gate; nothing here depends on its ordering for correctness.
+    needs: [lint-and-typecheck]
     runs-on: ubuntu-latest
     env:
       # Dummy values for build — real values are in Vercel
@@ -195,10 +282,21 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
-  e2e:
-    name: E2E Tests
+  # WHY sharded (#ci-perf): `playwright test` (~3min, chromium + mobile
+  # projects) runs unsharded. Splitting the test list across 2 shards roughly
+  # halves E2E wall-clock. Each shard boots its own `next start` server against
+  # the shared build artifact and runs an independent slice; only pass/fail
+  # matters here (no blob/HTML report is published on success), so no report
+  # merge is needed — the `e2e` gate below just aggregates results.
+  # fail-fast:false so both shards report even if one fails.
+  e2e-shard:
+    name: E2E Shard (${{ matrix.shard }})
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
       GITHUB_CLIENT_ID: dummy
       GITHUB_CLIENT_SECRET: dummy
@@ -240,8 +338,8 @@ jobs:
           name: nextjs-build
           path: apps/web/.next/
 
-      - name: Run E2E tests
-        run: pnpm run test:e2e
+      - name: Run E2E tests (shard ${{ matrix.shard }}/2)
+        run: pnpm --filter @chapa/web exec playwright test --shard=${{ matrix.shard }}/2
         env:
           CI: true
 
@@ -249,11 +347,28 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+  # WHY a separate gate job named exactly "E2E Tests": branch protection
+  # requires a check literally named "E2E Tests", which a matrix job does not
+  # produce. This aggregator preserves that required-check name and fails if any
+  # E2E shard did not succeed.
+  e2e:
+    name: E2E Tests
+    needs: [e2e-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any E2E shard failed
+        if: needs.e2e-shard.result != 'success'
+        run: |
+          echo "::error::One or more E2E shards did not succeed (result: ${{ needs.e2e-shard.result }})"
+          exit 1
+      - run: echo "All E2E shards passed."
 
   deployment-smoke:
     name: Deployment Smoke

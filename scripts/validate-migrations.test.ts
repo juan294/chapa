@@ -13,7 +13,12 @@ describe("validate-migrations CLI", () => {
     const scriptPath = resolve(__dirname, "validate-migrations.ts");
     const repoRoot = resolve(__dirname, "..");
 
-    const result = await execFileAsync("node", [scriptPath], {
+    // Run through the repo-supported TS runtime (tsx), exactly like the
+    // `validate:migrations` package script. Bare `node file.ts` only executes
+    // TypeScript on Node >=22 (native type stripping); CI pins Node 20, where
+    // it throws ERR_UNKNOWN_FILE_EXTENSION. `node --import tsx` is the
+    // node-entrypoint form that works on the pinned runtime.
+    const result = await execFileAsync("node", ["--import", "tsx", scriptPath], {
       cwd: repoRoot,
     });
 
