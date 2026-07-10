@@ -1,65 +1,57 @@
 # Cost Analyst Report
-> Generated: 2026-07-09 | Health status: green
+> Generated: 2026-07-10 | Health status: green
 
 ## Executive Summary
-The 13-commit delta since the 2026-07-08 cycle (HEAD `3b953903` → `3a619e26`, the v2.17.0 release + observability/security batch) is **cost-neutral to cost-reducing**: the landing page (highest-traffic route) is now statically rendered with ISR, and the only new recurring workload is a once-daily synthetic latency probe. Estimated monthly cost at 10K users holds at **~$50–75/mo**.
-
-## Cost-Surface Delta (since 2026-07-08 cycle)
-
-Audited commit-by-commit:
-
-| Commit | Change | Cost impact |
-|--------|--------|-------------|
-| `767c1a3e` | Landing page `force-static` + `revalidate: 3600` (#982) | **Reducing** — `/` no longer invokes a serverless function per request; served from CDN/ISR, re-rendered at most hourly. Locale/OAuth-error params moved client-side (`LandingPageClient.tsx`). |
-| `ba66bea1` | Badge route `Server-Timing` header + `/api/cron/latency-check` (#974) | **Negligible** — header formatting is in-memory string work per response; the cron adds 1 probe/day (`maxDuration: 60`, 10s abort) that hits `badge.svg?__chapa_smoke=1` (read-only smoke param — no snapshot persistence, no cache writes). ~30 extra badge invocations/month. |
-| `f260a00a` | `reconcileSnapshotWrite` saga (#975) | **Neutral** — same two writes as before (Supabase + Redis mirror); adds one webhook `captureOperationalAlert` call only on genuine partial failure (incident-bounded). `isRedisConfigured()` guard avoids false alerts on unconfigured deployments. |
-| `0cd25d86` | `rateLimit` → `rateLimitStrict` on `/api/auth/session` (60/min/IP) and `/api/refresh` (5/hr/handle) | **Neutral** — identical Redis op count; only the Redis-unavailable behavior changed (fail-closed). Availability tradeoff accepted as a security fix, not a cost item. |
-| `5b4bc7c6` | Health probe now queries `metrics_snapshots` (select + order + limit 1) instead of `users` (#976) | **Negligible** — marginally heavier indexed query on a rate-limited health route. |
-| `2895a761`, `3a619e26` | `buildStatsFrom*` pipeline extraction, i18n typed accessors | **Neutral** — pure refactors, no new I/O. |
-| `49342fdf` | Supplemental stats magnitude caps (#985) | **Neutral** — validation only; marginally *reduces* garbage-data persistence risk. |
-| `e6ec78bf` | ADR only (no middleware) | None. |
+Infrastructure cost surface is unchanged and healthy: the delta since the 2026-07-09 cycle (`3a619e26 → 3c335b6e`, 4 commits) is test-only + docs + one cost-*reducing* refactor. Estimated steady-state cost at 10K users remains **~$50–75/mo**, with 0 uncached external calls and 0 unbounded-storage patterns.
 
 ## Redis Usage
-- Key patterns (by producer): `stats:<handle>` + `stats:stale:<handle>` (GitHub stats, 6h/7d), `svg:*` via `badge-svg-cache` (24h + jitter), `supplemental:<handle>` (24h, Supabase-backed), `history:*` / snapshot cache, `craft:*`, `avatar:*`, `og:*`, `flags:*`, `cli:device:*`, `ratelimit:*` (pipeline INCR+EXPIRE), `stats:dirty:<handle>` (1h), cron heartbeats, email dedup markers, platform negative-cache keys.
-- TTL coverage: **35 non-redis-module `cacheSet()` call sites; 34/35 (97%) pass an explicit positive TTL**; the default parameter is 21,600s (`redis.ts:82`), so nothing falls through to no-expiry. The single TTL-0 site remains the intentional `cron:warm-cache:offset` rotation cursor (`warm-cache/route.ts:148`) — a fixed-size overwrite-in-place key, not additive.
-- Rate limiter: `rateLimit`/`rateLimitStrict` use pipelined INCR+EXPIRE (`redis.ts:262-273`) — every rate-limit key expires.
-- New this cycle: `isRedisConfigured()` helper (pure env check, no I/O). Zero new key patterns.
-- Growth risk: **LOW** — no unbounded patterns. Bounded direct-redis singletons unchanged (`stats:badges_generated` INCR counter, `stats:unique_badges` HLL ~12 KB).
+- **Key patterns** (all TTL-bounded unless noted):
+  - `stats:<handle>` / `stats:stale:<handle>` — GitHub-derived StatsData, `CACHE_TTL` primary + `STALE_TTL` 7d fallback (`github/client.ts:356,364`)
+  - `stats:dirty:<handle>` — same-day refresh marker, `DIRTY_STATS_TTL` 1h (`cache/dirty-stats.ts:22`)
+  - `svg:<handle>:<theme>` — rendered badge, per-handle-jittered TTL (`render/badge-svg-cache.ts:87`); render lock `cacheSetNx` `BADGE_RENDER_LOCK_TTL` (`badge.svg/route.ts:102`)
+  - `history:<handle>` — snapshot list, `HISTORY_CACHE_TTL` (`history/history.ts:61`)
+  - `supplemental:<handle>` — EMU merge payload, `SUPPLEMENTAL_TTL`/`CACHE_TTL` 24h (`client.ts:247`, `supplemental/route.ts:103`)
+  - `ratelimit:*` — INCR + EXPIRE fixed-window, always TTL'd on first increment (`redis.ts:202,240`)
+  - Cron heartbeats (`cron:lastrun:*`, warm-cache/sync-audience/process-campaigns) — `HEARTBEAT_TTL_SECONDS`
+  - Bounded singletons: `stats:badges_generated` (INCR counter) + `stats:unique_badges` (HyperLogLog, ~12 KB fixed) — self-bounding, not per-user growth
+  - Misc TTL'd: platform stats + neg-cache (`fetch-linked-platform.ts`), avatar data-URI, snapshot/craft caches, feature-flags, studio config, OG image, CLI device sessions, email dedup markers
+- **TTL coverage**: **34/35 non-module `cacheSet`/`cacheIncr`/`cacheReserveQuota` call sites (97%) carry an explicit positive TTL.** Default `cacheSet` TTL = 21,600s / 6h (`redis.ts:82`). The lone TTL-0 (persistent) write is the warm-cache rotation cursor `cron:warm-cache:offset` (`warm-cache/route.ts:148`) — a single fixed key, intentional, not user-scoped.
+- **Growth risk: LOW.** Every per-user key pattern is TTL-bounded (≤7d). No unbounded set/list accumulation. The two persistent keys are fixed-cardinality counters.
 
 ## Database Usage
-- Tables: **11 tables + 2 views, 28 migrations** (028 = service-role grants; no new tables this cycle).
-- Query patterns: efficient — no N+1 detected. `dbGetLatestSnapshot`-shaped reads are select+order+limit on indexed columns; the health probe now mirrors that shape. `reconcileSnapshotWrite` performs the same single durable write (insert or replace) as before, just wrapped in an observable envelope. `dbGetCampaignStats` 4-parallel-COUNT (P2-1) carried, monitor-only (admin surface, threshold-gated).
-- Connection management: lazy singleton (`lib/db/supabase.ts`), `server-only`, `persistSession: false`, all queries under `withTimeout` — unchanged and correct for serverless.
+- **Tables**: 11 tables + 2 views across **28 migrations** (028 = service-role grants; no new tables this cycle). RLS ENABLE + FORCE on all 11 tables per the 2026-07-06 security cycle; views are `SECURITY INVOKER` (014).
+- **Query patterns**: No N+1. Data access goes through `lib/db/*` with parallelized COUNTs where needed. `dbGetCampaignStats` runs 4 parallel COUNT queries (P2-1, monitor-only, admin-only + threshold-gated — not a hot path). `statsComplete` gate (#1003) skips snapshot writes for poisoned stats, a small write reduction.
+- **Connection management**: **lazy singleton** (`lib/db/supabase.ts`), `server-only`, `persistSession:false`, `withTimeout`-wrapped. One client instance per serverless container — no per-request connection churn.
 
 ## External API Calls
-| Route | External Service | Cached | Rate Limited | Risk |
+| Route / path | External Service | Cached | Rate Limited | Risk |
 |-------|-----------------|--------|-------------|------|
-| `/u/:handle/badge.svg` | GitHub GraphQL (+ linked platforms) | 6h primary + 7d SWR stale, SVG cache 24h, in-flight dedup + Redis lock | Yes (on cache miss only) | Low |
-| `/api/cron/warm-cache` | GitHub GraphQL | Writes cache; rotation-bounded batch | CRON_SECRET | Low |
-| `/api/cron/latency-check` (new) | Own badge endpoint (1 fetch/day) | n/a (synthetic, read-only smoke param) | CRON_SECRET | Low |
-| `/api/refresh` | GitHub GraphQL | Busts + rewrites cache | **Strict** 5/hr/handle (now fail-closed) | Low |
-| `/api/auth/session` | — (Redis only) | n/a | **Strict** 60/min/IP (now fail-closed) | Low |
-| `/api/health` | GitHub probe + Supabase + Redis | 60s probe cache | Yes | Low |
-| `/api/challenge` | Resend | n/a | Strict IP 5/hr + handle 3/day | Low |
-| Cron sync-audience / process-campaigns | Resend | Contacts cached; heartbeat keys | CRON_SECRET | Low |
-| Telemetry/analytics | PostHog | Fire-and-forget, dedup-marker guarded | Per-handle | Low |
+| `getStats()` (badge, profile, refresh) | GitHub GraphQL | Yes — `stats:*` 6h + 7d SWR + in-flight dedup + Redis render lock | Yes (`rateLimit`) | Low |
+| `fetch-linked-platform` (Bitbucket/Codeberg/GitLab) | Platform REST/GraphQL | Yes — 6h + neg-cache | via caller | Low |
+| `/api/challenge` | Resend (email) | n/a (write) | Yes — `rateLimitStrict` IP 5/hr + handle 3/day | Low |
+| `/api/cron/sync-audience` | Resend (audience) | Yes — `CONTACTS_CACHE_TTL` | CRON_SECRET | Low |
+| `/api/admin/campaigns/[id]/test` | Resend (test email) | n/a | admin auth | Low |
+| `/api/health` | GitHub API probe | 60s | Yes | Low |
+| `/api/cron/latency-check` | own badge endpoint (synthetic) | read-only `__chapa_smoke=1` | CRON_SECRET, `maxDuration=60` | Low |
+| PostHog (server events) | PostHog | fire-and-forget, incident-bounded | n/a | Low |
 
-**Uncached external calls: 0** (excluding fire-and-forget analytics and the intentional daily synthetic probe).
+- **Uncached external calls: 0.** Every GitHub-hitting path passes through `getStats()` (cached + in-flight-deduped + Redis-locked). No route can trigger unbounded GitHub usage — cron/bulk use the server token and CDN `s-maxage=21600` fronts the badge route.
 
 ## Resource Management
-- No leaks found. Fresh grep: **0 `setInterval` in server code** (`app/api`, `lib`); all intervals are client components with cleanup.
-- `inflightBadgeRenders` Map remains self-clearing per request (documented accepted risk).
-- Latency-check probe drains the response body and uses `AbortSignal.timeout(10_000)` — no dangling fetches; `maxDuration: 60` caps the function.
-- **P3-1 carried (unchanged)**: the `fetchStats` rejection path (`client.ts:174-181`) serves stale without refreshing the primary key — during a transient GitHub partial-degradation incident, uncached handles refetch per origin request until healed. Bounded by CDN s-maxage + in-flight dedup. Fix remains: mirror the 6h stale re-cache or add a short negative-cache.
+- No unclosed connections: Supabase + Redis are lazy singletons; GitHub/platform fetches are `withTimeout`-wrapped across 23 lib files.
+- `inflightBadgeRenders` Map is self-clearing (documented accepted risk).
+- All `setInterval` usages are client components with cleanup refs — no serverless timers leak.
+- No large in-memory buffers without limits: OG-image PNG is base64'd and cached, not retained; HLL is fixed ~12 KB.
+- **`client.ts` P3-1 refactor (this cycle)**: the total-fetch-failure stale-serve path now mirrors the #1002 degraded-fetch anti-thrash pattern via a shared `_serveStaleAndReCache()` helper (`client.ts:168-177`) — re-caches stale into the primary key (6h TTL, guarded by `readOnly`). **Cost-reducing**: bounds GitHub refetch churn during a sustained upstream outage. Closes the P3-1 carried 5+ cycles.
 
-## Vercel-Specific Cost Factors
-- **Function sizes/durations**: badge `maxDuration=35`; `bulk-recalculate` + 3 crons at 300; new `latency-check` correctly scoped to **60** (not 300) — good hygiene. 4 crons total, all daily.
-- **Landing page now static** (`force-static`, `revalidate: 3600`): the single biggest invocation-count route moved from per-request serverless to CDN/ISR. This is the most material cost improvement of the cycle.
-- **Caching headers**: badge `s-maxage=21600 / SWR=86400` (success), `300/600` (error) — unchanged. The added `Server-Timing` header does not affect cacheability.
-- **Bundle**: landing page was restructured into `LandingPageClient.tsx` (501 lines, client component) — content moved rather than added; carried figure 2,079 KB raw / 659 KB gzipped remains below the 2,300 KB `ANALYZE=true` trigger, but the next performance cycle should re-measure since `/` shifted server → client rendering.
+## Vercel Cost Factors
+- **Serverless sizing**: badge route `maxDuration=35`; 3 heavy crons `=300`; `latency-check` correctly scoped `=60` (good hygiene). No oversized routes.
+- **Edge vs serverless**: appropriate — data-heavy routes stay serverless (Node runtime for Redis/Supabase/Sharp).
+- **ISR/SSG**: landing `/` is `force-static` + `revalidate:3600` (#982) — the highest-traffic route is CDN/ISR-served, the biggest invocation-count win. Badge route CDN-fronted at `s-maxage=21600 / SWR=86400`. Bundle carried at 2,128 KB raw / 672 KB gzipped (per 2026-07-09 performance re-baseline) — no client-bundle delta this cycle (test/docs only), below the 2,300 KB `ANALYZE` trigger.
 
 ## Recommendations
-1. **(P3, carried)** Add a short negative-cache or stale re-cache on the `fetchStats` rejection path (`apps/web/lib/github/client.ts:174-181`) to bound refetch churn during GitHub partial-degradation incidents.
-2. **(P3, new — monitor only)** The `reconcileSnapshotWrite` P2 alert fires per divergent write; during a sustained Redis outage on a busy day this could emit one webhook call per snapshot write. If it ever gets noisy, add a per-incident dedup marker (same pattern as email dedup keys). Not worth building preemptively.
-3. **(P2-1, carried, monitor-only)** `dbGetCampaignStats` 4-parallel-COUNT — revisit only if `campaigns/sends.ts` changes or campaign volume grows.
-4. **(Info)** Ask the performance agent to re-baseline First Load JS next cycle: the landing-page static refactor moved ~475 lines of server JSX into `LandingPageClient.tsx`; the visitor-facing chunk composition changed even if totals look flat.
+- **P1s: NONE. P2s: 1 (carried). P3s: 1 (carried).**
+- **P2-1 (carried, monitor-only)**: `dbGetCampaignStats` fires 4 parallel COUNT queries. Admin-only + threshold-gated, so not a live cost driver — revisit only if `campaigns/sends.ts` changes or campaign volume grows materially.
+- **P3-2 (carried, monitor-only)**: `reconcileSnapshotWrite` alert fires per divergent write; add a per-incident dedup marker only if it gets noisy during a sustained Redis outage. Agent's own prior guidance: not worth building preemptively.
+- **Closed this cycle**: P3-1 (`client.ts` stale-serve refetch churn) — resolved by the `_serveStaleAndReCache()` refactor; drop from carry lists.
+- No new cost surface introduced. Steady-state estimate holds at ~$50–75/mo at 10K users.

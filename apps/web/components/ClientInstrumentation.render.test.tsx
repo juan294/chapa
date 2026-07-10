@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import dynamic from "next/dynamic";
+import { resolveDynamicLoader } from "@/lib/test-helpers/dynamic-mock";
 
 vi.mock("@/components/ClientAnalytics", () => ({
   ClientAnalytics: () => <div data-testid="client-analytics" />,
@@ -37,11 +38,8 @@ describe("ClientInstrumentation render", () => {
     await import("./ClientInstrumentation");
     const { PostHogInit } = await import("@/components/PostHogProvider");
 
-    const call = vi.mocked(dynamic).mock.calls[0];
-    if (!call) throw new Error("dynamic() was not called");
-    const loader = call[0] as () => Promise<{ default: typeof PostHogInit }>;
-    const resolved = await loader();
+    const resolved = await resolveDynamicLoader<typeof PostHogInit>(dynamic);
 
-    expect(resolved.default).toBe(PostHogInit);
+    expect(resolved).toBe(PostHogInit);
   });
 });

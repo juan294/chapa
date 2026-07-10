@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import dynamic from "next/dynamic";
+import { resolveDynamicLoader } from "@/lib/test-helpers/dynamic-mock";
 
 vi.mock("./BadgeSkeleton", () => ({
   BadgeSkeleton: () => <div data-testid="badge-skeleton" />,
@@ -44,5 +46,18 @@ describe("SharePageOwnerContentLazy render", () => {
     expect(wrapper.getAttribute("data-handle")).toBe("octocat");
     expect(wrapper.getAttribute("data-ssr")).toBe("undefined");
     expect(screen.getByTestId("badge-skeleton")).toBeTruthy();
+  });
+
+  it("resolves the deferred loader to SharePageOwnerContent", async () => {
+    await import("./SharePageOwnerContentLazy");
+    const { SharePageOwnerContent } = await import(
+      "./SharePageOwnerContent"
+    );
+
+    const resolved = await resolveDynamicLoader<typeof SharePageOwnerContent>(
+      dynamic,
+    );
+
+    expect(resolved).toBe(SharePageOwnerContent);
   });
 });
