@@ -265,6 +265,48 @@ describe("AboutPage render (en)", () => {
     expect(screen.getByText("Privacy and fairness")).toBeDefined();
     expect(screen.getByText("Contact")).toBeDefined();
   });
+
+  // Lighthouse a11y regression (release-blocking, caught in the develop->main
+  // PR): the 7 archetype names + 3 amber links in the intro/privacy copy used
+  // the raw archetype/amber color as the TEXT color, which fails WCAG AA
+  // 4.5:1 contrast against the light theme's white background (these color
+  // tokens are identical in both themes, tuned for the dark theme's
+  // background) — and relied on color alone to distinguish the link from
+  // surrounding text (no underline). Text color must stay a high-contrast
+  // token; the archetype/amber color is preserved as a decorative underline.
+  it("renders archetype and amber inline links with accessible text color, not the raw brand color", async () => {
+    const { default: AboutPage } = await import("./page");
+    render(await AboutPage({ params: Promise.resolve({ locale: "en" }) }));
+
+    for (const name of [
+      "Builder",
+      "Quality Champion",
+      "Marathoner",
+      "Polymath",
+      "Artificer",
+      "Balanced",
+      "Emerging",
+    ]) {
+      const link = screen.getByText(name);
+      // Resting-state text color must be the accessible token, not the raw
+      // archetype color (which only meets contrast in dark mode) — the
+      // archetype color is preserved as a decorative underline and hover
+      // accent instead, neither of which affect the resting-state contrast
+      // Lighthouse/axe measure.
+      expect(link.className).toMatch(/text-text-primary/);
+      expect(link.className).not.toMatch(/(?<!hover:)text-archetype-/);
+      expect(link.className).toMatch(/underline/);
+      expect(link.className).toMatch(/decoration-archetype-/);
+    }
+
+    for (const label of ["scoring methodology", "badge verification"]) {
+      const link = screen.getByText(label);
+      expect(link.className).toMatch(/text-text-primary/);
+      expect(link.className).not.toBe("text-amber hover:text-amber-light transition-colors");
+      expect(link.className).toMatch(/underline/);
+      expect(link.className).toMatch(/decoration-amber/);
+    }
+  });
 });
 
 // #1023 (FE-H1) — this is the core flash-elimination proof for /about: the
