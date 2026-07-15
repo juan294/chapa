@@ -227,33 +227,47 @@ const SNAPSHOT_COLUMNS = [
 // ---------------------------------------------------------------------------
 
 /**
+ * Tri-state outcome of a `dbInsertSnapshot` call (#1015/#1016):
+ * - "inserted": a new row was written this call.
+ * - "duplicate": the handle+date row already existed — ON CONFLICT DO NOTHING
+ *   silently ignored the write. Benign, not a failure.
+ * - "failed": the write did not happen (DB unavailable or a genuine error).
+ */
+export type SnapshotInsertOutcome = "inserted" | "duplicate" | "failed";
+
+/**
  * Insert a snapshot. Uses ON CONFLICT DO NOTHING for date-based dedup.
- * Returns true if inserted, false if duplicate or on error.
+ *
+ * Detects insert vs. duplicate via row presence in the `.select("id")`
+ * response, NOT the HTTP status code (#1016) — status 201 vs. 200 is an
+ * undocumented PostgREST/supabase-js implementation detail that could change
+ * silently on a dependency upgrade. This mirrors `dbReplaceSnapshot`'s
+ * existing presence-based detection below.
  */
 export async function dbInsertSnapshot(
   handle: string,
   snapshot: MetricsSnapshot,
-): Promise<boolean> {
+): Promise<SnapshotInsertOutcome> {
   const db = getSupabase();
-  if (!db) return false;
+  if (!db) return "failed";
 
   try {
-    const { error, status } = await db
+    const { data, error } = await db
       .from("metrics_snapshots")
       .upsert(snapshotToInsertRow(handle, snapshot), {
         onConflict: "handle,date",
         ignoreDuplicates: true,
-      });
+      })
+      .select("id");
 
     if (error) throw error;
-    // status 201 = inserted, 200 = duplicate (ignored)
-    return status === 201;
+    return data && data.length > 0 ? "inserted" : "duplicate";
   } catch (error) {
     console.error(
       "[db] dbInsertSnapshot failed:",
       (error as Error).message,
     );
-    return false;
+    return "failed";
   }
 }
 

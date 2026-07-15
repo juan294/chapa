@@ -31,7 +31,7 @@ const snapshot = makeSnapshot({ date: "2026-04-17", adjustedComposite: 88 });
 describe("reconcileSnapshotWrite", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDbInsertSnapshot.mockResolvedValue(true);
+    mockDbInsertSnapshot.mockResolvedValue("inserted");
     mockDbReplaceSnapshot.mockResolvedValue(true);
     mockUpdateSnapshotCache.mockResolvedValue(true);
     mockIsRedisConfigured.mockReturnValue(true);
@@ -49,6 +49,7 @@ describe("reconcileSnapshotWrite", () => {
       persisted: true,
       cacheUpdated: true,
       reconciliationRequired: false,
+      writeOutcome: "inserted",
     });
     expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
   });
@@ -62,6 +63,7 @@ describe("reconcileSnapshotWrite", () => {
     expect(mockDbInsertSnapshot).not.toHaveBeenCalled();
     expect(result.persisted).toBe(true);
     expect(result.reconciliationRequired).toBe(false);
+    expect(result.writeOutcome).toBe("inserted");
   });
 
   it("emits a reconciliation alert when the durable write succeeds but the cache update fails", async () => {
@@ -76,6 +78,7 @@ describe("reconcileSnapshotWrite", () => {
       persisted: true,
       cacheUpdated: false,
       reconciliationRequired: true,
+      writeOutcome: "inserted",
     });
 
     // (b) — a structured reconciliation event is captured with enough context
@@ -107,12 +110,66 @@ describe("reconcileSnapshotWrite", () => {
       persisted: true,
       cacheUpdated: false,
       reconciliationRequired: false,
+      writeOutcome: "inserted",
     });
     expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
   });
 
-  it("does not attempt the cache write or alert when the durable write fails", async () => {
-    mockDbInsertSnapshot.mockResolvedValue(false);
+  // ---------------------------------------------------------------------------
+  // #1015/#1016 — tri-state write outcome branches
+  // ---------------------------------------------------------------------------
+
+  it("inserted+cache-ok: reports a clean write with no alert", async () => {
+    mockDbInsertSnapshot.mockResolvedValue("inserted");
+    mockUpdateSnapshotCache.mockResolvedValue(true);
+
+    const result = await reconcileSnapshotWrite("testuser", snapshot, {
+      mode: "insert",
+    });
+
+    expect(result.persisted).toBe(true);
+    expect(result.writeOutcome).toBe("inserted");
+    expect(result.cacheUpdated).toBe(true);
+    expect(result.reconciliationRequired).toBe(false);
+    expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it("duplicate+cache-refresh-attempted: still attempts the cache mirror, and never alerts even if that refresh fails (avoids flooding on repeat CDN-miss hits)", async () => {
+    mockDbInsertSnapshot.mockResolvedValue("duplicate");
+    mockUpdateSnapshotCache.mockResolvedValue(false);
+
+    const result = await reconcileSnapshotWrite("testuser", snapshot, {
+      mode: "insert",
+    });
+
+    // The opportunistic cache refresh was attempted...
+    expect(mockUpdateSnapshotCache).toHaveBeenCalledWith("testuser", snapshot);
+    // ...but a benign duplicate never escalates, even when that refresh fails.
+    expect(result).toEqual({
+      persisted: true,
+      cacheUpdated: false,
+      reconciliationRequired: false,
+      writeOutcome: "duplicate",
+    });
+    expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it("duplicate+cache-ok: reports a clean write with no alert", async () => {
+    mockDbInsertSnapshot.mockResolvedValue("duplicate");
+    mockUpdateSnapshotCache.mockResolvedValue(true);
+
+    const result = await reconcileSnapshotWrite("testuser", snapshot, {
+      mode: "insert",
+    });
+
+    expect(result.persisted).toBe(true);
+    expect(result.writeOutcome).toBe("duplicate");
+    expect(result.cacheUpdated).toBe(true);
+    expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it("failed: does not attempt the cache write and does not alert at this layer (escalation is the caller's job, see #1009)", async () => {
+    mockDbInsertSnapshot.mockResolvedValue("failed");
 
     const result = await reconcileSnapshotWrite("testuser", snapshot, {
       mode: "insert",
@@ -124,8 +181,21 @@ describe("reconcileSnapshotWrite", () => {
       persisted: false,
       cacheUpdated: false,
       reconciliationRequired: false,
+      writeOutcome: "failed",
     });
     expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
     expect(mockCaptureOperationalAlert).not.toHaveBeenCalled();
+  });
+
+  it("replace mode reports 'failed' (not 'duplicate') on a genuine write error — replace has no duplicate concept", async () => {
+    mockDbReplaceSnapshot.mockResolvedValue(false);
+
+    const result = await reconcileSnapshotWrite("testuser", snapshot, {
+      mode: "replace",
+    });
+
+    expect(result.writeOutcome).toBe("failed");
+    expect(result.persisted).toBe(false);
+    expect(mockUpdateSnapshotCache).not.toHaveBeenCalled();
   });
 });
