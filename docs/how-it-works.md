@@ -452,7 +452,7 @@ Chapa captures daily snapshots of each user's metrics and stores them permanentl
 ### How snapshots are captured
 
 Snapshots are recorded automatically in three places:
-1. **Cron warm-cache** — a scheduled job that refreshes active users daily
+1. **Cron warm-cache** — a scheduled job that refreshes active users on a round-robin rotation, running hourly (#1010; was daily) to shrink the staleness gap as the user base scales past the 50-handle/run ceiling
 2. **Badge route** — after rendering a badge SVG, a snapshot is captured via `after()`
 3. **Refresh endpoint** — when a manual refresh is triggered
 

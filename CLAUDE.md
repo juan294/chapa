@@ -110,7 +110,7 @@ Chapa generates a **live, embeddable, animated SVG badge** that showcases a deve
 
 ### Webhooks & Cron
 - POST `/api/webhooks/resend` Resend email webhook (HMAC verified)
-- GET `/api/cron/warm-cache` Daily cache warming (bearer auth via `CRON_SECRET`)
+- GET `/api/cron/warm-cache` Hourly cache warming (bearer auth via `CRON_SECRET`; #1010 — was daily, bumped to hourly to shrink the per-handle staleness gap at the 50-handle/run ceiling)
 - GET `/api/cron/sync-audience` Daily Resend audience sync (bearer auth via `CRON_SECRET`)
 - GET `/api/cron/process-campaigns` Daily campaign batch processor (bearer auth via `CRON_SECRET`)
 - GET `/api/cron/latency-check` Daily badge-route latency SLO synthetic monitor (bearer auth via `CRON_SECRET`); times `/u/:handle/badge.svg` and raises a P2 alert via `CHAPA_ALERT_WEBHOOK_URL` on p95 budget breach
