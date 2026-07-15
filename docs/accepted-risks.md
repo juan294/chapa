@@ -1,6 +1,6 @@
 # Accepted Risks & Known Limitations
 
-> Last reviewed: 2026-06-21 | Audit: v42
+> Last reviewed: 2026-07-15 | Audit: v42
 
 Documented security, infrastructure, and performance decisions that were evaluated during pre-launch audits and accepted as reasonable tradeoffs. Items here are intentional and should not be flagged as warnings in audits.
 
@@ -113,7 +113,23 @@ Documented security, infrastructure, and performance decisions that were evaluat
 - **Severity:** Low
 - **Accepted:** 2026-06-21
 
+## axe-core MPL-2.0 license (dev-only)
+
+- **Risk:** `axe-core` (pulled in transitively for accessibility testing) is licensed under MPL-2.0, which is not in our stated license policy (MIT, Apache-2.0, BSD, ISC).
+- **Accepted because:** `axe-core` is a `devDependency` used only by the a11y test suite — it is never imported by application code and never bundled into the production build. No MPL-licensed code is distributed to end users.
+- **Mitigation:** None required. Confirmed dev-only via `pnpm audit`/license scan in every security agent cycle.
+- **Severity:** None (dev-only)
+- **Accepted:** 2026-07-15
+
 ## Infrastructure
+
+## GitHub Advanced Security (code scanning + secret scanning) unavailable on repo tier
+
+- **Risk:** Native GitHub code scanning (CodeQL) and secret scanning are disabled on this repository (`403`/`404` from the respective alert APIs) — GitHub Advanced Security is not licensed for private repositories on this plan tier, so these alert surfaces cannot be enabled without a paid upgrade.
+- **Accepted because:** Equivalent coverage already runs in CI on every PR: the `Secret Scanning` workflow runs Gitleaks, and the `Security Scan` workflow runs `pnpm audit` (dependency vulnerabilities) and a license-compliance check. Weekly security-agent cycles independently re-verify secrets, dependency vulnerabilities, and license compliance against live source. Dependabot security alerts (a separate, unaffected feature) remain enabled with 0 open alerts.
+- **Mitigation:** None required today. Re-evaluate if the repo tier changes or if GHAS becomes available for private repos on the current plan.
+- **Severity:** Low
+- **Accepted:** 2026-07-15
 
 ## `packages/shared` has no build step (#450)
 
