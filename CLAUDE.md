@@ -344,8 +344,9 @@ pnpm run typecheck      # Check types
 pnpm run lint           # Check linting
 
 # Testing
-pnpm run test:watch     # Watch mode
-pnpm run test:coverage  # Coverage report
+pnpm run test:watch          # Watch mode
+pnpm run test:coverage       # Coverage report
+pnpm run test:contract:local # Contract suite against local Supabase (run `supabase start` first)
 
 # Development
 pnpm run dev            # Local dev server (port 3001)
