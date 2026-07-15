@@ -1,7 +1,8 @@
 "use client";
 
 import type { CraftResult, ImpactV6Result, StatsData } from "@chapa/shared";
-import { useTrendData } from "@/hooks/useTrendData";
+import type { TrendSummary } from "@/lib/history/trend";
+import type { SnapshotDiff } from "@/lib/history/diff";
 import { getArchetypeProfile } from "@/components/ImpactBreakdown";
 import { DimensionCardsRow } from "./DimensionCardsRow";
 import { CoachingInsights } from "./CoachingInsights";
@@ -18,6 +19,16 @@ interface ImpactDashboardProps {
   stats: StatsData;
   handle: string;
   craftResult?: CraftResult | null;
+  /**
+   * Trend/diff history data, fetched server-side (#1034) by the share page
+   * and threaded down as props. Previously this component fetched its own
+   * trend data client-side via `useTrendData`, creating a post-hydration
+   * waterfall (static shell -> hydrate -> lazy chunk -> client fetch).
+   * Both default to `null` — the same "no history yet" state the old client
+   * fetch showed while loading or on a fetch error.
+   */
+  trend?: TrendSummary | null;
+  diff?: SnapshotDiff | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -27,10 +38,10 @@ interface ImpactDashboardProps {
 export function ImpactDashboard({
   impact,
   stats,
-  handle,
   craftResult = null,
+  trend = null,
+  diff = null,
 }: ImpactDashboardProps) {
-  const { trend, diff } = useTrendData(handle);
   const { t } = useTranslation();
 
   const profileText = getArchetypeProfile(impact, t);

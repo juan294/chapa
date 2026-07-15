@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { vi } from "vitest";
 import { ImpactDashboard } from "./ImpactDashboard";
 
 // ---------------------------------------------------------------------------
 // Mocks
+//
+// #1034 — ImpactDashboard no longer fetches its own trend data via a client
+// `useTrendData()` hook (that caused a post-hydration fetch waterfall). It
+// now receives `trend`/`diff` as props, seeded server-side by the share
+// page. Tests below pass them directly instead of mocking a hook.
 // ---------------------------------------------------------------------------
-
-vi.mock("@/hooks/useTrendData", () => ({
-  useTrendData: vi.fn(),
-}));
 
 vi.mock("@/components/ImpactBreakdown", () => ({
   getArchetypeProfile: () => "Mock archetype profile text",
@@ -60,9 +62,6 @@ afterEach(cleanup);
 import type { ImpactV6Result, StatsData } from "@chapa/shared";
 import type { TrendSummary } from "@/lib/history/trend";
 import type { SnapshotDiff } from "@/lib/history/diff";
-import { useTrendData } from "@/hooks/useTrendData";
-
-const mockUseTrendData = vi.mocked(useTrendData);
 
 const mockImpact: ImpactV6Result = {
   handle: "testuser",
@@ -157,13 +156,6 @@ describe("ImpactDashboard", () => {
   // 1. Renders all sections including archetype header
   // ----------------------------------------------------------------
   it("renders all sections including archetype header", () => {
-    mockUseTrendData.mockReturnValue({
-      trend: null,
-      diff: null,
-      isLoading: false,
-      error: null,
-    });
-
     render(
       <ImpactDashboard
         impact={mockImpact}
@@ -185,21 +177,16 @@ describe("ImpactDashboard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 2. Passes trend/diff data to child components when available
+  // 2. Passes trend/diff data to child components when provided as props
   // ----------------------------------------------------------------
-  it("passes trend/diff data to child components when available", () => {
-    mockUseTrendData.mockReturnValue({
-      trend: mockTrend,
-      diff: mockDiff,
-      isLoading: false,
-      error: null,
-    });
-
+  it("passes trend/diff data to child components when provided as props", () => {
     render(
       <ImpactDashboard
         impact={mockImpact}
         stats={mockStats}
         handle="testuser"
+        trend={mockTrend}
+        diff={mockDiff}
       />,
     );
 
@@ -219,16 +206,9 @@ describe("ImpactDashboard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 3. Handles loading state (no trend data yet)
+  // 3. Defaults to null trend/diff when not provided (no history yet)
   // ----------------------------------------------------------------
-  it("handles loading state (no trend data yet)", () => {
-    mockUseTrendData.mockReturnValue({
-      trend: null,
-      diff: null,
-      isLoading: true,
-      error: null,
-    });
-
+  it("defaults to null trend/diff when not provided (no history yet)", () => {
     render(
       <ImpactDashboard
         impact={mockImpact}
@@ -258,30 +238,25 @@ describe("ImpactDashboard", () => {
   });
 
   // ----------------------------------------------------------------
-  // 4. Handles error state (trend fetch failed)
+  // 4. Renders gracefully when trend/diff are explicitly null (history
+  //    unavailable/degraded upstream)
   // ----------------------------------------------------------------
-  it("handles error state (trend fetch failed)", () => {
-    mockUseTrendData.mockReturnValue({
-      trend: null,
-      diff: null,
-      isLoading: false,
-      error: "Failed to load trend data",
-    });
-
+  it("renders gracefully when trend/diff are explicitly null", () => {
     render(
       <ImpactDashboard
         impact={mockImpact}
         stats={mockStats}
         handle="testuser"
+        trend={null}
+        diff={null}
       />,
     );
 
-    // All sections should still render despite error
+    // All sections should still render despite missing history
     expect(screen.getByTestId("dimension-cards-row")).toBeTruthy();
 
     expect(screen.getByTestId("coaching-insights")).toBeTruthy();
     expect(screen.getByTestId("activity-heatmap")).toBeTruthy();
     expect(screen.getByTestId("stats-grid")).toBeTruthy();
   });
-
 });

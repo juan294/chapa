@@ -11,6 +11,7 @@ const {
   mockRenderBadgeSvg,
   mockAfter,
   mockGetServerLocale,
+  mockGetTrendData,
 } = vi.hoisted(() => ({
   mockMaterializePublicProfile: vi.fn(),
   mockGetPublicProfileVerification: vi.fn(),
@@ -22,6 +23,7 @@ const {
   mockRenderBadgeSvg: vi.fn(),
   mockAfter: vi.fn(),
   mockGetServerLocale: vi.fn(),
+  mockGetTrendData: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/public-profile", () => ({
@@ -34,6 +36,10 @@ vi.mock("@/lib/profile/public-profile", () => ({
     mockPersistProfileSnapshot(...args),
   deferProfileCacheWork: (...args: unknown[]) =>
     mockDeferProfileCacheWork(...args),
+}));
+
+vi.mock("@/lib/history/get-trend-data", () => ({
+  getTrendData: (...args: unknown[]) => mockGetTrendData(...args),
 }));
 
 vi.mock("@/lib/validation", () => ({
@@ -105,6 +111,35 @@ vi.mock("@/components/BadgeSkeleton", () => ({
 }));
 
 import SharePage, { SharePageContent, generateMetadata } from "./page";
+import { SharePageOwnerContentLazy } from "@/components/SharePageOwnerContentLazy";
+
+/**
+ * Recursively walk a rendered React element tree (as returned by an async
+ * server component, not yet actually rendered to DOM) to find the first
+ * element matching `predicate`. Used to inspect props passed to a specific
+ * descendant without needing a full DOM render.
+ */
+function findElement(
+  node: unknown,
+  predicate: (el: { type: unknown; props: Record<string, unknown> }) => boolean,
+): { type: unknown; props: Record<string, unknown> } | null {
+  if (node == null || typeof node !== "object") return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findElement(child, predicate);
+      if (found) return found;
+    }
+    return null;
+  }
+  const el = node as { type?: unknown; props?: Record<string, unknown> };
+  if ("type" in el && "props" in el) {
+    if (predicate(el as { type: unknown; props: Record<string, unknown> })) {
+      return el as { type: unknown; props: Record<string, unknown> };
+    }
+    return findElement(el.props?.children, predicate);
+  }
+  return null;
+}
 
 const FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg">BADGE</svg>';
 
@@ -154,6 +189,7 @@ describe("SharePage /u/[handle]", () => {
     mockGetAvatarBase64.mockResolvedValue("data:image/png;base64,abc123");
     mockRenderBadgeSvg.mockReturnValue(FAKE_SVG);
     mockGetServerLocale.mockResolvedValue("en");
+    mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
   });
 
   it("generates metadata with the daily OG cache buster", async () => {
@@ -249,5 +285,103 @@ describe("SharePage /u/[handle]", () => {
       FAKE_MATERIALIZED.displayImpact,
       expect.objectContaining({ avatarDataUri: undefined }),
     );
+  });
+
+  // ----------------------------------------------------------------
+  // #1034 — server-side trend/diff fetch (no client fetch waterfall)
+  // ----------------------------------------------------------------
+  describe("server-side trend data (#1034)", () => {
+    const FAKE_TREND = {
+      direction: "improving" as const,
+      avgDelta: 3,
+      compositeValues: [{ date: "2026-04-10", value: 55 }, { date: "2026-04-17", value: 65 }],
+      dimensions: {
+        delivery: { avgDelta: 2, values: [] },
+        quality: { avgDelta: 1, values: [] },
+        consistency: { avgDelta: 0, values: [] },
+        breadth: { avgDelta: -1, values: [] },
+      },
+    };
+
+    const FAKE_DIFF = {
+      direction: "improving" as const,
+      daysBetween: 7,
+      compositeScore: 8,
+      adjustedComposite: 10,
+      confidence: 0,
+      dimensions: { delivery: 5, quality: 2, consistency: 1, breadth: 0 },
+      stats: {
+        commitsTotal: 10,
+        prsMergedCount: 2,
+        prsMergedWeight: 2,
+        reviewsSubmittedCount: 1,
+        issuesClosedCount: 0,
+        reposContributed: 0,
+        activeDays: 3,
+        linesAdded: 100,
+        linesDeleted: 20,
+        totalStars: 0,
+        totalForks: 0,
+        totalWatchers: 0,
+        topRepoShare: 0,
+      },
+      archetype: null,
+      tier: null,
+      profileType: null,
+      penaltyChanges: null,
+    };
+
+    it("fetches trend data alongside profile materialization and passes it to owner content (no client fetch required)", async () => {
+      mockGetTrendData.mockResolvedValue({ trend: FAKE_TREND, diff: FAKE_DIFF });
+
+      const result = await renderPage();
+
+      expect(mockGetTrendData).toHaveBeenCalledWith("testuser");
+
+      const ownerEl = findElement(
+        result,
+        (el) => el.type === SharePageOwnerContentLazy,
+      );
+      expect(ownerEl).not.toBeNull();
+      expect(ownerEl!.props.trend).toEqual(FAKE_TREND);
+      expect(ownerEl!.props.diff).toEqual(FAKE_DIFF);
+    });
+
+    it("renders successfully with a graceful empty state when trend history is unavailable", async () => {
+      mockGetTrendData.mockResolvedValue({ trend: null, diff: null });
+
+      const result = await renderPage();
+
+      const ownerEl = findElement(
+        result,
+        (el) => el.type === SharePageOwnerContentLazy,
+      );
+      expect(ownerEl).not.toBeNull();
+      expect(ownerEl!.props.trend).toBeNull();
+      expect(ownerEl!.props.diff).toBeNull();
+      // Impact/stats sections are still present — the page doesn't omit the
+      // dashboard just because history is missing.
+      expect(ownerEl!.props.stats).toEqual(FAKE_MATERIALIZED.stats);
+      expect(ownerEl!.props.impact).toEqual(FAKE_MATERIALIZED.displayImpact);
+    });
+
+    it("degrades gracefully (renders, does not throw) when getTrendData itself rejects", async () => {
+      // getTrendData is documented to fail-open internally and never reject,
+      // but this test guards the page-level integration in case that
+      // contract is ever violated in the future — the page must never 500
+      // just because history lookup failed (CLAUDE.md: "A 500 on legal user
+      // input is always a bug").
+      mockGetTrendData.mockRejectedValue(new Error("history store down"));
+
+      const result = await renderPage();
+
+      const ownerEl = findElement(
+        result,
+        (el) => el.type === SharePageOwnerContentLazy,
+      );
+      expect(ownerEl).not.toBeNull();
+      expect(ownerEl!.props.trend).toBeNull();
+      expect(ownerEl!.props.diff).toBeNull();
+    });
   });
 });
