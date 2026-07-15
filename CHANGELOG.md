@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Badge latency SLO + `Server-Timing` header (#974)**: the badge route now carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `materialize`/`render` breakdown on cold misses, always a `total`), enforced against an 800ms cache-hit / 3000ms cache-miss p95 budget. A new daily `/api/cron/latency-check` synthetic monitor times the live endpoint and raises a P2 `badge_latency_slo_breach` alert on breach or probe failure.
+- **Reconciliation alert on partial snapshot writes**: `reconcileSnapshotWrite` (`lib/profile/snapshot-write.ts`) wraps the Supabase `metrics_snapshots` write and its Redis mirror as one saga — if Supabase commits but the Redis write fails, a structured P2 operational alert fires instead of silently leaving the two stores diverged. Suppressed when Redis is unconfigured.
+
+### Fixed
+- **Fail-closed rate limiting on session/refresh routes**: `/api/auth/session` and `/api/refresh` now fail closed on a Redis outage instead of fail-open, tightening two auth-critical routes while public badge reads keep the documented fail-open behavior.
+- **Supplemental stats validation hardening**: added non-negative/magnitude caps to `medianPrLeadTimeHours` and `primaryReviewsSubmittedCount`, and corrected the `optionalRatios` allowlist from stale field names to the real fields that feed scoring (`batchSizeScore`, `prDescriptionRate`, `featureBranchRate`, `issueLinkageRate`).
+- **Health check now probes `metrics_snapshots` instead of `users`**: mirrors the actual hot-path read shape so an RLS misconfiguration scoped to `metrics_snapshots` is caught.
+- **Landing page (`/`) made statically renderable**: split into a `force-static` wrapper + client-side translated body, restoring ISR-cacheability without breaking locale switching.
+- **Bounded refetch churn on total GitHub fetch failure**: a sustained GitHub outage with stale data present now re-caches the stale data into the primary key instead of forcing a refetch on every request.
+
+### Changed
+- **Shared `buildStatsFrom*` PR-metrics pipeline**: the previously copy-pasted PR-metrics aggregation across Bitbucket/GitLab/Codeberg was folded into `computePlatformStats`, with a new cross-platform parity test.
+- **Typed i18n accessors**: `tArray`/`tObject` helpers replace 26 scattered `as unknown as` casts across landing, scoring, verification, and nav components.
+- **CI pipeline sharding (#1007)**: build no longer waits on the full test suite; unit/coverage and E2E suites each run as two shards with an aggregator gate, cutting the critical path from ~11m toward ~4.5–5m.
+
+### Docs
+- New ADR documenting the decision to gate `/studio`, `/admin`, and `/cli/authorize` inline per-page rather than via a global `middleware.ts`.
+- Two new formally-documented accepted risks (axe-core's MPL-2.0 license, GitHub Advanced Security unavailable on this repo's tier).
+
 ## [2.17.0] - 2026-07-08
 
 ### Added

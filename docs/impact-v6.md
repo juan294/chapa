@@ -153,6 +153,17 @@ with many merged PRs — which would collapse Delivery (70% PR-weighted) and fli
 to collaborative. `isDegradedPrFetch` (`apps/web/lib/github/stats-integrity.ts`) detects this
 and serves last-known-good instead of caching the zero (see CLAUDE.md → Caching rules).
 
+**Scoring-data integrity contract (#1004):** #1002's guard only catches an *already-degraded*
+fetch after the fact. #1004 adds three boundaries so a degraded payload can't reach the scoring
+pipeline, cache, or persisted history at all: an authoritative `search(is:merged)` count plus
+`assessRawFetchIntegrity` rejects a structurally-valid-but-degraded payload at the fetch
+boundary (no prior baseline needed); scope-aware, non-downgrading cache writes mean a
+public/cron `GITHUB_TOKEN` fetch can never clobber a user's authenticated cache entry, and
+`stats:stale` only ever holds complete data; and snapshot history plus the HMAC verification
+record are gated on stats completeness. `stats_fetch_rejected` and
+`snapshot_skipped_incomplete_stats` telemetry surface degradation in production; the
+`heal-poisoned-stats` maintenance script repairs already-poisoned cache keys and snapshot rows.
+
 Confidence is surfaced only to the profile owner in the share page's "How is my score calculated" panel. Visitors see formulas and platform caveats, but not confidence percentage or penalty flags, and public JSON-LD excludes confidence.
 
 ## Score Recalculation
