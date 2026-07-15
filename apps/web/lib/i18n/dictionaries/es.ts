@@ -253,6 +253,10 @@ export const es: Translations = {
       title: 'Algo salió mal',
       description: 'No pudimos cargar este perfil. Por favor, inténtalo de nuevo.',
     },
+    admin: {
+      title: 'Error en el panel de administración',
+      description: 'Algo salió mal al cargar el panel de administración. Por favor, inténtalo de nuevo.',
+    },
     tryAgain: 'Intentar de nuevo',
     goHome: 'Volver al inicio',
   },
