@@ -22,6 +22,7 @@ const CRON_HEARTBEATS = [
   "warm-cache",
   "sync-audience",
   "process-campaigns",
+  "latency-check",
 ] as const;
 
 interface CronHeartbeatStatus {
