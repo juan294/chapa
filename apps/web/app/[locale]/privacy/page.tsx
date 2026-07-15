@@ -1,6 +1,7 @@
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
 import { getServerT } from "@/lib/i18n/server";
+import { tArray } from "@/lib/i18n/typed-accessors";
 import type { Locale } from "@/lib/i18n/types";
 import type { Metadata } from "next";
 
@@ -34,7 +35,7 @@ export default async function PrivacyPage({
 }) {
   const { locale } = await params;
   const t = getServerT(locale);
-  const sections = t('legal.privacy.sections') as Array<{ heading: string; body: string }>;
+  const sections = tArray<{ heading: string; body: string }>(t, 'legal.privacy.sections');
 
   return (
     <div className="min-h-screen bg-bg">

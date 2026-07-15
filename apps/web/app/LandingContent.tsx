@@ -76,7 +76,7 @@ export function LandingContent({
   const heroLeadMiddle = hero.leadMiddle as string;
   const heroLeadImpact = hero.leadImpact as string;
   const heroLeadAfter = hero.leadAfter as string;
-  const heroBullets = hero.bullets as string[];
+  const heroBullets = tArray<string>(t, 'landing.hero.bullets');
   const heroPrimaryCta = hero.primaryCta as string;
   const heroPrimaryCtaPending = hero.primaryCtaPending as string;
   const heroVerifyCta = hero.verifyCta as string;

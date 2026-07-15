@@ -1,5 +1,6 @@
 import { NavbarClient } from "@/components/NavbarClient";
 import { GlobalCommandBarLazy } from "@/components/GlobalCommandBarLazy";
+import { tArray } from "@/lib/i18n/typed-accessors";
 import Link from "next/link";
 
 export type ArchetypeKey = 'builder' | 'guardian' | 'marathoner' | 'polymath' | 'artificer' | 'balanced' | 'emerging';
@@ -30,11 +31,16 @@ interface Props {
 export function ArchetypePageClient({ archetypeKey, badgeSvg, t }: Props) {
   const ns = `archetypes.${archetypeKey}`;
 
-  const essay = t(`${ns}.essay`) as string[];
-  const keySignals = t(`${ns}.keySignals`) as Array<{ tier: string; description: string }>;
+  const essay = tArray<string>(t, `${ns}.essay`);
+  const keySignals = tArray<{ tier: string; description: string }>(t, `${ns}.keySignals`);
   const accentClass = ACCENT_CLASS[archetypeKey];
 
-  // Guardian has additional solo key signals
+  // Guardian has additional solo key signals. This key is legitimately absent
+  // for the other six archetypes (resolveTranslation falls back to returning
+  // the key itself), so this intentionally stays a manual Array.isArray guard
+  // rather than tArray: tArray's console.warn on a shape mismatch would fire
+  // on every non-guardian archetype page load, which isn't a malformed-data
+  // warning worth surfacing — it's expected, optional-field behavior.
   const keySignalsSoloRaw = t(`${ns}.keySignalsSolo`);
   const keySignalsSolo = Array.isArray(keySignalsSoloRaw)
     ? (keySignalsSoloRaw as Array<{ tier: string; description: string }>)

@@ -171,7 +171,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               {t('about.scoring.capsBody') as string}
             </p>
             <Table
-              headers={t('about.scoring.capsTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.capsTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.capsTableRows')}
             />
 
@@ -186,7 +186,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* Delivery */}
             <SubHeading>{t('about.scoring.deliveryHeading') as string}</SubHeading>
             <Table
-              headers={t('about.scoring.deliveryTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.deliveryTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.deliveryTableRows')}
             />
             <p>
@@ -209,12 +209,12 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             </p>
             <SubHeading>{t('about.scoring.collaborativeQualityHeading') as string}</SubHeading>
             <Table
-              headers={t('about.scoring.collaborativeQualityTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.collaborativeQualityTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.collaborativeQualityTableRows')}
             />
             <SubHeading>{t('about.scoring.soloQualityHeading') as string}</SubHeading>
             <Table
-              headers={t('about.scoring.soloQualityTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.soloQualityTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.soloQualityTableRows')}
             />
             <p>
@@ -226,7 +226,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               {t('about.scoring.consistencyHeading') as string}
             </SubHeading>
             <Table
-              headers={t('about.scoring.consistencyTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.consistencyTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.consistencyTableRows')}
             />
             <p>
@@ -240,7 +240,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
             {/* Breadth */}
             <SubHeading>{t('about.scoring.breadthHeading') as string}</SubHeading>
             <Table
-              headers={t('about.scoring.breadthTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.breadthTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.breadthTableRows')}
             />
             <p>
@@ -263,7 +263,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               {t('about.scoring.craftWhatIntro') as string}
             </p>
             <Table
-              headers={t('about.scoring.craftTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.craftTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.craftTableRows')}
             />
             <p>
@@ -278,7 +278,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               {t('about.scoring.archetypesIntro') as string}
             </p>
             <Table
-              headers={t('about.scoring.archetypesTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.archetypesTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.archetypesTableRows')}
             />
             <p>
@@ -305,7 +305,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               {t('about.scoring.compositeConfidenceNote') as string}
             </p>
             <Table
-              headers={t('about.scoring.tiersTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.tiersTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.tiersTableRows')}
             />
 
@@ -322,7 +322,7 @@ export function ScoringMethodologyContent({ t }: { t: TFunction }) {
               {t('about.scoring.confidenceIntro2') as string}
             </p>
             <Table
-              headers={t('about.scoring.confidenceTableHeaders') as string[]}
+              headers={tArray<string>(t, 'about.scoring.confidenceTableHeaders')}
               rows={tArray<string[]>(t, 'about.scoring.confidenceTableRows')}
             />
             <p>

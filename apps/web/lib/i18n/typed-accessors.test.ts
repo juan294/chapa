@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { tArray, tObject } from './typed-accessors';
 import { resolveTranslation } from './resolve';
@@ -68,5 +69,32 @@ describe('tObject', () => {
     const result = tObject<Record<string, string>>(t, 'landing.hero.title');
     expect(result).toEqual({});
     expect(warn).toHaveBeenCalledOnce();
+  });
+});
+
+// #1026 (FE-M3) — regression guard: forbid unchecked `as string[]` / `as
+// Array<...>` casts directly on a `t(...)` call result, which is exactly the
+// pattern this file's tArray()/tObject() helpers exist to replace (an
+// unchecked cast crashes .map() on a malformed/missing translation key,
+// whereas tArray degrades gracefully). See apps/web/eslint.config.mjs for the
+// enforcing no-restricted-syntax rule.
+describe('eslint guard against unchecked t() casts (#1026)', () => {
+  const source = readFileSync(new URL('../../eslint.config.mjs', import.meta.url), 'utf8');
+
+  it('flags `t(...) as T[]` casts via a no-restricted-syntax selector', () => {
+    expect(source).toContain(
+      "TSAsExpression[expression.type='CallExpression'][expression.callee.name='t'][typeAnnotation.type='TSArrayType']"
+    );
+  });
+
+  it('flags `t(...) as Array<T>` casts via a no-restricted-syntax selector', () => {
+    expect(source).toContain(
+      "TSAsExpression[expression.type='CallExpression'][expression.callee.name='t'][typeAnnotation.type='TSTypeReference'][typeAnnotation.typeName.name='Array']"
+    );
+  });
+
+  it('excludes typed-accessors.ts and resolve.ts (the resolver internals, not caller casts)', () => {
+    expect(source).toContain('lib/i18n/typed-accessors.ts');
+    expect(source).toContain('lib/i18n/resolve.ts');
   });
 });
