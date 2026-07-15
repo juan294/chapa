@@ -10,6 +10,11 @@ const SOURCE = fs.readFileSync(
   "utf-8"
 );
 
+const DIMENSION_COLORS_SOURCE = fs.readFileSync(
+  resolve(__dirname, "../../lib/utils/dimension-colors.ts"),
+  "utf-8"
+);
+
 afterEach(cleanup);
 
 // ---------------------------------------------------------------------------
@@ -187,14 +192,21 @@ describe("ActivityHeatmap", () => {
   // 10. Uses CSS variables instead of hardcoded hex colors
   // ----------------------------------------------------------------
   it("uses CSS variables for dimension colors, not hardcoded hex", () => {
-    expect(SOURCE).toContain("var(--color-dimension-delivery)");
-    expect(SOURCE).toContain("var(--color-dimension-quality)");
-    expect(SOURCE).toContain("var(--color-dimension-consistency)");
-    expect(SOURCE).toContain("var(--color-dimension-breadth)");
+    // DIMENSION_COLORS is now centralized in the shared dimension-colors
+    // module (single source of truth, see issue #1040 / UX-L3) rather than
+    // redefined locally in this file — ActivityHeatmap only imports it.
+    expect(SOURCE).toContain(
+      'import { DIMENSION_COLORS } from "@/lib/utils/dimension-colors"'
+    );
+    expect(SOURCE).not.toMatch(/const DIMENSION_COLORS/);
 
-    const dimColorsBlock = SOURCE.match(
-      /DIMENSION_COLORS[\s\S]*?};/
-    )?.[0] ?? "";
+    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-delivery)");
+    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-quality)");
+    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-consistency)");
+    expect(DIMENSION_COLORS_SOURCE).toContain("var(--color-dimension-breadth)");
+
+    const dimColorsBlock =
+      DIMENSION_COLORS_SOURCE.match(/DIMENSION_COLORS[\s\S]*?};/)?.[0] ?? "";
     expect(dimColorsBlock).not.toContain('"#22c55e"');
     expect(dimColorsBlock).not.toContain('"#f97316"');
     expect(dimColorsBlock).not.toContain('"#06b6d4"');

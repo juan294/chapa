@@ -142,11 +142,9 @@ export function generateMockHeatmap(): number[][] {
 
 /**
  * Heatmap cell color based on intensity level (0-4).
+ *
+ * Re-exported from the shared `dimension-colors` module (single source of
+ * truth, see issue #1040 / UX-L3) for backward compatibility with existing
+ * consumers that import it from here.
  */
-export const INTENSITY_COLORS: Record<number, string> = {
-  0: "rgba(139,92,246,0.15)",
-  1: "rgba(139,92,246,0.35)",
-  2: "rgba(139,92,246,0.52)",
-  3: "rgba(139,92,246,0.72)",
-  4: "rgba(139,92,246,0.95)",
-};
+export { INTENSITY_COLORS } from "@/lib/utils/dimension-colors";
