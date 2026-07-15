@@ -103,4 +103,85 @@ describe("process-campaigns cron", () => {
       172800,
     );
   });
+
+  function makeCampaign(id: string, name: string) {
+    return {
+      id,
+      type: "announcement" as const,
+      name,
+      status: "sending" as const,
+      subject: "Test",
+      previewText: null,
+      headline: "Test",
+      bodyText: "Test",
+      features: [],
+      ctaText: "Click",
+      ctaUrl: "https://example.com",
+      totalRecipients: 10,
+      sentCount: 5,
+      failedCount: 0,
+      createdAt: "2026-03-15T00:00:00Z",
+      startedAt: "2026-03-15T00:00:00Z",
+      completedAt: null,
+    };
+  }
+
+  it("round-robins across ALL active campaigns in a single run, not just the first", async () => {
+    vi.mocked(dbGetCampaigns).mockResolvedValue([
+      makeCampaign("c-1", "Campaign One"),
+      makeCampaign("c-2", "Campaign Two"),
+    ]);
+    vi.mocked(processCampaignBatch).mockImplementation(async (campaignId: string) => {
+      if (campaignId === "c-1") return { sent: 5, failed: 0, remaining: 3 };
+      return { sent: 4, failed: 0, remaining: 0 };
+    });
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.status).toBe("ok");
+    expect(processCampaignBatch).toHaveBeenCalledTimes(2);
+    expect(processCampaignBatch).toHaveBeenNthCalledWith(1, "c-1");
+    expect(processCampaignBatch).toHaveBeenNthCalledWith(2, "c-2");
+    expect(body.processed).toBe(2);
+    expect(body.campaigns).toEqual([
+      { campaignId: "c-1", campaignName: "Campaign One", sent: 5, failed: 0, remaining: 3 },
+      { campaignId: "c-2", campaignName: "Campaign Two", sent: 4, failed: 0, remaining: 0 },
+    ]);
+    expect(cacheSet).toHaveBeenCalledWith(
+      "cron:lastrun:process-campaigns",
+      expect.any(Number),
+      172800,
+    );
+  });
+
+  it("stops iterating and defers remaining campaigns once the shared daily quota is exhausted", async () => {
+    vi.mocked(dbGetCampaigns).mockResolvedValue([
+      makeCampaign("c-1", "Campaign One"),
+      makeCampaign("c-2", "Campaign Two"),
+    ]);
+    // remaining: -1 is processCampaignBatch's signal that the shared Redis
+    // daily-send quota is exhausted (see lib/email/campaigns.ts).
+    vi.mocked(processCampaignBatch).mockImplementation(async (campaignId: string) => {
+      if (campaignId === "c-1") return { sent: 95, failed: 0, remaining: -1 };
+      throw new Error("campaign c-2 must not be processed once quota is exhausted");
+    });
+
+    const res = await GET(makeRequest("test-secret"));
+    const body = await res.json();
+
+    expect(body.status).toBe("ok");
+    // Only the first campaign was ever attempted — the second is deferred,
+    // never calling processCampaignBatch (and therefore never able to send
+    // past the daily cap).
+    expect(processCampaignBatch).toHaveBeenCalledTimes(1);
+    expect(processCampaignBatch).toHaveBeenCalledWith("c-1");
+    expect(body.processed).toBe(1);
+    expect(body.campaigns).toEqual([
+      { campaignId: "c-1", campaignName: "Campaign One", sent: 95, failed: 0, remaining: -1 },
+    ]);
+    expect(body.deferred).toEqual([
+      { campaignId: "c-2", campaignName: "Campaign Two", reason: "quota_exhausted" },
+    ]);
+  });
 });
