@@ -105,3 +105,16 @@ described in the CSP ADR), scope it deliberately:
 Re-evaluate if the number of gated routes grows large enough that per-page gates
 become a maintenance burden, or during any Next.js major upgrade that changes
 middleware/caching semantics.
+
+## 2026-07-15 addendum
+
+The "genuine cross-cutting concern" this ADR anticipated arrived: #1023
+(FE-H1), the locale-segmented content-page rewrite that eliminates the i18n
+locale flash on the 9 public content pages. A narrowly-scoped root proxy
+file (`apps/web/proxy.ts` — Next.js 16 renamed the `middleware.ts`
+convention to `proxy.ts` after this ADR was written) now exists for that one
+purpose, following exactly the three-step checklist above. It does **not**
+absorb the `/studio`, `/admin`, or `/cli/authorize` gates described in this
+ADR, which remain inline and unchanged. See
+`docs/decisions/2026-07-15-i18n-middleware-carve-out.md` for the full
+addendum, the exact matcher, and verification performed.

@@ -49,6 +49,10 @@ vi.mock("@/lib/i18n/server", async () => {
     return current;
   }
   return {
+    // Still needed by non-migrated pages exercised in this file
+    // (coming-soon/*) that read locale via getServerLocale() — only the 9
+    // #1023-migrated pages (privacy, terms, about*, archetypes/*) now take
+    // locale from the route's [locale] segment param instead.
     getServerLocale: vi.fn().mockResolvedValue("en"),
     getServerT: vi.fn().mockImplementation(() => (key: string) =>
       deepGet(en as unknown as Record<string, unknown>, key)
@@ -67,8 +71,8 @@ afterEach(cleanup);
 // ---------------------------------------------------------------------------
 describe("PrivacyPage render", () => {
   it("renders with navbar", async () => {
-    const { default: PrivacyPage } = await import("./privacy/page");
-    render(await PrivacyPage());
+    const { default: PrivacyPage } = await import("./[locale]/privacy/page");
+    render(await PrivacyPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -78,8 +82,8 @@ describe("PrivacyPage render", () => {
 // ---------------------------------------------------------------------------
 describe("TermsPage render", () => {
   it("renders with navbar", async () => {
-    const { default: TermsPage } = await import("./terms/page");
-    render(await TermsPage());
+    const { default: TermsPage } = await import("./[locale]/terms/page");
+    render(await TermsPage({ params: Promise.resolve({ locale: "en" }) }));
     expect(screen.getByTestId("navbar")).toBeDefined();
   });
 });
@@ -114,13 +118,13 @@ describe("VerifyInputPage render", () => {
 describe("Loading page renders", () => {
   it("renders PrivacyLoading", async () => {
     // Async server component (#884): await the call before rendering.
-    const { default: PrivacyLoading } = await import("./privacy/loading");
+    const { default: PrivacyLoading } = await import("./[locale]/privacy/loading");
     render(await PrivacyLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
 
   it("renders TermsLoading", async () => {
-    const { default: TermsLoading } = await import("./terms/loading");
+    const { default: TermsLoading } = await import("./[locale]/terms/loading");
     render(await TermsLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
@@ -144,7 +148,7 @@ describe("Loading page renders", () => {
   });
 
   it("renders ArchetypesLoading", async () => {
-    const { default: ArchetypesLoading } = await import("./archetypes/loading");
+    const { default: ArchetypesLoading } = await import("./[locale]/archetypes/loading");
     render(await ArchetypesLoading());
     expect(screen.getByRole("status")).toBeDefined();
   });
@@ -176,13 +180,13 @@ describe("Error page renders", () => {
   const noop = vi.fn();
 
   it("renders PrivacyError", async () => {
-    const { default: PrivacyError } = await import("./privacy/error");
+    const { default: PrivacyError } = await import("./[locale]/privacy/error");
     render(<PrivacyError error={makeError()} reset={noop} />);
     expect(screen.getByText("Something went wrong")).toBeDefined();
   });
 
   it("renders TermsError", async () => {
-    const { default: TermsError } = await import("./terms/error");
+    const { default: TermsError } = await import("./[locale]/terms/error");
     render(<TermsError error={makeError()} reset={noop} />);
     expect(screen.getByText("Something went wrong")).toBeDefined();
   });
@@ -200,7 +204,7 @@ describe("Error page renders", () => {
   });
 
   it("renders ArchetypesError", async () => {
-    const { default: ArchetypesError } = await import("./archetypes/error");
+    const { default: ArchetypesError } = await import("./[locale]/archetypes/error");
     render(<ArchetypesError error={makeError()} reset={noop} />);
     expect(screen.getByText("Something went wrong")).toBeDefined();
   });

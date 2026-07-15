@@ -101,6 +101,12 @@ export function NavbarShell({ navLinks, session, isAdmin, loading = false, t }: 
                 isAdmin={isAdmin}
               />
             ) : (
+              // Intentional native <a> for a server-redirect API route
+              // (GitHub OAuth), not a client-side page navigation. The
+              // #1023 top-level app/[locale] dynamic segment makes this
+              // lint rule's page-path heuristic false-positive on any
+              // /api/* href.
+              // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/auth/login"
                 className="font-heading text-sm text-terminal-dim transition-colors hover:text-amber"

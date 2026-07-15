@@ -537,6 +537,12 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   </button>
                 </div>
               ) : (
+                // Intentional native <a> for a server-redirect API route
+                // (Bitbucket OAuth connect), not a client-side page
+                // navigation. The #1023 top-level app/[locale] dynamic
+                // segment makes this lint rule's page-path heuristic
+                // false-positive on any /api/* href.
+                // eslint-disable-next-line @next/next/no-html-link-for-pages
                 <a
                   href="/api/auth/bitbucket/connect"
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
@@ -568,6 +574,12 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   </button>
                 </div>
               ) : (
+                // Intentional native <a> for a server-redirect API route
+                // (Codeberg OAuth connect), not a client-side page
+                // navigation. The #1023 top-level app/[locale] dynamic
+                // segment makes this lint rule's page-path heuristic
+                // false-positive on any /api/* href.
+                // eslint-disable-next-line @next/next/no-html-link-for-pages
                 <a
                   href="/api/auth/codeberg/connect"
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
@@ -599,6 +611,12 @@ export function UserMenu({ login, name, avatarUrl, isAdmin }: UserMenuProps) {
                   </button>
                 </div>
               ) : (
+                // Intentional native <a> for a server-redirect API route
+                // (GitLab OAuth connect), not a client-side page navigation.
+                // The #1023 top-level app/[locale] dynamic segment makes
+                // this lint rule's page-path heuristic false-positive on
+                // any /api/* href.
+                // eslint-disable-next-line @next/next/no-html-link-for-pages
                 <a
                   href="/api/auth/gitlab/connect"
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-text-secondary transition-colors hover:bg-amber/[0.06] hover:text-text-primary"
