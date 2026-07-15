@@ -51,6 +51,19 @@ export const BATCH_SIZE_MAX = 500;
 /** Commits in a 10-minute window that trigger the burst-activity confidence penalty. */
 export const BURST_ACTIVITY_THRESHOLD = 100;
 
+/**
+ * Daily commit count (from the contribution heatmap) treated as a "burst
+ * spike" when approximating `maxCommitsIn10Min`. Shared by GitHub's
+ * `buildStatsFromRaw` (packages/shared/src/stats-aggregation.ts) and the
+ * cross-platform `computePlatformStats` skeleton (platform-stats.ts) so the
+ * two aggregation paths can never silently diverge on this literal (#1024).
+ *
+ * Deliberately distinct from `BURST_ACTIVITY_THRESHOLD` (100), which is a
+ * separate, higher threshold applied downstream to the resulting
+ * `maxCommitsIn10Min` value to trigger a confidence penalty.
+ */
+export const DAILY_COMMIT_SPIKE_THRESHOLD = 30;
+
 /** Micro-commit ratio threshold that triggers the confidence penalty. */
 export const MICRO_COMMIT_THRESHOLD = 0.6;
 

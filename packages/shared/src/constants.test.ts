@@ -7,6 +7,7 @@ import {
   DIMENSION_KEYS,
   SOLO_DIMENSION_KEYS,
   BURST_ACTIVITY_THRESHOLD,
+  DAILY_COMMIT_SPIKE_THRESHOLD,
   MICRO_COMMIT_THRESHOLD,
   SINGLE_REPO_CONCENTRATION,
   LEAD_TIME_CAPS,
@@ -141,6 +142,24 @@ describe("shared/constants", () => {
   describe("scoring thresholds", () => {
     it("keeps BURST_ACTIVITY_THRESHOLD at 100", () => {
       expect(BURST_ACTIVITY_THRESHOLD).toBe(100);
+    });
+
+    it("keeps DAILY_COMMIT_SPIKE_THRESHOLD at 30 (#1024)", () => {
+      // The heatmap-derived maxCommitsIn10Min approximation (GitHub's
+      // buildStatsFromRaw and the shared computePlatformStats skeleton)
+      // treats a daily commit count >= this value as a burst spike. This is
+      // deliberately a distinct, lower threshold from BURST_ACTIVITY_THRESHOLD
+      // (100), which gates the confidence penalty applied to that derived value.
+      expect(DAILY_COMMIT_SPIKE_THRESHOLD).toBe(30);
+    });
+
+    it("DAILY_COMMIT_SPIKE_THRESHOLD is a positive integer", () => {
+      expect(DAILY_COMMIT_SPIKE_THRESHOLD).toBeGreaterThan(0);
+      expect(Number.isInteger(DAILY_COMMIT_SPIKE_THRESHOLD)).toBe(true);
+    });
+
+    it("DAILY_COMMIT_SPIKE_THRESHOLD is less than BURST_ACTIVITY_THRESHOLD (distinct, lower-severity signal)", () => {
+      expect(DAILY_COMMIT_SPIKE_THRESHOLD).toBeLessThan(BURST_ACTIVITY_THRESHOLD);
     });
 
     it("keeps MICRO_COMMIT_THRESHOLD at 0.6", () => {

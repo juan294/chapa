@@ -1,6 +1,13 @@
 import type { RawContributionData, StatsData, HeatmapDay } from "./types";
 import { computePrWeight } from "./scoring";
-import { MICRO_PR_LINE_THRESHOLD, PR_WEIGHT_AGG_CAP, REPO_DEPTH_THRESHOLD, BATCH_SIZE_MIN, BATCH_SIZE_MAX } from "./constants";
+import {
+  MICRO_PR_LINE_THRESHOLD,
+  PR_WEIGHT_AGG_CAP,
+  REPO_DEPTH_THRESHOLD,
+  BATCH_SIZE_MIN,
+  BATCH_SIZE_MAX,
+  DAILY_COMMIT_SPIKE_THRESHOLD,
+} from "./constants";
 
 /** Branch names that indicate a direct push (not a feature branch). */
 const DEFAULT_BRANCH_NAMES = new Set(["main", "master", "develop", "development", "dev", "developer", "trunk"]);
@@ -143,8 +150,11 @@ export function buildStatsFromRaw(raw: RawContributionData): StatsData {
       : 0;
 
   // 9. maxCommitsIn10Min approximation from daily spikes
+  // Shared with computePlatformStats() via DAILY_COMMIT_SPIKE_THRESHOLD (#1024)
+  // so this heuristic can never silently diverge between GitHub and the
+  // other platform aggregators.
   const maxDailyCount = Math.max(...heatmapData.map((d) => d.count), 0);
-  const maxCommitsIn10Min = maxDailyCount >= 30 ? maxDailyCount : 0;
+  const maxCommitsIn10Min = maxDailyCount >= DAILY_COMMIT_SPIKE_THRESHOLD ? maxDailyCount : 0;
 
   // 10. Total stars, forks, and watchers across owned repos
   const totalStars = raw.ownedRepoStars.nodes.reduce(
