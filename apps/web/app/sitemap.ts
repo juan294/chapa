@@ -9,6 +9,7 @@ const ARCHETYPES = [
   "guardian",
   "marathoner",
   "polymath",
+  "artificer",
   "balanced",
   "emerging",
 ] as const;
