@@ -303,7 +303,7 @@ export function BadgeOverlay() {
               key={`panel-${activeBase.id}`}
               role="tooltip"
               id={`${activeBase.id}-panel`}
-              className="absolute z-20 max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out opacity-100 translate-y-0"
+              className="absolute z-[99999] max-w-[220px] rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg shadow-black/20 p-3 text-xs text-text-secondary font-body leading-relaxed pointer-events-none transition-all duration-300 ease-out opacity-100 translate-y-0"
               style={{
                 top: activeBase.leaderLine.panelTop,
                 left: activeBase.leaderLine.panelLeft,

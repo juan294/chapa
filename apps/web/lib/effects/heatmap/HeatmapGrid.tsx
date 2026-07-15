@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { getDelayFn, INTENSITY_COLORS, WEEKS, DAYS } from "./animations";
+import { useState, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { getDelayFn, WEEKS, DAYS } from "./animations";
 import type { AnimationVariant } from "./animations";
 import type { HeatmapDay } from "@chapa/shared";
 import { formatIsoDate } from "@/lib/utils/date";
+import { INTENSITY_COLORS } from "@/lib/utils/dimension-colors";
 
 export interface HeatmapGridProps {
   data: HeatmapDay[];
@@ -121,6 +123,59 @@ export function computeDayLabels(sliced: HeatmapDay[]): string[] {
 /** Width of the day-of-week label column in pixels. */
 const DAY_LABEL_W = 32;
 
+/** Portal-rendered tooltip payload, tracked in viewport (screen) coordinates. */
+interface HeatmapTooltipData {
+  date: string;
+  count: number;
+  level: number;
+  /** Horizontal center of the hovered cell, in viewport coordinates. */
+  screenX: number;
+  /** Top edge of the hovered cell, in viewport coordinates. */
+  screenY: number;
+  /** Bottom edge of the hovered cell, in viewport coordinates (used for flip-below). */
+  cellBottom: number;
+}
+
+/**
+ * Cell tooltip, portal-rendered directly to `document.body`.
+ *
+ * Portaling (rather than `position: absolute` nested in the heatmap's own DOM
+ * tree) is required because this component renders inside contexts — e.g. the
+ * Studio/badge preview's tilt-3D card — that apply a CSS `transform` to an
+ * ancestor. `position: fixed` inside a transformed ancestor resolves relative
+ * to that ancestor instead of the viewport, so escaping via a portal is the
+ * only reliable fix. See docs/agents pre-launch UX-M1 / issue #1021.
+ */
+function HeatmapTooltip({ tip }: { tip: HeatmapTooltipData }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      role="tooltip"
+      className="pointer-events-none fixed rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg px-3 py-2 text-xs font-body transition-opacity duration-150"
+      style={{
+        zIndex: 99999,
+        left: tip.screenX,
+        ...(tip.screenY < 120
+          ? { top: tip.cellBottom + 8, transform: "translateX(-50%)" }
+          : { top: tip.screenY - 8, transform: "translate(-50%, -100%)" }),
+      }}
+    >
+      <p className="font-medium text-text-primary whitespace-nowrap">
+        {formatIsoDate(tip.date)}
+      </p>
+      <p className="text-text-secondary whitespace-nowrap">
+        {tip.count === 0
+          ? "No contributions"
+          : `${tip.count} contribution${tip.count !== 1 ? "s" : ""}`}
+      </p>
+      <p className="text-amber font-medium whitespace-nowrap">
+        {getIntensityLabel(tip.level)}
+      </p>
+    </div>,
+    document.body,
+  );
+}
+
 /**
  * Animated 13×7 contribution heatmap grid.
  *
@@ -138,37 +193,37 @@ export function HeatmapGrid({ data, animation, maxValue, showLabels = false }: H
   const max = maxValue ?? Math.max(1, ...sliced.map((d) => d.count));
   const delayFn = getDelayFn(animation);
 
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const gridRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<HeatmapTooltipData | null>(null);
 
   const handleMouseEnter = useCallback(
     (idx: number, e: React.MouseEvent<HTMLDivElement>) => {
-      setHoveredIdx(idx);
-      if (gridRef.current) {
-        const gridRect = gridRef.current.getBoundingClientRect();
-        const cellRect = e.currentTarget.getBoundingClientRect();
-        setTooltipPos({
-          x: cellRect.left - gridRect.left + cellRect.width / 2,
-          y: cellRect.top - gridRect.top,
-        });
+      const day = idx < sliced.length ? sliced[idx] : null;
+      if (!day) {
+        setTooltip(null);
+        return;
       }
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltip({
+        date: day.date,
+        count: day.count,
+        level: getIntensityLevel(day.count, max),
+        screenX: rect.left + rect.width / 2,
+        screenY: rect.top,
+        cellBottom: rect.bottom,
+      });
     },
-    [],
+    [sliced, max],
   );
 
   const handleMouseLeave = useCallback(() => {
-    setHoveredIdx(null);
+    setTooltip(null);
   }, []);
-
-  const hoveredDay = hoveredIdx !== null && hoveredIdx < sliced.length ? sliced[hoveredIdx] : null;
-  const hoveredLevel = hoveredDay ? getIntensityLevel(hoveredDay.count, max) : 0;
 
   const monthLabels = showLabels ? computeMonthLabels(sliced) : [];
   const dayLabels = showLabels ? computeDayLabels(sliced) : [];
 
   return (
-    <div ref={gridRef} className="relative">
+    <div className="relative">
       {/* Month labels row */}
       {showLabels && (
         <div
@@ -267,30 +322,8 @@ export function HeatmapGrid({ data, animation, maxValue, showLabels = false }: H
         </div>
       )}
 
-      {/* Tooltip */}
-      {hoveredDay && (
-        <div
-          role="tooltip"
-          className="pointer-events-none absolute z-50 -translate-x-1/2 rounded-lg bg-card/95 backdrop-blur-xl border border-stroke shadow-lg px-3 py-2 text-xs font-body transition-opacity duration-150"
-          style={{
-            left: tooltipPos.x + (showLabels ? DAY_LABEL_W : 0),
-            top: tooltipPos.y - 8 + (showLabels ? 20 : 0),
-            transform: "translate(-50%, -100%)",
-          }}
-        >
-          <p className="font-medium text-text-primary whitespace-nowrap">
-            {formatIsoDate(hoveredDay.date)}
-          </p>
-          <p className="text-text-secondary whitespace-nowrap">
-            {hoveredDay.count === 0
-              ? "No contributions"
-              : `${hoveredDay.count} contribution${hoveredDay.count !== 1 ? "s" : ""}`}
-          </p>
-          <p className="text-amber font-medium whitespace-nowrap">
-            {getIntensityLabel(hoveredLevel)}
-          </p>
-        </div>
-      )}
+      {/* Tooltip — portal-rendered to document.body (see HeatmapTooltip) */}
+      {tooltip && <HeatmapTooltip tip={tooltip} />}
     </div>
   );
 }

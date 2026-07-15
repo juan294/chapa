@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, fireEvent, cleanup } from "@testing-library/react";
 import { createElement } from "react";
 import {
   getIntensityLevel,
@@ -11,6 +11,11 @@ import {
 } from "./HeatmapGrid";
 import { WEEKS, DAYS } from "./animations";
 import type { HeatmapDay } from "@chapa/shared";
+
+// Tooltip is portal-rendered to document.body (see Fix #1021), so containers
+// from prior tests must be torn down or stale tooltip nodes leak into later
+// assertions that query document.body directly.
+afterEach(cleanup);
 
 /* ------------------------------------------------------------------ */
 /* getIntensityLevel (pure function)                                   */
@@ -374,10 +379,6 @@ describe("HeatmapGrid", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* HEATMAP_GRID_CSS                                                    */
-/* ------------------------------------------------------------------ */
-
-/* ------------------------------------------------------------------ */
 /* getIntensityLabel (via tooltip content)                              */
 /* ------------------------------------------------------------------ */
 
@@ -393,7 +394,7 @@ describe("getIntensityLabel (via tooltip)", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("No activity");
   });
 
@@ -410,7 +411,7 @@ describe("getIntensityLabel (via tooltip)", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("Light activity");
   });
 
@@ -425,7 +426,7 @@ describe("getIntensityLabel (via tooltip)", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("Active day");
   });
 
@@ -440,7 +441,7 @@ describe("getIntensityLabel (via tooltip)", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("High output");
   });
 
@@ -455,7 +456,7 @@ describe("getIntensityLabel (via tooltip)", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("Peak performance");
   });
 });
@@ -470,11 +471,11 @@ describe("HeatmapGrid hover interactions", () => {
     const { container } = render(
       createElement(HeatmapGrid, { data, animation: "fade-in" }),
     );
-    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip).not.toBeNull();
   });
 
@@ -486,9 +487,9 @@ describe("HeatmapGrid hover interactions", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    expect(container.querySelector('[role="tooltip"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="tooltip"]')).not.toBeNull();
     fireEvent.mouseLeave(cell);
-    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
   });
 
   it("displays correct contribution count in tooltip", () => {
@@ -502,7 +503,7 @@ describe("HeatmapGrid hover interactions", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("7 contributions");
   });
 
@@ -517,7 +518,7 @@ describe("HeatmapGrid hover interactions", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("1 contribution");
     expect(tooltip?.textContent).not.toContain("1 contributions");
   });
@@ -533,74 +534,118 @@ describe("HeatmapGrid hover interactions", () => {
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toContain("No contributions");
   });
 });
 
 /* ------------------------------------------------------------------ */
-/* Tooltip positioning with showLabels                                 */
+/* Tooltip portal + fixed positioning (Fix #1021 / UX-M1)              */
+/*                                                                      */
+/* The tooltip must portal to document.body with position:fixed and    */
+/* z-index 99999 — NOT position:absolute nested in the heatmap's own   */
+/* DOM tree — because BadgePreviewCard applies a CSS `transform` (tilt  */
+/* 3D) to an ancestor, and position:fixed inside a transformed ancestor */
+/* resolves relative to that ancestor instead of the viewport. Portal   */
+/* escapes the transformed ancestor entirely. It must also flip below   */
+/* the trigger when the trigger sits near the top of the viewport.      */
 /* ------------------------------------------------------------------ */
 
-describe("HeatmapGrid tooltip positioning", () => {
-  it("applies DAY_LABEL_W offset when showLabels is true", () => {
+describe("HeatmapGrid tooltip — portal + fixed positioning", () => {
+  it("portal-renders the tooltip as a direct child of document.body with position fixed and zIndex 99999", () => {
     const data = makeWeekAlignedDays(91, "2025-01-05");
     const { container } = render(
-      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
     );
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]') as HTMLElement;
+
+    // Not nested inside the heatmap's own render tree...
+    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+
+    // ...but present as a direct child of document.body (portaled).
+    const tooltip = document.body.querySelector(
+      '[role="tooltip"]',
+    ) as HTMLElement;
     expect(tooltip).not.toBeNull();
-    // DAY_LABEL_W is 32, so the left position includes that offset
-    const left = parseFloat(tooltip.style.left);
-    // With showLabels=true, left = tooltipPos.x + 32
-    // tooltipPos.x is 0 in jsdom (getBoundingClientRect returns zeros), so left = 32
-    expect(left).toBe(32);
+    expect(tooltip.parentElement).toBe(document.body);
+
+    // `fixed` positioning is applied via Tailwind class, not inline style.
+    expect(tooltip.className).toContain("fixed");
+    expect(tooltip.style.zIndex).toBe("99999");
   });
 
-  it("does not apply DAY_LABEL_W offset when showLabels is false", () => {
+  it("flips the tooltip below the cell when the cell is near the top of the viewport (screenY < 120)", () => {
     const data = makeWeekAlignedDays(91, "2025-01-05");
     const { container } = render(
-      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: false }),
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
     );
     const grid = container.querySelector('[role="img"]');
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
+
+    const rectSpy = vi
+      .spyOn(cell, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 50,
+        bottom: 74,
+        left: 100,
+        right: 124,
+        width: 24,
+        height: 24,
+        x: 100,
+        y: 50,
+        toJSON() {
+          return this;
+        },
+      } as DOMRect);
+
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]') as HTMLElement;
+    const tooltip = document.body.querySelector(
+      '[role="tooltip"]',
+    ) as HTMLElement;
     expect(tooltip).not.toBeNull();
-    // Without showLabels, left = tooltipPos.x + 0 = 0
-    const left = parseFloat(tooltip.style.left);
-    expect(left).toBe(0);
+    // Flip-below rule: anchors under the cell's bottom edge (+8), not above the top.
+    expect(parseFloat(tooltip.style.top)).toBe(74 + 8);
+    expect(tooltip.style.transform).toContain("translateX(-50%)");
+    expect(tooltip.style.transform).not.toContain("-100%");
+
+    rectSpy.mockRestore();
   });
 
-  it("applies different top offset when showLabels is true vs false", () => {
+  it("anchors the tooltip above the cell when the cell is not near the top of the viewport (screenY >= 120)", () => {
     const data = makeWeekAlignedDays(91, "2025-01-05");
-    // With showLabels=true
-    const { container: c1 } = render(
-      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: true }),
+    const { container } = render(
+      createElement(HeatmapGrid, { data, animation: "fade-in" }),
     );
-    const grid1 = c1.querySelector('[role="img"]');
-    const cell1 = grid1?.querySelector("[aria-hidden='true']") as HTMLElement;
-    fireEvent.mouseEnter(cell1);
-    const tooltip1 = c1.querySelector('[role="tooltip"]') as HTMLElement;
-    const top1 = parseFloat(tooltip1.style.top);
+    const grid = container.querySelector('[role="img"]');
+    const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
 
-    // With showLabels=false
-    const { container: c2 } = render(
-      createElement(HeatmapGrid, { data, animation: "fade-in", showLabels: false }),
-    );
-    const grid2 = c2.querySelector('[role="img"]');
-    const cell2 = grid2?.querySelector("[aria-hidden='true']") as HTMLElement;
-    fireEvent.mouseEnter(cell2);
-    const tooltip2 = c2.querySelector('[role="tooltip"]') as HTMLElement;
-    const top2 = parseFloat(tooltip2.style.top);
+    const rectSpy = vi
+      .spyOn(cell, "getBoundingClientRect")
+      .mockReturnValue({
+        top: 300,
+        bottom: 324,
+        left: 100,
+        right: 124,
+        width: 24,
+        height: 24,
+        x: 100,
+        y: 300,
+        toJSON() {
+          return this;
+        },
+      } as DOMRect);
 
-    // showLabels=true adds +20 to top: top = 0 - 8 + 20 = 12
-    // showLabels=false: top = 0 - 8 + 0 = -8
-    expect(top1).toBe(12);
-    expect(top2).toBe(-8);
+    fireEvent.mouseEnter(cell);
+    const tooltip = document.body.querySelector(
+      '[role="tooltip"]',
+    ) as HTMLElement;
+    expect(tooltip).not.toBeNull();
+    expect(parseFloat(tooltip.style.top)).toBe(300 - 8);
+    expect(tooltip.style.transform).toContain("translate(-50%, -100%)");
+
+    rectSpy.mockRestore();
   });
 });
 
@@ -621,16 +666,16 @@ describe("HeatmapGrid hoveredIdx boundary", () => {
     const lastCell = cells?.[90] as HTMLElement;
     fireEvent.mouseEnter(lastCell);
     // hoveredDay should be null because idx >= sliced.length
-    expect(container.querySelector('[role="tooltip"]')).toBeNull();
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
   });
 });
 
 /* ------------------------------------------------------------------ */
-/* gridRef null safety                                                  */
+/* Tooltip render safety with default (zeroed) bounding rects           */
 /* ------------------------------------------------------------------ */
 
-describe("HeatmapGrid gridRef null safety", () => {
-  it("does not crash when gridRef.current is null during hover", () => {
+describe("HeatmapGrid tooltip render safety", () => {
+  it("does not crash and still renders a tooltip when getBoundingClientRect returns zeros (jsdom default)", () => {
     const data = makeDays(91, 5);
     const { container } = render(
       createElement(HeatmapGrid, { data, animation: "fade-in" }),
@@ -639,7 +684,7 @@ describe("HeatmapGrid gridRef null safety", () => {
     const cell = grid?.querySelector("[aria-hidden='true']") as HTMLElement;
     // Even if getBoundingClientRect returns zeros (jsdom default), tooltip should still render
     fireEvent.mouseEnter(cell);
-    const tooltip = container.querySelector('[role="tooltip"]');
+    const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip).not.toBeNull();
   });
 });
