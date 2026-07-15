@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-07-15
+
 ### Added
 - **Locale-segmented content pages (#1023)**: the 9 public content pages (`/`, `/about`, `/about/scoring`, `/about/verification`, `/privacy`, `/terms`, 7 archetype pages) are now real React Server Components under `app/[locale]/...`, translated server-side via `getServerT(locale)` instead of a whole-page `"use client"` wrapper. A new, narrowly-scoped `apps/web/proxy.ts` (Next.js 16 renamed `middleware.ts` → `proxy.ts`) rewrites the canonical unprefixed URL to the internal locale route; both `en`/`es` variants are pre-rendered at build time, eliminating the locale-flash bug with no client-side re-render. See `docs/decisions/2026-07-15-i18n-middleware-carve-out.md` for the scope rationale (an intentional, narrow carve-out from the 2026-07-08 no-middleware ADR).
 - **Badge latency SLO + `Server-Timing` header (#974)**: the badge route now carries a `Server-Timing` header (`cache;desc="hit"` on warm hits, `materialize`/`render` breakdown on cold misses, always a `total`), enforced against an 800ms cache-hit / 3000ms cache-miss p95 budget. A new daily `/api/cron/latency-check` synthetic monitor times the live endpoint and raises a P2 `badge_latency_slo_breach` alert on breach or probe failure; its own heartbeat is now monitored by `/api/health` (#1018).
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Health check now probes `metrics_snapshots` instead of `users`**: mirrors the actual hot-path read shape so an RLS misconfiguration scoped to `metrics_snapshots` is caught.
 - **Landing page (`/`) made statically renderable**: split into a `force-static` wrapper + client-side translated body, restoring ISR-cacheability without breaking locale switching.
 - **Bounded refetch churn on total GitHub fetch failure**: a sustained GitHub outage with stale data present now re-caches the stale data into the primary key instead of forcing a refetch on every request.
+- **`sitemap.ts` omitted the Artificer archetype page (#1041)**: `/archetypes/artificer` existed and was linked in-app but was missing from the `ARCHETYPES` array powering `sitemap.xml`, so it was never discovered via search-engine crawl.
+- **Navbar login link + logo cursor failed WCAG AA contrast in light theme (#1043)**: the login link's `text-terminal-dim` (2.53:1) is now `text-text-secondary` (4.84:1), with padding added so its touch target meets the 24×24px minimum; the logo's blinking cursor glyph moved from `text-amber` (4.23:1) to `text-amber-dark` (5.70:1).
 
 ### Changed
 - **Shared `buildStatsFrom*` PR-metrics pipeline**: the previously copy-pasted PR-metrics aggregation across Bitbucket/GitLab/Codeberg was folded into `computePlatformStats`, with a new cross-platform parity test.

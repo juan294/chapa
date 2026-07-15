@@ -35,13 +35,13 @@ describe("sitemap", () => {
     expect(home?.changeFrequency).toBe("weekly");
   });
 
-  it("includes all 6 archetype pages", async () => {
+  it("includes all 7 archetype pages", async () => {
     vi.mocked(dbGetUsers).mockResolvedValue([]);
 
     const entries = await sitemap();
     const urls = entries.map((e) => e.url);
 
-    const archetypes = ["builder", "guardian", "marathoner", "polymath", "balanced", "emerging"];
+    const archetypes = ["builder", "guardian", "marathoner", "polymath", "artificer", "balanced", "emerging"];
     for (const archetype of archetypes) {
       expect(urls).toContain(`${BASE_URL}/archetypes/${archetype}`);
     }
